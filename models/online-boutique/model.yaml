@@ -1,0 +1,124 @@
+# Online Boutique：docs/sample-online-boutique.md（README の要約）だけから抽出したモデル
+# prompts/extract-model.md の規律に従い手作業で作成（API 未接続のため）。座標は書かず自動配置に任せている。
+# 実環境は samples/online-boutique/kubernetes-manifests.yaml を tools/import-k8s.mjs で取り込んだ actual.yaml
+name: Online Boutique（公開デモ）
+sources: [docs/sample-online-boutique.md]
+description: 公開デモアプリの README だけから起こしたモデルを、Kubernetes マニフェストの実態と突き合わせる題材。
+evidence:
+  - { type: doc, ref: "docs/sample-online-boutique.md#§1" }
+failPresets: [currencyservice, productcatalogservice, cartservice, redis-cart]
+tiers:
+  - { id: internet, label: インターネット, kind: origin, z: 1, origin: [-5, 0] }
+  - { id: app, label: アプリケーション（GKE）, z: 1 }
+  - { id: data, label: データ, z: 0 }
+nodes:
+  user:
+    label: 利用者
+    kind: actor
+    role: user
+    tier: internet
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.1" }]
+  loadgenerator:
+    label: 負荷生成
+    kind: client
+    tier: internet
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.3" }, { type: doc, ref: "docs/sample-online-boutique.md#§3.11" }]
+  frontend:
+    label: frontend
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.1" }, { type: doc, ref: "docs/sample-online-boutique.md#§2.2" }]
+  cartservice:
+    label: cart
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.2" }]
+  productcatalogservice:
+    label: productcatalog
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.3" }]
+  currencyservice:
+    label: currency
+    kind: service
+    tier: app
+    metrics: { rps: 900 }
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.4" }]
+  paymentservice:
+    label: payment
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.5" }]
+  shippingservice:
+    label: shipping
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.6" }]
+  emailservice:
+    label: email
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.7" }]
+  checkoutservice:
+    label: checkout
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.8" }]
+  recommendationservice:
+    label: recommendation
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.9" }]
+  adservice:
+    label: ad
+    kind: service
+    tier: app
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.10" }]
+  redis-cart:
+    label: Redis（カート）
+    kind: cache
+    tier: data
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§4.1" }]
+links:
+  - { id: u2f, from: user, to: frontend, sync: true, label: HTTP, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.1" }] }
+  - { id: lg2f, from: loadgenerator, to: frontend, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.3" }] }
+  - { id: f2pc, from: frontend, to: productcatalogservice, sync: true, label: gRPC, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }] }
+  - { id: f2cur, from: frontend, to: currencyservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }] }
+  - { id: f2ad, from: frontend, to: adservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }] }
+  - { id: f2rec, from: frontend, to: recommendationservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }] }
+  - { id: f2cart, from: frontend, to: cartservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.2" }] }
+  - { id: f2co, from: frontend, to: checkoutservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }] }
+  - { id: rec2cart, from: recommendationservice, to: cartservice, sync: true, label: カートの内容, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.9" }] }
+  - { id: co2cart, from: checkoutservice, to: cartservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }] }
+  - { id: co2pay, from: checkoutservice, to: paymentservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }] }
+  - { id: co2ship, from: checkoutservice, to: shippingservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }] }
+  - { id: co2mail, from: checkoutservice, to: emailservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }] }
+  - { id: cart2r, from: cartservice, to: redis-cart, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§4.1" }] }
+scenarios:
+  - id: browse
+    label: 商品を見る
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }]
+    steps:
+      - { links: [u2f], note: 利用者がトップページを開く }
+      - { links: [f2pc, f2cur], note: 商品一覧を取り、価格を利用者の通貨に換算する }
+      - { links: [f2ad, f2rec], note: 広告とおすすめを添える }
+  - id: checkout
+    label: 注文する
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }]
+    steps:
+      - { links: [u2f, f2co], note: 利用者が注文し、frontend が checkout に依頼する }
+      - { links: [co2cart, cart2r], note: カートを Redis から取り出す }
+      - { links: [co2pay], note: 決済する }
+      - { links: [co2ship, co2mail], note: 発送し、確認メールを送る }
+requirements:
+  - { id: REQ-F-01, kind: usecase, title: 商品を見る, text: 商品一覧を利用者の通貨で表示し、広告とおすすめを添える。, scenario: browse, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }] }
+  - { id: REQ-F-02, kind: usecase, title: カートに入れる, text: 商品をカートに追加し、次の訪問まで保持する。, links: [f2cart, cart2r], evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.2" }] }
+  - { id: REQ-F-03, kind: usecase, title: 注文する, text: カートの商品を決済し、発送と確認メールまで行う。, scenario: checkout, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }] }
+  - { id: BR-01, kind: rule, title: ログイン不要, text: 会員登録なしで買い物できる。セッション ID は自動発行。, nodes: [frontend], evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.1" }] }
+unknowns:
+  - { id: UNK-01, text: 各サービスの台数（冗長構成）が設計書に書かれていない, refs: [] }
+  - { id: UNK-02, text: サービス間呼び出しのタイムアウト・リトライが設計書に書かれていない, refs: [] }
+  - { id: UNK-03, text: Redis の永続化・冗長化の方針が書かれていない（消えるとカートが失われる）, refs: [redis-cart] }
+review:
+  - 呼び出し関係は README の文章（§5 のユースケース）から推測したもの。図にしか書かれていない関係は拾えていない可能性がある
+  - recommendation → cart は「カートの内容をもとに」（§3.9）から推測した。直接呼ぶのか frontend が渡すのかは不明

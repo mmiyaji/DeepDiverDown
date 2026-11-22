@@ -7,7 +7,9 @@
     { id: 'SPOF', sev: 'high', title: '単一障害点',
       run: m => Object.entries(m.nodes)
         .filter(([, n]) => !INFRA.includes(n.kind) && (n.replicas ?? 1) < 2)
-        .map(([id, n]) => ({ nodes: [id], msg: `${n.label} が ${n.replicas ?? 1} 台構成（${(n.evidence || [])[0]?.ref?.split('#')[1] || (n.evidence || [])[0]?.at || '根拠なし'}）` })) },
+        .map(([id, n]) => ({ nodes: [id], msg: n.replicas == null
+          ? `${n.label} の台数が書かれていない（1 台とみなす。冗長化の方針を確認）`
+          : `${n.label} が ${n.replicas} 台構成（${(n.evidence || [])[0]?.ref?.split('#')[1] || (n.evidence || [])[0]?.at || '根拠なし'}）` })) },
 
     { id: 'NO_TIMEOUT', sev: 'high', title: 'タイムアウト未定義',
       run: m => syncLinks(m).filter(l => l.timeoutMs == null)
@@ -247,6 +249,7 @@
       out.links[l.id] = r;
     }
     for (const x of d.items.filter(i => i.kind === 'extra')) out.drifts.push({ label: '実環境のみ', msg: x.msg });
+    for (const x of d.items.filter(i => i.kind === 'missing' && i.links)) out.drifts.push({ label: '設計のみ', msg: x.msg });
     for (const u of a?.unresolved || []) out.drifts.push({ label: u.from, msg: `${u.from} の ${u.env}=${u.value} の接続先が実環境にない（${u.reason}）` });
     for (const q of m.requirements || []) out.reqs[q.id] = fromEv(q, q.title);
     return out;
