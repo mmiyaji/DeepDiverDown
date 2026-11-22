@@ -58,8 +58,10 @@ gates: { maxDrift: 0, maxHigh: 0 } # 点検のしきい値
 - `byId`：ID → 種類・ラベル・確度
 - `byRef`：参照先（`docs/xxx.md#§3.2`、`docs/xxx.md`、IaC リソース、`infra/ecs.tf`）→ ID の配列（逆引き。影響調査に使う）
 
-## 3D ビュー
+## 3D / 2D 表示
 左上の「回転／移動」（R / M キー）で左ドラッグの役割を切り替え。右ドラッグはもう一方の操作、ホイールで拡大縮小。右上のボタンで 斜め / 真上 / 横 / 裏側 に切り替え。
+
+`D` キーまたは左上のボタンで 3D / 2D を切り替える。2D は真上から表示し、積層フロアを高さごとに縦に並べる。同じ高さのゾーンは `origin` に従って配置される。URL の `d=2` で 2D、`d=3` で 3D を指定する。障害シミュレーションの停止部品は `down=` に入る。
 
 ## フロアの配置（tiers）
 ```js
@@ -77,14 +79,27 @@ tiers: [
 - `kind:'origin'`：利用者・運用者がどこからアクセスするかを示すゾーン
 
 ## 複数モデルの登録
-各モデルファイルは `window.MODELS['<id>'] = { model, actual }` に登録し、`index.html` に `<script>` を1行足す。
-画面上部のセレクタ、または `#<id>` で切り替える。
+`models/registry.json` に登録し、サイドバーまたは `#/m/<id>/struct` で切り替える。
 
-## AWS 構成の表現（js/aws.js）
-- `node.svc`：`ecs` `lambda` `aurora` `sqs` など。形状・カテゴリ色・略称が自動で付く
+## クラウド構成の表現（js/catalog.js）
+- `node.svc` は `gcp:gke`、`azure:aks`、`oci:adb`、`cloudflare:waf`、`onprem:fw`、`k8s:deployment` のように指定する。`ecs` のように接頭辞を省略すると AWS として扱う。
+- カタログからサービス名とプロバイダー名、カテゴリ色、略称、形状を得る。形状の指定がない場合は `kind` に従う。
+- `node.provider` はカタログでサービスを特定できない部品のプロバイダーを指定するときに使う。
+- `icons/manifest.json` に `provider:service` の対応があると、設定に従い略称の代わりに画像を表示する。導入手順は README の「公式アイコン」を参照。
 - `node.az`：`['a','c']` のように配置 AZ。1つだけだと SINGLE_AZ 指摘
 - `node.subnet`：`public` / `private`。データストアが public だと PUBLIC_DATA 指摘
-- `groups`：`{ kind:'vpc'|'az'|'subnet', label, tier:'app' | ['app','data'], x0,y0,x1,y1 }` で範囲を描く
+- `groups` の `tier` にはフロア ID または配列を指定する。`x0, y0, x1, y1` でフロア内の範囲を固定できる。座標を省略すると `nodes` に列挙した部品から範囲を求める。`nodes` も省略すると対象フロアの全部品が対象になる。クラウドなどが重なる場合は境界の種類に応じて余白が異なる。
+- `group.provider` には `aws` / `gcp` / `azure` / `oci` / `cloudflare` / `onprem` / `k8s` を指定できる。
+
+| 枠の種類 | 表示 |
+|---|---|
+| `cloud` | プロバイダーやアカウント・プロジェクト。プロバイダー色の実線 |
+| `region` | リージョン。破線 |
+| `cluster` | Kubernetes クラスタ。青の一点鎖線 |
+| `namespace` | Kubernetes 名前空間。点線 |
+| `datacenter` | オンプレミス拠点。灰色の実線 |
+| `vpc` / `vnet` / `vcn` | 仮想ネットワーク。破線 |
+| `az` / `subnet` | 可用性ゾーン / サブネット |
 
 ## CI/CD パイプライン（type: 'pipeline'）
 - フロア = 環境（例：CI → stg → 本番）。`node.stage`：`source` `build` `test` `artifact` `deploy` `approval` `env` `monitor`
@@ -111,6 +126,7 @@ lead: { label:'テックリード', kind:'actor', role:'approver', team:'決済�
 | SHARED_DB | 1つの DB に複数サービスが直接アクセス |
 | RETRY_STORM | retry ありで下流の timeout が上流より長い |
 | SINGLE_AZ | AZ が1つだけ |
+| CROSS_CLOUD_SYNC | 異なるクラウドやオンプレミス間を同期で呼び出す |
 | PUBLIC_DATA | データストアがパブリックサブネット |
 | NO_APPROVAL | 承認を経ずに本番デプロイへ到達できる（pipeline） |
 | NO_TEST | テストを経ずにデプロイへ到達できる（pipeline） |
@@ -125,8 +141,8 @@ lead: { label:'テックリード', kind:'actor', role:'approver', team:'決済�
 | ビュー | 内容 | 条件 |
 |---|---|---|
 | `logical` 論理構成（機能配置） | 基盤部品（CDN・LB・NAT・WAF・Route 53・Secrets Manager など）を隠し、通り抜けた接続を機能どうしの接続にする。配置は自動 | 常に |
-| `cloud` 物理構成（サービス） | クラウドサービス単位。VPC の枠まで（AZ・サブネットは出さない）。既定 | 常に |
-| `network` 物理構成（ネットワーク） | VPC・AZ・サブネットの枠と、複数 AZ の部品を AZ ごとの実体（`ecs@a`）に展開。台数は AZ で割る。AZ をまたぐ接続は黄色 | AZ / サブネットの情報があるとき |
+| `cloud` 物理構成（サービス） | クラウドサービス単位。クラウド・リージョン・クラスタ・仮想ネットワーク・データセンターの枠。既定 | 常に |
+| `network` 物理構成（ネットワーク） | すべての境界の枠と、複数 AZ の部品を AZ ごとの実体（`ecs@a`）に展開。台数は AZ で割る。AZ をまたぐ接続は黄色 | AZ / サブネット / 名前空間の情報があるとき |
 
 ```yaml
 groups:

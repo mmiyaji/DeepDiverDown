@@ -13,12 +13,13 @@
 ## 現状（2026-11 時点）
 | 項目 | 状態 |
 |---|---|
-| 3D ビューア（3 ビュー × 8 モード・検索・比較・共有・書き出し・設定・スマホ対応） | 動作確認済み |
-| 解析（指摘 14 ルール・障害伝播・確度判定・網羅率・点検・索引・比較・ビュー変換） | 単体テスト 24 件 |
+| 3D ビューア（3D / 2D、3 ビュー × 8 モード・検索・比較・共有・書き出し・設定・スマホ対応） | 動作確認済み |
+| 解析（指摘 15 ルール・障害伝播・確度判定・網羅率・点検・索引・比較・ビュー変換） | 単体テスト 27 件 |
+| 対応クラウド | AWS、Google Cloud、Microsoft Azure、Oracle Cloud、Cloudflare、オンプレミス、Kubernetes |
 | 自動配置 | 動作するが、同じ列に部品が多いと縦に長くなる |
 | Terraform / Kubernetes 取り込み | サンプルで確認。実際の本番 state では未検証 |
 | 抽出 CLI（Claude API） | `--dry-run` のみ確認。実 API 呼び出しは未検証 |
-| GitHub Actions（CI） | 定義のみ。初回 push 時に初めて実行 |
+| GitHub Actions（CI） | main の既存 CI は成功。今回の変更はローカルで確認 |
 
 既知の課題：大きなモデル（100 部品超）での表示性能・ラベルの重なり、画面上での部品の編集、日本語フォントは OS 標準に依存。
 
@@ -26,7 +27,7 @@
 ```
 npm ci                                       # 依存を取得。postinstall で vendor/ を生成（git 管理外）
                                              # --ignore-scripts で実行した場合は続けて npm run vendor
-python -m http.server 8124 --bind 0.0.0.0   # → http://localhost:8124/#ec-shop
+python -m http.server 8124 --bind 0.0.0.0   # → http://localhost:8124/#/m/ec-shop/struct
 npm run gates                                # 点検（不合格なら exit 1）
 npm run index                                # models/<id>/index.json（ID 索引・逆引き索引）を生成
 ```
@@ -61,17 +62,17 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 |---|---|
 | ヘッダー | 検索（部品・ID・要件・根拠の参照先）、開く（YAML）、共有（視点込みのリンクをコピー）、画像（PNG）、レポート（Markdown）、ヘルプ、設定 |
 | サイドバー | モデル一覧（点検の合否・網羅率）、表示モード、フロアの表示切替、選択部品の周辺だけ表示 |
-| 3D ビュー | 回転 / 移動の切替、視点（斜め・真上・横・裏側）、クリックで選択 |
+| 構成図 | 3D / 2D、回転 / 移動の切替、視点（斜め・真上・横・裏側）、クリックで選択 |
 | 詳細パネル | モードごとの一覧・詳細。狭い画面では下から出るシート |
 
 ビュー：論理構成（機能配置）/ 物理構成（サービス）/ 物理構成（ネットワーク）。`V` キーで切り替え（詳細は docs/model-schema.md）
 
 表示モード：構造 / シナリオ / 障害シミュレーション / 指摘 / メトリクス / 根拠と確度 / 要件 / 比較
 
-- **URL**：`#/m/<model>/<mode>?s=<部品>&…` で画面の状態を表す。「共有」は視点（`v=`）も含める
+- **URL**：`#/m/<model>/<mode>?s=<部品>&…` で画面の状態を表す。2D は `d=2`。「共有」は視点（`v=`）も含める
 - **YAML の読み込み**：画面へドラッグ＆ドロップ、または「開く」。ブラウザ内（localStorage）に最大 5 件保存し、外部には送信しない。比較モードでドロップすると比較対象として読み込む
 - **比較**：`models/registry.json` の `compare` か、読み込んだ YAML と比べる。CLI は `npm run compare -- old.yaml new.yaml`
-- **設定**：テーマ・ラベルの大きさ・パケットの速さ・初期の視点・ドラッグの既定・点検しきい値・ルールの有効/無効（ブラウザに保存）
+- **設定**：テーマ・ラベルの大きさ・パケットの速さ・初期の表示（3D / 2D）・視点・ドラッグの既定・公式アイコン・点検しきい値・ルールの有効/無効（ブラウザに保存）
 
 | キー | 操作 |
 |---|---|
@@ -82,13 +83,14 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 | `←` `→` | シナリオのステップ |
 | `[` | サイドバーの開閉 |
 | `V` | ビューの切り替え |
+| `D` | 3D / 2D の切り替え |
 | `?` / `Esc` | ヘルプ / 閉じる・選択解除 |
 
 ## 取り込みと抽出（CLI）
 | コマンド | 内容 |
 |---|---|
-| `npm run import:tf -- state.json --out models/<id>/actual.yaml` | `terraform show -json`（または tfstate v4）から実環境スナップショットと IaC 在庫を作る。台数・AZ を取り出す |
-| `npm run import:k8s -- manifests.yaml --out models/<id>/actual.yaml` | Kubernetes マニフェスト（または `kubectl get -o yaml`）から部品・台数・接続（`*_ADDR` などの環境変数）を作る。宛先のない参照は `unresolved` |
+| `npm run import:tf -- state.json --out models/<id>/actual.yaml` | `terraform show -json`（または tfstate v4）から実環境スナップショットと IaC 在庫を作る。AWS、Google Cloud、Azure、OCI、Cloudflare の対応リソースと、state から分かる台数・AZ を取り出す |
+| `npm run import:k8s -- manifests.yaml --out models/<id>/actual.yaml` | Kubernetes マニフェスト（または `kubectl get -o yaml`）からワークロード・LoadBalancer Service・台数・接続（`*_ADDR` などの環境変数）を作る。宛先のない参照は `unresolved` |
 | `npm run extract -- --id <id> --doc docs/x.md [--actual …]` | Claude API（claude-opus-5-5）で 書き手→形式チェック→検証役→点検。`ant auth login` か `ANTHROPIC_API_KEY` が必要。`--dry-run` で API を呼ばずに確認 |
 
 - モデルの部品と取り込んだ部品は、同じ ID か、根拠の `{ type: iac, ref: <アドレス> }` で対応付く
@@ -98,6 +100,17 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 公開デモ [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo)（Apache-2.0）の README を要約した設計書（`docs/sample-online-boutique.md`）だけからモデルを起こし、
 公開マニフェストを参考に再構成した `samples/online-boutique/kubernetes-manifests.yaml` を取り込んで突き合わせた。
 設計書から読み取れなかった接続 4 件、設計書の推測が誤っていた接続 1 件、存在しないサービスへの参照 1 件、全サービスが 1 台構成であることを検出した。
+
+## 公式アイコン
+
+公式アイコンはリポジトリに同梱しません。各社の利用条件に従って、手元の SVG / PNG を `icons/<provider>/` に展開し、`npm run icons` で対応表 `icons/manifest.json` を生成してください。対応表がある場合は設定で「公式アイコンを使う」を切り替えられます。対応する画像がないサービスは略称で表示します。
+
+- `aws` [AWS Architecture Icons](https://aws.amazon.com/architecture/icons/)
+- `gcp` [Google Cloud Product Icons](https://cloud.google.com/icons)
+- `azure` [Azure Architecture Icons](https://learn.microsoft.com/azure/architecture/icons/)
+- `oci` [OCI Architecture Diagram Toolkits](https://docs.oracle.com/iaas/Content/General/Reference/graphicsfordiagrams.htm)
+- `cloudflare` [Cloudflare 公式ブランド資料](https://www.cloudflare.com/press/press-kit/)と[商標ガイドライン](https://www.cloudflare.com/trademark/)
+- `k8s` [Kubernetes Community Icons](https://github.com/kubernetes/community/tree/master/icons)
 
 ## テスト・CI
 `npm test`（`node --test`）で解析処理の単体テスト。`.github/workflows/ci.yml` で push / PR 時に実行（点検はサンプルが意図的に不合格なので報告のみ）。
@@ -116,7 +129,8 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 | `ec-shop` | EC サイト注文基盤（設計書 + 実環境スナップショット） |
 | `aws-web` | AWS Web 構成（VPC / AZ / サブネット、IaC 根拠、IaC 在庫） |
 | `cicd` | CI/CD パイプライン（ワークフロー定義を根拠に） |
-| `online-boutique` | 公開デモ Online Boutique（設計書要約 + Kubernetes 取り込み、自動配置） |
+| `online-boutique` | 公開デモ Online Boutique（GKE クラスタ、設計書要約 + Kubernetes 取り込み、自動配置） |
+| `hybrid` | 架空のハイブリッド受注基盤（Azure・OCI・Google Cloud・Cloudflare・オンプレミス） |
 
 詳細は `docs/model-schema.md`。
 

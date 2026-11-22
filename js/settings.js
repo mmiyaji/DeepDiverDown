@@ -4,6 +4,8 @@ export const DEFAULTS = {
   theme: 'auto',        // auto | light | dark
   labelScale: 1,        // ラベルの大きさ
   packetSpeed: 1,       // パケットの速さ
+  officialIcons: true,  // 対応表がある場合に表示
+  dimension: '3',      // 初期表示（3D / 2D）
   defaultView: 'iso',   // 初期の視点
   dragMode: 'rotate',   // 左ドラッグの既定
   disabledRules: [],    // 無効にした指摘ルール

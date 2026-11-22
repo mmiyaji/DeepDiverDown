@@ -1,6 +1,6 @@
 /* ビュー：同じモデルを 3 つの見せ方に変換する（解析は常に物理モデルで行い、表示だけを変える）
  *   logical  論理構成（機能配置）：基盤部品（CDN / LB / NAT / WAF …）を隠し、機能どうしの関係にまとめる
- *   cloud    物理構成（サービス）：クラウドサービス単位。VPC の境界まで
+ *   cloud    物理構成（サービス）：クラウドサービス単位。クラウド・クラスタ・仮想ネットワークなどの境界
  *   network  物理構成（ネットワーク）：VPC / AZ / サブネットと、複数 AZ の部品を AZ ごとの実体に展開
  * 変換結果は { tiers, groups, nodes, links, from, linkFrom }。from[ビューの部品] = [物理の部品 ID …] */
 (function () {
@@ -16,14 +16,14 @@
 
   function available(m) {
     const v = ['logical', 'cloud'];
-    if ((m.groups || []).some(g => g.kind === 'az' || g.kind === 'subnet') || Object.values(m.nodes).some(n => n.az)) v.push('network');
+    if ((m.groups || []).some(g => ['az', 'subnet', 'namespace'].includes(g.kind)) || Object.values(m.nodes).some(n => n.az)) v.push('network');
     return v;
   }
 
-  /* 物理（サービス）：AZ / サブネットの枠は出さない */
+  /* 物理（サービス）：AZ / サブネット / 名前空間の枠は出さない */
   function cloud(base) {
     return {
-      tiers: base.tiers, groups: (base.groups || []).filter(g => !['az', 'subnet'].includes(g.kind)), nodes: base.nodes, links: base.links,
+      tiers: base.tiers, groups: (base.groups || []).filter(g => !['az', 'subnet', 'namespace'].includes(g.kind)), nodes: base.nodes, links: base.links,
       from: Object.fromEntries(Object.keys(base.nodes).map(id => [id, [id]])), linkFrom: Object.fromEntries(base.links.map(l => [l.id, [l.id]])),
     };
   }
@@ -31,7 +31,7 @@
   /* 物理（ネットワーク）：AZ の帯の中に、部品を AZ ごとに置く */
   function network(base) {
     const groups = base.groups || [], nodes = {}, from = {}, linkFrom = {}, links = [];
-    const azBand = (tier, az) => groups.find(g => g.kind === 'az' && g.az === az && [].concat(g.tier).includes(tier));
+    const azBand = (tier, az) => groups.find(g => g.kind === 'az' && [g.y0, g.y1].every(Number.isFinite) && g.az === az && [].concat(g.tier).includes(tier));
     const inst = {}; // 物理 ID → [ビュー ID]
     for (const [id, n] of Object.entries(base.nodes)) {
       const zones = (n.az || []).filter(z => azBand(n.tier, z));

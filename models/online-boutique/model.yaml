@@ -8,10 +8,21 @@ evidence:
   - { type: doc, ref: "docs/sample-online-boutique.md#§1" }
 failPresets: [currencyservice, productcatalogservice, cartservice, redis-cart]
 tiers:
-  - { id: internet, label: インターネット, kind: origin, z: 1, origin: [-5, 0] }
-  - { id: app, label: アプリケーション（GKE）, z: 1 }
+  - { id: internet, label: インターネット, kind: origin, z: 1, origin: [-7, 0], size: [1, 3] }
+  - { id: edge, label: 公開入口, z: 1, origin: [-3.5, 0], size: [1, 3] }
+  - { id: app, label: アプリケーション, z: 1 }
   - { id: data, label: データ, z: 0 }
+groups:
+  - { kind: cloud, provider: gcp, label: "Google Cloud（プロジェクト）", tier: [edge, app, data] }
+  - { kind: cluster, provider: gcp, label: "GKE クラスタ", tier: [app, data] }
+  - { kind: namespace, label: "namespace: default", tier: [app, data] }
 nodes:
+  frontend-external:
+    label: frontend-external
+    kind: lb
+    svc: gcp:clb
+    tier: edge
+    evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.2" }, { type: iac, ref: service/frontend-external }]
   user:
     label: 利用者
     kind: actor
@@ -21,66 +32,79 @@ nodes:
   loadgenerator:
     label: 負荷生成
     kind: client
-    tier: internet
+    svc: k8s:deployment
+    tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.3" }, { type: doc, ref: "docs/sample-online-boutique.md#§3.11" }]
   frontend:
     label: frontend
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.1" }, { type: doc, ref: "docs/sample-online-boutique.md#§2.2" }]
   cartservice:
     label: cart
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.2" }]
   productcatalogservice:
     label: productcatalog
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.3" }]
   currencyservice:
     label: currency
     kind: service
+    svc: k8s:deployment
     tier: app
     metrics: { rps: 900 }
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.4" }]
   paymentservice:
     label: payment
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.5" }]
   shippingservice:
     label: shipping
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.6" }]
   emailservice:
     label: email
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.7" }]
   checkoutservice:
     label: checkout
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.8" }]
   recommendationservice:
     label: recommendation
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.9" }]
   adservice:
     label: ad
     kind: service
+    svc: k8s:deployment
     tier: app
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§3.10" }]
   redis-cart:
     label: Redis（カート）
     kind: cache
+    svc: k8s:deployment
     tier: data
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§4.1" }]
 links:
-  - { id: u2f, from: user, to: frontend, sync: true, label: HTTP, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.1" }] }
+  - { id: u2f, from: user, to: frontend-external, sync: true, label: HTTP, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.1" }] }
+  - { id: lb2f, from: frontend-external, to: frontend, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.2" }, { type: iac, ref: service/frontend-external }] }
   - { id: lg2f, from: loadgenerator, to: frontend, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.3" }] }
   - { id: f2pc, from: frontend, to: productcatalogservice, sync: true, label: gRPC, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }] }
   - { id: f2cur, from: frontend, to: currencyservice, sync: true, evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.1" }] }
@@ -106,7 +130,7 @@ scenarios:
     label: 注文する
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§5.3" }]
     steps:
-      - { links: [u2f, f2co], note: 利用者が注文し、frontend が checkout に依頼する }
+      - { links: [u2f, lb2f, f2co], note: 利用者が注文し、frontend が checkout に依頼する }
       - { links: [co2cart, cart2r], note: カートを Redis から取り出す }
       - { links: [co2pay], note: 決済する }
       - { links: [co2ship, co2mail], note: 発送し、確認メールを送る }

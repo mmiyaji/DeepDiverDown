@@ -14,7 +14,7 @@ export function importManifests(texts) {
   const docs = texts.flatMap(t => yaml.loadAll(t)).filter(Boolean).flatMap(d => d.kind === 'List' ? d.items : [d]);
   const workloads = docs.filter(d => ['Deployment', 'StatefulSet', 'DaemonSet'].includes(d.kind));
   const services = docs.filter(d => d.kind === 'Service');
-  const match = (sel, labels) => sel && Object.entries(sel).every(([k, v]) => labels?.[k] === v);
+  const match = (sel, labels) => sel && Object.keys(sel).length > 0 && Object.entries(sel).every(([k, v]) => labels?.[k] === v);
   // Service 名 → 部品名（セレクタでワークロードを引く）
   const svcTarget = {};
   for (const s of services) {
@@ -27,7 +27,7 @@ export function importManifests(texts) {
     const images = [...(pod.containers || [])].map(c => c.image);
     const exposed = services.filter(s => svcTarget[s.metadata.name] === name && s.spec?.type === 'LoadBalancer').map(s => s.metadata.name);
     nodes[name] = {
-      label: name, kind: DATA.test(images.join(' ') + name) ? 'db' : 'service', tier: DATA.test(images.join(' ') + name) ? 'data' : 'app',
+      label: name, svc: `k8s:${w.kind.toLowerCase()}`, kind: DATA.test(images.join(' ') + name) ? 'db' : 'service', tier: DATA.test(images.join(' ') + name) ? 'data' : 'app',
       replicas: w.kind === 'DaemonSet' ? 99 : (w.spec?.replicas ?? 1), image: images[0],
       ...(exposed.length ? { exposed } : {}),
     };
@@ -39,6 +39,13 @@ export function importManifests(texts) {
       else if (target === null) unresolved.push({ from: name, env: e.name, value: e.value, reason: `Service「${m[1]}」の宛先ワークロードがない` });
       else if (target !== name && !links.some(([f, t]) => f === name && t === target)) links.push([name, target]);
     }
+  }
+  for (const service of services.filter(s => s.spec?.type === 'LoadBalancer')) {
+    const name = service.metadata.name, id = `service/${name}`;
+    nodes[id] = { label: name, svc: 'k8s:service', kind: 'lb', tier: 'app' };
+    const targets = workloads.filter(w => (w.metadata.namespace || 'default') === (service.metadata.namespace || 'default') &&
+      match(service.spec.selector, w.spec?.template?.metadata?.labels));
+    for (const target of targets) links.push([id, target.metadata.name]);
   }
   return { capturedAt: new Date().toISOString().slice(0, 16).replace('T', ' '), source: 'kubernetes', nodes, links, ...(unresolved.length ? { unresolved } : {}) };
 }

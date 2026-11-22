@@ -62,7 +62,10 @@
   ];
 
   /* ---- クラウド構成向け（AWS / Google Cloud / Azure / OCI / Cloudflare / オンプレミス） ---- */
-  const prov = n => window.Catalog?.providerOf(n);
+  const prov = n => {
+    const p = window.Catalog?.providerOf(n);
+    return window.Catalog?.PROVIDERS[p] ? p : null;
+  };
   RULES.push(
     { id: 'CROSS_CLOUD_SYNC', sev: 'mid', title: 'クラウドをまたぐ同期呼び出し',
       run: m => m.links.filter(l => l.sync).map(l => [l, prov(m.nodes[l.from]), prov(m.nodes[l.to])])

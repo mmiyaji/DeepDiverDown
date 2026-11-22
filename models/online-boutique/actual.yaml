@@ -1,9 +1,10 @@
 # tools/import-k8s.mjs で samples/online-boutique/kubernetes-manifests.yaml から生成
-capturedAt: 2026-11-22 07:37
+capturedAt: 2026-11-22 08:36
 source: kubernetes
 nodes:
   frontend:
     label: frontend
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
@@ -11,70 +12,86 @@ nodes:
     exposed: [frontend-external]
   checkoutservice:
     label: checkoutservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: checkoutservice
   recommendationservice:
     label: recommendationservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: recommendationservice
   cartservice:
     label: cartservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: cartservice
   redis-cart:
     label: redis-cart
+    svc: k8s:deployment
     kind: db
     tier: data
     replicas: 1
     image: redis:alpine
   loadgenerator:
     label: loadgenerator
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: loadgenerator
   productcatalogservice:
     label: productcatalogservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: productcatalogservice
   currencyservice:
     label: currencyservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: currencyservice
   paymentservice:
     label: paymentservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: paymentservice
   shippingservice:
     label: shippingservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: shippingservice
   emailservice:
     label: emailservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: emailservice
   adservice:
     label: adservice
+    svc: k8s:deployment
     kind: service
     tier: app
     replicas: 1
     image: adservice
+  service/frontend-external:
+    label: frontend-external
+    svc: k8s:service
+    kind: lb
+    tier: app
 links:
   - - frontend
     - productcatalogservice
@@ -107,6 +124,8 @@ links:
   - - cartservice
     - redis-cart
   - - loadgenerator
+    - frontend
+  - - service/frontend-external
     - frontend
 unresolved:
   - from: frontend

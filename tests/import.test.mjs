@@ -10,6 +10,13 @@ import { importManifests } from '../tools/import-k8s.mjs';
 const A = loadAnalyze();
 const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
+test('Catalog：AWS の省略形式とマルチクラウドの接頭辞を解決する', () => {
+  assert.deepEqual(A.Catalog.lookup('ecs'), A.Catalog.lookup('aws:ecs'));
+  assert.equal(A.Catalog.lookup('gcp:gke').providerLabel, 'Google Cloud');
+  assert.equal(A.Catalog.lookup('k8s:deployment').shape, undefined);
+  assert.equal(A.Catalog.lookup('other:missing'), null);
+});
+
 test('layout：座標のない部品をリンクの向きに沿って並べ、フロアの大きさを決める', () => {
   const m = A.layout({
     tiers: [{ id: 'app', label: 'app' }],
@@ -38,11 +45,28 @@ test('import-tfstate：台数・AZ・在庫を取り出す', () => {
   assert.ok(!a.nodes['aws_subnet.public_a'], 'サブネットは部品にしない');
 });
 
+test('import-tfstate：Google Cloud・Azure・OCI・Cloudflare の部品を取り込む', () => {
+  const types = {
+    google_container_cluster: ['gcp:gke', {}],
+    azurerm_kubernetes_cluster: ['azure:aks', { default_node_pool: [{ node_count: 3 }] }],
+    oci_core_instance: ['oci:compute', {}],
+    cloudflare_r2_bucket: ['cloudflare:r2', {}],
+  };
+  const resources = Object.entries(types).map(([type, [, values]]) => ({ type, values, address: type }));
+  const a = importState({ values: { root_module: { resources } } });
+  for (const [type, [svc]] of Object.entries(types)) assert.equal(a.nodes[type].svc, svc);
+  assert.equal(a.nodes.azurerm_kubernetes_cluster.replicas, 3);
+  assert.equal(a.nodes.google_container_cluster.replicas, undefined);
+});
+
 test('import-k8s：*_ADDR から接続を作り、存在しない宛先を未解決にする', () => {
   const a = importManifests([read('samples/online-boutique/kubernetes-manifests.yaml')]);
-  assert.equal(Object.keys(a.nodes).length, 12);
+  assert.equal(Object.keys(a.nodes).length, 13);
   assert.equal(a.nodes['redis-cart'].tier, 'data');
   assert.equal(a.nodes.frontend.replicas, 1);
+  assert.equal(a.nodes.frontend.svc, 'k8s:deployment');
+  assert.equal(a.nodes['service/frontend-external'].svc, 'k8s:service');
+  assert.ok(a.links.some(([f, t]) => f === 'service/frontend-external' && t === 'frontend'));
   assert.deepEqual(a.nodes.frontend.exposed, ['frontend-external']);
   assert.ok(a.links.some(([f, t]) => f === 'checkoutservice' && t === 'paymentservice'));
   assert.equal(a.unresolved[0].from, 'frontend');

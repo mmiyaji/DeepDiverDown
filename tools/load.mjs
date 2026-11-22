@@ -1,4 +1,4 @@
-// Node から browser 用の js/analyze.js・js/aws.js・js/layout.js を読み込み、YAML モデルを解析するための共通処理
+// Node から browser 用の js/analyze.js・js/catalog.js・js/layout.js を読み込み、YAML モデルを解析するための共通処理
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -14,6 +14,7 @@ export function loadAnalyze() {
   vm.createContext(ctx);
   for (const f of ['js/catalog.js', 'js/layout.js', 'js/analyze.js', 'js/views.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
   cached = ctx.window.Analyze;
+  cached.Catalog = ctx.window.Catalog;
   cached.layout = ctx.window.Layout.apply;
   cached.Views = ctx.window.Views;
   return cached;
