@@ -52,7 +52,9 @@ const MODES = [
   ['compare', '比較', CMPR?.changes.length],
 ].filter(Boolean);
 
+const VIEWS = Views.available(M);
 const st = {
+  view: VIEWS.includes(ROUTE.q.w) ? ROUTE.q.w : VIEWS.includes(M.views?.default) ? M.views.default : 'cloud',
   mode: MODES.some(m => m[0] === ROUTE.mode) ? ROUTE.mode : 'struct',
   sel: M.nodes[ROUTE.q.s] ? ROUTE.q.s : null, nbr: ROUTE.q.n === '1',
   hidden: new Set((ROUTE.q.h || '').split(',').filter(Boolean)),
@@ -64,6 +66,7 @@ if (!M.scenarios?.[st.scen]) st.scen = 0;
 /* 現在の状態 → URL（共有リンク）。withView で視点も含める */
 function routeHash(withView) {
   const q = new URLSearchParams();
+  if (st.view !== 'cloud') q.set('w', st.view);
   if (st.sel) q.set('s', st.sel);
   if (st.nbr) q.set('n', '1');
   if (st.hidden.size) q.set('h', [...st.hidden].join(','));
@@ -79,10 +82,20 @@ function routeHash(withView) {
 const syncUrl = () => history.replaceState(null, '', routeHash(false));
 addEventListener('hashchange', () => { if (parseRoute().id !== KEY || parseRoute().q.v) location.reload(); });
 
+/* ================= ビュー（論理 / サービス / ネットワーク） =================
+ * 解析・モードの状態は物理モデル（allNodes / allLinks）で計算し、描画だけ VW() の部品に写す */
+let PROJ = null, PROJKEY = '';
+function VW() {
+  const key = `${st.view}|${st.mode === 'evidence' ? 'e' : st.mode === 'compare' ? 'c' : ''}`;
+  if (key !== PROJKEY) { PROJ = Views.project({ tiers: M.tiers, groups: M.groups || [], nodes: allNodes(), links: allLinks() }, M, st.view); PROJKEY = key; }
+  return PROJ;
+}
+/* 物理部品 ID → いまのビューでそれを表す部品 ID */
+const viewIdOf = id => { const P = VW(); return P.nodes[id] ? id : Object.keys(P.from).find(k => P.from[k].includes(id)); };
+
 /* ================= 座標 ================= */
-const TI = id => M.tiers.find(t => t.id === id) || {};
-const STACK = M.tiers.filter(t => t.z == null);
-const zOf = tier => TI(tier).z ?? (STACK.length - 1 - STACK.findIndex(t => t.id === tier));
+const TI = id => VW().tiers.find(t => t.id === id) || {};
+const zOf = tier => { const S = VW().tiers.filter(t => t.z == null); return TI(tier).z ?? (S.length - 1 - S.findIndex(t => t.id === tier)); };
 const off = tier => TI(tier).origin || [0, 0];
 const sizeOf = tier => TI(tier).size || [10, 4];
 const W = (gx, gy, tier) => [gx + off(tier)[0], zOf(tier) * FH, gy + off(tier)[1]];
@@ -105,9 +118,9 @@ const linkById = id => allLinks().find(l => l.id === id);
 const linkLabel = l => `${allNodes()[l.from]?.label ?? l.from} → ${allNodes()[l.to]?.label ?? l.to}`;
 
 function route(l) {
-  const N = allNodes(), a = N[l.from], b = N[l.to];
+  const P = VW(), a = P.nodes[l.from], b = P.nodes[l.to];
   const [ax, ay, az] = W(a.x, a.y, a.tier), [bx, by, bz] = W(b.x, b.y, b.tier);
-  const o = allLinks().some(x => x.from === l.to && x.to === l.from) && l.from > l.to ? 0.25 : 0, Y = 0.04;
+  const o = P.links.some(x => x.from === l.to && x.to === l.from) && l.from > l.to ? 0.25 : 0, Y = 0.04;
   let p;
   if (ay === by) p = ax === bx || az === bz ? [[ax, ay, az], [bx, by, bz]] : [[ax, ay, az], [(ax + bx) / 2, ay, az], [(ax + bx) / 2, by, bz], [bx, by, bz]];
   else p = [[ax, ay, az], [bx, ay, az], [bx, ay, bz], [bx, by, bz]];
@@ -218,27 +231,44 @@ function nodeSpec(id, n, s) {
   };
 }
 
+/* 物理部品の状態 → ビューの部品の状態 */
+function projectState(ns, ls) {
+  const P = VW(), nsV = {}, lsV = {};
+  for (const [vid, parts] of Object.entries(P.from)) {
+    const s = nsV[vid] = Views.mergeNode(parts.map(p => ns[p]));
+    const n = P.nodes[vid];
+    if (st.view === 'network' && s.badge?.text?.startsWith('×') && n.replicas < 99) s.badge = { text: `×${n.replicas}` }; // AZ ごとの台数
+    if (parts.length > 1 && !s.badge) s.badge = { text: `${parts.length} 部品` };
+    if (st.sel && (vid === st.sel || parts.includes(st.sel))) s.outline = true;
+  }
+  for (const l of P.links) {
+    const s = lsV[l.id] = Views.mergeLink((P.linkFrom[l.id] || []).map(p => ls[p]));
+    if (l.crossAz && !s.on && !s.dim) Object.assign(s, { on: true, color: '--warn' }); // AZ をまたぐ通信
+  }
+  return { nsV, lsV };
+}
+
 function draw() {
-  const { ns, ls } = decorate(), N = allNodes();
+  const d = decorate(), { nsV: ns, lsV: ls } = projectState(d.ns, d.ls), P = VW(), N = P.nodes;
   scene.begin();
-  for (const t of M.tiers) {
+  for (const t of P.tiers) {
     if (st.hidden.has(t.id)) continue;
     const [w, h] = sizeOf(t.id), [ox, oz] = off(t.id), y = zOf(t.id) * FH;
     const x0 = ox - 1.2, x1 = ox + w + 0.4, z0 = oz - 1.2, z1 = oz + h + 0.2;
     scene.floor({ x0, z0, x1, z1, y, origin: t.kind === 'origin', label: t.label, labelAt: t.origin ? [x0, y, z1] : [x1, y, z0] });
   }
-  for (const gr of M.groups || []) for (const t of [].concat(gr.tier)) {
-    if (st.hidden.has(t)) continue;
+  for (const gr of P.groups || []) for (const t of [].concat(gr.tier)) {
+    if (st.hidden.has(t) || !P.tiers.some(x => x.id === t)) continue;
     const y = zOf(t) * FH, [ox, oz] = off(t);
     scene.group({ y, kind: gr.kind, label: gr.label, pts: [[gr.x0 + ox, gr.y0 + oz], [gr.x1 + ox, gr.y0 + oz], [gr.x1 + ox, gr.y1 + oz], [gr.x0 + ox, gr.y1 + oz]] });
   }
-  for (const l of allLinks()) {
+  for (const l of P.links) {
     if (!visible(N[l.from]) || !visible(N[l.to])) continue;
-    const s = ls[l.id];
+    const s = ls[l.id] || {};
     scene.link({ points: route(l), color: s.color || (s.on ? '--ink' : '--mute'), thick: !!s.on, packets: !!s.packets,
       dashed: s.dashed || (!l.sync ? 'dash' : null), opacity: s.dim ? 0.12 : s.on ? 1 : 0.55 });
   }
-  for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node(nodeSpec(id, n, ns[id]));
+  for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node(nodeSpec(id, n, ns[id] || {}));
   scene.end();
   renderSidebar(); renderStats(); renderPanel(); syncUrl();
 }
@@ -252,7 +282,8 @@ function renderSidebar() {
       <span class="mmeta">${s.error ? '<span class="tag high">読込失敗</span>' : `<span class="tag ${s.pass ? 'ok' : 'high'}">${s.pass ? '合格' : '不合格'}</span> 網羅 ${s.cov}%`}</span></a>`;
   }).join('') + `<button class="b small" data-act="open">＋ YAML を開く</button>`;
   $('modes').innerHTML = MODES.map(([k, n, c], i) => `<button data-mode="${k}" class="${st.mode === k ? 'on' : ''}" ${st.mode === k ? 'aria-current="true"' : ''} title="${n}（${i + 1}）"><span>${n}</span>${c ? `<small>${c}</small>` : ''}</button>`).join('');
-  $('floors').innerHTML = M.tiers.map(t => `<label><input type="checkbox" data-tier="${t.id}" ${st.hidden.has(t.id) ? '' : 'checked'}> ${esc(t.label)}</label>`).join('');
+  $('views').innerHTML = VIEWS.map(v => `<button data-viewmode="${v}" class="${st.view === v ? 'on' : ''}" aria-pressed="${st.view === v}" title="${Views.VIEWS[v].label}（${Views.VIEWS[v].sub}）・V キーで切替"><b>${Views.VIEWS[v].label}</b><small>${Views.VIEWS[v].sub}</small></button>`).join('');
+  $('floors').innerHTML = VW().tiers.map(t => `<label><input type="checkbox" data-tier="${t.id}" ${st.hidden.has(t.id) ? '' : 'checked'}> ${esc(t.label)}</label>`).join('');
   $('nbr').checked = st.nbr;
   $('nbr').disabled = !st.sel;
 }
@@ -288,8 +319,24 @@ const tag = s => `<span class="tag st-${s}">${Analyze.STATUS[s]}</span>`;
 const evList = ev => (ev || []).map(e => `<div class="ev"><span class="mono">${esc(e.type)}</span> ${esc(e.at || e.ref)}${e.says ? ` <span class="mono acc-t">says ${esc(JSON.stringify(e.says))}</span>` : ''}</div>`).join('') || '<div class="sub">根拠なし</div>';
 const none = '<div class="sub">なし</div>';
 
+/* 論理構成でまとめた機能（複数の物理部品） */
+function componentDetail(id) {
+  const P = VW(), c = P.nodes[id]; if (!c) return '';
+  const parts = P.from[id] || [], ins = P.links.filter(l => l.to === id), outs = P.links.filter(l => l.from === id);
+  const iss = ISSUES.filter(i => i.nodes.some(n => parts.includes(n)));
+  const ln = l => `${esc(P.nodes[l.from]?.label)} → ${esc(P.nodes[l.to]?.label)} <span class="mono mute">${(P.linkFrom[l.id] || []).length} 経路</span>`;
+  return `<h4>選択中の機能</h4><h3>${esc(c.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">論理構成の機能 / ${esc(TI(c.tier).label || '')}</div>
+    ${c.description ? `<p>${esc(c.description)}</p>` : ''}
+    <div class="row"><button class="b small" data-focus="${id}">この機能に寄る（F）</button><button class="b small" data-viewmode="cloud">物理構成で見る</button><button class="b small" data-sel="">選択を解除</button></div>
+    <h4>担う物理部品（${parts.length}）</h4>${parts.map(p => `<div class="item">${esc(M.nodes[p]?.label || p)} <span class="mono mute">${esc(p)}</span> ${CLS.nodes[p] ? tag(CLS.nodes[p].status) : ''}</div>`).join('')}
+    <h4>呼び出し元</h4>${ins.map(l => `<div class="item" data-sel="${l.from}">${ln(l)}</div>`).join('') || none}
+    <h4>呼び出し先</h4>${outs.map(l => `<div class="item" data-sel="${l.to}">${ln(l)}</div>`).join('') || none}
+    ${iss.length ? '<h4>関連する指摘</h4>' + iss.map(i => `<div class="item"><span class="tag ${i.sev}">${esc(i.title)}</span><p>${esc(i.msg)}</p></div>`).join('') : ''}`;
+}
+
 function nodeDetail(id) {
-  const n = allNodes()[id]; if (!n) return '';
+  if (!allNodes()[id]) return componentDetail(id);
+  const n = allNodes()[id];
   const ins = allLinks().filter(l => l.to === id), outs = allLinks().filter(l => l.from === id);
   const iss = ISSUES.filter(i => i.nodes.includes(id)), c = CLS.nodes[id];
   const kind = n.kind === 'actor' ? `登場人物：${(ROLES[n.role] || ROLES.user).label}${n.team ? `（${esc(n.team)}・${n.headcount ?? 1}名）` : ''}` : n.svc && window.AWS?.[n.svc] ? AWS[n.svc].name : esc(n.kind);
@@ -387,16 +434,37 @@ function renderPanel() {
 }
 
 /* ================= 操作 ================= */
+/* id は物理部品でもビューの部品でもよい。物理 1 つに対応するビュー部品は物理 ID で持つ */
+function resolveSel(id) {
+  if (!id) return null;
+  if (allNodes()[id]) return id;
+  const parts = VW().from[id];
+  return parts ? (parts.length === 1 ? parts[0] : id) : null;
+}
 function select(id, { focus = false } = {}) {
-  st.sel = id && allNodes()[id] ? id : null;
+  st.sel = resolveSel(id);
   if (!st.sel) st.nbr = false;
-  if (focus && st.sel) { const n = allNodes()[st.sel]; if (st.hidden.has(n.tier)) st.hidden.delete(n.tier); const p = W(n.x, n.y, n.tier); scene.focusOn([p[0], p[1] + 0.5, p[2]]); }
+  if (focus && st.sel) {
+    const vid = viewIdOf(st.sel), n = vid && VW().nodes[vid];
+    if (n) { st.hidden.delete(n.tier); const p = W(n.x, n.y, n.tier); scene.focusOn([p[0], p[1] + 0.5, p[2]]); }
+  }
   draw();
 }
 function onPick(id) {
   if (!id) { if (st.sel) select(null); return; }
-  if (st.mode === 'fail' && M.nodes[id]) { st.down = st.down.includes(id) ? st.down.filter(x => x !== id) : [...st.down, id]; return draw(); }
-  select(st.sel === id ? null : id);
+  if (st.mode === 'fail') {
+    const parts = (VW().from[id] || [id]).filter(p => M.nodes[p]);
+    const allDown = parts.every(p => st.down.includes(p));
+    st.down = allDown ? st.down.filter(x => !parts.includes(x)) : [...new Set([...st.down, ...parts])];
+    return draw();
+  }
+  select(st.sel === resolveSel(id) ? null : id);
+}
+function setView(v) {
+  if (!VIEWS.includes(v) || v === st.view) return;
+  st.view = v; scene.fitted = false; // 配置が変わるので全体が収まるよう視点を合わせ直す
+  draw();
+  toast(`${Views.VIEWS[v].label}（${Views.VIEWS[v].sub}）`);
 }
 function setMode(m) { st.mode = m; st.issue = null; st.req = null; stopPlay(); draw(); }
 const stopPlay = () => { clearInterval(st.play); st.play = null; };
@@ -499,7 +567,7 @@ function modal(title, body) {
 function closeModal() { $('modal').hidden = true; lastFocus?.focus?.(); }
 
 const SHORTCUTS = [['/', '検索'], ['R / M', 'ドラッグを回転 / 移動に切り替え'], ['F', '選択中の部品に寄る'], ['N', '選択中の部品の周辺だけ表示'], ['Esc', '選択解除・閉じる'],
-  ['1〜' + MODES.length, '表示モードの切り替え'], ['← / →', 'シナリオのステップ'], ['[', 'サイドバーの開閉'], ['?', 'このヘルプ']];
+  ['1〜' + MODES.length, '表示モードの切り替え'], ['← / →', 'シナリオのステップ'], ['V', 'ビュー（論理 / 物理サービス / 物理ネットワーク）の切り替え'], ['[', 'サイドバーの開閉'], ['?', 'このヘルプ']];
 function openHelp(welcome) {
   modal(welcome ? 'DeepDiverDown へようこそ' : 'ヘルプ', `
     ${welcome ? '<p>設計書・IaC・コードから起こしたモデルを 3D で表示し、問題点と「どこがまだ確かめられていないか」を見つけるためのツールです。</p>' : ''}
@@ -548,7 +616,7 @@ function openSettings() {
 
 /* ================= イベント ================= */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-hit],[data-act],[data-drag],[data-view],[data-mode],[data-scen],[data-step],[data-goto],[data-play],[data-reset],[data-down],[data-issue],[data-metric],[data-req],[data-sel],[data-focus],[data-nbr],[data-rmlocal]');
+  const t = e.target.closest('[data-hit],[data-act],[data-drag],[data-viewmode],[data-view],[data-mode],[data-scen],[data-step],[data-goto],[data-play],[data-reset],[data-down],[data-issue],[data-metric],[data-req],[data-sel],[data-focus],[data-nbr],[data-rmlocal]');
   if (e.target.closest('#modal') && !e.target.closest('.dialog')) return closeModal();
   if (e.target.closest('#modal .close')) return closeModal();
   if (!t) { if (!e.target.closest('.search')) $('qres').hidden = true; return; }
@@ -575,6 +643,7 @@ document.addEventListener('click', e => {
   }
   if (d.rmlocal) { L.removeLocal(d.rmlocal); return location.hash = '#/m/' + REGISTRY[0].id + '/struct'; }
   if (d.drag) return setDrag(d.drag);
+  if (d.viewmode) return setView(d.viewmode);
   if (d.view) return scene.fit(d.view === 'reset' ? S.defaultView : d.view);
   if (d.mode) { document.body.classList.remove('nav-open'); return setMode(d.mode); }
   if (d.focus) return select(d.focus, { focus: true });
@@ -610,6 +679,7 @@ addEventListener('keydown', e => {
   if (k === '/') { e.preventDefault(); return $('q').focus(); }
   if (k === '?') return openHelp(false);
   if (k === 'Escape') return select(null);
+  if (k === 'v' || k === 'V') return setView(VIEWS[(VIEWS.indexOf(st.view) + 1) % VIEWS.length]);
   if (k === 'r' || k === 'R') return setDrag('rotate');
   if (k === 'm' || k === 'M') return setDrag('pan');
   if ((k === 'f' || k === 'F') && st.sel) return select(st.sel, { focus: true });

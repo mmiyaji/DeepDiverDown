@@ -118,3 +118,25 @@ lead: { label:'テックリード', kind:'actor', role:'approver', team:'決済�
 | SLOW_PIPELINE | 最長経路の所要時間が目標を超える（pipeline） |
 | SOD | 承認者が自分 / 同じチームのコードを承認できる（職務分掌） |
 | SINGLE_PERSON | 運用・承認などの担当が 1 名（属人化） |
+
+## ビュー（views）
+同じモデルを 3 つの見せ方で表示する。指摘・点検・確度は常に物理モデルで計算し、表示だけをビューの部品にまとめる。
+
+| ビュー | 内容 | 条件 |
+|---|---|---|
+| `logical` 論理構成（機能配置） | 基盤部品（CDN・LB・NAT・WAF・Route 53・Secrets Manager など）を隠し、通り抜けた接続を機能どうしの接続にする。配置は自動 | 常に |
+| `cloud` 物理構成（サービス） | クラウドサービス単位。VPC の枠まで（AZ・サブネットは出さない）。既定 | 常に |
+| `network` 物理構成（ネットワーク） | VPC・AZ・サブネットの枠と、複数 AZ の部品を AZ ごとの実体（`ecs@a`）に展開。台数は AZ で割る。AZ をまたぐ接続は黄色 | AZ / サブネットの情報があるとき |
+
+```yaml
+groups:
+  - { kind: az, label: AZ-a, az: a, tier: [app, data], x0: -0.8, y0: -0.8, x1: 7.2, y1: 1.4 }  # az: で AZ を指定
+views:
+  default: cloud          # 初期表示（省略時 cloud）
+  logical:
+    tiers: [...]          # 省略時は物理のフロアから空になったものを除く
+    components:           # 省略時は基盤以外の部品をそのまま機能とみなす
+      order: { label: 注文・決済, tier: app, realizedBy: [checkoutservice, paymentservice], description: … }
+```
+- 基盤として隠したくない部品は、モデル側で `role` を変えるか components に含める（`role: infra` で明示的に隠すこともできる）
+- 画面ではサイドバーの「ビュー」か `V` キーで切り替え。URL は `?w=logical` など
