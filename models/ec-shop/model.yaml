@@ -1,0 +1,484 @@
+# ECサイト 注文基盤
+name: ECサイト 注文基盤
+failPresets:
+  - pay
+  - db
+  - kafka
+  - redis
+tiers:
+  - id: internet
+    label: インターネット
+    kind: origin
+    z: 1
+    origin:
+      - -11
+      - 0
+    size:
+      - 1
+      - 3
+  - id: office
+    label: 社内（VPN）
+    kind: origin
+    z: 0
+    origin:
+      - -11
+      - 0
+    size:
+      - 1
+      - 3
+  - id: edge
+    label: エッジ
+    z: 1
+    origin:
+      - -7.6
+      - 0
+    size:
+      - 4
+      - 3
+  - id: app
+    label: アプリケーション
+    z: 1
+  - id: data
+    label: データ
+    z: 0
+nodes:
+  user:
+    label: 会員
+    kind: actor
+    role: user
+    tier: internet
+    x: 0
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§2.1
+  cdn:
+    label: CDN
+    kind: cdn
+    tier: edge
+    x: 0.5
+    'y': 1
+    replicas: 99
+    metrics:
+      p95: 15
+      cost: 120
+      rps: 900
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§2.2
+  alb:
+    label: ALB
+    kind: lb
+    tier: edge
+    x: 3
+    'y': 1
+    replicas: 2
+    metrics:
+      p95: 5
+      cost: 40
+      rps: 300
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§2.3
+  web:
+    label: Web (BFF)
+    kind: service
+    tier: app
+    x: 0
+    'y': 1
+    replicas: 3
+    metrics:
+      p95: 420
+      cost: 300
+      rps: 300
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.1
+  order:
+    label: 注文
+    kind: service
+    tier: app
+    x: 3
+    'y': 0
+    replicas: 2
+    metrics:
+      p95: 380
+      cost: 260
+      rps: 40
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.2
+  inv:
+    label: 在庫
+    kind: service
+    tier: app
+    x: 3
+    'y': 3
+    replicas: 2
+    metrics:
+      p95: 90
+      cost: 180
+      rps: 60
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.3
+  pay:
+    label: 決済
+    kind: service
+    tier: app
+    x: 6
+    'y': 0
+    replicas: 1
+    metrics:
+      p95: 900
+      cost: 90
+      rps: 40
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.4
+  notify:
+    label: 通知ワーカー
+    kind: worker
+    tier: app
+    x: 6
+    'y': 3
+    replicas: 1
+    metrics:
+      p95: 60
+      cost: 50
+      rps: 40
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.5
+  psp:
+    label: 決済代行
+    kind: external
+    tier: app
+    x: 9
+    'y': 0
+    metrics:
+      p95: 700
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§5.1
+  mail:
+    label: メール配信
+    kind: external
+    tier: app
+    x: 9
+    'y': 3
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§5.2
+  ops:
+    label: 運用担当
+    kind: actor
+    role: ops
+    team: SRE
+    headcount: 1
+    tier: office
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§7
+  db:
+    label: 注文 DB
+    kind: db
+    tier: data
+    x: 3
+    'y': 1
+    replicas: 2
+    metrics:
+      p95: 25
+      cost: 650
+      rps: 260
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§4.1
+  kafka:
+    label: Kafka
+    kind: queue
+    tier: data
+    x: 6
+    'y': 2
+    replicas: 3
+    metrics:
+      p95: 8
+      cost: 400
+      rps: 40
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§4.2
+  redis:
+    label: Redis
+    kind: cache
+    tier: data
+    x: 0
+    'y': 2
+    replicas: 1
+    metrics:
+      p95: 2
+      cost: 60
+      rps: 500
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§4.3
+links:
+  - id: u2c
+    from: user
+    to: cdn
+    sync: true
+    timeoutMs: 60000
+    label: HTTPS
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§2.1
+  - id: c2a
+    from: cdn
+    to: alb
+    sync: true
+    timeoutMs: 30000
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§2.2
+  - id: a2w
+    from: alb
+    to: web
+    sync: true
+    timeoutMs: 30000
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§2.3
+  - id: w2o
+    from: web
+    to: order
+    sync: true
+    label: 注文API
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.1
+  - id: w2r
+    from: web
+    to: redis
+    sync: true
+    timeoutMs: 200
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§4.3
+  - id: o2i
+    from: order
+    to: inv
+    sync: true
+    timeoutMs: 2000
+    label: 在庫引当
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.2
+  - id: i2o
+    from: inv
+    to: order
+    sync: true
+    timeoutMs: 2000
+    label: 引当完了CB
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.3
+  - id: o2p
+    from: order
+    to: pay
+    sync: true
+    timeoutMs: 3000
+    retry: 1
+    label: 決済依頼
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.2
+  - id: p2s
+    from: pay
+    to: psp
+    sync: true
+    timeoutMs: 10000
+    retry: 3
+    label: オーソリ
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.4
+  - id: o2d
+    from: order
+    to: db
+    sync: true
+    timeoutMs: 1000
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§4.1
+  - id: i2d
+    from: inv
+    to: db
+    sync: true
+    timeoutMs: 1000
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.3
+  - id: o2k
+    from: order
+    to: kafka
+    sync: false
+    label: order-events
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.2
+  - id: k2n
+    from: kafka
+    to: notify
+    sync: false
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.5
+  - id: op2p
+    from: ops
+    to: pay
+    sync: false
+    label: 手動再起動
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§7
+  - id: n2m
+    from: notify
+    to: mail
+    sync: true
+    timeoutMs: 5000
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.5
+scenarios:
+  - id: checkout
+    label: 注文確定
+    steps:
+      - links:
+          - u2c
+          - c2a
+          - a2w
+        note: 利用者のリクエストが CDN・ALB を経て Web に届く
+      - links:
+          - w2o
+        note: Web が注文サービスを同期呼び出し（タイムアウト未定義）
+      - links:
+          - o2i
+          - i2d
+        note: 在庫を引き当てる。在庫は注文 DB に同居
+      - links:
+          - i2o
+        note: 在庫から注文へコールバック（同期の循環）
+      - links:
+          - o2p
+          - p2s
+        note: 決済。PSP 10 秒 × リトライ 3 回が上流の 3 秒より長い
+      - links:
+          - o2d
+        note: 注文を確定して DB に書き込む
+      - links:
+          - o2k
+          - k2n
+          - n2m
+        note: イベント発行後は非同期で通知メールを送る
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§6.1
+  - id: cart
+    label: カート参照
+    steps:
+      - links:
+          - u2c
+          - c2a
+          - a2w
+        note: Web まで到達
+      - links:
+          - w2r
+        note: Redis からカートを取得（1 ノード）
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§6.2
+review:
+  - §3.1 Web → 注文 の同期呼び出しにタイムアウトの記載がない
+  - §3.3 在庫テーブルを注文 DB に同居させる方針は、サービス分割と矛盾する
+  - §3.4 決済が 1 台構成。注文確定の全経路が依存している
+sources:
+  - docs/sample-ec-design.md
+requirements:
+  - id: REQ-F-01
+    kind: usecase
+    title: 注文確定
+    text: 会員がカートの商品を注文し、決済が通れば確定メールを受け取る。
+    scenario: checkout
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§6.1
+  - id: REQ-F-02
+    kind: usecase
+    title: カート参照
+    text: 会員がカートの中身を確認する。
+    scenario: cart
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§6.2
+  - id: BR-01
+    kind: rule
+    title: 在庫引当は決済より前
+    text: 在庫を引き当ててから決済する。引当できなければ決済しない。
+    links:
+      - o2i
+      - o2p
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.2
+  - id: BR-02
+    kind: rule
+    title: 決済は外部 PSP でオーソリ
+    text: カード情報は自社で保持せず、決済代行にオーソリを依頼する。
+    links:
+      - o2p
+      - p2s
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.4
+  - id: ST-01
+    kind: state
+    title: 注文の状態遷移
+    text: 受付 → 在庫引当済 → 決済済 → 確定（失敗時はキャンセル）
+    nodes:
+      - order
+    states:
+      - 受付
+      - 在庫引当済
+      - 決済済
+      - 確定
+      - キャンセル
+    evidence:
+      - type: doc
+        ref: docs/sample-ec-design.md#§3.2
+  - id: NFR-01
+    kind: nfr
+    title: 注文確定の応答時間
+    text: 注文確定 API の p95 を 1 秒以内にする。
+    scenario: checkout
+unknowns:
+  - id: UNK-01
+    text: Web → 注文 の同期呼び出しのタイムアウト値が設計書にない
+    refs:
+      - w2o
+  - id: UNK-02
+    text: 注文確定の応答時間目標（NFR-01）の根拠となる記述がない
+    refs:
+      - NFR-01
+  - id: UNK-03
+    text: 運用担当の体制・手順（§7）が設計書に存在しない
+    refs:
+      - ops
+      - op2p
+gates:
+  maxDrift: 0
+  maxHigh: 0
+evidence:
+  - type: doc
+    ref: docs/sample-ec-design.md#§1

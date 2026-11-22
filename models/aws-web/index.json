@@ -1,0 +1,348 @@
+{
+  "model": "aws-web",
+  "name": "AWS Web アプリ構成",
+  "generatedAt": "2026-11-22T07:08:31.776Z",
+  "coverage": {
+    "covered": 19,
+    "total": 21
+  },
+  "byId": {
+    "user": {
+      "type": "node",
+      "label": "利用者",
+      "status": "claim"
+    },
+    "r53": {
+      "type": "node",
+      "label": "Route 53",
+      "status": "fact"
+    },
+    "cf": {
+      "type": "node",
+      "label": "CloudFront",
+      "status": "fact"
+    },
+    "waf": {
+      "type": "node",
+      "label": "WAF",
+      "status": "fact"
+    },
+    "alb": {
+      "type": "node",
+      "label": "ALB",
+      "status": "fact"
+    },
+    "nat": {
+      "type": "node",
+      "label": "NAT Gateway",
+      "status": "fact"
+    },
+    "ecs": {
+      "type": "node",
+      "label": "API（ECS）",
+      "status": "drift"
+    },
+    "sm": {
+      "type": "node",
+      "label": "Secrets Manager",
+      "status": "claim"
+    },
+    "worker": {
+      "type": "node",
+      "label": "画像処理",
+      "status": "fact"
+    },
+    "ext": {
+      "type": "node",
+      "label": "外部 API",
+      "status": "unknown"
+    },
+    "ops": {
+      "type": "node",
+      "label": "インフラ担当",
+      "status": "claim"
+    },
+    "aurora": {
+      "type": "node",
+      "label": "Aurora",
+      "status": "fact"
+    },
+    "redis": {
+      "type": "node",
+      "label": "ElastiCache",
+      "status": "fact"
+    },
+    "sqs": {
+      "type": "node",
+      "label": "SQS",
+      "status": "fact"
+    },
+    "s3": {
+      "type": "node",
+      "label": "S3",
+      "status": "fact"
+    },
+    "u2r": {
+      "type": "link",
+      "label": "利用者 → Route 53",
+      "status": "claim"
+    },
+    "u2cf": {
+      "type": "link",
+      "label": "利用者 → CloudFront",
+      "status": "claim"
+    },
+    "cf2w": {
+      "type": "link",
+      "label": "CloudFront → WAF",
+      "status": "fact"
+    },
+    "w2a": {
+      "type": "link",
+      "label": "WAF → ALB",
+      "status": "fact"
+    },
+    "a2e": {
+      "type": "link",
+      "label": "ALB → API（ECS）",
+      "status": "fact"
+    },
+    "e2sm": {
+      "type": "link",
+      "label": "API（ECS） → Secrets Manager",
+      "status": "claim"
+    },
+    "e2r": {
+      "type": "link",
+      "label": "API（ECS） → ElastiCache",
+      "status": "fact"
+    },
+    "e2db": {
+      "type": "link",
+      "label": "API（ECS） → Aurora",
+      "status": "fact"
+    },
+    "e2n": {
+      "type": "link",
+      "label": "API（ECS） → NAT Gateway",
+      "status": "fact"
+    },
+    "n2x": {
+      "type": "link",
+      "label": "NAT Gateway → 外部 API",
+      "status": "unknown"
+    },
+    "e2q": {
+      "type": "link",
+      "label": "API（ECS） → SQS",
+      "status": "fact"
+    },
+    "q2l": {
+      "type": "link",
+      "label": "SQS → 画像処理",
+      "status": "fact"
+    },
+    "op2e": {
+      "type": "link",
+      "label": "インフラ担当 → API（ECS）",
+      "status": "claim"
+    },
+    "l2s3": {
+      "type": "link",
+      "label": "画像処理 → S3",
+      "status": "fact"
+    },
+    "api": {
+      "type": "scenario",
+      "label": "API リクエスト"
+    },
+    "outbound": {
+      "type": "scenario",
+      "label": "外部 API 呼び出し"
+    },
+    "REQ-F-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "API リクエスト",
+      "status": "claim"
+    },
+    "NFR-01": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "AZ 障害への耐性",
+      "status": "claim"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "データ層はプライベートのみ",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "外部 API の提供元・SLA が不明"
+    }
+  },
+  "byRef": {
+    "docs/sample-aws-web.md#§1": [
+      "user"
+    ],
+    "docs/sample-aws-web.md": [
+      "user",
+      "r53",
+      "cf",
+      "waf",
+      "alb",
+      "nat",
+      "ecs",
+      "sm",
+      "worker",
+      "ops",
+      "aurora",
+      "redis",
+      "sqs",
+      "s3",
+      "u2r",
+      "u2cf",
+      "e2sm",
+      "op2e",
+      "api",
+      "outbound",
+      "REQ-F-01",
+      "NFR-01",
+      "BR-01"
+    ],
+    "docs/sample-aws-web.md#§2": [
+      "r53",
+      "cf",
+      "waf"
+    ],
+    "aws_route53_zone.main": [
+      "r53"
+    ],
+    "infra/dns.tf": [
+      "r53"
+    ],
+    "aws_cloudfront_distribution.main": [
+      "cf"
+    ],
+    "infra/edge.tf": [
+      "cf",
+      "waf"
+    ],
+    "aws_wafv2_web_acl.main": [
+      "waf"
+    ],
+    "docs/sample-aws-web.md#§3": [
+      "alb",
+      "nat",
+      "NFR-01"
+    ],
+    "aws_lb.api": [
+      "alb"
+    ],
+    "infra/network.tf": [
+      "alb",
+      "nat"
+    ],
+    "aws_nat_gateway.a": [
+      "nat"
+    ],
+    "docs/sample-aws-web.md#§4": [
+      "ecs",
+      "sm",
+      "outbound"
+    ],
+    "aws_ecs_service.api": [
+      "ecs"
+    ],
+    "infra/ecs.tf": [
+      "ecs"
+    ],
+    "docs/sample-aws-web.md#§5": [
+      "worker",
+      "sqs"
+    ],
+    "aws_lambda_function.image": [
+      "worker"
+    ],
+    "infra/worker.tf": [
+      "worker",
+      "sqs"
+    ],
+    "docs/sample-aws-web.md#§8": [
+      "ops"
+    ],
+    "docs/sample-aws-web.md#§6": [
+      "aurora",
+      "redis",
+      "s3",
+      "BR-01"
+    ],
+    "aws_rds_cluster.main": [
+      "aurora"
+    ],
+    "infra/db.tf": [
+      "aurora",
+      "redis"
+    ],
+    "aws_elasticache_replication_group.cache": [
+      "redis"
+    ],
+    "aws_sqs_queue.jobs": [
+      "sqs"
+    ],
+    "aws_s3_bucket.images": [
+      "s3"
+    ],
+    "infra/storage.tf": [
+      "s3"
+    ],
+    "docs/sample-aws-web.md#§7": [
+      "u2r",
+      "u2cf",
+      "e2sm",
+      "op2e",
+      "api",
+      "REQ-F-01"
+    ],
+    "cf->waf": [
+      "cf2w"
+    ],
+    "infra/security-groups.tf": [
+      "cf2w",
+      "w2a",
+      "a2e",
+      "e2r",
+      "e2db",
+      "e2n",
+      "e2q",
+      "q2l",
+      "l2s3"
+    ],
+    "waf->alb": [
+      "w2a"
+    ],
+    "alb->ecs": [
+      "a2e"
+    ],
+    "ecs->redis": [
+      "e2r"
+    ],
+    "ecs->aurora": [
+      "e2db"
+    ],
+    "ecs->nat": [
+      "e2n"
+    ],
+    "ecs->sqs": [
+      "e2q"
+    ],
+    "sqs->worker": [
+      "q2l"
+    ],
+    "worker->s3": [
+      "l2s3"
+    ]
+  }
+}

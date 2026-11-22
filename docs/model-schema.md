@@ -1,33 +1,65 @@
-# モデル仕様（v0）
+# モデル仕様（v1・YAML）
 
-```js
-window.MODEL = {
-  name: 'システム名',
-  source: 'docs/xxx.md',            // 元になった設計書
-  tiers: [ {id:'edge',label:'エッジ'}, {id:'app',label:'アプリ'}, {id:'data',label:'データ'} ], // 配列の先頭が最上階
-  nodes: {
-    order: {
-      label: '注文サービス',
-      kind: 'service',              // client | cdn | lb | service | worker | db | queue | cache | external
-      tier: 'app', x: 3, y: 1,      // フロア上のグリッド座標
-      replicas: 2,                  // 冗長台数（SPOF 判定に使用）
-      metrics: { p95: 180, cost: 420, rps: 120 },  // ms / USD月 / req/s
-      src: '§3.2',                  // 設計書の該当箇所
-    },
-  },
-  links: [
-    { id:'o2p', from:'order', to:'payment', sync:true, protocol:'HTTPS', timeoutMs:3000, retry:2, label:'決済依頼' },
-  ],
-  scenarios: [
-    { id:'checkout', label:'注文確定', steps:[ { links:['web2o'], note:'説明' } ] },
-  ],
-};
+モデルは `models/<id>/model.yaml`、実環境スナップショットは `models/<id>/actual.yaml`。
+`models/registry.json` に `{ "id": "...", "actual": true|false }` を追加すると画面に出る。
 
-window.ACTUAL = {   // 実環境から取得した構成（任意）
-  nodes: { order:{replicas:1} , debug:{label:'踏み台', kind:'service', tier:'app', x:8,y:3} },
-  links: [ ['order','payment'] ],   // [from, to] または {from, to}
-};
+```yaml
+name: システム名
+sources: [docs/xxx.md]            # 網羅の分母になる設計書（番号付き見出し ## 3.2 … が節になる）
+evidence:                          # モデル全体の根拠（概要の節など）
+  - { type: doc, ref: "docs/xxx.md#§1" }
+inventory:                         # 網羅の分母になる IaC リソース等
+  - { type: iac, ref: aws_ecs_service.api }
+tiers: [...]                       # 後述
+nodes:
+  order:
+    label: 注文サービス
+    kind: service                  # client | cdn | lb | service | worker | db | queue | cache | external | actor
+    tier: app
+    x: 3
+    y: 1
+    replicas: 2
+    metrics: { p95: 180, cost: 420, rps: 120 }
+    evidence:                      # 根拠（必須）。type: doc | iac | code | actual
+      - { type: doc, ref: "docs/xxx.md#§3.2" }
+      - { type: iac, ref: aws_ecs_service.order, at: "infra/ecs.tf:18", says: { replicas: 1 } }  # says が食い違えば「ずれ」
+    # status: unknown              # 判定を明示で上書きしたいときだけ
+links:
+  - { id: o2p, from: order, to: payment, sync: true, timeoutMs: 3000, retry: 2, evidence: [...] }
+scenarios:
+  - { id: checkout, label: 注文確定, evidence: [...], steps: [ { links: [w2o], note: 説明 } ] }
+requirements:                      # 技術に依存しない層
+  - { id: BR-01, kind: rule, title: 在庫引当は決済より前, text: ..., links: [o2i, o2p], evidence: [...] }
+  # kind: usecase（scenario: で紐付け）| rule | state（states: [...]）| nfr
+unknowns:                          # 確かめられなかったこと。推測で埋めずにここへ
+  - { id: UNK-01, text: Web → 注文 のタイムアウト値が不明, refs: [w2o] }
+gates: { maxDrift: 0, maxHigh: 0 } # 点検のしきい値
 ```
+
+## 確度の判定（js/analyze.js `classify`）
+1. `status` があればそれ
+2. `evidence[].says` の値が要素と食い違う → **ずれ**
+3. `actual.yaml` と比べて欠落・台数差 → **ずれ**、一致 → **事実**
+4. `iac` / `code` / `actual` の根拠あり → **事実**
+5. `doc` の根拠のみ → **主張**
+6. 根拠なし → **不明**
+
+## 点検（tools/gates.mjs・画面の「根拠と確度」）
+| ID | 合格条件 |
+|---|---|
+| COVERAGE | 設計書の全節・inventory・実環境の部品が、どこかの要素の根拠になっている |
+| BROKEN_REF | 根拠が指す設計書の節が存在する |
+| UNKNOWN_ACK | 不明な要素はすべて `unknowns` に登録されている |
+| DRIFT | ずれが `gates.maxDrift` 件以下 |
+| REQ_TRACE | 要件がすべて構成要素・シナリオに紐付いている |
+| HIGH_ISSUES | 重大な指摘が `gates.maxHigh` 件以下 |
+
+## 索引（tools/build-index.mjs → models/<id>/index.json）
+- `byId`：ID → 種類・ラベル・確度
+- `byRef`：参照先（`docs/xxx.md#§3.2`、`docs/xxx.md`、IaC リソース、`infra/ecs.tf`）→ ID の配列（逆引き。影響調査に使う）
+
+## 3D ビュー
+ドラッグで回転、右ドラッグ / Shift+ドラッグで移動、ホイールで拡大縮小。右上のボタンで 斜め / 真上 / 横 / 裏側 に切り替え。
 
 ## フロアの配置（tiers）
 ```js

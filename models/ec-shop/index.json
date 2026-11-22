@@ -1,0 +1,324 @@
+{
+  "model": "ec-shop",
+  "name": "ECサイト 注文基盤",
+  "generatedAt": "2026-11-22T07:08:31.773Z",
+  "coverage": {
+    "covered": 28,
+    "total": 29
+  },
+  "byId": {
+    "user": {
+      "type": "node",
+      "label": "会員",
+      "status": "claim"
+    },
+    "cdn": {
+      "type": "node",
+      "label": "CDN",
+      "status": "fact"
+    },
+    "alb": {
+      "type": "node",
+      "label": "ALB",
+      "status": "fact"
+    },
+    "web": {
+      "type": "node",
+      "label": "Web (BFF)",
+      "status": "fact"
+    },
+    "order": {
+      "type": "node",
+      "label": "注文",
+      "status": "drift"
+    },
+    "inv": {
+      "type": "node",
+      "label": "在庫",
+      "status": "fact"
+    },
+    "pay": {
+      "type": "node",
+      "label": "決済",
+      "status": "fact"
+    },
+    "notify": {
+      "type": "node",
+      "label": "通知ワーカー",
+      "status": "fact"
+    },
+    "psp": {
+      "type": "node",
+      "label": "決済代行",
+      "status": "fact"
+    },
+    "mail": {
+      "type": "node",
+      "label": "メール配信",
+      "status": "fact"
+    },
+    "ops": {
+      "type": "node",
+      "label": "運用担当",
+      "status": "claim"
+    },
+    "db": {
+      "type": "node",
+      "label": "注文 DB",
+      "status": "drift"
+    },
+    "kafka": {
+      "type": "node",
+      "label": "Kafka",
+      "status": "fact"
+    },
+    "redis": {
+      "type": "node",
+      "label": "Redis",
+      "status": "drift"
+    },
+    "u2c": {
+      "type": "link",
+      "label": "会員 → CDN",
+      "status": "claim"
+    },
+    "c2a": {
+      "type": "link",
+      "label": "CDN → ALB",
+      "status": "fact"
+    },
+    "a2w": {
+      "type": "link",
+      "label": "ALB → Web (BFF)",
+      "status": "fact"
+    },
+    "w2o": {
+      "type": "link",
+      "label": "Web (BFF) → 注文",
+      "status": "claim"
+    },
+    "w2r": {
+      "type": "link",
+      "label": "Web (BFF) → Redis",
+      "status": "drift"
+    },
+    "o2i": {
+      "type": "link",
+      "label": "注文 → 在庫",
+      "status": "claim"
+    },
+    "i2o": {
+      "type": "link",
+      "label": "在庫 → 注文",
+      "status": "claim"
+    },
+    "o2p": {
+      "type": "link",
+      "label": "注文 → 決済",
+      "status": "claim"
+    },
+    "p2s": {
+      "type": "link",
+      "label": "決済 → 決済代行",
+      "status": "fact"
+    },
+    "o2d": {
+      "type": "link",
+      "label": "注文 → 注文 DB",
+      "status": "claim"
+    },
+    "i2d": {
+      "type": "link",
+      "label": "在庫 → 注文 DB",
+      "status": "claim"
+    },
+    "o2k": {
+      "type": "link",
+      "label": "注文 → Kafka",
+      "status": "claim"
+    },
+    "k2n": {
+      "type": "link",
+      "label": "Kafka → 通知ワーカー",
+      "status": "fact"
+    },
+    "op2p": {
+      "type": "link",
+      "label": "運用担当 → 決済",
+      "status": "claim"
+    },
+    "n2m": {
+      "type": "link",
+      "label": "通知ワーカー → メール配信",
+      "status": "fact"
+    },
+    "checkout": {
+      "type": "scenario",
+      "label": "注文確定"
+    },
+    "cart": {
+      "type": "scenario",
+      "label": "カート参照"
+    },
+    "REQ-F-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "注文確定",
+      "status": "claim"
+    },
+    "REQ-F-02": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "カート参照",
+      "status": "claim"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "在庫引当は決済より前",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "決済は外部 PSP でオーソリ",
+      "status": "claim"
+    },
+    "ST-01": {
+      "type": "requirement",
+      "kind": "state",
+      "label": "注文の状態遷移",
+      "status": "claim"
+    },
+    "NFR-01": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "注文確定の応答時間",
+      "status": "unknown"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Web → 注文 の同期呼び出しのタイムアウト値が設計書にない"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "注文確定の応答時間目標（NFR-01）の根拠となる記述がない"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "運用担当の体制・手順（§7）が設計書に存在しない"
+    }
+  },
+  "byRef": {
+    "docs/sample-ec-design.md#§1": [
+      "model"
+    ],
+    "docs/sample-ec-design.md": [
+      "model",
+      "user",
+      "cdn",
+      "alb",
+      "web",
+      "order",
+      "inv",
+      "pay",
+      "notify",
+      "psp",
+      "mail",
+      "ops",
+      "db",
+      "kafka",
+      "redis",
+      "u2c",
+      "c2a",
+      "a2w",
+      "w2o",
+      "w2r",
+      "o2i",
+      "i2o",
+      "o2p",
+      "p2s",
+      "o2d",
+      "i2d",
+      "o2k",
+      "k2n",
+      "op2p",
+      "n2m",
+      "checkout",
+      "cart",
+      "REQ-F-01",
+      "REQ-F-02",
+      "BR-01",
+      "BR-02",
+      "ST-01"
+    ],
+    "docs/sample-ec-design.md#§2.1": [
+      "user",
+      "u2c"
+    ],
+    "docs/sample-ec-design.md#§2.2": [
+      "cdn",
+      "c2a"
+    ],
+    "docs/sample-ec-design.md#§2.3": [
+      "alb",
+      "a2w"
+    ],
+    "docs/sample-ec-design.md#§3.1": [
+      "web",
+      "w2o"
+    ],
+    "docs/sample-ec-design.md#§3.2": [
+      "order",
+      "o2i",
+      "o2p",
+      "o2k",
+      "BR-01",
+      "ST-01"
+    ],
+    "docs/sample-ec-design.md#§3.3": [
+      "inv",
+      "i2o",
+      "i2d"
+    ],
+    "docs/sample-ec-design.md#§3.4": [
+      "pay",
+      "p2s",
+      "BR-02"
+    ],
+    "docs/sample-ec-design.md#§3.5": [
+      "notify",
+      "k2n",
+      "n2m"
+    ],
+    "docs/sample-ec-design.md#§5.1": [
+      "psp"
+    ],
+    "docs/sample-ec-design.md#§5.2": [
+      "mail"
+    ],
+    "docs/sample-ec-design.md#§7": [
+      "ops",
+      "op2p"
+    ],
+    "docs/sample-ec-design.md#§4.1": [
+      "db",
+      "o2d"
+    ],
+    "docs/sample-ec-design.md#§4.2": [
+      "kafka"
+    ],
+    "docs/sample-ec-design.md#§4.3": [
+      "redis",
+      "w2r"
+    ],
+    "docs/sample-ec-design.md#§6.1": [
+      "checkout",
+      "REQ-F-01"
+    ],
+    "docs/sample-ec-design.md#§6.2": [
+      "cart",
+      "REQ-F-02"
+    ]
+  }
+}

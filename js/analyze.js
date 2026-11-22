@@ -7,7 +7,7 @@
     { id: 'SPOF', sev: 'high', title: '単一障害点',
       run: m => Object.entries(m.nodes)
         .filter(([, n]) => !INFRA.includes(n.kind) && (n.replicas ?? 1) < 2)
-        .map(([id, n]) => ({ nodes: [id], msg: `${n.label} が ${n.replicas ?? 1} 台構成（${n.src || '出典なし'}）` })) },
+        .map(([id, n]) => ({ nodes: [id], msg: `${n.label} が ${n.replicas ?? 1} 台構成（${(n.evidence || [])[0]?.ref?.split('#')[1] || (n.evidence || [])[0]?.at || '根拠なし'}）` })) },
 
     { id: 'NO_TIMEOUT', sev: 'high', title: 'タイムアウト未定義',
       run: m => syncLinks(m).filter(l => l.timeoutMs == null)
@@ -177,5 +177,113 @@
     return { nodes, links, extraNodes, extraLinks, items };
   }
 
-  window.Analyze = { lint, impact, diff, RULES };
+  /* ================= 根拠・確度（Reverse Spec Flow の考え方） =================
+   * fact    : IaC / コード / 実環境で裏が取れた
+   * claim   : 設計書などに書いてあるが未検証（出所の分かる主張）
+   * unknown : 根拠がない
+   * drift   : 根拠どうしが食い違う（設計 ≠ 実装・実環境）
+   */
+  const STATUS = { fact: '事実', claim: '主張', unknown: '不明', drift: 'ずれ' };
+
+  /* Markdown の番号付き見出し → 節 ID（§3.2）。子を持つ親見出しは分母から除く */
+  function parseSections(md) {
+    const s = [...md.matchAll(/^#{2,4}\s+(\d+(?:\.\d+)*)\.?\s+(.+)$/gm)].map(x => ({ id: '§' + x[1], title: x[2].trim() }));
+    return s.filter(a => !s.some(b => b.id.startsWith(a.id + '.')));
+  }
+
+  function classify(m, a) {
+    const d = diff(m, a), out = { nodes: {}, links: {}, reqs: {}, drifts: [] };
+    const fromEv = (el, label) => {
+      if (el.status) return { status: el.status, why: '明示' };
+      const ev = el.evidence || [];
+      for (const e of ev) if (e.says) for (const [k, v] of Object.entries(e.says)) if (el[k] != null && el[k] !== v) {
+        out.drifts.push({ label, msg: `${label}：設計 ${k}=${el[k]} ／ ${e.type === 'iac' ? 'IaC' : 'コード'}（${e.at || e.ref}）${k}=${v}` });
+        return { status: 'drift', why: `${k} が一致しない` };
+      }
+      if (ev.some(e => e.type === 'iac' || e.type === 'code' || e.type === 'actual')) return { status: 'fact', why: '実装で確認' };
+      if (ev.some(e => e.type === 'doc')) return { status: 'claim', why: '設計書の記述のみ' };
+      return { status: 'unknown', why: '根拠なし' };
+    };
+    for (const [id, n] of Object.entries(m.nodes)) {
+      let r = fromEv(n, n.label);
+      if (a && n.kind !== 'actor' && r.status !== 'drift') {
+        if (d.nodes[id]) { r = { status: 'drift', why: d.nodes[id] === 'missing' ? '実環境に存在しない' : '台数が一致しない' }; out.drifts.push({ label: n.label, msg: d.items.find(i => i.nodes?.includes(id))?.msg }); }
+        else if (a.nodes[id]) r = { status: 'fact', why: '実環境で確認' };
+      }
+      out.nodes[id] = r;
+    }
+    for (const l of m.links) {
+      const lab = `${m.nodes[l.from].label} → ${m.nodes[l.to].label}`;
+      let r = fromEv(l, lab);
+      if (a && r.status !== 'drift' && ![l.from, l.to].some(x => m.nodes[x].kind === 'actor')) {
+        if (d.links[l.id]) r = { status: 'drift', why: '実環境に接続がない' };
+        else if (out.nodes[l.from].status === 'fact' && out.nodes[l.to].status === 'fact') r = { status: 'fact', why: '実環境で確認' };
+      }
+      out.links[l.id] = r;
+    }
+    for (const x of d.items.filter(i => i.kind === 'extra')) out.drifts.push({ label: '実環境のみ', msg: x.msg });
+    for (const q of m.requirements || []) out.reqs[q.id] = fromEv(q, q.title);
+    return out;
+  }
+
+  /* 根拠の参照先 → 正規化したキー（ファイル#節 / IaC リソース / ファイル） */
+  const refKey = e => e.ref;
+  function evidenceOwners(m) {
+    const own = [];
+    const push = (id, kind, label, ev) => (ev || []).forEach(e => own.push({ id, kind, label, e }));
+    push('model', 'model', m.name, m.evidence);
+    Object.entries(m.nodes).forEach(([id, n]) => push(id, 'node', n.label, n.evidence));
+    m.links.forEach(l => push(l.id, 'link', `${m.nodes[l.from].label} → ${m.nodes[l.to].label}`, l.evidence));
+    (m.scenarios || []).forEach(s => push(s.id, 'scenario', s.label, s.evidence));
+    (m.requirements || []).forEach(q => push(q.id, 'req', q.title, q.evidence));
+    return own;
+  }
+
+  /* 網羅：設計書の節 + IaC 在庫 + 実環境の部品 を分母にする */
+  function coverage(m, a, docs) {
+    const own = evidenceOwners(m), refs = new Set(own.map(o => refKey(o.e))), items = [];
+    for (const src of m.sources || []) for (const s of docs[src] || []) items.push({ kind: 'doc', ref: `${src}#${s.id}`, label: `${s.id} ${s.title}`, ok: refs.has(`${src}#${s.id}`) });
+    for (const inv of m.inventory || []) items.push({ kind: inv.type || 'iac', ref: inv.ref, label: inv.ref, ok: refs.has(inv.ref) });
+    if (a) for (const [id, x] of Object.entries(a.nodes)) items.push({ kind: 'actual', ref: `actual:${id}`, label: x.label || m.nodes[id]?.label || id, ok: !!m.nodes[id] });
+    const broken = own.filter(o => o.e.type === 'doc').filter(o => { const [f, s] = o.e.ref.split('#'); return docs[f] && s && !docs[f].some(x => x.id === s); })
+      .map(o => ({ id: o.id, label: o.label, ref: o.e.ref }));
+    return { items, total: items.length, covered: items.filter(i => i.ok).length, missing: items.filter(i => !i.ok), broken };
+  }
+
+  /* 点検（gates）：合否は AI の報告ではなくこの判定で決める */
+  function gates(m, a, docs) {
+    const cls = classify(m, a), cov = coverage(m, a, docs), issues = lint(m), g = m.gates || {};
+    const ack = new Set((m.unknowns || []).flatMap(u => u.refs || []));
+    const unk = [...Object.entries(cls.nodes).map(([id, r]) => [id, m.nodes[id].label, r]), ...Object.entries(cls.links).map(([id, r]) => [id, id, r]), ...Object.entries(cls.reqs).map(([id, r]) => [id, id, r])]
+      .filter(([, , r]) => r.status === 'unknown');
+    const unack = unk.filter(([id]) => !ack.has(id));
+    const reqNoTrace = (m.requirements || []).filter(q => !(q.nodes?.length || q.links?.length || q.scenario));
+    const high = issues.filter(i => i.sev === 'high');
+    const res = [
+      { id: 'COVERAGE', label: '網羅率 100%', pass: cov.covered === cov.total, detail: `${cov.covered} / ${cov.total}`, items: cov.missing.map(x => `${x.label}（${x.kind}）`) },
+      { id: 'BROKEN_REF', label: '根拠の参照先が存在する', pass: !cov.broken.length, detail: `${cov.broken.length} 件`, items: cov.broken.map(b => `${b.label} → ${b.ref}`) },
+      { id: 'UNKNOWN_ACK', label: '不明はすべて unknowns に登録済み', pass: !unack.length, detail: `未登録 ${unack.length} / 不明 ${unk.length}`, items: unack.map(([id, l]) => `${l}（${id}）`) },
+      { id: 'DRIFT', label: `ずれ ${g.maxDrift ?? 0} 件以下`, pass: cls.drifts.length <= (g.maxDrift ?? 0), detail: `${cls.drifts.length} 件`, items: cls.drifts.map(x => x.msg) },
+      { id: 'REQ_TRACE', label: '要件がすべて構成要素に紐付く', pass: !reqNoTrace.length, detail: `${reqNoTrace.length} 件`, items: reqNoTrace.map(q => `${q.id} ${q.title}`) },
+      { id: 'HIGH_ISSUES', label: `重大な指摘 ${g.maxHigh ?? 0} 件以下`, pass: high.length <= (g.maxHigh ?? 0), detail: `${high.length} 件`, items: high.map(i => i.msg) },
+    ];
+    return { pass: res.every(r => r.pass), results: res, cls, cov, issues };
+  }
+
+  /* 索引：ID → 要素 / 参照先 → ID（逆引き） */
+  function index(m) {
+    const byId = {}, byRef = {};
+    Object.entries(m.nodes).forEach(([id, n]) => byId[id] = { type: 'node', label: n.label });
+    m.links.forEach(l => byId[l.id] = { type: 'link', label: `${m.nodes[l.from].label} → ${m.nodes[l.to].label}` });
+    (m.scenarios || []).forEach(s => byId[s.id] = { type: 'scenario', label: s.label });
+    (m.requirements || []).forEach(q => byId[q.id] = { type: 'requirement', kind: q.kind, label: q.title });
+    (m.unknowns || []).forEach(u => byId[u.id] = { type: 'unknown', label: u.text });
+    evidenceOwners(m).forEach(o => {
+      const keys = [o.e.ref, o.e.at && o.e.at.split(':')[0], o.e.ref.split('#')[0]].filter((k, i, a) => k && a.indexOf(k) === i);
+      keys.forEach(k => { (byRef[k] = byRef[k] || []).includes(o.id) || byRef[k].push(o.id); });
+    });
+    return { byId, byRef };
+  }
+
+  window.Analyze = { lint, impact, diff, RULES, STATUS, parseSections, classify, coverage, gates, index };
 })();

@@ -1,0 +1,551 @@
+# AWS Web アプリ構成
+name: AWS Web アプリ構成
+description: CloudFront + ALB + ECS Fargate + Aurora の定番構成に、非同期処理（SQS + Lambda）を加えたもの。色は AWS のサービスカテゴリ。
+failPresets:
+  - nat
+  - aurora
+  - redis
+  - ecs
+tiers:
+  - id: internet
+    label: インターネット
+    kind: origin
+    z: 1
+    origin:
+      - -11
+      - 0
+    size:
+      - 1
+      - 4
+  - id: office
+    label: 社内（VPN）
+    kind: origin
+    z: 0
+    origin:
+      - -11
+      - 0
+    size:
+      - 1
+      - 4
+  - id: edge
+    label: エッジ（グローバル）
+    z: 1
+    origin:
+      - -7.6
+      - 0
+    size:
+      - 4
+      - 4
+  - id: app
+    label: VPC：アプリ層
+    z: 1
+  - id: data
+    label: VPC：データ層
+    z: 0
+groups:
+  - kind: vpc
+    label: VPC 10.0.0.0/16
+    tier:
+      - app
+      - data
+    x0: -1
+    y0: -1
+    x1: 7.4
+    y1: 4
+  - kind: az
+    label: AZ-a
+    tier:
+      - app
+      - data
+    x0: -0.8
+    y0: -0.8
+    x1: 7.2
+    y1: 1.4
+  - kind: az
+    label: AZ-c
+    tier:
+      - app
+      - data
+    x0: -0.8
+    y0: 1.6
+    x1: 7.2
+    y1: 3.8
+  - kind: subnet
+    label: public
+    tier: app
+    x0: -0.6
+    y0: -0.6
+    x1: 1.6
+    y1: 3.6
+nodes:
+  user:
+    label: 利用者
+    kind: actor
+    role: user
+    tier: internet
+    x: 0
+    'y': 2
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§1
+  r53:
+    label: Route 53
+    svc: route53
+    tier: edge
+    x: 0.5
+    'y': 0
+    replicas: 99
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§2
+      - type: iac
+        ref: aws_route53_zone.main
+        at: infra/dns.tf:3
+  cf:
+    label: CloudFront
+    svc: cloudfront
+    tier: edge
+    x: 0.5
+    'y': 2
+    replicas: 99
+    metrics:
+      p95: 20
+      cost: 150
+      rps: 1200
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§2
+      - type: iac
+        ref: aws_cloudfront_distribution.main
+        at: infra/edge.tf:12
+  waf:
+    label: WAF
+    svc: waf
+    tier: edge
+    x: 3
+    'y': 2
+    replicas: 99
+    metrics:
+      p95: 2
+      cost: 40
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§2
+      - type: iac
+        ref: aws_wafv2_web_acl.main
+        at: infra/edge.tf:58
+  alb:
+    label: ALB
+    svc: alb
+    tier: app
+    x: 0.5
+    'y': 1.5
+    replicas: 2
+    az:
+      - a
+      - c
+    subnet: public
+    metrics:
+      p95: 5
+      cost: 30
+      rps: 400
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§3
+      - type: iac
+        ref: aws_lb.api
+        at: infra/network.tf:88
+  nat:
+    label: NAT Gateway
+    svc: nat
+    tier: app
+    x: 0.5
+    'y': 0
+    replicas: 1
+    az:
+      - a
+    subnet: public
+    metrics:
+      cost: 45
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§3
+      - type: iac
+        ref: aws_nat_gateway.a
+        at: infra/network.tf:41
+        says:
+          replicas: 1
+  ecs:
+    label: API（ECS）
+    svc: ecs
+    tier: app
+    x: 3.5
+    'y': 1.5
+    replicas: 4
+    az:
+      - a
+      - c
+    subnet: private
+    metrics:
+      p95: 160
+      cost: 280
+      rps: 400
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§4
+      - type: iac
+        ref: aws_ecs_service.api
+        at: infra/ecs.tf:18
+        says:
+          replicas: 2
+  sm:
+    label: Secrets Manager
+    svc: secrets
+    tier: app
+    x: 9
+    'y': 3.4
+    replicas: 99
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§4
+  worker:
+    label: 画像処理
+    svc: lambda
+    tier: app
+    x: 6.2
+    'y': 2.6
+    replicas: 99
+    metrics:
+      p95: 1200
+      cost: 60
+      rps: 20
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§5
+      - type: iac
+        ref: aws_lambda_function.image
+        at: infra/worker.tf:5
+  ext:
+    label: 外部 API
+    kind: external
+    tier: app
+    x: 9
+    'y': 0
+  ops:
+    label: インフラ担当
+    kind: actor
+    role: ops
+    team: インフラ
+    headcount: 2
+    tier: office
+    x: 0
+    'y': 2
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§8
+  aurora:
+    label: Aurora
+    svc: aurora
+    tier: data
+    x: 3
+    'y': 1.5
+    replicas: 2
+    az:
+      - a
+      - c
+    subnet: private
+    metrics:
+      p95: 12
+      cost: 520
+      rps: 380
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§6
+      - type: iac
+        ref: aws_rds_cluster.main
+        at: infra/db.tf:9
+  redis:
+    label: ElastiCache
+    svc: elasticache
+    tier: data
+    x: 0.5
+    'y': 0.3
+    replicas: 1
+    az:
+      - a
+    subnet: private
+    metrics:
+      p95: 1
+      cost: 70
+      rps: 900
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§6
+      - type: iac
+        ref: aws_elasticache_replication_group.cache
+        at: infra/db.tf:44
+        says:
+          replicas: 1
+  sqs:
+    label: SQS
+    svc: sqs
+    tier: data
+    x: 6
+    'y': 0.5
+    replicas: 99
+    metrics:
+      cost: 5
+      rps: 20
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§5
+      - type: iac
+        ref: aws_sqs_queue.jobs
+        at: infra/worker.tf:30
+  s3:
+    label: S3
+    svc: s3
+    tier: data
+    x: 9
+    'y': 2.5
+    replicas: 99
+    metrics:
+      cost: 25
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§6
+      - type: iac
+        ref: aws_s3_bucket.images
+        at: infra/storage.tf:2
+links:
+  - id: u2r
+    from: user
+    to: r53
+    sync: true
+    timeoutMs: 5000
+    label: DNS
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§7
+  - id: u2cf
+    from: user
+    to: cf
+    sync: true
+    timeoutMs: 60000
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§7
+  - id: cf2w
+    from: cf
+    to: waf
+    sync: true
+    timeoutMs: 30000
+    evidence:
+      - type: iac
+        ref: cf->waf
+        at: infra/security-groups.tf
+  - id: w2a
+    from: waf
+    to: alb
+    sync: true
+    timeoutMs: 30000
+    evidence:
+      - type: iac
+        ref: waf->alb
+        at: infra/security-groups.tf
+  - id: a2e
+    from: alb
+    to: ecs
+    sync: true
+    timeoutMs: 60000
+    evidence:
+      - type: iac
+        ref: alb->ecs
+        at: infra/security-groups.tf
+  - id: e2sm
+    from: ecs
+    to: sm
+    sync: true
+    timeoutMs: 3000
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§7
+  - id: e2r
+    from: ecs
+    to: redis
+    sync: true
+    timeoutMs: 100
+    evidence:
+      - type: iac
+        ref: ecs->redis
+        at: infra/security-groups.tf
+  - id: e2db
+    from: ecs
+    to: aurora
+    sync: true
+    timeoutMs: 3000
+    evidence:
+      - type: iac
+        ref: ecs->aurora
+        at: infra/security-groups.tf
+  - id: e2n
+    from: ecs
+    to: nat
+    sync: true
+    timeoutMs: 10000
+    evidence:
+      - type: iac
+        ref: ecs->nat
+        at: infra/security-groups.tf
+  - id: n2x
+    from: nat
+    to: ext
+    sync: true
+    timeoutMs: 10000
+  - id: e2q
+    from: ecs
+    to: sqs
+    sync: false
+    label: ジョブ投入
+    evidence:
+      - type: iac
+        ref: ecs->sqs
+        at: infra/security-groups.tf
+  - id: q2l
+    from: sqs
+    to: worker
+    sync: false
+    evidence:
+      - type: iac
+        ref: sqs->worker
+        at: infra/security-groups.tf
+  - id: op2e
+    from: ops
+    to: ecs
+    sync: false
+    label: ECS Exec
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§7
+  - id: l2s3
+    from: worker
+    to: s3
+    sync: true
+    timeoutMs: 5000
+    evidence:
+      - type: iac
+        ref: worker->s3
+        at: infra/security-groups.tf
+scenarios:
+  - id: api
+    label: API リクエスト
+    steps:
+      - links:
+          - u2r
+        note: Route 53 で名前解決
+      - links:
+          - u2cf
+          - cf2w
+        note: CloudFront で受け、WAF でフィルタ
+      - links:
+          - w2a
+          - a2e
+        note: パブリックサブネットの ALB から、プライベートの ECS タスクへ
+      - links:
+          - e2r
+          - e2db
+        note: キャッシュを確認し、なければ Aurora を参照
+      - links:
+          - e2q
+          - q2l
+          - l2s3
+        note: 重い処理は SQS 経由で Lambda に任せ、結果を S3 へ
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§7
+  - id: outbound
+    label: 外部 API 呼び出し
+    steps:
+      - links:
+          - a2e
+        note: リクエストを受けた ECS が
+      - links:
+          - e2n
+          - n2x
+        note: NAT Gateway 経由でインターネット上の外部 API を呼ぶ（NAT は AZ-a のみ）
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§4
+review:
+  - NAT Gateway が AZ-a にしかない。AZ-a 障害で AZ-c のタスクも外部 API を呼べなくなる
+  - ElastiCache がレプリカなし・単一 AZ
+sources:
+  - docs/sample-aws-web.md
+inventory:
+  - type: iac
+    ref: aws_route53_zone.main
+  - type: iac
+    ref: aws_cloudfront_distribution.main
+  - type: iac
+    ref: aws_wafv2_web_acl.main
+  - type: iac
+    ref: aws_lb.api
+  - type: iac
+    ref: aws_nat_gateway.a
+  - type: iac
+    ref: aws_ecs_service.api
+  - type: iac
+    ref: aws_lambda_function.image
+  - type: iac
+    ref: aws_rds_cluster.main
+  - type: iac
+    ref: aws_elasticache_replication_group.cache
+  - type: iac
+    ref: aws_sqs_queue.jobs
+  - type: iac
+    ref: aws_s3_bucket.images
+  - type: iac
+    ref: aws_cloudwatch_log_group.api
+  - type: iac
+    ref: aws_iam_role.ecs_task
+requirements:
+  - id: REQ-F-01
+    kind: usecase
+    title: API リクエスト
+    text: 利用者の API リクエストを処理し、重い処理は非同期に回す。
+    scenario: api
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§7
+  - id: NFR-01
+    kind: nfr
+    title: AZ 障害への耐性
+    text: 1 つの AZ が停止してもサービスを継続する。
+    nodes:
+      - nat
+      - redis
+      - ecs
+      - aurora
+      - alb
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§3
+  - id: BR-01
+    kind: rule
+    title: データ層はプライベートのみ
+    text: DB・キャッシュはインターネットから到達できないサブネットに置く。
+    nodes:
+      - aurora
+      - redis
+    evidence:
+      - type: doc
+        ref: docs/sample-aws-web.md#§6
+unknowns:
+  - id: UNK-01
+    text: 外部 API の提供元・SLA が不明
+    refs:
+      - ext
+      - n2x
+gates:
+  maxDrift: 0
+  maxHigh: 0

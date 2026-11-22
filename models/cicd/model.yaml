@@ -1,0 +1,454 @@
+# CI/CD パイプライン
+name: CI/CD パイプライン
+type: pipeline
+description: GitHub への push から本番デプロイまで。下のフロアから上へ、環境を昇っていく。
+metrics:
+  - - duration
+    - 所要時間
+    - 分
+  - - cost
+    - 月額コスト
+    - $
+leadTimeLimit: 30
+failPresets:
+  - unit
+  - e2e
+  - lead
+  - oncall
+tiers:
+  - id: prod
+    label: 本番
+  - id: stg
+    label: ステージング
+  - id: ci
+    label: CI
+nodes:
+  dev:
+    label: 開発者
+    kind: actor
+    role: dev
+    team: 決済チーム
+    headcount: 5
+    stage: actor
+    tier: ci
+    x: -0.6
+    'y': 3.6
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§2
+  gh:
+    label: GitHub (main)
+    svc: github
+    kind: external
+    stage: source
+    tier: ci
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:3
+  build:
+    label: ビルド
+    svc: codebuild
+    stage: build
+    tier: ci
+    x: 2.5
+    'y': 1.5
+    metrics:
+      duration: 6
+      cost: 40
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:14
+  unit:
+    label: ユニットテスト
+    svc: codebuild
+    stage: test
+    tier: ci
+    x: 5
+    'y': 0.3
+    metrics:
+      duration: 8
+      cost: 55
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:31
+  scan:
+    label: 脆弱性スキャン
+    svc: codebuild
+    stage: test
+    tier: ci
+    x: 5
+    'y': 2.8
+    metrics:
+      duration: 3
+      cost: 20
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:44
+  ecr:
+    label: イメージ
+    svc: ecr
+    stage: artifact
+    tier: ci
+    x: 8
+    'y': 1.5
+    metrics:
+      duration: 1
+      cost: 10
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:57
+  dstg:
+    label: stg デプロイ
+    svc: codedeploy
+    stage: deploy
+    tier: stg
+    x: 8
+    'y': 1.5
+    metrics:
+      duration: 5
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:66
+  ecsstg:
+    label: ECS (stg)
+    svc: ecs
+    stage: env
+    tier: stg
+    x: 8
+    'y': 3.5
+    metrics:
+      cost: 120
+    evidence:
+      - type: code
+        ref: infra/ecs-stg.tf
+        at: infra/ecs-stg.tf:1
+  e2e:
+    label: E2E テスト
+    svc: codebuild
+    stage: test
+    tier: stg
+    x: 4.5
+    'y': 1.5
+    metrics:
+      duration: 15
+      cost: 60
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:80
+  lead:
+    label: テックリード
+    kind: actor
+    role: approver
+    team: 決済チーム
+    headcount: 1
+    stage: actor
+    tier: prod
+    x: 2.2
+    'y': -0.4
+    evidence:
+      - type: code
+        ref: .github/CODEOWNERS
+        at: .github/CODEOWNERS:1
+  oncall:
+    label: 運用当番
+    kind: actor
+    role: ops
+    team: SRE
+    headcount: 3
+    stage: actor
+    tier: prod
+    x: -0.6
+    'y': 3.6
+  appr:
+    label: リリース承認
+    svc: approval
+    stage: approval
+    tier: prod
+    x: 4.5
+    'y': 1.5
+    metrics:
+      duration: 10
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:95
+  dprod:
+    label: 本番デプロイ
+    svc: codedeploy
+    stage: deploy
+    tier: prod
+    x: 8
+    'y': 1.5
+    join: any
+    metrics:
+      duration: 8
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml:104
+  ecsprod:
+    label: ECS (本番)
+    svc: ecs
+    stage: env
+    tier: prod
+    x: 8
+    'y': 3.5
+    metrics:
+      cost: 480
+    evidence:
+      - type: code
+        ref: infra/ecs-prod.tf
+        at: infra/ecs-prod.tf:1
+  cw:
+    label: アラーム
+    svc: cloudwatch
+    stage: monitor
+    tier: prod
+    x: 3
+    'y': 3.6
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§5
+links:
+  - id: push
+    from: dev
+    to: gh
+    sync: true
+    label: push
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§2
+  - id: ok
+    from: lead
+    to: appr
+    sync: true
+    label: 承認
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§4
+  - id: alert
+    from: cw
+    to: oncall
+    sync: false
+    label: 通知
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§5
+  - id: rb
+    from: oncall
+    to: dprod
+    sync: false
+    kind: rollback
+    label: 手動ロールバック
+  - id: g2b
+    from: gh
+    to: build
+    sync: true
+    label: push
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: b2u
+    from: build
+    to: unit
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: b2s
+    from: build
+    to: scan
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: u2e
+    from: unit
+    to: ecr
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: s2e
+    from: scan
+    to: ecr
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: e2d
+    from: ecr
+    to: dstg
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: d2s
+    from: dstg
+    to: ecsstg
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: d2t
+    from: dstg
+    to: e2e
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: t2a
+    from: e2e
+    to: appr
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: a2p
+    from: appr
+    to: dprod
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: p2e
+    from: dprod
+    to: ecsprod
+    sync: true
+    evidence:
+      - type: code
+        ref: .github/workflows/release.yml
+        at: .github/workflows/release.yml
+  - id: hot
+    from: build
+    to: dprod
+    sync: true
+    label: hotfix ブランチ
+    evidence:
+      - type: code
+        ref: .github/workflows/hotfix.yml
+        at: .github/workflows/hotfix.yml:9
+  - id: mon
+    from: ecsprod
+    to: cw
+    sync: false
+    label: メトリクス
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§5
+scenarios:
+  - id: release
+    label: main へ push → 本番
+    steps:
+      - links:
+          - push
+          - g2b
+        note: 開発者が main に push し、パイプラインが起動してコンテナイメージをビルド
+      - links:
+          - b2u
+          - b2s
+        note: ユニットテストと脆弱性スキャンを並列実行
+      - links:
+          - u2e
+          - s2e
+        note: 両方通ったイメージだけを ECR に登録
+      - links:
+          - e2d
+          - d2s
+        note: ステージングの ECS にデプロイ
+      - links:
+          - d2t
+        note: ステージングで E2E テスト（15 分）
+      - links:
+          - t2a
+          - ok
+        note: テックリードがリリースを承認（開発者と同じチーム）
+      - links:
+          - a2p
+          - p2e
+        note: 本番の ECS にデプロイ
+      - links:
+          - mon
+          - alert
+        note: CloudWatch で監視し、異常を運用当番に通知
+      - links:
+          - rb
+        note: 運用当番が手動でロールバック。自動ロールバックはない
+  - id: hotfix
+    label: hotfix
+    steps:
+      - links:
+          - push
+          - g2b
+        note: 開発者が hotfix ブランチに push
+      - links:
+          - hot
+          - p2e
+        note: ビルド後、テストも承認も経ずに本番へ直接デプロイされる
+review:
+  - hotfix 経路がテスト・承認を迂回している
+  - 本番デプロイに自動ロールバックがない
+sources:
+  - docs/sample-cicd.md
+requirements:
+  - id: REQ-P-01
+    kind: rule
+    title: 本番リリースは承認必須
+    text: 本番デプロイの前に、開発者以外の承認を得る。
+    nodes:
+      - appr
+      - dprod
+      - lead
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§4
+  - id: REQ-P-02
+    kind: rule
+    title: テストを通ったイメージだけをデプロイ
+    text: ユニットテストと脆弱性スキャンを通過したイメージだけを ECR に登録する。
+    links:
+      - u2e
+      - s2e
+      - e2d
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§3
+  - id: NFR-P-01
+    kind: nfr
+    title: リードタイム 30 分以内
+    text: main への push から本番反映まで 30 分以内。
+    scenario: release
+    evidence:
+      - type: doc
+        ref: docs/sample-cicd.md#§6
+unknowns:
+  - id: UNK-01
+    text: 運用当番の体制（人数・連絡手段）を裏付ける資料がない
+    refs:
+      - oncall
+      - rb
+gates:
+  maxDrift: 0
+  maxHigh: 0
+evidence:
+  - type: doc
+    ref: docs/sample-cicd.md#§1
