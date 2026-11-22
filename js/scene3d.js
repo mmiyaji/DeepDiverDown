@@ -33,6 +33,7 @@ export class Scene3D {
     this.scene.add(new THREE.AmbientLight(0xffffff, 1.6));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-4, 10, 6); this.scene.add(sun);
     const fill = new THREE.DirectionalLight(0xffffff, 0.5); fill.position.set(6, 3, -4); this.scene.add(fill);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d2c4, 0.35)); // 上面を明るく、側面を少し落として立体感を出す
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     Object.assign(this.controls, { enableDamping: true, dampingFactor: 0.12, screenSpacePanning: true, minZoom: 0.3, maxZoom: 6 });
@@ -52,6 +53,21 @@ export class Scene3D {
       const hit = this.ray.intersectObjects(this.pick, false)[0];
       this.onPick?.(hit?.object.userData.id ?? null);
     });
+    /* ホバー：部品の上ではカーソルを変え、その部品のラベルを優先して表示する */
+    let hoverQueued = null;
+    this.renderer.domElement.addEventListener('pointermove', e => {
+      if (e.buttons) return;
+      hoverQueued = e;
+      requestAnimationFrame(() => {
+        if (!hoverQueued) return;
+        const ev = hoverQueued; hoverQueued = null;
+        const r = this.renderer.domElement.getBoundingClientRect();
+        this.ray.setFromCamera(new THREE.Vector2((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1), this.camera);
+        const id = this.ray.intersectObjects(this.pick, false)[0]?.object.userData.id ?? null;
+        if (id !== this.hoverId) { this.hoverId = id; this.labelsDirty = true; this.renderer.domElement.style.cursor = id ? 'pointer' : ''; }
+      });
+    });
+    this.renderer.domElement.addEventListener('pointerleave', () => { if (this.hoverId) { this.hoverId = null; this.labelsDirty = true; } });
     this.controls.addEventListener('start', () => { this.usingControls = true; });
     this.controls.addEventListener('end', () => { this.usingControls = false; });
     this.controls.addEventListener('change', () => {
@@ -81,15 +97,55 @@ export class Scene3D {
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
       this.labels.render(this.scene, this.camera);
-      if (this.flat) {
-        this.labelProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
-        if (this.labelsDirty || !this.labelProjection.equals(this.lastLabelProjection)) {
-          this.placeLabels();
-          this.lastLabelProjection.copy(this.labelProjection);
-          this.labelsDirty = false;
-        }
+      this.renderMinimap();
+      // ラベルの重なりは 2D・3D とも解消する（3D は動かしている間の負荷を抑えて間引く）
+      this.labelProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+      const moved = !this.labelProjection.equals(this.lastLabelProjection), now = performance.now();
+      if (this.labelsDirty || (moved && (this.flat || now - (this.lastPlace || 0) > 120))) {
+        this.placeLabels();
+        this.lastLabelProjection.copy(this.labelProjection);
+        this.labelsDirty = false; this.lastPlace = now;
       }
     });
+  }
+
+  /* ミニマップ：右下に真上からの全体図。クリックでその場所へ視点を移す */
+  setMinimap(on) {
+    this.miniOn = on;
+    if (!this.miniEl) {
+      this.miniEl = document.createElement('button');
+      this.miniEl.className = 'minimap'; this.miniEl.type = 'button';
+      this.miniEl.title = '全体図：クリックした場所へ移動';
+      this.miniEl.addEventListener('click', e => {
+        const b = this.miniBounds; if (!b) return;
+        const r = this.miniEl.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+        this.focusOn([b.cx - b.hw + fx * b.hw * 2, this.controls.target.y, b.cz - b.hh + fy * b.hh * 2], this.camera.zoom);
+      });
+      this.el.appendChild(this.miniEl);
+    }
+    this.miniEl.hidden = !on;
+  }
+  updateMinimapCamera() {
+    const box = new THREE.Box3().setFromObject(this.root);
+    if (box.isEmpty()) return;
+    const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3()), aspect = 180 / 130;
+    let hw = s.x / 2 + 0.8, hh = s.z / 2 + 0.8;
+    if (hw / hh > aspect) hh = hw / aspect; else hw = hh * aspect;
+    this.miniCam = this.miniCam || new THREE.OrthographicCamera(-1, 1, 1, -1, -500, 500);
+    Object.assign(this.miniCam, { left: -hw, right: hw, top: hh, bottom: -hh });
+    this.miniCam.up.set(0, 0, -1); // 画面の上 = 奥（-z）
+    this.miniCam.position.set(c.x, box.max.y + 50, c.z); this.miniCam.lookAt(c.x, 0, c.z);
+    this.miniCam.updateProjectionMatrix();
+    this.miniBounds = { cx: c.x, cz: c.z, hw, hh };
+  }
+  renderMinimap() {
+    if (!this.miniOn || !this.miniCam || this.el.clientWidth < 520) { if (this.miniEl) this.miniEl.style.visibility = this.miniOn && this.miniCam && this.el.clientWidth >= 520 ? '' : 'hidden'; return; }
+    this.miniEl.style.visibility = '';
+    const r = this.renderer, W = this.el.clientWidth, w = 180, h = 130, x = W - w - 12, y = 12;
+    r.autoClear = false; r.setScissorTest(true); r.setScissor(x, y, w, h); r.setViewport(x, y, w, h);
+    r.setClearColor(this.color('--card'), 0.94); r.clear();
+    r.render(this.scene, this.miniCam);
+    r.setScissorTest(false); r.setViewport(0, 0, W, this.el.clientHeight); r.setClearColor(0x000000, 0); r.autoClear = true;
   }
 
   /* 2D では画面上のラベルを測り、優先順に重なりのないものを表示する */
@@ -98,7 +154,7 @@ export class Scene3D {
     const labels = Array.from(layer.children).filter(el => el.style.display !== 'none').map(el => ({
       el,
       rect: el.getBoundingClientRect(),
-      priority: el.dataset.selected ? -1 : el.dataset.icon ? -0.5 : LABEL_PRIORITY.get(el.classList[0]),
+      priority: (this.hoverId && el.dataset.node === this.hoverId) ? -2 : el.dataset.selected ? -1 : el.dataset.icon ? -0.5 : LABEL_PRIORITY.get(el.classList[0]),
     }));
     labels.sort((a, b) => a.priority - b.priority);
     const occupied = [];
@@ -327,6 +383,7 @@ export class Scene3D {
     this.flat = flat;
     this.labelsDirty = true;
     if (!this.fitted) { this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true; }
+    this.updateMinimapCamera();
   }
 
   fit(view = 'iso') {
@@ -364,7 +421,8 @@ export class Scene3D {
     if (!origin) {
       const geo = new THREE.BoxGeometry(w, 0.06, d);
       const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
-        color: this.color('--plate'), transparent: true, opacity: style === 'flow' ? 0.52 : 0.82,
+        color: this.color('--plate'), emissive: this.color('--plate'), emissiveIntensity: 0.45, // 床は暗くしすぎない
+        transparent: true, opacity: style === 'flow' ? 0.5 : 0.72,
       }));
       mesh.position.set(cx, y - 0.03, cz); this.root.add(mesh);
       mesh.add(this.edges(geo, this.color('--line')));
@@ -373,7 +431,7 @@ export class Scene3D {
       for (let z = Math.ceil(z0); z <= z1; z++) pts.push(x0, y + 0.002, z, x1, y + 0.002, z);
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
       this.root.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({
-        color: this.color('--grid'), transparent: !!style, opacity: style === 'flow' ? 0.56 : 0.8,
+        color: this.color('--grid'), transparent: true, opacity: style === 'flow' ? 0.45 : 0.55,
       })));
     } else this.loop([[x0, z0], [x1, z0], [x1, z1], [x0, z1]], y, '--mute', 'dash');
     const inside = (style || insetLabel) && labelAt[0] === x1;
@@ -415,8 +473,17 @@ export class Scene3D {
     }[kind] || ['--mute', 'dash'];
     const ink = ['cluster', 'datacenter'].includes(kind) ? fallback : color || fallback;
     this.loop(pts, y, ink, style, fill);
+    // クラウド・データセンター・クラスタは、枠の内側を淡く塗って入れ子が分かるようにする
+    const tint = { cloud: 0.07, datacenter: 0.07, cluster: 0.05, region: 0.03 }[kind];
+    if (tint) {
+      const [a, , c] = pts, w = Math.abs(c[0] - a[0]), d = Math.abs(c[1] - a[1]);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: this.color(ink), transparent: true, opacity: tint, depthWrite: false }));
+      m.rotation.x = -Math.PI / 2; m.position.set((a[0] + c[0]) / 2, y + 0.004 + (kind === 'cluster' ? 0.002 : 0), (a[1] + c[1]) / 2); m.renderOrder = -1;
+      this.root.add(m);
+    }
+    if (!label) return; // 複数フロアにまたがる枠は、ラベルを 1 か所だけに出す
     const [x, z] = kind === 'az' ? pts[1] : kind === 'cloud' ? pts[0] : pts[3];
-    this.label(label, [x, y + 0.02, z], 'g-lbl', kind === 'az' || kind === 'cloud' ? [0, 1] : [0, 0], { color: this.color(ink).getStyle() });
+    this.label(label, [x, y + 0.02, z], `g-lbl g-${kind}`, kind === 'az' || kind === 'cloud' ? [0, 1] : [0, 0], { color: this.color(ink).getStyle(), borderColor: this.color(ink).getStyle() });
   }
 
   /* ---------- ノード ---------- */
@@ -495,6 +562,11 @@ export class Scene3D {
       top *= scale;
     }
     if (s.flat) { g.scale.y = 0.25 / top; top = 0.25; }
+    else if (s.opacity >= 0.3) { // 接地影：床に置かれていることが分かるように
+      const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.62, 32), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.1 * s.opacity, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2; shadow.position.set(x + 0.08, y + 0.006, z + 0.08); shadow.scale.set(1, 0.85, 1); shadow.renderOrder = -1;
+      this.root.add(shadow);
+    }
     if (s.abbr) {
       const mark = this.label(s.abbr.text, [x, y + top + 0.02, z], 'abbr', [0.5, 0.5],
         { color: s.abbr.color, opacity: s.opacity < 0.5 ? 0.4 : 1 });
@@ -512,17 +584,20 @@ export class Scene3D {
     const nameClass = s.solidStyle ? 'n-lbl n-3d n-3d-' + s.solidStyle
       : s.flatStyle === 'silhouette' ? 'n-lbl n-silhouette' : 'n-lbl';
     const name = this.label(s.label, [x, y, z + (s.solidStyle ? 0.68 : 0.5)], nameClass, [0.5, -0.3]);
+    name.dataset.node = s.id;
     if (s.selected) name.dataset.selected = 'true';
     if (s.flat && s.icon) name.style.marginTop = '10px';
     if (s.sub) {
       const sub = this.label(s.sub.text, [x, y, z + (s.solidStyle ? 0.68 : 0.5)], 'n-sub', [0.5, -0.3],
         { color: s.sub.color, opacity: s.opacity < 0.5 ? 0.35 : 1 });
+      sub.dataset.node = s.id;
       sub.style.marginTop = s.flat ? `calc(19px * var(--lbl-scale) + ${s.icon ? 10 : 0}px)` : 'calc(20px * var(--lbl-scale))';
     }
     if (s.labelAccent) name.classList.add('acc');
     if (s.opacity < 0.5) name.style.opacity = 0.35;
     if (s.badge) {
       const badge = this.label(s.badge.text, [x, y + top + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]);
+      badge.dataset.node = s.id;
       // 真上からは高さの差が画面に出ないので、公式アイコンの上に離して配置する。
       if (s.flat && s.icon) badge.style.marginTop = '-16px';
       if (s.opacity < 0.5) badge.style.opacity = 0.4;

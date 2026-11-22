@@ -65,7 +65,8 @@ const MODES = [
 
 const VIEWS = Views.available(M);
 const st = {
-  dimension: PREVIEW ? '2' : ['2', '3'].includes(ROUTE.q.d) ? ROUTE.q.d : S.dimension,
+  cmpOnly: false, cmpKinds: new Set(["added", "removed", "changed"]), minimap: S.minimap ?? true,
+  dimension: ['2', '3'].includes(ROUTE.q.d) ? ROUTE.q.d : PREVIEW ? '2' : S.dimension,
   view: VIEWS.includes(ROUTE.q.w) ? ROUTE.q.w : VIEWS.includes(M.views?.default) ? M.views.default : 'cloud',
   mode: MODES.some(m => m[0] === ROUTE.mode) ? ROUTE.mode : 'struct',
   sel: M.nodes[ROUTE.q.s] ? ROUTE.q.s : null, nbr: ROUTE.q.n === '1',
@@ -237,7 +238,7 @@ function nodeSpec(id, n, s) {
   const solidStyle = style3D();
   const flatStyle = flat ? (S.nodeStyle2D === 'silhouette' ? 'silhouette' : 'card') : null;
   const ext = n.kind === 'external' && !svc;
-  let color = scene.color('--paper'), opacity = s.dim ? 0.15 : 1, dashed = ext;
+  let color = scene.color('--paper'), opacity = s.dim ? 0.15 : s.soft ? 0.38 : 1, dashed = ext;
   if (n.kind === 'actor') color = scene.mix((ROLES[n.role] || ROLES.user).c, '--paper', 0.5);
   else if (svc) color = scene.mix(svc.color, '--paper', 0.42);
   else if (['db', 'queue', 'cache'].includes(n.kind)) color = scene.color('--dark');
@@ -282,6 +283,26 @@ function projectState(ns, ls) {
     const s = lsV[l.id] = Views.mergeLink((P.linkFrom[l.id] || []).map(p => ls[p]));
     if (l.crossAz && !s.on && !s.dim) Object.assign(s, { on: true, color: '--warn' }); // AZ をまたぐ通信
   }
+  /* 選択中は、つながっている部品と接続を残して周りを控えめにする（「周辺だけ」より穏やか） */
+  const sv = st.sel && viewIdOf(st.sel);
+  if (sv && !st.nbr) {
+    const near = new Set([sv]);
+    for (const l of P.links) { if (l.from === sv) near.add(l.to); if (l.to === sv) near.add(l.from); }
+    for (const [vid, s] of Object.entries(nsV)) if (!near.has(vid) && !s.dim) s.soft = true;
+    for (const l of P.links) {
+      const s = lsV[l.id];
+      if (l.from === sv || l.to === sv) { if (!s.on) Object.assign(s, { on: true, color: '--ink' }); }
+      else if (!s.dim) s.soft = true;
+    }
+  }
+  /* 比較の絞り込み：選んだ種類の変化だけを強調し、変化のない部品は薄くする */
+  if (st.mode === 'compare' && CMPR && st.cmpOnly) {
+    for (const [vid, parts] of Object.entries(P.from)) {
+      const hit = parts.some(p => st.cmpKinds.has(CMPR.nodes[p]));
+      if (!hit) nsV[vid].dim = true;
+    }
+    for (const l of P.links) if (!(P.linkFrom[l.id] || []).some(p => st.cmpKinds.has(CMPR.links[p]))) lsV[l.id].dim = true;
+  }
   return { nsV, lsV };
 }
 
@@ -294,6 +315,7 @@ function draw() {
     const x0 = ox - 1.2, x1 = ox + w + 0.4, z0 = oz - 1.2, z1 = oz + h + 0.2;
     scene.floor({ style: style3D(), insetLabel: st.dimension === '2', x0, z0, x1, z1, y, origin: t.kind === 'origin', label: t.label, labelAt: t.origin ? [x0, y, z1] : [x1, y, z0] });
   }
+  const labeled = new Set();
   for (const gr of P.groups || []) for (const t of [].concat(gr.tier)) {
     if (st.hidden.has(t) || !P.tiers.some(x => x.id === t)) continue;
     const [ox, y, oz] = W(0, 0, t);
@@ -311,7 +333,7 @@ function draw() {
     const provider = Catalog.PROVIDERS[gr.provider];
     const label = gr.kind === 'cloud' && provider && !gr.label?.includes(provider.label)
       ? [provider.label, gr.label].filter(Boolean).join('｜') : gr.label;
-    scene.group({ y, kind: gr.kind, label, color: provider?.color,
+    scene.group({ y, kind: gr.kind, label: labeled.has(gr) ? "" : (labeled.add(gr), label), color: provider?.color,
       pts: [[x0 + ox, y0 + oz], [x1 + ox, y0 + oz], [x1 + ox, y1 + oz], [x0 + ox, y1 + oz]] });
   }
   for (const l of P.links) {
@@ -321,7 +343,7 @@ function draw() {
     const solid = !!style3D();
     scene.link({ points: route(l), solid, arrow: solid && !crossFloor, color: s.color || (s.on ? '--ink' : solid ? '--diagram-link' : '--mute'), thick: !!s.on, packets: !!s.packets,
       dashed: s.dashed || (style3D() === 'flow' && crossFloor && !s.on ? 'dot' : !l.sync ? 'dash' : null),
-      opacity: s.dim ? 0.12 : s.on ? 1 : solid ? (crossFloor ? 0.68 : 0.9) : 0.55 });
+      opacity: s.dim ? 0.12 : s.soft ? 0.18 : s.on ? 1 : solid ? (crossFloor ? 0.68 : 0.9) : 0.55 });
   }
   for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node(nodeSpec(id, n, ns[id] || {}));
   scene.end(st.dimension === '2');
@@ -351,11 +373,29 @@ function renderLibrary() {
     groups.get(category).push(entry);
   }
   $('reference-section').hidden = !groups.size;
-  $('reference-list').innerHTML = [...groups].map(([category, entries], index) =>
-    `<details class="reference-category"${entries.some(entry => entry.id === KEY) || (!ENTRY.reference && index === 0) ? ' open' : ''}>
-      <summary>${esc(category)}</summary><div class="mlist">${entries
+  $('reference-list').innerHTML = [...groups].map(([category, entries]) =>
+    `<details class="reference-category"${entries.some(entry => entry.id === KEY) ? ' open' : ''}>
+      <summary>${esc(category)} <small>${entries.length}</small></summary><div class="mlist">${entries
         .sort((a, b) => (a.reference.order ?? Number.MAX_SAFE_INTEGER) - (b.reference.order ?? Number.MAX_SAFE_INTEGER))
         .map(modelLink).join('')}</div></details>`).join('');
+}
+
+/* モデル一覧の絞り込み：一致したモデルのある分類だけ開く */
+function filterLibrary(q) {
+  const s = q.trim().toLowerCase();
+  document.querySelectorAll('#library .mitem').forEach(a => { a.hidden = !!s && !a.textContent.toLowerCase().includes(s); });
+  document.querySelectorAll('#reference-list details').forEach(d => {
+    const any = [...d.querySelectorAll('.mitem')].some(a => !a.hidden);
+    d.hidden = !any; if (s) d.open = any;
+  });
+}
+/* モデルを選ぶ（Ctrl+K・ヘッダーのモデル名）：サイドバーのモデル一覧を開いて絞り込み欄へ */
+function pickModel() {
+  if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open');
+  else document.body.classList.remove('nav-closed');
+  $('library').open = true;
+  $('model-filter').focus();
+  $('model-filter').select();
 }
 
 function renderSidebar() {
@@ -367,6 +407,16 @@ function renderSidebar() {
   $('floors').innerHTML = VW().tiers.map(t => `<label><input type="checkbox" data-tier="${t.id}" ${st.hidden.has(t.id) ? '' : 'checked'}> ${esc(t.label)}</label>`).join('');
   $('nbr').checked = st.nbr;
   $('nbr').disabled = !st.sel;
+  $('minimap').checked = st.minimap;
+}
+
+/* 凡例：線の意味 + このモデルに登場するクラウド・枠の種類 */
+function contextLegend() {
+  const provs = [...new Set(Object.values(M.nodes).map(n => Catalog.providerOf(n)).filter(Boolean))];
+  const kinds = [...new Set((M.groups || []).map(g => g.kind))];
+  const KIND = { cloud: 'クラウド', region: 'リージョン', vpc: 'VPC', vnet: 'VNet', vcn: 'VCN', az: 'AZ', subnet: 'サブネット', cluster: 'クラスタ', namespace: 'Namespace', datacenter: 'データセンター' };
+  return (provs.length ? '<span class="lg-sep"></span>' + provs.map(p => `<span><b class="sw" style="background:${Catalog.PROVIDERS[p].color}"></b>${esc(Catalog.PROVIDERS[p].label)}</span>`).join('') : '') +
+    (kinds.length ? '<span class="lg-sep"></span>' + kinds.map(k => `<span><b class="fr fr-${k}"></b>${KIND[k] || k}</span>`).join('') : '');
 }
 
 /* ================= 統計・凡例 ================= */
@@ -389,7 +439,7 @@ function renderStats() {
     compare: '<span><i class="ok"></i>追加</span><span><i class="dash acc"></i>削除</span><span><i class="warn"></i>変更</span>',
     fail: '<span><i></i>同期</span><span><i class="dash"></i>非同期</span><span><i class="acc"></i>失敗する呼び出し</span>',
   };
-  $('legend').innerHTML = ENTRY.reference ? '<span>線は処理・データの流れを示します</span>' : leg[st.mode] || '<span><i></i>同期</span><span><i class="dash"></i>非同期</span>';
+  $('legend').innerHTML = (ENTRY.reference ? '<span>線は処理・データの流れを示します</span>' : leg[st.mode] || '<span><i></i>同期</span><span><i class="dash"></i>非同期</span>') + contextLegend();
 }
 function syncP95(sc) {
   const ids = new Set(sc.steps.flatMap(s => s.links).map(linkById).filter(l => l?.sync).map(l => l.to));
@@ -473,9 +523,26 @@ function comparePanel() {
     <pre class="code">git show HEAD~1:models/${esc(KEY)}/model.yaml &gt; old.yaml
 npm run compare -- old.yaml models/${esc(KEY)}/model.yaml</pre>`;
   const sel = c => c.type === 'node' ? c.id : (allLinks().find(l => l.id === c.id)?.from || '');
+  const K = { added: '追加', removed: '削除', changed: '変更' };
+  const list = cmpList(), cur = list[st.cmpIdx];
   return `<h3>比較：${esc(CMP.label)} → 現在</h3><div class="sub">比較対象から現在のモデルへの変化。削除された部品は半透明で表示。</div>
+    <div class="seg" role="group" aria-label="表示する変化">${Object.entries(K).map(([k, n]) =>
+      `<button class="cmp-${k} ${st.cmpKinds.has(k) ? 'on' : ''}" data-cmp-kind="${k}" aria-pressed="${st.cmpKinds.has(k)}">${n} <b>${CMPR.changes.filter(c => c.kind === k).length}</b></button>`).join('')}</div>
+    <label class="chk"><input type="checkbox" data-cmp-only ${st.cmpOnly ? 'checked' : ''}> 変化した箇所だけを強調（他は薄く）</label>
+    <div class="row stepper"><button class="b small" data-cmp-step="-1" ${list.length ? '' : 'disabled'}>← 前の変化</button>
+      <span class="mono">${list.length ? `${(st.cmpIdx ?? -1) + 1} / ${list.length}` : '0 / 0'}</span>
+      <button class="b small" data-cmp-step="1" ${list.length ? '' : 'disabled'}>次の変化 →</button></div>
+    ${cur ? `<div class="note"><span class="tag cmp-${cur.kind}">${K[cur.kind]}</span>${esc(cur.msg)}</div>` : ''}
     <div class="row"><button class="b small" data-act="open-compare">比較対象を変更</button>${CMP.own ? '<button class="b small" data-act="clear-compare">読み込んだ比較対象を解除</button>' : ''}</div>
-    ${['added', 'removed', 'changed'].map(k => { const cs = CMPR.changes.filter(c => c.kind === k); return `<h4>${{ added: '追加', removed: '削除', changed: '変更' }[k]}（${cs.length}）</h4>` + (cs.map(c => `<div class="item" data-sel="${sel(c)}"><span class="tag cmp-${k}">${c.type === 'node' ? '部品' : '接続'}</span>${esc(c.msg)}</div>`).join('') || none); }).join('')}`;
+    ${Object.keys(K).filter(k => st.cmpKinds.has(k)).map(k => { const cs = CMPR.changes.filter(c => c.kind === k); return `<h4>${K[k]}（${cs.length}）</h4>` + (cs.map(c => `<div class="item ${c === cur ? 'on' : ''}" data-sel="${sel(c)}"><span class="tag cmp-${k}">${c.type === 'node' ? '部品' : '接続'}</span>${esc(c.msg)}</div>`).join('') || none); }).join('')}`;
+}
+const cmpList = () => (CMPR?.changes || []).filter(c => st.cmpKinds.has(c.kind));
+/* 変化を 1 件ずつたどる：その部品へ視点を移す */
+function stepChange(d) {
+  const list = cmpList(); if (!list.length) return;
+  st.cmpIdx = ((st.cmpIdx ?? -1) + d + list.length) % list.length;
+  const c = list[st.cmpIdx];
+  select(c.type === 'node' ? c.id : allLinks().find(l => l.id === c.id)?.from, { focus: true });
 }
 
 function referenceDetails() {
@@ -600,8 +667,10 @@ const SEARCH = [
   ...(M.requirements || []).map(q => ({ t: 'req', id: q.id, label: q.title, sub: q.id, key: `${q.id} ${q.title} ${q.text}` })),
   ...(M.scenarios || []).map((s, i) => ({ t: 'scenario', id: i, label: s.label, sub: 'シナリオ', key: s.label })),
   ...Object.entries(IDX.byRef).map(([ref, ids]) => ({ t: 'ref', id: ref, label: ref, sub: `→ ${ids.slice(0, 4).join(', ')}${ids.length > 4 ? '…' : ''}`, key: ref, sel: ids.find(x => M.nodes[x]) || ids.map(x => M.links.find(l => l.id === x)?.from).find(Boolean) })),
+  // 他のモデルへも検索から移動できる（一覧をたどらずに済む）
+  ...REGISTRY.filter(r => r.id !== KEY).map(r => ({ t: 'model', id: r.id, label: r.name || r.id, sub: r.reference?.category || (r.local ? 'ローカル' : '設計モデル'), key: `${r.name || ''} ${r.id} ${r.reference?.category || ''}` })),
 ];
-const T_LABEL = { node: '部品', link: '接続', req: '要件', scenario: 'シナリオ', ref: '根拠' };
+const T_LABEL = { node: '部品', link: '接続', req: '要件', scenario: 'シナリオ', ref: '根拠', model: 'モデル' };
 let qHits = [], qIdx = 0;
 function search(q) {
   const s = q.trim().toLowerCase();
@@ -615,6 +684,7 @@ function renderHits() {
 }
 function openHit(x) {
   $('q').value = ''; qHits = []; renderHits(); $('qres').hidden = true; $('q').blur();
+  if (x.t === 'model') { location.hash = `#/m/${encodeURIComponent(x.id)}/struct`; return; }
   if (x.t === 'req') { st.mode = 'req'; st.req = x.id; return draw(); }
   if (x.t === 'scenario') { st.mode = 'scenario'; st.scen = x.id; st.step = 0; return draw(); }
   select(x.t === 'node' ? x.id : x.sel, { focus: true });
@@ -705,7 +775,7 @@ async function openReferenceComparison() {
   const body = $('modal-body');
   const pending = body.firstElementChild;
   try {
-    const { renderReferenceComparison } = await import('./reference-compare.js?v=touch-picker');
+    const { renderReferenceComparison } = await import('./reference-compare.js?v=ui5');
     if (body.contains(pending)) renderReferenceComparison(body, REGISTRY, KEY);
   } catch {
     if (body.contains(pending)) pending.textContent = '比較を読み込めませんでした。開き直して再試行してください。';
@@ -779,7 +849,7 @@ function openSettings() {
 
 /* ================= イベント ================= */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-hit],[data-act],button[data-drag],[data-viewmode],[data-view],[data-mode],[data-scen],[data-step],[data-goto],[data-play],[data-reset],[data-down],[data-issue],[data-metric],[data-req],[data-sel],[data-focus],[data-nbr],[data-rmlocal]');
+  const t = e.target.closest('[data-hit],[data-act],[data-cmp-kind],[data-cmp-step],button[data-drag],[data-viewmode],[data-view],[data-mode],[data-scen],[data-step],[data-goto],[data-play],[data-reset],[data-down],[data-issue],[data-metric],[data-req],[data-sel],[data-focus],[data-nbr],[data-rmlocal]');
   if (e.target.closest('#modal') && !e.target.closest('.dialog')) return closeModal();
   if (e.target.closest('#modal .close')) return closeModal();
   if (!t) { if (!e.target.closest('.search')) $('qres').hidden = true; return; }
@@ -788,6 +858,7 @@ document.addEventListener('click', e => {
   if (d.act) {
     const a = d.act;
     if (a === 'reference-compare') return openReferenceComparison();
+    if (a === 'pick-model') return pickModel();
     if (a === 'dimension') return toggleDimension();
     if (a === 'share') return share();
     if (a === 'png') return exportPng();
@@ -813,6 +884,8 @@ document.addEventListener('click', e => {
     return;
   }
   if (d.rmlocal) { L.removeLocal(d.rmlocal); return location.hash = '#/m/' + REGISTRY[0].id + '/struct'; }
+  if (d.cmpKind) { st.cmpKinds.has(d.cmpKind) ? st.cmpKinds.delete(d.cmpKind) : st.cmpKinds.add(d.cmpKind); st.cmpIdx = null; return draw(); }
+  if (d.cmpStep) return stepChange(+d.cmpStep);
   if (d.drag) return setDrag(d.drag);
   if (d.viewmode) return setView(d.viewmode);
   if (d.view) return scene.fit(st.dimension === '2' ? 'top' : d.view === 'reset' ? S.defaultView : d.view);
@@ -834,6 +907,13 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   if (e.target.dataset.tier) { e.target.checked ? st.hidden.delete(e.target.dataset.tier) : st.hidden.add(e.target.dataset.tier); draw(); }
   if (e.target.id === 'nbr') { st.nbr = e.target.checked; draw(); }
+  if (e.target.id === 'minimap') { st.minimap = e.target.checked; S.minimap = st.minimap; saveSettings(S); scene.setMinimap(st.minimap); }
+  if (e.target.matches('[data-cmp-only]')) { st.cmpOnly = e.target.checked; draw(); }
+});
+$('model-filter').addEventListener('input', e => filterLibrary(e.target.value));
+$('model-filter').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const a = [...document.querySelectorAll('#library .mitem')].find(x => !x.hidden); if (a) location.hash = a.getAttribute('href'); }
+  if (e.key === 'Escape') { e.target.value = ''; filterLibrary(''); e.target.blur(); }
 });
 $('q').addEventListener('input', e => search(e.target.value));
 $('q').addEventListener('focus', e => e.target.value && search(e.target.value));
@@ -846,6 +926,7 @@ $('q').addEventListener('keydown', e => {
 addEventListener('keydown', e => {
   if (PREVIEW) return;
   if (!$('modal').hidden) { if (e.key === 'Escape') closeModal(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); return pickModel(); }
   if (e.target.closest('input,select,textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key;
   if (k === '/') { e.preventDefault(); return $('q').focus(); }
@@ -871,6 +952,7 @@ document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
 setDimension(st.dimension, false);
 renderLibrary();
+scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();
 draw();
 if (ROUTE.q.v) { const v = ROUTE.q.v.split('_').map(Number); if (v.length === 7 && v.every(Number.isFinite)) scene.setView({ p: v.slice(0, 3), t: v.slice(3, 6), z: v[6] }); }

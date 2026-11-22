@@ -52,85 +52,62 @@ const PRODUCTS = {
   ],
 };
 
+/* プロダクト比較：左右をドロップダウンで選び、入れ替え・2D/3D・観点表で比べる */
 export function renderReferenceComparison(container, registry, currentId) {
   const entries = Object.keys(PRODUCTS).map(id => registry.find(entry => entry.id === id && entry.reference)).filter(Boolean);
   if (entries.length < 2) {
     container.textContent = '比較できるリファレンスが不足しています。';
     return;
   }
+  const initial = entries.find(entry => entry.id === currentId) || entries[0];
+  const selected = [initial, entries.find(entry => entry.id !== initial.id)];
+  let dimension = '2';
 
   container.innerHTML = `
     <div class="ref-compare-controls">
-      <div class="ref-compare-selectors" role="group" aria-label="比較するプロダクト">
-        <button type="button" class="b" data-side="0" aria-expanded="false" aria-controls="ref-compare-picker"><strong>左を変更</strong><span></span></button>
-        <button type="button" class="b" data-side="1" aria-expanded="false" aria-controls="ref-compare-picker"><strong>右を変更</strong><span></span></button>
-      </div>
-      <div class="ref-compare-picker" id="ref-compare-picker" role="group" aria-labelledby="ref-compare-picker-title" hidden>
-        <h3 id="ref-compare-picker-title"></h3><div class="ref-compare-options"></div>
-      </div>
+      <label class="ref-pick">左 <select data-side="0" aria-label="左に表示するプロダクト"></select></label>
+      <button type="button" class="b" data-swap title="左右を入れ替える">⇄ 入れ替え</button>
+      <label class="ref-pick">右 <select data-side="1" aria-label="右に表示するプロダクト"></select></label>
+      <div class="seg ref-dim" role="group" aria-label="表示"><button type="button" data-dim="2" class="on" aria-pressed="true">2D</button><button type="button" data-dim="3" aria-pressed="false">3D</button></div>
     </div>
     <div class="ref-compare-grid">
-      <section><iframe></iframe><a target="_blank" rel="noopener">左のリファレンスを開く</a></section>
-      <section><iframe></iframe><a target="_blank" rel="noopener">右のリファレンスを開く</a></section>
+      <section><iframe></iframe><a target="_blank" rel="noopener">左のリファレンスを開く ↗</a></section>
+      <section><iframe></iframe><a target="_blank" rel="noopener">右のリファレンスを開く ↗</a></section>
     </div>
     <h3>比較ポイント</h3>
-    <p>各製品の図で採用した構成を、同じ観点で比較しています。</p>
+    <p class="sub">各製品の図で採用した構成を、同じ観点で並べています。行にカーソルを当てると強調します。</p>
     <table class="ref-compare-table"><thead></thead><tbody></tbody></table>`;
 
-  const buttons = [...container.querySelectorAll('[data-side]')];
+  const selects = [...container.querySelectorAll('select[data-side]')];
   const sections = [...container.querySelectorAll('.ref-compare-grid section')];
-  const picker = container.querySelector('#ref-compare-picker');
-  const options = picker.querySelector('.ref-compare-options');
-  const initial = entries.find(entry => entry.id === currentId) || entries[0];
-  const selected = [initial, entries.find(entry => entry.id !== initial.id)];
-  let activeSide = null;
 
-  function showPicker(side) {
-    activeSide = side;
-    buttons.forEach((button, index) => button.setAttribute('aria-expanded', side === index));
-    picker.hidden = side === null;
-    if (side === null) return;
-
-    picker.querySelector('h3').textContent = side === 0 ? '左に表示するプロダクト' : '右に表示するプロダクト';
-    options.replaceChildren();
-    for (const entry of entries) {
-      const option = document.createElement('button');
-      const current = entry.id === selected[side].id;
-      const used = entry.id === selected[1 - side].id;
-      option.type = 'button';
-      option.className = current ? 'b on' : 'b';
-      option.disabled = used;
-      option.setAttribute('aria-pressed', current);
-      option.textContent = (entry.name || entry.id) + (used ? '（反対側に表示中）' : '');
-      option.addEventListener('click', () => {
-        selected[side] = entry;
-        showPicker(null);
-        update();
-        buttons[side].focus();
-      });
-      options.append(option);
-    }
-    picker.scrollTop = 0;
+  function fillOptions() {
+    selects.forEach((sel, side) => {
+      sel.replaceChildren(...entries.map(entry => {
+        const o = document.createElement('option');
+        o.value = entry.id; o.textContent = entry.name || entry.id;
+        o.disabled = entry.id === selected[1 - side].id; // 反対側と同じものは選べない
+        o.selected = entry.id === selected[side].id;
+        return o;
+      }));
+    });
   }
 
   function update() {
+    fillOptions();
     const names = selected.map(entry => entry.name || entry.id);
     selected.forEach((entry, side) => {
-      const name = names[side];
-      buttons[side].querySelector('span').textContent = name;
-      const section = sections[side];
-      const iframe = section.querySelector('iframe');
+      const section = sections[side], iframe = section.querySelector('iframe');
       const url = new URL(location.pathname, location.origin);
-      url.hash = `/m/${encodeURIComponent(entry.id)}/struct?d=2`;
+      url.hash = `/m/${encodeURIComponent(entry.id)}/struct?d=${dimension}`;
       section.querySelector('a').href = url.href;
       url.searchParams.set('preview', 'reference');
-      iframe.title = `${name}の構成図`;
+      url.searchParams.set('dim', dimension); // ハッシュだけの変更では再読込されないため、クエリにも入れる
+      iframe.title = `${names[side]}の構成図`;
       if (iframe.src !== url.href) iframe.src = url.href;
     });
-    const head = container.querySelector('thead');
-    const body = container.querySelector('tbody');
-    head.replaceChildren();
-    body.replaceChildren();
+    const head = container.querySelector('thead'), body = container.querySelector('tbody');
+    head.replaceChildren(); body.replaceChildren();
     const addRow = (parent, texts, heading) => {
       const row = parent.insertRow();
       texts.forEach((value, index) => {
@@ -144,6 +121,15 @@ export function renderReferenceComparison(container, registry, currentId) {
     AXES.forEach((axis, index) => addRow(body, [axis, ...selected.map(entry => PRODUCTS[entry.id][index])], false));
   }
 
-  buttons.forEach((button, side) => button.addEventListener('click', () => showPicker(activeSide === side ? null : side)));
+  selects.forEach((sel, side) => sel.addEventListener('change', () => {
+    selected[side] = entries.find(entry => entry.id === sel.value);
+    update();
+  }));
+  container.querySelector('[data-swap]').addEventListener('click', () => { selected.reverse(); update(); });
+  container.querySelectorAll('[data-dim]').forEach(button => button.addEventListener('click', () => {
+    dimension = button.dataset.dim;
+    container.querySelectorAll('[data-dim]').forEach(b => { b.classList.toggle('on', b === button); b.setAttribute('aria-pressed', b === button); });
+    update();
+  }));
   update();
 }

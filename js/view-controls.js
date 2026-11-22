@@ -6,10 +6,18 @@
     event.stopPropagation();
     const expanded = document.body.classList.toggle('viewer-maximized');
     toggle.setAttribute('aria-pressed', expanded);
-    toggle.textContent = expanded ? '元の表示' : '最大化';
+    toggle.querySelector('span').textContent = expanded ? '元に戻す' : '最大化';
     toggle.title = expanded ? '構成図を元の表示に戻す' : '構成図を画面内で最大化';
     nav.disabled = expanded;
   });
+})();
+
+/* 書き出しメニュー：項目を選んだら閉じる。外側クリック・Esc でも閉じる */
+(() => {
+  const menu = document.querySelector('details.menu');
+  menu.addEventListener('click', e => { if (e.target.closest('[role="menuitem"]')) menu.open = false; });
+  document.addEventListener('click', e => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); } });
 })();
 
 /* 詳細ペインは広い画面では右列、狭い画面では下から開く。 */
@@ -25,7 +33,8 @@
     if (!open && panel.contains(document.activeElement)) toggle.focus();
     panel.hidden = !open;
     toggle.setAttribute('aria-expanded', open);
-    toggle.textContent = open ? '詳細を閉じる' : '詳細を開く';
+    toggle.classList.toggle('on', open);
+    toggle.title = open ? '詳細パネルを閉じる' : '詳細パネルを開く';
   }
 
   toggle.addEventListener('click', () => {
