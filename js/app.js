@@ -17,13 +17,20 @@
   ].filter(Boolean);
 
   /* ---------- geometry ---------- */
-  const zOf = tier => M.tiers.length - 1 - M.tiers.findIndex(t => t.id === tier);
+  /* フロア：z 省略時は配列順に積む（先頭が最上階）。origin で同じ高さの横に並べられる */
+  const TI = id => M.tiers.find(t => t.id === id) || {};
+  const STACK = M.tiers.filter(t => t.z == null);
+  const zOf = tier => TI(tier).z ?? (STACK.length - 1 - STACK.findIndex(t => t.id === tier));
+  const off = tier => TI(tier).origin || [0, 0];
+  const sizeOf = tier => TI(tier).size || [10, 4];
   const P = (x, y, z) => [OX + (x - y) * S * 0.866, OY + (x + y) * S * 0.5 - z * FLOOR];
+  const GP = (x, y, tier) => { const [ox, oy] = off(tier); return P(x + ox, y + oy, zOf(tier)); };
   const allNodes = () => st.mode === 'diff' ? { ...M.nodes, ...DIFF.extraNodes } : M.nodes;
   const allLinks = () => st.mode === 'diff' ? [...M.links, ...DIFF.extraLinks] : M.links;
 
   function route(l) {
-    const N = allNodes(), a = N[l.from], b = N[l.to], za = zOf(a.tier), zb = zOf(b.tier);
+    const N = allNodes(), za = zOf(N[l.from].tier), zb = zOf(N[l.to].tier);
+    const g = n => ({ x: n.x + off(n.tier)[0], y: n.y + off(n.tier)[1] }), a = g(N[l.from]), b = g(N[l.to]);
     const rev = allLinks().some(o => o.from === l.to && o.to === l.from) && l.from > l.to ? 0.3 : 0;
     let pts;
     if (za === zb) {
@@ -159,17 +166,21 @@
     svg.innerHTML = '';
     const { ns, ls } = decorate(), N = allNodes();
     /* floors（下から） */
-    [...M.tiers].reverse().forEach(t => {
-      const z = zOf(t.id), c = [[-1.2, -1.2], [10.4, -1.2], [10.4, 4.2], [-1.2, 4.2]].map(([x, y]) => P(x, y, z));
-      el('polygon', { points: c.map(p => p.join(',')).join(' '), fill: 'var(--plate)', 'fill-opacity': .72, stroke: 'var(--line)' });
-      for (let i = 0; i <= 10; i++) { const a = P(i - .2, -1.2, z), b = P(i - .2, 4.2, z); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'var(--grid)' }); }
-      for (let j = 0; j <= 4; j++) { const a = P(-1.2, j - .2, z), b = P(10.4, j - .2, z); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'var(--grid)' }); }
-      const lp = P(-1.2, 4.2, z);
-      el('text', { x: lp[0] - 8, y: lp[1] + 4, 'text-anchor': 'end', 'font-size': 12, 'font-weight': 700, fill: 'var(--mute)' }).textContent = t.label;
+    [...M.tiers].sort((a, b) => zOf(a.id) - zOf(b.id)).forEach(t => {
+      const [w, h] = sizeOf(t.id), id = t.id, Q = (x, y) => GP(x, y, id);
+      const c = [[-1.2, -1.2], [w + .4, -1.2], [w + .4, h + .2], [-1.2, h + .2]].map(([x, y]) => Q(x, y));
+      el('polygon', { points: c.map(p => p.join(',')).join(' '), fill: t.kind === 'origin' ? 'var(--card)' : 'var(--plate)', 'fill-opacity': .72,
+        stroke: t.kind === 'origin' ? 'var(--mute)' : 'var(--line)', 'stroke-dasharray': t.kind === 'origin' ? '5 4' : null });
+      if (t.kind !== 'origin') {
+        for (let i = 0; i <= w; i++) { const a = Q(i - .2, -1.2), b = Q(i - .2, h + .2); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'var(--grid)' }); }
+        for (let j = 0; j <= h; j++) { const a = Q(-1.2, j - .2), b = Q(w + .4, j - .2); el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'var(--grid)' }); }
+      }
+      const side = !!t.origin, lp = side ? Q(-1.2, h + .2) : Q(w + .4, -1.2); // 横に並ぶゾーンは左端、積むフロアは右端にラベル
+      el('text', { x: lp[0] + (side ? -8 : 10), y: lp[1] + 4, 'text-anchor': side ? 'end' : 'start', 'font-size': 12, 'font-weight': 700, fill: 'var(--mute)' }).textContent = t.label;
     });
     /* groups（VPC / AZ / サブネット / 環境など） */
     (M.groups || []).forEach(gr => (Array.isArray(gr.tier) ? gr.tier : [gr.tier]).forEach(t => {
-      const z = zOf(t), c = [[gr.x0, gr.y0], [gr.x1, gr.y0], [gr.x1, gr.y1], [gr.x0, gr.y1]].map(([x, y]) => P(x, y, z));
+      const c = [[gr.x0, gr.y0], [gr.x1, gr.y0], [gr.x1, gr.y1], [gr.x0, gr.y1]].map(([x, y]) => GP(x, y, t));
       const sty = { vpc: ['var(--ink)', '8 4', 1.2, 'none'], az: ['var(--mute)', '2 3', 1, 'none'], subnet: ['none', null, 0, 'var(--grid)'] }[gr.kind] || ['var(--mute)', '4 4', 1, 'none'];
       el('polygon', { points: c.map(p => p.join(',')).join(' '), stroke: sty[0], 'stroke-dasharray': sty[1], 'stroke-width': sty[2], fill: sty[3], 'fill-opacity': .9 });
       const lp = gr.kind === 'az' ? c[1] : c[3];
@@ -186,13 +197,17 @@
       if (s.packets) packets.push({ p, len: len(p), dots: [0, 1, 2].map(() => el('rect', { width: 8, height: 8, fill: s.color, stroke: 'var(--card)', 'stroke-width': 1 })) });
     });
     /* nodes */
-    Object.keys(N).sort((a, b) => zOf(N[a].tier) - zOf(N[b].tier) || (N[a].x + N[a].y) - (N[b].x + N[b].y)).forEach(id => {
-      const n = N[id], s = ns[id], [x, y] = P(n.x, n.y, zOf(n.tier));
+    const gsum = n => n.x + n.y + off(n.tier)[0] + off(n.tier)[1];
+    Object.keys(N).sort((a, b) => zOf(N[a].tier) - zOf(N[b].tier) || gsum(N[a]) - gsum(N[b])).forEach(id => {
+      const n = N[id], s = ns[id], [x, y] = GP(n.x, n.y, n.tier);
       const g = el('g', { class: 'node', 'data-id': id, opacity: s.dim ? 0.22 : 1 });
       const m = shape(g, n, x, y, s);
       el('text', { x, y: y + m.bottom, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: s.fill === 'down' ? 'var(--accent)' : 'var(--fg)' }, g).textContent = n.label;
       if (s.badge) label(g, x, y - m.top, s.badge, s.fill === 'down' || s.badge.startsWith('!') || st.mode === 'diff' ? { bg: 'var(--accent)', stroke: 'var(--accent)', color: '#fff' } : {});
     });
+    if (!svg.dataset.fit) { // 初回描画で全体が収まるよう viewBox を合わせる（モード切替でぶれないよう固定）
+      const b = svg.getBBox(); svg.setAttribute('viewBox', `${b.x - 24} ${b.y - 24} ${b.width + 48} ${b.height + 48}`); svg.dataset.fit = 1;
+    }
     renderStats(); renderPanel();
   }
   const len = p => p.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - p[i][0], q[1] - p[i][1]), 0);

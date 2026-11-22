@@ -29,6 +29,21 @@ window.ACTUAL = {   // 実環境から取得した構成（任意）
 };
 ```
 
+## フロアの配置（tiers）
+```js
+tiers: [
+  { id:'internet', label:'インターネット', kind:'origin', z:1, origin:[-11,0], size:[1,3] }, // アクセス元（点線のゾーン）
+  { id:'office',   label:'社内（VPN）',    kind:'origin', z:0, origin:[-11,0], size:[1,3] },
+  { id:'edge',     label:'エッジ',         z:1, origin:[-7.6,0], size:[4,3] },           // アプリと同じ高さで手前に並べる
+  { id:'app',      label:'アプリケーション', z:1 },
+  { id:'data',     label:'データ',         z:0 },
+]
+```
+- `z`：高さ（大きいほど上）。省略したフロアは配列順に積む
+- `origin`：グリッド上のずらし量。x をマイナスにすると処理の流れ（左上→右下）の上流側に並ぶ
+- `size`：床の大きさ（既定 10×4）
+- `kind:'origin'`：利用者・運用者がどこからアクセスするかを示すゾーン
+
 ## 複数モデルの登録
 各モデルファイルは `window.MODELS['<id>'] = { model, actual }` に登録し、`index.html` に `<script>` を1行足す。
 画面上部のセレクタ、または `#<id>` で切り替える。
