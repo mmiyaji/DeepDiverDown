@@ -1,0 +1,37 @@
+name: OpenLineage の基本アーキテクチャ
+description: 受注原本から明細、日次売上へ変換する Job と RunEvent を収集し、データリネージを構成する流れを追うリファレンスです。
+reference:
+  objectives:
+    - Dataset、Job、Run、RunEvent の役割を区別する。
+    - 変換 Job の入力・出力 Dataset をつなげて lineage を読む。
+    - START/COMPLETE の RunEvent と設計時メタデータイベントの違いを理解する。
+  sources:
+    - {title: OpenLineage Object Model, url: "https://openlineage.io/docs/1.47.0/spec/object-model/"}
+    - {title: OpenLineage Naming Conventions, url: "https://openlineage.io/docs/spec/naming/"}
+sources: [docs/reference-openlineage.md]
+evidence: [{type: doc, ref: "docs/reference-openlineage.md#§1"}]
+tiers:
+  - {id: flow, label: データ資産と変換 Job, kind: origin, z: 0, size: [18, 3]}
+  - {id: lineage, label: Lineage 収集, z: 1, origin: [0, 0], size: [18, 3]}
+nodes:
+  raw: {label: 受注原本 Dataset, kind: db, tier: flow, x: 0, y: 1.5, description: 整形前の受注データ。, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§2"}]}
+  normalize: {label: 整形 Job, kind: service, tier: flow, x: 4, y: 1.5, description: 原本を読み、受注明細を生成する Job。, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§3"}]}
+  detail: {label: 受注明細 Dataset, kind: db, tier: flow, x: 8, y: 1.5, description: 整形 Job の出力で集計の入力。, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§2"}]}
+  aggregate: {label: 集計 Job, kind: service, tier: flow, x: 12, y: 1.5, description: 明細を読み日次売上を作る Job。, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§3"}]}
+  sales: {label: 日次売上 Dataset, kind: db, tier: flow, x: 16, y: 1.5, description: 下流分析が読む集計結果。, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§2"}]}
+  events: {label: RunEvent 収集先, kind: service, tier: lineage, x: 8, y: 1.5, description: Job 実行の START/COMPLETE と Dataset 情報を受け取る。, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§4"}]}
+links:
+  - {id: normalize-input, from: raw, to: normalize, label: 入力 Dataset, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§3"}]}
+  - {id: detail-output, from: normalize, to: detail, label: 出力 Dataset, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§3"}]}
+  - {id: aggregate-input, from: detail, to: aggregate, label: 入力 Dataset, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§3"}]}
+  - {id: sales-output, from: aggregate, to: sales, label: 出力 Dataset, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§3"}]}
+  - {id: normalize-events, from: normalize, to: events, label: RunEvent を送る, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§4"}]}
+  - {id: aggregate-events, from: aggregate, to: events, label: RunEvent を送る, evidence: [{type: doc, ref: "docs/reference-openlineage.md#§4"}]}
+scenarios:
+  - id: order-lineage
+    label: 原本から日次売上までの lineage
+    evidence: [{type: doc, ref: "docs/reference-openlineage.md#§1"}, {type: doc, ref: "docs/reference-openlineage.md#§5"}, {type: doc, ref: "docs/reference-openlineage.md#§6"}]
+    steps:
+      - {links: [normalize-input, normalize-events], note: 整形 Job が原本を読み、START/COMPLETE の RunEvent を収集先へ送る。}
+      - {links: [detail-output, aggregate-input], note: 受注明細 Dataset が生成され、集計 Job の入力になる。}
+      - {links: [aggregate-events, sales-output], note: 集計 Job の実行を記録し、日次売上 Dataset を生成する。}

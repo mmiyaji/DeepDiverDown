@@ -1,0 +1,36 @@
+name: Apache Airflow のワークフローアーキテクチャ
+description: DAGで取り込み、変換、品質チェックを順序付け、失敗後に再試行する流れです。
+reference:
+  objectives:
+    - DAGとTaskの依存関係を読む。
+    - SchedulerとExecutorを区別する。
+    - Worker実行と再試行を追う。
+  sources:
+    - {title: Airflow Architecture Overview, url: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html}
+sources: [docs/reference-apache-airflow.md]
+evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§1}, {type: doc, ref: docs/reference-apache-airflow.md#§6}]
+tiers: [{id: orchestration, label: オーケストレーション, z: 1, size: [16, 3]}, {id: data, label: タスクと状態, z: 0, size: [18, 3]}]
+nodes:
+  dag: {label: DAG, kind: service, tier: orchestration, x: 0, y: 1.5, description: Taskと依存関係を定義。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
+  scheduler: {label: Scheduler, kind: service, tier: orchestration, x: 3, y: 1.5, description: Taskを提出。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
+  executor: {label: Executor, kind: worker, tier: orchestration, x: 6, y: 1.5, description: 実行方式を提供。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
+  worker: {label: Worker, kind: worker, tier: data, x: 9, y: 1.5, description: Taskを実行。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
+  metadata: {label: Metadata DB, kind: db, tier: data, x: 6, y: 1.5, description: DAGと状態を保持。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
+  ingest: {label: Raw ingest, kind: service, tier: data, x: 12, y: 1.5, description: 取り込みTask。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+  transform: {label: Transform, kind: service, tier: data, x: 15, y: 1.5, description: 変換Task。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+  quality: {label: Quality check, kind: service, tier: data, x: 18, y: 1.5, description: 品質チェックTask。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+links:
+  - {id: schedule, from: dag, to: scheduler, label: DAGを解析, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
+  - {id: submit, from: scheduler, to: executor, label: Taskを提出, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
+  - {id: dispatch, from: executor, to: worker, label: 実行を割り当て, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
+  - {id: run-ingest, from: worker, to: ingest, label: 取り込み, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+  - {id: run-transform, from: ingest, to: transform, label: 依存順に変換, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
+  - {id: run-quality, from: transform, to: quality, label: 品質検査, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+  - {id: state, from: worker, to: metadata, label: 実行状態を記録, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
+scenarios:
+  - {id: pipeline, label: 取り込みから品質確認, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}], steps: [{links: [schedule, submit, dispatch], note: SchedulerがDAGを発火し、ExecutorへTaskを提出する。}, {links: [run-ingest, run-transform, run-quality], note: Workerが依存順に取り込み、変換、品質検査を実行する。}, {links: [state], note: 実行状態をMetadata DBへ記録する。}]}
+requirements:
+  - {id: BR-01, kind: usecase, title: 依存順ワークフロー, text: 取り込み、変換、品質検査を順に実行する。, links: [run-ingest, run-transform, run-quality], evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
+  - {id: NFR-01, kind: nfr, title: 失敗からの再試行, text: Task失敗を記録し再試行できる。, links: [state, dispatch], evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
+unknowns: [{id: UNK-01, text: Executor種別、Worker台数、リトライ回数は未確定。, refs: [executor, worker, dispatch]}]
+gates: {maxDrift: 0, maxHigh: 0}

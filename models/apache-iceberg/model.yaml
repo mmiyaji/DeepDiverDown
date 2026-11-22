@@ -1,0 +1,31 @@
+name: Apache Iceberg の基本アーキテクチャ
+description: テーブルメタデータからスナップショット、Manifest、データファイルをたどって読む流れを追います。
+reference:
+  objectives:
+    - テーブルメタデータとスナップショットの関係を説明する。
+    - Manifest List と Manifest を経由してデータファイルを絞り込む流れを追う。
+    - スナップショットを選んだ時点読み取りの考え方を理解する。
+  sources:
+    - {title: Apache Iceberg Specification, url: https://iceberg.apache.org/spec/}
+    - {title: Apache Iceberg Terms, url: https://iceberg.apache.org/terms/}
+sources: [docs/reference-apache-iceberg.md]
+evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§1}]
+tiers:
+  - {id: query, label: クエリとメタデータ, z: 1, size: [10,3]}
+  - {id: storage, label: オブジェクトストレージ, z: 0, origin: [1,0], size: [15,3]}
+nodes:
+  engine: {label: SQL エンジン, kind: service, tier: query, x: 0, y: 1.5, description: テーブルを読み、スナップショットを選ぶ。, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§1}]}
+  metadata: {label: Table Metadata, kind: db, tier: storage, x: 3, y: 1.5, description: スキーマ、パーティション、スナップショットを記録する。, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§2}]}
+  snapshot: {label: Snapshot, kind: db, tier: storage, x: 6, y: 1.5, description: ある時点の表の状態を指す。, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§2}]}
+  list: {label: Manifest List, kind: db, tier: storage, x: 9, y: 1.5, description: スナップショットを構成する Manifest を列挙する。, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§3}]}
+  manifest: {label: Manifest, kind: db, tier: storage, x: 12, y: 1.5, description: データファイル、パーティション値、統計を保持する。, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§3}]}
+  data: {label: Data Files, kind: db, shape3D: crate, tier: storage, x: 15, y: 1.5, description: クエリが実際に読むデータファイル。, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§4}]}
+links:
+  - {id: choose, from: engine, to: metadata, label: テーブルを解決, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§1}]}
+  - {id: select, from: metadata, to: snapshot, label: スナップショットを選択, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§2}]}
+  - {id: locate, from: snapshot, to: list, label: Manifest List を参照, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§3}]}
+  - {id: expand, from: list, to: manifest, label: Manifest を列挙, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§3}]}
+  - {id: scan, from: manifest, to: data, label: 必要なファイルを読む, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§4}]}
+  - {id: timetravel, from: engine, to: snapshot, label: 過去の snapshot を指定, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§5}]}
+scenarios:
+  - {id: snapshot-read, label: 注文スナップショットを読む, evidence: [{type: doc, ref: docs/reference-apache-iceberg.md#§6}], steps: [{links: [choose, select], note: テーブルのメタデータから読みたいスナップショットを選ぶ。}, {links: [locate, expand], note: Snapshot から Manifest List と Manifest をたどる。}, {links: [scan], note: 統計で絞り込んだデータファイルだけを読む。}]}

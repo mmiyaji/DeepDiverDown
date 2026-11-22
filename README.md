@@ -172,7 +172,17 @@ npm run icons -- --aws-pptx "C:\path\to\AWS-Toolkit.pptx"
 | `kafka` | Apache Kafka のパーティション、書き込み・複製・消費、リーダー切り替え。解説は [docs/reference-kafka.md](docs/reference-kafka.md) |
 | `kafka-connect` | 外部DBから Kafka を経由する取り込み、保存と再開。解説は [docs/reference-kafka-connect.md](docs/reference-kafka-connect.md) |
 
-追加候補は [モダンデータスタックのリファレンス候補](docs/reference-modern-data-stack-candidates.md) に整理しています。
+| 分野 | 追加リファレンス |
+|---|---|
+| データ取り込み | [Debezium](docs/reference-debezium.md) |
+| ストリーム処理 | [Spark Structured Streaming](docs/reference-spark-structured-streaming.md)、[Spark Streaming（DStreams）](docs/reference-spark-streaming.md)、[Apache Flink](docs/reference-flink.md)、[Kafka Streams](docs/reference-kafka-streams.md) |
+| 構成概念 | [メダリオン](docs/reference-medallion.md)、[データレイクハウス](docs/reference-data-lakehouse.md)、[データクリーンルーム](docs/reference-data-clean-room.md)、[ETL と ELT](docs/reference-etl-elt.md) |
+| テーブル形式とカタログ | [Apache Iceberg](docs/reference-apache-iceberg.md)、[Delta Lake](docs/reference-delta-lake.md)、[Apache Hudi](docs/reference-apache-hudi.md)、[Iceberg REST Catalog](docs/reference-iceberg-rest-catalog.md) |
+| 変換とオーケストレーション | [dbt](docs/reference-dbt.md)、[Apache Airflow](docs/reference-apache-airflow.md)、[AWS Glue](docs/reference-aws-glue.md) |
+| クラウド分析基盤 | [Snowflake](docs/reference-snowflake.md)、[Databricks](docs/reference-databricks.md) |
+| 運用とガバナンス | [OpenLineage](docs/reference-openlineage.md) |
+
+続く候補は [モダンデータスタックのリファレンス候補](docs/reference-modern-data-stack-candidates.md) に整理しています。
 
 詳細は `docs/model-schema.md`。
 

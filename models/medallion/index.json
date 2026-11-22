@@ -1,0 +1,142 @@
+{
+  "model": "medallion",
+  "name": "メダリオンアーキテクチャ",
+  "generatedAt": "2026-11-22T15:39:59.151Z",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "events": {
+      "type": "node",
+      "label": "受注 CDC",
+      "status": "claim"
+    },
+    "bronze": {
+      "type": "node",
+      "label": "Bronze・原本",
+      "status": "claim"
+    },
+    "prepare": {
+      "type": "node",
+      "label": "検証・正規化",
+      "status": "claim"
+    },
+    "quarantine": {
+      "type": "node",
+      "label": "隔離テーブル",
+      "status": "claim"
+    },
+    "silver": {
+      "type": "node",
+      "label": "Silver・受注明細",
+      "status": "claim"
+    },
+    "gold": {
+      "type": "node",
+      "label": "Gold・日次売上",
+      "status": "claim"
+    },
+    "bi": {
+      "type": "node",
+      "label": "BI",
+      "status": "claim"
+    },
+    "land": {
+      "type": "link",
+      "label": "受注 CDC → Bronze・原本",
+      "status": "claim"
+    },
+    "normalize": {
+      "type": "link",
+      "label": "Bronze・原本 → 検証・正規化",
+      "status": "claim"
+    },
+    "reject": {
+      "type": "link",
+      "label": "検証・正規化 → 隔離テーブル",
+      "status": "claim"
+    },
+    "curate": {
+      "type": "link",
+      "label": "検証・正規化 → Silver・受注明細",
+      "status": "claim"
+    },
+    "aggregate": {
+      "type": "link",
+      "label": "Silver・受注明細 → Gold・日次売上",
+      "status": "claim"
+    },
+    "serve": {
+      "type": "link",
+      "label": "Gold・日次売上 → BI",
+      "status": "claim"
+    },
+    "daily-sales": {
+      "type": "scenario",
+      "label": "受注イベントから日次売上へ"
+    },
+    "replay": {
+      "type": "scenario",
+      "label": "検証ルールの修正と再処理"
+    }
+  },
+  "byRef": {
+    "docs/reference-medallion.md#§1": [
+      "model",
+      "events",
+      "daily-sales",
+      "replay"
+    ],
+    "docs/reference-medallion.md": [
+      "model",
+      "events",
+      "bronze",
+      "prepare",
+      "quarantine",
+      "silver",
+      "gold",
+      "bi",
+      "land",
+      "normalize",
+      "reject",
+      "curate",
+      "aggregate",
+      "serve",
+      "daily-sales",
+      "replay"
+    ],
+    "docs/reference-medallion.md#§2": [
+      "bronze",
+      "land"
+    ],
+    "docs/reference-medallion.md#§3": [
+      "prepare",
+      "quarantine",
+      "silver",
+      "normalize",
+      "reject",
+      "curate"
+    ],
+    "docs/reference-medallion.md#§4": [
+      "gold",
+      "bi",
+      "aggregate",
+      "serve"
+    ]
+  },
+  "reference": {
+    "category": "構成概念",
+    "order": 10,
+    "objectives": [
+      "各層をデータ品質と利用者で区別する。",
+      "再処理の起点を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "Databricks · Medallion lakehouse architecture",
+        "url": "https://docs.databricks.com/aws/en/lakehouse/medallion"
+      }
+    ]
+  }
+}

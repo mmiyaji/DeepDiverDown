@@ -1,0 +1,34 @@
+name: ETL と ELT の比較アーキテクチャ
+description: 同じ注文データを、ロード前に変換する ETL とロード後に変換する ELT で比較します。
+reference:
+  objectives:
+    - ETL と ELT の変換タイミングの違いを説明する。
+    - ETL の curated 出力と ELT の raw 保持・後段モデル化を比較する。
+    - AWS Glue Job と dbt SQL モデルを例として役割を区別する。
+  sources:
+    - {title: AWS Glue concepts, url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html}
+    - {title: AWS Glue overview, url: https://docs.aws.amazon.com/glue/latest/dg/}
+    - {title: What is dbt?, url: https://docs.getdbt.com/docs/introduction}
+sources: [docs/reference-etl-elt.md]
+evidence: [{type: doc, ref: docs/reference-etl-elt.md#§1}]
+tiers:
+  - {id: input, label: 共通入力, z: 1, size: [18,3]}
+  - {id: compare, label: 変換経路の比較, z: 0, origin: [1,0], size: [16,5]}
+nodes:
+  source: {label: 注文データソース, kind: external, tier: input, x: 0, y: 2.5, description: ETL と ELT が共有する入力。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§1},{type: doc, ref: docs/reference-etl-elt.md#§5}]}
+  etl-job: {label: ETL Job（Glue 等）, kind: worker, tier: compare, x: 4, y: 1, description: ロード前に抽出・変換する。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
+  curated: {label: Curated Table, kind: db, shape3D: crate, tier: compare, x: 8, y: 1, description: 変換済みデータを保持する ETL 出力。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
+  raw: {label: Raw Landing, kind: db, shape3D: crate, tier: compare, x: 4, y: 4, description: 変換前のデータを先に保持する ELT 入力層。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
+  dbt: {label: SQL Models（dbt 等）, kind: worker, tier: compare, x: 8, y: 4, description: 分析基盤上で raw データを変換する。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
+  mart: {label: Analytics Mart, kind: db, tier: compare, x: 12, y: 2.5, description: ETL または ELT の分析用出力。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§4}]}
+  bi: {label: BI / Consumer, kind: external, tier: input, x: 16, y: 2.5, description: 集計結果を利用する下流。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§6}]}
+links:
+  - {id: etl-extract, from: source, to: etl-job, label: Extract・Transform, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
+  - {id: etl-load, from: etl-job, to: curated, label: 変換済みを Load, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
+  - {id: etl-mart, from: curated, to: mart, label: 分析用に提供, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§4}]}
+  - {id: elt-load, from: source, to: raw, label: 先に Load, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
+  - {id: elt-transform, from: raw, to: dbt, label: 後段で Transform, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
+  - {id: elt-mart, from: dbt, to: mart, label: モデル化した結果, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
+  - {id: consume, from: mart, to: bi, label: 集計を利用, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§6}]}
+scenarios:
+  - {id: compare-etl-elt, label: 注文データの ETL / ELT 比較, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§6}], steps: [{links: [etl-extract, etl-load], note: ETL はロード前に変換し、Curated Table へ書く。}, {links: [elt-load, elt-transform], note: ELT は Raw Landing へ先にロードし、基盤上の SQL モデルで変換する。}, {links: [etl-mart, elt-mart, consume], note: 両経路の分析用 Mart を BI が利用する。}]}

@@ -1,0 +1,34 @@
+name: Databricks レイクハウス参照アーキテクチャ
+description: 外部データを取り込み、ストレージ上で変換し、Unity Catalog管理下で分析する流れです。
+reference:
+  objectives:
+    - SourceからStorageまでのレーンを追う。
+    - TransformとQuery/Processを区別する。
+    - Unity Catalogのガバナンスを理解する。
+  sources:
+    - {title: Databricks reference architectures, url: https://docs.databricks.com/aws/en/lakehouse-architecture/reference}
+sources: [docs/reference-databricks.md]
+evidence: [{type: doc, ref: docs/reference-databricks.md#§1}, {type: doc, ref: docs/reference-databricks.md#§6}]
+tiers: [{id: lakehouse, label: Lakehouse, z: 0, size: [18, 3]}, {id: governance, label: Governance and serving, z: 1, origin: [4, 0], size: [13, 3]}]
+nodes:
+  source: {label: Source, kind: external, tier: lakehouse, x: 0, y: 1.5, description: 外部データ源。, evidence: [{type: doc, ref: docs/reference-databricks.md#§2}]}
+  ingest: {label: Ingest, kind: service, tier: lakehouse, x: 3, y: 1.5, description: バッチ・ストリーム取り込み。, evidence: [{type: doc, ref: docs/reference-databricks.md#§2}]}
+  storage: {label: Object storage, kind: db, tier: lakehouse, x: 6, y: 1.5, description: データとAI資産を保存。, evidence: [{type: doc, ref: docs/reference-databricks.md#§3}]}
+  transform: {label: Transform, kind: worker, tier: lakehouse, x: 9, y: 1.5, description: Spark等で整備。, evidence: [{type: doc, ref: docs/reference-databricks.md#§3}]}
+  catalog: {label: Unity Catalog, kind: service, tier: governance, x: 5, y: 1.5, description: ガバナンスを提供。, evidence: [{type: doc, ref: docs/reference-databricks.md#§4}]}
+  query: {label: SQL / Query, kind: worker, tier: governance, x: 9, y: 1.5, description: テーブルをクエリ。, evidence: [{type: doc, ref: docs/reference-databricks.md#§4}]}
+  serving: {label: BI / Serving, kind: service, tier: governance, x: 13, y: 1.5, description: 分析・提供先。, evidence: [{type: doc, ref: docs/reference-databricks.md#§5}]}
+links:
+  - {id: ingest-data, from: source, to: ingest, label: データを取り込む, evidence: [{type: doc, ref: docs/reference-databricks.md#§2}]}
+  - {id: land, from: ingest, to: storage, label: Storageへ配置, evidence: [{type: doc, ref: docs/reference-databricks.md#§3}]}
+  - {id: refine, from: storage, to: transform, label: データを変換, evidence: [{type: doc, ref: docs/reference-databricks.md#§3}]}
+  - {id: govern, from: transform, to: catalog, label: Catalogで管理, evidence: [{type: doc, ref: docs/reference-databricks.md#§4}]}
+  - {id: query-data, from: catalog, to: query, label: 管理下でクエリ, evidence: [{type: doc, ref: docs/reference-databricks.md#§4}]}
+  - {id: serve, from: query, to: serving, label: 分析へ提供, evidence: [{type: doc, ref: docs/reference-databricks.md#§5}]}
+scenarios:
+  - {id: lakehouse-flow, label: 取り込みから分析, evidence: [{type: doc, ref: docs/reference-databricks.md#§5}], steps: [{links: [ingest-data, land], note: Sourceからバッチまたはストリームでデータを取り込む。}, {links: [refine, govern], note: Storage上のデータを変換しUnity Catalogで管理する。}, {links: [query-data, serve], note: 管理下のテーブルをクエリし分析へ提供する。}]}
+requirements:
+  - {id: BR-01, kind: usecase, title: 取り込みと分析, text: 外部データを整備し分析利用できる。, links: [ingest-data, refine, serve], evidence: [{type: doc, ref: docs/reference-databricks.md#§2}]}
+  - {id: NFR-01, kind: nfr, title: ガバナンス, text: 管理カタログ下でデータを参照する。, links: [govern, query-data], evidence: [{type: doc, ref: docs/reference-databricks.md#§4}]}
+unknowns: [{id: UNK-01, text: クラウドサービス、テーブル形式、計算サイズは未確定。, refs: [ingest, storage, transform]}]
+gates: {maxDrift: 0, maxHigh: 0}

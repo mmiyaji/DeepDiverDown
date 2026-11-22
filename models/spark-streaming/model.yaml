@@ -1,0 +1,37 @@
+name: Apache Spark Streaming（DStreams）の基本アーキテクチャ
+description: StreamingContext が入力を RDD の列として処理し、チェックポイントから復旧する旧 API の流れを追うリファレンスです。
+reference:
+  objectives:
+    - DStream、RDD、StreamingContext、出力操作の関係を区別する。
+    - バッチ間隔ごとの変換と状態付き集計を追う。
+    - チェックポイントからドライバーを復旧する流れを理解する。
+  sources:
+    - {title: Spark Streaming Programming Guide, url: "https://spark.apache.org/docs/latest/streaming-programming-guide.html"}
+sources: [docs/reference-spark-streaming.md]
+evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§1"}]
+tiers:
+  - {id: runtime, label: 入力と Streaming 実行, kind: origin, z: 0, size: [14, 3]}
+  - {id: recovery, label: 復旧, z: 1, origin: [0, 0], size: [14, 3]}
+nodes:
+  source: {label: Input Stream, kind: queue, tier: runtime, x: 0, y: 1.5, description: Kafka などからイベントを受け取る。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§2"}]}
+  context: {label: StreamingContext, kind: service, tier: runtime, x: 4, y: 1.5, description: バッチ間隔とストリーミング計算を管理する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§3"}]}
+  dstream: {label: DStream, kind: service, tier: runtime, x: 7, y: 1.5, description: 連続する RDD の系列として入力を表す。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§2"}]}
+  executors: {label: RDD Executors, kind: worker, tier: runtime, x: 10, y: 1.5, description: 各バッチの RDD 変換と集計を並列実行する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§4"}]}
+  output: {label: Batch Output, kind: db, tier: runtime, x: 13, y: 1.5, description: foreachRDD などで外部システムへ保存する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§5"}]}
+  checkpoint: {label: Checkpoint Directory, kind: db, tier: recovery, x: 7, y: 1.5, description: 状態と進捗を信頼できるファイルシステムへ保存する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§6"}]}
+links:
+  - {id: receive, from: source, to: context, label: 入力を受信, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§2"}]}
+  - {id: batches, from: context, to: dstream, label: バッチ間隔で RDD を生成, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§3"}]}
+  - {id: transform, from: dstream, to: executors, label: 変換・集計, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§4"}]}
+  - {id: emit, from: executors, to: output, label: バッチを出力, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§5"}]}
+  - {id: save, from: context, to: checkpoint, label: 状態を保存, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§6"}]}
+  - {id: restore, from: checkpoint, to: context, label: StreamingContext を復元, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§6"}]}
+scenarios:
+  - id: dstream-recovery
+    label: DStream のバッチ処理と復旧
+    evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§1"}, {type: doc, ref: "docs/reference-spark-streaming.md#§7"}]
+    steps:
+      - {links: [receive, batches], note: 入力を受け、バッチ間隔ごとに RDD 列へ変換する。}
+      - {links: [transform], note: RDD の変換と状態付き集計を実行する。}
+      - {links: [emit, save], note: バッチを出力し、チェックポイントへ状態を保存する。}
+      - {links: [restore], note: ドライバー障害時はチェックポイントから StreamingContext を再生成する。}

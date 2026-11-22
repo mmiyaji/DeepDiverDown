@@ -1,0 +1,35 @@
+name: AWS Glue の基本アーキテクチャ
+description: Crawler と Data Catalog でデータを発見し、トリガーされたサーバーレス ETL Job で分析用に整備する流れを追います。
+reference:
+  objectives:
+    - Crawler と Data Catalog の役割を区別する。
+    - AWS Glue Job がサーバーレス実行環境で抽出・変換・ロードする流れを追う。
+    - Trigger と Workflow による依存関係・監視を理解する。
+  sources:
+    - {title: AWS Glue concepts, url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html}
+    - {title: AWS Glue components, url: https://docs.aws.amazon.com/glue/latest/dg/components-overview.html}
+    - {title: AWS Glue How it works, url: https://docs.aws.amazon.com/glue/latest/dg/how-it-works.html}
+    - {title: AWS Glue workflows, url: https://docs.aws.amazon.com/glue/latest/dg/workflows_overview.html}
+sources: [docs/reference-aws-glue.md]
+evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]
+tiers:
+  - {id: discover, label: 発見と制御, z: 1, size: [15,3]}
+  - {id: data, label: データ処理, z: 0, origin: [2,0], size: [14,3]}
+nodes:
+  source: {label: データソース（S3 等）, kind: external, tier: data, x: 0, y: 1.5, description: 注文ファイルなどの元データ。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
+  crawler: {label: Glue Crawler, kind: worker, tier: discover, x: 2, y: 1.5, description: データを走査しスキーマを推測する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
+  catalog: {label: Glue Data Catalog, kind: db, tier: discover, x: 5, y: 1.5, description: テーブルとジョブが使う技術メタデータを管理する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§2}]}
+  trigger: {label: Trigger / Workflow, kind: service, tier: discover, x: 8, y: 1.5, description: スケジュール・イベント・依存関係で Job を起動する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§4}]}
+  job: {label: Glue ETL Job, kind: worker, tier: data, x: 10, y: 1.5, description: Spark または Ray のサーバーレス環境で変換する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§3}]}
+  target: {label: 分析用ターゲット, kind: db, shape3D: crate, tier: data, x: 13, y: 1.5, description: 整備済みデータを置くデータレイク等。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
+  monitor: {label: Logs / Monitoring, kind: service, tier: discover, x: 13, y: 2.5, description: ジョブ実行の状態、ログ、通知を追う。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
+links:
+  - {id: crawl, from: source, to: crawler, label: スキーマを発見, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
+  - {id: catalog, from: crawler, to: catalog, label: テーブル定義を登録, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
+  - {id: trigger, from: trigger, to: job, label: Job を起動, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§4}]}
+  - {id: metadata, from: catalog, to: job, label: ソース・ターゲット定義を提供, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§2}]}
+  - {id: process, from: source, to: job, label: データを抽出・変換, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§3}]}
+  - {id: load, from: job, to: target, label: 結果をロード, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
+  - {id: observe, from: job, to: monitor, label: 実行を監視, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
+scenarios:
+  - {id: catalog-etl, label: Catalog から分析用データへ, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§6}], steps: [{links: [crawl, catalog], note: Crawler がソースを走査し、Data Catalog にテーブル定義を登録する。}, {links: [trigger, metadata, process], note: Trigger が Job を起動し、Catalog の定義を使って抽出・変換する。}, {links: [load, observe], note: 結果をターゲットへ書き、ログと状態を監視する。}]}

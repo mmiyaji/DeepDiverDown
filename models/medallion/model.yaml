@@ -1,0 +1,41 @@
+name: "メダリオンアーキテクチャ"
+description: "受注イベントを Bronze に保持し、Silver で整え、Gold の日次集計を BI で読みます。"
+reference:
+  objectives: ["各層をデータ品質と利用者で区別する。", "再処理の起点を確認する。"]
+  sources:
+    - {"title": "Databricks · Medallion lakehouse architecture", "url": "https://docs.databricks.com/aws/en/lakehouse/medallion"}
+sources: [docs/reference-medallion.md]
+evidence: [{"type": "doc", "ref": "docs/reference-medallion.md#§1"}]
+tiers:
+  - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+nodes:
+  events: {"label": "受注 CDC", "kind": "queue", "tier": "flow", "x": 0, "y": 2, "description": "注文の変更を届ける。", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§1"}]}
+  bronze: {"label": "Bronze・原本", "kind": "db", "tier": "flow", "x": 4, "y": 2, "description": "イベントを保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§2"}]}
+  prepare: {"label": "検証・正規化", "kind": "worker", "tier": "flow", "x": 8, "y": 2, "description": "型と順序を確認する。", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§3"}]}
+  quarantine: {"label": "隔離テーブル", "kind": "db", "tier": "flow", "x": 8, "y": 0, "description": "処理できない行を残す。", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§3"}]}
+  silver: {"label": "Silver・受注明細", "kind": "db", "tier": "flow", "x": 12, "y": 2, "description": "検証済み明細を保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§3"}]}
+  gold: {"label": "Gold・日次売上", "kind": "db", "tier": "flow", "x": 16, "y": 2, "description": "日付・通貨別に集計する。", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§4"}]}
+  bi: {"label": "BI", "kind": "client", "tier": "flow", "x": 16, "y": 5, "description": "日次集計を表示する。", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§4"}]}
+links:
+  - {"id": "land", "from": "events", "to": "bronze", "label": "原本を追記", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§2"}]}
+  - {"id": "normalize", "from": "bronze", "to": "prepare", "label": "イベントを読む", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§3"}]}
+  - {"id": "reject", "from": "prepare", "to": "quarantine", "label": "無効行を隔離", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§3"}]}
+  - {"id": "curate", "from": "prepare", "to": "silver", "label": "明細を更新", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§3"}]}
+  - {"id": "aggregate", "from": "silver", "to": "gold", "label": "日次集計を更新", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§4"}]}
+  - {"id": "serve", "from": "gold", "to": "bi", "label": "売上を表示", "evidence": [{"type": "doc", "ref": "docs/reference-medallion.md#§4"}]}
+scenarios:
+  - id: daily-sales
+    label: "受注イベントから日次売上へ"
+    evidence: [{"type": "doc", "ref": "docs/reference-medallion.md#§1"}]
+    steps:
+      - {"links": ["land"], "note": "変更イベントを原本として残す。"}
+      - {"links": ["normalize", "curate"], "note": "順序と型を検証して明細を確定する。"}
+      - {"links": ["aggregate"], "note": "日付・通貨ごとの売上を集計する。"}
+      - {"links": ["serve"], "note": "BI が Gold を読む。"}
+  - id: replay
+    label: "検証ルールの修正と再処理"
+    evidence: [{"type": "doc", "ref": "docs/reference-medallion.md#§1"}]
+    steps:
+      - {"links": ["normalize", "reject"], "note": "旧ルールで処理できなかった行を隔離する。"}
+      - {"links": ["normalize", "curate"], "note": "ルール修正後に Bronze を再処理して明細へ反映する。"}
+      - {"links": ["aggregate", "serve"], "note": "影響日の集計を更新する。"}

@@ -1,0 +1,34 @@
+name: dbt の ELT アーキテクチャ
+description: ロード済みデータを依存関係付きSQLモデルでmartへ変換しテストする流れです。
+reference:
+  objectives:
+    - SQLモデルと依存関係を追う。
+    - 実行と品質テストを区別する。
+    - lineageが変更影響を説明することを理解する。
+  sources:
+    - {title: What is dbt?, url: https://docs.getdbt.com/docs/introduction}
+sources: [docs/reference-dbt.md]
+evidence: [{type: doc, ref: docs/reference-dbt.md#§1}, {type: doc, ref: docs/reference-dbt.md#§6}]
+tiers: [{id: data, label: データ変換, z: 0, size: [18, 3]}, {id: control, label: 実行と品質, z: 1, origin: [4, 0], size: [14, 3]}]
+nodes:
+  raw: {label: Raw table, kind: db, tier: data, x: 0, y: 1.5, description: ロード済み注文データ。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  project: {label: dbt project, kind: service, tier: control, x: 3, y: 1.5, description: SQLモデルを管理。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  dag: {label: Model DAG, kind: service, tier: control, x: 6, y: 1.5, description: モデル依存関係。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  compute: {label: Warehouse compute, kind: worker, tier: control, x: 9, y: 1.5, description: SQLを実行。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  staging: {label: Staging models, kind: db, tier: data, x: 10, y: 1.5, description: 整形済みモデル。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  mart: {label: Analytics mart, kind: db, tier: data, x: 14, y: 1.5, description: 分析用成果物。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  tests: {label: dbt tests, kind: service, tier: control, x: 14, y: 1.5, description: 品質を検証。, evidence: [{type: doc, ref: docs/reference-dbt.md#§4}]}
+links:
+  - {id: input, from: raw, to: project, label: 入力を参照, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  - {id: graph, from: project, to: dag, label: 依存関係を構築, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  - {id: execute, from: dag, to: compute, label: SQLを実行, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  - {id: stage, from: compute, to: staging, label: stagingを生成, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  - {id: mart, from: staging, to: mart, label: martへ変換, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  - {id: check, from: mart, to: tests, label: 品質をテスト, evidence: [{type: doc, ref: docs/reference-dbt.md#§4}]}
+scenarios:
+  - {id: build, label: stagingからmartへ, evidence: [{type: doc, ref: docs/reference-dbt.md#§5}], steps: [{links: [input, graph], note: Raw tableを参照し、モデルの依存関係を確定する。}, {links: [execute], note: DAG順にコンパイル済みSQLを実行する。}, {links: [stage, mart], note: stagingから分析用martを生成する。}, {links: [check], note: テスト結果を確認する。}]}
+requirements:
+  - {id: BR-01, kind: usecase, title: 分析用データを生成, text: 依存関係順にモデルを構築する。, links: [graph, execute, mart], evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  - {id: NFR-01, kind: nfr, title: 品質検証, text: 成果物をテストできる。, links: [check], evidence: [{type: doc, ref: docs/reference-dbt.md#§4}]}
+unknowns: [{id: UNK-01, text: 実行環境、スケジュール、テスト定義は未確定。, refs: [execute, check]}]
+gates: {maxDrift: 0, maxHigh: 0}
