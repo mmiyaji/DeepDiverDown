@@ -1,0 +1,31 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.9.5",
+  "values": {
+    "root_module": {
+      "resources": [
+        { "address": "aws_route53_zone.main", "mode": "managed", "type": "aws_route53_zone", "name": "main", "values": { "name": "example.jp" } },
+        { "address": "aws_cloudfront_distribution.main", "mode": "managed", "type": "aws_cloudfront_distribution", "name": "main", "values": { "id": "E1ABC" } },
+        { "address": "aws_wafv2_web_acl.main", "mode": "managed", "type": "aws_wafv2_web_acl", "name": "main", "values": { "name": "web-acl" } },
+        { "address": "aws_subnet.public_a", "mode": "managed", "type": "aws_subnet", "name": "public_a", "values": { "id": "subnet-pa", "availability_zone": "ap-northeast-1a" } },
+        { "address": "aws_subnet.public_c", "mode": "managed", "type": "aws_subnet", "name": "public_c", "values": { "id": "subnet-pc", "availability_zone": "ap-northeast-1c" } },
+        { "address": "aws_subnet.private_a", "mode": "managed", "type": "aws_subnet", "name": "private_a", "values": { "id": "subnet-ra", "availability_zone": "ap-northeast-1a" } },
+        { "address": "aws_subnet.private_c", "mode": "managed", "type": "aws_subnet", "name": "private_c", "values": { "id": "subnet-rc", "availability_zone": "ap-northeast-1c" } },
+        { "address": "aws_lb.api", "mode": "managed", "type": "aws_lb", "name": "api", "values": { "name": "api-alb", "subnets": ["subnet-pa", "subnet-pc"] } },
+        { "address": "aws_nat_gateway.a", "mode": "managed", "type": "aws_nat_gateway", "name": "a", "values": { "subnet_id": "subnet-pa", "tags": { "Name": "nat-a" } } },
+        { "address": "aws_ecs_service.api", "mode": "managed", "type": "aws_ecs_service", "name": "api", "values": { "name": "api", "desired_count": 2, "network_configuration": [{ "subnets": ["subnet-ra", "subnet-rc"] }] } },
+        { "address": "aws_lambda_function.image", "mode": "managed", "type": "aws_lambda_function", "name": "image", "values": { "function_name": "image-worker" } },
+        { "address": "aws_rds_cluster.main", "mode": "managed", "type": "aws_rds_cluster", "name": "main", "values": { "cluster_identifier": "app-db", "availability_zones": ["ap-northeast-1a", "ap-northeast-1c"] } },
+        { "address": "aws_rds_cluster_instance.main[0]", "mode": "managed", "type": "aws_rds_cluster_instance", "name": "main", "values": { "cluster_identifier": "app-db" } },
+        { "address": "aws_rds_cluster_instance.main[1]", "mode": "managed", "type": "aws_rds_cluster_instance", "name": "main", "values": { "cluster_identifier": "app-db" } },
+        { "address": "aws_elasticache_replication_group.cache", "mode": "managed", "type": "aws_elasticache_replication_group", "name": "cache", "values": { "num_cache_clusters": 1, "preferred_cache_cluster_azs": ["ap-northeast-1a"] } },
+        { "address": "aws_sqs_queue.jobs", "mode": "managed", "type": "aws_sqs_queue", "name": "jobs", "values": { "name": "image-jobs" } },
+        { "address": "aws_s3_bucket.images", "mode": "managed", "type": "aws_s3_bucket", "name": "images", "values": { "bucket": "app-images" } },
+        { "address": "aws_secretsmanager_secret.db", "mode": "managed", "type": "aws_secretsmanager_secret", "name": "db", "values": { "name": "app/db" } },
+        { "address": "aws_instance.bastion", "mode": "managed", "type": "aws_instance", "name": "bastion", "values": { "availability_zone": "ap-northeast-1a", "tags": { "Name": "bastion" } } },
+        { "address": "aws_cloudwatch_log_group.api", "mode": "managed", "type": "aws_cloudwatch_log_group", "name": "api", "values": { "name": "/ecs/api" } },
+        { "address": "aws_iam_role.ecs_task", "mode": "managed", "type": "aws_iam_role", "name": "ecs_task", "values": { "name": "ecs-task" } }
+      ]
+    }
+  }
+}

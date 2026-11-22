@@ -62,6 +62,21 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 | `[` | サイドバーの開閉 |
 | `?` / `Esc` | ヘルプ / 閉じる・選択解除 |
 
+## 取り込みと抽出（CLI）
+| コマンド | 内容 |
+|---|---|
+| `npm run import:tf -- state.json --out models/<id>/actual.yaml` | `terraform show -json`（または tfstate v4）から実環境スナップショットと IaC 在庫を作る。台数・AZ を取り出す |
+| `npm run import:k8s -- manifests.yaml --out models/<id>/actual.yaml` | Kubernetes マニフェスト（または `kubectl get -o yaml`）から部品・台数・接続（`*_ADDR` などの環境変数）を作る。宛先のない参照は `unresolved` |
+| `npm run extract -- --id <id> --doc docs/x.md [--actual …]` | Claude API（claude-opus-5-5）で 書き手→形式チェック→検証役→点検。`ant auth login` か `ANTHROPIC_API_KEY` が必要。`--dry-run` で API を呼ばずに確認 |
+
+- モデルの部品と取り込んだ部品は、同じ ID か、根拠の `{ type: iac, ref: <アドレス> }` で対応付く
+- 座標（x, y）を省いた部品は自動配置される（`layout: auto` で全部並べ直し）
+
+### 公開サンプルでの試行（online-boutique）
+公開デモ [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo)（Apache-2.0）の README を要約した設計書（`docs/sample-online-boutique.md`）だけからモデルを起こし、
+公開マニフェストを参考に再構成した `samples/online-boutique/kubernetes-manifests.yaml` を取り込んで突き合わせた。
+設計書から読み取れなかった接続 4 件、設計書の推測が誤っていた接続 1 件、存在しないサービスへの参照 1 件、全サービスが 1 台構成であることを検出した。
+
 ## テスト・CI
 `npm test`（`node --test`）で解析処理の単体テスト。`.github/workflows/ci.yml` で push / PR 時に実行（点検はサンプルが意図的に不合格なので報告のみ）。
 

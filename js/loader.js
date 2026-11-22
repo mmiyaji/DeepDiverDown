@@ -33,9 +33,9 @@ export async function loadRegistry() {
 export async function loadEntry(entry) {
   if (entry.local) {
     const x = store.get(LOCAL, []).find(y => y.id === entry.id);
-    return { model: jsyaml.load(x.yaml), actual: null, docs: {} };
+    return { model: Layout.apply(jsyaml.load(x.yaml)), actual: null, docs: {} };
   }
-  const model = jsyaml.load(await text(`models/${entry.id}/model.yaml`));
+  const model = Layout.apply(jsyaml.load(await text(`models/${entry.id}/model.yaml`)));
   const actual = entry.actual ? jsyaml.load(await text(`models/${entry.id}/actual.yaml`)) : null;
   return { model, actual, docs: await loadDocs(model) };
 }
@@ -59,8 +59,8 @@ export function removeLocal(id) { store.set(LOCAL, store.get(LOCAL, []).filter(x
 /* 比較対象：ユーザーが読み込んだもの → registry の compare の順で探す */
 export async function loadCompare(key, entry) {
   const own = store.get(CMP + key, null);
-  if (own) return { model: jsyaml.load(own.yaml), label: own.label, own: true };
-  if (entry.compare) return { model: jsyaml.load(await text(entry.compare.path)), label: entry.compare.label, own: false };
+  if (own) return { model: Layout.apply(jsyaml.load(own.yaml)), label: own.label, own: true };
+  if (entry.compare) return { model: Layout.apply(jsyaml.load(await text(entry.compare.path))), label: entry.compare.label, own: false };
   return null;
 }
 export function saveCompare(key, yamlText, fileName) {

@@ -7,7 +7,9 @@
     { id: 'SPOF', sev: 'high', title: '単一障害点',
       run: m => Object.entries(m.nodes)
         .filter(([, n]) => !INFRA.includes(n.kind) && (n.replicas ?? 1) < 2)
-        .map(([id, n]) => ({ nodes: [id], msg: `${n.label} が ${n.replicas ?? 1} 台構成（${(n.evidence || [])[0]?.ref?.split('#')[1] || (n.evidence || [])[0]?.at || '根拠なし'}）` })) },
+        .map(([id, n]) => ({ nodes: [id], msg: n.replicas == null
+          ? `${n.label} の台数が書かれていない（1 台とみなす。冗長化の方針を確認）`
+          : `${n.label} が ${n.replicas} 台構成（${(n.evidence || [])[0]?.ref?.split('#')[1] || (n.evidence || [])[0]?.at || '根拠なし'}）` })) },
 
     { id: 'NO_TIMEOUT', sev: 'high', title: 'タイムアウト未定義',
       run: m => syncLinks(m).filter(l => l.timeoutMs == null)
@@ -151,31 +153,55 @@
   }
 
   /* 設計（MODEL）と実環境（ACTUAL）の差分 */
+  /* 設計の部品 → 実環境の部品の対応。同じ ID、または根拠に書いた IaC の参照（aws_ecs_service.api / deployment/cart など）で引く */
+  function matchActual(m, a) {
+    const match = {};
+    for (const [id, n] of Object.entries(m.nodes)) {
+      if (a.nodes[id]) { match[id] = id; continue; }
+      const ref = (n.evidence || []).filter(e => e.type === 'iac' || e.type === 'actual').map(e => e.ref).find(r => a.nodes[r]);
+      if (ref) match[id] = ref;
+    }
+    return match;
+  }
+
+  /* 設計（MODEL）と実環境（ACTUAL）の差分。actual.links がないときは接続を比べない */
   function diff(m, a) {
-    if (!a) return { nodes: {}, links: {}, extraNodes: {}, extraLinks: [], items: [] };
+    if (!a) return { nodes: {}, links: {}, extraNodes: {}, extraLinks: [], items: [], match: {} };
     const nodes = {}, links = {}, items = [], extraNodes = {}, extraLinks = [];
-    const al = (a.links || []).map(l => Array.isArray(l) ? l : [l.from, l.to]);
+    const match = matchActual(m, a), back = Object.fromEntries(Object.entries(match).map(([k, v]) => [v, k]));
+    const toModel = k => back[k] || k;
     const actor = id => m.nodes[id]?.kind === 'actor';
     for (const [id, n] of Object.entries(m.nodes)) {
-      if (n.kind === 'actor') continue;
-      const x = a.nodes[id];
+      if (n.kind === 'actor' || n.kind === 'external') continue;
+      const x = a.nodes[match[id]];
       if (!x) { nodes[id] = 'missing'; items.push({ kind: 'missing', nodes: [id], msg: `${n.label} が実環境に存在しない` }); }
       else if (n.replicas != null && x.replicas != null && x.replicas !== n.replicas) {
         nodes[id] = 'replicas'; items.push({ kind: 'replicas', nodes: [id], msg: `${n.label}：設計 ${n.replicas} 台 → 実環境 ${x.replicas} 台` });
       }
     }
-    for (const [id, x] of Object.entries(a.nodes)) if (!m.nodes[id]) {
-      extraNodes[id] = x; items.push({ kind: 'extra', nodes: [id], msg: `${x.label || id} が設計書にない（実環境のみ）` });
+    // 設計にない実環境の部品は、所属フロアの右側に並べて表示する
+    const lastTier = (m.tiers.filter(t => !t.origin).at(-1) || m.tiers.at(-1)).id;
+    const slot = {};
+    for (const [key, x] of Object.entries(a.nodes)) if (!back[key]) {
+      const tier = m.tiers.some(t => t.id === x.tier) ? x.tier : lastTier;
+      const t = m.tiers.find(z => z.id === tier), i = slot[tier] = (slot[tier] ?? -1) + 1;
+      const w = (t.size || [10, 4])[0];
+      extraNodes[key] = { ...x, label: x.label || key, tier, x: x.x ?? w + 1 + Math.floor(i / 3) * 2.2, y: x.y ?? (i % 3) * 1.6 };
+      items.push({ kind: 'extra', nodes: [key], msg: `${x.label || key} が設計書にない（実環境のみ）` });
     }
-    for (const l of m.links) if (!actor(l.from) && !actor(l.to) && !al.some(([f, t]) => f === l.from && t === l.to)) {
-      links[l.id] = 'missing';
-      if (!nodes[l.from] && !nodes[l.to]) items.push({ kind: 'missing', links: [l.id], msg: `${m.nodes[l.from].label} → ${m.nodes[l.to].label} の接続が実環境にない` });
+    if (a.links) {
+      const al = a.links.map(l => Array.isArray(l) ? l : [l.from, l.to]).map(([f, t]) => [toModel(f), toModel(t)]);
+      for (const l of m.links) if (!actor(l.from) && !actor(l.to) && m.nodes[l.to]?.kind !== 'external' && !al.some(([f, t]) => f === l.from && t === l.to)) {
+        links[l.id] = 'missing';
+        if (!nodes[l.from] && !nodes[l.to]) items.push({ kind: 'missing', links: [l.id], msg: `${m.nodes[l.from].label} → ${m.nodes[l.to].label} の接続が実環境にない` });
+      }
+      al.filter(([f, t]) => !m.links.some(l => l.from === f && l.to === t)).forEach(([f, t]) => {
+        const id = `x_${f}_${t}`; extraLinks.push({ id, from: f, to: t, sync: true });
+        const lab = k => (m.nodes[k] || extraNodes[k] || {}).label || k;
+        items.push({ kind: 'extra', links: [id], msg: `${lab(f)} → ${lab(t)} の接続が設計書にない` });
+      });
     }
-    al.filter(([f, t]) => !m.links.some(l => l.from === f && l.to === t)).forEach(([f, t]) => {
-      const id = `x_${f}_${t}`; extraLinks.push({ id, from: f, to: t, sync: true });
-      items.push({ kind: 'extra', links: [id], msg: `${(m.nodes[f] || a.nodes[f]).label || f} → ${(m.nodes[t] || a.nodes[t]).label || t} の接続が設計書にない` });
-    });
-    return { nodes, links, extraNodes, extraLinks, items };
+    return { nodes, links, extraNodes, extraLinks, items, match };
   }
 
   /* ================= 根拠・確度（Reverse Spec Flow の考え方） =================
@@ -209,7 +235,7 @@
       let r = fromEv(n, n.label);
       if (a && n.kind !== 'actor' && r.status !== 'drift') {
         if (d.nodes[id]) { r = { status: 'drift', why: d.nodes[id] === 'missing' ? '実環境に存在しない' : '台数が一致しない' }; out.drifts.push({ label: n.label, msg: d.items.find(i => i.nodes?.includes(id))?.msg }); }
-        else if (a.nodes[id]) r = { status: 'fact', why: '実環境で確認' };
+        else if (d.match[id]) r = { status: 'fact', why: '実環境で確認' };
       }
       out.nodes[id] = r;
     }
@@ -223,6 +249,8 @@
       out.links[l.id] = r;
     }
     for (const x of d.items.filter(i => i.kind === 'extra')) out.drifts.push({ label: '実環境のみ', msg: x.msg });
+    for (const x of d.items.filter(i => i.kind === 'missing' && i.links)) out.drifts.push({ label: '設計のみ', msg: x.msg });
+    for (const u of a?.unresolved || []) out.drifts.push({ label: u.from, msg: `${u.from} の ${u.env}=${u.value} の接続先が実環境にない（${u.reason}）` });
     for (const q of m.requirements || []) out.reqs[q.id] = fromEv(q, q.title);
     return out;
   }
@@ -244,8 +272,13 @@
   function coverage(m, a, docs) {
     const own = evidenceOwners(m), refs = new Set(own.map(o => refKey(o.e))), items = [];
     for (const src of m.sources || []) for (const s of docs[src] || []) items.push({ kind: 'doc', ref: `${src}#${s.id}`, label: `${s.id} ${s.title}`, ok: refs.has(`${src}#${s.id}`) });
-    for (const inv of m.inventory || []) items.push({ kind: inv.type || 'iac', ref: inv.ref, label: inv.ref, ok: refs.has(inv.ref) });
-    if (a) for (const [id, x] of Object.entries(a.nodes)) items.push({ kind: 'actual', ref: `actual:${id}`, label: x.label || m.nodes[id]?.label || id, ok: !!m.nodes[id] });
+    // 在庫：モデルに書いたもの + 取り込んだ実環境スナップショットの在庫（重複は除く）
+    const inv = [...(m.inventory || []), ...(a?.inventory || [])].filter((x, i, arr) => arr.findIndex(y => y.ref === x.ref) === i);
+    for (const x of inv) items.push({ kind: x.type || 'iac', ref: x.ref, label: x.ref, ok: refs.has(x.ref) });
+    if (a) {
+      const matched = new Set(Object.values(matchActual(m, a)));
+      for (const [id, x] of Object.entries(a.nodes)) if (!inv.some(y => y.ref === id)) items.push({ kind: 'actual', ref: `actual:${id}`, label: x.label || id, ok: matched.has(id) });
+    }
     const broken = own.filter(o => o.e.type === 'doc').filter(o => { const [f, s] = o.e.ref.split('#'); return docs[f] && s && !docs[f].some(x => x.id === s); })
       .map(o => ({ id: o.id, label: o.label, ref: o.e.ref }));
     return { items, total: items.length, covered: items.filter(i => i.ok).length, missing: items.filter(i => !i.ok), broken };

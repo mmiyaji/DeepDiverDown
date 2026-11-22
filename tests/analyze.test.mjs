@@ -55,7 +55,7 @@ test('impact：パイプラインは下流に伝播し、join:any は別経路�
 test('classify：IaC の says が食い違うと「ずれ」、doc のみは「主張」、根拠なしは「不明」', () => {
   const c = A.classify(aws.model, null);
   assert.equal(c.nodes.ecs.status, 'drift');
-  assert.equal(c.nodes.sm.status, 'claim');
+  assert.equal(c.nodes.user.status, 'claim');
   assert.equal(c.nodes.ext.status, 'unknown');
   assert.equal(c.nodes.aurora.status, 'fact');
 });
