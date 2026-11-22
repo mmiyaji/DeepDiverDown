@@ -1,0 +1,59 @@
+name: Apache Kafka Connect の基本アーキテクチャ
+description: 外部DBの受注データが Source Connector、Kafka Topic、Sink Connector を経て保存先に届く流れを追います。
+reference:
+  objectives:
+    - Connector と Worker、Source Task と Sink Task の役割を区別する。
+    - 外部DBから Kafka を経由し、保存先に書き込まれる流れを追う。
+    - Source 側と Sink 側で何の進捗を記録するかを理解する。
+  sources:
+    - {"title": "Kafka Connect Overview","url": "https://kafka.apache.org/44/kafka-connect/overview/"}
+    - {"title": "Kafka Connect User Guide","url": "https://kafka.apache.org/44/kafka-connect/user-guide/"}
+    - {"title": "Debezium Connector for PostgreSQL","url": "https://debezium.io/documentation/reference/stable/connectors/postgresql.html"}
+sources: [docs/reference-kafka-connect.md]
+evidence: [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"}]
+tiers:
+  - {"id": "flow","label": "受注データの流れ","z": 0,"size": [16,3]}
+  - {"id": "operation","label": "実行と進捗","z": 1,"origin": [4,0],"size": [8,3]}
+nodes:
+  database:
+    {"label": "外部DB（PostgreSQL）","kind": "db","tier": "flow","x": 0,"y": 1.5,"description": "受注テーブルと変更ログを持つ。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§2"}]}
+  source:
+    {"label": "Source Connector","kind": "worker","shape3D": "plug","tier": "flow","x": 4,"y": 1.5,"description": "Debezium の Source Task が既存データと変更を取り込む例。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§2"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§3"}]}
+  kafka:
+    {"label": "Kafka Topic","kind": "queue","tier": "flow","x": 8,"y": 1.5,"description": "受注データのイベントを保持し、Sink Task から読み出せるようにする。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§3"}]}
+  sink:
+    {"label": "Sink Connector","kind": "worker","shape3D": "plug","tier": "flow","x": 12,"y": 1.5,"description": "Sink Task が Kafka を購読し、保存先へ書き込む。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
+  destination:
+    {"label": "保存先（オブジェクトストレージ）","kind": "db","shape3D": "crate","tier": "flow","x": 16,"y": 1.5,"description": "受注イベントを下流の処理や分析用に保存する例。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
+  worker:
+    {"label": "Connect Worker","kind": "service","tier": "operation","x": 1,"y": 1.5,"description": "Connector に対応する Task を実行する。図は分散実行基盤の代表点。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"}]}
+  offsets:
+    {"label": "Kafka 上の進捗","kind": "db","tier": "operation","x": 7,"y": 1.5,"description": "Source オフセットと Sink の Consumer Group オフセットを模式的にまとめたもの。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
+links:
+  - {"id": "start-source","from": "worker","to": "source","label": "Source Task を実行","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"}]}
+  - {"id": "start-sink","from": "worker","to": "sink","label": "Sink Task を実行","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"}]}
+  - {"id": "capture","from": "database","to": "source","label": "スナップショット・変更取得","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§2"}]}
+  - {"id": "publish","from": "source","to": "kafka","label": "イベントを発行","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§3"}]}
+  - {"id": "fetch","from": "kafka","to": "sink","label": "取得したイベント","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
+  - {"id": "write","from": "sink","to": "destination","label": "保存先に書き込む","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
+  - {"id": "source-offset","from": "source","to": "offsets","label": "ソース位置を記録","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
+  - {"id": "sink-offset","from": "sink","to": "offsets","label": "Consumer Group の位置をコミット","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
+  - {"id": "resume","from": "offsets","to": "sink","label": "コミット済み位置から再開","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
+scenarios:
+  - id: delivery
+    label: 外部DBから保存先まで
+    evidence: [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§2"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§3"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]
+    steps:
+      - {"links": ["start-source","start-sink"],"note": "起動。Connect Worker が Source Task と Sink Task を実行する。"}
+      - {"links": ["capture"],"note": "取り込み。初回は受注テーブルのスナップショットを取り、その後は PostgreSQL の変更ログを読む例。"}
+      - {"links": ["publish","source-offset"],"note": "発行。Source Task が受注イベントを Kafka Topic に送り、ソース側の読み取り位置を記録する。"}
+      - {"links": ["fetch"],"note": "取得。Sink Task が Kafka Topic を購読し、自分の進捗に従ってイベントを取りに行く。"}
+      - {"links": ["write"],"note": "保存。Sink Task が受注イベントをオブジェクトストレージへ書き込む。"}
+      - {"links": ["sink-offset"],"note": "進捗を保存。Sink 側は次に読む Kafka の位置を Consumer Group のオフセットとしてコミットする。"}
+  - id: sink-restart
+    label: Sink Task の再開
+    evidence: [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]
+    steps:
+      - {"links": ["start-sink","resume"],"note": "再開。Sink Task が再起動すると、コミット済みの位置を参照する。"}
+      - {"links": ["fetch","write"],"note": "再取得。保存済みでも進捗が未コミットだった範囲は、再び取得・処理される場合がある。"}
+      - {"links": ["sink-offset"],"note": "進捗をコミット。再処理時に重複を防げるかは、コネクターと出力方式に依存する。"}

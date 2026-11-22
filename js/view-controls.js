@@ -11,3 +11,42 @@
     nav.disabled = expanded;
   });
 })();
+
+/* 詳細ペインは広い画面では右列、狭い画面では下から開く。 */
+(() => {
+  const panel = document.getElementById('panel');
+  const toggle = document.getElementById('detail-toggle');
+  const close = document.getElementById('detail-close');
+  const compact = matchMedia('(max-width:900px)');
+  let userOpen;
+
+  function render() {
+    const open = userOpen ?? !compact.matches;
+    if (!open && panel.contains(document.activeElement)) toggle.focus();
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', open);
+    toggle.textContent = open ? '詳細を閉じる' : '詳細を開く';
+  }
+
+  toggle.addEventListener('click', () => {
+    userOpen = panel.hidden;
+    render();
+    if (userOpen && compact.matches) panel.focus({ preventScroll: true });
+  });
+  close.addEventListener('click', () => {
+    userOpen = false;
+    render();
+    toggle.focus();
+  });
+  document.querySelector('a.skip[href="#panel"]').addEventListener('click', event => {
+    event.preventDefault();
+    if (document.body.classList.contains('viewer-maximized')) {
+      document.querySelector('[data-act="maximize-view"]').click();
+    }
+    userOpen = true;
+    render();
+    panel.focus();
+  });
+  compact.addEventListener('change', render);
+  render();
+})();

@@ -7,6 +7,8 @@ export const DEFAULTS = {
   packetSpeed: 1,       // パケットの速さ
   aiProvider: 'claude', // AI を実行する CLI
   officialIcons: true,  // 対応表がある場合に表示
+  nodeStyle3D: 'components', // components | flow
+  nodeStyle2D: 'card', // card | silhouette
   dimension: '3',      // 初期表示（3D / 2D）
   defaultView: 'iso',   // 初期の視点
   dragMode: 'rotate',   // 左ドラッグの既定

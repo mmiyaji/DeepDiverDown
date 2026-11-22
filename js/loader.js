@@ -48,8 +48,11 @@ export async function loadEntry(entry) {
     return { model: Layout.apply(jsyaml.load(x.yaml)), actual: null, docs: {} };
   }
   const model = Layout.apply(jsyaml.load(await text(`models/${entry.id}/model.yaml`)));
-  const actual = entry.actual ? jsyaml.load(await text(`models/${entry.id}/actual.yaml`)) : null;
-  return { model, actual, docs: await loadDocs(model) };
+  const [actual, docs] = await Promise.all([
+    entry.actual ? text(`models/${entry.id}/actual.yaml`).then(raw => jsyaml.load(raw)) : null,
+    loadDocs(model),
+  ]);
+  return { model, actual, docs };
 }
 
 export async function loadDocs(model) {

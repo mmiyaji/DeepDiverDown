@@ -1,0 +1,63 @@
+name: Apache Spark の基本アーキテクチャ
+description: Driver と Executor の役割を見ながら、バッチアプリケーションの投入、並列実行、Shuffle、出力、再計算を順に学ぶリファレンスです。Executor の数と配置は説明用です。
+reference:
+  objectives:
+    - Driver、Cluster Manager、Executor の役割を区別する。
+    - バッチ処理の投入から結果保存までを追う。
+    - Shuffle とパーティション再計算が必要になる場面を理解する。
+  sources:
+    - {title: Apache Spark Cluster Mode Overview, url: "https://spark.apache.org/docs/latest/cluster-overview.html"}
+    - {title: Submitting Applications, url: "https://spark.apache.org/docs/latest/submitting-applications.html"}
+    - {title: RDD Programming Guide, url: "https://spark.apache.org/docs/latest/rdd-programming-guide.html"}
+    - {title: Job Scheduling, url: "https://spark.apache.org/docs/latest/job-scheduling.html"}
+sources: [docs/reference-spark.md]
+evidence: [{type: doc, ref: "docs/reference-spark.md#§1"}]
+tiers:
+  - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-4, 0], size: [2.5, 2]}
+  - {id: control, label: 実行制御と資源管理, z: 1, size: [10, 3]}
+  - {id: workers, label: ワーカーノード上の実行プロセス, z: 0, size: [10, 4]}
+  - {id: storage, label: 外部ストレージ, z: 0, origin: [12, 0], size: [2.5, 4]}
+nodes:
+  submitter:
+    {label: spark-submit, kind: client, tier: entry, x: 0, y: 1, description: アプリケーションのコードと実行設定を渡す。, evidence: [{type: doc, ref: "docs/reference-spark.md#§2"}]}
+  driver:
+    {label: Driver, kind: service, tier: control, x: 1, y: 1.5, description: メインプログラムを実行し、SparkContext が Job・Stage・Task の実行を調整する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§2"}, {type: doc, ref: "docs/reference-spark.md#§4"}]}
+  manager:
+    {label: Cluster Manager, kind: service, tier: control, x: 7, y: 1.5, description: アプリケーション間の実行資源を割り当てる。例は Standalone・YARN・Kubernetes。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
+  executor-a:
+    {label: Executor A, kind: worker, tier: workers, x: 2, y: 2, description: ワーカーノード上で Task を実行し、必要に応じて中間データを保持する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
+  executor-b:
+    {label: Executor B, kind: worker, tier: workers, x: 7, y: 2, description: 同じアプリケーションの別の実行プロセス。担当パーティションを並列に処理する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}, {type: doc, ref: "docs/reference-spark.md#§4"}]}
+  input:
+    {label: 入力データ, kind: db, tier: storage, x: 0.5, y: 0, description: Executor が読むファイルの例。HDFS や対応するオブジェクトストレージを使える。, evidence: [{type: doc, ref: "docs/reference-spark.md#§5"}]}
+  output:
+    {label: 集計結果, kind: db, tier: storage, x: 0.5, y: 3.5, description: このシナリオでは集計結果をファイルに保存する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§6"}]}
+links:
+  - {id: submit, from: submitter, to: driver, label: アプリケーション投入, evidence: [{type: doc, ref: "docs/reference-spark.md#§2"}]}
+  - {id: allocate, from: driver, to: manager, label: 実行資源を要求, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
+  - {id: start-a, from: manager, to: executor-a, label: Executor を配置, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
+  - {id: start-b, from: manager, to: executor-b, label: Executor を配置, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
+  - {id: task-a, from: driver, to: executor-a, label: Task を割り当て, evidence: [{type: doc, ref: "docs/reference-spark.md#§4"}]}
+  - {id: task-b, from: driver, to: executor-b, label: Task を割り当て, evidence: [{type: doc, ref: "docs/reference-spark.md#§4"}, {type: doc, ref: "docs/reference-spark.md#§7"}]}
+  - {id: read-a, from: input, to: executor-a, label: 担当データを読み込み, evidence: [{type: doc, ref: "docs/reference-spark.md#§5"}]}
+  - {id: read-b, from: input, to: executor-b, label: 担当データを読み込み, evidence: [{type: doc, ref: "docs/reference-spark.md#§5"}, {type: doc, ref: "docs/reference-spark.md#§7"}]}
+  - {id: shuffle, from: executor-a, to: executor-b, label: Shuffle ブロックを転送, evidence: [{type: doc, ref: "docs/reference-spark.md#§5"}]}
+  - {id: write-a, from: executor-a, to: output, label: 集計結果を保存, evidence: [{type: doc, ref: "docs/reference-spark.md#§6"}]}
+  - {id: write-b, from: executor-b, to: output, label: 集計結果を保存, evidence: [{type: doc, ref: "docs/reference-spark.md#§6"}]}
+scenarios:
+  - id: spark-batch
+    label: Spark バッチ処理の流れ
+    evidence: [{type: doc, ref: "docs/reference-spark.md#§1"}]
+    steps:
+      - {links: [submit], note: "投入。spark-submit からアプリケーションを開始し、Driver がメインプログラムを実行する。"}
+      - {links: [allocate, start-a, start-b], note: "資源を確保。Cluster Manager が資源を割り当て、ワーカーノード上に Executor を配置する。"}
+      - {links: [task-a, task-b], note: "処理を分割。アクションを契機に Job が実行される。Driver は Stage ごとに Task を Executor に割り当てる。"}
+      - {links: [read-a, read-b], note: "並列に読み込む。Executor は外部ストレージから自分の Task が担当するデータを読む。"}
+      - {links: [shuffle], note: "Shuffle。例の groupBy では同じキーをまとめるために再分配する。図は下流 Task が別の Executor からブロックを取得する一例。"}
+      - {links: [write-a, write-b], note: "出力。集計を終えた Task が外部ストレージに結果を書き込む。"}
+  - id: spark-recompute
+    label: パーティション喪失からの再計算
+    evidence: [{type: doc, ref: "docs/reference-spark.md#§7"}]
+    steps:
+      - {links: [task-b], note: "Executor A で担当していたパーティションが失われた例。Driver が必要な処理を別の Executor に割り当てる。"}
+      - {links: [read-b], note: "Executor B が必要な入力を読み直し、依存関係をたどって失われたパーティションを再計算する。"}

@@ -61,7 +61,7 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 | 場所 | 機能 |
 |---|---|
 | ヘッダー | 検索（部品・ID・要件・根拠の参照先）、開く（YAML）、共有（視点込みのリンクをコピー）、画像（PNG / SVG）、レポート（Markdown）、ヘルプ、設定 |
-| サイドバー | モデル一覧（点検の合否・網羅率）、表示モード、フロアの表示切替、選択部品の周辺だけ表示 |
+| サイドバー | 設計モデル一覧と分野別のアーキテクチャリファレンス、表示モード、フロアの表示切替、選択部品の周辺だけ表示 |
 | 構成図 | 3D / 2D、画面内最大化、回転 / 移動の切替、視点（斜め・真上・横・裏側）、クリックで選択 |
 | 詳細パネル | モードごとの一覧・詳細。狭い画面では下から出るシート |
 
@@ -159,6 +159,20 @@ npm run icons -- --aws-pptx "C:\path\to\AWS-Toolkit.pptx"
 | `cicd` | CI/CD パイプライン（ワークフロー定義を根拠に） |
 | `online-boutique` | 公開デモ Online Boutique（GKE クラスタ、設計書要約 + Kubernetes 取り込み、自動配置） |
 | `hybrid` | 架空のハイブリッド受注基盤（Azure・OCI・Google Cloud・Cloudflare・オンプレミス） |
+
+## アーキテクチャリファレンス
+
+初回は一覧用の登録情報と、表示する1件のモデル・根拠資料・実環境ファイル（ある場合）を読み込みます。サイドバーの点検結果も表示中の設計モデルにだけ表示します。別の設計モデルやリファレンスの本体は選んだとき、比較用モデルは比較やレポートに使うときに読み込みます。
+
+公式資料に基づく解説モデルです。サイドバーの「アーキテクチャリファレンス」から分野別に探せます。各リファレンスは構成図・シナリオ・学習目標・公式資料を持てます。追加手順は [モデル仕様の「アーキテクチャリファレンス」](docs/model-schema.md#アーキテクチャリファレンス) を参照してください。
+
+| ID | 内容 |
+|---|---|
+| `spark` | Apache Spark のクラスタ構成、バッチ処理、Shuffle、パーティション再計算。解説は [docs/reference-spark.md](docs/reference-spark.md) |
+| `kafka` | Apache Kafka のパーティション、書き込み・複製・消費、リーダー切り替え。解説は [docs/reference-kafka.md](docs/reference-kafka.md) |
+| `kafka-connect` | 外部DBから Kafka を経由する取り込み、保存と再開。解説は [docs/reference-kafka-connect.md](docs/reference-kafka-connect.md) |
+
+追加候補は [モダンデータスタックのリファレンス候補](docs/reference-modern-data-stack-candidates.md) に整理しています。
 
 詳細は `docs/model-schema.md`。
 

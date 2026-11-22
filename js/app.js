@@ -1,6 +1,6 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js';
-import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js';
+import { Scene3D } from './scene3d.js?v=card-icons';
+import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
 import * as L from './loader.js';
 import { openDesign } from './design.js';
 
@@ -20,7 +20,10 @@ function parseRoute() {
   return { id: m[1], mode: m[2] || null, q: Object.fromEntries(new URLSearchParams(m[3] || '')) };
 }
 const ROUTE = parseRoute();
-const ICONS = await fetch('icons/manifest.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
+const [REGISTRY, ICONS] = await Promise.all([
+  L.loadRegistry(),
+  fetch('icons/manifest.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
+]);
 const iconDirectory = new URL('icons/', location.href);
 const icons = Object.fromEntries(Object.entries(ICONS || {}).flatMap(([id, path]) => {
   if (typeof path !== 'string' || !URL.canParse(path, location.href)) return [];
@@ -29,38 +32,34 @@ const icons = Object.fromEntries(Object.entries(ICONS || {}).flatMap(([id, path]
 }));
 Catalog.setIcons(icons);
 const hasIcons = Object.keys(icons).length > 0;
-const REGISTRY = await L.loadRegistry();
 const ENTRY = REGISTRY.find(r => r.id === ROUTE.id) || REGISTRY[0], KEY = ENTRY.id;
 const { model: M, actual: A, docs: DOCS } = await L.loadEntry(ENTRY);
-const CMP = await L.loadCompare(KEY, ENTRY).catch(() => null);
 const OPTS = { disabled: S.disabledRules, gates: S.gates };
 
 const PIPE = M.type === 'pipeline';
 const METRICS = M.metrics || [['p95', 'p95 レイテンシ', 'ms'], ['cost', '月額コスト', '$'], ['rps', 'RPS', 'rps']];
 const ISSUES = Analyze.lint(M, OPTS), DIFF = Analyze.diff(M, A);
 const GATES = Analyze.gates(M, A, DOCS, OPTS), CLS = GATES.cls, COV = GATES.cov, IDX = Analyze.index(M);
-const CMPR = CMP ? Analyze.compareModels(CMP.model, M) : null;
+let CMP = null, CMPR = null, comparisonLoad;
+function ensureComparison() {
+  return comparisonLoad ||= L.loadCompare(KEY, ENTRY).then(candidate => {
+    CMP = candidate;
+    CMPR = CMP ? Analyze.compareModels(CMP.model, M) : null;
+    PROJKEY = '';
+  }).catch(() => {});
+}
 const REQ_KIND = { usecase: 'ユースケース', rule: '業務ルール', state: '状態遷移', nfr: '非機能要件' };
 const ROLES = {
   user: { label: '利用者', c: '#2E73B8' }, dev: { label: '開発者', c: '#3F8624' }, approver: { label: '承認者', c: '#C98A12' },
   ops: { label: '運用者', c: '#8C4FFF' }, admin: { label: '管理者', c: '#6d6a63' }, attacker: { label: '攻撃者', c: '#C8321F' },
 };
 
-/* サイドバー用：全モデルの点検結果（読み込めないものは error） */
-const SUMMARY = {};
-await Promise.all(REGISTRY.map(async r => {
-  try {
-    const d = r.id === KEY ? { model: M, actual: A, docs: DOCS } : await L.loadEntry(r);
-    const g = Analyze.gates(d.model, d.actual, d.docs, OPTS);
-    SUMMARY[r.id] = { name: d.model.name, pass: g.pass, cov: g.cov.total ? Math.round(g.cov.covered / g.cov.total * 100) : 100, local: r.local };
-  } catch { SUMMARY[r.id] = { name: r.name || r.id, error: true, local: r.local }; }
-}));
 
 const MODES = [
   ['struct', '構造'], ['scenario', 'シナリオ'], ['fail', '障害シミュレーション'], ['lint', '指摘', ISSUES.length],
   ['metric', 'メトリクス'], ['evidence', '根拠と確度', GATES.results.filter(r => !r.pass).length], M.requirements && ['req', '要件', M.requirements.length],
-  ['compare', '比較', CMPR?.changes.length],
-].filter(Boolean);
+  ['compare', '比較'],
+].filter(mode => mode && (!ENTRY.reference || ['struct', 'scenario'].includes(mode[0])));
 
 const VIEWS = Views.available(M);
 const st = {
@@ -110,12 +109,13 @@ const TI = id => VW().tiers.find(t => t.id === id) || {};
 const zOf = tier => { const S = VW().tiers.filter(t => t.z == null); return TI(tier).z ?? (S.length - 1 - S.findIndex(t => t.id === tier)); };
 const off = tier => TI(tier).origin || [0, 0];
 const sizeOf = tier => TI(tier).size || [10, 4];
+const style3D = () => st.dimension === '3' ? (S.nodeStyle3D === 'flow' ? 'flow' : 'components') : null;
 const W = (gx, gy, tier) => {
   const [ox, oz] = off(tier);
   const z = zOf(tier), flat = st.dimension === '2';
   const tiers = VW().tiers;
   const depth = flat ? Math.max(...tiers.map(t => off(t.id)[1] + sizeOf(t.id)[1])) - Math.min(...tiers.map(t => off(t.id)[1])) + 3 : 0;
-  return [gx + ox, flat ? 0 : z * FH, gy + oz - z * depth];
+  return [gx + ox, flat ? 0 : z * (style3D() === 'flow' ? FH * 1.45 : FH), gy + oz - z * depth];
 };
 const visible = n => n && !st.hidden.has(n.tier);
 
@@ -231,11 +231,24 @@ const serviceLabel = svc => svc && `${svc.name}｜${svc.providerLabel}`;
 function nodeSpec(id, n, s) {
   const svc = Catalog.lookup(n.svc);
   const shape = n.kind === 'actor' ? 'person' : (svc?.shape ?? (['db', 'cache'].includes(n.kind) ? 'cyl' : n.kind === 'queue' ? 'queue' : 'box'));
+  const flat = st.dimension === '2';
+  const solidStyle = style3D();
+  const flatStyle = flat ? (S.nodeStyle2D === 'silhouette' ? 'silhouette' : 'card') : null;
   const ext = n.kind === 'external' && !svc;
   let color = scene.color('--paper'), opacity = s.dim ? 0.15 : 1, dashed = ext;
   if (n.kind === 'actor') color = scene.mix((ROLES[n.role] || ROLES.user).c, '--paper', 0.5);
   else if (svc) color = scene.mix(svc.color, '--paper', 0.42);
   else if (['db', 'queue', 'cache'].includes(n.kind)) color = scene.color('--dark');
+  if (flatStyle === 'silhouette' && !svc && n.kind !== 'actor') {
+    const tint = n.shape3D === 'crate' ? '#348573'
+      : { cyl: '#477786', queue: '#397972', box: '#526885' }[shape];
+    color = scene.mix(tint, '--paper', 0.48);
+  }
+  if (solidStyle === 'components' && !svc && n.kind !== 'actor') {
+    const tint = n.shape3D === 'crate' ? '#348573'
+      : { cyl: '#32778f', queue: '#258477', box: n.kind === 'worker' ? '#3e718b' : '#627c96' }[shape];
+    color = scene.mix(tint, '--paper', 0.82);
+  } else if (solidStyle === 'flow') color = scene.color('--paper');
   if (ext) opacity = Math.min(opacity, 0.35);
   if (s.fill === 'down') color = scene.color('--accent');
   if (s.fill === 'impact') color = scene.mix('--accent', '--paper', 0.38);
@@ -246,7 +259,7 @@ function nodeSpec(id, n, s) {
   if (s.status === 'drift') s.outline = true;
   if (s.ghost) { opacity = Math.min(opacity, 0.3); dashed = true; }
   return {
-    id, shape, flat: st.dimension === '2', color, opacity, dashed, outline: !!s.outline, h: s.h || (n.kind === 'client' ? 0.7 : 1), pos: W(n.x, n.y, n.tier),
+    id, shape, shape3D: n.shape3D, kind: n.kind, flat, flatStyle, solidStyle, color, cardTint: s.fill || s.heat != null ? color.getStyle() : null, opacity, dashed, outline: !!s.outline, h: s.h || (n.kind === 'client' ? 0.7 : 1), pos: W(n.x, n.y, n.tier),
     icon: S.officialIcons ? svc?.iconUrl : null,
     label: n.label, selected: VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', badge: s.badge, abbr: svc && { text: svc.abbr, color: svc.color },
     sub: svc && { text: serviceLabel(svc), color: svc.providerColor },
@@ -277,7 +290,7 @@ function draw() {
     if (st.hidden.has(t.id)) continue;
     const [w, h] = sizeOf(t.id), [ox, y, oz] = W(0, 0, t.id);
     const x0 = ox - 1.2, x1 = ox + w + 0.4, z0 = oz - 1.2, z1 = oz + h + 0.2;
-    scene.floor({ x0, z0, x1, z1, y, origin: t.kind === 'origin', label: t.label, labelAt: t.origin ? [x0, y, z1] : [x1, y, z0] });
+    scene.floor({ style: style3D(), insetLabel: st.dimension === '2', x0, z0, x1, z1, y, origin: t.kind === 'origin', label: t.label, labelAt: t.origin ? [x0, y, z1] : [x1, y, z0] });
   }
   for (const gr of P.groups || []) for (const t of [].concat(gr.tier)) {
     if (st.hidden.has(t) || !P.tiers.some(x => x.id === t)) continue;
@@ -302,8 +315,11 @@ function draw() {
   for (const l of P.links) {
     if (!visible(N[l.from]) || !visible(N[l.to])) continue;
     const s = ls[l.id] || {};
-    scene.link({ points: route(l), color: s.color || (s.on ? '--ink' : '--mute'), thick: !!s.on, packets: !!s.packets,
-      dashed: s.dashed || (!l.sync ? 'dash' : null), opacity: s.dim ? 0.12 : s.on ? 1 : 0.55 });
+    const crossFloor = N[l.from].tier !== N[l.to].tier;
+    const solid = !!style3D();
+    scene.link({ points: route(l), solid, arrow: solid && !crossFloor, color: s.color || (s.on ? '--ink' : solid ? '--diagram-link' : '--mute'), thick: !!s.on, packets: !!s.packets,
+      dashed: s.dashed || (style3D() === 'flow' && crossFloor && !s.on ? 'dot' : !l.sync ? 'dash' : null),
+      opacity: s.dim ? 0.12 : s.on ? 1 : solid ? (crossFloor ? 0.68 : 0.9) : 0.55 });
   }
   for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node(nodeSpec(id, n, ns[id] || {}));
   scene.end(st.dimension === '2');
@@ -311,14 +327,40 @@ function draw() {
 }
 
 /* ================= サイドバー ================= */
+function modelLink(entry) {
+  const selected = entry.id === KEY;
+  const marker = entry.design ? '設計案' : entry.local ? 'ローカル' : '';
+  const coverage = COV.total ? Math.round(COV.covered / COV.total * 100) : 100;
+  const detail = selected && !entry.reference
+    ? `<span class="tag ${GATES.pass ? 'ok' : 'high'}">${GATES.pass ? '合格' : '不合格'}</span> 網羅 ${coverage}%` : '';
+  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''}" ${selected ? 'aria-current="page"' : ''}>
+    <span class="mname">${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}</span>
+    ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
+}
+
+function renderLibrary() {
+  $('mlist').innerHTML = REGISTRY.filter(entry => !entry.reference).map(modelLink).join('') +
+    '<button class="b small" data-act="open">＋ YAML を開く</button>';
+
+  const groups = new Map();
+  for (const entry of REGISTRY.filter(r => r.reference)) {
+    const category = entry.reference.category || 'その他';
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(entry);
+  }
+  $('reference-section').hidden = !groups.size;
+  $('reference-list').innerHTML = [...groups].map(([category, entries], index) =>
+    `<details class="reference-category"${entries.some(entry => entry.id === KEY) || (!ENTRY.reference && index === 0) ? ' open' : ''}>
+      <summary>${esc(category)}</summary><div class="mlist">${entries
+        .sort((a, b) => (a.reference.order ?? Number.MAX_SAFE_INTEGER) - (b.reference.order ?? Number.MAX_SAFE_INTEGER))
+        .map(modelLink).join('')}</div></details>`).join('');
+}
+
 function renderSidebar() {
-  $('mlist').innerHTML = REGISTRY.map(r => {
-    const s = SUMMARY[r.id] || {};
-    return `<a href="#/m/${r.id}/struct" class="mitem ${r.id === KEY ? 'on' : ''}" ${r.id === KEY ? 'aria-current="page"' : ''}>
-      <span class="mname">${esc(s.name)}${r.design ? ' <small class="loc">設計案</small>' : s.local ? ' <small class="loc">ローカル</small>' : ''}</span>
-      <span class="mmeta">${s.error ? '<span class="tag high">読込失敗</span>' : `<span class="tag ${s.pass ? 'ok' : 'high'}">${s.pass ? '合格' : '不合格'}</span> 網羅 ${s.cov}%`}</span></a>`;
-  }).join('') + `<button class="b small" data-act="open">＋ YAML を開く</button>`;
-  $('modes').innerHTML = MODES.map(([k, n, c], i) => `<button data-mode="${k}" class="${st.mode === k ? 'on' : ''}" ${st.mode === k ? 'aria-current="true"' : ''} title="${n}（${i + 1}）"><span>${n}</span>${c ? `<small>${c}</small>` : ''}</button>`).join('');
+  $('modes').innerHTML = MODES.map(([k, n, count], i) => {
+    const c = k === 'compare' ? CMPR?.changes.length : count;
+    return `<button data-mode="${k}" class="${st.mode === k ? 'on' : ''}" ${st.mode === k ? 'aria-current="true"' : ''} title="${n}（${i + 1}）"><span>${n}</span>${c ? `<small>${c}</small>` : ''}</button>`;
+  }).join('');
   $('views').innerHTML = VIEWS.map(v => `<button data-viewmode="${v}" class="${st.view === v ? 'on' : ''}" aria-pressed="${st.view === v}" title="${Views.VIEWS[v].label}（${Views.VIEWS[v].sub}）・V キーで切替"><b>${Views.VIEWS[v].label}</b><small>${Views.VIEWS[v].sub}</small></button>`).join('');
   $('floors').innerHTML = VW().tiers.map(t => `<label><input type="checkbox" data-tier="${t.id}" ${st.hidden.has(t.id) ? '' : 'checked'}> ${esc(t.label)}</label>`).join('');
   $('nbr').checked = st.nbr;
@@ -331,7 +373,8 @@ const count = (o, s) => Object.values(o).filter(r => r.status === s).length;
 function renderStats() {
   let h = '';
   if (st.mode === 'struct') h = stat('ノード', Object.keys(M.nodes).length) + stat('同期 / 非同期', `${M.links.filter(l => l.sync).length} / ${M.links.filter(l => !l.sync).length}`) + stat('指摘', ISSUES.length, ISSUES.length) + stat('点検', GATES.pass ? '合格' : '不合格', !GATES.pass);
-  if (st.mode === 'scenario' && M.scenarios?.length) { const sc = M.scenarios[st.scen], p = syncP95(sc); h = stat('シナリオ', esc(sc.label)) + stat('ステップ', `${st.step + 1} / ${sc.steps.length}`) + (PIPE ? '' : stat('同期経路 p95 合計', `${p} ms`, p > 1000)); }
+  if (st.mode === 'struct' && ENTRY.reference) h = stat('構成部品', Object.keys(M.nodes).length) + stat('接続', M.links.length);
+  if (st.mode === 'scenario' && M.scenarios?.length) { const sc = M.scenarios[st.scen], p = syncP95(sc); h = stat('シナリオ', esc(sc.label)) + stat('ステップ', `${st.step + 1} / ${sc.steps.length}`) + (PIPE || ENTRY.reference ? '' : stat('同期経路 p95 合計', `${p} ms`, p > 1000)); }
   if (st.mode === 'fail') { const r = Analyze.impact(M, st.down); h = stat('停止', st.down.length, st.down.length) + stat('影響', r.impacted.length, r.impacted.length) + stat('滞留', r.delayed.length) + stat('止まるシナリオ', `${r.brokenScenarios.length} / ${M.scenarios?.length || 0}`, r.brokenScenarios.length); }
   if (st.mode === 'lint') h = stat('重大', ISSUES.filter(i => i.sev === 'high').length, 1) + stat('注意', ISSUES.filter(i => i.sev === 'mid').length) + stat('無効にしたルール', S.disabledRules.length);
   if (st.mode === 'metric') { const vs = Object.values(M.nodes).map(n => n.metrics?.[st.metric]).filter(v => v != null), sum = ['cost', 'duration'].includes(st.metric); h = stat('指標', METRICS.find(x => x[0] === st.metric)[1]) + (vs.length ? stat(sum ? '合計' : '最大', fmt(st.metric, sum ? vs.reduce((a, b) => a + b, 0) : Math.max(...vs))) : ''); }
@@ -344,7 +387,7 @@ function renderStats() {
     compare: '<span><i class="ok"></i>追加</span><span><i class="dash acc"></i>削除</span><span><i class="warn"></i>変更</span>',
     fail: '<span><i></i>同期</span><span><i class="dash"></i>非同期</span><span><i class="acc"></i>失敗する呼び出し</span>',
   };
-  $('legend').innerHTML = leg[st.mode] || '<span><i></i>同期</span><span><i class="dash"></i>非同期</span>';
+  $('legend').innerHTML = ENTRY.reference ? '<span>線は処理・データの流れを示します</span>' : leg[st.mode] || '<span><i></i>同期</span><span><i class="dash"></i>非同期</span>';
 }
 function syncP95(sc) {
   const ids = new Set(sc.steps.flatMap(s => s.links).map(linkById).filter(l => l?.sync).map(l => l.to));
@@ -433,10 +476,19 @@ npm run compare -- old.yaml models/${esc(KEY)}/model.yaml</pre>`;
     ${['added', 'removed', 'changed'].map(k => { const cs = CMPR.changes.filter(c => c.kind === k); return `<h4>${{ added: '追加', removed: '削除', changed: '変更' }[k]}（${cs.length}）</h4>` + (cs.map(c => `<div class="item" data-sel="${sel(c)}"><span class="tag cmp-${k}">${c.type === 'node' ? '部品' : '接続'}</span>${esc(c.msg)}</div>`).join('') || none); }).join('')}`;
 }
 
+function referenceDetails() {
+  if (!ENTRY.reference) return '';
+  const { objectives = [], sources = [] } = M.reference || {};
+  const links = sources.filter(source => /^https?:\/\//i.test(source.url));
+  return `${objectives.length ? `<h4>学べること</h4><ul>${objectives.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}
+    ${links.length ? `<h4>公式資料</h4><ul>${links.map(source =>
+      `<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a></li>`).join('')}</ul>` : ''}`;
+}
+
 function renderPanel() {
   let h = '';
   if (st.mode === 'struct') h = st.sel ? nodeDetail(st.sel) : `<h3>${esc(M.name)}</h3><div class="sub">${(M.sources || []).map(s => `<a href="${esc(s)}" target="_blank">${esc(s)}</a>`).join(' ') || (ENTRY.local ? 'ブラウザに読み込んだモデル' : '')}</div>
-      ${M.description ? `<p>${esc(M.description)}</p>` : ''}<p>左のサイドバーで表示モードやフロアを切り替え、部品をクリックすると詳細を表示します。上の検索（<kbd>/</kbd>）で部品・ID・根拠の参照先を探せます。</p>
+      ${M.description ? `<p>${esc(M.description)}</p>` : ''}${ENTRY.reference && M.scenarios?.length ? '<button type="button" class="b on" data-mode="scenario">処理の流れを見る</button>' : ''}${referenceDetails()}<p>左のサイドバーで表示モードやフロアを切り替え、部品をクリックすると詳細を表示します。上の検索（<kbd>/</kbd>）で部品・ID・根拠の参照先を探せます。</p>
       ${M.review?.length ? '<h4>抽出時のレビューメモ</h4>' + M.review.map(r => `<div class="item"><p>${esc(r)}</p></div>`).join('') : ''}`;
   if (st.mode === 'scenario') {
     if (!M.scenarios?.length) h = '<h3>シナリオ</h3><div class="sub">このモデルにはシナリオがありません。</div>';
@@ -504,7 +556,11 @@ function setView(v) {
   draw();
   toast(`${Views.VIEWS[v].label}（${Views.VIEWS[v].sub}）`);
 }
-function setMode(m) { st.mode = m; st.issue = null; st.req = null; stopPlay(); draw(); }
+async function setMode(m) {
+  st.mode = m; st.issue = null; st.req = null; stopPlay();
+  if (m === 'compare') await ensureComparison();
+  if (st.mode === m) draw();
+}
 const stopPlay = () => { clearInterval(st.play); st.play = null; };
 
 let drag3D = S.dragMode;
@@ -579,7 +635,8 @@ function exportPng() {
   const c = scene.snapshot(exportBackground());
   c.toBlob(b => { download(`${KEY}-${st.mode}.png`, b); toast('画像を書き出しました'); });
 }
-function exportReport() {
+async function exportReport() {
+  if (!ENTRY.reference) await ensureComparison();
   const ok = b => b ? '合格' : '不合格', line = s => String(s).replace(/\|/g, '\\|');
   const md = [
     `# ${M.name} レビューレポート`, '', `- モデル：\`${KEY}\`${M.sources?.length ? `（${M.sources.join(', ')}）` : ''}`, `- 生成：${new Date().toLocaleString('ja-JP')}`,
@@ -656,6 +713,8 @@ function openSettings() {
     <label>テーマ <select name="theme">${[['auto', 'OS に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, n]) => `<option value="${v}" ${S.theme === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label>ラベルの大きさ <input type="range" name="labelScale" min="0.8" max="1.5" step="0.05" value="${S.labelScale}"><output>${Math.round(S.labelScale * 100)}%</output></label>
     <label>パケットの速さ <input type="range" name="packetSpeed" min="0" max="3" step="0.25" value="${S.packetSpeed}"><output>${S.packetSpeed}×</output></label>
+    <label>2D の部品デザイン <select name="nodeStyle2D"><option value="card" ${S.nodeStyle2D !== 'silhouette' ? 'selected' : ''}>ラベル一体型カード</option><option value="silhouette" ${S.nodeStyle2D === 'silhouette' ? 'selected' : ''}>種類別のシルエット</option></select></label>
+    <label>3D の部品デザイン <select name="nodeStyle3D"><option value="components" ${S.nodeStyle3D !== 'flow' ? 'selected' : ''}>形と色で部品を区別</option><option value="flow" ${S.nodeStyle3D === 'flow' ? 'selected' : ''}>フロアと接続を強調</option></select></label>
     <label>初期の表示 <select name="dimension"><option value="3" ${S.dimension === '3' ? 'selected' : ''}>3D</option><option value="2" ${S.dimension === '2' ? 'selected' : ''}>2D</option></select></label>
     <label>初期の視点 <select name="defaultView">${[['iso', '斜め'], ['top', '真上'], ['side', '横'], ['back', '裏側']].map(([v, n]) => `<option value="${v}" ${S.defaultView === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label>左ドラッグの既定 <select name="dragMode"><option value="rotate" ${S.dragMode === 'rotate' ? 'selected' : ''}>回転</option><option value="pan" ${S.dragMode === 'pan' ? 'selected' : ''}>移動</option></select></label>
@@ -668,7 +727,7 @@ function openSettings() {
     <h4>指摘ルール</h4>
     <div class="rules">${rules.map(r => `<label class="chk"><input type="checkbox" name="rule" value="${r.id}" ${S.disabledRules.includes(r.id) ? '' : 'checked'}> <span class="tag ${r.sev}">${r.sev === 'high' ? '重大' : '注意'}</span>${esc(r.title)} <small class="mono mute">${r.id}${r.for ? ' / ' + r.for : ''}</small></label>`).join('')}</div>
     <h4>データ</h4>
-    <div class="locals">${REGISTRY.filter(r => r.local).map(r => `<div class="item">${esc(SUMMARY[r.id]?.name)} <button type="button" class="b small" data-rmlocal="${r.id}">削除</button></div>`).join('') || '<div class="sub">ブラウザに読み込んだモデルはありません</div>'}</div>
+    <div class="locals">${REGISTRY.filter(r => r.local).map(r => `<div class="item">${esc(r.name || r.id)} <button type="button" class="b small" data-rmlocal="${r.id}">削除</button></div>`).join('') || '<div class="sub">ブラウザに読み込んだモデルはありません</div>'}</div>
     <div class="row mt"><button type="button" class="b" data-act="reset-settings">設定を初期値に戻す</button><button type="button" class="b on" data-act="reload">再読み込みして点検に反映</button></div>
     <p class="sub">表示の設定はすぐに反映されます。しきい値とルールは再読み込みで反映されます。設定はこのブラウザにだけ保存されます。</p>
     </form>`);
@@ -676,6 +735,8 @@ function openSettings() {
   f.addEventListener('input', e => {
     const fd = new FormData(f);
     Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dimension: fd.get('dimension'), dragMode: fd.get('dragMode') });
+    S.nodeStyle3D = fd.get('nodeStyle3D') === 'flow' ? 'flow' : 'components';
+    S.nodeStyle2D = fd.get('nodeStyle2D') === 'silhouette' ? 'silhouette' : 'card';
     S.aiProvider = fd.get('aiProvider') === 'codex' ? 'codex' : 'claude';
     if (hasIcons) S.officialIcons = fd.has('officialIcons');
     const g = {}; for (const k of ['maxDrift', 'maxHigh']) if (fd.get(k) !== '') g[k] = Math.max(0, +fd.get(k)); S.gates = g;
@@ -687,7 +748,10 @@ function openSettings() {
     if (e.target.name === 'defaultView') scene.initialView = S.defaultView;
     if (e.target.name === 'dimension') setDimension(S.dimension);
     if (e.target.name === 'dragMode') { drag3D = S.dragMode; setDrag(drag3D); }
-    if (['theme', 'officialIcons'].includes(e.target.name)) draw();
+    if (['theme', 'officialIcons', 'nodeStyle2D', 'nodeStyle3D'].includes(e.target.name)) {
+      draw();
+      if (e.target.name === 'nodeStyle3D' && style3D() && scene.fitView) scene.fit(scene.fitView);
+    }
   });
 }
 
@@ -721,7 +785,6 @@ document.addEventListener('click', e => {
       if (matchMedia('(max-width:900px)').matches) return document.body.classList.toggle('nav-open'); // 狭い画面は引き出しの開閉のみ
       S.sidebar = !document.body.classList.toggle('nav-closed'); return saveSettings(S);
     }
-    if (a === 'sheet') return document.body.classList.toggle('sheet-open');
     if (a === 'reload') return location.reload();
     if (a === 'reset-settings') { saveSettings({ ...DEFAULTS }); return location.reload(); }
     return;
@@ -783,6 +846,8 @@ addEventListener('keydown', e => {
 document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
 setDimension(st.dimension, false);
+renderLibrary();
+if (st.mode === 'compare') await ensureComparison();
 draw();
 if (ROUTE.q.v) { const v = ROUTE.q.v.split('_').map(Number); if (v.length === 7 && v.every(Number.isFinite)) scene.setView({ p: v.slice(0, 3), t: v.slice(3, 6), z: v[6] }); }
 if (ENTRY.id !== ROUTE.id && ROUTE.id) toast(`モデル「${ROUTE.id}」が見つからないため、${M.name} を表示しています`);
