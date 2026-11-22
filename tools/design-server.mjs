@@ -126,7 +126,10 @@ createServer(async (req, res) => {
     }
     const absolute = path.join(ROOT, file.slice(1));
     if (!(await stat(absolute)).isFile()) return send(res, 404, { error: 'ファイルが見つかりません。' });
-    res.writeHead(200, { 'Content-Type': mime[path.extname(absolute)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
+    const headers = { 'Content-Type': mime[path.extname(absolute)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' };
+    // 手元に置いた第三者の SVG（公式アイコン等）を直接開いても、スクリプトは実行させない
+    if (path.extname(absolute) === '.svg') headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox";
+    res.writeHead(200, headers);
     if (req.method === 'HEAD') res.end();
     else createReadStream(absolute).on('error', () => res.destroy()).pipe(res);
   } catch (error) {
