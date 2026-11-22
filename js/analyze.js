@@ -59,12 +59,66 @@
           msg: `${m.nodes[dn.from].label} → ${m.nodes[dn.to].label} は最大 ${dn.timeoutMs * (1 + (dn.retry || 0)) / 1000} 秒かかりうるが、上流は ${up.timeoutMs / 1000} 秒で打ち切る（無駄な処理・二重決済の危険）` }))) },
   ];
 
+  /* ---- AWS 構成向け ---- */
+  RULES.push(
+    { id: 'SINGLE_AZ', sev: 'high', title: '単一 AZ 配置',
+      run: m => Object.entries(m.nodes).filter(([, n]) => n.az && n.az.length < 2)
+        .map(([id, n]) => ({ nodes: [id], msg: `${n.label} が AZ ${n.az.join(',')} のみに配置。AZ 障害で停止する` })) },
+    { id: 'PUBLIC_DATA', sev: 'high', title: 'データストアがパブリック',
+      run: m => Object.entries(m.nodes).filter(([, n]) => n.subnet === 'public' && (['db', 'cache'].includes(n.kind) || ['cyl'].includes(window.AWS?.[n.svc]?.shape)))
+        .map(([id, n]) => ({ nodes: [id], msg: `${n.label} がパブリックサブネットにある` })) },
+  );
+
+  /* ---- CI/CD パイプライン向け（for: 'pipeline'） ---- */
+  const sources = m => Object.keys(m.nodes).filter(id => !m.links.some(l => l.to === id && l.sync));
+  const reach = (m, avoid) => {
+    const seen = new Set(sources(m)), q = [...seen];
+    while (q.length) { const n = q.shift(); for (const l of m.links) if (l.sync && l.from === n && !seen.has(l.to) && !avoid(l.to)) { seen.add(l.to); q.push(l.to); } }
+    return seen;
+  };
+  const deploys = (m, env) => Object.entries(m.nodes).filter(([, n]) => n.stage === 'deploy' && (!env || n.tier === env)).map(([id]) => id);
+  RULES.push(
+    { id: 'NO_APPROVAL', for: 'pipeline', sev: 'high', title: '承認なしで本番に到達',
+      run: m => { const r = reach(m, id => m.nodes[id].stage === 'approval');
+        return deploys(m, 'prod').filter(id => r.has(id)).map(id => ({ nodes: [id], links: m.links.filter(l => l.to === id && m.nodes[l.from].stage !== 'approval').map(l => l.id),
+          msg: `${m.nodes[id].label} に手動承認を経ずに到達できる経路がある` })); } },
+    { id: 'NO_TEST', for: 'pipeline', sev: 'high', title: 'テストを経ないデプロイ',
+      run: m => { const r = reach(m, id => m.nodes[id].stage === 'test');
+        return deploys(m).filter(id => r.has(id)).map(id => ({ nodes: [id], msg: `${m.nodes[id].label} にテストを通らずに到達できる経路がある` })); } },
+    { id: 'NO_ROLLBACK', for: 'pipeline', sev: 'mid', title: '自動ロールバックなし',
+      run: m => deploys(m, 'prod').filter(id => !m.links.some(l => l.to === id && l.kind === 'rollback'))
+        .map(id => ({ nodes: [id], msg: `${m.nodes[id].label} に監視アラームからのロールバック経路がない` })) },
+    { id: 'SLOW_PIPELINE', for: 'pipeline', sev: 'mid', title: 'リードタイムが長い',
+      run: m => {
+        const memo = {}, best = id => memo[id] ?? (memo[id] = (m.nodes[id].metrics?.duration || 0) + Math.max(0, ...m.links.filter(l => l.sync && l.from === id).map(l => best(l.to))));
+        const total = Math.max(...sources(m).map(best)), limit = m.leadTimeLimit || 30;
+        return total > limit ? [{ nodes: Object.entries(m.nodes).filter(([, n]) => (n.metrics?.duration || 0) >= 10).map(([id]) => id),
+          msg: `push から本番まで最長 ${total} 分（目標 ${limit} 分）。10 分以上のステージがボトルネック` }] : [];
+      } },
+  );
+
   function lint(m) {
-    return RULES.flatMap(r => r.run(m).map(x => ({ rule: r.id, title: r.title, sev: r.sev, nodes: [], links: [], ...x })));
+    const type = m.type || 'system';
+    return RULES.filter(r => (r.for || 'system') === type).flatMap(r => r.run(m).map(x => ({ rule: r.id, title: r.title, sev: r.sev, nodes: [], links: [], ...x })));
   }
 
   /* 障害伝播：同期で依存しているノードは影響を受ける（非同期は滞留のみ） */
   function impact(m, down) {
+    if (m.type === 'pipeline') { // パイプラインは下流へ伝播（実行されない）
+      // join: 'all'（既定：前段が1つでも失敗したら実行されない）/ 'any'（別経路が生きていれば実行される）
+      const skip = new Set(), bad = id => down.includes(id) || skip.has(id);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const id of Object.keys(m.nodes)) {
+          if (bad(id)) continue;
+          const pre = m.links.filter(l => l.sync && l.to === id).map(l => l.from);
+          if (pre.length && (m.nodes[id].join === 'any' ? pre.every(bad) : pre.some(bad))) { skip.add(id); changed = true; }
+        }
+      }
+      const broken = (m.scenarios || []).filter(s => s.steps.some(st => st.links.some(id => { const l = m.links.find(x => x.id === id); return l && bad(l.from); })));
+      return { impacted: [...skip], delayed: [], brokenScenarios: broken };
+    }
     const hit = new Set(down), delayed = new Set();
     let changed = true;
     while (changed) {

@@ -1,5 +1,5 @@
 // 実環境（AWS / IaC）から取得した構成のサンプル。実運用では Terraform state や API から生成する想定。
-window.ACTUAL = {
+window.MODELS['ec-shop'].actual = {
   capturedAt: '2026-11-22 09:00',
   nodes: {
     user: {}, cdn: { replicas: 99 }, alb: { replicas: 2 },

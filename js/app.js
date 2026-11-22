@@ -1,16 +1,20 @@
 /* DeepDiverDown viewer：フロア式アイソメ描画 + 6モード */
 (function () {
-  const M = window.MODEL, A = window.ACTUAL;
+  const REG = window.MODELS, KEY = REG[location.hash.slice(1)] ? location.hash.slice(1) : Object.keys(REG)[0];
+  const M = REG[KEY].model, A = REG[KEY].actual;
+  const PIPE = M.type === 'pipeline';
+  const METRICS = M.metrics || [['p95', 'p95 レイテンシ', 'ms'], ['cost', '月額コスト', '$'], ['rps', 'RPS', 'rps']];
+  addEventListener('hashchange', () => location.reload());
   const ISSUES = Analyze.lint(M), DIFF = Analyze.diff(M, A);
   const NS = 'http://www.w3.org/2000/svg', $ = id => document.getElementById(id);
   const svg = $('scene');
   const S = 36, FLOOR = 185, OX = 330, OY = 430;
 
-  const st = { mode: 'struct', sel: null, scen: 0, step: 0, down: [], issue: null, metric: 'p95', play: null };
+  const st = { mode: 'struct', sel: null, scen: 0, step: 0, down: [], issue: null, metric: METRICS[0][0], play: null };
   const MODES = [
     ['struct', '構造'], ['scenario', 'シナリオ'], ['fail', '障害シミュレーション'],
-    ['lint', '指摘', ISSUES.length], ['metric', 'メトリクス'], ['diff', '設計と実環境の差分', DIFF.items.length],
-  ];
+    ['lint', '指摘', ISSUES.length], ['metric', 'メトリクス'], A && ['diff', '設計と実環境の差分', DIFF.items.length],
+  ].filter(Boolean);
 
   /* ---------- geometry ---------- */
   const zOf = tier => M.tiers.length - 1 - M.tiers.findIndex(t => t.id === tier);
@@ -47,26 +51,33 @@
   }
 
   function shape(g, n, x, y, state) {
-    const [top, l, r] = tones(n.kind, state), h = state.h || (n.kind === 'client' ? 26 : 36);
+    const svc = n.svc && window.AWS?.[n.svc], plain = state.fill == null && state.heat == null;
+    const kind = svc ? ({ cyl: 'db', queue: 'queue' }[svc.shape] || (n.kind === 'external' ? 'external' : 'service')) : n.kind;
+    let [top, l, r] = tones(kind, state);
+    const h = state.h || (kind === 'client' ? 26 : 36);
+    if (svc && plain) {
+      const c = AWS_CAT[svc.cat];
+      [top, l, r] = [`color-mix(in srgb, ${c} 16%, var(--paper))`, `color-mix(in srgb, ${c} 28%, var(--paper-l))`, `color-mix(in srgb, ${c} 45%, var(--paper-r))`];
+    } else if (kind === 'external' && plain) [top, l, r] = ['var(--card)', 'var(--card)', 'var(--card)'];
     const sk = { stroke: state.outline ? 'var(--accent)' : 'var(--ink)', 'stroke-width': state.outline ? 2.2 : 1.2, 'stroke-linejoin': 'round',
-      'stroke-dasharray': n.kind === 'external' || state.ghost ? '4 3' : null };
-    if (n.kind === 'external' && state.fill == null && state.heat == null) { l === l; }
-    const op = state.ghost ? 0.35 : 1, gg = el('g', { opacity: op }, g);
-    if (['db', 'cache'].includes(n.kind)) {
+      'stroke-dasharray': kind === 'external' || state.ghost ? '4 3' : null };
+    const gg = el('g', { opacity: state.ghost ? 0.35 : 1 }, g);
+    let topY, m;
+    if (['db', 'cache'].includes(kind)) {
       const rx = 28, ry = 13;
       el('path', { d: `M${x - rx},${y - h} V${y} A${rx},${ry} 0 0 0 ${x + rx},${y} V${y - h}`, style: `fill:${l}`, ...sk }, gg);
       el('ellipse', { cx: x, cy: y - h, rx, ry, style: `fill:${top}`, ...sk }, gg);
-      return { top: h + 22, bottom: 26 };
-    }
-    if (n.kind === 'queue') {
+      topY = y - h; m = { top: h + 22, bottom: 26 };
+    } else if (kind === 'queue') {
       for (let i = 0; i < 3; i++) cube(gg, x, y - i * 11, 9, top, l, r, sk, 30);
-      return { top: 60, bottom: 30 };
+      topY = y - 31; m = { top: 60, bottom: 30 };
+    } else {
+      cube(gg, x, y, h, top, l, r, sk, kind === 'client' ? 22 : 28);
+      topY = y - h; m = { top: h + 26, bottom: 28 };
     }
-    const w = n.kind === 'client' ? 22 : 28;
-    cube(gg, x, y, h, n.kind === 'external' && state.fill == null && state.heat == null ? 'var(--card)' : top,
-      n.kind === 'external' && state.fill == null && state.heat == null ? 'var(--card)' : l,
-      n.kind === 'external' && state.fill == null && state.heat == null ? 'var(--card)' : r, sk, w);
-    return { top: h + 26, bottom: 28 };
+    if (svc) el('text', { x, y: topY + 4, 'text-anchor': 'middle', 'font-size': svc.abbr.length > 3 ? 9 : 11, 'font-weight': 700,
+      fill: plain ? AWS_CAT[svc.cat] : 'var(--fg)', opacity: state.ghost ? .4 : 1 }, gg).textContent = svc.abbr;
+    return m;
   }
   function cube(g, x, y, h, top, l, r, sk, w) {
     const d = w * 0.5;
@@ -96,8 +107,8 @@
     }
     if (st.mode === 'fail') {
       const r = Analyze.impact(M, st.down);
-      st.down.forEach(id => Object.assign(ns[id], { fill: 'down', badge: '停止' }));
-      r.impacted.forEach(id => Object.assign(ns[id], { fill: 'impact', badge: '影響' }));
+      st.down.forEach(id => Object.assign(ns[id], { fill: 'down', badge: PIPE ? '失敗' : '停止' }));
+      r.impacted.forEach(id => Object.assign(ns[id], { fill: 'impact', badge: PIPE ? '未実行' : '影響' }));
       r.delayed.forEach(id => Object.assign(ns[id], { fill: 'delay', badge: '滞留' }));
       M.links.forEach(l => { if (st.down.includes(l.to) || r.impacted.includes(l.to)) Object.assign(ls[l.id], l.sync ? { on: true, color: 'var(--accent)', dash: true, packets: true } : {}); });
     }
@@ -122,7 +133,7 @@
     if (st.sel && ns[st.sel]) ns[st.sel].outline = true;
     return { ns, ls };
   }
-  const fmt = (k, v) => k === 'p95' ? `${v}ms` : k === 'cost' ? `$${v}` : `${v}rps`;
+  const fmt = (k, v) => { const u = (METRICS.find(x => x[0] === k) || [])[2] || ''; return u === '$' ? `$${v}` : `${v}${u}`; };
 
   /* ---------- render ---------- */
   let packets = [];
@@ -138,6 +149,14 @@
       const lp = P(-1.2, 4.2, z);
       el('text', { x: lp[0] - 8, y: lp[1] + 4, 'text-anchor': 'end', 'font-size': 12, 'font-weight': 700, fill: 'var(--mute)' }).textContent = t.label;
     });
+    /* groups（VPC / AZ / サブネット / 環境など） */
+    (M.groups || []).forEach(gr => (Array.isArray(gr.tier) ? gr.tier : [gr.tier]).forEach(t => {
+      const z = zOf(t), c = [[gr.x0, gr.y0], [gr.x1, gr.y0], [gr.x1, gr.y1], [gr.x0, gr.y1]].map(([x, y]) => P(x, y, z));
+      const sty = { vpc: ['var(--ink)', '8 4', 1.2, 'none'], az: ['var(--mute)', '2 3', 1, 'none'], subnet: ['none', null, 0, 'var(--grid)'] }[gr.kind] || ['var(--mute)', '4 4', 1, 'none'];
+      el('polygon', { points: c.map(p => p.join(',')).join(' '), stroke: sty[0], 'stroke-dasharray': sty[1], 'stroke-width': sty[2], fill: sty[3], 'fill-opacity': .9 });
+      const lp = gr.kind === 'az' ? c[1] : c[3];
+      el('text', { x: lp[0] + (gr.kind === 'az' ? 6 : 4), y: lp[1] + (gr.kind === 'az' ? 0 : -4), 'font-size': 10, 'font-weight': 600, fill: 'var(--mute)' }).textContent = gr.label;
+    }));
     /* links */
     packets = [];
     allLinks().forEach(l => {
@@ -166,11 +185,11 @@
   function stat(lab, v, bad) { return `<div class="stat ${bad ? 'bad' : ''}"><small>${lab}</small><b>${v}</b></div>`; }
   function renderStats() {
     let h = '';
-    if (st.mode === 'struct') h = stat('ノード', Object.keys(M.nodes).length) + stat('同期 / 非同期', `${M.links.filter(l => l.sync).length} / ${M.links.filter(l => !l.sync).length}`) + stat('指摘', ISSUES.length, 1) + stat('差分', DIFF.items.length, 1);
+    if (st.mode === 'struct') h = stat('ノード', Object.keys(M.nodes).length) + stat('同期 / 非同期', `${M.links.filter(l => l.sync).length} / ${M.links.filter(l => !l.sync).length}`) + stat('指摘', ISSUES.length, 1) + (A ? stat('差分', DIFF.items.length, 1) : '');
     if (st.mode === 'scenario') { const sc = M.scenarios[st.scen]; h = stat('シナリオ', sc.label) + stat('ステップ', `${st.step + 1} / ${sc.steps.length}`) + stat('同期経路 p95 合計', `${syncP95(sc)} ms`, syncP95(sc) > 1000); }
     if (st.mode === 'fail') { const r = Analyze.impact(M, st.down); h = stat('停止', st.down.length, st.down.length) + stat('影響', r.impacted.length, r.impacted.length) + stat('滞留', r.delayed.length) + stat('止まるシナリオ', `${r.brokenScenarios.length} / ${M.scenarios.length}`, r.brokenScenarios.length); }
     if (st.mode === 'lint') h = stat('重大', ISSUES.filter(i => i.sev === 'high').length, 1) + stat('注意', ISSUES.filter(i => i.sev === 'mid').length);
-    if (st.mode === 'metric') { const vs = Object.values(M.nodes).map(n => n.metrics?.[st.metric]).filter(v => v != null); h = stat('指標', { p95: 'p95 レイテンシ', cost: '月額コスト', rps: 'RPS' }[st.metric]) + stat(st.metric === 'cost' ? '合計' : '最大', fmt(st.metric, st.metric === 'cost' ? vs.reduce((a, b) => a + b, 0) : Math.max(...vs))); }
+    if (st.mode === 'metric') { const vs = Object.values(M.nodes).map(n => n.metrics?.[st.metric]).filter(v => v != null); const sum = ['cost', 'duration'].includes(st.metric); h = stat('指標', METRICS.find(x => x[0] === st.metric)[1]) + stat(sum ? '合計' : '最大', fmt(st.metric, sum ? vs.reduce((a, b) => a + b, 0) : Math.max(...vs))); }
     if (st.mode === 'diff') h = stat('実環境に欠落', DIFF.items.filter(i => i.kind === 'missing').length, 1) + stat('設計書にない', DIFF.items.filter(i => i.kind === 'extra').length, 1) + stat('台数差', DIFF.items.filter(i => i.kind === 'replicas').length, 1) + stat('取得', A?.capturedAt || '—');
     $('stats').innerHTML = h;
     $('legend').innerHTML = '<span><i></i>同期</span><span><i style="border-top-style:dashed"></i>非同期</span>' +
@@ -186,7 +205,7 @@
     const n = allNodes()[id], ins = allLinks().filter(l => l.to === id), outs = allLinks().filter(l => l.from === id);
     const iss = ISSUES.filter(i => i.nodes.includes(id));
     const ln = l => `${allNodes()[l.from].label} → ${allNodes()[l.to].label} <span class="mono" style="color:var(--mute)">${l.sync ? 'sync' : 'async'}${l.timeoutMs ? ' ' + l.timeoutMs / 1000 + 's' : ''}${l.retry ? ' retry' + l.retry : ''}</span>`;
-    return `<h4>選択中のノード</h4><h3>${n.label}</h3><div class="sub">${n.kind} / ${M.tiers.find(t => t.id === n.tier)?.label || ''} ${n.src ? `/ 設計書 ${n.src}` : ''}</div>
+    return `<h4>選択中のノード</h4><h3>${n.label}</h3><div class="sub">${n.svc && window.AWS?.[n.svc] ? AWS[n.svc].name : n.kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${n.subnet} subnet` : ''} /${M.tiers.find(t => t.id === n.tier)?.label || ''} ${n.src ? `/ 設計書 ${n.src}` : ''}</div>
       <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
       <h4>呼び出し元</h4>${ins.map(l => `<div class="item">${ln(l)}</div>`).join('') || '<div class="sub">なし</div>'}
       <h4>呼び出し先</h4>${outs.map(l => `<div class="item">${ln(l)}</div>`).join('') || '<div class="sub">なし</div>'}
@@ -197,7 +216,7 @@
     let h = '';
     if (st.mode === 'struct') {
       h = st.sel ? nodeDetail(st.sel) : `<h3>${M.name}</h3><div class="sub">設計書 <a href="${M.source}" target="_blank">${M.source}</a> から抽出したモデル</div>
-        <p>3 つのフロア（${M.tiers.map(t => t.label).join(' / ')}）に部品を配置しています。ノードをクリックすると詳細を表示します。</p>
+        <p>${M.tiers.length} つのフロア（${M.tiers.map(t => t.label).join(' / ')}）に部品を配置しています。ノードをクリックすると詳細を表示します。</p>${M.description ? `<p>${M.description}</p>` : ''}
         ${M.review?.length ? `<h4>抽出時のレビューメモ</h4>` + M.review.map(r => `<div class="item"><p>${r}</p></div>`).join('') : ''}`;
     }
     if (st.mode === 'scenario') {
@@ -210,21 +229,21 @@
     }
     if (st.mode === 'fail') {
       const r = Analyze.impact(M, st.down);
-      h = `<h3>障害シミュレーション</h3><div class="sub">ノードをクリックして停止 / 復旧。同期で依存している部品に影響が伝播します。</div>
-        <div class="row"><button class="b" data-reset>すべて復旧</button>${['pay', 'db', 'kafka', 'redis'].filter(id => M.nodes[id]).map(id => `<button class="b" data-down="${id}">${M.nodes[id].label} 停止</button>`).join('')}</div>
+      h = `<h3>障害シミュレーション</h3><div class="sub">${PIPE ? 'ステージをクリックして失敗させる。後続のステージは実行されなくなります。' : 'ノードをクリックして停止 / 復旧。同期で依存している部品に影響が伝播します。'}</div>
+        <div class="row"><button class="b" data-reset>すべて復旧</button>${(M.failPresets || []).filter(id => M.nodes[id]).map(id => `<button class="b" data-down="${id}">${M.nodes[id].label} 停止</button>`).join('')}</div>
         <h4>停止中</h4>${st.down.map(id => `<div class="item"><b>${M.nodes[id].label}</b></div>`).join('') || '<div class="sub">なし</div>'}
-        <h4>影響を受ける（同期依存）</h4>${r.impacted.map(id => `<div class="item">${M.nodes[id].label}</div>`).join('') || '<div class="sub">なし</div>'}
+        <h4>${PIPE ? '実行されないステージ' : '影響を受ける（同期依存）'}</h4>${r.impacted.map(id => `<div class="item">${M.nodes[id].label}</div>`).join('') || '<div class="sub">なし</div>'}
         <h4>処理が滞留する（非同期）</h4>${r.delayed.map(id => `<div class="item">${M.nodes[id].label}</div>`).join('') || '<div class="sub">なし</div>'}
         <h4>止まるユースケース</h4>${r.brokenScenarios.map(s => `<div class="item"><span class="tag high">停止</span>${s.label}</div>`).join('') || '<div class="sub">なし</div>'}`;
     }
     if (st.mode === 'lint') {
-      h = `<h3>指摘 ${ISSUES.length} 件</h3><div class="sub">モデルに ${Analyze.RULES.length} 種類のルールを当てた結果。クリックで該当箇所を強調。</div>` +
+      h = `<h3>指摘 ${ISSUES.length} 件</h3><div class="sub">モデルに ${Analyze.RULES.filter(r => (r.for || "system") === (M.type || "system")).length} 種類のルールを当てた結果。クリックで該当箇所を強調。</div>` +
         ISSUES.map((i, k) => `<div class="item ${st.issue === k ? 'on' : ''}" data-issue="${k}"><span class="tag ${i.sev}">${i.title}</span><p>${i.msg}</p></div>`).join('');
     }
     if (st.mode === 'metric') {
       const rows = Object.entries(M.nodes).filter(([, n]) => n.metrics?.[st.metric] != null).sort((a, b) => b[1].metrics[st.metric] - a[1].metrics[st.metric]);
       const max = rows[0]?.[1].metrics[st.metric] || 1;
-      h = `<div class="row">${[['p95', 'p95 レイテンシ'], ['cost', '月額コスト'], ['rps', 'RPS']].map(([k, n]) => `<button class="b ${st.metric === k ? 'on' : ''}" data-metric="${k}">${n}</button>`).join('')}</div>
+      h = `<div class="row">${METRICS.map(([k, n]) => `<button class="b ${st.metric === k ? 'on' : ''}" data-metric="${k}">${n}</button>`).join('')}</div>
         <div class="sub">値を立体の高さと色の濃さで表示。高く赤いほど大きい。</div>` +
         rows.map(([id, n]) => `<div class="item" data-sel="${id}"><b>${n.label}</b> <span class="mono">${fmt(st.metric, n.metrics[st.metric])}</span><div class="bar" style="width:${n.metrics[st.metric] / max * 100}%"></div></div>`).join('');
     }
@@ -269,6 +288,8 @@
     render();
   });
 
+  $('msel').innerHTML = Object.entries(REG).map(([k, r]) => `<option value="${k}" ${k === KEY ? 'selected' : ''}>${r.model.name}</option>`).join('');
+  $('msel').onchange = e => { location.hash = e.target.value; };
   $('mname').textContent = M.name;
   $('msrc').textContent = M.source; $('msrc').href = M.source;
   document.title = `${M.name} — DeepDiverDown`;

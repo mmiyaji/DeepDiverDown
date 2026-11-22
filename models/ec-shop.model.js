@@ -1,6 +1,8 @@
 // docs/sample-ec-design.md から抽出（prompts/extract-model.md 使用 → 人がレビュー）
-window.MODEL = {
+(window.MODELS = window.MODELS || {})['ec-shop'] = { actual: null };
+window.MODELS['ec-shop'].model = {
   name: 'ECサイト 注文基盤',
+  failPresets: ['pay', 'db', 'kafka', 'redis'],
   source: 'docs/sample-ec-design.md',
   tiers: [
     { id: 'edge', label: 'エッジ' },

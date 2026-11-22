@@ -29,7 +29,23 @@ window.ACTUAL = {   // 実環境から取得した構成（任意）
 };
 ```
 
-## 指摘ルール（js/lint.js）
+## 複数モデルの登録
+各モデルファイルは `window.MODELS['<id>'] = { model, actual }` に登録し、`index.html` に `<script>` を1行足す。
+画面上部のセレクタ、または `#<id>` で切り替える。
+
+## AWS 構成の表現（js/aws.js）
+- `node.svc`：`ecs` `lambda` `aurora` `sqs` など。形状・カテゴリ色・略称が自動で付く
+- `node.az`：`['a','c']` のように配置 AZ。1つだけだと SINGLE_AZ 指摘
+- `node.subnet`：`public` / `private`。データストアが public だと PUBLIC_DATA 指摘
+- `groups`：`{ kind:'vpc'|'az'|'subnet', label, tier:'app' | ['app','data'], x0,y0,x1,y1 }` で範囲を描く
+
+## CI/CD パイプライン（type: 'pipeline'）
+- フロア = 環境（例：CI → stg → 本番）。`node.stage`：`source` `build` `test` `artifact` `deploy` `approval` `env` `monitor`
+- `metrics.duration`（分）でリードタイムを計算。`leadTimeLimit` が目標値
+- 障害シミュレーションは下流へ伝播（実行されない）。`node.join:'any'` は別経路が生きていれば実行される
+- 監視からの自動ロールバックは `{ from:'alarm', to:'deploy', kind:'rollback' }` で表す
+
+## 指摘ルール（js/analyze.js）
 | ID | 内容 |
 |---|---|
 | SPOF | client / external 以外で replicas < 2 |
@@ -38,3 +54,9 @@ window.ACTUAL = {   // 実環境から取得した構成（任意）
 | CYCLE | 同期呼び出しが循環している |
 | SHARED_DB | 1つの DB に複数サービスが直接アクセス |
 | RETRY_STORM | retry ありで下流の timeout が上流より長い |
+| SINGLE_AZ | AZ が1つだけ |
+| PUBLIC_DATA | データストアがパブリックサブネット |
+| NO_APPROVAL | 承認を経ずに本番デプロイへ到達できる（pipeline） |
+| NO_TEST | テストを経ずにデプロイへ到達できる（pipeline） |
+| NO_ROLLBACK | 本番デプロイに自動ロールバック経路がない（pipeline） |
+| SLOW_PIPELINE | 最長経路の所要時間が目標を超える（pipeline） |
