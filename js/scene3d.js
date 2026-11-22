@@ -8,7 +8,7 @@ const VIEWS = { iso: [1, 1.05, 1], top: [0.001, 1, 0.001], side: [0.05, 0.35, 1]
 export class Scene3D {
   constructor(el, { onPick } = {}) {
     this.el = el; this.onPick = onPick;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); // PNG 書き出しのため保持
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     el.appendChild(this.renderer.domElement);
     this.labels = new CSS2DRenderer();
@@ -42,9 +42,18 @@ export class Scene3D {
     new ResizeObserver(() => this.resize()).observe(el);
     this.resize();
     const clock = new THREE.Clock();
+    this.speed = 1; this.phase = 0;
     this.renderer.setAnimationLoop(() => {
-      const t = clock.getElapsedTime();
-      for (const p of this.packets) p.meshes.forEach((m, i) => m.position.copy(at(p, ((t * 1.6) / p.len + i / p.meshes.length) % 1)));
+      const dt = clock.getDelta();
+      this.phase += dt * 1.6 * this.speed;
+      for (const p of this.packets) p.meshes.forEach((m, i) => m.position.copy(at(p, (this.phase / p.len + i / p.meshes.length) % 1)));
+      if (this.anim) { // 視点のなめらかな移動
+        const a = this.anim, k = Math.min(1, (performance.now() - a.t0) / 450), e = 1 - (1 - k) ** 3;
+        const tgt = a.from.clone().lerp(a.to, e), d = tgt.clone().sub(this.controls.target);
+        this.controls.target.copy(tgt); this.camera.position.add(d);
+        this.camera.zoom = a.z0 + (a.z1 - a.z0) * e; this.camera.updateProjectionMatrix();
+        if (k >= 1) this.anim = null;
+      }
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
       this.labels.render(this.scene, this.camera);
@@ -58,6 +67,41 @@ export class Scene3D {
     this.controls.mouseButtons = { LEFT: rot ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: rot ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE };
     this.controls.touches = { ONE: rot ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN, TWO: rot ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE };
     this.el.dataset.drag = mode;
+  }
+
+  /* 指定した位置を画面中央へ（なめらかに）。zoom は倍率 */
+  focusOn(pos, zoom = Math.max(this.camera.zoom, 1.8)) {
+    this.anim = { from: this.controls.target.clone(), to: new THREE.Vector3(...pos), z0: this.camera.zoom, z1: zoom, t0: performance.now() };
+  }
+  /* 共有リンク用：視点の保存と復元 */
+  getView() {
+    const r = v => v.toArray().map(x => +x.toFixed(2));
+    return { p: r(this.camera.position), t: r(this.controls.target), z: +this.camera.zoom.toFixed(2) };
+  }
+  setView(v) {
+    if (!v?.p || !v?.t) return;
+    this.camera.position.fromArray(v.p); this.controls.target.fromArray(v.t);
+    this.camera.zoom = v.z || 1; this.camera.lookAt(this.controls.target); this.camera.updateProjectionMatrix(); this.fitted = true;
+  }
+
+  /* PNG 書き出し：WebGL の画像に HTML ラベルを重ねて 1 枚にする */
+  snapshot(bg) {
+    const src = this.renderer.domElement, dpr = src.width / src.clientWidth, c = document.createElement('canvas');
+    c.width = src.width; c.height = src.height;
+    const g = c.getContext('2d'); g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0);
+    const base = this.el.getBoundingClientRect();
+    g.scale(dpr, dpr); g.textBaseline = 'middle';
+    for (const el of this.labels.domElement.querySelectorAll('div')) {
+      if (el.style.display === 'none' || !el.textContent) continue;
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el), x = r.left - base.left, y = r.top - base.top;
+      if (r.right < base.left || r.left > base.right || r.bottom < base.top || r.top > base.bottom) continue;
+      g.globalAlpha = +cs.opacity || 1;
+      if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') { g.fillStyle = cs.backgroundColor; g.fillRect(x, y, r.width, r.height); }
+      if (parseFloat(cs.borderTopWidth)) { g.strokeStyle = cs.borderTopColor; g.lineWidth = 1; g.strokeRect(x + .5, y + .5, r.width - 1, r.height - 1); }
+      g.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; g.fillStyle = cs.color; g.textAlign = 'center';
+      g.fillText(el.textContent, x + r.width / 2, y + r.height / 2 + 0.5);
+    }
+    return c;
   }
 
   /* ---------- 基本 ---------- */
@@ -76,7 +120,7 @@ export class Scene3D {
     this.root.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => m.dispose()); });
     this.root.clear(); this.lbl.clear(); this.pick = []; this.packets = [];
   }
-  end() { if (!this.fitted) { this.fit(); this.fitted = true; } }
+  end() { if (!this.fitted) { this.fit(this.initialView || 'iso'); this.fitted = true; } }
 
   fit(view = 'iso') {
     const box = new THREE.Box3().setFromObject(this.root), c = box.getCenter(new THREE.Vector3());

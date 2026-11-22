@@ -14,29 +14,65 @@
 </script>
 </head>
 <body>
+<a class="skip" href="#panel">詳細パネルへ移動</a>
 <header class="top">
+  <button class="icon" data-act="nav" aria-label="サイドバーの開閉（[）" title="サイドバーの開閉（[）">☰</button>
   <div class="brand">DeepDiverDown</div>
-  <div class="meta"><select id="msel"></select></div>
+  <div class="crumb" id="mtitle"></div>
+  <div class="search" role="search">
+    <input id="q" type="search" placeholder="部品・ID・根拠を検索（/）" aria-label="部品・ID・根拠を検索" aria-controls="qres" autocomplete="off">
+    <div id="qres" class="qres" role="listbox" hidden></div>
+  </div>
+  <nav class="actions" aria-label="操作">
+    <button data-act="open" title="YAML を開く">開く</button>
+    <button data-act="share" title="今の画面（視点を含む）のリンクをコピー">共有</button>
+    <button data-act="png" title="3D 図を PNG で保存">画像</button>
+    <button data-act="report" title="点検・指摘を Markdown で保存">レポート</button>
+    <button class="icon" data-act="help" aria-label="ヘルプ（?）" title="ヘルプ（?）">?</button>
+    <button class="icon" data-act="settings" aria-label="設定" title="設定">⚙</button>
+  </nav>
 </header>
-<nav class="modes" id="modes"></nav>
-<div class="app">
-  <section class="main">
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="モデルと表示">
+    <section><h5>モデル</h5><div id="mlist" class="mlist"></div></section>
+    <section><h5>表示モード</h5><nav id="modes" class="modes" aria-label="表示モード"></nav></section>
+    <section><h5>フロア</h5><div id="floors" class="floors"></div></section>
+    <section><h5>表示</h5><label class="chk"><input type="checkbox" id="nbr"> 選択中の部品の周辺だけ</label></section>
+  </aside>
+  <div class="scrim" data-act="nav" aria-hidden="true"></div>
+
+  <main class="main">
     <div class="stage">
-      <div class="stats" id="stats"></div>
-      <div class="view" id="view">
+      <div class="stats" id="stats" aria-live="polite"></div>
+      <div class="view" id="view" aria-label="3D 図。部品をクリックで選択">
         <div class="dragctl" role="group" aria-label="ドラッグの操作">
           <button data-drag="rotate" title="ドラッグで回転（R）">⟳ 回転</button><button data-drag="pan" title="ドラッグで移動（M）">✥ 移動</button>
         </div>
-        <div class="viewctl">
+        <div class="viewctl" role="group" aria-label="視点">
           <button data-view="iso">斜め</button><button data-view="top">真上</button><button data-view="side">横</button><button data-view="back">裏側</button><button data-view="reset">リセット</button>
         </div>
         <div class="hint" id="hint"></div>
       </div>
       <div class="legend" id="legend"></div>
     </div>
-  </section>
-  <aside class="panel" id="panel"></aside>
+  </main>
+
+  <aside class="panel" id="panel" tabindex="-1" aria-label="詳細">
+    <button class="sheet-handle" data-act="sheet" aria-label="詳細パネルの開閉"><span></span>詳細</button>
+    <div id="panel-body"></div>
+  </aside>
 </div>
+
+<div id="modal" class="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="dialog-head"><h2 id="modal-title"></h2><button class="close icon" aria-label="閉じる">×</button></div>
+    <div id="modal-body" class="dialog-body"></div>
+  </div>
+</div>
+<div id="drop" class="drop" hidden><div>YAML をドロップして読み込む</div></div>
+<input type="file" id="file" accept=".yaml,.yml" hidden>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="vendor/js-yaml/js-yaml.min.js"></script>
 <script src="js/aws.js"></script>
