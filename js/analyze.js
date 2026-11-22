@@ -1,6 +1,6 @@
 /* モデル解析：指摘ルール（lint）・障害影響の伝播・実環境との差分 */
 (function () {
-  const INFRA = ['client', 'external', 'cdn'];
+  const INFRA = ['client', 'external', 'cdn', 'actor'];
   const syncLinks = m => m.links.filter(l => l.sync);
 
   const RULES = [
@@ -39,7 +39,7 @@
           if (path.length > best.length) best = path;
           for (const l of adj[n] || []) if (!vis.has(l.to)) walk(l.to, [...path, l], new Set([...vis, l.to]));
         };
-        Object.entries(m.nodes).filter(([, n]) => n.tier !== 'edge' && n.kind !== 'external').forEach(([id]) => walk(id, [], new Set([id])));
+        Object.entries(m.nodes).filter(([, n]) => n.tier !== 'edge' && !['external', 'actor'].includes(n.kind)).forEach(([id]) => walk(id, [], new Set([id])));
         return best.length >= 3 ? [{ links: best.map(l => l.id), nodes: [best[0].from, ...best.map(l => l.to)],
           msg: `同期呼び出しが ${best.length} 段連鎖：` + [best[0].from, ...best.map(l => l.to)].map(id => m.nodes[id].label).join(' → ') + '。末端の遅延・障害がすべて上流に波及する' }] : [];
       } },
@@ -86,8 +86,20 @@
       run: m => { const r = reach(m, id => m.nodes[id].stage === 'test');
         return deploys(m).filter(id => r.has(id)).map(id => ({ nodes: [id], msg: `${m.nodes[id].label} にテストを通らずに到達できる経路がある` })); } },
     { id: 'NO_ROLLBACK', for: 'pipeline', sev: 'mid', title: '自動ロールバックなし',
-      run: m => deploys(m, 'prod').filter(id => !m.links.some(l => l.to === id && l.kind === 'rollback'))
-        .map(id => ({ nodes: [id], msg: `${m.nodes[id].label} に監視アラームからのロールバック経路がない` })) },
+      run: m => deploys(m, 'prod').filter(id => !m.links.some(l => l.to === id && l.kind === 'rollback' && m.nodes[l.from].kind !== 'actor'))
+        .map(id => { const man = m.links.find(l => l.to === id && l.kind === 'rollback');
+          return { nodes: [id, ...(man ? [man.from] : [])], links: man ? [man.id] : [],
+            msg: man ? `${m.nodes[id].label} のロールバックは ${m.nodes[man.from].label} の手作業のみ。夜間・休日の検知から復旧までが人に依存する` : `${m.nodes[id].label} に監視アラームからのロールバック経路がない` }; }) },
+    { id: 'SOD', for: 'any', sev: 'high', title: '職務分掌の欠如',
+      run: m => Object.entries(m.nodes).filter(([, n]) => n.kind === 'actor').flatMap(([id, n]) => {
+        const tgt = m.links.filter(l => l.from === id).map(l => m.nodes[l.to].stage), team = n.team;
+        const self = tgt.includes('source') && tgt.includes('approval');
+        const sameTeam = team && tgt.includes('approval') && Object.entries(m.nodes).some(([j, o]) => j !== id && o.kind === 'actor' && o.team === team && m.links.some(l => l.from === j && m.nodes[l.to].stage === 'source'));
+        return self || sameTeam ? [{ nodes: [id], msg: `${n.label} が${self ? '自分のコード' : '同じチーム（' + team + '）のコード'}を本番リリース承認できる` }] : [];
+      }) },
+    { id: 'SINGLE_PERSON', for: 'any', sev: 'mid', title: '属人化',
+      run: m => Object.entries(m.nodes).filter(([, n]) => n.kind === 'actor' && n.role !== 'user' && (n.headcount ?? 1) < 2)
+        .map(([id, n]) => ({ nodes: [id], msg: `${n.label} の担当が ${n.headcount ?? 1} 名。不在時に${m.links.filter(l => l.from === id).map(l => m.nodes[l.to].label).join('・')}への作業が誰もできなくなる` })) },
     { id: 'SLOW_PIPELINE', for: 'pipeline', sev: 'mid', title: 'リードタイムが長い',
       run: m => {
         const memo = {}, best = id => memo[id] ?? (memo[id] = (m.nodes[id].metrics?.duration || 0) + Math.max(0, ...m.links.filter(l => l.sync && l.from === id).map(l => best(l.to))));
@@ -99,7 +111,7 @@
 
   function lint(m) {
     const type = m.type || 'system';
-    return RULES.filter(r => (r.for || 'system') === type).flatMap(r => r.run(m).map(x => ({ rule: r.id, title: r.title, sev: r.sev, nodes: [], links: [], ...x })));
+    return RULES.filter(r => r.for === 'any' || (r.for || 'system') === type).flatMap(r => r.run(m).map(x => ({ rule: r.id, title: r.title, sev: r.sev, nodes: [], links: [], ...x })));
   }
 
   /* 障害伝播：同期で依存しているノードは影響を受ける（非同期は滞留のみ） */
@@ -142,7 +154,9 @@
     if (!a) return { nodes: {}, links: {}, extraNodes: {}, extraLinks: [], items: [] };
     const nodes = {}, links = {}, items = [], extraNodes = {}, extraLinks = [];
     const al = (a.links || []).map(l => Array.isArray(l) ? l : [l.from, l.to]);
+    const actor = id => m.nodes[id]?.kind === 'actor';
     for (const [id, n] of Object.entries(m.nodes)) {
+      if (n.kind === 'actor') continue;
       const x = a.nodes[id];
       if (!x) { nodes[id] = 'missing'; items.push({ kind: 'missing', nodes: [id], msg: `${n.label} が実環境に存在しない` }); }
       else if (n.replicas != null && x.replicas != null && x.replicas !== n.replicas) {
@@ -152,7 +166,7 @@
     for (const [id, x] of Object.entries(a.nodes)) if (!m.nodes[id]) {
       extraNodes[id] = x; items.push({ kind: 'extra', nodes: [id], msg: `${x.label || id} が設計書にない（実環境のみ）` });
     }
-    for (const l of m.links) if (!al.some(([f, t]) => f === l.from && t === l.to)) {
+    for (const l of m.links) if (!actor(l.from) && !actor(l.to) && !al.some(([f, t]) => f === l.from && t === l.to)) {
       links[l.id] = 'missing';
       if (!nodes[l.from] && !nodes[l.to]) items.push({ kind: 'missing', links: [l.id], msg: `${m.nodes[l.from].label} → ${m.nodes[l.to].label} の接続が実環境にない` });
     }

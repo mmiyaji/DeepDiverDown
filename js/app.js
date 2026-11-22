@@ -50,7 +50,25 @@
     return ['db', 'queue', 'cache'].includes(kind) ? ['var(--dark)', 'var(--dark-l)', 'var(--dark-r)'] : ['var(--paper)', 'var(--paper-l)', 'var(--paper-r)'];
   }
 
+  /* 登場人物：role ごとに色分けした人型 */
+  const ROLES = {
+    user: { label: '利用者', c: '#2E73B8' }, dev: { label: '開発者', c: '#3F8624' }, approver: { label: '承認者', c: '#C98A12' },
+    ops: { label: '運用者', c: '#8C4FFF' }, admin: { label: '管理者', c: '#6d6a63' }, attacker: { label: '攻撃者', c: '#C8321F' },
+  };
+  function person(g, n, x, y, state) {
+    const c = state.fill === 'down' ? 'var(--accent)' : (ROLES[n.role] || ROLES.user).c;
+    const fill = state.fill === 'down' ? 'var(--accent)' : `color-mix(in srgb, ${c} 35%, var(--paper))`;
+    const sk = { stroke: state.outline ? 'var(--accent)' : 'var(--ink)', 'stroke-width': state.outline ? 2.2 : 1.2 };
+    const gg = el('g', { opacity: state.ghost ? 0.35 : 1 }, g);
+    el('ellipse', { cx: x, cy: y, rx: 16, ry: 8, fill: 'var(--grid)', stroke: 'var(--line)' }, gg);
+    el('path', { d: `M${x - 13},${y} L${x - 11},${y - 22} Q${x - 10},${y - 28} ${x},${y - 28} Q${x + 10},${y - 28} ${x + 11},${y - 22} L${x + 13},${y} Q${x},${y + 6} ${x - 13},${y} Z`, style: `fill:${fill}`, ...sk }, gg);
+    el('circle', { cx: x, cy: y - 38, r: 8.5, style: `fill:${fill}`, ...sk }, gg);
+    el('text', { x, y: y - 9, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 700, fill: c }, gg).textContent = (ROLES[n.role] || ROLES.user).label;
+    return { top: 60, bottom: 22 };
+  }
+
   function shape(g, n, x, y, state) {
+    if (n.kind === 'actor') return person(g, n, x, y, state);
     const svc = n.svc && window.AWS?.[n.svc], plain = state.fill == null && state.heat == null;
     const kind = svc ? ({ cyl: 'db', queue: 'queue' }[svc.shape] || (n.kind === 'external' ? 'external' : 'service')) : n.kind;
     let [top, l, r] = tones(kind, state);
@@ -202,8 +220,9 @@
   }
 
   function nodeDetail(id) {
-    const n = allNodes()[id], ins = allLinks().filter(l => l.to === id), outs = allLinks().filter(l => l.from === id);
+    let n = allNodes()[id]; const ins =allLinks().filter(l => l.to === id), outs = allLinks().filter(l => l.from === id);
     const iss = ISSUES.filter(i => i.nodes.includes(id));
+    if (n.kind === 'actor') n = { ...n, kind: `登場人物：${(ROLES[n.role] || ROLES.user).label}${n.team ? `（${n.team}）` : ''}` };
     const ln = l => `${allNodes()[l.from].label} → ${allNodes()[l.to].label} <span class="mono" style="color:var(--mute)">${l.sync ? 'sync' : 'async'}${l.timeoutMs ? ' ' + l.timeoutMs / 1000 + 's' : ''}${l.retry ? ' retry' + l.retry : ''}</span>`;
     return `<h4>選択中のノード</h4><h3>${n.label}</h3><div class="sub">${n.svc && window.AWS?.[n.svc] ? AWS[n.svc].name : n.kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${n.subnet} subnet` : ''} /${M.tiers.find(t => t.id === n.tier)?.label || ''} ${n.src ? `/ 設計書 ${n.src}` : ''}</div>
       <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${k}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
@@ -237,7 +256,7 @@
         <h4>止まるユースケース</h4>${r.brokenScenarios.map(s => `<div class="item"><span class="tag high">停止</span>${s.label}</div>`).join('') || '<div class="sub">なし</div>'}`;
     }
     if (st.mode === 'lint') {
-      h = `<h3>指摘 ${ISSUES.length} 件</h3><div class="sub">モデルに ${Analyze.RULES.filter(r => (r.for || "system") === (M.type || "system")).length} 種類のルールを当てた結果。クリックで該当箇所を強調。</div>` +
+      h = `<h3>指摘 ${ISSUES.length} 件</h3><div class="sub">モデルに ${Analyze.RULES.filter(r => r.for === "any" || (r.for || "system") === (M.type || "system")).length} 種類のルールを当てた結果。クリックで該当箇所を強調。</div>` +
         ISSUES.map((i, k) => `<div class="item ${st.issue === k ? 'on' : ''}" data-issue="${k}"><span class="tag ${i.sev}">${i.title}</span><p>${i.msg}</p></div>`).join('');
     }
     if (st.mode === 'metric') {

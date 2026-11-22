@@ -45,6 +45,15 @@ window.ACTUAL = {   // 実環境から取得した構成（任意）
 - 障害シミュレーションは下流へ伝播（実行されない）。`node.join:'any'` は別経路が生きていれば実行される
 - 監視からの自動ロールバックは `{ from:'alarm', to:'deploy', kind:'rollback' }` で表す
 
+## 登場人物（kind: 'actor'）
+```js
+lead: { label:'テックリード', kind:'actor', role:'approver', team:'決済チーム', headcount:1, tier:'prod', x:2, y:0 }
+```
+- `role`：`user`（利用者）`dev`（開発者）`approver`（承認者）`ops`（運用者）`admin`（管理者）`attacker`（攻撃者）。色分けした人型で描く
+- `team` / `headcount`：職務分掌・属人化の指摘に使う
+- 人物からのリンクは操作（push・承認・手動ロールバックなど）。障害シミュレーションで人物を「停止」すると不在を表せる
+- 人物は SPOF 判定・実環境との差分の対象外
+
 ## 指摘ルール（js/analyze.js）
 | ID | 内容 |
 |---|---|
@@ -60,3 +69,5 @@ window.ACTUAL = {   // 実環境から取得した構成（任意）
 | NO_TEST | テストを経ずにデプロイへ到達できる（pipeline） |
 | NO_ROLLBACK | 本番デプロイに自動ロールバック経路がない（pipeline） |
 | SLOW_PIPELINE | 最長経路の所要時間が目標を超える（pipeline） |
+| SOD | 承認者が自分 / 同じチームのコードを承認できる（職務分掌） |
+| SINGLE_PERSON | 運用・承認などの担当が 1 名（属人化） |

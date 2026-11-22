@@ -10,7 +10,7 @@ window.MODELS['ec-shop'].model = {
     { id: 'data', label: 'データ' },
   ],
   nodes: {
-    user:   { label: '利用者',     kind: 'client',  tier: 'edge', x: 0, y: 1, src: '§2.1' },
+    user:   { label: '会員', kind: 'actor', role: 'user',  tier: 'edge', x: 0, y: 1, src: '§2.1' },
     cdn:    { label: 'CDN',        kind: 'cdn',     tier: 'edge', x: 3, y: 1, replicas: 99, src: '§2.2', metrics: { p95: 15, cost: 120, rps: 900 } },
     alb:    { label: 'ALB',        kind: 'lb',      tier: 'edge', x: 6, y: 1, replicas: 2, src: '§2.3', metrics: { p95: 5, cost: 40, rps: 300 } },
     web:    { label: 'Web (BFF)',  kind: 'service', tier: 'app',  x: 0, y: 1, replicas: 3, src: '§3.1', metrics: { p95: 420, cost: 300, rps: 300 } },
@@ -20,6 +20,7 @@ window.MODELS['ec-shop'].model = {
     notify: { label: '通知ワーカー', kind: 'worker', tier: 'app',  x: 6, y: 3, replicas: 1, src: '§3.5', metrics: { p95: 60, cost: 50, rps: 40 } },
     psp:    { label: '決済代行',   kind: 'external', tier: 'app', x: 9, y: 0, src: '§5.1', metrics: { p95: 700 } },
     mail:   { label: 'メール配信', kind: 'external', tier: 'app', x: 9, y: 3, src: '§5.2' },
+    ops:    { label: '運用担当', kind: 'actor', role: 'ops', team: 'SRE', headcount: 1, tier: 'edge', x: 9, y: 3.5, src: '§7' },
     db:     { label: '注文 DB',    kind: 'db',      tier: 'data', x: 3, y: 1, replicas: 2, src: '§4.1', metrics: { p95: 25, cost: 650, rps: 260 } },
     kafka:  { label: 'Kafka',      kind: 'queue',   tier: 'data', x: 6, y: 2, replicas: 3, src: '§4.2', metrics: { p95: 8, cost: 400, rps: 40 } },
     redis:  { label: 'Redis',      kind: 'cache',   tier: 'data', x: 0, y: 2, replicas: 1, src: '§4.3', metrics: { p95: 2, cost: 60, rps: 500 } },
@@ -38,6 +39,7 @@ window.MODELS['ec-shop'].model = {
     { id: 'i2d',  from: 'inv',   to: 'db',    sync: true, timeoutMs: 1000, src: '§3.3' },
     { id: 'o2k',  from: 'order', to: 'kafka', sync: false, label: 'order-events', src: '§3.2' },
     { id: 'k2n',  from: 'kafka', to: 'notify', sync: false, src: '§3.5' },
+    { id: 'op2p', from: 'ops', to: 'pay', sync: false, label: '手動再起動', src: '§7' },
     { id: 'n2m',  from: 'notify', to: 'mail', sync: true, timeoutMs: 5000, src: '§3.5' },
   ],
   scenarios: [

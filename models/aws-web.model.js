@@ -17,7 +17,7 @@ window.MODELS['aws-web'].model = {
     { kind: 'subnet', label: 'public', tier: 'app', x0: -0.6, y0: -0.6, x1: 1.6, y1: 3.6 },
   ],
   nodes: {
-    user:   { label: '利用者', kind: 'client', tier: 'edge', x: 0, y: 2 },
+    user:   { label: '利用者', kind: 'actor', role: 'user', tier: 'edge', x: 0, y: 2 },
     r53:    { label: 'Route 53', svc: 'route53', tier: 'edge', x: 2, y: 0, replicas: 99, src: '§2' },
     cf:     { label: 'CloudFront', svc: 'cloudfront', tier: 'edge', x: 3, y: 2, replicas: 99, src: '§2', metrics: { p95: 20, cost: 150, rps: 1200 } },
     waf:    { label: 'WAF', svc: 'waf', tier: 'edge', x: 6, y: 2, replicas: 99, src: '§2', metrics: { p95: 2, cost: 40 } },
@@ -27,6 +27,7 @@ window.MODELS['aws-web'].model = {
     sm:     { label: 'Secrets Manager', svc: 'secrets', tier: 'edge', x: 9, y: 0, replicas: 99, src: '§4' },
     worker: { label: '画像処理', svc: 'lambda', tier: 'app', x: 6.2, y: 2.6, replicas: 99, src: '§5', metrics: { p95: 1200, cost: 60, rps: 20 } },
     ext:    { label: '外部 API', kind: 'external', tier: 'app', x: 9, y: 0, src: '§4' },
+    ops:    { label: 'インフラ担当', kind: 'actor', role: 'ops', team: 'インフラ', headcount: 2, tier: 'edge', x: 9, y: 3.5 },
     aurora: { label: 'Aurora', svc: 'aurora', tier: 'data', x: 3, y: 1.5, replicas: 2, az: ['a', 'c'], subnet: 'private', src: '§6', metrics: { p95: 12, cost: 520, rps: 380 } },
     redis:  { label: 'ElastiCache', svc: 'elasticache', tier: 'data', x: 0.5, y: 0.3, replicas: 1, az: ['a'], subnet: 'private', src: '§6', metrics: { p95: 1, cost: 70, rps: 900 } },
     sqs:    { label: 'SQS', svc: 'sqs', tier: 'data', x: 6, y: 0.5, replicas: 99, src: '§5', metrics: { cost: 5, rps: 20 } },
@@ -45,6 +46,7 @@ window.MODELS['aws-web'].model = {
     { id: 'n2x',  from: 'nat', to: 'ext', sync: true, timeoutMs: 10000 },
     { id: 'e2q',  from: 'ecs', to: 'sqs', sync: false, label: 'ジョブ投入' },
     { id: 'q2l',  from: 'sqs', to: 'worker', sync: false },
+    { id: 'op2e', from: 'ops', to: 'ecs', sync: false, label: 'ECS Exec' },
     { id: 'l2s3', from: 'worker', to: 's3', sync: true, timeoutMs: 5000 },
   ],
   scenarios: [
