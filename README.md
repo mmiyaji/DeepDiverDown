@@ -3,6 +3,25 @@
 設計書・IaC・コードを「根拠付きの構造化モデル」に落とし、3D 図解・動き・指摘・点検で
 人間が設計上の問題点と「どこがまだ確かめられていないか」を把握しやすくする実験プロジェクト。
 
+> [!IMPORTANT]
+> **個人の学習用プロジェクトです。動作・正確性・継続的な保守を含め、いかなる保証もしません。**
+> - 指摘・点検・確度判定の結果は参考情報であり、設計レビューや監査の代わりにはなりません。誤検出・見落としがあります
+> - 収録しているモデル・設計書・IaC はすべて説明用のサンプルです（`online-boutique` 以外は架空。Terraform の state も架空）
+> - 抽出 CLI は外部 API（Claude API）に設計書を送信します。機密情報を含む資料に使う場合は、各自の責任で利用規約・社内規程を確認してください
+> - 予告なく仕様変更・公開停止することがあります。Issue / PR への対応も約束しません
+
+## 現状（2026-11 時点）
+| 項目 | 状態 |
+|---|---|
+| 3D ビューア（8 モード・検索・比較・共有・書き出し・設定・スマホ対応） | 動作確認済み |
+| 解析（指摘 14 ルール・障害伝播・確度判定・網羅率・点検・索引・比較） | 単体テスト 18 件 |
+| 自動配置 | 動作するが、同じ列に部品が多いと縦に長くなる |
+| Terraform / Kubernetes 取り込み | サンプルで確認。実際の本番 state では未検証 |
+| 抽出 CLI（Claude API） | `--dry-run` のみ確認。実 API 呼び出しは未検証 |
+| GitHub Actions（CI） | 定義のみ。初回 push 時に初めて実行 |
+
+既知の課題：大きなモデル（100 部品超）での表示性能・ラベルの重なり、画面上での部品の編集、日本語フォントは OS 標準に依存。
+
 ## 起動
 ```
 npm ci                                       # 依存を取得。postinstall で vendor/ を生成（git 管理外）
@@ -94,5 +113,15 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 | `ec-shop` | EC サイト注文基盤（設計書 + 実環境スナップショット） |
 | `aws-web` | AWS Web 構成（VPC / AZ / サブネット、IaC 根拠、IaC 在庫） |
 | `cicd` | CI/CD パイプライン（ワークフロー定義を根拠に） |
+| `online-boutique` | 公開デモ Online Boutique（設計書要約 + Kubernetes 取り込み、自動配置） |
 
 詳細は `docs/model-schema.md`。
+
+## 動作環境
+Node.js 22 以上（CLI・テスト）、Python 3（静的ファイルの配信。他のサーバーでも可）、WebGL が使えるブラウザ。
+
+## クレジット・ライセンス
+- 依存ライブラリ：[three.js](https://threejs.org/)（MIT）、[js-yaml](https://github.com/nodeca/js-yaml)（MIT）、[Inter](https://rsms.me/inter/) / [IBM Plex Mono](https://github.com/IBM/plex)（SIL OFL 1.1）、[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript)（MIT）。`npm ci` 時に `vendor/` へ各ライセンス文とともに配置
+- `docs/sample-online-boutique.md` と `samples/online-boutique/` は [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo)（Apache-2.0）の公開情報をもとに独自に要約・再構成したもの（原本の複製ではない）
+- 「根拠と確度」の考え方は AWS の [Reverse Spec Flow](https://aws.amazon.com/jp/blogs/news/aidm-introducing-reverse-spec-flow/) の記事を参考にした
+- このリポジトリ自体のライセンスは未設定（現時点では著作権者に権利が留保される）
