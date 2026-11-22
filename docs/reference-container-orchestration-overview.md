@@ -15,6 +15,8 @@
 | 独自 API のオーケストレーター | [HashiCorp Nomad](reference-nomad.md) | Job、Task Group、Allocation と Server・Client の分担 |
 | 独自 API のオーケストレーター | [Docker Swarm](reference-docker-swarm.md) | Manager が Service の希望状態に合わせて Task を配置する流れ |
 
+サイドバーの **「プロダクトを比較」** を開き、上部の **「左を変更」** または **「右を変更」** から候補を選ぶ。2つの構成図と、制御プレーン、実行単位と配置、運用の違いを表で確認できる。
+
 ## 見比べるポイント
 
 - **希望状態**。Kubernetes では Deployment が Pod のテンプレートと希望数を持つ。ECS、Nomad、Swarm ではそれぞれの API が実行単位と希望状態を表現する。

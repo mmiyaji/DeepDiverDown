@@ -20,6 +20,8 @@ function parseRoute() {
   return { id: m[1], mode: m[2] || null, q: Object.fromEntries(new URLSearchParams(m[3] || '')) };
 }
 const ROUTE = parseRoute();
+const PREVIEW = window.parent !== window && new URLSearchParams(location.search).get('preview') === 'reference';
+if (PREVIEW) document.body.classList.add('reference-preview');
 const [REGISTRY, ICONS] = await Promise.all([
   L.loadRegistry(),
   fetch('icons/manifest.json').then(r => r.ok ? r.json() : {}).catch(() => ({})),
@@ -63,7 +65,7 @@ const MODES = [
 
 const VIEWS = Views.available(M);
 const st = {
-  dimension: ['2', '3'].includes(ROUTE.q.d) ? ROUTE.q.d : S.dimension,
+  dimension: PREVIEW ? '2' : ['2', '3'].includes(ROUTE.q.d) ? ROUTE.q.d : S.dimension,
   view: VIEWS.includes(ROUTE.q.w) ? ROUTE.q.w : VIEWS.includes(M.views?.default) ? M.views.default : 'cloud',
   mode: MODES.some(m => m[0] === ROUTE.mode) ? ROUTE.mode : 'struct',
   sel: M.nodes[ROUTE.q.s] ? ROUTE.q.s : null, nbr: ROUTE.q.n === '1',
@@ -688,7 +690,27 @@ function modal(title, body) {
   $('modal-title').textContent = title; $('modal-body').innerHTML = body; $('modal').hidden = false;
   $('modal').querySelector('.close').focus();
 }
-function closeModal() { $('modal').hidden = true; lastFocus?.focus?.(); }
+function closeModal() {
+  $('modal').hidden = true;
+  if ($('modal').classList.contains('reference-comparison')) {
+    $('modal-body').replaceChildren();
+    $('modal').classList.remove('reference-comparison');
+  }
+  lastFocus?.focus?.();
+}
+
+async function openReferenceComparison() {
+  modal('プロダクト比較', '<p role="status">比較を読み込み中…</p>');
+  $('modal').classList.add('reference-comparison');
+  const body = $('modal-body');
+  const pending = body.firstElementChild;
+  try {
+    const { renderReferenceComparison } = await import('./reference-compare.js?v=touch-picker');
+    if (body.contains(pending)) renderReferenceComparison(body, REGISTRY, KEY);
+  } catch {
+    if (body.contains(pending)) pending.textContent = '比較を読み込めませんでした。開き直して再試行してください。';
+  }
+}
 
 const SHORTCUTS = [['/', '検索'], ['D', '3D / 2D を切り替え'], ['R / M', 'ドラッグを回転 / 移動に切り替え'], ['F', '選択中の部品に寄る'], ['N', '選択中の部品の周辺だけ表示'], ['Esc', '選択解除・閉じる'],
   ['1〜' + MODES.length, '表示モードの切り替え'], ['← / →', 'シナリオのステップ'], ['V', 'ビュー（論理 / 物理サービス / 物理ネットワーク）の切り替え'], ['[', 'サイドバーの開閉'], ['?', 'このヘルプ']];
@@ -765,6 +787,7 @@ document.addEventListener('click', e => {
   if (d.hit != null) return openHit(qHits[+d.hit]);
   if (d.act) {
     const a = d.act;
+    if (a === 'reference-compare') return openReferenceComparison();
     if (a === 'dimension') return toggleDimension();
     if (a === 'share') return share();
     if (a === 'png') return exportPng();
@@ -821,6 +844,7 @@ $('q').addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.target.value = ''; search(''); $('qres').hidden = true; e.target.blur(); }
 });
 addEventListener('keydown', e => {
+  if (PREVIEW) return;
   if (!$('modal').hidden) { if (e.key === 'Escape') closeModal(); return; }
   if (e.target.closest('input,select,textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key;
@@ -851,4 +875,4 @@ if (st.mode === 'compare') await ensureComparison();
 draw();
 if (ROUTE.q.v) { const v = ROUTE.q.v.split('_').map(Number); if (v.length === 7 && v.every(Number.isFinite)) scene.setView({ p: v.slice(0, 3), t: v.slice(3, 6), z: v[6] }); }
 if (ENTRY.id !== ROUTE.id && ROUTE.id) toast(`モデル「${ROUTE.id}」が見つからないため、${M.name} を表示しています`);
-if (once('ddd.welcome')) openHelp(true);
+if (!PREVIEW && once('ddd.welcome')) openHelp(true);
