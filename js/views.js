@@ -6,7 +6,7 @@
 (function () {
   const INFRA_KIND = ['cdn', 'lb'];
   const INFRA_SVC = ['cloudfront', 'route53', 'waf', 'alb', 'nat', 'apigw', 'secrets', 'cloudwatch'];
-  const isInfra = n => INFRA_KIND.includes(n.kind) || INFRA_SVC.includes(n.svc) || n.role === 'infra';
+  const isInfra = n => INFRA_KIND.includes(n.kind) || INFRA_SVC.includes(n.svc) || !!window.Catalog?.lookup(n.svc)?.infra || n.role === 'infra';
   const VIEWS = {
     logical: { label: '論理構成', sub: '機能配置' },
     cloud: { label: '物理構成', sub: 'サービス' },
