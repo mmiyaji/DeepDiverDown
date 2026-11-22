@@ -5,7 +5,7 @@
 
 ## 起動
 ```
-npm install
+npm install && npm run vendor               # 依存を vendor/ に同梱（コミット済みなので通常は不要）
 python -m http.server 8124 --bind 0.0.0.0   # → http://localhost:8124/#ec-shop
 npm run gates                                # 点検（不合格なら exit 1）
 npm run index                                # models/<id>/index.json（ID 索引・逆引き索引）を生成
@@ -19,7 +19,8 @@ models/<id>/      model.yaml（唯一の正）・actual.yaml（実環境スナ�
 js/analyze.js     指摘ルール・障害伝播・確度判定・網羅率・点検・索引（ブラウザと Node で共用）
 js/scene3d.js     Three.js 描画（回転・拡大縮小・移動、ラベル、パケット）
 js/app.js         画面（モード・パネル）
-tools/            gates.mjs（点検 CLI）・build-index.mjs（索引生成）
+tools/            gates.mjs（点検 CLI）・build-index.mjs（索引生成）・vendor.mjs（同梱物の生成）
+vendor/           three.js・js-yaml・欧文フォント（ライセンス文付き。外部通信なしで動作）
 ```
 
 ## パイプライン（Reverse Spec Flow の考え方を取り入れたもの）
