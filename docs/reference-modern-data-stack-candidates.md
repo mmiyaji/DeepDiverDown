@@ -33,8 +33,8 @@
 | dbt | 分析基盤にロード済みのデータを、依存関係付き SQL モデルで staging から mart へ変換し、テストする | [dbt Introduction](https://docs.getdbt.com/docs/introduction) |
 | Apache Airflow | 取り込み、変換、品質チェックの DAG をスケジューリングし、タスク失敗後に再試行する | [Airflow Architecture](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html) |
 | AWS Glue | カタログでデータを発見し、ジョブがデータを読み、変換してストレージへ書く | [AWS Glue](https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html) |
-| Azure Data Factory | パイプラインがコピー処理を起動し、取り込み先にデータを配置する | [Azure Data Factory](https://learn.microsoft.com/en-us/azure/data-factory/introduction) |
-| Google Cloud Dataflow | Apache Beam のパイプラインを実行し、入力から集計・出力まで追う | [Dataflow Overview](https://cloud.google.com/dataflow/docs/overview) |
+| [Azure Data Factory](reference-azure-data-factory.md) | パイプラインがコピー処理を起動し、取り込み先にデータを配置する | [Azure Data Factory](https://learn.microsoft.com/en-us/azure/data-factory/introduction) |
+| [Google Cloud Dataflow](reference-google-cloud-dataflow.md) | Apache Beam のパイプラインを実行し、入力から集計・出力まで追う | [Dataflow Overview](https://cloud.google.com/dataflow/docs/overview) |
 
 ## ストリーム処理
 

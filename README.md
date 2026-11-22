@@ -178,7 +178,7 @@ npm run icons -- --aws-pptx "C:\path\to\AWS-Toolkit.pptx"
 | ストリーム処理 | [Spark Structured Streaming](docs/reference-spark-structured-streaming.md)、[Spark Streaming（DStreams）](docs/reference-spark-streaming.md)、[Apache Flink](docs/reference-flink.md)、[Kafka Streams](docs/reference-kafka-streams.md) |
 | 構成概念 | [メダリオン](docs/reference-medallion.md)、[データレイクハウス](docs/reference-data-lakehouse.md)、[データクリーンルーム](docs/reference-data-clean-room.md)、[ETL と ELT](docs/reference-etl-elt.md) |
 | テーブル形式とカタログ | [Apache Iceberg](docs/reference-apache-iceberg.md)、[Delta Lake](docs/reference-delta-lake.md)、[Apache Hudi](docs/reference-apache-hudi.md)、[Iceberg REST Catalog](docs/reference-iceberg-rest-catalog.md) |
-| 変換とオーケストレーション | [dbt](docs/reference-dbt.md)、[Apache Airflow](docs/reference-apache-airflow.md)、[AWS Glue](docs/reference-aws-glue.md) |
+| 変換とオーケストレーション | [dbt](docs/reference-dbt.md)、[Apache Airflow](docs/reference-apache-airflow.md)、[AWS Glue](docs/reference-aws-glue.md)、[Azure Data Factory](docs/reference-azure-data-factory.md)、[Google Cloud Dataflow](docs/reference-google-cloud-dataflow.md) |
 | クラウド分析基盤 | [Snowflake](docs/reference-snowflake.md)、[Databricks](docs/reference-databricks.md) |
 | 運用とガバナンス | [OpenLineage](docs/reference-openlineage.md) |
 
