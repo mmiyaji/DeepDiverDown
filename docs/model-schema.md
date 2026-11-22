@@ -184,3 +184,20 @@ views:
 ```
 - 基盤として隠したくない部品は、モデル側で `role` を変えるか components に含める（`role: infra` で明示的に隠すこともできる）
 - 画面ではサイドバーの「ビュー」か `V` キーで切り替え。URL は `?w=logical` など
+
+## 並列表現（分散・並列処理）
+分散・並列で動く部分を図で分かるようにする。数値は説明用の例でよい（実際の数が設定で変わる場合は `N`）。
+
+```yaml
+nodes:
+  executor: { label: Executor, kind: worker, tier: workers, parallel: N, slots: 4 }  # 同じ実行単位が並列 / 同時 4 Task
+  input:    { label: 入力データ, kind: db, tier: storage, partitions: 6 }            # 6 分割されたデータ
+groups:
+  - { kind: parallel, label: Executor を並列に実行, tier: workers, nodes: [executor-a, executor-b] }
+```
+| 項目 | 図での表現 |
+|---|---|
+| `parallel` | 部品の後ろに写しを重ねて描き、「×N 並列」のバッジを付ける。単一障害点の指摘からは外す |
+| `slots` | 上面に小さな立方体を並べ、同時に走る Task を示す。部品の下に「同時 N Task」 |
+| `partitions` | データストアを分割数の段（帯）で描く。部品の下に「N 分割」 |
+| `groups` の `kind: parallel` | 並列に動く部品群を、色付きの破線の枠と淡い塗りで囲む（範囲は部品から自動計算） |

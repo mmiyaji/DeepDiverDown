@@ -17,6 +17,8 @@ tiers:
   - {id: control, label: 実行制御と資源管理, z: 1, size: [10, 3]}
   - {id: workers, label: ワーカーノード上の実行プロセス, z: 0, size: [10, 4]}
   - {id: storage, label: 外部ストレージ, z: 0, origin: [12, 0], size: [2.5, 4]}
+groups:
+  - {kind: parallel, label: Executor を並列に実行（数は設定による）, tier: workers, nodes: [executor-a, executor-b]}
 nodes:
   submitter:
     {label: spark-submit, kind: client, tier: entry, x: 0, y: 1, description: アプリケーションのコードと実行設定を渡す。, evidence: [{type: doc, ref: "docs/reference-spark.md#§2"}]}
@@ -25,11 +27,11 @@ nodes:
   manager:
     {label: Cluster Manager, kind: service, tier: control, x: 7, y: 1.5, description: アプリケーション間の実行資源を割り当てる。例は Standalone・YARN・Kubernetes。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
   executor-a:
-    {label: Executor A, kind: worker, tier: workers, x: 2, y: 2, description: ワーカーノード上で Task を実行し、必要に応じて中間データを保持する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
+    {slots: 4, label: Executor A, kind: worker, tier: workers, x: 2, y: 2, description: ワーカーノード上で Task を実行し、必要に応じて中間データを保持する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}]}
   executor-b:
-    {label: Executor B, kind: worker, tier: workers, x: 7, y: 2, description: 同じアプリケーションの別の実行プロセス。担当パーティションを並列に処理する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}, {type: doc, ref: "docs/reference-spark.md#§4"}]}
+    {slots: 4, label: Executor B, kind: worker, tier: workers, x: 7, y: 2, description: 同じアプリケーションの別の実行プロセス。担当パーティションを並列に処理する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§3"}, {type: doc, ref: "docs/reference-spark.md#§4"}]}
   input:
-    {label: 入力データ, kind: db, tier: storage, x: 0.5, y: 0, description: Executor が読むファイルの例。HDFS や対応するオブジェクトストレージを使える。, evidence: [{type: doc, ref: "docs/reference-spark.md#§5"}]}
+    {partitions: 6, label: 入力データ, kind: db, tier: storage, x: 0.5, y: 0, description: Executor が読むファイルの例。HDFS や対応するオブジェクトストレージを使える。, evidence: [{type: doc, ref: "docs/reference-spark.md#§5"}]}
   output:
     {label: 集計結果, kind: db, tier: storage, x: 0.5, y: 3.5, description: このシナリオでは集計結果をファイルに保存する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§6"}]}
 links:

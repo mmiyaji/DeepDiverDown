@@ -9,13 +9,15 @@ sources: [docs/reference-trino.md]
 evidence: [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]
 tiers:
   - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+groups:
+  - {kind: parallel, label: Split ごとに Worker が並列実行, tier: flow, nodes: [scan, reduce]}
 nodes:
   client: {"label": "SQL クライアント", "kind": "client", "tier": "flow", "x": 0, "y": 1, "description": "受注明細を日別に集計する SQL を送る。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
   control: {"label": "Coordinator", "kind": "service", "tier": "flow", "x": 4, "y": 1, "description": "分散計画と Task の実行を調整する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
   connector: {"label": "Iceberg Connector", "kind": "service", "tier": "flow", "x": 9, "y": 0, "description": "カタログとテーブルメタデータから Split を列挙する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§2"}]}
-  scan: {"label": "Worker・スキャン Task", "kind": "worker", "tier": "flow", "x": 8, "y": 4, "description": "担当 Split を読み、部分集計する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
-  data: {"label": "Iceberg・データファイル", "kind": "db", "tier": "flow", "x": 13, "y": 4, "description": "受注明細のファイルを保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§2"}]}
-  reduce: {"label": "Worker・集約 Task", "kind": "worker", "tier": "flow", "x": 4, "y": 4, "description": "Exchange で受け取った部分集計を統合する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+  scan: {"parallel": "N", "label": "Worker・スキャン Task", "kind": "worker", "tier": "flow", "x": 8, "y": 4, "description": "担当 Split を読み、部分集計する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+  data: {"partitions": 6, "label": "Iceberg・データファイル", "kind": "db", "tier": "flow", "x": 13, "y": 4, "description": "受注明細のファイルを保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§2"}]}
+  reduce: {"parallel": "N", "label": "Worker・集約 Task", "kind": "worker", "tier": "flow", "x": 4, "y": 4, "description": "Exchange で受け取った部分集計を統合する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
 links:
   - {"id": "submit", "from": "client", "to": "control", "label": "SQL を送る", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
   - {"id": "resolve", "from": "control", "to": "connector", "label": "テーブル解決と Split 列挙", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§2"}]}
