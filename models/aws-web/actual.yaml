@@ -1,0 +1,105 @@
+# tools/import-tfstate.mjs で samples/aws-web/terraform-show.json から生成
+capturedAt: 2026-11-22 07:37
+source: terraform:samples/aws-web/terraform-show.json
+nodes:
+  aws_route53_zone.main:
+    label: example.jp
+    svc: route53
+    tier: edge
+    replicas: 99
+  aws_cloudfront_distribution.main:
+    label: main
+    svc: cloudfront
+    tier: edge
+    replicas: 99
+  aws_wafv2_web_acl.main:
+    label: web-acl
+    svc: waf
+    tier: edge
+    replicas: 99
+  aws_lb.api:
+    label: api-alb
+    svc: alb
+    tier: app
+    az: [a, c]
+  aws_nat_gateway.a:
+    label: nat-a
+    svc: nat
+    tier: app
+    replicas: 1
+    az: [a]
+  aws_ecs_service.api:
+    label: api
+    svc: ecs
+    tier: app
+    replicas: 2
+    az: [a, c]
+  aws_lambda_function.image:
+    label: image
+    svc: lambda
+    tier: app
+    replicas: 99
+  aws_rds_cluster.main:
+    label: main
+    svc: aurora
+    tier: data
+    replicas: 2
+    az: [a, c]
+  aws_elasticache_replication_group.cache:
+    label: cache
+    svc: elasticache
+    tier: data
+    replicas: 1
+    az: [a]
+  aws_sqs_queue.jobs:
+    label: image-jobs
+    svc: sqs
+    tier: data
+    replicas: 99
+  aws_s3_bucket.images:
+    label: images
+    svc: s3
+    tier: data
+    replicas: 99
+  aws_secretsmanager_secret.db:
+    label: app/db
+    svc: secrets
+    tier: app
+    replicas: 99
+  aws_instance.bastion:
+    label: bastion
+    svc: ec2
+    tier: app
+    replicas: 1
+    az: [a]
+inventory:
+  - type: iac
+    ref: aws_route53_zone.main
+  - type: iac
+    ref: aws_cloudfront_distribution.main
+  - type: iac
+    ref: aws_wafv2_web_acl.main
+  - type: iac
+    ref: aws_lb.api
+  - type: iac
+    ref: aws_nat_gateway.a
+  - type: iac
+    ref: aws_ecs_service.api
+  - type: iac
+    ref: aws_lambda_function.image
+  - type: iac
+    ref: aws_rds_cluster.main
+  - type: iac
+    ref: aws_elasticache_replication_group.cache
+  - type: iac
+    ref: aws_sqs_queue.jobs
+  - type: iac
+    ref: aws_s3_bucket.images
+  - type: iac
+    ref: aws_secretsmanager_secret.db
+  - type: iac
+    ref: aws_instance.bastion
+  - type: iac
+    ref: aws_cloudwatch_log_group.api
+  - type: iac
+    ref: aws_iam_role.ecs_task

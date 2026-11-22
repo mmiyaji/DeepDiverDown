@@ -1,0 +1,194 @@
+# Online Boutique（GoogleCloudPlatform/microservices-demo, Apache-2.0）の公開マニフェストを参考に、
+# DeepDiverDown の取り込み確認用として構成だけを再構成したもの（原本の複製ではない）。
+# サービス名・replicas 未指定・*_ADDR による接続先は公開マニフェストの事実に合わせている。
+# 出典：https://github.com/GoogleCloudPlatform/microservices-demo/blob/main/release/kubernetes-manifests.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: frontend }
+spec:
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      containers:
+        - name: server
+          image: frontend
+          env:
+            - { name: PRODUCT_CATALOG_SERVICE_ADDR, value: "productcatalogservice:3550" }
+            - { name: CURRENCY_SERVICE_ADDR, value: "currencyservice:7000" }
+            - { name: CART_SERVICE_ADDR, value: "cartservice:7070" }
+            - { name: RECOMMENDATION_SERVICE_ADDR, value: "recommendationservice:8080" }
+            - { name: SHIPPING_SERVICE_ADDR, value: "shippingservice:50051" }
+            - { name: CHECKOUT_SERVICE_ADDR, value: "checkoutservice:5050" }
+            - { name: AD_SERVICE_ADDR, value: "adservice:9555" }
+            - { name: SHOPPING_ASSISTANT_SERVICE_ADDR, value: "shoppingassistantservice:80" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: frontend }
+spec: { type: ClusterIP, selector: { app: frontend }, ports: [{ port: 80 }] }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: frontend-external }
+spec: { type: LoadBalancer, selector: { app: frontend }, ports: [{ port: 80 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: checkoutservice }
+spec:
+  selector: { matchLabels: { app: checkoutservice } }
+  template:
+    metadata: { labels: { app: checkoutservice } }
+    spec:
+      containers:
+        - name: server
+          image: checkoutservice
+          env:
+            - { name: PRODUCT_CATALOG_SERVICE_ADDR, value: "productcatalogservice:3550" }
+            - { name: SHIPPING_SERVICE_ADDR, value: "shippingservice:50051" }
+            - { name: PAYMENT_SERVICE_ADDR, value: "paymentservice:50051" }
+            - { name: EMAIL_SERVICE_ADDR, value: "emailservice:5000" }
+            - { name: CURRENCY_SERVICE_ADDR, value: "currencyservice:7000" }
+            - { name: CART_SERVICE_ADDR, value: "cartservice:7070" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: checkoutservice }
+spec: { type: ClusterIP, selector: { app: checkoutservice }, ports: [{ port: 5050 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: recommendationservice }
+spec:
+  selector: { matchLabels: { app: recommendationservice } }
+  template:
+    metadata: { labels: { app: recommendationservice } }
+    spec:
+      containers:
+        - name: server
+          image: recommendationservice
+          env:
+            - { name: PRODUCT_CATALOG_SERVICE_ADDR, value: "productcatalogservice:3550" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: recommendationservice }
+spec: { type: ClusterIP, selector: { app: recommendationservice }, ports: [{ port: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: cartservice }
+spec:
+  selector: { matchLabels: { app: cartservice } }
+  template:
+    metadata: { labels: { app: cartservice } }
+    spec:
+      containers:
+        - name: server
+          image: cartservice
+          env:
+            - { name: REDIS_ADDR, value: "redis-cart:6379" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: cartservice }
+spec: { type: ClusterIP, selector: { app: cartservice }, ports: [{ port: 7070 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redis-cart }
+spec:
+  selector: { matchLabels: { app: redis-cart } }
+  template:
+    metadata: { labels: { app: redis-cart } }
+    spec:
+      containers:
+        - { name: redis, image: "redis:alpine" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis-cart }
+spec: { type: ClusterIP, selector: { app: redis-cart }, ports: [{ port: 6379 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: loadgenerator }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: loadgenerator } }
+  template:
+    metadata: { labels: { app: loadgenerator } }
+    spec:
+      initContainers:
+        - name: frontend-check
+          image: busybox
+          env:
+            - { name: FRONTEND_ADDR, value: "frontend:80" }
+      containers:
+        - name: main
+          image: loadgenerator
+          env:
+            - { name: FRONTEND_ADDR, value: "frontend:80" }
+# 以下、他サービスを呼ばないもの
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: productcatalogservice }
+spec: { selector: { matchLabels: { app: productcatalogservice } }, template: { metadata: { labels: { app: productcatalogservice } }, spec: { containers: [{ name: server, image: productcatalogservice }] } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: productcatalogservice }
+spec: { type: ClusterIP, selector: { app: productcatalogservice }, ports: [{ port: 3550 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: currencyservice }
+spec: { selector: { matchLabels: { app: currencyservice } }, template: { metadata: { labels: { app: currencyservice } }, spec: { containers: [{ name: server, image: currencyservice }] } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: currencyservice }
+spec: { type: ClusterIP, selector: { app: currencyservice }, ports: [{ port: 7000 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: paymentservice }
+spec: { selector: { matchLabels: { app: paymentservice } }, template: { metadata: { labels: { app: paymentservice } }, spec: { containers: [{ name: server, image: paymentservice }] } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: paymentservice }
+spec: { type: ClusterIP, selector: { app: paymentservice }, ports: [{ port: 50051 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: shippingservice }
+spec: { selector: { matchLabels: { app: shippingservice } }, template: { metadata: { labels: { app: shippingservice } }, spec: { containers: [{ name: server, image: shippingservice }] } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: shippingservice }
+spec: { type: ClusterIP, selector: { app: shippingservice }, ports: [{ port: 50051 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: emailservice }
+spec: { selector: { matchLabels: { app: emailservice } }, template: { metadata: { labels: { app: emailservice } }, spec: { containers: [{ name: server, image: emailservice }] } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: emailservice }
+spec: { type: ClusterIP, selector: { app: emailservice }, ports: [{ port: 5000 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: adservice }
+spec: { selector: { matchLabels: { app: adservice } }, template: { metadata: { labels: { app: adservice } }, spec: { containers: [{ name: server, image: adservice }] } } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: adservice }
+spec: { type: ClusterIP, selector: { app: adservice }, ports: [{ port: 9555 }] }
