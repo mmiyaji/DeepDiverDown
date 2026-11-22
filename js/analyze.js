@@ -109,9 +109,10 @@
       } },
   );
 
-  function lint(m) {
-    const type = m.type || 'system';
-    return RULES.filter(r => r.for === 'any' || (r.for || 'system') === type).flatMap(r => r.run(m).map(x => ({ rule: r.id, title: r.title, sev: r.sev, nodes: [], links: [], ...x })));
+  /* モデルの種類に当てはまるルール（opts.disabled で個別に無効化できる） */
+  const rulesFor = (m, opts = {}) => RULES.filter(r => (r.for === 'any' || (r.for || 'system') === (m.type || 'system')) && !(opts.disabled || []).includes(r.id));
+  function lint(m, opts = {}) {
+    return rulesFor(m, opts).flatMap(r => r.run(m).map(x => ({ rule: r.id, title: r.title, sev: r.sev, nodes: [], links: [], ...x })));
   }
 
   /* 障害伝播：同期で依存しているノードは影響を受ける（非同期は滞留のみ） */
@@ -251,8 +252,8 @@
   }
 
   /* 点検（gates）：合否は AI の報告ではなくこの判定で決める */
-  function gates(m, a, docs) {
-    const cls = classify(m, a), cov = coverage(m, a, docs), issues = lint(m), g = m.gates || {};
+  function gates(m, a, docs, opts = {}) {
+    const cls = classify(m, a), cov = coverage(m, a, docs), issues = lint(m, opts), g = { ...(m.gates || {}), ...(opts.gates || {}) };
     const ack = new Set((m.unknowns || []).flatMap(u => u.refs || []));
     const unk = [...Object.entries(cls.nodes).map(([id, r]) => [id, m.nodes[id].label, r]), ...Object.entries(cls.links).map(([id, r]) => [id, id, r]), ...Object.entries(cls.reqs).map(([id, r]) => [id, id, r])]
       .filter(([, , r]) => r.status === 'unknown');
@@ -285,5 +286,33 @@
     return { byId, byRef };
   }
 
-  window.Analyze = { lint, impact, diff, RULES, STATUS, parseSections, classify, coverage, gates, index };
+  /* 2 つのモデル（旧 base → 新 cur）を比較：追加 / 削除 / 変更 */
+  const FIELDS = { node: ['label', 'kind', 'svc', 'tier', 'replicas', 'az', 'subnet', 'role', 'team', 'headcount'], link: ['from', 'to', 'sync', 'timeoutMs', 'retry', 'kind'] };
+  const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  function compareModels(base, cur) {
+    const out = { nodes: {}, links: {}, changes: [], removedNodes: {}, removedLinks: [] };
+    const fieldDiff = (a, b, keys) => keys.filter(k => !same(a[k], b[k])).map(k => `${k}: ${a[k] ?? '—'} → ${b[k] ?? '—'}`);
+    for (const [id, n] of Object.entries(cur.nodes)) {
+      const o = base.nodes[id];
+      if (!o) { out.nodes[id] = 'added'; out.changes.push({ id, type: 'node', kind: 'added', msg: `${n.label} を追加` }); continue; }
+      const d = fieldDiff(o, n, FIELDS.node);
+      if (d.length) { out.nodes[id] = 'changed'; out.changes.push({ id, type: 'node', kind: 'changed', msg: `${n.label}：${d.join(' / ')}` }); }
+    }
+    for (const [id, n] of Object.entries(base.nodes)) if (!cur.nodes[id]) {
+      out.nodes[id] = 'removed'; out.removedNodes[id] = n; out.changes.push({ id, type: 'node', kind: 'removed', msg: `${n.label} を削除` });
+    }
+    const lab = (m, l) => `${(m.nodes[l.from] || {}).label || l.from} → ${(m.nodes[l.to] || {}).label || l.to}`;
+    for (const l of cur.links) {
+      const o = base.links.find(x => x.id === l.id);
+      if (!o) { out.links[l.id] = 'added'; out.changes.push({ id: l.id, type: 'link', kind: 'added', msg: `${lab(cur, l)} を追加` }); continue; }
+      const d = fieldDiff(o, l, FIELDS.link);
+      if (d.length) { out.links[l.id] = 'changed'; out.changes.push({ id: l.id, type: 'link', kind: 'changed', msg: `${lab(cur, l)}：${d.join(' / ')}` }); }
+    }
+    for (const l of base.links) if (!cur.links.some(x => x.id === l.id)) {
+      out.links[l.id] = 'removed'; out.removedLinks.push(l); out.changes.push({ id: l.id, type: 'link', kind: 'removed', msg: `${lab(base, l)} を削除` });
+    }
+    return out;
+  }
+
+  window.Analyze = { lint, impact, diff, RULES, rulesFor, STATUS, parseSections, classify, coverage, gates, index, compareModels };
 })();

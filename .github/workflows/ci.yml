@@ -1,0 +1,20 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # サンプルモデルは問題を意図的に含むため、点検結果は報告のみ（失敗させない）
+      - name: gates (report only)
+        run: npm run gates
+        continue-on-error: true
