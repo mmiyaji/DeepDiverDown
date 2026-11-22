@@ -1,0 +1,194 @@
+{
+  "model": "airbyte",
+  "name": "Airbyte の基本アーキテクチャ",
+  "generatedAt": "2026-11-22T15:45:24.949Z",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "受注 API",
+      "status": "claim"
+    },
+    "sourceConnector": {
+      "type": "node",
+      "label": "Source Connector",
+      "status": "claim"
+    },
+    "syncJob": {
+      "type": "node",
+      "label": "Sync Job",
+      "status": "claim"
+    },
+    "destinationConnector": {
+      "type": "node",
+      "label": "Destination Connector",
+      "status": "claim"
+    },
+    "warehouse": {
+      "type": "node",
+      "label": "分析用ウェアハウス",
+      "status": "claim"
+    },
+    "connection": {
+      "type": "node",
+      "label": "Connection 設定",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "State / cursor",
+      "status": "claim"
+    },
+    "configure": {
+      "type": "link",
+      "label": "Connection 設定 → Sync Job",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "受注 API → Source Connector",
+      "status": "claim"
+    },
+    "execute": {
+      "type": "link",
+      "label": "Source Connector → Sync Job",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "Sync Job → Destination Connector",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "Destination Connector → 分析用ウェアハウス",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "link",
+      "label": "Destination Connector → State / cursor",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "link",
+      "label": "State / cursor → Source Connector",
+      "status": "claim"
+    },
+    "incremental": {
+      "type": "scenario",
+      "label": "初回と増分同期"
+    },
+    "failure-resume": {
+      "type": "scenario",
+      "label": "途中失敗後の再開"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "受注 Stream を増分複製",
+      "status": "claim"
+    },
+    "NFR-01": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "未コミットデータを飛ばさない",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "具体的な実行間隔と内部サービス配置は確定していない。"
+    }
+  },
+  "byRef": {
+    "docs/reference-airbyte.md#§1": [
+      "model",
+      "source",
+      "connection",
+      "configure",
+      "incremental"
+    ],
+    "docs/reference-airbyte.md": [
+      "model",
+      "source",
+      "sourceConnector",
+      "syncJob",
+      "destinationConnector",
+      "warehouse",
+      "connection",
+      "state",
+      "configure",
+      "read",
+      "execute",
+      "write",
+      "commit",
+      "checkpoint",
+      "resume",
+      "incremental",
+      "failure-resume",
+      "BR-01",
+      "NFR-01"
+    ],
+    "docs/reference-airbyte.md#§2": [
+      "source",
+      "sourceConnector",
+      "read",
+      "incremental",
+      "BR-01"
+    ],
+    "docs/reference-airbyte.md#§3": [
+      "syncJob",
+      "destinationConnector",
+      "warehouse",
+      "execute",
+      "write",
+      "commit",
+      "incremental"
+    ],
+    "docs/reference-airbyte.md#§5": [
+      "connection",
+      "state",
+      "resume",
+      "incremental"
+    ],
+    "docs/reference-airbyte.md#§4": [
+      "state",
+      "execute",
+      "commit",
+      "checkpoint",
+      "resume",
+      "incremental",
+      "failure-resume",
+      "NFR-01"
+    ]
+  },
+  "reference": {
+    "category": "データ取り込み",
+    "order": 30,
+    "objectives": [
+      "Connection と Connector の役割を区別する",
+      "Full Refresh と Incremental・cursor・State の関係を理解する",
+      "コミット済み State から再開する流れを追う"
+    ],
+    "sources": [
+      {
+        "title": "Airbyte Protocol",
+        "url": "https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol"
+      },
+      {
+        "title": "Connections and streams",
+        "url": "https://docs.airbyte.com/platform/using-airbyte/getting-started/set-up-a-connection"
+      },
+      {
+        "title": "Sync Modes",
+        "url": "https://docs.airbyte.com/platform/using-airbyte/core-concepts/sync-modes"
+      },
+      {
+        "title": "Incremental Sync",
+        "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync"
+      }
+    ]
+  }
+}

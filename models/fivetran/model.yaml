@@ -1,0 +1,52 @@
+name: Fivetran の基本アーキテクチャ
+description: Connector が基幹 DB を初回同期し、cursor を使う増分同期でウェアハウスへロードし、必要なら後段変換を実行する流れ。
+reference:
+  objectives: [Source・Connection・Destination の役割を区別する, Initial sync と Incremental sync・cursor の関係を理解する, ロード後の変換と再同期を区別する]
+  sources:
+    - {title: Get Started with Fivetran, url: https://fivetran.com/docs/getting-started/quickstart}
+    - {title: Sync Overview, url: https://fivetran.com/docs/core-concepts/syncoverview}
+    - {title: Fivetran Glossary, url: https://fivetran.com/docs/getting-started/glossary}
+    - {title: Supported Destinations, url: https://fivetran.com/docs/destinations}
+sources: [docs/reference-fivetran.md]
+evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}]
+tiers:
+  - {id: flow, label: Fivetran データフロー, z: 0, origin: [0,0], size: [16,4]}
+  - {id: operation, label: 同期運用, z: 1, origin: [0,0], size: [16,4]}
+nodes:
+  source: {label: 基幹 DB, kind: external, tier: flow, x: 1, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§2}]}
+  connector: {label: Fivetran Connector, kind: worker, tier: flow, x: 4, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§3}]}
+  initial: {label: Initial sync, kind: service, tier: flow, x: 7, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§2}]}
+  incremental: {label: Incremental sync, kind: service, tier: flow, x: 10, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
+  destination: {label: クラウドデータウェアハウス, kind: db, tier: flow, x: 13, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§4}]}
+  cursor: {label: 進捗 cursor, kind: db, tier: operation, x: 6, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
+  transform: {label: Destination 上の変換, kind: service, tier: operation, x: 12, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§5}]}
+links:
+  - {id: extract, from: source, to: connector, label: データを抽出, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}]}
+  - {id: historical, from: connector, to: initial, label: 履歴を初回同期, evidence: [{type: doc, ref: docs/reference-fivetran.md#§2}]}
+  - {id: changes, from: connector, to: incremental, label: 追加・変更を抽出, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
+  - {id: position, from: incremental, to: cursor, label: 成功位置を記録, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
+  - {id: load, from: initial, to: destination, label: 履歴をロード, evidence: [{type: doc, ref: docs/reference-fivetran.md#§2}, {type: doc, ref: docs/reference-fivetran.md#§4}]}
+  - {id: load-incremental, from: incremental, to: destination, label: 増分をロード, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}, {type: doc, ref: docs/reference-fivetran.md#§4}]}
+  - {id: transform-link, from: destination, to: transform, label: ロード後に変換, evidence: [{type: doc, ref: docs/reference-fivetran.md#§5}]}
+  - {id: resume, from: cursor, to: incremental, label: 次回の増分境界, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
+scenarios:
+  - id: initial-to-incremental
+    label: 初回同期から増分同期へ
+    evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§2}, {type: doc, ref: docs/reference-fivetran.md#§3}, {type: doc, ref: docs/reference-fivetran.md#§4}, {type: doc, ref: docs/reference-fivetran.md#§5}]
+    steps:
+      - {links: [extract, historical], note: Source と Destination を設定し履歴を Initial sync する。}
+      - {links: [load], note: 履歴データを Destination にロードする。}
+      - {links: [changes, position], note: 成功後は追加・変更だけを取り cursor を更新する。}
+      - {links: [load-incremental, transform-link], note: 増分をロードし必要なら Destination 上で変換する。}
+  - id: failed-sync
+    label: 失敗と再同期の判断
+    evidence: [{type: doc, ref: docs/reference-fivetran.md#§5}]
+    steps:
+      - {links: [changes, load-incremental], note: 増分同期が失敗すると Destination の追加・更新は行われない。}
+      - {links: [position], note: 接続状態とエラーを確認する。}
+      - {links: [historical, load], note: 整合性修復が必要なら再同期を検討する。}
+requirements:
+  - {id: BR-01, kind: usecase, title: 受注データを履歴から継続同期, text: Initial sync 後は cursor を使って更新する。, links: [historical, load, changes, position, load-incremental], evidence: [{type: doc, ref: docs/reference-fivetran.md#§2}]}
+  - {id: NFR-01, kind: nfr, title: 失敗と再同期を区別, text: 通常の増分同期と整合性修復を混同しない。, links: [position, historical, load], evidence: [{type: doc, ref: docs/reference-fivetran.md#§5}]}
+unknowns: [{id: UNK-01, text: Connector 種別・同期間隔・Destination 製品名は確定していない。, refs: [extract, load-incremental]}]
+gates: {maxDrift: 0, maxHigh: 0}

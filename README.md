@@ -174,7 +174,7 @@ npm run icons -- --aws-pptx "C:\path\to\AWS-Toolkit.pptx"
 
 | 分野 | 追加リファレンス |
 |---|---|
-| データ取り込み | [Debezium](docs/reference-debezium.md) |
+| データ取り込み | [Debezium](docs/reference-debezium.md)、[Airbyte](docs/reference-airbyte.md)、[Fivetran](docs/reference-fivetran.md) |
 | ストリーム処理 | [Spark Structured Streaming](docs/reference-spark-structured-streaming.md)、[Spark Streaming（DStreams）](docs/reference-spark-streaming.md)、[Apache Flink](docs/reference-flink.md)、[Kafka Streams](docs/reference-kafka-streams.md) |
 | 構成概念 | [メダリオン](docs/reference-medallion.md)、[データレイクハウス](docs/reference-data-lakehouse.md)、[データクリーンルーム](docs/reference-data-clean-room.md)、[ETL と ELT](docs/reference-etl-elt.md) |
 | テーブル形式とカタログ | [Apache Iceberg](docs/reference-apache-iceberg.md)、[Delta Lake](docs/reference-delta-lake.md)、[Apache Hudi](docs/reference-apache-hudi.md)、[Iceberg REST Catalog](docs/reference-iceberg-rest-catalog.md) |

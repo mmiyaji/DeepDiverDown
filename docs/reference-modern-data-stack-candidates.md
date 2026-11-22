@@ -28,8 +28,8 @@
 |---|---|---|
 | Kafka Connect | Source Connector が外部システムから Topic に送り、Sink Connector が下流へ届ける。分散 Worker と Task の分担、再開位置も追う | [Kafka Connect Overview](https://kafka.apache.org/44/kafka-connect/overview/) |
 | Debezium | PostgreSQL の初期スナップショットから、変更ログに基づく Kafka への CDC 引き継ぎを追う | [Debezium Architecture](https://debezium.io/documentation/reference/stable/architecture.html) |
-| Airbyte | Source Connector、Destination Connector、同期状態を使った増分コピーの再開 | [Airbyte Protocol](https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol) |
-| Fivetran | SaaS や基幹DBの初回同期から、増分同期とウェアハウスへのロードまで | [Fivetran Docs](https://fivetran.com/docs/getting-started) |
+| [Airbyte](reference-airbyte.md) | Source Connector、Destination Connector、同期状態を使った増分コピーの再開 | [Airbyte Protocol](https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol) |
+| [Fivetran](reference-fivetran.md) | SaaS や基幹DBの初回同期から、増分同期とウェアハウスへのロードまで | [Fivetran Docs](https://fivetran.com/docs/getting-started) |
 | dbt | 分析基盤にロード済みのデータを、依存関係付き SQL モデルで staging から mart へ変換し、テストする | [dbt Introduction](https://docs.getdbt.com/docs/introduction) |
 | Apache Airflow | 取り込み、変換、品質チェックの DAG をスケジューリングし、タスク失敗後に再試行する | [Airflow Architecture](https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html) |
 | AWS Glue | カタログでデータを発見し、ジョブがデータを読み、変換してストレージへ書く | [AWS Glue](https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html) |
