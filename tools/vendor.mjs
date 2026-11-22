@@ -35,6 +35,6 @@ for (const [pkg, family, weights] of fonts) {
 fs.writeFileSync(path.join(OUT, 'fonts/fonts.css'), css);
 
 const list = [['three', 'MIT'], ['js-yaml', 'MIT'], ['@fontsource/inter', 'OFL-1.1'], ['@fontsource/ibm-plex-mono', 'OFL-1.1']];
-fs.writeFileSync(path.join(OUT, 'README.md'), '# vendor\n\n`npm run vendor` で node_modules から生成。手で編集しない。\n\n| パッケージ | バージョン | ライセンス |\n|---|---|---|\n' +
+fs.writeFileSync(path.join(OUT, 'README.md'), '# vendor\n\n`npm ci`（postinstall）または `npm run vendor` で node_modules から生成。git 管理外・手で編集しない。\n\n| パッケージ | バージョン | ライセンス |\n|---|---|---|\n' +
   list.map(([p, l]) => `| ${p} | ${ver(p)} | ${l} |`).join('\n') + '\n');
 console.log('done');
