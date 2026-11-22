@@ -102,3 +102,21 @@ test('compareModels：追加 / 削除 / 変更を検出する', () => {
   assert.equal(r.nodes.c, 'added');
   assert.equal(r.links.ab, 'removed');
 });
+
+test('CROSS_CLOUD_SYNC：クラウド間の同期リンクを指摘する', () => {
+  const nodes = {
+    aks: { label: 'AKS', svc: 'azure:aks' },
+    adb: { label: 'ADB', svc: 'oci:adb' },
+    sql: { label: 'SQL', svc: 'azure:sqldb' },
+    pod: { label: 'Pod', svc: 'k8s:deployment' },
+  };
+  const links = [
+    { id: 'cross', from: 'aks', to: 'adb', sync: true },
+    { id: 'async', from: 'aks', to: 'adb', sync: false },
+    { id: 'same', from: 'aks', to: 'sql', sync: true },
+    { id: 'workload', from: 'aks', to: 'pod', sync: true },
+  ];
+  const issues = A.lint({ nodes, links }).filter(i => i.rule === 'CROSS_CLOUD_SYNC');
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].links[0], 'cross');
+});

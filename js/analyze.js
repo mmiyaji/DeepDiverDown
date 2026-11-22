@@ -61,13 +61,22 @@
           msg: `${m.nodes[dn.from].label} → ${m.nodes[dn.to].label} は最大 ${dn.timeoutMs * (1 + (dn.retry || 0)) / 1000} 秒かかりうるが、上流は ${up.timeoutMs / 1000} 秒で打ち切る（無駄な処理・二重決済の危険）` }))) },
   ];
 
-  /* ---- AWS 構成向け ---- */
+  /* ---- クラウド構成向け（AWS / Google Cloud / Azure / OCI / Cloudflare / オンプレミス） ---- */
+  const prov = n => {
+    const p = window.Catalog?.providerOf(n);
+    return window.Catalog?.PROVIDERS[p] ? p : null;
+  };
   RULES.push(
+    { id: 'CROSS_CLOUD_SYNC', sev: 'mid', title: 'クラウドをまたぐ同期呼び出し',
+      run: m => m.links.filter(l => l.sync).map(l => [l, prov(m.nodes[l.from]), prov(m.nodes[l.to])])
+        .filter(([l, a, b]) => a && b && a !== b && !['k8s'].includes(a) && !['k8s'].includes(b) && m.nodes[l.from].kind !== 'actor')
+        .map(([l, a, b]) => ({ links: [l.id], nodes: [l.from, l.to],
+          msg: `${m.nodes[l.from].label}（${window.Catalog.PROVIDERS[a].label}）→ ${m.nodes[l.to].label}（${window.Catalog.PROVIDERS[b].label}）を同期で呼ぶ。回線・相手側の障害が直接波及し、遅延と転送料金もかかる` })) },
     { id: 'SINGLE_AZ', sev: 'high', title: '単一 AZ 配置',
       run: m => Object.entries(m.nodes).filter(([, n]) => n.az && n.az.length < 2)
         .map(([id, n]) => ({ nodes: [id], msg: `${n.label} が AZ ${n.az.join(',')} のみに配置。AZ 障害で停止する` })) },
     { id: 'PUBLIC_DATA', sev: 'high', title: 'データストアがパブリック',
-      run: m => Object.entries(m.nodes).filter(([, n]) => n.subnet === 'public' && (['db', 'cache'].includes(n.kind) || ['cyl'].includes(window.AWS?.[n.svc]?.shape)))
+      run: m => Object.entries(m.nodes).filter(([, n]) => n.subnet === 'public' && (['db', 'cache'].includes(n.kind) || window.Catalog?.lookup(n.svc)?.shape === 'cyl'))
         .map(([id, n]) => ({ nodes: [id], msg: `${n.label} がパブリックサブネットにある` })) },
   );
 

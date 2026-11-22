@@ -37,10 +37,15 @@ test('network：複数 AZ の部品を AZ ごとに展開し、片側 AZ にし�
   assert.ok(v.links.some(l => l.from === 'ecs@a' && l.to === 'aurora@a' && !l.crossAz), '同じ AZ 同士はその中で接続');
 });
 
-test('cloud：AZ・サブネットの枠は出さず、VPC は残す', () => {
-  const v = V.project(base(M['aws-web']), M['aws-web'], 'cloud');
-  assert.ok(v.groups.every(g => !['az', 'subnet'].includes(g.kind)));
-  assert.ok(v.groups.some(g => g.kind === 'vpc'));
+test('ビューごとにクラウド・クラスタ・ネットワークの枠を出し分ける', () => {
+  const m = M['aws-web'];
+  const visible = ['cloud', 'region', 'cluster', 'vpc', 'vnet', 'vcn', 'datacenter'];
+  const networkOnly = ['az', 'subnet', 'namespace'];
+  const groups = [...visible, ...networkOnly].map(kind => ({ kind, tier: m.tiers[0].id }));
+  const model = { ...m, groups };
+  assert.deepEqual(Array.from(V.project(base(model), model, 'cloud').groups, g => g.kind), visible);
+  assert.equal(V.project(base(model), model, 'logical').groups.length, 0);
+  assert.equal(V.project(base(model), model, 'network').groups.length, groups.length);
 });
 
 test('mergeNode：停止 > 影響、ずれ > 主張、強調は 1 つでもあれば', () => {

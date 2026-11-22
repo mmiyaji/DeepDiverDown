@@ -19,6 +19,15 @@ function parseRoute() {
   return { id: m[1], mode: m[2] || null, q: Object.fromEntries(new URLSearchParams(m[3] || '')) };
 }
 const ROUTE = parseRoute();
+const ICONS = await fetch('icons/manifest.json').then(r => r.ok ? r.json() : {}).catch(() => ({}));
+const iconDirectory = new URL('icons/', location.href);
+const icons = Object.fromEntries(Object.entries(ICONS || {}).flatMap(([id, path]) => {
+  if (typeof path !== 'string' || !URL.canParse(path, location.href)) return [];
+  const url = new URL(path, location.href);
+  return url.origin === iconDirectory.origin && url.pathname.startsWith(iconDirectory.pathname) ? [[id, url.href]] : [];
+}));
+Catalog.setIcons(icons);
+const hasIcons = Object.keys(icons).length > 0;
 const REGISTRY = await L.loadRegistry();
 const ENTRY = REGISTRY.find(r => r.id === ROUTE.id) || REGISTRY[0], KEY = ENTRY.id;
 const { model: M, actual: A, docs: DOCS } = await L.loadEntry(ENTRY);
@@ -54,11 +63,12 @@ const MODES = [
 
 const VIEWS = Views.available(M);
 const st = {
+  dimension: ['2', '3'].includes(ROUTE.q.d) ? ROUTE.q.d : S.dimension,
   view: VIEWS.includes(ROUTE.q.w) ? ROUTE.q.w : VIEWS.includes(M.views?.default) ? M.views.default : 'cloud',
   mode: MODES.some(m => m[0] === ROUTE.mode) ? ROUTE.mode : 'struct',
   sel: M.nodes[ROUTE.q.s] ? ROUTE.q.s : null, nbr: ROUTE.q.n === '1',
   hidden: new Set((ROUTE.q.h || '').split(',').filter(Boolean)),
-  scen: +ROUTE.q.sc || 0, step: +ROUTE.q.st || 0, down: (ROUTE.q.d || '').split(',').filter(id => M.nodes[id]),
+  scen: +ROUTE.q.sc || 0, step: +ROUTE.q.st || 0, down: (ROUTE.q.down || (['2', '3'].includes(ROUTE.q.d) ? '' : ROUTE.q.d) || '').split(',').filter(id => M.nodes[id]),
   issue: ROUTE.q.i != null ? +ROUTE.q.i : null, req: ROUTE.q.r || null, metric: METRICS.some(x => x[0] === ROUTE.q.m) ? ROUTE.q.m : METRICS[0][0], play: null,
 };
 if (!M.scenarios?.[st.scen]) st.scen = 0;
@@ -67,11 +77,12 @@ if (!M.scenarios?.[st.scen]) st.scen = 0;
 function routeHash(withView) {
   const q = new URLSearchParams();
   if (st.view !== 'cloud') q.set('w', st.view);
+  if (st.dimension === '2' || S.dimension === '2' || withView) q.set('d', st.dimension);
   if (st.sel) q.set('s', st.sel);
   if (st.nbr) q.set('n', '1');
   if (st.hidden.size) q.set('h', [...st.hidden].join(','));
   if (st.mode === 'scenario') { q.set('sc', st.scen); q.set('st', st.step); }
-  if (st.mode === 'fail' && st.down.length) q.set('d', st.down.join(','));
+  if (st.mode === 'fail' && st.down.length) q.set('down', st.down.join(','));
   if (st.mode === 'lint' && st.issue != null) q.set('i', st.issue);
   if (st.mode === 'req' && st.req) q.set('r', st.req);
   if (st.mode === 'metric') q.set('m', st.metric);
@@ -98,7 +109,13 @@ const TI = id => VW().tiers.find(t => t.id === id) || {};
 const zOf = tier => { const S = VW().tiers.filter(t => t.z == null); return TI(tier).z ?? (S.length - 1 - S.findIndex(t => t.id === tier)); };
 const off = tier => TI(tier).origin || [0, 0];
 const sizeOf = tier => TI(tier).size || [10, 4];
-const W = (gx, gy, tier) => [gx + off(tier)[0], zOf(tier) * FH, gy + off(tier)[1]];
+const W = (gx, gy, tier) => {
+  const [ox, oz] = off(tier);
+  const z = zOf(tier), flat = st.dimension === '2';
+  const tiers = VW().tiers;
+  const depth = flat ? Math.max(...tiers.map(t => off(t.id)[1] + sizeOf(t.id)[1])) - Math.min(...tiers.map(t => off(t.id)[1])) + 3 : 0;
+  return [gx + ox, flat ? 0 : z * FH, gy + oz - z * depth];
+};
 const visible = n => n && !st.hidden.has(n.tier);
 
 function allNodes() {
@@ -208,13 +225,15 @@ const scene = new Scene3D($('view'), { onPick: id => onPick(id) });
 scene.speed = S.packetSpeed;
 scene.initialView = S.defaultView;
 
+const serviceLabel = svc => svc && `${svc.name}｜${svc.providerLabel}`;
+
 function nodeSpec(id, n, s) {
-  const svc = n.svc && window.AWS?.[n.svc];
-  const shape = n.kind === 'actor' ? 'person' : svc?.shape === 'cyl' || ['db', 'cache'].includes(n.kind) ? 'cyl' : svc?.shape === 'queue' || n.kind === 'queue' ? 'queue' : 'box';
+  const svc = Catalog.lookup(n.svc);
+  const shape = n.kind === 'actor' ? 'person' : (svc?.shape ?? (['db', 'cache'].includes(n.kind) ? 'cyl' : n.kind === 'queue' ? 'queue' : 'box'));
   const ext = n.kind === 'external' && !svc;
   let color = scene.color('--paper'), opacity = s.dim ? 0.15 : 1, dashed = ext;
   if (n.kind === 'actor') color = scene.mix((ROLES[n.role] || ROLES.user).c, '--paper', 0.5);
-  else if (svc) color = scene.mix(AWS_CAT[svc.cat], '--paper', 0.42);
+  else if (svc) color = scene.mix(svc.color, '--paper', 0.42);
   else if (['db', 'queue', 'cache'].includes(n.kind)) color = scene.color('--dark');
   if (ext) opacity = Math.min(opacity, 0.35);
   if (s.fill === 'down') color = scene.color('--accent');
@@ -226,8 +245,10 @@ function nodeSpec(id, n, s) {
   if (s.status === 'drift') s.outline = true;
   if (s.ghost) { opacity = Math.min(opacity, 0.3); dashed = true; }
   return {
-    id, shape, color, opacity, dashed, outline: !!s.outline, h: s.h || (n.kind === 'client' ? 0.7 : 1), pos: W(n.x, n.y, n.tier),
-    label: n.label, labelAccent: s.fill === 'down', badge: s.badge, abbr: svc && { text: svc.abbr, color: AWS_CAT[svc.cat] },
+    id, shape, flat: st.dimension === '2', color, opacity, dashed, outline: !!s.outline, h: s.h || (n.kind === 'client' ? 0.7 : 1), pos: W(n.x, n.y, n.tier),
+    icon: S.officialIcons ? svc?.iconUrl : null,
+    label: n.label, labelAccent: s.fill === 'down', badge: s.badge, abbr: svc && { text: svc.abbr, color: svc.color },
+    sub: svc && { text: serviceLabel(svc), color: svc.providerColor },
   };
 }
 
@@ -253,14 +274,29 @@ function draw() {
   scene.begin();
   for (const t of P.tiers) {
     if (st.hidden.has(t.id)) continue;
-    const [w, h] = sizeOf(t.id), [ox, oz] = off(t.id), y = zOf(t.id) * FH;
+    const [w, h] = sizeOf(t.id), [ox, y, oz] = W(0, 0, t.id);
     const x0 = ox - 1.2, x1 = ox + w + 0.4, z0 = oz - 1.2, z1 = oz + h + 0.2;
     scene.floor({ x0, z0, x1, z1, y, origin: t.kind === 'origin', label: t.label, labelAt: t.origin ? [x0, y, z1] : [x1, y, z0] });
   }
   for (const gr of P.groups || []) for (const t of [].concat(gr.tier)) {
     if (st.hidden.has(t) || !P.tiers.some(x => x.id === t)) continue;
-    const y = zOf(t) * FH, [ox, oz] = off(t);
-    scene.group({ y, kind: gr.kind, label: gr.label, pts: [[gr.x0 + ox, gr.y0 + oz], [gr.x1 + ox, gr.y0 + oz], [gr.x1 + ox, gr.y1 + oz], [gr.x0 + ox, gr.y1 + oz]] });
+    const [ox, y, oz] = W(0, 0, t);
+    let { x0, y0, x1, y1 } = gr;
+    if (![x0, y0, x1, y1].every(Number.isFinite)) {
+      const members = Object.entries(N).filter(([id, n]) => n.tier === t &&
+        (!gr.nodes || P.from[id].some(source => gr.nodes.includes(source))) &&
+        (gr.kind !== 'az' || !gr.az || n.az?.includes(gr.az))).map(([, n]) => n);
+      if (!members.length) continue;
+      const xs = members.map(n => n.x), ys = members.map(n => n.y);
+      const padding = { cloud: 1.2, region: 1.0, cluster: 0.8, namespace: 0.6 }[gr.kind] ?? 0.8;
+      x0 = Math.min(...xs) - padding; x1 = Math.max(...xs) + padding;
+      y0 = Math.min(...ys) - padding; y1 = Math.max(...ys) + padding;
+    }
+    const provider = Catalog.PROVIDERS[gr.provider];
+    const label = gr.kind === 'cloud' && provider && !gr.label?.includes(provider.label)
+      ? [provider.label, gr.label].filter(Boolean).join('｜') : gr.label;
+    scene.group({ y, kind: gr.kind, label, color: provider?.color,
+      pts: [[x0 + ox, y0 + oz], [x1 + ox, y0 + oz], [x1 + ox, y1 + oz], [x0 + ox, y1 + oz]] });
   }
   for (const l of P.links) {
     if (!visible(N[l.from]) || !visible(N[l.to])) continue;
@@ -269,7 +305,7 @@ function draw() {
       dashed: s.dashed || (!l.sync ? 'dash' : null), opacity: s.dim ? 0.12 : s.on ? 1 : 0.55 });
   }
   for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node(nodeSpec(id, n, ns[id] || {}));
-  scene.end();
+  scene.end(st.dimension === '2');
   renderSidebar(); renderStats(); renderPanel(); syncUrl();
 }
 
@@ -339,7 +375,7 @@ function nodeDetail(id) {
   const n = allNodes()[id];
   const ins = allLinks().filter(l => l.to === id), outs = allLinks().filter(l => l.from === id);
   const iss = ISSUES.filter(i => i.nodes.includes(id)), c = CLS.nodes[id];
-  const kind = n.kind === 'actor' ? `登場人物：${(ROLES[n.role] || ROLES.user).label}${n.team ? `（${esc(n.team)}・${n.headcount ?? 1}名）` : ''}` : n.svc && window.AWS?.[n.svc] ? AWS[n.svc].name : esc(n.kind);
+  const kind = n.kind === 'actor' ? `登場人物：${(ROLES[n.role] || ROLES.user).label}${n.team ? `（${esc(n.team)}・${n.headcount ?? 1}名）` : ''}` : esc(serviceLabel(Catalog.lookup(n.svc)) || n.kind);
   const ln = l => `${esc(linkLabel(l))} <span class="mono mute">${l.sync ? 'sync' : 'async'}${l.timeoutMs ? ' ' + l.timeoutMs / 1000 + 's' : ''}${l.retry ? ' retry' + l.retry : ''}</span> ${CLS.links[l.id] ? tag(CLS.links[l.id].status) : ''}`;
   const reqs = (M.requirements || []).filter(q => q.nodes?.includes(id));
   return `<h4>選択中の部品</h4><h3>${esc(n.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${esc(n.subnet)} subnet` : ''} / ${esc(TI(n.tier).label || '')}</div>
@@ -469,10 +505,27 @@ function setView(v) {
 function setMode(m) { st.mode = m; st.issue = null; st.req = null; stopPlay(); draw(); }
 const stopPlay = () => { clearInterval(st.play); st.play = null; };
 
+let drag3D = S.dragMode;
+const toggleDimension = () => setDimension(st.dimension === '2' ? '3' : '2');
+function setDimension(dimension, redraw = true) {
+  st.dimension = dimension;
+  const flat = dimension === '2';
+  scene.controls.enableRotate = !flat;
+  scene.fitted = false;
+  setDrag(drag3D);
+  const button = document.querySelector('[data-act="dimension"]');
+  button.textContent = flat ? '2D / 3D' : '3D / 2D';
+  button.setAttribute('aria-pressed', flat);
+  document.querySelector('button[data-drag="rotate"]').disabled = flat;
+  document.querySelectorAll('[data-view]:not([data-view="reset"]):not([data-view="top"])').forEach(b => { b.disabled = flat; });
+  if (redraw) draw();
+}
 function setDrag(mode) {
+  if (st.dimension === '2') mode = 'pan';
+  else drag3D = mode;
   scene.setDragMode(mode);
-  document.querySelectorAll('[data-drag]').forEach(b => { b.classList.toggle('on', b.dataset.drag === mode); b.setAttribute('aria-pressed', b.dataset.drag === mode); });
-  $('hint').textContent = mode === 'rotate' ? 'ドラッグ：回転 ／ 右ドラッグ：移動 ／ ホイール：拡大縮小' : 'ドラッグ：移動 ／ 右ドラッグ：回転 ／ ホイール：拡大縮小';
+  document.querySelectorAll('button[data-drag]').forEach(b => { b.classList.toggle('on', b.dataset.drag === mode); b.setAttribute('aria-pressed', b.dataset.drag === mode); });
+  $('hint').textContent = st.dimension === '2' ? 'ドラッグ：移動 ／ ホイール：拡大縮小' : mode === 'rotate' ? 'ドラッグ：回転 ／ 右ドラッグ：移動 ／ ホイール：拡大縮小' : 'ドラッグ：移動 ／ 右ドラッグ：回転 ／ ホイール：拡大縮小';
 }
 
 /* トースト通知 */
@@ -481,7 +534,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 
 /* ================= 検索 ================= */
 const SEARCH = [
-  ...Object.entries(M.nodes).map(([id, n]) => ({ t: 'node', id, label: n.label, sub: `${id} ・ ${n.svc && window.AWS?.[n.svc] ? AWS[n.svc].name : n.kind}`, key: `${n.label} ${id} ${n.svc || ''} ${n.kind || ''} ${n.team || ''}` })),
+  ...Object.entries(M.nodes).map(([id, n]) => ({ t: 'node', id, label: n.label, sub: `${id} ・ ${serviceLabel(Catalog.lookup(n.svc)) || n.kind}`, key: `${n.label} ${id} ${n.svc || ''} ${n.kind || ''} ${n.team || ''} ${serviceLabel(Catalog.lookup(n.svc)) || ''}` })),
   ...M.links.map(l => ({ t: 'link', id: l.id, label: linkLabel(l), sub: l.id, key: `${linkLabel(l)} ${l.id} ${l.label || ''}`, sel: l.from })),
   ...(M.requirements || []).map(q => ({ t: 'req', id: q.id, label: q.title, sub: q.id, key: `${q.id} ${q.title} ${q.text}` })),
   ...(M.scenarios || []).map((s, i) => ({ t: 'scenario', id: i, label: s.label, sub: 'シナリオ', key: s.label })),
@@ -566,7 +619,7 @@ function modal(title, body) {
 }
 function closeModal() { $('modal').hidden = true; lastFocus?.focus?.(); }
 
-const SHORTCUTS = [['/', '検索'], ['R / M', 'ドラッグを回転 / 移動に切り替え'], ['F', '選択中の部品に寄る'], ['N', '選択中の部品の周辺だけ表示'], ['Esc', '選択解除・閉じる'],
+const SHORTCUTS = [['/', '検索'], ['D', '3D / 2D を切り替え'], ['R / M', 'ドラッグを回転 / 移動に切り替え'], ['F', '選択中の部品に寄る'], ['N', '選択中の部品の周辺だけ表示'], ['Esc', '選択解除・閉じる'],
   ['1〜' + MODES.length, '表示モードの切り替え'], ['← / →', 'シナリオのステップ'], ['V', 'ビュー（論理 / 物理サービス / 物理ネットワーク）の切り替え'], ['[', 'サイドバーの開閉'], ['?', 'このヘルプ']];
 function openHelp(welcome) {
   modal(welcome ? 'DeepDiverDown へようこそ' : 'ヘルプ', `
@@ -585,9 +638,11 @@ function openSettings() {
   modal('設定', `
     <form id="settings" class="settings">
     <h4>表示</h4>
+    <label class="chk"><input type="checkbox" name="officialIcons" ${S.officialIcons ? 'checked' : ''} ${hasIcons ? '' : 'disabled'}> 公式アイコンを使う</label>
     <label>テーマ <select name="theme">${[['auto', 'OS に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, n]) => `<option value="${v}" ${S.theme === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label>ラベルの大きさ <input type="range" name="labelScale" min="0.8" max="1.5" step="0.05" value="${S.labelScale}"><output>${Math.round(S.labelScale * 100)}%</output></label>
     <label>パケットの速さ <input type="range" name="packetSpeed" min="0" max="3" step="0.25" value="${S.packetSpeed}"><output>${S.packetSpeed}×</output></label>
+    <label>初期の表示 <select name="dimension"><option value="3" ${S.dimension === '3' ? 'selected' : ''}>3D</option><option value="2" ${S.dimension === '2' ? 'selected' : ''}>2D</option></select></label>
     <label>初期の視点 <select name="defaultView">${[['iso', '斜め'], ['top', '真上'], ['side', '横'], ['back', '裏側']].map(([v, n]) => `<option value="${v}" ${S.defaultView === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label>左ドラッグの既定 <select name="dragMode"><option value="rotate" ${S.dragMode === 'rotate' ? 'selected' : ''}>回転</option><option value="pan" ${S.dragMode === 'pan' ? 'selected' : ''}>移動</option></select></label>
     <h4>点検のしきい値 <small class="sub">空欄はモデルの設定（gates）に従う</small></h4>
@@ -603,20 +658,23 @@ function openSettings() {
   const f = $('settings');
   f.addEventListener('input', e => {
     const fd = new FormData(f);
-    Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dragMode: fd.get('dragMode') });
+    Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dimension: fd.get('dimension'), dragMode: fd.get('dragMode') });
+    if (hasIcons) S.officialIcons = fd.has('officialIcons');
     const g = {}; for (const k of ['maxDrift', 'maxHigh']) if (fd.get(k) !== '') g[k] = Math.max(0, +fd.get(k)); S.gates = g;
     S.disabledRules = rules.map(r => r.id).filter(id => !fd.getAll('rule').includes(id));
     f.querySelectorAll('output')[0].textContent = Math.round(S.labelScale * 100) + '%';
     f.querySelectorAll('output')[1].textContent = S.packetSpeed + '×';
     saveSettings(S); applyAppearance(S); scene.speed = S.packetSpeed;
-    if (e.target.name === 'dragMode') setDrag(S.dragMode);
-    if (e.target.name === 'theme') draw();
+    if (e.target.name === 'defaultView') scene.initialView = S.defaultView;
+    if (e.target.name === 'dimension') setDimension(S.dimension);
+    if (e.target.name === 'dragMode') { drag3D = S.dragMode; setDrag(drag3D); }
+    if (['theme', 'officialIcons'].includes(e.target.name)) draw();
   });
 }
 
 /* ================= イベント ================= */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-hit],[data-act],[data-drag],[data-viewmode],[data-view],[data-mode],[data-scen],[data-step],[data-goto],[data-play],[data-reset],[data-down],[data-issue],[data-metric],[data-req],[data-sel],[data-focus],[data-nbr],[data-rmlocal]');
+  const t = e.target.closest('[data-hit],[data-act],button[data-drag],[data-viewmode],[data-view],[data-mode],[data-scen],[data-step],[data-goto],[data-play],[data-reset],[data-down],[data-issue],[data-metric],[data-req],[data-sel],[data-focus],[data-nbr],[data-rmlocal]');
   if (e.target.closest('#modal') && !e.target.closest('.dialog')) return closeModal();
   if (e.target.closest('#modal .close')) return closeModal();
   if (!t) { if (!e.target.closest('.search')) $('qres').hidden = true; return; }
@@ -624,6 +682,7 @@ document.addEventListener('click', e => {
   if (d.hit != null) return openHit(qHits[+d.hit]);
   if (d.act) {
     const a = d.act;
+    if (a === 'dimension') return toggleDimension();
     if (a === 'share') return share();
     if (a === 'png') return exportPng();
     if (a === 'report') return exportReport();
@@ -644,7 +703,7 @@ document.addEventListener('click', e => {
   if (d.rmlocal) { L.removeLocal(d.rmlocal); return location.hash = '#/m/' + REGISTRY[0].id + '/struct'; }
   if (d.drag) return setDrag(d.drag);
   if (d.viewmode) return setView(d.viewmode);
-  if (d.view) return scene.fit(d.view === 'reset' ? S.defaultView : d.view);
+  if (d.view) return scene.fit(st.dimension === '2' ? 'top' : d.view === 'reset' ? S.defaultView : d.view);
   if (d.mode) { document.body.classList.remove('nav-open'); return setMode(d.mode); }
   if (d.focus) return select(d.focus, { focus: true });
   if (d.nbr != null) { st.nbr = !st.nbr; return draw(); }
@@ -679,6 +738,7 @@ addEventListener('keydown', e => {
   if (k === '/') { e.preventDefault(); return $('q').focus(); }
   if (k === '?') return openHelp(false);
   if (k === 'Escape') return select(null);
+  if (k === 'd' || k === 'D') return toggleDimension();
   if (k === 'v' || k === 'V') return setView(VIEWS[(VIEWS.indexOf(st.view) + 1) % VIEWS.length]);
   if (k === 'r' || k === 'R') return setDrag('rotate');
   if (k === 'm' || k === 'M') return setDrag('pan');
@@ -696,8 +756,8 @@ addEventListener('keydown', e => {
 /* ================= 起動 ================= */
 document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
-setDrag(S.dragMode);
+setDimension(st.dimension, false);
 draw();
-if (ROUTE.q.v) { const v = ROUTE.q.v.split('_').map(Number); if (v.length === 7) scene.setView({ p: v.slice(0, 3), t: v.slice(3, 6), z: v[6] }); }
+if (ROUTE.q.v) { const v = ROUTE.q.v.split('_').map(Number); if (v.length === 7 && v.every(Number.isFinite)) scene.setView({ p: v.slice(0, 3), t: v.slice(3, 6), z: v[6] }); }
 if (ENTRY.id !== ROUTE.id && ROUTE.id) toast(`モデル「${ROUTE.id}」が見つからないため、${M.name} を表示しています`);
 if (once('ddd.welcome')) openHelp(true);

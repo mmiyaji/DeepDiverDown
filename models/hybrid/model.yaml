@@ -1,0 +1,58 @@
+name: ハイブリッド受注基盤
+sources: [docs/sample-hybrid.md]
+evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§1" }]
+tiers:
+  - { id: internet, label: インターネット, z: 2, origin: [-3, 0], size: [1, 3], kind: origin }
+  - { id: edge, label: Cloudflare, z: 2, origin: [0, 0], size: [6, 3] }
+  - { id: azure, label: Azure, z: 1, origin: [0, 0], size: [9, 7] }
+  - { id: oci, label: OCI, z: 1, origin: [11, 0], size: [4, 4] }
+  - { id: office, label: 社内拠点, z: 0, origin: [0, 0], size: [9, 5] }
+  - { id: gcp, label: Google Cloud, z: 0, origin: [11, 0], size: [4, 4] }
+groups:
+  - { kind: cloud, provider: cloudflare, tier: edge, label: Cloudflare エッジ }
+  - { kind: cloud, provider: azure, tier: azure, label: Microsoft Azure（受注） }
+  - { kind: cloud, provider: oci, tier: oci, label: Oracle Cloud（基幹 DB） }
+  - { kind: datacenter, provider: onprem, tier: office, label: 社内データセンター }
+  - { kind: cloud, provider: gcp, tier: gcp, label: Google Cloud（分析） }
+  - { kind: az, provider: azure, tier: azure, az: "1", label: ゾーン 1, x0: 1.2, x1: 5.5, y0: -0.7, y1: 1.1 }
+  - { kind: az, provider: azure, tier: azure, az: "2", label: ゾーン 2, x0: 1.2, x1: 5.5, y0: 1.3, y1: 3.1 }
+  - { kind: az, provider: azure, tier: azure, az: "3", label: ゾーン 3, x0: 1.2, x1: 5.5, y0: 3.3, y1: 5.1 }
+nodes:
+  user: { label: 利用者, kind: actor, tier: internet, x: 0, y: 0, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  dns: { label: DNS, kind: external, tier: edge, x: 0, y: 0, svc: cloudflare:dns, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  waf: { label: WAF, kind: external, tier: edge, x: 2, y: 0, svc: cloudflare:waf, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  cdn: { label: CDN, kind: external, tier: edge, x: 4, y: 0, svc: cloudflare:cdn, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  gateway: { label: Application Gateway, kind: lb, tier: azure, x: 0, y: 0, svc: azure:appgw, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  aks: { label: 受注アプリ, kind: service, tier: azure, x: 3, y: 2, svc: azure:aks, replicas: 3, az: ["1", "2", "3"], evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  sql: { label: 受注 DB, kind: db, tier: azure, x: 7, y: 0, svc: azure:sqldb, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  bus: { label: 受け渡しキュー, kind: queue, tier: azure, x: 7, y: 2, svc: azure:servicebus, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  vault: { label: 鍵管理, kind: service, tier: azure, x: 7, y: 4, svc: azure:keyvault, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  adb: { label: 基幹 ERP DB, kind: db, tier: oci, x: 2, y: 2, svc: oci:adb, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
+  fastconnect: { label: FastConnect, kind: service, tier: oci, x: 0, y: 0, svc: oci:fastconnect, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
+  vpn: { label: VPN 装置, kind: service, tier: office, x: 0, y: 2, svc: onprem:vpn, replicas: 1, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  fw: { label: 境界 FW, kind: service, tier: office, x: 2, y: 2, svc: onprem:fw, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  erp: { label: 基幹サーバー, kind: service, tier: office, x: 4, y: 2, svc: onprem:server, replicas: 2, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  local-db: { label: オンプレ DB, kind: db, tier: office, x: 7, y: 2, svc: onprem:db, replicas: 1, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  ops: { label: 運用者, kind: actor, tier: office, x: 0, y: 0, role: ops, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  bigquery: { label: 受注分析, kind: external, tier: gcp, x: 1, y: 1, svc: gcp:bigquery, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§6" }] }
+links:
+  - { id: user-to-dns, from: user, to: dns, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  - { id: dns-to-waf, from: dns, to: waf, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  - { id: waf-to-cdn, from: waf, to: cdn, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  - { id: cdn-to-gateway, from: cdn, to: gateway, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§2" }] }
+  - { id: gateway-to-aks, from: gateway, to: aks, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  - { id: aks-to-sql, from: aks, to: sql, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  - { id: aks-to-bus, from: aks, to: bus, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  - { id: aks-to-vault, from: aks, to: vault, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
+  - { id: aks-to-adb, from: aks, to: adb, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
+  - { id: fastconnect-to-adb, from: fastconnect, to: adb, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
+  - { id: bus-to-vpn, from: bus, to: vpn, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  - { id: vpn-to-fw, from: vpn, to: fw, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  - { id: fw-to-erp, from: fw, to: erp, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  - { id: erp-to-local-db, from: erp, to: local-db, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  - { id: ops-to-vpn, from: ops, to: vpn, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
+  - { id: sql-to-bigquery, from: sql, to: bigquery, sync: false, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§6" }] }
+requirements:
+  - { id: NFR-01, kind: nfr, title: 分析障害時の受注継続, text: 分析先に障害が起きても受注処理を継続する。, links: [sql-to-bigquery], evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§7" }] }
+unknowns:
+  - { id: UNK-01, text: 受注アプリから基幹 DB へのタイムアウト値は未確認。, refs: [aks-to-adb] }

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-const VIEWS = { iso: [1, 1.05, 1], top: [0.001, 1, 0.001], side: [0.05, 0.35, 1], back: [-1, 1.05, -1] };
+const VIEWS = { iso: [1, 1.05, 1], top: [0, 1, 0.0001], side: [0.05, 0.35, 1], back: [-1, 1.05, -1] };
 
 export class Scene3D {
   constructor(el, { onPick } = {}) {
@@ -64,8 +64,8 @@ export class Scene3D {
   setDragMode(mode) {
     this.dragMode = mode;
     const rot = mode === 'rotate';
-    this.controls.mouseButtons = { LEFT: rot ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: rot ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE };
-    this.controls.touches = { ONE: rot ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN, TWO: rot ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE };
+    this.controls.mouseButtons = { LEFT: rot ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: rot || !this.controls.enableRotate ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE };
+    this.controls.touches = { ONE: rot ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN, TWO: rot || !this.controls.enableRotate ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE };
     this.el.dataset.drag = mode;
   }
 
@@ -81,6 +81,9 @@ export class Scene3D {
   setView(v) {
     if (!v?.p || !v?.t) return;
     this.camera.position.fromArray(v.p); this.controls.target.fromArray(v.t);
+    if (!this.controls.enableRotate) {
+      this.camera.position.copy(this.controls.target).addScaledVector(new THREE.Vector3(...VIEWS.top).normalize(), 100);
+    }
     this.camera.zoom = v.z || 1; this.camera.lookAt(this.controls.target); this.camera.updateProjectionMatrix(); this.fitted = true;
   }
 
@@ -91,8 +94,16 @@ export class Scene3D {
     const g = c.getContext('2d'); g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0);
     const base = this.el.getBoundingClientRect();
     g.scale(dpr, dpr); g.textBaseline = 'middle';
-    for (const el of this.labels.domElement.querySelectorAll('div')) {
-      if (el.style.display === 'none' || !el.textContent) continue;
+    for (const el of this.labels.domElement.children) {
+      if (el.style.display === 'none') continue;
+      const img = el.querySelector('img');
+      if (img?.complete && img.naturalWidth) {
+        const r = img.getBoundingClientRect();
+        g.globalAlpha = Number(getComputedStyle(el).opacity);
+        g.drawImage(img, r.left - base.left, r.top - base.top, r.width, r.height);
+        continue;
+      }
+      if (!el.textContent) continue;
       const r = el.getBoundingClientRect(), cs = getComputedStyle(el), x = r.left - base.left, y = r.top - base.top;
       if (r.right < base.left || r.left > base.right || r.bottom < base.top || r.top > base.bottom) continue;
       g.globalAlpha = +cs.opacity || 1;
@@ -120,10 +131,12 @@ export class Scene3D {
     this.root.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => m.dispose()); });
     this.root.clear(); this.lbl.clear(); this.pick = []; this.packets = [];
   }
-  end() { if (!this.fitted) { this.fit(this.initialView || 'iso'); this.fitted = true; } }
+  end(flat) { if (!this.fitted) { this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true; } }
 
   fit(view = 'iso') {
+    this.anim = null;
     const box = new THREE.Box3().setFromObject(this.root), c = box.getCenter(new THREE.Vector3());
+    if (box.isEmpty()) return;
     const d = new THREE.Vector3(...VIEWS[view]).normalize();
     this.camera.position.copy(c).addScaledVector(d, 100);
     this.camera.zoom = 1; this.controls.target.copy(c); this.camera.lookAt(c); this.camera.updateMatrixWorld();
@@ -167,6 +180,20 @@ export class Scene3D {
   loop(pts, y, color, style, fill) {
     const v = [...pts, pts[0]].map(([x, z]) => new THREE.Vector3(x, y + 0.01, z));
     const geo = new THREE.BufferGeometry().setFromPoints(v);
+    if (style === 'dashdot') {
+      const segments = [], pattern = [0.28, 0.1, 0.05, 0.1];
+      for (let i = 1; i < v.length; i++) {
+        const a = v[i - 1], b = v[i], length = a.distanceTo(b);
+        for (let offset = 0, part = 0; offset < length; part++) {
+          const end = Math.min(length, offset + pattern[part % pattern.length]);
+          if (part % 2 === 0) segments.push(a.clone().lerp(b, offset / length), a.clone().lerp(b, end / length));
+          offset = end;
+        }
+      }
+      geo.setFromPoints(segments);
+      this.root.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: this.color(color) })));
+      return;
+    }
     const mat = style ? new THREE.LineDashedMaterial({ color: this.color(color), dashSize: style === 'dot' ? 0.06 : 0.22, gapSize: style === 'dot' ? 0.1 : 0.12 })
       : new THREE.LineBasicMaterial({ color: this.color(color) });
     const line = new THREE.Line(geo, mat); if (style) line.computeLineDistances(); this.root.add(line);
@@ -176,11 +203,17 @@ export class Scene3D {
       m.rotation.x = -Math.PI / 2; m.position.set((a[0] + c[0]) / 2, y + 0.005, (a[1] + c[1]) / 2); this.root.add(m);
     }
   }
-  group({ pts, y, kind, label }) {
-    const sty = { vpc: ['--ink', 'dash'], az: ['--mute', 'dot'], subnet: ['--line', null, '--grid'] }[kind] || ['--mute', 'dash'];
-    this.loop(pts, y, sty[0], sty[1], sty[2]);
-    const [x, z] = kind === 'az' ? pts[1] : pts[3];
-    this.label(label, [x, y + 0.02, z], 'g-lbl', kind === 'az' ? [0, 1] : [0, 0]);
+  group({ pts, y, kind, label, color }) {
+    const vpc = ['--ink', 'dash'];
+    const [fallback, style, fill] = {
+      vpc, vnet: vpc, vcn: vpc, az: ['--mute', 'dot'], subnet: ['--line', null, '--grid'],
+      cloud: ['--mute'], region: ['--mute', 'dash'], cluster: ['#326CE5', 'dashdot'],
+      namespace: ['--mute', 'dot'], datacenter: ['#6d6a63'],
+    }[kind] || ['--mute', 'dash'];
+    const ink = ['cluster', 'datacenter'].includes(kind) ? fallback : color || fallback;
+    this.loop(pts, y, ink, style, fill);
+    const [x, z] = kind === 'az' ? pts[1] : kind === 'cloud' ? pts[0] : pts[3];
+    this.label(label, [x, y + 0.02, z], 'g-lbl', kind === 'az' || kind === 'cloud' ? [0, 1] : [0, 0], { color: this.color(ink).getStyle() });
   }
 
   /* ---------- ノード ---------- */
@@ -200,8 +233,23 @@ export class Scene3D {
       add(new THREE.CylinderGeometry(0.16, 0.28, 0.62, 20), 0.31);
       add(new THREE.SphereGeometry(0.17, 20, 14), 0.84); top = 1.02;
     } else add(new THREE.BoxGeometry(s.w || 0.86, s.h, s.w || 0.86), s.h / 2);
-    if (s.abbr) this.label(s.abbr.text, [x, y + top + 0.02, z], 'abbr', [0.5, 0.5], { color: s.abbr.color, opacity: s.opacity < 0.5 ? 0.4 : 1 });
+    if (s.flat) { g.scale.y = 0.25 / top; top = 0.25; }
+    if (s.abbr) {
+      const mark = this.label(s.abbr.text, [x, y + top + 0.02, z], 'abbr', [0.5, 0.5],
+        { color: s.abbr.color, opacity: s.opacity < 0.5 ? 0.4 : 1 });
+      if (s.icon) {
+        const img = document.createElement('img');
+        img.className = 'n-icon'; img.alt = s.abbr.text;
+        img.addEventListener('load', () => mark.replaceChildren(img), { once: true });
+        img.src = s.icon;
+      }
+    }
     const name = this.label(s.label, [x, y, z + 0.5], 'n-lbl', [0.5, -0.3]);
+    if (s.sub) {
+      const sub = this.label(s.sub.text, [x, y, z + 0.5], 'n-sub', [0.5, -0.3],
+        { color: s.sub.color, opacity: s.opacity < 0.5 ? 0.35 : 1 });
+      sub.style.marginTop = 'calc(15px * var(--lbl-scale))';
+    }
     if (s.labelAccent) name.classList.add('acc');
     if (s.opacity < 0.5) name.style.opacity = 0.35;
     if (s.badge) { const b = this.label(s.badge.text, [x, y + top + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]); if (s.opacity < 0.5) b.style.opacity = 0.4; }
