@@ -23,6 +23,7 @@ export class Scene3D {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     Object.assign(this.controls, { enableDamping: true, dampingFactor: 0.12, screenSpacePanning: true, minZoom: 0.3, maxZoom: 6 });
+    this.setDragMode('rotate');
 
     this.root = new THREE.Group(); this.lbl = new THREE.Group();
     this.scene.add(this.root, this.lbl);
@@ -48,6 +49,15 @@ export class Scene3D {
       this.renderer.render(this.scene, this.camera);
       this.labels.render(this.scene, this.camera);
     });
+  }
+
+  /* 左ドラッグ（1 本指）の役割を切り替える。右ドラッグ（2 本指）は常にもう一方 */
+  setDragMode(mode) {
+    this.dragMode = mode;
+    const rot = mode === 'rotate';
+    this.controls.mouseButtons = { LEFT: rot ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: rot ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE };
+    this.controls.touches = { ONE: rot ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN, TWO: rot ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE };
+    this.el.dataset.drag = mode;
   }
 
   /* ---------- 基本 ---------- */

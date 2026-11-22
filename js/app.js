@@ -236,7 +236,7 @@ function reqPanel() {
 function renderPanel() {
   let h = '';
   if (st.mode === 'struct') h = st.sel ? nodeDetail(st.sel) : `<h3>${M.name}</h3><div class="sub">${(M.sources || []).map(s => `<a href="${s}" target="_blank">${s}</a>`).join(' ')} から抽出したモデル</div>
-      ${M.description ? `<p>${M.description}</p>` : ''}<p>ドラッグで回転、右ドラッグで移動、ホイールで拡大縮小。部品をクリックすると詳細を表示します。</p>
+      ${M.description ? `<p>${M.description}</p>` : ''}<p>左上の「回転／移動」でドラッグの操作を切り替えます（R / M キーでも可）。ホイールで拡大縮小、部品をクリックすると詳細を表示します。</p>
       ${M.review?.length ? '<h4>抽出時のレビューメモ</h4>' + M.review.map(r => `<div class="item"><p>${r}</p></div>`).join('') : ''}`;
   if (st.mode === 'scenario') {
     const sc = M.scenarios[st.scen], s = sc.steps[st.step];
@@ -277,8 +277,26 @@ function onPick(id) {
 const renderModes = () => $('modes').innerHTML = MODES.map(([k, n, c]) => `<button data-mode="${k}" class="${st.mode === k ? 'on' : ''}">${n}${c ? `<small>${c}</small>` : ''}</button>`).join('');
 const stopPlay = () => { clearInterval(st.play); st.play = null; };
 
+/* ドラッグの役割（回転 / 移動）。選択はブラウザに保存 */
+function setDrag(mode) {
+  scene.setDragMode(mode);
+  document.querySelectorAll('[data-drag]').forEach(b => b.classList.toggle('on', b.dataset.drag === mode));
+  $('hint').textContent = mode === 'rotate'
+    ? 'ドラッグ：回転 ／ 右ドラッグ：移動 ／ ホイール：拡大縮小 ／ M キーで移動モード'
+    : 'ドラッグ：移動 ／ 右ドラッグ：回転 ／ ホイール：拡大縮小 ／ R キーで回転モード';
+  try { localStorage.setItem('ddd.drag', mode); } catch {}
+}
+let saved = 'rotate'; try { saved = localStorage.getItem('ddd.drag') || 'rotate'; } catch {}
+setDrag(saved);
+addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'r' || e.key === 'R') setDrag('rotate');
+  if (e.key === 'm' || e.key === 'M') setDrag('pan');
+});
+
 document.addEventListener('click', e => {
   const d = k => e.target.closest(`[data-${k}]`)?.dataset[k];
+  if (d('drag')) return setDrag(d('drag'));
   if (d('view')) return d('view') === 'reset' ? scene.fit('iso') : scene.fit(d('view'));
   if (d('mode')) { st.mode = d('mode'); st.sel = null; st.issue = null; st.req = null; stopPlay(); renderModes(); return draw(); }
   if (d('scen') != null) { st.scen = +d('scen'); st.step = 0; stopPlay(); }
