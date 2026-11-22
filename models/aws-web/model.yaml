@@ -54,6 +54,7 @@ groups:
     y1: 4
   - kind: az
     label: AZ-a
+    az: a
     tier:
       - app
       - data
@@ -63,6 +64,7 @@ groups:
     y1: 1.4
   - kind: az
     label: AZ-c
+    az: c
     tier:
       - app
       - data
@@ -552,3 +554,12 @@ unknowns:
 gates:
   maxDrift: 0
   maxHigh: 0
+
+# ビュー：論理構成（機能配置）でまとめる単位
+views:
+  logical:
+    components:
+      api: { label: API（注文・照会）, tier: app, realizedBy: [ecs], description: 利用者の操作を受けて業務処理を行う }
+      imaging: { label: 画像処理, tier: app, realizedBy: [sqs, worker], description: 投入された画像を非同期で処理する }
+      appdata: { label: 業務データ, tier: data, realizedBy: [aurora, redis], description: 注文などの業務データとそのキャッシュ }
+      files: { label: 画像ファイル, tier: data, realizedBy: [s3] }

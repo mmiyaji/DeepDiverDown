@@ -12,9 +12,10 @@ export function loadAnalyze() {
   if (cached) return cached;
   const ctx = { window: {} };
   vm.createContext(ctx);
-  for (const f of ['js/aws.js', 'js/layout.js', 'js/analyze.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+  for (const f of ['js/aws.js', 'js/layout.js', 'js/analyze.js', 'js/views.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
   cached = ctx.window.Analyze;
   cached.layout = ctx.window.Layout.apply;
+  cached.Views = ctx.window.Views;
   return cached;
 }
 

@@ -122,3 +122,17 @@ unknowns:
 review:
   - 呼び出し関係は README の文章（§5 のユースケース）から推測したもの。図にしか書かれていない関係は拾えていない可能性がある
   - recommendation → cart は「カートの内容をもとに」（§3.9）から推測した。直接呼ぶのか frontend が渡すのかは不明
+
+# ビュー：論理構成（機能配置）。業務のまとまりで束ねる
+views:
+  logical:
+    tiers:
+      - { id: internet, label: 利用者, kind: origin, z: 1, origin: [-5, 0] }
+      - { id: app, label: 業務機能, z: 1 }
+    components:
+      storefront: { label: 店頭（画面）, tier: app, realizedBy: [frontend] }
+      catalog: { label: 商品・おすすめ・広告, tier: app, realizedBy: [productcatalogservice, recommendationservice, adservice] }
+      cart: { label: カート, tier: app, realizedBy: [cartservice, redis-cart] }
+      order: { label: 注文・決済, tier: app, realizedBy: [checkoutservice, paymentservice] }
+      fulfil: { label: 配送・通知, tier: app, realizedBy: [shippingservice, emailservice] }
+      currency: { label: 通貨換算, tier: app, realizedBy: [currencyservice] }
