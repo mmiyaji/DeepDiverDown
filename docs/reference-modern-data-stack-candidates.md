@@ -1,6 +1,6 @@
 # モダンデータスタックのリファレンス候補
 
-公開済みの教材は [README のリファレンス一覧](../README.md#アーキテクチャリファレンス) から開けます。以下には、公開済み教材と今後追加する候補のシナリオをまとめています。
+公開済みの教材は [README のリファレンス一覧](../README.md#アーキテクチャリファレンス) から開けます。この一覧の全項目をリファレンスに収録しました。
 
 既存の Spark（バッチ）と Kafka（分散ログ）につなげられる教材候補。各行のシナリオは、構成図で追う処理の例を示す。
 
@@ -53,10 +53,10 @@ Kafka Connect は Kafka と外部システムの間でデータを運ぶ。Kafka
 |---|---|---|
 | Snowflake | ストレージ・仮想ウェアハウス・クラウドサービスの役割を分け、取り込みと BI を別ウェアハウスで実行する | [Snowflake Architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts) |
 | Databricks | レイクハウス基盤で取り込んだデータを Spark などで整備し、Unity Catalog の管理下で Databricks SQL から読む | [Databricks・参照アーキテクチャ](https://docs.databricks.com/aws/en/lakehouse-architecture/reference) |
-| Google BigQuery | ストレージ層と計算層を分け、クエリの Stage、Slot、分散 Shuffle を追う | [BigQuery Overview](https://cloud.google.com/bigquery/docs/introduction)・[Query Plan](https://cloud.google.com/bigquery/docs/query-plan-explanation) |
-| Amazon Redshift | プロビジョンド構成で Leader Node が計画を作り、Compute Node に分散して実行する | [Redshift Architecture](https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html) |
-| Microsoft Fabric | OneLake を基盤としてデータを整備し、Lakehouse または Warehouse から分析する | [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview) |
-| Trino | Coordinator がクエリを計画し、Worker が Connector を通じてデータを分散読み出しする | [Trino Concepts](https://trino.io/docs/current/overview/concepts.html) |
+| [Google BigQuery](reference-bigquery.md) | ストレージ層と計算層を分け、クエリの Stage、Slot、分散 Shuffle を追う | [BigQuery Overview](https://cloud.google.com/bigquery/docs/introduction)・[Query Plan](https://cloud.google.com/bigquery/docs/query-plan-explanation) |
+| [Amazon Redshift](reference-redshift.md) | プロビジョンド構成で Leader Node が計画を作り、Compute Node に分散して実行する | [Redshift Architecture](https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html) |
+| [Microsoft Fabric](reference-microsoft-fabric.md) | OneLake を基盤としてデータを整備し、Lakehouse または Warehouse から分析する | [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview) |
+| [Trino](reference-trino.md) | Coordinator がクエリを計画し、Worker が Connector を通じてデータを分散読み出しする | [Trino Concepts](https://trino.io/docs/current/overview/concepts.html) |
 
 ## 運用・ガバナンス
 

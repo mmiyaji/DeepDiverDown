@@ -1,0 +1,138 @@
+{
+  "model": "trino",
+  "name": "Trino の分散クエリアーキテクチャ",
+  "generatedAt": "2026-11-22T15:46:03.020Z",
+  "coverage": {
+    "covered": 3,
+    "total": 3
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "control": {
+      "type": "node",
+      "label": "Coordinator",
+      "status": "claim"
+    },
+    "connector": {
+      "type": "node",
+      "label": "Iceberg Connector",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "Worker・スキャン Task",
+      "status": "claim"
+    },
+    "data": {
+      "type": "node",
+      "label": "Iceberg・データファイル",
+      "status": "claim"
+    },
+    "reduce": {
+      "type": "node",
+      "label": "Worker・集約 Task",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "SQL クライアント → Coordinator",
+      "status": "claim"
+    },
+    "resolve": {
+      "type": "link",
+      "label": "Coordinator → Iceberg Connector",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "Coordinator → Worker・スキャン Task",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "Iceberg・データファイル → Worker・スキャン Task",
+      "status": "claim"
+    },
+    "exchange": {
+      "type": "link",
+      "label": "Worker・スキャン Task → Worker・集約 Task",
+      "status": "claim"
+    },
+    "collect": {
+      "type": "link",
+      "label": "Worker・集約 Task → Coordinator",
+      "status": "claim"
+    },
+    "return": {
+      "type": "link",
+      "label": "Coordinator → SQL クライアント",
+      "status": "claim"
+    },
+    "orders-by-date": {
+      "type": "scenario",
+      "label": "Iceberg の受注明細を日別集計"
+    }
+  },
+  "byRef": {
+    "docs/reference-trino.md#§1": [
+      "model",
+      "client",
+      "control",
+      "submit",
+      "assign",
+      "orders-by-date"
+    ],
+    "docs/reference-trino.md": [
+      "model",
+      "client",
+      "control",
+      "connector",
+      "scan",
+      "data",
+      "reduce",
+      "submit",
+      "resolve",
+      "assign",
+      "read",
+      "exchange",
+      "collect",
+      "return",
+      "orders-by-date"
+    ],
+    "docs/reference-trino.md#§2": [
+      "connector",
+      "data",
+      "resolve"
+    ],
+    "docs/reference-trino.md#§3": [
+      "scan",
+      "reduce",
+      "read",
+      "exchange",
+      "collect",
+      "return"
+    ]
+  },
+  "reference": {
+    "category": "SQL エンジン",
+    "order": 10,
+    "objectives": [
+      "Stage、Task、Split の関係を区別する。",
+      "Connector で読み出したデータが Exchange を経て返る流れを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Trino · Concepts",
+        "url": "https://trino.io/docs/current/overview/concepts.html"
+      },
+      {
+        "title": "Trino · Iceberg connector",
+        "url": "https://trino.io/docs/current/connector/iceberg.html"
+      }
+    ]
+  }
+}
