@@ -1,0 +1,53 @@
+name: "小ファイルの整理：コンパクション"
+description: ストリーミングで増えた注文データの小ファイルを、再書き込み・スナップショットコミット・保持期間後の掃除で整理する流れを追います。
+reference:
+  objectives:
+    - コンパクション（データファイルの再書き込み）とバイト列の圧縮を区別する。
+    - bin-packing と、必要な場合だけ選ぶ sort rewrite の費用・効果を比較する。
+    - 新しいスナップショットのコミットと、旧ファイルの保持・削除を別段階として説明する。
+  sources:
+    - {title: Apache Iceberg Maintenance, url: https://iceberg.apache.org/docs/nightly/maintenance/}
+    - {title: Apache Iceberg Spark Procedures, url: https://iceberg.apache.org/docs/latest/spark-procedures/}
+    - {title: Delta Lake Optimizations, url: https://docs.delta.io/optimizations-oss/}
+    - {title: Delta Transaction Log Protocol, url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md}
+sources: [docs/reference-compaction.md]
+evidence: [{type: doc, ref: docs/reference-compaction.md#§1}]
+tiers:
+  - {id: ingest, label: ストリーミング取り込み, z: 1, origin: [0, 0], size: [5, 3]}
+  - {id: maintenance, label: コンパクション運用, z: 1, origin: [7, 0], size: [10, 3]}
+  - {id: table, label: orders テーブル, z: 0, origin: [0, 0], size: [16, 3]}
+  - {id: lifecycle, label: ファイルライフサイクル, z: 0, origin: [18, 0], size: [8, 3]}
+nodes:
+  stream_writer: {label: マイクロバッチ書き込み, kind: service, tier: ingest, x: 2, y: 1.5, description: 注文イベントを order_date パーティションへ小さなファイルとして追加する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§1}]}
+  planner: {label: 対象選択プランナー, kind: worker, tier: maintenance, x: 2.5, y: 1.5, description: ファイルサイズとパーティションを調べ、rewrite 対象を選ぶ。, evidence: [{type: doc, ref: docs/reference-compaction.md#§3}]}
+  rewrite: {label: Rewrite ジョブ, kind: worker, tier: maintenance, x: 6.5, y: 1.5, description: bin-packing または任意の sort で入力ファイルを再構成する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§2}, {type: doc, ref: docs/reference-compaction.md#§4}]}
+  metadata: {label: テーブルメタデータ, kind: db, tier: table, x: 4, y: 1.5, description: 現行スナップショットとデータファイルの参照を管理する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  orders: {label: orders / order_date, kind: db, shape3D: crate, tier: table, x: 9, y: 1.5, description: マイクロバッチの小ファイルと rewrite 後のデータファイルを保持する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§1}, {type: doc, ref: docs/reference-compaction.md#§5}]}
+  reader: {label: クエリエンジン, kind: service, tier: table, x: 14, y: 1.5, description: 現行または選択したスナップショットを読み取る。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  snapshot: {label: 新スナップショット, kind: db, tier: lifecycle, x: 2, y: 1.5, description: 新ファイル追加と旧ファイル除外を表すコミット済みの表状態。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  cleanup: {label: 保持期間後の掃除, kind: worker, tier: lifecycle, x: 6, y: 1.5, description: 期限切れスナップショットや不要ファイルを運用ポリシーに従って物理削除する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§6}]}
+links:
+  - {id: ingest, from: stream_writer, to: orders, label: 小ファイルを書き込む, evidence: [{type: doc, ref: docs/reference-compaction.md#§1}]}
+  - {id: inspect, from: orders, to: planner, label: ファイル情報を調べる, evidence: [{type: doc, ref: docs/reference-compaction.md#§3}]}
+  - {id: plan, from: planner, to: rewrite, label: rewrite 対象を渡す, evidence: [{type: doc, ref: docs/reference-compaction.md#§3}]}
+  - {id: rewrite-files, from: rewrite, to: orders, label: 新しいデータファイルを書く, evidence: [{type: doc, ref: docs/reference-compaction.md#§2}, {type: doc, ref: docs/reference-compaction.md#§4}]}
+  - {id: commit, from: rewrite, to: metadata, label: メタデータをコミット, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  - {id: publish, from: metadata, to: snapshot, label: 新スナップショットを公開, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  - {id: read, from: reader, to: snapshot, label: 一貫したスナップショットを読む, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  - {id: expire, from: snapshot, to: cleanup, label: 保持期間後に掃除, evidence: [{type: doc, ref: docs/reference-compaction.md#§6}]}
+scenarios:
+  - id: compact-orders
+    label: 注文の日次パーティションを整理する
+    evidence: [{type: doc, ref: docs/reference-compaction.md#§8}]
+    steps:
+      - {links: [ingest, inspect], note: マイクロバッチで増えた order_date パーティションの小ファイルを観測し、対象を選ぶ。}
+      - {links: [plan, rewrite-files], note: 既定は bin-packing とし、検索局所性が必要な場合だけ sort rewrite を実行する。}
+      - {links: [commit, publish, read], note: 新ファイルと旧ファイルの参照をメタデータへコミットし、読み取りは新しい一貫したスナップショットを使う。}
+      - {links: [expire], note: 過去の読み取りに必要な保持期間を過ぎてから旧ファイルを掃除する。}
+requirements:
+  - {id: BR-01, kind: rule, title: データを失わずに再構成する, text: コンパクションは論理的な注文データを変えず、メタデータのコミットで現行ファイル集合を切り替える。, links: [rewrite-files, commit, publish], evidence: [{type: doc, ref: docs/reference-compaction.md#§2}, {type: doc, ref: docs/reference-compaction.md#§5}]}
+  - {id: BR-02, kind: rule, title: 旧ファイルを保持期間前に削除しない, text: 時点読み取りと同時実行中の読み取りを壊さないため、物理削除は保持ポリシー後に行う。, links: [read, expire], evidence: [{type: doc, ref: docs/reference-compaction.md#§6}]}
+  - {id: NFR-01, kind: nfr, title: 読み取りコストを下げる, text: 小ファイル数とメタデータ・ファイルオープン負荷を減らしつつ、rewrite の計算費用と遅延を許容範囲に収める。, links: [inspect, rewrite-files, read], evidence: [{type: doc, ref: docs/reference-compaction.md#§1}, {type: doc, ref: docs/reference-compaction.md#§7}]}
+unknowns:
+  - {id: UNK-01, text: 実際の target file size、閾値、保持日数、実行スケジュールは利用環境ごとに決める。, refs: [planner, cleanup]}
+gates: {maxDrift: 0, maxHigh: 0}

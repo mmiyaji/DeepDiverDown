@@ -1,0 +1,69 @@
+name: "読み取りの絞り込み：ソートとプルーニング"
+description: order_date パーティションと customer_id の保存順序を例に、パーティション・プルーニング、ブロック／ファイルのスキップ、残りのスキャンと ORDER BY を区別する。
+reference:
+  objectives:
+    - 保存時のソート／クラスタリングとクエリの ORDER BY を区別する。
+    - order_date のパーティション・プルーニングと customer_id のブロック／ファイル・スキップを別の最適化として追う。
+    - 最適化後に残ったデータをスキャンし、必要なら結果を並べ替える流れを説明する。
+  sources:
+    - {title: Query partitioned tables, url: https://cloud.google.com/bigquery/docs/querying-partitioned-tables}
+    - {title: Introduction to clustered tables, url: https://cloud.google.com/bigquery/docs/clustered-tables}
+    - {title: Query clustered tables, url: https://cloud.google.com/bigquery/docs/querying-clustered-tables}
+    - {title: Apache Iceberg Specification - Sorting, url: https://iceberg.apache.org/spec/#sorting}
+sources: [docs/reference-sorting-pruning.md]
+evidence:
+  - {type: doc, ref: docs/reference-sorting-pruning.md#§1}
+  - {type: doc, ref: docs/reference-sorting-pruning.md#§2}
+  - {type: doc, ref: docs/reference-sorting-pruning.md#§3}
+  - {type: doc, ref: docs/reference-sorting-pruning.md#§4}
+  - {type: doc, ref: docs/reference-sorting-pruning.md#§5}
+  - {type: doc, ref: docs/reference-sorting-pruning.md#§7}
+tiers:
+  - {id: plan, label: SQL とクエリ計画, z: 1, size: [15, 3]}
+  - {id: storage, label: 保存データ, z: 0, origin: [1, 0], size: [11, 3]}
+nodes:
+  analyst: {label: Analyst / SQL, kind: actor, tier: plan, x: 0, y: 1.5, description: orders を検索する利用者。WHERE と任意の ORDER BY を指定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
+  query: {label: Query engine, kind: worker, tier: plan, x: 4, y: 1.5, description: 述語を解析し、パーティションと保存単位の候補を段階的に絞る。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}, {type: doc, ref: docs/reference-sorting-pruning.md#§5}]}
+  orders: {label: orders table, kind: db, tier: storage, x: 5, y: 1.5, description: order_date でパーティション化し、各パーティション内を customer_id の保存順序で整理する論理テーブル。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}]}
+  partitions: {label: order_date partitions, kind: db, tier: storage, x: 2, y: 0.2, description: order_date の境界で分けられた候補領域。述語に合うパーティションだけを残す。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
+  blocks: {label: customer_id blocks/files, kind: db, tier: storage, x: 7, y: 0.2, description: パーティション内の保存単位。customer_id の局所性と統計を使い、範囲外をスキップできる場合がある。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}, {type: doc, ref: docs/reference-sorting-pruning.md#§5}]}
+  scan: {label: Remaining scan, kind: worker, tier: plan, x: 9, y: 1.5, description: 絞り込み後も必要な保存単位を読み、行条件と列投影を評価する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+  result: {label: Result / ORDER BY, kind: external, tier: plan, x: 14, y: 1.5, description: 残った行を返す。ORDER BY が指定された場合は結果順序を別途確定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}, {type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+links:
+  - {id: submit, from: analyst, to: query, label: SQL と述語を送る, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
+  - {id: layout, from: orders, to: partitions, label: order_date で分割, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}, {type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
+  - {id: cluster, from: orders, to: blocks, label: customer_id の保存順序, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}]}
+  - {id: partition-prune, from: query, to: partitions, label: パーティションをプルーニング, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
+  - {id: block-skip, from: query, to: blocks, label: 統計で単位をスキップ, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
+  - {id: read, from: blocks, to: scan, label: 残った単位を読む, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+  - {id: return, from: scan, to: result, label: 行を返す, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+  - {id: order, from: query, to: result, label: ORDER BY の要求, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}, {type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+scenarios:
+  - id: month-customer
+    label: 月と顧客を指定する
+    evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§6.1}]
+    steps:
+      - {links: [submit, partition-prune], note: order_date の定数範囲から対象月のパーティションだけを候補にする。}
+      - {links: [block-skip], note: customer_id = 42 と保存単位の統計を照合し、範囲外をスキップする。}
+      - {links: [read, return], note: 残った単位をスキャンし、行条件を評価して結果を返す。}
+  - id: stored-vs-order
+    label: 保存順序と結果順序を分ける
+    evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§6.2}]
+    steps:
+      - {links: [layout, cluster], note: 書き込み時の整理が後続の局所性とスキップ候補を作る。}
+      - {links: [partition-prune, block-skip], note: WHERE は候補領域を絞るが、保存順序だけでは全結果の順序を保証しない。}
+      - {links: [order], note: ORDER BY が指定されたときだけ、結果の並べ替えを要求する。}
+  - id: weak-predicate
+    label: 述語が絞り込みに効かない場合
+    evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§6.3}]
+    steps:
+      - {links: [submit], note: パーティション境界を事前に確定しにくい式を含むクエリを送る。}
+      - {links: [partition-prune, block-skip], note: パーティションや保存単位のスキップが弱まり、候補が増える。}
+      - {links: [read], note: 候補領域をスキャンしてから行条件を評価する。}
+requirements:
+  - {id: BR-01, kind: usecase, title: 段階的な読み取り削減, text: order_date のパーティションと customer_id の保存単位を別々に絞り、残りだけをスキャンする。, links: [partition-prune, block-skip, read], evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}, {type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+  - {id: BR-02, kind: rule, title: ORDER BY の意味を分離, text: 保存時のソート／クラスタリングをクエリ結果の ORDER BY と混同しない。, links: [cluster, order, return], evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}, {type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+  - {id: NFR-01, kind: nfr, title: 実装差を明示, text: ブロック、ファイル、列チャンク、min/max 統計の適用単位を特定の実装の保証として断定しない。, links: [block-skip, read], evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§1}, {type: doc, ref: docs/reference-sorting-pruning.md#§5}]}
+unknowns:
+  - {id: UNK-01, text: 実際のエンジン、ファイル形式、統計の粒度、再クラスタリング頻度は未確定。, refs: [query, blocks, scan]}
+gates: {maxDrift: 0, maxHigh: 0}

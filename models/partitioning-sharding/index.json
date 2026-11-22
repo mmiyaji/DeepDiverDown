@@ -1,0 +1,189 @@
+{
+  "model": "partitioning-sharding",
+  "name": "データ配置と並列性：パーティショニングとシャーディング",
+  "generatedAt": "2026-11-22T16:01:40.500Z",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "order-api": {
+      "type": "node",
+      "label": "注文 API",
+      "status": "claim"
+    },
+    "partition-router": {
+      "type": "node",
+      "label": "パーティション／シャードルーター",
+      "status": "claim"
+    },
+    "orders-table": {
+      "type": "node",
+      "label": "論理 orders テーブル",
+      "status": "claim"
+    },
+    "time-partition": {
+      "type": "node",
+      "label": "order_date 時間パーティション",
+      "status": "claim"
+    },
+    "hash-shard-a": {
+      "type": "node",
+      "label": "customer_id ハッシュシャード A",
+      "status": "claim"
+    },
+    "hash-shard-b": {
+      "type": "node",
+      "label": "customer_id ハッシュシャード B",
+      "status": "claim"
+    },
+    "query-worker": {
+      "type": "node",
+      "label": "並列クエリタスク",
+      "status": "claim"
+    },
+    "route-write": {
+      "type": "link",
+      "label": "注文 API → パーティション／シャードルーター",
+      "status": "claim"
+    },
+    "logical-write": {
+      "type": "link",
+      "label": "パーティション／シャードルーター → 論理 orders テーブル",
+      "status": "claim"
+    },
+    "time-route": {
+      "type": "link",
+      "label": "論理 orders テーブル → order_date 時間パーティション",
+      "status": "claim"
+    },
+    "hash-route-a": {
+      "type": "link",
+      "label": "order_date 時間パーティション → customer_id ハッシュシャード A",
+      "status": "claim"
+    },
+    "hash-route-b": {
+      "type": "link",
+      "label": "order_date 時間パーティション → customer_id ハッシュシャード B",
+      "status": "claim"
+    },
+    "selective-read": {
+      "type": "link",
+      "label": "customer_id ハッシュシャード A → 並列クエリタスク",
+      "status": "claim"
+    },
+    "parallel-read": {
+      "type": "link",
+      "label": "customer_id ハッシュシャード B → 並列クエリタスク",
+      "status": "claim"
+    },
+    "merge": {
+      "type": "link",
+      "label": "並列クエリタスク → 論理 orders テーブル",
+      "status": "claim"
+    },
+    "order-routing": {
+      "type": "scenario",
+      "label": "注文の書き込みと顧客検索"
+    },
+    "parallel-aggregation": {
+      "type": "scenario",
+      "label": "月次集計のタスク並列化"
+    }
+  },
+  "byRef": {
+    "docs/reference-partitioning-sharding.md#§1": [
+      "model",
+      "orders-table"
+    ],
+    "docs/reference-partitioning-sharding.md": [
+      "model",
+      "order-api",
+      "partition-router",
+      "orders-table",
+      "time-partition",
+      "hash-shard-a",
+      "hash-shard-b",
+      "query-worker",
+      "route-write",
+      "logical-write",
+      "time-route",
+      "hash-route-a",
+      "hash-route-b",
+      "selective-read",
+      "parallel-read",
+      "merge",
+      "order-routing",
+      "parallel-aggregation"
+    ],
+    "docs/reference-partitioning-sharding.md#§4": [
+      "order-api",
+      "partition-router",
+      "time-partition",
+      "route-write",
+      "logical-write",
+      "time-route"
+    ],
+    "docs/reference-partitioning-sharding.md#§7": [
+      "order-api",
+      "query-worker",
+      "parallel-read",
+      "order-routing",
+      "parallel-aggregation"
+    ],
+    "docs/reference-partitioning-sharding.md#§3": [
+      "partition-router",
+      "hash-shard-a",
+      "hash-shard-b",
+      "hash-route-a",
+      "hash-route-b"
+    ],
+    "docs/reference-partitioning-sharding.md#§2": [
+      "orders-table",
+      "time-partition",
+      "time-route"
+    ],
+    "docs/reference-partitioning-sharding.md#§6": [
+      "hash-shard-a",
+      "hash-shard-b"
+    ],
+    "docs/reference-partitioning-sharding.md#§5": [
+      "query-worker",
+      "selective-read",
+      "parallel-read",
+      "merge",
+      "parallel-aggregation"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 10,
+    "objectives": [
+      "時間パーティション、ファイル／テーブル保存単位、ハッシュシャードを区別する。",
+      "order_date と customer_id から書き込み・読み出し先を決める流れを説明する。",
+      "選択的検索、全体集計のタスク分割、ホットスポットと偏りのトレードオフを理解する。"
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL Table Partitioning",
+        "url": "https://www.postgresql.org/docs/current/ddl-partitioning.html"
+      },
+      {
+        "title": "Apache Iceberg Partitioning",
+        "url": "https://iceberg.apache.org/docs/latest/partitioning/"
+      },
+      {
+        "title": "Amazon DynamoDB Partitions",
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html"
+      },
+      {
+        "title": "DynamoDB Partition Key Design",
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html"
+      },
+      {
+        "title": "Trino・Tasks と Splits",
+        "url": "https://trino.io/docs/current/overview/concepts.html#split"
+      }
+    ]
+  }
+}

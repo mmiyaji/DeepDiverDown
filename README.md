@@ -183,6 +183,17 @@ npm run icons -- --aws-pptx "C:\path\to\AWS-Toolkit.pptx"
 | SQL エンジン | [Trino](docs/reference-trino.md) |
 | 運用とガバナンス | [OpenLineage](docs/reference-openlineage.md) |
 
+### 大規模データ分析の基本概念
+
+同じ受注データを使って、保存時の配置、読み取り、書き換え、分散実行のどこで各手法が効くかを比較できます。
+
+| どこで使うか | リファレンス | 比較するポイント |
+|---|---|---|
+| 保存と振り分け | [パーティショニングとシャーディング](docs/reference-partitioning-sharding.md) | 日付で読み取り範囲を区切る。顧客キーで書き込み先を振り分ける |
+| 読み取り | [ソートとプルーニング](docs/reference-sorting-pruning.md) | 保存順序と統計を使い、スキャンしなくてよい範囲を判断する |
+| 保存の保守 | [コンパクション](docs/reference-compaction.md) | 小ファイルをまとめ、ファイルを開く負荷と書き換えコストを比較する |
+| 分散実行 | [シャッフルとデータスキュー](docs/reference-shuffle-skew.md) | 結合キーで再配分し、作業が一部のタスクに偏る理由を追う |
+
 調査項目とシナリオの対応は [モダンデータスタックのリファレンス候補](docs/reference-modern-data-stack-candidates.md) に整理しています。
 
 詳細は `docs/model-schema.md`。

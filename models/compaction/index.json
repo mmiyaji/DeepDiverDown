@@ -1,0 +1,211 @@
+{
+  "model": "compaction",
+  "name": "小ファイルの整理：コンパクション",
+  "generatedAt": "2026-11-22T16:01:40.502Z",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "stream_writer": {
+      "type": "node",
+      "label": "マイクロバッチ書き込み",
+      "status": "claim"
+    },
+    "planner": {
+      "type": "node",
+      "label": "対象選択プランナー",
+      "status": "claim"
+    },
+    "rewrite": {
+      "type": "node",
+      "label": "Rewrite ジョブ",
+      "status": "claim"
+    },
+    "metadata": {
+      "type": "node",
+      "label": "テーブルメタデータ",
+      "status": "claim"
+    },
+    "orders": {
+      "type": "node",
+      "label": "orders / order_date",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "クエリエンジン",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "node",
+      "label": "新スナップショット",
+      "status": "claim"
+    },
+    "cleanup": {
+      "type": "node",
+      "label": "保持期間後の掃除",
+      "status": "claim"
+    },
+    "ingest": {
+      "type": "link",
+      "label": "マイクロバッチ書き込み → orders / order_date",
+      "status": "claim"
+    },
+    "inspect": {
+      "type": "link",
+      "label": "orders / order_date → 対象選択プランナー",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "link",
+      "label": "対象選択プランナー → Rewrite ジョブ",
+      "status": "claim"
+    },
+    "rewrite-files": {
+      "type": "link",
+      "label": "Rewrite ジョブ → orders / order_date",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "Rewrite ジョブ → テーブルメタデータ",
+      "status": "claim"
+    },
+    "publish": {
+      "type": "link",
+      "label": "テーブルメタデータ → 新スナップショット",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "クエリエンジン → 新スナップショット",
+      "status": "claim"
+    },
+    "expire": {
+      "type": "link",
+      "label": "新スナップショット → 保持期間後の掃除",
+      "status": "claim"
+    },
+    "compact-orders": {
+      "type": "scenario",
+      "label": "注文の日次パーティションを整理する"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "データを失わずに再構成する",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "旧ファイルを保持期間前に削除しない",
+      "status": "claim"
+    },
+    "NFR-01": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "読み取りコストを下げる",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実際の target file size、閾値、保持日数、実行スケジュールは利用環境ごとに決める。"
+    }
+  },
+  "byRef": {
+    "docs/reference-compaction.md#§1": [
+      "model",
+      "stream_writer",
+      "orders",
+      "ingest",
+      "NFR-01"
+    ],
+    "docs/reference-compaction.md": [
+      "model",
+      "stream_writer",
+      "planner",
+      "rewrite",
+      "metadata",
+      "orders",
+      "reader",
+      "snapshot",
+      "cleanup",
+      "ingest",
+      "inspect",
+      "plan",
+      "rewrite-files",
+      "commit",
+      "publish",
+      "read",
+      "expire",
+      "compact-orders",
+      "BR-01",
+      "BR-02",
+      "NFR-01"
+    ],
+    "docs/reference-compaction.md#§3": [
+      "planner",
+      "inspect",
+      "plan"
+    ],
+    "docs/reference-compaction.md#§2": [
+      "rewrite",
+      "rewrite-files",
+      "BR-01"
+    ],
+    "docs/reference-compaction.md#§4": [
+      "rewrite",
+      "rewrite-files"
+    ],
+    "docs/reference-compaction.md#§5": [
+      "metadata",
+      "orders",
+      "reader",
+      "snapshot",
+      "commit",
+      "publish",
+      "read",
+      "BR-01"
+    ],
+    "docs/reference-compaction.md#§6": [
+      "cleanup",
+      "expire",
+      "BR-02"
+    ],
+    "docs/reference-compaction.md#§8": [
+      "compact-orders"
+    ],
+    "docs/reference-compaction.md#§7": [
+      "NFR-01"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 30,
+    "objectives": [
+      "コンパクション（データファイルの再書き込み）とバイト列の圧縮を区別する。",
+      "bin-packing と、必要な場合だけ選ぶ sort rewrite の費用・効果を比較する。",
+      "新しいスナップショットのコミットと、旧ファイルの保持・削除を別段階として説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Apache Iceberg Maintenance",
+        "url": "https://iceberg.apache.org/docs/nightly/maintenance/"
+      },
+      {
+        "title": "Apache Iceberg Spark Procedures",
+        "url": "https://iceberg.apache.org/docs/latest/spark-procedures/"
+      },
+      {
+        "title": "Delta Lake Optimizations",
+        "url": "https://docs.delta.io/optimizations-oss/"
+      },
+      {
+        "title": "Delta Transaction Log Protocol",
+        "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
+      }
+    ]
+  }
+}
