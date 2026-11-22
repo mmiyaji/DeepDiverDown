@@ -85,7 +85,7 @@
       servicebus: S('SB', 'Service Bus', 'int', { shape: 'queue', icon: ['Azure-Service-Bus'] }),
       eventhubs: S('EH', 'Event Hubs', 'int', { shape: 'queue', icon: ['Event-Hubs'] }),
       keyvault: S('KV', 'Key Vault', 'sec', { infra: I, icon: ['Key-Vaults'] }),
-      entra: S('Entra', 'Microsoft Entra ID', 'sec', { icon: ['Entra-ID', 'Azure-Active-Directory'] }),
+      entra: S('Entra', 'Microsoft Entra ID', 'sec', { icon: ['Microsoft Entra ID color icon', 'Entra-ID', 'Azure-Active-Directory'] }),
       firewall: S('FW', 'Azure Firewall', 'sec', { infra: I, icon: ['Firewalls'] }),
       nat: S('NAT', 'NAT Gateway', 'net', { infra: I, icon: ['NAT'] }),
       expressroute: S('ER', 'ExpressRoute', 'net', { infra: I, icon: ['ExpressRoute-Circuits'] }),

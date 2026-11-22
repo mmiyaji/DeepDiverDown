@@ -6,9 +6,10 @@
   --dark:#141414;--dark-l:#2b2b2b;--dark-r:#454545;
   --f:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,monospace;
-  --lbl-scale:1;--side:240px;--pane:380px;--head:56px;
+  --lbl-scale:1;--side:240px;--pane:380px;--head:56px;--screen-height:100vh;
   color-scheme:light;
 }
+@supports (height:100dvh){:root{--screen-height:100dvh}}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#121211;--panel:#181817;--card:#1d1d1b;--fg:#ecebe6;--mute:#a29f97;--line:#33322f;--grid:#262624;--ink:#e6e4dd;--accent:#ff6a50;--warn:#e0a43a;--ok:#5cbf86;--plate:#1c1c1a;
   --paper:#4a4945;--paper-l:#3a3936;--paper-r:#2a2927;--dark:#f2f0ea;--dark-l:#d9d6cd;--dark-r:#b9b6ad;color-scheme:dark;
@@ -31,7 +32,7 @@ kbd{font:600 11px var(--mono);border:1px solid var(--line);border-bottom-width:2
 .brand{font:700 18px var(--f);letter-spacing:-.01em;white-space:nowrap}
 .brand:after{content:"";display:inline-block;width:7px;height:7px;background:var(--accent);margin-left:5px}
 .crumb{color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.search{position:relative;flex:1;max-width:420px;margin-left:auto}
+.search{position:relative;flex:1;min-width:0;max-width:420px;margin-left:auto}
 .search input{width:100%;font:14px var(--f);color:var(--fg);background:var(--card);border:1px solid var(--line);padding:6px 10px}
 .search input:focus{border-color:var(--ink);outline:none}
 .qres{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--ink);max-height:60vh;overflow:auto;box-shadow:0 8px 24px #0002}
@@ -46,10 +47,10 @@ kbd{font:600 11px var(--mono);border:1px solid var(--line);border-bottom-width:2
 .icon{font-size:16px;line-height:1;padding:4px 8px}
 
 /* ---------- レイアウト ---------- */
-.shell{display:grid;grid-template-columns:var(--side) minmax(0,1fr) var(--pane);height:calc(100vh - var(--head))}
+.shell{display:grid;grid-template-columns:var(--side) minmax(0,1fr) var(--pane);grid-template-rows:minmax(0,1fr);height:calc(var(--screen-height) - var(--head))}
 body.nav-closed .shell{grid-template-columns:0 minmax(0,1fr) var(--pane)}
 body.nav-closed .sidebar{visibility:hidden}
-.sidebar{border-right:1px solid var(--line);background:var(--panel);overflow:auto;padding:12px 0}
+.sidebar{border-right:1px solid var(--line);background:var(--panel);min-height:0;overflow-y:auto;overscroll-behavior-y:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;padding:12px 0 calc(20px + env(safe-area-inset-bottom,0px))}
 .sidebar section{padding:6px 14px 10px}
 .sidebar h5{font:700 11px var(--f);color:var(--mute);letter-spacing:.08em;margin:6px 0}
 .mlist{display:flex;flex-direction:column;gap:2px}
@@ -84,7 +85,7 @@ body.nav-closed .sidebar{visibility:hidden}
 .legend i.acc{border-color:var(--accent)}.legend i.warn{border-color:var(--warn)}.legend i.ok{border-color:var(--ok)}
 
 /* ---------- 3D ビュー ---------- */
-.view{position:relative;flex:1;min-height:360px;overflow:hidden;touch-action:none;isolation:isolate} /* ラベルの z-index をビュー内に閉じ込める */
+.view{position:relative;flex:1;min-height:360px;container-type:inline-size;overflow:hidden;touch-action:none;isolation:isolate} /* ラベルの z-index をビュー内に閉じ込める */
 .view canvas{display:block;cursor:grab}
 .view canvas:active{cursor:grabbing}
 .view[data-drag="pan"] canvas,.view[data-drag="pan"] canvas:active{cursor:move}
@@ -182,10 +183,10 @@ details.gate p{margin:4px 0 0 12px;font-size:12.5px;color:var(--mute);word-break
   .crumb{display:none}
   .actions button[data-act="png"],.actions button[data-act="report"]{display:none}
   .shell,body.nav-closed .shell{display:block;height:auto}
-  .sidebar{position:fixed;top:var(--head);bottom:0;left:0;width:min(300px,85vw);z-index:30;transform:translateX(-100%);transition:transform .2s;visibility:visible!important}
+  .sidebar{position:fixed;top:var(--head);height:calc(var(--screen-height) - var(--head));left:0;width:min(300px,85vw);z-index:30;transform:translateX(-100%);transition:transform .2s;visibility:visible!important}
   body.nav-open .sidebar{transform:none}
   body.nav-open .scrim{display:block;position:fixed;inset:var(--head) 0 0 0;background:#0005;z-index:25}
-  .main{padding:8px;height:calc(100vh - var(--head) - 52px)}
+  .main{padding:8px;height:calc(var(--screen-height) - var(--head) - 52px)}
   .panel{position:fixed;left:0;right:0;bottom:0;z-index:28;max-height:70vh;border-left:0;border-top:1px solid var(--ink);transform:translateY(calc(100% - 44px));transition:transform .2s;padding-top:0;box-shadow:0 -6px 20px #0002}
   body.sheet-open .panel{transform:none}
   .sheet-handle{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;background:none;border:0;padding:6px 0 8px;font:600 12px var(--f);color:var(--mute);cursor:pointer;position:sticky;top:0;background:var(--panel)}
@@ -195,10 +196,26 @@ details.gate p{margin:4px 0 0 12px;font-size:12.5px;color:var(--mute);word-break
   .stats{gap:12px}.stat{min-width:0}.stat b{font-size:15px}
   .settings label{grid-template-columns:1fr;gap:2px}
 }
-@media (max-width:560px){
-  .brand{font-size:15px}
+@container (max-width:565px){
+  .viewctl{top:38px}
+}
+@container (max-width:410px){
+  .n-icon{width:20px;height:20px}
+}
+@media (max-width:620px){
+  :root{--head:84px}
+  .top{display:grid;grid-template-areas:"nav actions" "brand search";grid-template-columns:auto minmax(0,1fr);gap:4px 8px;padding:6px 8px}
+  .top>[data-act="nav"]{grid-area:nav;justify-self:start}
+  .brand{grid-area:brand;font-size:15px}
+  .actions{grid-area:actions;justify-self:end;gap:2px}
   .actions button[data-act="open"],.actions button[data-act="share"]{display:none}
-  .search{max-width:none}
+  .search{grid-area:search;max-width:none;margin-left:0}
+}
+body.viewer-maximized .shell{grid-template-columns:minmax(0,1fr)}
+body.viewer-maximized .shell>.sidebar,body.viewer-maximized .shell>.scrim,body.viewer-maximized .shell>.panel{display:none}
+body.viewer-maximized .main{height:calc(var(--screen-height) - var(--head))}
+@media (max-width:360px){
+  .dragctl button{padding-inline:8px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 /* ビュー切替（論理 / 物理サービス / 物理ネットワーク） */
@@ -209,3 +226,19 @@ details.gate p{margin:4px 0 0 12px;font-size:12.5px;color:var(--mute);word-break
 .views button:hover{border-color:var(--ink)}
 .views button.on{border-color:var(--ink);background:var(--ink);color:var(--bg)}
 .views button.on b{color:var(--bg)}
+
+/* 要件定義・設計 */
+.design-picker label{display:flex;gap:8px;align-items:center}
+.design-form{display:grid;gap:10px;margin-top:12px}
+.design-form>label,.design-details label{display:grid;gap:4px}
+.design-details summary{cursor:pointer;color:var(--mute)}
+.design-details>div{display:grid;gap:10px;padding:10px 0 0}
+.design-details fieldset label{display:flex;align-items:baseline}
+.design-form input:not([type=checkbox]),.design-form select,.design-form textarea,.design-picker select{
+  font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);padding:6px 8px;min-width:0;max-width:100%
+}
+.design-form textarea{resize:vertical}
+.design-form fieldset{display:grid;gap:4px;border:1px solid var(--line);min-width:0}
+.design-records{list-style:none;padding:0}
+.design-records li{display:flex;gap:6px;align-items:center;border-top:1px solid var(--line);padding:6px 0}
+.design-records li span{flex:1;min-width:0;overflow-wrap:anywhere}

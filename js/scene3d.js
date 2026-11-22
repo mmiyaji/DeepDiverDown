@@ -3,6 +3,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
+const LABEL_PRIORITY = new Map(['n-lbl', 'n-badge', 'g-lbl', 't-lbl', 'abbr', 'n-sub'].map((name, index) => [name, index]));
+const LABEL_GAP = 2;
+const overlaps = (a, b, gap = 0) => a.left < b.right + gap && a.right + gap > b.left &&
+  a.top < b.bottom + gap && a.bottom + gap > b.top;
+
 const VIEWS = { iso: [1, 1.05, 1], top: [0, 1, 0.0001], side: [0.05, 0.35, 1], back: [-1, 1.05, -1] };
 
 export class Scene3D {
@@ -39,8 +44,19 @@ export class Scene3D {
       const hit = this.ray.intersectObjects(this.pick, false)[0];
       this.onPick?.(hit?.object.userData.id ?? null);
     });
-    new ResizeObserver(() => this.resize()).observe(el);
+    this.controls.addEventListener('start', () => { this.usingControls = true; });
+    this.controls.addEventListener('end', () => { this.usingControls = false; });
+    this.controls.addEventListener('change', () => {
+      if (this.usingControls) this.fitView = null;
+    });
+    new ResizeObserver(() => {
+      if (this.fitView && this.root.children.length) this.fit(this.fitView);
+      else this.resize();
+    }).observe(el);
     this.resize();
+    this.labelProjection = new THREE.Matrix4();
+    this.lastLabelProjection = new THREE.Matrix4();
+    document.fonts.ready.then(() => { this.labelsDirty = true; });
     const clock = new THREE.Clock();
     this.speed = 1; this.phase = 0;
     this.renderer.setAnimationLoop(() => {
@@ -57,7 +73,32 @@ export class Scene3D {
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
       this.labels.render(this.scene, this.camera);
+      if (this.flat) {
+        this.labelProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+        if (this.labelsDirty || !this.labelProjection.equals(this.lastLabelProjection)) {
+          this.placeLabels();
+          this.lastLabelProjection.copy(this.labelProjection);
+          this.labelsDirty = false;
+        }
+      }
     });
+  }
+
+  /* 2D では画面上のラベルを測り、優先順に重なりのないものを表示する */
+  placeLabels(layer = this.labels.domElement) {
+    const frame = layer.getBoundingClientRect();
+    const labels = Array.from(layer.children).filter(el => el.style.display !== 'none').map(el => ({
+      el,
+      rect: el.getBoundingClientRect(),
+      priority: el.dataset.selected ? -1 : el.dataset.icon ? -0.5 : LABEL_PRIORITY.get(el.classList[0]),
+    }));
+    labels.sort((a, b) => a.priority - b.priority);
+    const occupied = [];
+    for (const { el, rect } of labels) {
+      const visible = overlaps(rect, frame) && !occupied.some(other => overlaps(rect, other, LABEL_GAP));
+      el.style.visibility = visible ? '' : 'hidden';
+      if (visible) occupied.push(rect);
+    }
   }
 
   /* 左ドラッグ（1 本指）の役割を切り替える。右ドラッグ（2 本指）は常にもう一方 */
@@ -71,6 +112,7 @@ export class Scene3D {
 
   /* 指定した位置を画面中央へ（なめらかに）。zoom は倍率 */
   focusOn(pos, zoom = Math.max(this.camera.zoom, 1.8)) {
+    this.fitView = null;
     this.anim = { from: this.controls.target.clone(), to: new THREE.Vector3(...pos), z0: this.camera.zoom, z1: zoom, t0: performance.now() };
   }
   /* 共有リンク用：視点の保存と復元 */
@@ -80,6 +122,7 @@ export class Scene3D {
   }
   setView(v) {
     if (!v?.p || !v?.t) return;
+    this.fitView = null;
     this.camera.position.fromArray(v.p); this.controls.target.fromArray(v.t);
     if (!this.controls.enableRotate) {
       this.camera.position.copy(this.controls.target).addScaledVector(new THREE.Vector3(...VIEWS.top).normalize(), 100);
@@ -87,30 +130,131 @@ export class Scene3D {
     this.camera.zoom = v.z || 1; this.camera.lookAt(this.controls.target); this.camera.updateProjectionMatrix(); this.fitted = true;
   }
 
+  fullSvgLayout() {
+    const bounds = new THREE.Box3().setFromObject(this.root);
+    const center = bounds.getCenter(new THREE.Vector3()), size = bounds.getSize(new THREE.Vector3());
+    const pixelsPerUnit = 96;
+    const width = Math.ceil(size.x * pixelsPerUnit) + 320;
+    const height = Math.ceil(size.z * pixelsPerUnit) + 128;
+    const halfWidth = width / (2 * pixelsPerUnit), halfHeight = height / (2 * pixelsPerUnit);
+    const camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, 0.1, 200);
+    camera.up.set(0, 0, -1);
+    camera.position.copy(center).y += 100;
+    camera.lookAt(center);
+    camera.updateMatrixWorld();
+    return { width, height, camera };
+  }
+
+  *fullSvgLabels(camera, width, height) {
+    // 書き出し用の領域で DOM ラベルを測り、画面のカメラとラベルには触れない。
+    const renderer = new CSS2DRenderer();
+    const layer = renderer.domElement;
+    Object.assign(layer.style, { position: 'fixed', top: '0', left: '0', opacity: '0', pointerEvents: 'none' });
+    layer.setAttribute('aria-hidden', 'true');
+    renderer.setSize(width, height);
+    const labels = new THREE.Scene();
+    labels.add(this.lbl.clone());
+    document.body.append(layer);
+    try {
+      renderer.render(labels, camera);
+      this.placeLabels(layer);
+      yield* this.exportLabels(layer);
+    } finally {
+      layer.remove();
+    }
+  }
+
+  async snapshotSvg(bg, title, { full = false } = {}) {
+    const { SVGRenderer } = await import('three/addons/renderers/SVGRenderer.js');
+    const { width, height, camera } = full ? this.fullSvgLayout()
+      : { width: this.el.clientWidth, height: this.el.clientHeight, camera: this.camera };
+    const labels = full ? this.fullSvgLabels(camera, width, height) : this.exportLabels();
+    const renderer = new SVGRenderer();
+    renderer.setSize(width, height);
+    renderer.setPrecision(2);
+    camera.updateMatrixWorld();
+    const exportScene = new THREE.Scene();
+    exportScene.add(this.root.clone());
+    // SVGRenderer は WebGL と光量の扱いが異なるため、書き出し用のライトを調整する。
+    for (const light of this.scene.children.filter(child => child.isLight)) {
+      const copy = light.clone();
+      if (copy.isAmbientLight) copy.color.multiplyScalar(0.62);
+      else copy.intensity *= 0.32;
+      exportScene.add(copy);
+    }
+    renderer.render(exportScene, camera);
+    const svg = renderer.domElement;
+    const pixelsPerUnit = height * camera.zoom / (camera.top - camera.bottom);
+    for (const path of svg.querySelectorAll('path')) {
+      const dash = path.style.strokeDasharray;
+      if (dash) path.style.strokeDasharray = dash.split(/[ ,]+/).map(n => Math.max(1, parseFloat(n) * pixelsPerUnit)).join(' ');
+    }
+    svg.removeAttribute('style');
+    svg.setAttribute('overflow', 'hidden');
+    const element = (tag, attributes, parent = svg) => {
+      const node = document.createElementNS(svg.namespaceURI, tag);
+      for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+      parent.appendChild(node);
+      return node;
+    };
+    const background = element('rect', { x: -width / 2, y: -height / 2, width, height, fill: bg });
+    svg.prepend(background);
+    const heading = element('title', {});
+    heading.textContent = title;
+    svg.prepend(heading);
+    const overlay = element('g', { transform: `translate(${-width / 2} ${-height / 2})` });
+    for (const { x, y, width, height, style, img, text } of labels) {
+      const group = element('g', { opacity: style.opacity }, overlay);
+      if (img) {
+        const icon = document.createElement('canvas');
+        icon.width = Math.ceil(width * 2); icon.height = Math.ceil(height * 2);
+        icon.getContext('2d').drawImage(img, 0, 0, icon.width, icon.height);
+        element('image', { x, y, width, height, href: icon.toDataURL() }, group);
+        continue;
+      }
+      const border = parseFloat(style.borderTopWidth);
+      if (border || style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+        element('rect', { x, y, width, height, fill: style.backgroundColor,
+          stroke: border ? style.borderTopColor : 'none', 'stroke-width': border }, group);
+      }
+      element('text', { x: x + width / 2, y: y + height / 2, fill: style.color,
+        'font-family': style.fontFamily, 'font-size': style.fontSize, 'font-weight': style.fontWeight,
+        'text-anchor': 'middle', 'dominant-baseline': 'central' }, group).textContent = text;
+    }
+    return new XMLSerializer().serializeToString(svg);
+  }
+
+  *exportLabels(layer = this.labels.domElement) {
+    const base = layer.getBoundingClientRect();
+    for (const el of layer.children) {
+      if (el.style.display === 'none' || el.style.visibility === 'hidden') continue;
+      const image = el.querySelector('img'), img = image?.complete && image.naturalWidth ? image : null;
+      if (!img && !el.textContent) continue;
+      const r = (img || el).getBoundingClientRect();
+      if (r.right < base.left || r.left > base.right || r.bottom < base.top || r.top > base.bottom) continue;
+      // CSS の object-fit: contain と同じ縦横比で書き出す。
+      const scale = img ? Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight) : 1;
+      const width = img ? img.naturalWidth * scale : r.width;
+      const height = img ? img.naturalHeight * scale : r.height;
+      yield { x: r.left - base.left + (r.width - width) / 2,
+        y: r.top - base.top + (r.height - height) / 2, width, height,
+        style: getComputedStyle(el), img, text: el.textContent };
+    }
+  }
+
   /* PNG 書き出し：WebGL の画像に HTML ラベルを重ねて 1 枚にする */
   snapshot(bg) {
     const src = this.renderer.domElement, dpr = src.width / src.clientWidth, c = document.createElement('canvas');
     c.width = src.width; c.height = src.height;
     const g = c.getContext('2d'); g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0);
-    const base = this.el.getBoundingClientRect();
     g.scale(dpr, dpr); g.textBaseline = 'middle';
-    for (const el of this.labels.domElement.children) {
-      if (el.style.display === 'none') continue;
-      const img = el.querySelector('img');
-      if (img?.complete && img.naturalWidth) {
-        const r = img.getBoundingClientRect();
-        g.globalAlpha = Number(getComputedStyle(el).opacity);
-        g.drawImage(img, r.left - base.left, r.top - base.top, r.width, r.height);
-        continue;
-      }
-      if (!el.textContent) continue;
-      const r = el.getBoundingClientRect(), cs = getComputedStyle(el), x = r.left - base.left, y = r.top - base.top;
-      if (r.right < base.left || r.left > base.right || r.bottom < base.top || r.top > base.bottom) continue;
-      g.globalAlpha = +cs.opacity || 1;
-      if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') { g.fillStyle = cs.backgroundColor; g.fillRect(x, y, r.width, r.height); }
-      if (parseFloat(cs.borderTopWidth)) { g.strokeStyle = cs.borderTopColor; g.lineWidth = 1; g.strokeRect(x + .5, y + .5, r.width - 1, r.height - 1); }
-      g.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; g.fillStyle = cs.color; g.textAlign = 'center';
-      g.fillText(el.textContent, x + r.width / 2, y + r.height / 2 + 0.5);
+    for (const { x, y, width, height, style, img, text } of this.exportLabels()) {
+      g.globalAlpha = Number(style.opacity);
+      if (img) { g.drawImage(img, x, y, width, height); continue; }
+      if (style.backgroundColor !== 'rgba(0, 0, 0, 0)') { g.fillStyle = style.backgroundColor; g.fillRect(x, y, width, height); }
+      if (parseFloat(style.borderTopWidth)) { g.strokeStyle = style.borderTopColor; g.lineWidth = 1; g.strokeRect(x + .5, y + .5, width - 1, height - 1); }
+      g.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`; g.fillStyle = style.color; g.textAlign = 'center';
+      g.fillText(text, x + width / 2, y + height / 2 + 0.5);
     }
     return c;
   }
@@ -122,6 +266,7 @@ export class Scene3D {
 
   resize() {
     const w = this.el.clientWidth, h = this.el.clientHeight || 1, a = w / h;
+    this.labelsDirty = true;
     this.renderer.setSize(w, h); this.labels.setSize(w, h);
     Object.assign(this.camera, { left: -this.frustum * a, right: this.frustum * a, top: this.frustum, bottom: -this.frustum });
     this.camera.updateProjectionMatrix();
@@ -131,12 +276,17 @@ export class Scene3D {
     this.root.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => m.dispose()); });
     this.root.clear(); this.lbl.clear(); this.pick = []; this.packets = [];
   }
-  end(flat) { if (!this.fitted) { this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true; } }
+  end(flat) {
+    this.flat = flat;
+    this.labelsDirty = true;
+    if (!this.fitted) { this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true; }
+  }
 
   fit(view = 'iso') {
     this.anim = null;
     const box = new THREE.Box3().setFromObject(this.root), c = box.getCenter(new THREE.Vector3());
     if (box.isEmpty()) return;
+    this.fitView = view;
     const d = new THREE.Vector3(...VIEWS[view]).normalize();
     this.camera.position.copy(c).addScaledVector(d, 100);
     this.camera.zoom = 1; this.controls.target.copy(c); this.camera.lookAt(c); this.camera.updateMatrixWorld();
@@ -240,19 +390,30 @@ export class Scene3D {
       if (s.icon) {
         const img = document.createElement('img');
         img.className = 'n-icon'; img.alt = s.abbr.text;
-        img.addEventListener('load', () => mark.replaceChildren(img), { once: true });
+        img.addEventListener('load', () => {
+          mark.replaceChildren(img);
+          mark.dataset.icon = 'true';
+          this.labelsDirty = true;
+        }, { once: true });
         img.src = s.icon;
       }
     }
     const name = this.label(s.label, [x, y, z + 0.5], 'n-lbl', [0.5, -0.3]);
+    if (s.selected) name.dataset.selected = 'true';
+    if (s.flat && s.icon) name.style.marginTop = '10px';
     if (s.sub) {
       const sub = this.label(s.sub.text, [x, y, z + 0.5], 'n-sub', [0.5, -0.3],
         { color: s.sub.color, opacity: s.opacity < 0.5 ? 0.35 : 1 });
-      sub.style.marginTop = 'calc(15px * var(--lbl-scale))';
+      sub.style.marginTop = s.flat ? `calc(19px * var(--lbl-scale) + ${s.icon ? 10 : 0}px)` : 'calc(15px * var(--lbl-scale))';
     }
     if (s.labelAccent) name.classList.add('acc');
     if (s.opacity < 0.5) name.style.opacity = 0.35;
-    if (s.badge) { const b = this.label(s.badge.text, [x, y + top + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]); if (s.opacity < 0.5) b.style.opacity = 0.4; }
+    if (s.badge) {
+      const badge = this.label(s.badge.text, [x, y + top + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]);
+      // 真上からは高さの差が画面に出ないので、公式アイコンの上に離して配置する。
+      if (s.flat && s.icon) badge.style.marginTop = '-16px';
+      if (s.opacity < 0.5) badge.style.opacity = 0.4;
+    }
   }
 
   /* ---------- リンク・パケット ---------- */

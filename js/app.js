@@ -1,7 +1,8 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
 import { Scene3D } from './scene3d.js';
-import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS } from './settings.js';
+import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js';
 import * as L from './loader.js';
+import { openDesign } from './design.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -247,7 +248,7 @@ function nodeSpec(id, n, s) {
   return {
     id, shape, flat: st.dimension === '2', color, opacity, dashed, outline: !!s.outline, h: s.h || (n.kind === 'client' ? 0.7 : 1), pos: W(n.x, n.y, n.tier),
     icon: S.officialIcons ? svc?.iconUrl : null,
-    label: n.label, labelAccent: s.fill === 'down', badge: s.badge, abbr: svc && { text: svc.abbr, color: svc.color },
+    label: n.label, selected: VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', badge: s.badge, abbr: svc && { text: svc.abbr, color: svc.color },
     sub: svc && { text: serviceLabel(svc), color: svc.providerColor },
   };
 }
@@ -314,7 +315,7 @@ function renderSidebar() {
   $('mlist').innerHTML = REGISTRY.map(r => {
     const s = SUMMARY[r.id] || {};
     return `<a href="#/m/${r.id}/struct" class="mitem ${r.id === KEY ? 'on' : ''}" ${r.id === KEY ? 'aria-current="page"' : ''}>
-      <span class="mname">${esc(s.name)}${s.local ? ' <small class="loc">ローカル</small>' : ''}</span>
+      <span class="mname">${esc(s.name)}${r.design ? ' <small class="loc">設計案</small>' : s.local ? ' <small class="loc">ローカル</small>' : ''}</span>
       <span class="mmeta">${s.error ? '<span class="tag high">読込失敗</span>' : `<span class="tag ${s.pass ? 'ok' : 'high'}">${s.pass ? '合格' : '不合格'}</span> 網羅 ${s.cov}%`}</span></a>`;
   }).join('') + `<button class="b small" data-act="open">＋ YAML を開く</button>`;
   $('modes').innerHTML = MODES.map(([k, n, c], i) => `<button data-mode="${k}" class="${st.mode === k ? 'on' : ''}" ${st.mode === k ? 'aria-current="true"' : ''} title="${n}（${i + 1}）"><span>${n}</span>${c ? `<small>${c}</small>` : ''}</button>`).join('');
@@ -352,7 +353,7 @@ function syncP95(sc) {
 
 /* ================= パネル ================= */
 const tag = s => `<span class="tag st-${s}">${Analyze.STATUS[s]}</span>`;
-const evList = ev => (ev || []).map(e => `<div class="ev"><span class="mono">${esc(e.type)}</span> ${esc(e.at || e.ref)}${e.says ? ` <span class="mono acc-t">says ${esc(JSON.stringify(e.says))}</span>` : ''}</div>`).join('') || '<div class="sub">根拠なし</div>';
+const evList = ev => (ev || []).map(e => `<div class="ev"><span class="mono">${esc(e.type)}</span> ${esc(e.at || e.ref)}${e.quote ? `<blockquote>${esc(e.quote)}</blockquote>` : ''}${e.says ? ` <span class="mono acc-t">says ${esc(JSON.stringify(e.says))}</span>` : ''}</div>`).join('') || '<div class="sub">根拠なし</div>';
 const none = '<div class="sub">なし</div>';
 
 /* 論理構成でまとめた機能（複数の物理部品） */
@@ -379,6 +380,7 @@ function nodeDetail(id) {
   const ln = l => `${esc(linkLabel(l))} <span class="mono mute">${l.sync ? 'sync' : 'async'}${l.timeoutMs ? ' ' + l.timeoutMs / 1000 + 's' : ''}${l.retry ? ' retry' + l.retry : ''}</span> ${CLS.links[l.id] ? tag(CLS.links[l.id].status) : ''}`;
   const reqs = (M.requirements || []).filter(q => q.nodes?.includes(id));
   return `<h4>選択中の部品</h4><h3>${esc(n.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${esc(n.subnet)} subnet` : ''} / ${esc(TI(n.tier).label || '')}</div>
+    ${n.description ? `<p>${esc(n.description)}</p>` : ''}
     <div class="row"><button class="b small" data-focus="${id}">この部品に寄る（F）</button><button class="b small ${st.nbr ? 'on' : ''}" data-nbr>周辺だけ表示（N）</button><button class="b small" data-sel="">選択を解除</button></div>
     ${c ? `<div class="row">${tag(c.status)}<span class="sub m0">${esc(c.why)}</span></div>` : ''}
     <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
@@ -456,7 +458,7 @@ function renderPanel() {
       <h4>止まるユースケース</h4>${r.brokenScenarios.map(s => `<div class="item"><span class="tag high">停止</span>${esc(s.label)}</div>`).join('') || none}`;
   }
   if (st.mode === 'lint') h = `<h3>指摘 ${ISSUES.length} 件</h3><div class="sub">モデルにルールを当てた結果。クリックで該当箇所を強調。ルールは設定で個別に無効化できます。</div>` +
-    ISSUES.map((i, k) => `<div class="item ${st.issue === k ? 'on' : ''}" data-issue="${k}"><span class="tag ${i.sev}">${esc(i.title)}</span><p>${esc(i.msg)}</p></div>`).join('');
+    ISSUES.map((i, k) => `<div class="item ${st.issue === k ? 'on' : ''}" data-issue="${k}"><span class="tag ${i.sev}">${esc(i.title)}</span><p>${esc(i.msg)}</p>${st.issue === k ? '<button class="b small" data-act="assist-finding">AI に対応を相談</button>' : ''}</div>`).join('');
   if (st.mode === 'metric') {
     const rows = Object.entries(M.nodes).filter(([, n]) => n.metrics?.[st.metric] != null).sort((a, b) => b[1].metrics[st.metric] - a[1].metrics[st.metric]), max = rows[0]?.[1].metrics[st.metric] || 1;
     h = `<div class="row">${METRICS.map(([k, n]) => `<button class="b ${st.metric === k ? 'on' : ''}" data-metric="${k}">${n}</button>`).join('')}</div><div class="sub">値を立体の高さと色の濃さで表示。</div>` +
@@ -510,6 +512,7 @@ const toggleDimension = () => setDimension(st.dimension === '2' ? '3' : '2');
 function setDimension(dimension, redraw = true) {
   st.dimension = dimension;
   const flat = dimension === '2';
+  document.querySelector('[data-act="svg-full"]').hidden = !flat;
   scene.controls.enableRotate = !flat;
   scene.fitted = false;
   setDrag(drag3D);
@@ -561,8 +564,19 @@ function openHit(x) {
 
 /* ================= 書き出し・共有 ================= */
 function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+const exportBackground = () => getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || '#fff';
+async function exportSvg(full = false) {
+  try {
+    const svg = await scene.snapshotSvg(exportBackground(), M.name, { full });
+    download(`${KEY}-${st.mode}${full ? '-full' : ''}.svg`, new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+    toast('SVG を書き出しました');
+  } catch (error) {
+    console.error(error);
+    toast('SVG を書き出せませんでした');
+  }
+}
 function exportPng() {
-  const c = scene.snapshot(getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || '#fff');
+  const c = scene.snapshot(exportBackground());
   c.toBlob(b => { download(`${KEY}-${st.mode}.png`, b); toast('画像を書き出しました'); });
 }
 function exportReport() {
@@ -645,6 +659,9 @@ function openSettings() {
     <label>初期の表示 <select name="dimension"><option value="3" ${S.dimension === '3' ? 'selected' : ''}>3D</option><option value="2" ${S.dimension === '2' ? 'selected' : ''}>2D</option></select></label>
     <label>初期の視点 <select name="defaultView">${[['iso', '斜め'], ['top', '真上'], ['side', '横'], ['back', '裏側']].map(([v, n]) => `<option value="${v}" ${S.defaultView === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label>左ドラッグの既定 <select name="dragMode"><option value="rotate" ${S.dragMode === 'rotate' ? 'selected' : ''}>回転</option><option value="pan" ${S.dragMode === 'pan' ? 'selected' : ''}>移動</option></select></label>
+    <h4>AI 支援</h4>
+    <label>実行先 <select name="aiProvider">${Object.entries(AI_PROVIDERS).map(([id, label]) => `<option value="${id}" ${(S.aiProvider === 'codex' ? 'codex' : 'claude') === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+    <p class="sub">実行先は AI 用ビューアでの対話・取り込み・指摘対応に適用されます。</p>
     <h4>点検のしきい値 <small class="sub">空欄はモデルの設定（gates）に従う</small></h4>
     <label>許容する「ずれ」の件数 <input type="number" name="maxDrift" min="0" value="${S.gates.maxDrift ?? ''}" placeholder="${M.gates?.maxDrift ?? 0}"></label>
     <label>許容する重大な指摘の件数 <input type="number" name="maxHigh" min="0" value="${S.gates.maxHigh ?? ''}" placeholder="${M.gates?.maxHigh ?? 0}"></label>
@@ -659,12 +676,14 @@ function openSettings() {
   f.addEventListener('input', e => {
     const fd = new FormData(f);
     Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dimension: fd.get('dimension'), dragMode: fd.get('dragMode') });
+    S.aiProvider = fd.get('aiProvider') === 'codex' ? 'codex' : 'claude';
     if (hasIcons) S.officialIcons = fd.has('officialIcons');
     const g = {}; for (const k of ['maxDrift', 'maxHigh']) if (fd.get(k) !== '') g[k] = Math.max(0, +fd.get(k)); S.gates = g;
     S.disabledRules = rules.map(r => r.id).filter(id => !fd.getAll('rule').includes(id));
     f.querySelectorAll('output')[0].textContent = Math.round(S.labelScale * 100) + '%';
     f.querySelectorAll('output')[1].textContent = S.packetSpeed + '×';
     saveSettings(S); applyAppearance(S); scene.speed = S.packetSpeed;
+    if (e.target.name === 'labelScale') scene.labelsDirty = true;
     if (e.target.name === 'defaultView') scene.initialView = S.defaultView;
     if (e.target.name === 'dimension') setDimension(S.dimension);
     if (e.target.name === 'dragMode') { drag3D = S.dragMode; setDrag(drag3D); }
@@ -685,8 +704,15 @@ document.addEventListener('click', e => {
     if (a === 'dimension') return toggleDimension();
     if (a === 'share') return share();
     if (a === 'png') return exportPng();
+    if (a === 'svg') return exportSvg();
+    if (a === 'svg-full') return exportSvg(true);
     if (a === 'report') return exportReport();
     if (a === 'open') return pickFile('model');
+    if (a === 'design' || a === 'assist-finding') {
+      modal('要件定義・設計', '<div id="design-editor"></div>');
+      return openDesign($('design-editor'), { key: KEY, download, aiProvider: S.aiProvider,
+        finding: a === 'assist-finding' ? ISSUES[st.issue] : undefined, base: M });
+    }
     if (a === 'open-compare') return pickFile('compare');
     if (a === 'clear-compare') { L.clearCompare(KEY); return location.reload(); }
     if (a === 'help') return openHelp(false);

@@ -15,6 +15,8 @@ fs.rmSync(OUT, { recursive: true, force: true });
 copy('three/build/three.module.js', 'three/three.module.js');
 copy('three/examples/jsm/controls/OrbitControls.js', 'three/addons/controls/OrbitControls.js');
 copy('three/examples/jsm/renderers/CSS2DRenderer.js', 'three/addons/renderers/CSS2DRenderer.js');
+copy('three/examples/jsm/renderers/SVGRenderer.js', 'three/addons/renderers/SVGRenderer.js');
+copy('three/examples/jsm/renderers/Projector.js', 'three/addons/renderers/Projector.js');
 copy('three/LICENSE', 'three/LICENSE');
 
 // js-yaml（MIT）
