@@ -1,0 +1,39 @@
+name: Docker Swarm mode サービススケジューリング
+description: replicated の注文 API を Swarm manager が task に割り当て、障害時に置き換える流れ。
+reference:
+  objectives: [service の desired state と task slot を区別する, scheduler のノード割り当てを説明する, 注文 API のデプロイとローリング更新を追う]
+  sources:
+    - {title: How services work, url: https://docs.docker.com/engine/swarm/how-swarm-mode-works/services}
+    - {title: Deploy services to a swarm, url: https://docs.docker.com/engine/swarm/services}
+    - {title: Apply rolling updates to a service, url: https://docs.docker.com/engine/swarm/swarm-tutorial/rolling-update}
+sources: [docs/reference-docker-swarm.md]
+evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}]
+tiers: [{id: control, label: Swarm 制御, z: 1, size: [12, 3]}, {id: runtime, label: ノード実行, z: 0, size: [12, 3]}]
+nodes:
+  service: {label: replicated Service（注文 API）, kind: service, tier: control, x: 1, y: 1.5, description: replicas と更新方針を持つ desired state。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}, {type: doc, ref: docs/reference-docker-swarm.md#§3}]}
+  manager: {label: Swarm manager, kind: scheduler, tier: control, x: 5, y: 1.5, description: オーケストレーターと scheduler を実行する管理ノード。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}, {type: doc, ref: docs/reference-docker-swarm.md#§2}]}
+  scheduler: {label: Swarm scheduler, kind: scheduler, tier: control, x: 9, y: 1.5, description: task slot を条件適合 worker に割り当てる機構。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}, {type: doc, ref: docs/reference-docker-swarm.md#§3}]}
+  task: {label: API task slot, kind: service, tier: runtime, x: 2, y: 1.5, description: scheduler が container を起動するための一方向の slot。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}]}
+  worker: {label: Swarm worker, kind: host, tier: runtime, x: 6, y: 1.5, description: task に割り当てられ container を実行するノード。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§3}, {type: doc, ref: docs/reference-docker-swarm.md#§4}]}
+  update: {label: UpdateConfig, kind: service, tier: runtime, x: 10, y: 1.5, description: 更新並列度・遅延・失敗時動作を定める方針。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§5}]}
+links:
+  - {id: desired, from: service, to: manager, label: desired state, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}]}
+  - {id: assign, from: manager, to: scheduler, label: task を計画, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}]}
+  - {id: fill, from: scheduler, to: task, label: slot を作成, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}]}
+  - {id: run, from: task, to: worker, label: container を実行, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§3}]}
+  - {id: recover, from: manager, to: scheduler, label: 失敗 task を再配置, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§4}]}
+scenarios:
+  - id: order-api
+    label: 注文 API のデプロイ
+    evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}, {type: doc, ref: docs/reference-docker-swarm.md#§2}, {type: doc, ref: docs/reference-docker-swarm.md#§3}]
+    steps:
+      - {links: [desired], note: replicated Service に注文 API の desired replicas を登録する。}
+      - {links: [assign, fill], note: manager の scheduler が task slot を作り worker を選ぶ。}
+      - {links: [run], note: worker が task の container を起動し API を提供する。}
+  - id: replacement
+    label: 注文 API の置き換え
+    evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§4}, {type: doc, ref: docs/reference-docker-swarm.md#§5}]
+    steps:
+      - {links: [recover], note: health check 失敗または worker drain を検知する。}
+      - {links: [assign, fill], note: scheduler が利用可能な worker へ新 task を割り当てる。}
+      - {links: [run], note: 新 container が RUNNING になり、更新なら UpdateConfig の順序で次へ進む。}

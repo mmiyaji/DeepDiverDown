@@ -1,0 +1,61 @@
+name: OpenShift の基本アーキテクチャ
+description: プロジェクト内の注文 API を Deployment として投入し、Service・Route で公開し、worker 障害後の再調整を追います。
+reference:
+  objectives:
+    - OpenShift の API、Controller、Scheduler、Route の役割を区別する。
+    - 注文 API を Deployment から Pod にし、Service と Route で公開する流れを追う。
+    - worker 障害後の再調整が環境条件に依存することを理解する。
+  sources:
+    - {title: OpenShift Container Platform 4.21 Building applications, url: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index"}
+    - {title: Kubernetes Deployments, url: "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"}
+    - {title: Kubernetes Cluster Architecture, url: "https://kubernetes.io/docs/concepts/architecture/"}
+sources: [docs/reference-openshift.md]
+evidence:
+  - {type: doc, ref: "docs/reference-openshift.md#§1"}
+  - {type: doc, ref: "docs/reference-openshift.md#§2"}
+  - {type: doc, ref: "docs/reference-openshift.md#§3"}
+  - {type: doc, ref: "docs/reference-openshift.md#§4"}
+  - {type: doc, ref: "docs/reference-openshift.md#§5"}
+  - {type: doc, ref: "docs/reference-openshift.md#§6"}
+tiers:
+  - {id: client, label: 利用者, kind: origin, z: 1, origin: [-4, 0], size: [2.5, 3]}
+  - {id: control, label: OpenShift 制御, z: 1, size: [8, 3]}
+  - {id: worker, label: ワーカーノード, z: 0, size: [8, 3]}
+  - {id: edge, label: 外部公開, z: 0, origin: [9, 0], size: [3, 3]}
+nodes:
+  oc:
+    {label: oc / 利用者, kind: client, tier: client, x: 0, y: 1.5, description: プロジェクトを選択し注文 API の Deployment を送る。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§2"}]}
+  api:
+    {label: OpenShift API, kind: service, tier: control, x: 0, y: 1.5, description: プロジェクト内のリソース操作を受け付ける API 入口。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§2"}]}
+  controller:
+    {label: Controller / Scheduler, kind: service, tier: control, x: 4, y: 1.5, description: Deployment の差分を調整し、Pod の配置を決める制御部品群。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}, {type: doc, ref: "docs/reference-openshift.md#§5"}]}
+  kubelet:
+    {label: worker の kubelet, kind: worker, tier: worker, x: 1, y: 1.5, description: ノード上で割り当てられた注文 API Pod を起動する。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}]}
+  order-api:
+    {label: 注文 API Pod, kind: service, tier: worker, x: 5, y: 1.5, description: Deployment の Pod テンプレートから起動される注文 API。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}, {type: doc, ref: "docs/reference-openshift.md#§4"}]}
+  service:
+    {label: 注文 API Service, kind: lb, tier: edge, x: 0.5, y: 1.5, description: 注文 API Pod への内部エンドポイント。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
+  route:
+    {label: OpenShift Route, kind: lb, tier: edge, x: 2.2, y: 1.5, description: Service をホスト名で外部公開する入口。DNS は別途構成する。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
+links:
+  - {id: apply, from: oc, to: api, label: Deployment を適用, evidence: [{type: doc, ref: "docs/reference-openshift.md#§2"}]}
+  - {id: reconcile, from: api, to: controller, label: 状態を調整, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}]}
+  - {id: schedule, from: controller, to: kubelet, label: Pod を配置, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}]}
+  - {id: start, from: kubelet, to: order-api, label: Pod を起動, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}]}
+  - {id: service-route, from: route, to: service, label: Service を公開, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
+  - {id: route-pod, from: service, to: order-api, label: Pod へ転送, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
+  - {id: worker-loss, from: order-api, to: controller, label: worker 障害後に再調整, evidence: [{type: doc, ref: "docs/reference-openshift.md#§5"}]}
+scenarios:
+  - id: deploy-order-api
+    label: OpenShift に注文 API を公開
+    evidence: [{type: doc, ref: "docs/reference-openshift.md#§2"}, {type: doc, ref: "docs/reference-openshift.md#§4"}]
+    steps:
+      - {links: [apply], note: "oc 利用者がプロジェクト内へ注文 API の Deployment を適用する。"}
+      - {links: [reconcile, schedule, start], note: "API と制御部品が状態を調整し、worker の kubelet が注文 API Pod を起動する。"}
+      - {links: [service-route, route-pod], note: "Service を Route でホスト名公開し、外部リクエストを Pod へ転送する。"}
+  - id: worker-loss
+    label: worker 障害後の再調整
+    evidence: [{type: doc, ref: "docs/reference-openshift.md#§5"}]
+    steps:
+      - {links: [worker-loss], note: "注文 API Pod が載る worker 障害を検知し、Deployment の状態との差分が生じる。"}
+      - {links: [reconcile, schedule, start], note: "Controller と Scheduler が再配置を試みる。残存ノード・リソース・条件に依存する。"}

@@ -183,6 +183,10 @@ npm run icons -- --aws-pptx "C:\path\to\AWS-Toolkit.pptx"
 | SQL エンジン | [Trino](docs/reference-trino.md) |
 | 運用とガバナンス | [OpenLineage](docs/reference-openlineage.md) |
 
+### コンテナオーケストレーション
+
+Kubernetes、主要なディストリビューション・マネージドサービス、独自 API のオーケストレーターを、注文 API の配置と復旧の流れで比較します。[コンテナオーケストレーションのリファレンス一覧](docs/reference-container-orchestration-overview.md)
+
 ### 大規模データ分析の基本概念
 
 同じ受注データを使って、保存時の配置、読み取り、書き換え、分散実行のどこで各手法が効くかを比較できます。
