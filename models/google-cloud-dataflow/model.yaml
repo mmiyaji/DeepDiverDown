@@ -1,0 +1,41 @@
+name: Google Cloud Dataflow のパイプラインアーキテクチャ
+description: Pub/Sub の注文イベントを Apache Beam パイプラインで変換・集計し、Dataflow のワーカーから BigQuery へ出力する流れです。
+reference:
+  objectives:
+    - Beam Pipeline と PCollection、変換の関係を読む。
+    - Dataflow Runner と分散ワーカーの役割を区別する。
+    - 出力とジョブ監視までの実行経路を追う。
+  sources:
+    - {title: Dataflow documentation, url: https://cloud.google.com/dataflow/docs/overview}
+    - {title: Use Apache Beam to build pipelines, url: https://cloud.google.com/dataflow/docs/guides/use-beam}
+    - {title: Dataflow monitoring interface, url: https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf}
+    - {title: Dataflow product overview, url: https://cloud.google.com/products/dataflow}
+sources: [docs/reference-google-cloud-dataflow.md]
+evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§1}, {type: doc, ref: docs/reference-google-cloud-dataflow.md#§7}]
+tiers:
+  - {id: control, label: パイプライン制御, z: 1, size: [22, 3]}
+  - {id: data, label: イベント処理, z: 0, size: [22, 3]}
+nodes:
+  pubsub: {label: Pub/Sub, kind: queue, tier: data, x: 0, y: 1.5, description: 注文イベントを提供する入力ストリーム。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
+  beam: {label: Apache Beam Pipeline, kind: service, tier: control, x: 0, y: 1.5, description: 入力、変換、出力の処理グラフを定義する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§2}]}
+  collection: {label: PCollection, kind: service, tier: data, x: 4, y: 1.5, description: パイプライン内で受け渡す論理的なデータ集合。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§2}]}
+  transform: {label: Beam Transform, kind: worker, tier: data, x: 8, y: 1.5, description: 検証・キー付け・ウィンドウ集計を適用する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
+  runner: {label: Dataflow Runner, kind: service, tier: control, x: 5, y: 1.5, description: Beam グラフを Dataflow ジョブとして投入する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
+  workers: {label: Dataflow Workers, kind: worker, tier: data, x: 12, y: 1.5, description: パイプライン段階を分散実行するワーカー群。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
+  bigquery: {label: BigQuery, kind: db, tier: data, x: 18, y: 1.5, description: 集計済み注文データを格納する出力先の例。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
+  monitoring: {label: Dataflow Monitoring, kind: service, tier: control, x: 12, y: 1.5, description: ジョブ状態と段階ごとの指標を可視化する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
+links:
+  - {id: define, from: beam, to: runner, label: ジョブを投入, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
+  - {id: ingest, from: pubsub, to: collection, label: イベントを読む, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
+  - {id: apply, from: collection, to: transform, label: 変換を適用, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§2}, {type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
+  - {id: dispatch, from: runner, to: workers, label: 分散実行, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
+  - {id: execute, from: transform, to: workers, label: ワーカーで処理, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
+  - {id: write, from: workers, to: bigquery, label: 集計結果を書き込む, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
+  - {id: observe, from: runner, to: monitoring, label: ジョブを監視, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
+scenarios:
+  - {id: stream-aggregation, label: 注文イベントの集計, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§6}], steps: [{links: [define], note: Beam Pipeline を定義し、Dataflow Runner にジョブとして投入する。}, {links: [ingest, apply], note: Pub/Sub から注文イベントを読み、PCollection に対して検証・キー付け・集計の変換を適用する。}, {links: [dispatch, execute], note: Runner が処理グラフを Dataflow Workers に分散して実行する。}, {links: [write, observe], note: 集計結果を BigQuery に書き込み、ジョブ状態と指標を Monitoring で確認する。}]}
+requirements:
+  - {id: BR-01, kind: usecase, title: イベント集計, text: 注文イベントを読み、変換・集計して分析用テーブルへ出力する。, links: [ingest, apply, execute, write], evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§6}]}
+  - {id: NFR-01, kind: nfr, title: 実行可視化, text: 分散ジョブの状態と段階ごとの指標を確認できる。, links: [observe], evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
+unknowns: [{id: UNK-01, text: 実際の Beam SDK 言語、ウィンドウ設定、ワーカー構成、BigQuery スキーマは未確定。, refs: [beam, transform, workers, bigquery]}]
+gates: {maxDrift: 0, maxHigh: 0}

@@ -1,0 +1,35 @@
+name: "Trino の分散クエリアーキテクチャ"
+description: "SQL クライアントの受注集計を Trino が計画し、Iceberg テーブルを並列に読んで結果を返します。"
+reference:
+  objectives: ["Stage、Task、Split の関係を区別する。", "Connector で読み出したデータが Exchange を経て返る流れを追う。"]
+  sources:
+    - {"title": "Trino · Concepts", "url": "https://trino.io/docs/current/overview/concepts.html"}
+    - {"title": "Trino · Iceberg connector", "url": "https://trino.io/docs/current/connector/iceberg.html"}
+sources: [docs/reference-trino.md]
+evidence: [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]
+tiers:
+  - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+nodes:
+  client: {"label": "SQL クライアント", "kind": "client", "tier": "flow", "x": 0, "y": 1, "description": "受注明細を日別に集計する SQL を送る。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
+  control: {"label": "Coordinator", "kind": "service", "tier": "flow", "x": 4, "y": 1, "description": "分散計画と Task の実行を調整する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
+  connector: {"label": "Iceberg Connector", "kind": "service", "tier": "flow", "x": 9, "y": 0, "description": "カタログとテーブルメタデータから Split を列挙する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§2"}]}
+  scan: {"label": "Worker・スキャン Task", "kind": "worker", "tier": "flow", "x": 8, "y": 4, "description": "担当 Split を読み、部分集計する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+  data: {"label": "Iceberg・データファイル", "kind": "db", "tier": "flow", "x": 13, "y": 4, "description": "受注明細のファイルを保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§2"}]}
+  reduce: {"label": "Worker・集約 Task", "kind": "worker", "tier": "flow", "x": 4, "y": 4, "description": "Exchange で受け取った部分集計を統合する。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+links:
+  - {"id": "submit", "from": "client", "to": "control", "label": "SQL を送る", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
+  - {"id": "resolve", "from": "control", "to": "connector", "label": "テーブル解決と Split 列挙", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§2"}]}
+  - {"id": "assign", "from": "control", "to": "scan", "label": "Task と Split を割り当てる", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
+  - {"id": "read", "from": "data", "to": "scan", "label": "Connector 経由で対象を読む", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+  - {"id": "exchange", "from": "scan", "to": "reduce", "label": "Exchange で部分集計を渡す", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+  - {"id": "collect", "from": "reduce", "to": "control", "label": "集計結果を返す", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+  - {"id": "return", "from": "control", "to": "client", "label": "結果を取得", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§3"}]}
+scenarios:
+  - id: orders-by-date
+    label: "Iceberg の受注明細を日別集計"
+    evidence: [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]
+    steps:
+      - {"links": ["submit", "resolve"], "note": "Coordinator が SQL を解析し、Iceberg テーブルと読み取り対象の Split を解決する。"}
+      - {"links": ["assign", "read"], "note": "Worker が担当 Split を読み、並列に部分集計する。"}
+      - {"links": ["exchange"], "note": "別 Stage の Task が Exchange 経由で部分集計を受け取り、日別にまとめる。"}
+      - {"links": ["collect", "return"], "note": "Coordinator が最終結果を取得し、クライアントに返す。"}

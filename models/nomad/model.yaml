@@ -1,0 +1,39 @@
+name: Nomad ジョブスケジューリング
+description: 注文 API を Nomad の Evaluation、Allocation、scheduler で配置し、置き換える流れ。
+reference:
+  objectives: [ジョブとクライアントを区別する, Allocation と scheduler の役割を区別する, 注文 API の配置と置き換えを追う]
+  sources:
+    - {title: How Nomad job scheduling works, url: https://developer.hashicorp.com/nomad/docs/concepts/scheduling/how-scheduling-works}
+    - {title: Glossary, url: https://developer.hashicorp.com/nomad/docs/glossary}
+    - {title: Advanced job scheduling, url: https://developer.hashicorp.com/nomad/docs/job-scheduling}
+sources: [docs/reference-nomad.md]
+evidence: [{type: doc, ref: docs/reference-nomad.md#§1}]
+tiers: [{id: control, label: Nomad 制御, z: 1, size: [12, 3]}, {id: runtime, label: ノード実行, z: 0, size: [12, 3]}]
+nodes:
+  job: {label: 注文 API ジョブ, kind: service, tier: control, x: 1, y: 1.5, description: task group と count を宣言する desired state。, evidence: [{type: doc, ref: docs/reference-nomad.md#§1}, {type: doc, ref: docs/reference-nomad.md#§3}]}
+  evaluation: {label: Evaluation, kind: scheduler, tier: control, x: 4, y: 1.5, description: 状態変化を契機に作られるスケジューリング判断単位。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
+  scheduler: {label: Nomad scheduler, kind: scheduler, tier: control, x: 7, y: 1.5, description: feasible node を絞り ranking して Allocation plan を作る。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}, {type: doc, ref: docs/reference-nomad.md#§3}]}
+  allocation: {label: Allocation, kind: service, tier: runtime, x: 2, y: 1.5, description: task group と client node の対応を表す割り当て。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
+  client: {label: Nomad client node, kind: host, tier: runtime, x: 6, y: 1.5, description: Allocation を受け注文 API task を実行するノード。, evidence: [{type: doc, ref: docs/reference-nomad.md#§1}, {type: doc, ref: docs/reference-nomad.md#§4}]}
+  deployment: {label: Deployment, kind: service, tier: runtime, x: 10, y: 1.5, description: update と健全性に従い段階的な変更を監視する。, evidence: [{type: doc, ref: docs/reference-nomad.md#§4}]}
+links:
+  - {id: submit, from: job, to: evaluation, label: ジョブを評価, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
+  - {id: plan, from: evaluation, to: scheduler, label: 評価を処理, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
+  - {id: allocate, from: scheduler, to: allocation, label: Allocation plan, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}, {type: doc, ref: docs/reference-nomad.md#§3}]}
+  - {id: run, from: allocation, to: client, label: task を実行, evidence: [{type: doc, ref: docs/reference-nomad.md#§4}]}
+  - {id: replace, from: deployment, to: evaluation, label: 次の評価, evidence: [{type: doc, ref: docs/reference-nomad.md#§4}]}
+scenarios:
+  - id: order-api
+    label: 注文 API のデプロイ
+    evidence: [{type: doc, ref: docs/reference-nomad.md#§1}, {type: doc, ref: docs/reference-nomad.md#§2}, {type: doc, ref: docs/reference-nomad.md#§3}]
+    steps:
+      - {links: [submit], note: service ジョブを登録する。}
+      - {links: [plan, allocate], note: Evaluation を scheduler が処理し、Allocation plan を作る。}
+      - {links: [run], note: Allocation を client node に置き注文 API task を実行する。}
+  - id: replacement
+    label: 注文 API の置き換え
+    evidence: [{type: doc, ref: docs/reference-nomad.md#§4}, {type: doc, ref: docs/reference-nomad.md#§5}]
+    steps:
+      - {links: [replace], note: 更新または障害で次の Evaluation を発行する。}
+      - {links: [plan, allocate], note: scheduler が停止・更新・新規 Allocation を計画する。}
+      - {links: [run], note: client が新 Allocation を実行し、Deployment が健全性を確認する。}

@@ -1,0 +1,37 @@
+name: "Microsoft Fabric の基本アーキテクチャ"
+description: "受注データを OneLake に置き、Lakehouse の Delta テーブルを SQL と Power BI で利用します。"
+reference:
+  objectives: ["OneLake、Lakehouse、Spark、SQL 分析エンドポイントの役割を区別する。", "一つの Delta テーブルを更新と分析で共有する流れを追う。"]
+  sources:
+    - {"title": "Microsoft Learn · Microsoft Fabric", "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview"}
+    - {"title": "Microsoft Learn · OneLake", "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"}
+    - {"title": "Microsoft Learn · SQL analytics endpoint", "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"}
+    - {title: Microsoft Learn · Fabric Lakehouse, url: "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"}
+sources: [docs/reference-microsoft-fabric.md]
+evidence: [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§1"}]
+tiers:
+  - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+nodes:
+  source: {"label": "受注データ", "kind": "external", "tier": "flow", "x": 0, "y": 3, "description": "取り込み元。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  pipeline: {"label": "Fabric パイプライン", "kind": "service", "tier": "flow", "x": 4, "y": 3, "description": "受注ファイルをコピーする。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  files: {"label": "OneLake・Files", "kind": "db", "tier": "flow", "x": 8, "y": 3, "description": "受注ファイルを置く。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  spark: {"label": "Spark ノートブック", "kind": "worker", "tier": "flow", "x": 12, "y": 3, "description": "型や欠損値を確認する。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  delta: {"label": "OneLake・Delta テーブル", "kind": "db", "tier": "flow", "x": 16, "y": 3, "description": "分析用明細を保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§1"}]}
+  sql: {"label": "SQL 分析エンドポイント", "kind": "service", "tier": "flow", "x": 12, "y": 0, "description": "Delta テーブルの読み取り口。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
+  bi: {"label": "Power BI", "kind": "client", "tier": "flow", "x": 8, "y": 0, "description": "集計結果を可視化する。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
+links:
+  - {"id": "extract", "from": "source", "to": "pipeline", "label": "受注データを取得", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  - {"id": "copy", "from": "pipeline", "to": "files", "label": "Files にコピー", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  - {"id": "load", "from": "files", "to": "spark", "label": "取り込んだデータを読む", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  - {"id": "write", "from": "spark", "to": "delta", "label": "Delta テーブルに書く", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
+  - {"id": "read", "from": "delta", "to": "sql", "label": "明細を SQL で読む", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
+  - {"id": "report", "from": "sql", "to": "bi", "label": "売上を表示", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
+scenarios:
+  - id: report-sales
+    label: "受注データから売上レポートへ"
+    evidence: [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§1"}]
+    steps:
+      - {"links": ["extract", "copy"], "note": "Fabric のパイプラインで受注ファイルを OneLake に取り込む。"}
+      - {"links": ["load", "write"], "note": "Spark で受注を整え、分析用 Delta テーブルに書き込む。"}
+      - {"links": ["read"], "note": "SQL 分析エンドポイントが Delta テーブルから売上を集計する。"}
+      - {"links": ["report"], "note": "Power BI が SQL 接続経由で集計結果を表示する。"}

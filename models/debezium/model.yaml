@@ -1,0 +1,41 @@
+name: Debezium の CDC アーキテクチャ
+description: PostgreSQL の初期スナップショットと変更ログを CDC イベントとして Kafka へ届ける流れを追います。
+reference:
+  objectives:
+    - 初期スナップショットと変更ログ捕捉を区別する。
+    - Source Connector、Kafka Topic、下流 Consumer の役割を追う。
+    - オフセットから再開する前提を理解する。
+  sources:
+    - {title: Debezium Architecture, url: https://debezium.io/documentation/reference/stable/architecture.html}
+    - {title: PostgreSQL connector, url: https://debezium.io/documentation/reference/stable/connectors/postgresql.html}
+sources: [docs/reference-debezium.md]
+evidence: [{type: doc, ref: docs/reference-debezium.md#§1}, {type: doc, ref: docs/reference-debezium.md#§6}, {type: doc, ref: docs/reference-debezium.md#§7}]
+tiers:
+  - {id: flow, label: CDC データフロー, z: 0, size: [18, 3]}
+  - {id: control, label: 実行と再開, z: 1, origin: [4, 0], size: [10, 3]}
+nodes:
+  database: {label: PostgreSQL 注文DB, kind: db, tier: flow, x: 0, y: 1.5, description: 受注テーブルとWALを持つ。, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}]}
+  logical: {label: 論理レプリケーション, kind: service, tier: flow, x: 3, y: 1.5, description: WALの変更を公開する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§3}]}
+  connector: {label: Debezium Source Connector, kind: worker, tier: flow, x: 6, y: 1.5, description: スナップショットと変更をイベント化する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}, {type: doc, ref: docs/reference-debezium.md#§4}]}
+  worker: {label: Kafka Connect Worker, kind: service, tier: control, x: 5, y: 1.5, description: Connector Taskを実行する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  topic: {label: Kafka Topic, kind: queue, tier: flow, x: 10, y: 1.5, description: CDCイベントを保持する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  offset: {label: CDC オフセット, kind: db, tier: control, x: 10, y: 1.5, description: ログの読み取り位置を保持する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§5}]}
+  consumer: {label: 下流 Consumer, kind: service, tier: flow, x: 14, y: 1.5, description: Topicのイベントを購読する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+links:
+  - {id: snapshot, from: database, to: connector, label: 初期スナップショット, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}]}
+  - {id: repl, from: database, to: logical, label: WALの変更を公開, evidence: [{type: doc, ref: docs/reference-debezium.md#§3}]}
+  - {id: capture, from: logical, to: connector, label: 変更を捕捉, evidence: [{type: doc, ref: docs/reference-debezium.md#§3}]}
+  - {id: execute, from: worker, to: connector, label: Source Taskを実行, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  - {id: publish, from: connector, to: topic, label: CDCイベントを発行, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  - {id: position, from: connector, to: offset, label: ログ位置を記録, evidence: [{type: doc, ref: docs/reference-debezium.md#§5}]}
+  - {id: consume, from: topic, to: consumer, label: イベントを購読, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  - {id: resume, from: offset, to: connector, label: 位置から再開, evidence: [{type: doc, ref: docs/reference-debezium.md#§5}]}
+scenarios:
+  - {id: initial-cdc, label: 初回同期から継続CDC, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}], steps: [{links: [execute, snapshot], note: WorkerがConnectorを起動し、まず既存行のスナップショットを読む。}, {links: [repl, capture], note: スナップショット後に変更ログを読む。}, {links: [publish, position], note: イベントを発行し読み取り位置を記録する。}, {links: [consume], note: 下流Consumerがイベントを購読する。}]}
+  - {id: restart, label: Connector再起動, evidence: [{type: doc, ref: docs/reference-debezium.md#§5}], steps: [{links: [resume], note: 記録済みログ位置から再開する。}, {links: [publish], note: 重複処理の要否は下流設計に依存する。}]}
+requirements:
+  - {id: BR-01, kind: usecase, title: 初回同期と継続CDC, text: 既存行を取り込んだ後も変更イベントを配信する。, links: [repl, capture, publish], evidence: [{type: doc, ref: docs/reference-debezium.md#§2}]}
+  - {id: NFR-01, kind: nfr, title: 再開可能性, text: 記録済み位置を使って再開できる前提を明示する。, links: [position, resume], evidence: [{type: doc, ref: docs/reference-debezium.md#§5}]}
+unknowns:
+  - {id: UNK-01, text: 実環境のスナップショットモード、topic命名、重複排除方式は未確定。, refs: [capture, publish]}
+gates: {maxDrift: 0, maxHigh: 0}

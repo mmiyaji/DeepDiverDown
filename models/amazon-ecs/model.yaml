@@ -1,0 +1,39 @@
+name: Amazon ECS サービススケジューリング
+description: Fargate と EC2 の実行方式を比較し、注文 API のタスク配置と障害時の置き換えを追います。
+reference:
+  objectives: [Fargate と EC2 の実行方式、および capacity provider の違いを区別する, desired count を維持するサービススケジューラーとタスク配置を区別する, 注文 API のデプロイと失敗タスクの置き換えを追う]
+  sources:
+    - {title: Amazon ECS scheduling tasks, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/scheduling_tasks.html}
+    - {title: Amazon ECS service deployment controllers and strategies, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_service-options.html}
+sources: [docs/reference-amazon-ecs.md]
+evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}]
+tiers: [{id: control, label: ECS 制御, z: 1, size: [12, 3]}, {id: runtime, label: 実行基盤, z: 0, size: [12, 3]}]
+nodes:
+  service: {label: ECS Service（注文 API）, kind: service, tier: control, x: 1, y: 1.5, description: desired count と更新方針を持つ長時間稼働サービス。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
+  scheduler: {label: サービススケジューラー, kind: scheduler, tier: control, x: 5, y: 1.5, description: desired count を維持し、起動・停止・置き換えを調整する。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§2}, {type: doc, ref: docs/reference-amazon-ecs.md#§4}]}
+  placement: {label: タスク配置, kind: service, tier: control, x: 9, y: 1.5, description: 実行方式、容量、制約、配置戦略を使い候補を選ぶ仕組み。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  fargate: {label: Fargate タスク, kind: worker, tier: runtime, x: 2, y: 1.5, description: AWS 管理のサーバーレス実行方式。AZ 間の均衡を試みる。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  ec2: {label: EC2 コンテナインスタンス, kind: host, tier: runtime, x: 6, y: 1.5, description: 登録済みインスタンスの CPU・メモリ・属性を使う実行基盤。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  alb: {label: ロードバランサー, kind: gateway, tier: runtime, x: 10, y: 1.5, description: ECS Service の注文 API へリクエストを転送する入口。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
+links:
+  - {id: define, from: service, to: scheduler, label: desired state を登録, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
+  - {id: choose, from: scheduler, to: placement, label: 配置を依頼, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  - {id: fargate-place, from: placement, to: fargate, label: Fargate に配置, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  - {id: ec2-place, from: placement, to: ec2, label: EC2 に配置, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  - {id: route, from: alb, to: service, label: API リクエスト, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
+  - {id: replace, from: scheduler, to: placement, label: 失敗タスクを再配置, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§4}]}
+scenarios:
+  - id: order-api
+    label: 注文 API のデプロイ
+    evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}, {type: doc, ref: docs/reference-amazon-ecs.md#§3}]
+    steps:
+      - {links: [define], note: ECS Service に注文 API のタスク定義と desired count を登録する。}
+      - {links: [choose], note: サービススケジューラーが実行方式・容量・制約を使って配置候補を決める。}
+      - {links: [fargate-place, ec2-place, route], note: Fargate または EC2 にタスクを置き、ロードバランサーから API を受ける。}
+  - id: replacement
+    label: 注文 API タスクの置き換え
+    evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§4}, {type: doc, ref: docs/reference-amazon-ecs.md#§5}]
+    steps:
+      - {links: [define], note: 実行中タスクの停止・失敗を ECS Service が検知する。}
+      - {links: [replace], note: サービススケジューラーが desired count を満たす置き換えを計画する。}
+      - {links: [choose, fargate-place, ec2-place], note: 配置条件を再評価し、Fargate または適合する EC2 へ新タスクを置く。}

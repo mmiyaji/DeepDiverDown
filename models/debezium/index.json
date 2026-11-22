@@ -1,0 +1,189 @@
+{
+  "model": "debezium",
+  "name": "Debezium の CDC アーキテクチャ",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "database": {
+      "type": "node",
+      "label": "PostgreSQL 注文DB",
+      "status": "claim"
+    },
+    "logical": {
+      "type": "node",
+      "label": "論理レプリケーション",
+      "status": "claim"
+    },
+    "connector": {
+      "type": "node",
+      "label": "Debezium Source Connector",
+      "status": "claim"
+    },
+    "worker": {
+      "type": "node",
+      "label": "Kafka Connect Worker",
+      "status": "claim"
+    },
+    "topic": {
+      "type": "node",
+      "label": "Kafka Topic",
+      "status": "claim"
+    },
+    "offset": {
+      "type": "node",
+      "label": "CDC オフセット",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "下流 Consumer",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "link",
+      "label": "PostgreSQL 注文DB → Debezium Source Connector",
+      "status": "claim"
+    },
+    "repl": {
+      "type": "link",
+      "label": "PostgreSQL 注文DB → 論理レプリケーション",
+      "status": "claim"
+    },
+    "capture": {
+      "type": "link",
+      "label": "論理レプリケーション → Debezium Source Connector",
+      "status": "claim"
+    },
+    "execute": {
+      "type": "link",
+      "label": "Kafka Connect Worker → Debezium Source Connector",
+      "status": "claim"
+    },
+    "publish": {
+      "type": "link",
+      "label": "Debezium Source Connector → Kafka Topic",
+      "status": "claim"
+    },
+    "position": {
+      "type": "link",
+      "label": "Debezium Source Connector → CDC オフセット",
+      "status": "claim"
+    },
+    "consume": {
+      "type": "link",
+      "label": "Kafka Topic → 下流 Consumer",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "link",
+      "label": "CDC オフセット → Debezium Source Connector",
+      "status": "claim"
+    },
+    "initial-cdc": {
+      "type": "scenario",
+      "label": "初回同期から継続CDC"
+    },
+    "restart": {
+      "type": "scenario",
+      "label": "Connector再起動"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "初回同期と継続CDC",
+      "status": "claim"
+    },
+    "NFR-01": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "再開可能性",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境のスナップショットモード、topic命名、重複排除方式は未確定。"
+    }
+  },
+  "byRef": {
+    "docs/reference-debezium.md#§1": [
+      "model"
+    ],
+    "docs/reference-debezium.md": [
+      "model",
+      "database",
+      "logical",
+      "connector",
+      "worker",
+      "topic",
+      "offset",
+      "consumer",
+      "snapshot",
+      "repl",
+      "capture",
+      "execute",
+      "publish",
+      "position",
+      "consume",
+      "resume",
+      "initial-cdc",
+      "restart",
+      "BR-01",
+      "NFR-01"
+    ],
+    "docs/reference-debezium.md#§6": [
+      "model"
+    ],
+    "docs/reference-debezium.md#§7": [
+      "model"
+    ],
+    "docs/reference-debezium.md#§2": [
+      "database",
+      "connector",
+      "snapshot",
+      "initial-cdc",
+      "BR-01"
+    ],
+    "docs/reference-debezium.md#§3": [
+      "logical",
+      "repl",
+      "capture"
+    ],
+    "docs/reference-debezium.md#§4": [
+      "connector",
+      "worker",
+      "topic",
+      "consumer",
+      "execute",
+      "publish",
+      "consume"
+    ],
+    "docs/reference-debezium.md#§5": [
+      "offset",
+      "position",
+      "resume",
+      "restart",
+      "NFR-01"
+    ]
+  },
+  "reference": {
+    "category": "データ取り込み",
+    "order": 20,
+    "objectives": [
+      "初期スナップショットと変更ログ捕捉を区別する。",
+      "Source Connector、Kafka Topic、下流 Consumer の役割を追う。",
+      "オフセットから再開する前提を理解する。"
+    ],
+    "sources": [
+      {
+        "title": "Debezium Architecture",
+        "url": "https://debezium.io/documentation/reference/stable/architecture.html"
+      },
+      {
+        "title": "PostgreSQL connector",
+        "url": "https://debezium.io/documentation/reference/stable/connectors/postgresql.html"
+      }
+    ]
+  }
+}

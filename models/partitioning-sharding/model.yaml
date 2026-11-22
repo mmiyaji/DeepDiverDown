@@ -1,0 +1,61 @@
+name: "データ配置と並列性：パーティショニングとシャーディング"
+description: "注文データを order_date の時間パーティションと customer_id のハッシュシャードへ配置し、書き込み・読み出し・タスク並列化の違いを追うリファレンスです。"
+reference:
+  objectives:
+    - "時間パーティション、ファイル／テーブル保存単位、ハッシュシャードを区別する。"
+    - "order_date と customer_id から書き込み・読み出し先を決める流れを説明する。"
+    - "選択的検索、全体集計のタスク分割、ホットスポットと偏りのトレードオフを理解する。"
+  sources:
+    - {title: "PostgreSQL Table Partitioning", url: "https://www.postgresql.org/docs/current/ddl-partitioning.html"}
+    - {title: "Apache Iceberg Partitioning", url: "https://iceberg.apache.org/docs/latest/partitioning/"}
+    - {title: "Amazon DynamoDB Partitions", url: "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html"}
+    - {title: "DynamoDB Partition Key Design", url: "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html"}
+    - {title: "Trino・Tasks と Splits", url: "https://trino.io/docs/current/overview/concepts.html#split"}
+sources: ["docs/reference-partitioning-sharding.md"]
+evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§1"}]
+tiers:
+  - {id: "ingress", label: "注文受付", kind: "origin", z: 1, origin: [-5, 0], size: [2.5, 4]}
+  - {id: "routing", label: "キー計算とルーティング", z: 1, size: [5, 4]}
+  - {id: "storage", label: "時間パーティション内の保存", z: 0, size: [10, 6]}
+  - {id: "compute", label: "読み出しタスク", z: 1, origin: [10, 0], size: [3.5, 6]}
+nodes:
+  order-api:
+    {label: "注文 API", kind: "service", tier: "ingress", x: 0, y: 2, description: "order_date と customer_id を含む注文を受け、論理的な orders へ書き込む。", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§4"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§7"}]}
+  partition-router:
+    {label: "パーティション／シャードルーター", kind: "service", tier: "routing", x: 1, y: 2, description: "order_date で時間パーティションを選び、customer_id のハッシュでシャードを選ぶ。", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§3"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§4"}]}
+  orders-table:
+    {label: "論理 orders テーブル", kind: "db", tier: "storage", x: 0, y: 1, description: "利用者からは1つに見える注文表。物理パーティションの親となる論理単位。", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§1"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§2"}]}
+  time-partition:
+    {label: "order_date 時間パーティション", kind: "db", tier: "storage", x: 3, y: 1, description: "order_date の月・日などの範囲で分けた表またはファイル群。期間検索と保持期限管理の単位。", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§2"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§4"}]}
+  hash-shard-a:
+    {label: "customer_id ハッシュシャード A", kind: "db", tier: "storage", x: 6, y: 1, description: "時間パーティション内で hash(customer_id) の一部を担当する保存先の例。", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§3"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§6"}]}
+  hash-shard-b:
+    {label: "customer_id ハッシュシャード B", kind: "db", tier: "storage", x: 6, y: 4, description: "同じ論理的な時間範囲の別ハッシュ値を担当する保存先の例。", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§3"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§6"}]}
+  query-worker:
+    {label: "並列クエリタスク", kind: "worker", tier: "compute", x: 0, y: 3, description: "複数パーティション・シャードを読む部分タスクを実行し、部分集計をマージする。", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§5"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§7"}]}
+links:
+  - {id: "route-write", from: "order-api", to: "partition-router", label: "注文を書き込む", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§4"}]}
+  - {id: "logical-write", from: "partition-router", to: "orders-table", label: "論理 orders へルーティング", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§4"}]}
+  - {id: "time-route", from: "orders-table", to: "time-partition", label: "order_date で範囲選択", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§2"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§4"}]}
+  - {id: "hash-route-a", from: "time-partition", to: "hash-shard-a", label: "customer_id のハッシュ", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§3"}]}
+  - {id: "hash-route-b", from: "time-partition", to: "hash-shard-b", label: "customer_id のハッシュ", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§3"}]}
+  - {id: "selective-read", from: "hash-shard-a", to: "query-worker", label: "顧客検索の対象を読む", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§5"}]}
+  - {id: "parallel-read", from: "hash-shard-b", to: "query-worker", label: "集計タスクを並列実行", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§5"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§7"}]}
+  - {id: "merge", from: "query-worker", to: "orders-table", label: "部分結果をマージ", evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§5"}]}
+scenarios:
+  - id: "order-routing"
+    label: "注文の書き込みと顧客検索"
+    evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§7"}]
+    steps:
+      - {links: ["route-write"], note: "注文 API が order_date と customer_id を含む注文をルーターへ渡す。"}
+      - {links: ["logical-write", "time-route"], note: "ルーターが論理 orders から当日の時間パーティションを選ぶ。"}
+      - {links: ["hash-route-a", "hash-route-b"], note: "customer_id のハッシュで担当シャードを決め、書き込みを分散する。"}
+      - {links: ["selective-read"], note: "顧客別検索では同じキーから候補シャードを絞って読む。"}
+  - id: "parallel-aggregation"
+    label: "月次集計のタスク並列化"
+    evidence: [{type: "doc", ref: "docs/reference-partitioning-sharding.md#§5"}, {type: "doc", ref: "docs/reference-partitioning-sharding.md#§7"}]
+    steps:
+      - {links: ["time-route"], note: "対象期間の時間パーティションを列挙する。"}
+      - {links: ["parallel-read"], note: "複数シャードを部分タスクへ分け、並列に読み出す。"}
+      - {links: ["merge"], note: "部分集計をマージし、ホットシャードや欠落をメトリクスで確認する。"}
+gates: {maxDrift: 0, maxHigh: 0}

@@ -1,0 +1,37 @@
+name: データレイクハウスの基本アーキテクチャ（Apache Iceberg 例）
+description: 計算、Catalog、Iceberg のメタデータ、オブジェクトストレージ上のデータを分離して追うリファレンスです。
+reference:
+  objectives:
+    - 計算エンジン、Catalog、snapshot/manifest、データファイルの役割を区別する。
+    - Iceberg の metadata tree から必要なデータファイルを選ぶ流れを理解する。
+    - 書き込みコミットでテーブルの snapshot が切り替わることを追う。
+  sources:
+    - {title: Databricks Reference Architectures, url: "https://docs.databricks.com/aws/en/lakehouse-architecture/reference"}
+    - {title: Apache Iceberg Terms, url: "https://iceberg.apache.org/terms/"}
+    - {title: Apache Iceberg Java API, url: "https://iceberg.apache.org/docs/latest/api/"}
+sources: [docs/reference-data-lakehouse.md]
+evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§1"}]
+tiers:
+  - {id: lakehouse, label: 計算・Catalog・データとメタデータ, kind: origin, z: 0, size: [18, 3]}
+nodes:
+  engine: {label: Compute Engine, kind: service, tier: lakehouse, x: 0, y: 1.5, description: ETL とクエリを実行し、テーブルを読み書きする。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§2"}]}
+  catalog: {label: Catalog, kind: service, tier: lakehouse, x: 4, y: 0.8, description: テーブル名、場所、スキーマを解決する入口。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§3"}]}
+  snapshot: {label: Iceberg Snapshot, kind: db, tier: lakehouse, x: 8, y: 1.5, description: ある時点のテーブル状態を指す。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
+  manifests: {label: Manifest List / Files, kind: db, tier: lakehouse, x: 12, y: 1.5, description: Snapshot を構成するデータファイルと統計を列挙する。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
+  data: {label: Data Files, kind: db, tier: lakehouse, x: 16, y: 1.5, description: オブジェクトストレージに置かれたテーブル行データ。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§2"}]}
+  metadata: {label: Table Metadata, kind: db, tier: lakehouse, x: 16, y: 2.7, description: スキーマ、snapshot、manifest への参照を保持する。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
+links:
+  - {id: resolve, from: engine, to: catalog, label: テーブルを解決, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§3"}]}
+  - {id: commit, from: engine, to: snapshot, label: 新しい snapshot をコミット, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§5"}]}
+  - {id: index, from: snapshot, to: manifests, label: manifest を参照, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
+  - {id: list-data, from: manifests, to: data, label: 必要なデータファイルを選択, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
+  - {id: write-data, from: engine, to: data, label: データファイルを書き込む, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§5"}]}
+  - {id: write-meta, from: engine, to: metadata, label: テーブルメタデータを更新, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§5"}]}
+scenarios:
+  - id: iceberg-read-write
+    label: Iceberg テーブルの書き込みと読み出し
+    evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§1"}, {type: doc, ref: "docs/reference-data-lakehouse.md#§6"}]
+    steps:
+      - {links: [resolve, write-data, write-meta], note: 計算エンジンが Catalog でテーブルを解決し、データとメタデータを書き込む。}
+      - {links: [commit, index], note: コミットで新しい snapshot が manifest を参照する。}
+      - {links: [list-data], note: 読み手は manifest の情報から必要なデータファイルだけを選ぶ。}

@@ -1,0 +1,225 @@
+{
+  "model": "sorting-pruning",
+  "name": "読み取りの絞り込み：ソートとプルーニング",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "analyst": {
+      "type": "node",
+      "label": "Analyst / SQL",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "Query engine",
+      "status": "claim"
+    },
+    "orders": {
+      "type": "node",
+      "label": "orders table",
+      "status": "claim"
+    },
+    "partitions": {
+      "type": "node",
+      "label": "order_date partitions",
+      "status": "claim"
+    },
+    "blocks": {
+      "type": "node",
+      "label": "customer_id blocks/files",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "Remaining scan",
+      "status": "claim"
+    },
+    "result": {
+      "type": "node",
+      "label": "Result / ORDER BY",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "Analyst / SQL → Query engine",
+      "status": "claim"
+    },
+    "layout": {
+      "type": "link",
+      "label": "orders table → order_date partitions",
+      "status": "claim"
+    },
+    "cluster": {
+      "type": "link",
+      "label": "orders table → customer_id blocks/files",
+      "status": "claim"
+    },
+    "partition-prune": {
+      "type": "link",
+      "label": "Query engine → order_date partitions",
+      "status": "claim"
+    },
+    "block-skip": {
+      "type": "link",
+      "label": "Query engine → customer_id blocks/files",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "customer_id blocks/files → Remaining scan",
+      "status": "claim"
+    },
+    "return": {
+      "type": "link",
+      "label": "Remaining scan → Result / ORDER BY",
+      "status": "claim"
+    },
+    "order": {
+      "type": "link",
+      "label": "Query engine → Result / ORDER BY",
+      "status": "claim"
+    },
+    "month-customer": {
+      "type": "scenario",
+      "label": "月と顧客を指定する"
+    },
+    "stored-vs-order": {
+      "type": "scenario",
+      "label": "保存順序と結果順序を分ける"
+    },
+    "weak-predicate": {
+      "type": "scenario",
+      "label": "述語が絞り込みに効かない場合"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "段階的な読み取り削減",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "ORDER BY の意味を分離",
+      "status": "claim"
+    },
+    "NFR-01": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "実装差を明示",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実際のエンジン、ファイル形式、統計の粒度、再クラスタリング頻度は未確定。"
+    }
+  },
+  "byRef": {
+    "docs/reference-sorting-pruning.md#§1": [
+      "model",
+      "NFR-01"
+    ],
+    "docs/reference-sorting-pruning.md": [
+      "model",
+      "analyst",
+      "query",
+      "orders",
+      "partitions",
+      "blocks",
+      "scan",
+      "result",
+      "submit",
+      "layout",
+      "cluster",
+      "partition-prune",
+      "block-skip",
+      "read",
+      "return",
+      "order",
+      "month-customer",
+      "stored-vs-order",
+      "weak-predicate",
+      "BR-01",
+      "BR-02",
+      "NFR-01"
+    ],
+    "docs/reference-sorting-pruning.md#§2": [
+      "model",
+      "orders",
+      "result",
+      "layout",
+      "cluster",
+      "order",
+      "BR-02"
+    ],
+    "docs/reference-sorting-pruning.md#§3": [
+      "model",
+      "analyst",
+      "query",
+      "partitions",
+      "blocks",
+      "submit",
+      "layout",
+      "partition-prune",
+      "block-skip",
+      "BR-01"
+    ],
+    "docs/reference-sorting-pruning.md#§4": [
+      "model",
+      "scan",
+      "result",
+      "read",
+      "return",
+      "order",
+      "BR-01",
+      "BR-02"
+    ],
+    "docs/reference-sorting-pruning.md#§5": [
+      "model",
+      "query",
+      "blocks",
+      "NFR-01"
+    ],
+    "docs/reference-sorting-pruning.md#§7": [
+      "model"
+    ],
+    "docs/reference-sorting-pruning.md#§6.1": [
+      "month-customer"
+    ],
+    "docs/reference-sorting-pruning.md#§6.2": [
+      "stored-vs-order"
+    ],
+    "docs/reference-sorting-pruning.md#§6.3": [
+      "weak-predicate"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 20,
+    "objectives": [
+      "保存時のソート／クラスタリングとクエリの ORDER BY を区別する。",
+      "order_date のパーティション・プルーニングと customer_id のブロック／ファイル・スキップを別の最適化として追う。",
+      "最適化後に残ったデータをスキャンし、必要なら結果を並べ替える流れを説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Query partitioned tables",
+        "url": "https://cloud.google.com/bigquery/docs/querying-partitioned-tables"
+      },
+      {
+        "title": "Introduction to clustered tables",
+        "url": "https://cloud.google.com/bigquery/docs/clustered-tables"
+      },
+      {
+        "title": "Query clustered tables",
+        "url": "https://cloud.google.com/bigquery/docs/querying-clustered-tables"
+      },
+      {
+        "title": "Apache Iceberg Specification - Sorting",
+        "url": "https://iceberg.apache.org/spec/#sorting"
+      }
+    ]
+  }
+}

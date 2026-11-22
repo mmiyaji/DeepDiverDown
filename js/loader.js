@@ -1,5 +1,6 @@
 /* モデルの読み込み：リポジトリのモデル（registry.json）と、ブラウザに読み込んだローカルのモデル */
 const LOCAL = 'ddd.local';      // 読み込んだ YAML（最大 5 件）
+const DESIGNS = 'ddd.designs'; // 要件定義・設計モードの下書き
 const CMP = 'ddd.compare.';     // モデルごとの比較対象 YAML
 
 const store = {
@@ -24,20 +25,34 @@ export function validate(m) {
   return e;
 }
 
+export const loadDesignDrafts = () => store.get(DESIGNS, {});
+export function saveDesignDraft(draft) {
+  return store.set(DESIGNS, { ...loadDesignDrafts(), [draft.id]: draft });
+}
+
 export async function loadRegistry() {
   const reg = JSON.parse(await text('models/registry.json'));
   const local = store.get(LOCAL, []).map(x => ({ id: x.id, local: true, name: x.name }));
-  return [...reg, ...local];
+  const designs = Object.values(loadDesignDrafts()).filter(d => d.opened)
+    .map(d => ({ id: d.id, name: d.model.name, design: true }));
+  return [...reg, ...local, ...designs];
 }
 
 export async function loadEntry(entry) {
+  if (entry.design) {
+    const draft = loadDesignDrafts()[entry.id];
+    return { model: Layout.apply(draft.model), actual: null, docs: await loadDocs(draft.model) };
+  }
   if (entry.local) {
     const x = store.get(LOCAL, []).find(y => y.id === entry.id);
     return { model: Layout.apply(jsyaml.load(x.yaml)), actual: null, docs: {} };
   }
   const model = Layout.apply(jsyaml.load(await text(`models/${entry.id}/model.yaml`)));
-  const actual = entry.actual ? jsyaml.load(await text(`models/${entry.id}/actual.yaml`)) : null;
-  return { model, actual, docs: await loadDocs(model) };
+  const [actual, docs] = await Promise.all([
+    entry.actual ? text(`models/${entry.id}/actual.yaml`).then(raw => jsyaml.load(raw)) : null,
+    loadDocs(model),
+  ]);
+  return { model, actual, docs };
 }
 
 export async function loadDocs(model) {

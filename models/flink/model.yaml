@@ -1,0 +1,38 @@
+name: Apache Flink の基本アーキテクチャ
+description: Kafka のイベントをイベント時刻の窓で集計し、状態とチェックポイントから復旧する流れを追うリファレンスです。
+reference:
+  objectives:
+    - Source、ウォーターマーク、状態付き演算子、Sink の役割を区別する。
+    - イベント時刻とウォーターマークで窓を閉じる流れを理解する。
+    - チェックポイントから入力位置と演算子状態を復元する。
+  sources:
+    - {title: Stateful Stream Processing, url: "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/"}
+    - {title: Timely Stream Processing, url: "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"}
+sources: [docs/reference-flink.md]
+evidence: [{type: doc, ref: "docs/reference-flink.md#§1"}]
+tiers:
+  - {id: flow, label: 入力と並列データフロー, kind: origin, z: 0, size: [12, 3]}
+  - {id: fault, label: 障害復旧, z: 1, origin: [0, 0], size: [18, 3]}
+nodes:
+  source: {label: Kafka Source, kind: queue, tier: flow, x: 0, y: 1.5, description: Kafka からイベントと読み取り位置を取得する。, evidence: [{type: doc, ref: "docs/reference-flink.md#§2"}]}
+  watermark: {label: Watermark Generator, kind: service, tier: flow, x: 3, y: 1.5, description: イベント時刻の進行をウォーターマークで示す。, evidence: [{type: doc, ref: "docs/reference-flink.md#§3"}]}
+  operator: {label: Window Operator, kind: worker, tier: flow, x: 7, y: 1.5, description: キーごとの窓状態を更新し、窓を閉じて結果を作る。, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}]}
+  sink: {label: Sink, kind: db, tier: flow, x: 11, y: 1.5, description: 窓集計の結果を下流システムへ書く。, evidence: [{type: doc, ref: "docs/reference-flink.md#§6"}]}
+  state: {label: Keyed State, kind: db, tier: fault, x: 7, y: 1.5, description: キー付き演算子の集計状態をスナップショット対象として保持する。Operator State とは区別する。, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}, {type: doc, ref: "docs/reference-flink.md#§5"}]}
+  checkpoint: {label: Checkpoint, kind: db, tier: fault, x: 11, y: 1.5, description: 入力位置と演算子状態の一貫したスナップショット。, evidence: [{type: doc, ref: "docs/reference-flink.md#§5"}]}
+links:
+  - {id: ingest, from: source, to: watermark, label: イベントを取り込む, evidence: [{type: doc, ref: "docs/reference-flink.md#§2"}]}
+  - {id: advance, from: watermark, to: operator, label: 時刻を進める, evidence: [{type: doc, ref: "docs/reference-flink.md#§3"}]}
+  - {id: aggregate, from: operator, to: state, label: 窓状態を更新, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}]}
+  - {id: emit, from: operator, to: sink, label: 窓結果を出力, evidence: [{type: doc, ref: "docs/reference-flink.md#§6"}]}
+  - {id: snapshot, from: operator, to: checkpoint, label: 状態と入力位置をスナップショット, evidence: [{type: doc, ref: "docs/reference-flink.md#§5"}]}
+  - {id: restore, from: checkpoint, to: operator, label: 最新成功点から復元, evidence: [{type: doc, ref: "docs/reference-flink.md#§6"}]}
+scenarios:
+  - id: flink-window-recovery
+    label: イベント時刻の窓集計と復旧
+    evidence: [{type: doc, ref: "docs/reference-flink.md#§1"}, {type: doc, ref: "docs/reference-flink.md#§7"}]
+    steps:
+      - {links: [ingest, advance], note: Source がイベントを読み、ウォーターマークでイベント時刻を進める。}
+      - {links: [aggregate], note: Window Operator がキー別の状態を更新する。}
+      - {links: [emit, snapshot], note: 窓結果を Sink へ送り、状態と入力位置をチェックポイントする。}
+      - {links: [restore], note: 障害時は最新成功チェックポイントから演算子を復元する。}

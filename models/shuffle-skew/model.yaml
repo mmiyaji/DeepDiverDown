@@ -1,0 +1,38 @@
+name: "分散実行：シャッフルとデータスキュー"
+description: "受注明細と顧客マスタを並列に結合し、キーの偏りが処理時間に与える影響を追います。"
+reference:
+  objectives: ["シャッフルが必要になる条件とコストを理解する。", "タスクごとのデータ量と実行時間を見比べてスキューを特定する。"]
+  sources:
+    - {"title": "Apache Spark · Shuffle operations", "url": "https://spark.apache.org/docs/latest/rdd-programming-guide.html#shuffle-operations"}
+    - {"title": "Apache Spark · Performance Tuning", "url": "https://spark.apache.org/docs/latest/sql-performance-tuning.html#optimizing-skew-join"}
+    - {"title": "Google Cloud · Query plan and timeline", "url": "https://cloud.google.com/bigquery/docs/query-plan-explanation"}
+sources: [docs/reference-shuffle-skew.md]
+evidence: [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]
+tiers:
+  - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+nodes:
+  orders: {"label": "受注明細・日付範囲", "kind": "db", "tier": "flow", "x": 0, "y": 1, "description": "日付で絞った同じ期間の受注明細。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
+  customers: {"label": "顧客マスタ", "kind": "db", "tier": "flow", "x": 0, "y": 4, "description": "customer_id で対応する属性を保持。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
+  shuffle: {"label": "Shuffle Exchange", "kind": "service", "tier": "flow", "x": 4, "y": 2.5, "description": "結合キーに従って両入力を再配分。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§2"}]}
+  join: {"label": "Join タスク・通常", "kind": "worker", "tier": "flow", "x": 8, "y": 1, "description": "その他の結合キーの担当範囲を処理する。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§2"}]}
+  hot: {"label": "Join タスク・偏りあり", "kind": "worker", "tier": "flow", "x": 8, "y": 4, "description": "一部の顧客キーに受注明細が集中し、担当する入力が大きい。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§3"}]}
+  metrics: {"label": "タスク実行指標", "kind": "service", "tier": "flow", "x": 12, "y": 0, "description": "タスクごとの入力バイト・処理時間を確認。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§3"}]}
+  result: {"label": "結合結果", "kind": "db", "tier": "flow", "x": 16, "y": 2.5, "description": "受注明細に顧客属性を付加した結果。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
+links:
+  - {"id": "scan-orders", "from": "orders", "to": "shuffle", "label": "対象日の明細を送る", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
+  - {"id": "scan-customers", "from": "customers", "to": "shuffle", "label": "マスタを送る", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
+  - {"id": "exchange", "from": "shuffle", "to": "join", "label": "customer_id で振り分ける", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§2"}]}
+  - {"id": "exchange-hot", "from": "shuffle", "to": "hot", "label": "集中したキーを含む範囲を配る", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§2"}]}
+  - {"id": "inspect", "from": "join", "to": "metrics", "label": "タスクごとの負荷を確認", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§3"}]}
+  - {"id": "inspect-hot", "from": "hot", "to": "metrics", "label": "入力バイト・時間の偏りを確認", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§3"}]}
+  - {"id": "write", "from": "join", "to": "result", "label": "属性を付けた明細を書き出す", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
+  - {"id": "write-hot", "from": "hot", "to": "result", "label": "属性を付けた明細を書き出す", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
+scenarios:
+  - id: join-orders
+    label: "受注明細を顧客属性と結合する"
+    evidence: [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]
+    steps:
+      - {"links": ["scan-orders", "scan-customers"], "note": "受注明細は日付で絞り、顧客マスタと合わせて読み込む。"}
+      - {"links": ["exchange", "exchange-hot"], "note": "両側の同じ customer_id が同じ結合タスクに届くようにデータを振り分ける。"}
+      - {"links": ["inspect", "inspect-hot"], "note": "特定の顧客に明細が偏った場合は、タスクごとの処理量や時間のばらつきを調べる。"}
+      - {"links": ["write", "write-hot"], "note": "結合結果に顧客属性を付けて利用側へ渡す。"}

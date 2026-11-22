@@ -1,7 +1,8 @@
 # モデル仕様（v1・YAML）
 
 モデルは `models/<id>/model.yaml`、実環境スナップショットは `models/<id>/actual.yaml`。
-`models/registry.json` に `{ "id": "...", "actual": true|false }` を追加すると画面に出る。
+`models/registry.json` に `{ "id": "...", "name": "一覧での表示名", "actual": true|false }` を追加すると画面に出る。
+一覧はモデル YAML を取得せずに表示するため、登録時は `name` に YAML と同じ表示名を指定する。省略時は ID を表示する。
 
 ```yaml
 name: システム名
@@ -15,6 +16,7 @@ nodes:
   order:
     label: 注文サービス
     kind: service                  # client | cdn | lb | service | worker | db | queue | cache | external | actor
+    shape3D: plug                  # 任意。3D 案1と 2D のシルエット・カード内アイコンの形状を指定（plug | crate）
     tier: app
     x: 3
     y: 1
@@ -80,6 +82,32 @@ tiers: [
 
 ## 複数モデルの登録
 `models/registry.json` に登録し、サイドバーまたは `#/m/<id>/struct` で切り替える。
+
+## アーキテクチャリファレンス
+
+1件につき `models/<id>/model.yaml` に構成部品・接続・シナリオを保持し、`docs/reference-<id>.md` に番号付きの解説を書く。部品や接続の `evidence` から解説の節を参照する。
+
+`models/registry.json` の登録例
+
+```json
+{ "id": "spark", "name": "Apache Spark の基本アーキテクチャ", "actual": false, "reference": { "category": "バッチ処理", "order": 10 } }
+```
+
+- `name` はモデルを開く前に一覧に出す表示名。設計モデルにも指定でき、省略時は ID を表示する。
+- `category` はサイドバー上の分野名。同じ分野を使うリファレンスは同じ文字列で登録する。分野は登録一覧での初出順。
+- `order` は同じ分野内の表示順。小さい数字から表示し、省略時は末尾に置く。
+- モデル YAML の `reference` には学習目標と公式資料を保持できる。次のフィールドは解説文の根拠を指すトップレベルの `sources` と独立している。
+
+```yaml
+reference:
+  objectives:
+    - Driver と Executor の役割を区別する。
+  sources:
+    - title: Apache Spark Cluster Mode Overview
+      url: https://spark.apache.org/docs/latest/cluster-overview.html
+```
+
+`npm run index` で分野・順序・学習目標・資料リンクも索引に格納する。点検は参照先やモデル形式の確認に使える。運用を想定したルールは、個別の運用環境を定義しない解説モデルにも適用される。
 
 ## クラウド構成の表現（js/catalog.js）
 - `node.svc` は `gcp:gke`、`azure:aks`、`oci:adb`、`cloudflare:waf`、`onprem:fw`、`k8s:deployment` のように指定する。`ecs` のように接頭辞を省略すると AWS として扱う。

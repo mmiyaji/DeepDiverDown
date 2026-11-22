@@ -1,0 +1,52 @@
+name: Azure AKS system/user node pools
+description: Azure 管理の AKS コントロールプレーンと system/user node pool を API・デプロイ・置換の順で追います。
+reference:
+  objectives:
+    - AKS のマネージドコントロールプレーンとサブスクリプション側ノードの境界を区別する。
+    - system node pool と user node pool の役割を区別する。
+    - フルアップグレードの control plane → node pool 順序を追う。
+  sources:
+    - {title: AKS core concepts, url: https://learn.microsoft.com/azure/aks/core-aks-concepts}
+    - {title: Create node pools, url: https://learn.microsoft.com/azure/aks/create-node-pools}
+    - {title: Upgrade AKS control plane, url: https://learn.microsoft.com/azure/aks/upgrade-aks-control-plane}
+sources: [docs/reference-azure-aks.md]
+evidence:
+  - {type: doc, ref: docs/reference-azure-aks.md#§1}
+  - {type: doc, ref: docs/reference-azure-aks.md#§6}
+  - {type: doc, ref: docs/reference-azure-aks.md#§7}
+  - {type: doc, ref: docs/reference-azure-aks.md#§8}
+tiers:
+  - {id: interface, label: 利用・管理, z: 2, origin: [-1, 0], size: [12, 3]}
+  - {id: edge, label: 公開・レジストリ, z: 1, origin: [0, 0], size: [12, 3]}
+  - {id: control, label: AKS コントロールプレーン, z: 1, origin: [0, 4], size: [12, 3]}
+  - {id: pools, label: サブスクリプション側ノードプール, z: 0, origin: [0, 8], size: [12, 3]}
+nodes:
+  operator: {label: 運用者, kind: actor, tier: interface, x: 1, y: 1.5, role: ops, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  api: {label: AKS / Kubernetes API, kind: service, svc: azure:aks, tier: control, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§2}]}
+  system: {label: System node pool, kind: worker, svc: azure:aks, tier: pools, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}]}
+  user: {label: User node pool, kind: worker, svc: azure:aks, tier: pools, x: 6, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}]}
+  workload: {label: Deployment / Pods, kind: service, svc: k8s:deployment, tier: pools, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  lb: {label: Azure Load Balancer / Service, kind: lb, svc: azure:load-balancer, tier: edge, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  registry: {label: Azure Container Registry, kind: external, svc: azure:container-registry, tier: edge, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+links:
+  - {id: submit, from: operator, to: api, label: API で desired state を送る, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  - {id: system-schedule, from: api, to: system, label: 基盤 Pod を配置, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}, {type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  - {id: user-schedule, from: api, to: user, label: アプリ Pod を配置, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  - {id: pull, from: user, to: registry, label: イメージを取得, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  - {id: run, from: user, to: workload, label: Pod を実行, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  - {id: expose, from: workload, to: lb, label: Service で公開, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  - {id: replace, from: api, to: user, label: pool を順次 drain・置換, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§5}]}
+scenarios:
+  - id: api-deploy-replace
+    label: API・デプロイ・ノード置換
+    evidence: [{type: doc, ref: docs/reference-azure-aks.md#§7}]
+    steps:
+      - {links: [submit], note: 受付。Azure/Kubernetes API に設定または Deployment を送る。}
+      - {links: [system-schedule, user-schedule, pull, run], note: 配置。system/user pool へ割り当て、ACR から起動する。}
+      - {links: [expose], note: 公開。Service/Azure Load Balancer がワークロードを公開する。}
+      - {links: [replace], note: 置換。control plane 更新後、node pool を順番に drain して新 VM へ再配置する。}
+requirements:
+  - {id: BR-01, kind: usecase, title: system/user 分離デプロイ, text: 基盤 Pod とアプリ Pod を役割別 node pool に配置して公開する。, links: [system-schedule, user-schedule, run, expose], evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}, {type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  - {id: NFR-01, kind: nfr, title: 順序付きアップグレード, text: フルアップグレードを control plane 先行、node pool 順次で実施する。, links: [replace], evidence: [{type: doc, ref: docs/reference-azure-aks.md#§5}]}
+unknowns:
+  - {id: UNK-01, text: 実際のサブスクリプション、リージョン、ゾーン、VM SKU、ノード数、PDB、ネットワーク設定は未確定。, refs: [system, user, workload]}

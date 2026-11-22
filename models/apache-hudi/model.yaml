@@ -1,0 +1,33 @@
+name: Apache Hudi の基本アーキテクチャ
+description: 更新イベントを Hudi のタイムラインへ取り込み、Copy-on-Write と Merge-on-Read を比較します。
+reference:
+  objectives:
+    - Hudi のコミットタイムラインと増分クエリの関係を理解する。
+    - Copy-on-Write と Merge-on-Read の書き込み・読み取り特性を比較する。
+    - Snapshot、Incremental、Read Optimized の各クエリの違いを説明する。
+  sources:
+    - {title: Apache Hudi Concepts, url: https://hudi.apache.org/docs/concepts/}
+sources: [docs/reference-apache-hudi.md]
+evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§1}]
+tiers:
+  - {id: ingest, label: 取り込み, z: 1, size: [17,3]}
+  - {id: storage, label: Hudi テーブル, z: 0, origin: [2,0], size: [15,3]}
+nodes:
+  cdc: {label: CDC / 更新イベント, kind: external, tier: ingest, x: 0, y: 1.5, description: 挿入・更新・削除の変更を届ける。, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§1}]}
+  timeline: {label: Hudi Timeline, kind: queue, tier: storage, x: 3, y: 1.5, description: コミットの履歴と変更の境界を管理する。, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§1}]}
+  cow: {label: Copy-on-Write Base Files, kind: db, shape3D: crate, tier: storage, x: 6, y: 0.5, description: 更新時にベース列ファイルを書き換える経路。, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§2}]}
+  mor: {label: Merge-on-Read Log Files, kind: db, tier: storage, x: 6, y: 2.5, description: 更新をログへ追記し、読み取り時にマージする経路。, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§3}]}
+  compact: {label: Compactor, kind: worker, tier: storage, x: 9, y: 2.5, description: MoR のログをベースファイルへ反映する。, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§3}]}
+  query: {label: Query Engine, kind: service, tier: ingest, x: 12, y: 1.5, description: Snapshot・Incremental・Read Optimized を実行する。, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§4}]}
+  output: {label: 分析結果, kind: external, tier: ingest, x: 15, y: 1.5, description: 下流分析や BI が受け取る結果。, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§4}]}
+links:
+  - {id: ingest, from: cdc, to: timeline, label: 更新をコミット, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§1}]}
+  - {id: cow-write, from: timeline, to: cow, label: ベースファイルを書き換え, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§2}]}
+  - {id: mor-write, from: timeline, to: mor, label: ログへ追記, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§3}]}
+  - {id: compact, from: mor, to: compact, label: コンパクション, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§3}]}
+  - {id: snapshot, from: cow, to: query, label: Snapshot を読む, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§4}]}
+  - {id: merge-read, from: mor, to: query, label: ベースとログをマージして読む, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§3}]}
+  - {id: incremental, from: timeline, to: query, label: コミット以降を読む, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§4}]}
+  - {id: deliver, from: query, to: output, label: 結果を渡す, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§4}]}
+scenarios:
+  - {id: upsert-cdc, label: CDC 更新を取り込む, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§5}], steps: [{links: [ingest], note: CDC の更新イベントをコミットとして取り込む。}, {links: [cow-write, snapshot], note: CoW ではベースファイルを書き換え、Snapshot query で読む。}, {links: [mor-write, merge-read, compact], note: MoR ではログへ追記し、読み取り時マージまたはコンパクション後のベースを使う。}, {links: [incremental, deliver], note: タイムライン以降の変更または結果を下流へ渡す。}]}

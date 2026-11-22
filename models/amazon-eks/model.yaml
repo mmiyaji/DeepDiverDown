@@ -1,0 +1,52 @@
+name: Amazon EKS マネージドノードグループ
+description: AWS 管理の EKS コントロールプレーンと利用者アカウント内の managed node group を API・デプロイ・置換の順で追います。
+reference:
+  objectives:
+    - EKS が管理するコントロールプレーンと利用者が管理するデータプレーンの境界を区別する。
+    - managed node group のノード更新・ドレイン・置換の流れを追う。
+    - API 受付からイメージ取得、公開、ノード置換までを同じ順序で説明する。
+  sources:
+    - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+    - {title: Managed node groups, url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+    - {title: Update a managed node group, url: https://docs.aws.amazon.com/eks/latest/userguide/update-managed-node-group.html}
+sources: [docs/reference-amazon-eks.md]
+evidence:
+  - {type: doc, ref: docs/reference-amazon-eks.md#§1}
+  - {type: doc, ref: docs/reference-amazon-eks.md#§6}
+  - {type: doc, ref: docs/reference-amazon-eks.md#§7}
+  - {type: doc, ref: docs/reference-amazon-eks.md#§8}
+tiers:
+  - {id: interface, label: 利用・管理, z: 2, origin: [-1, 0], size: [12, 3]}
+  - {id: edge, label: 公開境界, z: 1, origin: [0, 0], size: [12, 3]}
+  - {id: control, label: EKS コントロールプレーン, z: 1, origin: [0, 4], size: [12, 3]}
+  - {id: data, label: 利用者アカウントのデータプレーン, z: 0, origin: [0, 8], size: [12, 3]}
+nodes:
+  operator: {label: 運用者, kind: actor, tier: interface, x: 1, y: 1.5, role: ops, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  api: {label: EKS / Kubernetes API, kind: service, svc: aws:eks, tier: control, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§2}]}
+  managed: {label: Managed node group, kind: worker, svc: aws:eks, tier: data, x: 5, y: 1.5, description: EKS がライフサイクルを自動化する EC2 ノードグループ。, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§3}]}
+  workload: {label: Deployment / Pods, kind: service, svc: k8s:deployment, tier: data, x: 8, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  lb: {label: Load Balancer / Service, kind: lb, svc: aws:elb, tier: edge, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  registry: {label: Amazon ECR, kind: external, svc: aws:ecr, tier: edge, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  observer: {label: CloudWatch / operator, kind: external, svc: aws:cloudwatch, tier: interface, x: 7, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§5}]}
+links:
+  - {id: submit, from: operator, to: api, label: API で desired state を送る, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  - {id: schedule, from: api, to: managed, label: Pod をスケジュール, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  - {id: pull, from: managed, to: registry, label: イメージを取得, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  - {id: run, from: managed, to: workload, label: Pod を実行, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  - {id: expose, from: workload, to: lb, label: Service で公開, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  - {id: replace, from: api, to: managed, label: drain・新ノードへ置換, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§5}]}
+  - {id: observe, from: managed, to: observer, label: 状態を監視, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§5}]}
+scenarios:
+  - id: api-deploy-replace
+    label: API・デプロイ・ノード置換
+    evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§7}]
+    steps:
+      - {links: [submit], note: 受付。運用者が EKS/Kubernetes API に desired state を送る。}
+      - {links: [schedule, pull, run], note: 配置。Pod を managed node group に割り当て、ECR から起動する。}
+      - {links: [expose], note: 公開。Service/Load Balancer がワークロードを公開する。}
+      - {links: [replace], note: 置換。更新または auto repair がノードを drain し、新ノードへ再配置する。}
+requirements:
+  - {id: BR-01, kind: usecase, title: マネージド境界を保ったデプロイ, text: EKS API から managed node group 上の Pod へ配備し公開する。, links: [submit, schedule, run, expose], evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§2}, {type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  - {id: NFR-01, kind: nfr, title: ドレイン付き置換, text: ノード更新・障害時に Pod をドレインして新ノードへ置換する。, links: [replace], evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§5}]}
+unknowns:
+  - {id: UNK-01, text: 実際の AWS リージョン、AZ、ノード数、インスタンスタイプ、PDB、IAM/VPC 設定は未確定。, refs: [managed, workload]}

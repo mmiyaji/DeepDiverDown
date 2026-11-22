@@ -31,7 +31,7 @@ export function loadModels(only) {
     const dir = path.join(ROOT, 'models', r.id);
     const model = readModel(path.join(dir, 'model.yaml'));
     const actual = r.actual ? yaml.load(fs.readFileSync(path.join(dir, 'actual.yaml'), 'utf8')) : null;
-    return { id: r.id, dir, model, actual };
+    return { id: r.id, dir, model, actual, reference: r.reference };
   });
 }
 

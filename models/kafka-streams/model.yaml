@@ -1,0 +1,37 @@
+name: Apache Kafka Streams の基本アーキテクチャ
+description: Kafka Topic をアプリケーション内のトポロジーで処理し、状態ストアを changelog から復元する流れを追うリファレンスです。
+reference:
+  objectives:
+    - Topic パーティション、Task、Processor Topology の関係を理解する。
+    - 集計状態を Local State Store に保持する流れを追う。
+    - changelog Topic による状態復元と Task 再配置を理解する。
+  sources:
+    - {title: Kafka Streams Architecture, url: "https://kafka.apache.org/44/streams/architecture/"}
+sources: [docs/reference-kafka-streams.md]
+evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§1"}]
+tiers:
+  - {id: app, label: Kafka 入力と Streams アプリケーション, kind: origin, z: 0, size: [14, 3]}
+  - {id: durability, label: 状態と復旧, z: 1, origin: [0, 0], size: [14, 3]}
+nodes:
+  topic: {label: Input Topic, kind: queue, tier: app, x: 0, y: 1.5, description: パーティション化された受注イベントを保持する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§2"}]}
+  task: {label: Stream Task, kind: worker, tier: app, x: 4, y: 1.5, description: 入力パーティションを担当し、トポロジーを実行する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§2"}]}
+  topology: {label: Processor Topology, kind: service, tier: app, x: 7, y: 1.5, description: Source、変換、集計プロセッサの処理グラフ。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§3"}]}
+  state: {label: Local State Store, kind: db, tier: app, x: 10, y: 2.7, description: Task ごとの集計状態を保持・照会する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§4"}]}
+  output: {label: Output Topic, kind: queue, tier: app, x: 13, y: 1.5, description: トポロジーが生成した結果を公開する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§3"}]}
+  changelog: {label: Changelog Topic, kind: queue, tier: durability, x: 10, y: 1.5, description: 状態ストアの更新を複製して記録する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§5"}]}
+links:
+  - {id: consume, from: topic, to: task, label: パーティションを割り当て, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§2"}]}
+  - {id: process, from: task, to: topology, label: レコードを処理, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§3"}]}
+  - {id: update, from: topology, to: state, label: 集計状態を更新, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§4"}]}
+  - {id: produce, from: topology, to: output, label: 結果を発行, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§3"}]}
+  - {id: log, from: state, to: changelog, label: 状態更新を記録, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§5"}]}
+  - {id: restore, from: changelog, to: state, label: 状態を再生, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§5"}]}
+scenarios:
+  - id: kafka-streams-state-recovery
+    label: Topic から集計・状態復元
+    evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§1"}, {type: doc, ref: "docs/reference-kafka-streams.md#§6"}, {type: doc, ref: "docs/reference-kafka-streams.md#§7"}]
+    steps:
+      - {links: [consume, process], note: Task が入力パーティションを受け持ち、トポロジーで処理する。}
+      - {links: [update, produce], note: 集計状態を更新し、結果を Output Topic へ発行する。}
+      - {links: [log], note: State Store の更新を changelog Topic に記録する。}
+      - {links: [restore], note: Task 再配置時に changelog を再生して状態を復元する。}
