@@ -1,8 +1,8 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
 import { Scene3D } from './scene3d.js?v=card-icons';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
-import * as L from './loader.js';
-import { openDesign } from './design.js';
+import * as L from './loader.js?v=nc1';
+import { openDesign } from './design.js?v=nc1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

@@ -1,5 +1,5 @@
 /* 要件と設計案を段階的に整理し、ビューアと同じモデル形式で保存する。 */
-import { loadDesignDrafts, saveDesignDraft } from './loader.js';
+import { loadDesignDrafts, saveDesignDraft } from './loader.js?v=nc1';
 import { AI_PROVIDERS } from './settings.js';
 import { applyInterview, isUndecided } from './design-interview.js';
 

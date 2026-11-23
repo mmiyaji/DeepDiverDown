@@ -8,7 +8,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch { /* noop */ } },
 };
-const text = async p => { const r = await fetch(p); if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.text(); };
+// 追加・更新したモデルが古いキャッシュで隠れないよう、毎回サーバーに再検証させる
+const text = async p => { const r = await fetch(p, { cache: 'no-cache' }); if (!r.ok) throw new Error(`${p}: ${r.status}`); return r.text(); };
 
 /* 最低限の形をチェック。問題があればメッセージの配列を返す */
 export function validate(m) {
