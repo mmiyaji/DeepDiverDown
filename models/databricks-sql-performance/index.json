@@ -2,8 +2,8 @@
   "model": "databricks-sql-performance",
   "name": "Databricks SQL の実行プロファイルとファイル配置",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "bi": {
@@ -13,17 +13,17 @@
     },
     "warehouse": {
       "type": "node",
-      "label": "SQL Warehouse",
+      "label": "SQL 実行の計算資源",
       "status": "claim"
     },
     "engine": {
       "type": "node",
-      "label": "Photon 対応演算",
+      "label": "最適化された演算エンジン",
       "status": "claim"
     },
     "scan": {
       "type": "node",
-      "label": "Delta テーブルのファイル",
+      "label": "列指向テーブルのデータファイル",
       "status": "claim"
     },
     "shuffle": {
@@ -33,7 +33,7 @@
     },
     "profile": {
       "type": "node",
-      "label": "Query Profile",
+      "label": "クエリの演算子プロファイル",
       "status": "claim"
     },
     "optimizer": {
@@ -43,17 +43,17 @@
     },
     "submit": {
       "type": "link",
-      "label": "注文集計 SQL → SQL Warehouse",
+      "label": "注文集計 SQL → SQL 実行の計算資源",
       "status": "claim"
     },
     "execute": {
       "type": "link",
-      "label": "SQL Warehouse → Photon 対応演算",
+      "label": "SQL 実行の計算資源 → 最適化された演算エンジン",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "Photon 対応演算 → Delta テーブルのファイル",
+      "label": "最適化された演算エンジン → 列指向テーブルのデータファイル",
       "status": "claim"
     },
     "join": {
@@ -63,22 +63,70 @@
     },
     "observe": {
       "type": "link",
-      "label": "結合・再分配 → Query Profile",
+      "label": "結合・再分配 → クエリの演算子プロファイル",
       "status": "claim"
     },
     "scan-profile": {
       "type": "link",
-      "label": "Delta テーブルのファイル → Query Profile",
+      "label": "列指向テーブルのデータファイル → クエリの演算子プロファイル",
       "status": "claim"
     },
     "maintain": {
       "type": "link",
-      "label": "テーブル保守 → Delta テーブルのファイル",
+      "label": "テーブル保守 → 列指向テーブルのデータファイル",
       "status": "claim"
     },
     "plan": {
       "type": "scenario",
       "label": "日付を絞った集計でスキャンを確認"
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "databricks-sql-serverless",
+      "label": "Databricks SQL Editor",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-warehouse": {
+      "type": "implementation",
+      "impl": "databricks-sql-serverless",
+      "label": "Serverless SQL Warehouse と Photon",
+      "realizes": [
+        "warehouse",
+        "engine",
+        "shuffle"
+      ]
+    },
+    "example-scan": {
+      "type": "implementation",
+      "impl": "databricks-sql-serverless",
+      "label": "Unity Catalog 管理 Delta テーブル",
+      "realizes": [
+        "scan"
+      ]
+    },
+    "example-profile": {
+      "type": "implementation",
+      "impl": "databricks-sql-serverless",
+      "label": "Databricks Query Profile",
+      "realizes": [
+        "profile"
+      ]
+    },
+    "example-optimizer": {
+      "type": "implementation",
+      "impl": "databricks-sql-serverless",
+      "label": "Liquid Clustering のテーブル設定",
+      "realizes": [
+        "optimizer"
+      ]
+    },
+    "example-history": {
+      "type": "implementation",
+      "impl": "databricks-sql-serverless",
+      "label": "system.query.history",
+      "realizes": []
     }
   },
   "byRef": {
@@ -103,7 +151,13 @@
       "observe",
       "scan-profile",
       "maintain",
-      "plan"
+      "plan",
+      "example-bi",
+      "example-warehouse",
+      "example-scan",
+      "example-profile",
+      "example-optimizer",
+      "example-history"
     ],
     "docs/reference-databricks-sql-performance.md#§2": [
       "warehouse",
@@ -123,6 +177,14 @@
       "observe",
       "scan-profile",
       "plan"
+    ],
+    "docs/reference-databricks-sql-performance.md#§5": [
+      "example-bi",
+      "example-warehouse",
+      "example-scan",
+      "example-profile",
+      "example-optimizer",
+      "example-history"
     ]
   },
   "reference": {

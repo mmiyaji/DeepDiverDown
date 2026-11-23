@@ -60,3 +60,101 @@ timeline:
     - {id: s8811, label: "8811", time: "11-22 02:00", kind: delete, node: snapshot, description: 行単位の削除（位置削除ファイルの追加）。}
     - {id: s8812, label: "8812", time: "11-23 02:00", kind: append, node: snapshot, description: 現在の版（current-snapshot-id）。}
 blocks: [{"id":"evolution","title":"パーティションの進化：月 → 日","legend":{"0":"旧仕様（month）のファイル","2":"新仕様（day）のファイル"},"note":"仕様の変更はメタデータだけで、既存ファイルは動かない。数値は説明用。","lanes":[{"id":"m09","label":"month=2026-09","node":"data"},{"id":"m10","label":"month=2026-10","node":"data"},{"id":"d01","label":"day=11-01","node":"data","optional":true},{"id":"d02","label":"day=11-02","node":"data","optional":true},{"id":"d03","label":"day=11-03","node":"data","optional":true}],"items":{"m09":[{"id":"s1","label":"09-a","k":0},{"id":"s2","label":"09-b","k":0},{"id":"s3","label":"09-c","k":0}],"m10":[{"id":"o1","label":"10-a","k":0},{"id":"o2","label":"10-b","k":0},{"id":"o3","label":"10-c","k":0}]}},{"id":"files","title":"スナップショットの失効と孤立ファイルの削除","legend":{"0":"現在の版も参照","2":"新しいファイル","4":"古い版だけが参照","6":"孤立ファイル"},"note":"数値は説明用。","lanes":[{"id":"live","label":"現在の版が参照","node":"data"},{"id":"old","label":"古い版だけが参照","node":"data"},{"id":"orphan","label":"どこからも参照されない","node":"data"}],"items":{"live":[{"id":"c1","label":"f-101","k":0},{"id":"c2","label":"f-102","k":0},{"id":"c3","label":"f-103","k":0},{"id":"c4","label":"f-110","k":2},{"id":"c5","label":"f-111","k":2}],"old":[{"id":"x1","label":"f-090","k":4,"note":"上書き前の古いファイル。8805 以前の版だけが参照する。"},{"id":"x2","label":"f-091","k":4},{"id":"x3","label":"f-092","k":4},{"id":"x4","label":"f-093","k":4}],"orphan":[{"id":"z1","label":"tmp-7f3","k":6,"note":"書き込みに失敗したジョブが残したファイル。どのメタデータも参照しない。"}]}}]
+implementations:
+  - id: spark-minio
+    label: Spark・Iceberg REST・MinIO
+    description: Apache Iceberg の Spark Quickstart に沿って、Spark と REST カタログを起動し、MinIO へテーブルファイルを置く例。
+    sources:
+      - title: Apache Iceberg Specification
+        url: https://iceberg.apache.org/spec/
+      - title: Spark and Iceberg Quickstart
+        url: https://iceberg.apache.org/spark-quickstart/
+    nodes:
+      spark-minio-spark:
+        label: Spark SQL・Iceberg Runtime
+        kind: service
+        tier: query
+        x: 0
+        y: 1.5
+        description: テーブルをロードし、計画と読み書きを行う。
+        realizes:
+          - engine
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9
+      spark-minio-meta:
+        label: MinIO の metadata.json と Snapshot
+        kind: file
+        tier: storage
+        x: 3
+        y: 1.5
+        description: 表定義と各スナップショットの参照情報を同じメタデータに保持する。
+        realizes:
+          - metadata
+          - snapshot
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9
+        drill: iceberg-catalog-read
+      spark-minio-list:
+        label: MinIO の Manifest List
+        kind: file
+        tier: storage
+        x: 9
+        y: 1.5
+        description: スナップショットで使う Manifest の一覧を保持する。
+        realizes:
+          - list
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9
+      spark-minio-manifests:
+        label: MinIO の Manifest
+        kind: file
+        tier: storage
+        x: 12
+        y: 1.5
+        description: 対象データファイルの位置と統計を保持する。
+        realizes:
+          - manifest
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9
+      spark-minio-parquet:
+        label: MinIO の Parquet
+        kind: file
+        tier: storage
+        x: 15
+        y: 1.5
+        description: クエリに必要なデータ本体。
+        realizes:
+          - data
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9
+        drill: parquet-internals
+      spark-minio-rest:
+        label: REST Catalog コンテナ
+        kind: catalog
+        tier: query
+        x: 4
+        y: 2
+        description: Spark が使う現在のテーブルメタデータを解決する。
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9
+    links:
+      - id: spark-minio-resolve
+        from: spark-minio-spark
+        to: spark-minio-rest
+        label: テーブルをロード
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9
+      - id: spark-minio-pointer
+        from: spark-minio-rest
+        to: spark-minio-meta
+        label: 現行メタデータを解決
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-iceberg.md#§9

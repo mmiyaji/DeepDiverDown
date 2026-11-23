@@ -2,8 +2,8 @@
   "model": "iceberg-catalog-read",
   "name": "Iceberg カタログ経由の読み取り：カタログからページまで",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "coordinator": {
@@ -133,6 +133,84 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のカタログ実装、認証方式、資格情報の委任とサーバー側スキャン計画への対応は未確定。"
+    },
+    "trino-rest-coord": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "Trino Coordinator",
+      "realizes": [
+        "coordinator"
+      ]
+    },
+    "trino-rest-workers": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "Trino Workers",
+      "realizes": [
+        "worker"
+      ]
+    },
+    "trino-rest-rest": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "Polaris Iceberg REST API",
+      "realizes": [
+        "rest"
+      ]
+    },
+    "trino-rest-sts": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "Polaris と AWS STS の一時認証情報",
+      "realizes": [
+        "creds"
+      ]
+    },
+    "trino-rest-meta": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "S3 の metadata.json",
+      "realizes": [
+        "metajson"
+      ]
+    },
+    "trino-rest-list": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "S3 の Manifest List（Avro）",
+      "realizes": [
+        "mlist"
+      ]
+    },
+    "trino-rest-manifest": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "S3 の Manifest（Avro）",
+      "realizes": [
+        "manifest"
+      ]
+    },
+    "trino-rest-parquet": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "S3 の Parquet ファイル",
+      "realizes": [
+        "data"
+      ]
+    },
+    "trino-rest-delete": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "S3 の位置削除ファイル",
+      "realizes": [
+        "deletes"
+      ]
+    },
+    "trino-rest-config": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "etc/catalog/iceberg.properties",
+      "realizes": []
     }
   },
   "byRef": {
@@ -165,7 +243,17 @@
       "vended-credentials",
       "concurrent-commit",
       "CR-01",
-      "CR-02"
+      "CR-02",
+      "trino-rest-coord",
+      "trino-rest-workers",
+      "trino-rest-rest",
+      "trino-rest-sts",
+      "trino-rest-meta",
+      "trino-rest-list",
+      "trino-rest-manifest",
+      "trino-rest-parquet",
+      "trino-rest-delete",
+      "trino-rest-config"
     ],
     "docs/reference-iceberg-catalog-read.md#§4": [
       "model"
@@ -202,11 +290,26 @@
     ],
     "docs/reference-iceberg-catalog-read.md#§6": [
       "catalog-to-page"
+    ],
+    "docs/reference-iceberg-catalog-read.md#§7": [
+      "trino-rest-coord",
+      "trino-rest-workers",
+      "trino-rest-rest",
+      "trino-rest-sts",
+      "trino-rest-meta",
+      "trino-rest-list",
+      "trino-rest-manifest",
+      "trino-rest-parquet",
+      "trino-rest-delete",
+      "trino-rest-config"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 26,
+    "category": "データ配置と読み取り",
+    "order": 31,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "iceberg-distributed-scan",
     "objectives": [
       "カタログが持つもの（現在の metadata.json へのポインタ）と持たないもの（データ・Manifest）を区別する。",
       "loadTable からスナップショット選択、Manifest List・Manifest のプルーニング、Parquet の範囲 GET までを順に追う。",

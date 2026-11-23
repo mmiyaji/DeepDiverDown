@@ -15,7 +15,7 @@ tiers:
   - {id: mem, label: メモリ, z: 1, size: [12, 3]}
   - {id: disk, label: ディスク, z: 0, size: [12, 3]}
 nodes:
-  client: {label: Writer / Reader, kind: client, tier: app, x: 0, y: 1.5, description: キーを書き込み・読み取る。, evidence: [{"type":"doc","ref":"docs/reference-lsm-compaction.md#§2"}]}
+  client: {label: キー値を書き読むアプリ, kind: client, tier: app, x: 0, 'y': 1.5, description: キーを書き込み・読み取る。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§2}]}
   wal: {label: WAL, kind: db, tier: disk, x: 0, y: 1.5, description: 書き込みを先に追記する耐久化用のログ。, evidence: [{"type":"doc","ref":"docs/reference-lsm-compaction.md#§2"}]}
   memtable: {label: MemTable, kind: cache, tier: mem, x: 4, y: 1.5, description: メモリ上のキー順の表。, evidence: [{"type":"doc","ref":"docs/reference-lsm-compaction.md#§2"}]}
   l0: {label: L0 SSTables, kind: db, tier: disk, x: 4, y: 1.5, partitions: 2, description: フラッシュでできた SSTable。キー範囲が重なる。, evidence: [{"type":"doc","ref":"docs/reference-lsm-compaction.md#§3"}]}
@@ -39,3 +39,23 @@ unknowns:
   - {id: UNK-01, text: 実際のエンジン、コンパクション方式（レベル型・サイズ階層型）、階層の数とサイズは未確定。, refs: [l0, l1, l2]}
 gates: {maxDrift: 0, maxHigh: 0}
 blocks: [{"id":"lsm","title":"LSM ツリーの階層","legend":{"0":"L0 の SSTable","2":"L1","3":"L2","4":"書き込み（MemTable）"},"note":"キーと階層の数は説明用。","lanes":[{"id":"mem","label":"MemTable","sub":"メモリ","node":"memtable"},{"id":"l0","label":"L0","sub":"範囲が重なる","node":"l0"},{"id":"l1","label":"L1","sub":"範囲が重ならない","node":"l1"},{"id":"l2","label":"L2","sub":"いちばん大きい","node":"l2"}],"items":{"mem":[],"l0":[],"l1":[{"id":"l1a","label":"L1 k1〜k5","k":2},{"id":"l1b","label":"L1 k6〜k9","k":2}],"l2":[{"id":"l2a","label":"L2 k1〜k3","k":3},{"id":"l2b","label":"L2 k4〜k6","k":3},{"id":"l2c","label":"L2 k7〜k9","k":3}]}}]
+
+implementations:
+  - id: rocksdb-level
+    label: "RocksDB の leveled compaction"
+    description: "ローカルの永続ディレクトリーに RocksDB を組み込み、列ファミリーの leveled compaction を使う例。キーの世代は LSM 木に保存され、名前や状態は RocksDB の設定とファイル配置に現れる。"
+    sources:
+      - {title: RocksDB Wiki - Compaction, url: https://github.com/facebook/rocksdb/wiki/Compaction}
+      - {title: Apache Cassandra - Compaction, url: https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/index.html}
+      - {title: RocksDB Leveled Compaction, url: https://github.com/meta/rocksdb/wiki/Leveled-Compaction}
+      - {title: RocksDB MANIFEST, url: https://github.com/meta/rocksdb/wiki/MANIFEST}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      rocksdb-level-app: {label: RocksDB を組み込むアプリプロセス, kind: client, tier: processing, x: 1, y: 1.15, realizes: [client], description: Get と Put によりキー・値を読み書きする。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
+      rocksdb-level-memory: {label: RocksDB の共有 WAL と列ファミリーの MemTable, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [wal, memtable], description: 書き込みのログをディスクへ残し、読み取り可能な作業状態を MemTable に持つ。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
+      rocksdb-level-sst: {label: RocksDB DB パスの SST ファイル群, kind: file, tier: processing, x: 5, y: 1.15, realizes: [l0, l1, l2], description: L0 はキー範囲が重なり得る。上位レベルでは同じレベルのファイルを重ならないキー範囲に整理する。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
+      rocksdb-level-manifest: {label: RocksDB MANIFEST, kind: file, tier: setup, x: 1, y: 1.5, description: 各レベルを構成するファイルの変更を記録し、復旧時に現在の版を組み立てる。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
+    links:
+      - {id: rocksdb-level-manifest-connection, from: rocksdb-level-manifest, to: rocksdb-level-sst, label: レベル内のファイル構成を記録}

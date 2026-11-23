@@ -2,8 +2,8 @@
   "model": "airbyte",
   "name": "Airbyte の基本アーキテクチャ",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "source": {
@@ -13,67 +13,67 @@
     },
     "sourceConnector": {
       "type": "node",
-      "label": "Source Connector",
+      "label": "入力 API アダプター",
       "status": "claim"
     },
     "syncJob": {
       "type": "node",
-      "label": "Sync Job",
+      "label": "同期の実行単位",
       "status": "claim"
     },
     "destinationConnector": {
       "type": "node",
-      "label": "Destination Connector",
+      "label": "出力アダプター",
       "status": "claim"
     },
     "warehouse": {
       "type": "node",
-      "label": "分析用ウェアハウス",
+      "label": "分析用データベース",
       "status": "claim"
     },
     "connection": {
       "type": "node",
-      "label": "Connection 設定",
+      "label": "同期対象と実行設定",
       "status": "claim"
     },
     "state": {
       "type": "node",
-      "label": "State / cursor",
+      "label": "増分の再開位置",
       "status": "claim"
     },
     "configure": {
       "type": "link",
-      "label": "Connection 設定 → Sync Job",
+      "label": "同期対象と実行設定 → 同期の実行単位",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "受注 API → Source Connector",
+      "label": "受注 API → 入力 API アダプター",
       "status": "claim"
     },
     "execute": {
       "type": "link",
-      "label": "Source Connector → Sync Job",
+      "label": "入力 API アダプター → 同期の実行単位",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "Sync Job → Destination Connector",
+      "label": "同期の実行単位 → 出力アダプター",
       "status": "claim"
     },
     "commit": {
       "type": "link",
-      "label": "Destination Connector → 分析用ウェアハウス",
+      "label": "出力アダプター → 分析用データベース",
       "status": "claim"
     },
     "checkpoint": {
       "type": "link",
-      "label": "Destination Connector → State / cursor",
+      "label": "出力アダプター → 増分の再開位置",
       "status": "claim"
     },
     "resume": {
       "type": "link",
-      "label": "State / cursor → Source Connector",
+      "label": "増分の再開位置 → 入力 API アダプター",
       "status": "claim"
     },
     "incremental": {
@@ -99,6 +99,54 @@
     "UNK-01": {
       "type": "unknown",
       "label": "具体的な実行間隔と内部サービス配置は確定していない。"
+    },
+    "builder-postgres-api": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "注文 API の orders エンドポイント",
+      "realizes": [
+        "source"
+      ]
+    },
+    "builder-postgres-builder": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "Airbyte のカスタム Source",
+      "realizes": [
+        "sourceConnector"
+      ]
+    },
+    "builder-postgres-airbyte": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "Airbyte の Connection・同期ジョブ・状態",
+      "realizes": [
+        "connection",
+        "syncJob",
+        "state"
+      ]
+    },
+    "builder-postgres-adapter": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "Airbyte Postgres Destination",
+      "realizes": [
+        "destinationConnector"
+      ]
+    },
+    "builder-postgres-db": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "PostgreSQL の分析用スキーマ",
+      "realizes": [
+        "warehouse"
+      ]
+    },
+    "builder-postgres-manifest": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "カスタム Source の宣言ファイル",
+      "realizes": []
     }
   },
   "byRef": {
@@ -128,7 +176,13 @@
       "incremental",
       "failure-resume",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "builder-postgres-api",
+      "builder-postgres-builder",
+      "builder-postgres-airbyte",
+      "builder-postgres-adapter",
+      "builder-postgres-db",
+      "builder-postgres-manifest"
     ],
     "docs/reference-airbyte.md#§2": [
       "source",
@@ -161,11 +215,21 @@
       "incremental",
       "failure-resume",
       "NFR-01"
+    ],
+    "docs/reference-airbyte.md#§6": [
+      "builder-postgres-api",
+      "builder-postgres-builder",
+      "builder-postgres-airbyte",
+      "builder-postgres-adapter",
+      "builder-postgres-db",
+      "builder-postgres-manifest"
     ]
   },
   "reference": {
-    "category": "データ取り込み",
+    "category": "取り込み",
     "order": 30,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Connection と Connector の役割を区別する",
       "Full Refresh と Incremental・cursor・State の関係を理解する",

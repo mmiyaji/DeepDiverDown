@@ -53,3 +53,23 @@ ORC は 1 つの列を、役割ごとの複数の **Stream** に分けて保存�
 
 - `open-orc`：最後の 1 バイト → Postscript → File Footer の順に開く。
 - `orc-predicate`：Stripe 統計で Stripe を捨て、Row Index で行グループを読み飛ばし、必要な列の Stream だけを取る。
+
+## 7. 実装例：Trino Hive と S3 上の ORC
+
+ORC を使う Hive テーブルを Trino で検索する例。ファイルは S3 に置き、対応する述語と利用可能な統計で不要な Stripe や行グループを除外する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| Stripe と列を読む処理 | Trino Worker の ORC Reader | Postscript から圧縮・メタデータを解釈し、述語と投影を読取に適用する。 |
+| Header "ORC"、Stripes、Metadata（Stripe 統計）、File Footer、Postscript + 長さ、Index Data（Row Index）、Row Data（Streams）、Stripe Footer | S3 上の ORC オブジェクト | Header、Stripe、Index、Stream、各フッターを同じファイル内に保持する。 |
+
+実装で加わる部品を以下に示す。
+
+- Hive カタログの ORC 設定。ブルームフィルターも使う場合はファイルにインデックスがあることと orc.bloom-filters.enabled を確認する。
+
+公式資料
+
+- [ORC Specification v1](https://orc.apache.org/specification/ORCv1/)
+- [ORC Indexes](https://orc.apache.org/docs/indexes.html)
+- [Trino object storage file formats](https://trino.io/docs/current/object-storage/file-formats.html)
+- [Trino Hive connector](https://trino.io/docs/current/connector/hive.html)

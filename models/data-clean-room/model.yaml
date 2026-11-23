@@ -31,3 +31,123 @@ scenarios:
       - {"links": ["media-input", "sales-input"], "note": "許可された列で照合し、キャンペーン単位に集計する。"}
       - {"links": ["check-result"], "note": "指定列の一意値が最小件数に届かない結果行を除く。"}
       - {"links": ["receive"], "note": "受領権限がある参加者が集計を受け取る。"}
+implementations:
+  - id: aws-cleanrooms
+    label: AWS Clean Rooms・Glue・S3
+    description: 媒体社と小売社がそれぞれの AWS Glue テーブルを AWS Clean Rooms のコラボレーションに関連付ける例。
+    sources:
+      - title: AWS · AWS Clean Rooms
+        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/what-is.html
+      - title: AWS · 集計分析ルール
+        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/analysis-rules-aggregation.html
+      - title: Associating tables to a collaboration
+        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/associate-configured-table.html
+      - title: Running SQL queries
+        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/use-sql-editor.html
+    nodes:
+      aws-cleanrooms-media:
+        label: 媒体社の Glue テーブル（S3）
+        kind: table
+        tier: flow
+        x: 0
+        y: 1
+        description: 広告接触ログを指す設定済みテーブル。
+        svc: glue
+        realizes:
+          - media
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+      aws-cleanrooms-retail:
+        label: 小売社の Glue テーブル（S3）
+        kind: table
+        tier: flow
+        x: 0
+        y: 4
+        description: 注文履歴を指す設定済みテーブル。
+        svc: glue
+        realizes:
+          - sales
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+      aws-cleanrooms-controls:
+        label: AWS Clean Rooms の集計分析ルール
+        kind: policy
+        tier: flow
+        x: 4
+        y: 0
+        description: 許可する結合や集計と最小集計しきい値を設定する。
+        realizes:
+          - policy
+          - release
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+      aws-cleanrooms-collab:
+        label: AWS Clean Rooms コラボレーション
+        kind: worker
+        tier: flow
+        x: 8
+        y: 2
+        description: 許可されたメンバーが制約内で共同クエリを実行する。
+        realizes:
+          - room
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+      aws-cleanrooms-member:
+        label: 結果受領が許可されたメンバー
+        kind: client
+        tier: flow
+        x: 16
+        y: 2
+        description: 自社の Amazon S3 に集計結果を受け取る。
+        realizes:
+          - recipient
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+      aws-cleanrooms-iam:
+        label: テーブル関連付け用 IAM ロール
+        kind: service
+        tier: flow
+        x: 4
+        y: 2.5
+        description: AWS Clean Rooms が関連付けた入力テーブルへアクセスする権限を与える。
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+      aws-cleanrooms-output:
+        label: 結果受領者の Amazon S3
+        kind: service
+        tier: flow
+        x: 12
+        y: 2.5
+        description: 結果設定で指定された S3 バケットに出力する。
+        svc: s3
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+    links:
+      - id: aws-cleanrooms-assume-role
+        from: aws-cleanrooms-collab
+        to: aws-cleanrooms-iam
+        label: 入力のアクセス権限を使用
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+      - id: aws-cleanrooms-deliver
+        from: aws-cleanrooms-collab
+        to: aws-cleanrooms-output
+        label: 許可された結果を出力
+        evidence:
+          - type: doc
+            ref: docs/reference-data-clean-room.md#§4
+    groups:
+      - label: 共同分析の AWS 範囲
+        kind: cloud
+        provider: aws
+        nodes:
+          - aws-cleanrooms-controls
+          - aws-cleanrooms-collab

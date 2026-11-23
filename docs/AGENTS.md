@@ -8,4 +8,5 @@
    - `drift` は、どちらが正しいかを人に確認するまで実装の前提にしない。
 3. **根拠を示す。** 回答・変更提案には、根拠となる `evidence`（`path:line` や `docs/xxx.md#§n`）を添える。
 4. **要件（requirements）は技術に依存しない層。** 作り直し・移行の入力には、構成（nodes / links）ではなく要件を優先して使う。
-5. **モデルを変更したら点検する。** `node tools/gates.mjs <id>` と `node tools/build-index.mjs` を実行し、結果を報告する。合否を自分で判定しない。
+5. **リファレンスは「機能配置」と「実装例」で描き分ける。** リファレンスを新しく調査・作成するときや、構成図を見直すときは、`nodes` / `links` を製品に依存しない機能配置として書き、各機能をサービスで組んだ実装例（AWS など）を `implementations` に加える。実装例には公式資料（`sources`）を付け、解説に「実装例」の節と、機能と担い手の対応表を書く。書き方は [モデル仕様の「機能配置と実装例」](model-schema.md#機能配置と実装例implementations) に従う。
+6. **モデルを変更したら点検する。** `node tools/gates.mjs <id>` と `node tools/build-index.mjs` を実行し、結果を報告する。合否を自分で判定しない。

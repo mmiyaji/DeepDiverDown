@@ -28,3 +28,22 @@
 - [管理／外部テーブルの指針](https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices)
 - [オブジェクトストレージのライフサイクル](https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle)
 - [Unity Catalog のリネージ](https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage)
+
+## 5. 実装例 Unity Catalog と AWS S3 の本番管理
+
+本番カタログを本番ワークスペースに束縛し、管理テーブルと外部着地表の保存責任を分ける例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 分析ワークスペース | Databricks 本番ワークスペース | 本番カタログを利用するワークスペースを制限する。 |
+| 統制メタストア・本番カタログと業務スキーマ | Unity Catalog のメタストアと prod.sales | カタログ、スキーマ、権限を管理する。 |
+| 管理ストレージ上の注文表 | prod.sales.orders 管理 Delta テーブル | サービスがデータライフサイクルを管理する。 |
+| 外部ファイルを登録した注文表 | prod.sales.orders_landing 外部表 | 外部ロケーションのファイルを表として登録する。 |
+| 保存パスとアクセス資格情報 | Unity Catalog 外部ロケーションと Storage Credential | アクセスを許可する S3 パスと認証主体を関連付ける。 |
+| クラウドストレージ | Amazon S3 の着地・管理領域 | 外部ファイルと管理テーブル用の保存先を分ける。 |
+| 参照クエリ／BI | 分析者用 SQL Warehouse | 許可された表と、マスクされた列の出力を参照する。 |
+| 列リネージ | Unity Catalog リネージと system.access の履歴 | 対応する処理で記録されたテーブル・列の依存を確認する。 |
+
+ワークスペースの束縛とオブジェクト権限を両方確認する。外部ファイルを更新する処理と、管理テーブルのファイルライフサイクルは別に運用する。
+
+出典 [Unity Catalog のアクセス制御](https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control)、[ワークスペース・バインディング](https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding)、[管理／外部テーブルの指針](https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices)、[オブジェクトストレージのライフサイクル](https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle)、[Unity Catalog のリネージ](https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage)、[Databricks の S3 外部ロケーション](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3)、[Databricks のリネージシステムテーブル](https://docs.databricks.com/aws/en/admin/system-tables/lineage)

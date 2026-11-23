@@ -2,8 +2,8 @@
   "model": "nomad",
   "name": "Nomad ジョブスケジューリング",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "job": {
@@ -13,52 +13,52 @@
     },
     "evaluation": {
       "type": "node",
-      "label": "Evaluation",
+      "label": "配置の再評価",
       "status": "claim"
     },
     "scheduler": {
       "type": "node",
-      "label": "Nomad scheduler",
+      "label": "配置先の決定",
       "status": "claim"
     },
     "allocation": {
       "type": "node",
-      "label": "Allocation",
+      "label": "クライアントへの作業割当",
       "status": "claim"
     },
     "client": {
       "type": "node",
-      "label": "Nomad client node",
+      "label": "実行ノード",
       "status": "claim"
     },
     "deployment": {
       "type": "node",
-      "label": "Deployment",
+      "label": "更新の進行管理",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "注文 API ジョブ → Evaluation",
+      "label": "注文 API ジョブ → 配置の再評価",
       "status": "claim"
     },
     "plan": {
       "type": "link",
-      "label": "Evaluation → Nomad scheduler",
+      "label": "配置の再評価 → 配置先の決定",
       "status": "claim"
     },
     "allocate": {
       "type": "link",
-      "label": "Nomad scheduler → Allocation",
+      "label": "配置先の決定 → クライアントへの作業割当",
       "status": "claim"
     },
     "run": {
       "type": "link",
-      "label": "Allocation → Nomad client node",
+      "label": "クライアントへの作業割当 → 実行ノード",
       "status": "claim"
     },
     "replace": {
       "type": "link",
-      "label": "Deployment → Evaluation",
+      "label": "更新の進行管理 → 配置の再評価",
       "status": "claim"
     },
     "order-api": {
@@ -68,6 +68,39 @@
     "replacement": {
       "type": "scenario",
       "label": "注文 API の置き換え"
+    },
+    "vm-job": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "注文 API の Nomad jobspec",
+      "realizes": [
+        "job"
+      ]
+    },
+    "vm-scheduler": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "Nomad server VM 群",
+      "realizes": [
+        "evaluation",
+        "scheduler",
+        "allocation",
+        "deployment"
+      ]
+    },
+    "vm-client": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "Nomad client VM 群の Docker driver",
+      "realizes": [
+        "client"
+      ]
+    },
+    "vm-consul": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "Consul サービス登録とヘルスチェック",
+      "realizes": []
     }
   },
   "byRef": {
@@ -91,7 +124,11 @@
       "run",
       "replace",
       "order-api",
-      "replacement"
+      "replacement",
+      "vm-job",
+      "vm-scheduler",
+      "vm-client",
+      "vm-consul"
     ],
     "docs/reference-nomad.md#§3": [
       "job",
@@ -117,11 +154,19 @@
     ],
     "docs/reference-nomad.md#§5": [
       "replacement"
+    ],
+    "docs/reference-nomad.md#§6": [
+      "vm-job",
+      "vm-scheduler",
+      "vm-client",
+      "vm-consul"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
-    "order": 90,
+    "category": "その他のオーケストレーター",
+    "order": 20,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "ジョブとクライアントを区別する",
       "Allocation と scheduler の役割を区別する",

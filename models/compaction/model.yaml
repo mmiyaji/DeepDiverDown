@@ -20,12 +20,12 @@ tiers:
 nodes:
   stream_writer: {label: マイクロバッチ書き込み, kind: service, tier: ingest, x: 2, y: 1.5, description: 注文イベントを order_date パーティションへ小さなファイルとして追加する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§1}]}
   planner: {label: 対象選択プランナー, kind: worker, tier: maintenance, x: 2.5, y: 1.5, description: ファイルサイズとパーティションを調べ、rewrite 対象を選ぶ。, evidence: [{type: doc, ref: docs/reference-compaction.md#§3}]}
-  rewrite: {label: Rewrite ジョブ, kind: worker, tier: maintenance, x: 6.5, y: 1.5, description: bin-packing または任意の sort で入力ファイルを再構成する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§2}, {type: doc, ref: docs/reference-compaction.md#§4}]}
-  metadata: {label: テーブルメタデータ, kind: db, tier: table, x: 4, y: 1.5, description: 現行スナップショットとデータファイルの参照を管理する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  rewrite: {label: データファイルの再作成, kind: worker, tier: maintenance, x: 6.5, 'y': 1.5, description: bin-packing または任意の sort で入力ファイルを再構成する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§2}, {type: doc, ref: docs/reference-compaction.md#§4}]}
+  metadata: {label: 表の状態を管理するメタデータ, kind: db, tier: table, x: 4, 'y': 1.5, description: 現行スナップショットとデータファイルの参照を管理する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
   orders: {label: orders / order_date, kind: db, shape3D: crate, tier: table, x: 9, y: 1.5, description: マイクロバッチの小ファイルと rewrite 後のデータファイルを保持する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§1}, {type: doc, ref: docs/reference-compaction.md#§5}]}
   reader: {label: クエリエンジン, kind: service, tier: table, x: 14, y: 1.5, description: 現行または選択したスナップショットを読み取る。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
-  snapshot: {label: 新スナップショット, kind: db, tier: lifecycle, x: 2, y: 1.5, description: 新ファイル追加と旧ファイル除外を表すコミット済みの表状態。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
-  cleanup: {label: 保持期間後の掃除, kind: worker, tier: lifecycle, x: 6, y: 1.5, description: 期限切れスナップショットや不要ファイルを運用ポリシーに従って物理削除する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§6}]}
+  snapshot: {label: 公開された新しい読取時点, kind: db, tier: lifecycle, x: 2, 'y': 1.5, description: 新ファイル追加と旧ファイル除外を表すコミット済みの表状態。, evidence: [{type: doc, ref: docs/reference-compaction.md#§5}]}
+  cleanup: {label: 保持期限後の古いデータの整理, kind: worker, tier: lifecycle, x: 6, 'y': 1.5, description: 期限切れスナップショットや不要ファイルを運用ポリシーに従って物理削除する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§6}]}
 links:
   - {id: ingest, from: stream_writer, to: orders, label: 小ファイルを書き込む, evidence: [{type: doc, ref: docs/reference-compaction.md#§1}]}
   - {id: inspect, from: orders, to: planner, label: ファイル情報を調べる, evidence: [{type: doc, ref: docs/reference-compaction.md#§3}]}
@@ -59,3 +59,26 @@ distribution:
   scaleMax: 140
   note: "マイクロバッチごとに数 MB〜20 MB のファイルが増えた例。コンパクションで目標 128 MB 前後の少数のファイルにまとめる（数値は説明用）。"
   bars: [{id: f0, label: "ファイル 1", short: "1", value: 12, node: orders}, {id: f1, label: "ファイル 2", short: "2", value: 8, node: orders}, {id: f2, label: "ファイル 3", short: "3", value: 15, node: orders}, {id: f3, label: "ファイル 4", short: "4", value: 6, node: orders}, {id: f4, label: "ファイル 5", short: "5", value: 22, node: orders}, {id: f5, label: "ファイル 6", short: "6", value: 9, node: orders}, {id: f6, label: "ファイル 7", short: "7", value: 11, node: orders}, {id: f7, label: "ファイル 8", short: "8", value: 7, node: orders}, {id: f8, label: "ファイル 9", short: "9", value: 18, node: orders}, {id: f9, label: "ファイル 10", short: "10", value: 5, node: orders}, {id: f10, label: "ファイル 11", short: "11", value: 14, node: orders}, {id: f11, label: "ファイル 12", short: "12", value: 10, node: orders}, {id: f12, label: "ファイル 13", short: "13", value: 9, node: orders}, {id: f13, label: "ファイル 14", short: "14", value: 16, node: orders}, {id: f14, label: "ファイル 15", short: "15", value: 6, node: orders}, {id: f15, label: "ファイル 16", short: "16", value: 13, node: orders}, {id: f16, label: "ファイル 17", short: "17", value: 8, node: orders}, {id: f17, label: "ファイル 18", short: "18", value: 21, node: orders}, {id: f18, label: "ファイル 19", short: "19", value: 7, node: orders}, {id: f19, label: "ファイル 20", short: "20", value: 12, node: orders}, {id: f20, label: "ファイル 21", short: "21", value: 10, node: orders}, {id: f21, label: "ファイル 22", short: "22", value: 15, node: orders}, {id: f22, label: "ファイル 23", short: "23", value: 9, node: orders}, {id: f23, label: "ファイル 24", short: "24", value: 11, node: orders}, {id: f24, label: "ファイル 25", short: "25", value: 6, node: orders}, {id: f25, label: "ファイル 26", short: "26", value: 14, node: orders}, {id: f26, label: "ファイル 27", short: "27", value: 8, node: orders}, {id: f27, label: "ファイル 28", short: "28", value: 19, node: orders}, {id: f28, label: "ファイル 29", short: "29", value: 10, node: orders}, {id: f29, label: "ファイル 30", short: "30", value: 7, node: orders}, {id: f30, label: "ファイル 31", short: "31", value: 13, node: orders}, {id: f31, label: "ファイル 32", short: "32", value: 9, node: orders}]
+
+implementations:
+  - id: iceberg-spark
+    label: "Spark プロシージャで Iceberg の小ファイルを整理"
+    description: "注文の Iceberg テーブルへ継続書き込みし、Spark の保守ジョブで小さなファイルをまとめる例。読み手のスナップショットと古いファイルの保持期間を管理する。"
+    sources:
+      - {title: Apache Iceberg Maintenance, url: https://iceberg.apache.org/docs/nightly/maintenance/}
+      - {title: Apache Iceberg Spark Procedures, url: https://iceberg.apache.org/docs/latest/spark-procedures/}
+      - {title: Delta Lake Optimizations, url: https://docs.delta.io/optimizations-oss/}
+      - {title: Delta Transaction Log Protocol, url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md}
+      - {title: Iceberg Table Maintenance, url: https://iceberg.apache.org/docs/latest/maintenance/}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      iceberg-spark-write: {label: Spark のマイクロバッチ書き込み, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [stream_writer], description: Iceberg へ小さな Parquet ファイルを継続して追加する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+      iceberg-spark-action: {label: Spark の rewrite_data_files, kind: workflow, tier: processing, x: 1, y: 3.65, realizes: [planner, rewrite], description: テーブルのファイル群を調べ、binpack 戦略で対象を選んで書き直す。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+      iceberg-spark-iceberg: {label: Iceberg のテーブル・メタデータ・スナップショット, kind: catalog, tier: processing, x: 5, y: 1.15, realizes: [metadata, orders, snapshot], description: 注文データのファイル集合をスナップショットで管理し、再作成をコミットする。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+      iceberg-spark-query: {label: Spark SQL の読み手, kind: service, tier: processing, x: 5, y: 3.65, realizes: [reader], description: 読み取り時に選択したスナップショットの一貫した状態を参照する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+      iceberg-spark-expire: {label: Spark の expire_snapshots, kind: worker, tier: processing, x: 9, y: 1.15, realizes: [cleanup], description: 保護対象のスナップショットを保持し、期限切れのものと参照されなくなったファイルを整理する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+      iceberg-spark-policy: {label: コンパクションと保持の設定, kind: policy, tier: setup, x: 1, y: 1.5, description: 対象ファイルの基準、出力サイズの目安、履歴を保持する期間を決めてから実行する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+    links:
+      - {id: iceberg-spark-policy-connection, from: iceberg-spark-policy, to: iceberg-spark-action, label: 対象と出力サイズを設定}

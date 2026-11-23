@@ -38,13 +38,13 @@ tiers:
       - 15
       - 3
   - id: catalog
-    label: OneLake catalog
+    label: カタログの利用・運用
     z: 1
     size:
       - 15
       - 4
   - id: fabric
-    label: ワークスペースの資産と実行
+    label: ワークスペースの資産とクエリ
     z: 0
     size:
       - 15
@@ -56,7 +56,7 @@ nodes:
     tier: people
     x: 3
     y: 1
-    description: Fabric アイテムを発見し、必要に応じてアクセスを申請する。
+    description: 資産を発見し、必要に応じてアクセスを申請する。
     evidence:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§2
@@ -73,7 +73,7 @@ nodes:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§4
   explore:
-    label: Explore
+    label: 資産の発見
     kind: service
     tier: catalog
     x: 3
@@ -83,7 +83,7 @@ nodes:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§2
   govern:
-    label: Govern
+    label: ガバナンス状態の管理
     kind: service
     tier: catalog
     x: 7
@@ -93,17 +93,17 @@ nodes:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§3
   secure:
-    label: Secure
+    label: アクセス権限の管理
     kind: service
     tier: catalog
     x: 11
     y: 1
-    description: ワークスペースと OneLake セキュリティのロールを表示・管理する。
+    description: ワークスペースと資産に設定した認可ロールを表示・管理する。
     evidence:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§4
   items:
-    label: Fabric アイテム
+    label: 分析アセット
     kind: external
     tier: fabric
     x: 3
@@ -125,12 +125,12 @@ nodes:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§4
   roles:
-    label: OneLake セキュリティロール
+    label: データアクセスロール
     kind: service
     tier: fabric
     x: 11
     y: 1
-    description: OneLake 内のデータに適用する権限範囲を定義する。
+    description: 行・列などの権限範囲を定義する。
     evidence:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§4
@@ -268,3 +268,123 @@ requirements:
     evidence:
       - type: doc
         ref: docs/reference-fabric-onelake-catalog.md#§4
+implementations:
+  - id: fabric-managed
+    label: OneLake・SQL 分析エンドポイント
+    description: OneLake catalog を使い、Fabric の Lakehouse と関連レポートを検索し、クエリ時に細かな権限を適用する例。
+    sources:
+      - title: OneLake Catalog Overview
+        url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview
+      - title: OneLake Catalog Item Details
+        url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-item-details
+      - title: Secure Your Fabric Data
+        url: https://learn.microsoft.com/en-us/fabric/governance/secure-your-data
+      - title: Read Data Secured with OneLake Security
+        url: https://learn.microsoft.com/en-us/fabric/onelake/security/read-secured-data
+      - title: OneLake security overview
+        url: https://learn.microsoft.com/en-us/fabric/onelake/security/fabric-onelake-security
+    nodes:
+      fabric-managed-reader:
+        label: レポートを探す分析担当者
+        kind: actor
+        tier: people
+        x: 3
+        y: 1
+        description: 認定、上流、利用条件を確認する。
+        realizes:
+          - consumer
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-admin:
+        label: Fabric ワークスペース管理者
+        kind: actor
+        tier: people
+        x: 10
+        y: 1
+        description: 資産の認定とユーザーの権限を設定する。
+        realizes:
+          - admin
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-catalog:
+        label: OneLake catalog（Explore・Govern・Secure）
+        kind: catalog
+        tier: catalog
+        x: 7
+        y: 1
+        description: 発見、運用状況、ロール管理を統合した入口。
+        realizes:
+          - explore
+          - govern
+          - secure
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-items:
+        label: Power BI レポートと Lakehouse
+        kind: external
+        tier: fabric
+        x: 3
+        y: 1
+        description: 探す対象のレポートと、基になるテーブルを持つ。
+        realizes:
+          - items
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-workspace:
+        label: Fabric ドメイン・ワークスペース
+        kind: external
+        tier: fabric
+        x: 7
+        y: 1
+        description: アイテムの整理とワークスペースロールの範囲。
+        realizes:
+          - workspaces
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-roles:
+        label: OneLake Security
+        kind: policy
+        tier: fabric
+        x: 11
+        y: 1
+        description: テーブルの行・列のアクセスを Entra ID に結び付ける。
+        realizes:
+          - roles
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-sql:
+        label: SQL 分析エンドポイント
+        kind: service
+        tier: fabric
+        x: 13
+        y: 2
+        description: ユーザー ID の実効権限でクエリを実行する。
+        realizes:
+          - engine
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-identity:
+        label: Microsoft Entra ID
+        kind: service
+        tier: people
+        x: 6
+        y: 2.5
+        description: 利用者・グループの ID を認証する。
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6
+    links:
+      - id: fabric-managed-resolve-user
+        from: fabric-managed-identity
+        to: fabric-managed-sql
+        label: クエリ実行ユーザーを識別
+        evidence:
+          - type: doc
+            ref: docs/reference-fabric-onelake-catalog.md#§6

@@ -41,3 +41,26 @@ Google Cloud API と Kubernetes API を入口に、GKE cluster 境界内のコ�
 - [Choose a cluster mode](https://cloud.google.com/kubernetes-engine/docs/concepts/choose-cluster-mode)
 - [About node pools](https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools)
 - [Manually upgrade a cluster](https://cloud.google.com/kubernetes-engine/docs/how-to/upgrading-a-cluster)
+
+## 9. 実装例：GKE Standard のリージョンクラスタ
+GKE Standard で基盤用とアプリ用のノードプールを置き、Artifact Registry の注文 API を外部 L4 ロードバランサーで公開する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 運用者 | gcloud と kubectl |
+| マネージド制御 API | GKE リージョン制御プレーン |
+| 基盤用ノード群（配置例） | Compute Engine 基盤用プール |
+| アプリ用ノード群（配置例） | Compute Engine アプリ用プール |
+| 注文 API の実行単位 | 注文 API Deployment / Pod |
+| アプリ公開・振り分け | 外部パススルー Network Load Balancer |
+| コンテナイメージの保管 | Artifact Registry |
+
+- **注文 API の LoadBalancer Service**。Service のポートと注文 API のエンドポイントを対応させる。
+
+基盤用とアプリ用のプール分割はこの例の配置方針。ゾーン分散、LB の種類、ノードのリポジトリへのアクセス権を用途に合わせて設定する。
+
+公式資料
+- [GKE cluster modes](https://cloud.google.com/kubernetes-engine/docs/concepts/choose-cluster-mode)
+- [GKE node pools](https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools)
+- [GKE LoadBalancer Services](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/service-load-balancer)
+- [Artifact Registry integration with GKE](https://cloud.google.com/artifact-registry/docs/integrate-gke)

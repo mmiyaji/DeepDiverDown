@@ -1,7 +1,8 @@
 /* 要件と設計案を段階的に整理し、ビューアと同じモデル形式で保存する。 */
 import { loadDesignDrafts, saveDesignDraft } from './loader.js?v=nc1';
 import { AI_PROVIDERS } from './settings.js';
-import { applyInterview, isUndecided } from './design-interview.js';
+import { applyInterview, isUndecided } from './design-interview.js?v=objects1';
+import { NODE_KINDS } from './node-kinds.js';
 
 const pendingInterviews = new Set();
 let refreshInterview;
@@ -12,10 +13,7 @@ const STEPS = [
   ['links', '接続'], ['unknowns', '未決事項'], ['review', 'レビュー'],
 ];
 const TIERS = [['entry', '利用者・入口'], ['app', 'アプリケーション'], ['data', 'データ']];
-const KINDS = [
-  ['actor', '利用者・運用者'], ['client', 'クライアント'], ['cdn', 'CDN'], ['external', '外部システム'], ['lb', 'ロードバランサー'],
-  ['service', 'サービス'], ['worker', 'ワーカー'], ['db', 'データベース'], ['queue', 'キュー'], ['cache', 'キャッシュ'],
-];
+const KINDS = Object.entries(NODE_KINDS).map(([id, { label }]) => [id, label]);
 const REQUIREMENTS = [['usecase', 'ユースケース'], ['rule', '業務ルール'], ['nfr', '非機能要件']];
 const esc = value => String(value ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const idFor = prefix => `${prefix}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;

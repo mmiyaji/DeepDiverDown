@@ -26,11 +26,11 @@ tiers:
   - {"id":"engine","label":"DuckDB の物理計画","z":1,"origin":[0,0],"size":[16,3]}
   - {"id":"parquet","label":"orders.parquet","z":0,"origin":[2,0],"size":[12,3]}
 nodes:
-  query: {"label":"SQL / EXPLAIN","kind":"actor","tier":"engine","x":1,"y":1.5,"description":"直近 7 日・顧客 42 のクエリを実行または計画する。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§2"}]}
-  optimizer: {"label":"オプティマイザ","kind":"service","tier":"engine","x":4,"y":1.5,"description":"必要列と押し込める述語をスキャンへ渡す。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§2"}]}
+  query: {label: 検索 SQL と計画の確認, kind: actor, tier: engine, x: 1, 'y': 1.5, description: 直近 7 日・顧客 42 のクエリを実行または計画する。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§2}]}
+  optimizer: {label: 読取の最適化, kind: service, tier: engine, x: 4, 'y': 1.5, description: 必要列と押し込める述語をスキャンへ渡す。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§2}]}
   scan: {"label":"Parquet スキャン","kind":"worker","tier":"engine","x":8,"y":1.5,"description":"候補グループの列チャンクを読み、押し込まれた条件を行単位で評価する。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§3"}]}
   project: {"label":"結果の投影","kind":"worker","tier":"engine","x":12,"y":1.5,"description":"注文番号と金額を返す。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§3"}]}
-  profile: {"label":"実行時プロファイル","kind":"external","tier":"engine","x":15,"y":1.5,"description":"実行した物理演算子と行数・時間を表示する。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§4"}]}
+  profile: {label: 実行時の観測, kind: external, tier: engine, x: 15, 'y': 1.5, description: 実行した物理演算子と行数・時間を表示する。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§4}]}
   footer: {"label":"フッター統計","kind":"segment","tier":"parquet","x":3,"y":1.5,"description":"行グループ内の列チャンクの位置と利用可能な統計を持つ。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§3"}]}
   groups: {"label":"行グループ","kind":"segment","tier":"parquet","x":7,"y":1.5,"description":"同じ行範囲について、列ごとのチャンクを束ねる。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§3"}]}
   columns: {"label":"列チャンク","kind":"segment","tier":"parquet","x":11,"y":1.5,"description":"各行グループの選択列・条件列を物理的に保持する。","evidence":[{"type":"doc","ref":"docs/reference-duckdb.md#§3"}]}
@@ -149,3 +149,24 @@ grid:
       - 1
   cellNote: 1 マスは 1 列チャンク。各マスの重みを 1 とした説明用の図。
   note: 図の割合はチャンク数に基づく。ディスク I/O 量や実測バイト数は含まない。
+
+implementations:
+  - id: python-parquet
+    label: "Python に組み込む DuckDB と Parquet"
+    description: "Python プロセス内の DuckDB がローカルの orders.parquet を直接読む例。必要な列と行グループを絞り、データの読取と性能の観測は同じ埋め込みエンジンで行う。"
+    sources:
+      - {title: DuckDB Reading and Writing Parquet Files, url: https://duckdb.org/docs/data/parquet}
+      - {title: DuckDB Querying Parquet Metadata, url: https://duckdb.org/docs/current/data/parquet/metadata}
+      - {title: DuckDB EXPLAIN, url: https://duckdb.org/docs/stable/guides/meta/explain}
+      - {title: DuckDB Profiling, url: https://duckdb.org/docs/current/dev/profiling}
+      - {title: DuckDB Python API, url: https://duckdb.org/docs/stable/clients/python/overview}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      python-parquet-client: {label: Python の DuckDB 接続, kind: client, tier: processing, x: 1, y: 1.15, realizes: [query], description: duckdb.connect で作った接続から SQL を実行する。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
+      python-parquet-engine: {label: 同じプロセスの DuckDB エンジン, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [optimizer, scan, project, profile], description: read_parquet へ述語と列要求を渡し、EXPLAIN ANALYZE で実行を観測する。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
+      python-parquet-parquet: {label: ローカルの orders.parquet, kind: file, tier: processing, x: 5, y: 1.15, realizes: [footer, groups, columns], description: フッターと列チャンクを持ち、直接読み取れる。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
+      python-parquet-metadata: {label: parquet_metadata の診断用 SQL, kind: file, tier: setup, x: 1, y: 1.5, description: 日付と顧客 ID の min/max を確認して候補グループの説明に使う。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
+    links:
+      - {id: python-parquet-metadata-connection, from: python-parquet-metadata, to: python-parquet-client, label: ファイル内統計を調べる}

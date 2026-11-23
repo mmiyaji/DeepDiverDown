@@ -2,8 +2,8 @@
   "model": "snowflake-query-performance",
   "name": "Snowflake のクエリ性能とウェアハウス",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "bi": {
@@ -13,17 +13,17 @@
     },
     "control": {
       "type": "node",
-      "label": "クラウドサービス",
+      "label": "クエリ受付と計画",
       "status": "claim"
     },
     "queue": {
       "type": "node",
-      "label": "ウェアハウス待ち行列",
+      "label": "実行待ち行列",
       "status": "claim"
     },
     "clusters": {
       "type": "node",
-      "label": "クラスター群",
+      "label": "並列クエリ実行資源",
       "status": "claim"
     },
     "metadata": {
@@ -33,7 +33,7 @@
     },
     "micro": {
       "type": "node",
-      "label": "マイクロパーティション",
+      "label": "列指向のストレージ区画",
       "status": "claim"
     },
     "result": {
@@ -43,27 +43,27 @@
     },
     "submit": {
       "type": "link",
-      "label": "BI クエリ → クラウドサービス",
+      "label": "BI クエリ → クエリ受付と計画",
       "status": "claim"
     },
     "wait": {
       "type": "link",
-      "label": "クラウドサービス → ウェアハウス待ち行列",
+      "label": "クエリ受付と計画 → 実行待ち行列",
       "status": "claim"
     },
     "allocate": {
       "type": "link",
-      "label": "ウェアハウス待ち行列 → クラスター群",
+      "label": "実行待ち行列 → 並列クエリ実行資源",
       "status": "claim"
     },
     "bounds": {
       "type": "link",
-      "label": "クラウドサービス → 区画メタデータ",
+      "label": "クエリ受付と計画 → 区画メタデータ",
       "status": "claim"
     },
     "scan": {
       "type": "link",
-      "label": "クラスター群 → マイクロパーティション",
+      "label": "並列クエリ実行資源 → 列指向のストレージ区画",
       "status": "claim"
     },
     "reuse": {
@@ -73,7 +73,7 @@
     },
     "return": {
       "type": "link",
-      "label": "クラスター群 → BI クエリ",
+      "label": "並列クエリ実行資源 → BI クエリ",
       "status": "claim"
     },
     "cached": {
@@ -84,6 +84,54 @@
     "pruning": {
       "type": "scenario",
       "label": "日付フィルターで読む区画を減らす"
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "注文集計 SQL クライアント",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-control": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "Snowflake Cloud Services",
+      "realizes": [
+        "control"
+      ]
+    },
+    "example-queue": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "BI_WH マルチクラスターウェアハウス",
+      "realizes": [
+        "queue",
+        "clusters"
+      ]
+    },
+    "example-metadata": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "Snowflake ORDERS のマイクロパーティション",
+      "realizes": [
+        "metadata",
+        "micro"
+      ]
+    },
+    "example-result": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "Snowflake の永続化クエリ結果",
+      "realizes": [
+        "result"
+      ]
+    },
+    "example-history": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "ACCOUNT_USAGE.QUERY_HISTORY",
+      "realizes": []
     }
   },
   "byRef": {
@@ -110,7 +158,13 @@
       "reuse",
       "return",
       "cached",
-      "pruning"
+      "pruning",
+      "example-bi",
+      "example-control",
+      "example-queue",
+      "example-metadata",
+      "example-result",
+      "example-history"
     ],
     "docs/reference-snowflake-query-performance.md#§2": [
       "queue",
@@ -130,6 +184,14 @@
       "result",
       "reuse",
       "cached"
+    ],
+    "docs/reference-snowflake-query-performance.md#§5": [
+      "example-bi",
+      "example-control",
+      "example-queue",
+      "example-metadata",
+      "example-result",
+      "example-history"
     ]
   },
   "reference": {

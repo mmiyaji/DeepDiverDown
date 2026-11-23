@@ -1,8 +1,9 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=dv1';
+import { Scene3D } from './scene3d.js?v=objects1';
+import { NODE_KINDS, nodeShape } from './node-kinds.js';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
 import * as L from './loader.js?v=nc1';
-import { openDesign } from './design.js?v=nc1';
+import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=dv2';
 import { initResize } from './resize.js?v=rz2';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=bm1';
@@ -17,10 +18,12 @@ applyAppearance(S);
 if (!S.sidebar) document.body.classList.add('nav-closed');
 
 function parseRoute() {
-  const h = decodeURIComponent(location.hash.slice(1));
+  const h = location.hash.slice(1);
   const m = h.match(/^\/m\/([^/?]+)(?:\/([^/?]+))?(?:\?(.*))?$/);
-  if (!m) return { id: h.split('?')[0], mode: null, q: {} }; // 旧形式 #ec-shop
-  return { id: m[1], mode: m[2] || null, q: Object.fromEntries(new URLSearchParams(m[3] || '')) };
+  const encodedId = m?.[1] ?? h.split('?')[0]; // 旧形式 #ec-shop も受け付ける
+  let id = encodedId;
+  try { id = decodeURIComponent(encodedId); } catch { /* 不正なエンコードは未知の ID として扱う */ }
+  return { id, mode: m?.[2] || null, q: Object.fromEntries(new URLSearchParams(m?.[3] || '')) };
 }
 const ROUTE = parseRoute();
 const PREVIEW = window.parent !== window && new URLSearchParams(location.search).get('preview') === 'reference';
@@ -67,12 +70,16 @@ const MODES = [
 ].filter(mode => mode && (!ENTRY.reference || ['struct', 'scenario'].includes(mode[0])));
 
 const VIEWS = Views.available(M);
+const initialView = VIEWS.includes(ROUTE.q.w) ? ROUTE.q.w : VIEWS.includes(M.views?.default) ? M.views.default : 'cloud';
+const initialSelection = ROUTE.q.s;
+const initialImplNodes = Views.implOf(M, initialView)?.nodes || {};
 const st = {
   cmpOnly: false, cmpKinds: new Set(["added", "removed", "changed"]), minimap: S.minimap ?? true,
   dimension: ['2', '3'].includes(ROUTE.q.d) ? ROUTE.q.d : PREVIEW ? '2' : S.dimension,
-  view: VIEWS.includes(ROUTE.q.w) ? ROUTE.q.w : VIEWS.includes(M.views?.default) ? M.views.default : 'cloud',
+  view: initialView,
   mode: MODES.some(m => m[0] === ROUTE.mode) ? ROUTE.mode : 'struct',
-  sel: M.nodes[ROUTE.q.s] ? ROUTE.q.s : null, nbr: ROUTE.q.n === '1',
+  sel: Object.hasOwn(M.nodes, initialSelection) || Object.hasOwn(initialImplNodes, initialSelection) ? initialSelection : null,
+  nbr: ROUTE.q.n === '1',
   hidden: new Set((ROUTE.q.h || '').split(',').filter(Boolean)),
   scen: +ROUTE.q.sc || 0, step: +ROUTE.q.st || 0, down: (ROUTE.q.down || (['2', '3'].includes(ROUTE.q.d) ? '' : ROUTE.q.d) || '').split(',').filter(id => M.nodes[id]),
   issue: ROUTE.q.i != null ? +ROUTE.q.i : null, req: ROUTE.q.r || null, metric: METRICS.some(x => x[0] === ROUTE.q.m) ? ROUTE.q.m : METRICS[0][0], play: null,
@@ -94,7 +101,7 @@ function routeHash(withView) {
   if (st.mode === 'metric') q.set('m', st.metric);
   if (withView) { const v = scene.getView(); q.set('v', [...v.p, ...v.t, v.z].join('_')); }
   const s = q.toString();
-  return `#/m/${KEY}/${st.mode}${s ? '?' + s : ''}`;
+  return `#/m/${encodeURIComponent(KEY)}/${st.mode}${s ? '?' + s : ''}`;
 }
 const syncUrl = () => history.replaceState(null, '', routeHash(false));
 addEventListener('hashchange', () => { if (parseRoute().id !== KEY || parseRoute().q.v) location.reload(); });
@@ -283,10 +290,11 @@ scene.speed = S.packetSpeed;
 scene.initialView = S.defaultView;
 
 const serviceLabel = svc => svc && `${svc.name}｜${svc.providerLabel}`;
+const kindLabel = kind => Object.hasOwn(NODE_KINDS, kind) ? NODE_KINDS[kind].label : kind;
 
 function nodeSpec(id, n, s) {
   const svc = Catalog.lookup(n.svc);
-  const shape = n.kind === 'actor' ? 'person' : n.kind === 'segment' ? 'slab' : (svc?.shape ?? (['db', 'cache'].includes(n.kind) ? 'cyl' : n.kind === 'queue' ? 'queue' : 'box'));
+  const shape = nodeShape(n.kind, svc?.shape);
   const flat = st.dimension === '2';
   const solidStyle = style3D();
   const flatStyle = flat ? (S.nodeStyle2D === 'silhouette' ? 'silhouette' : 'card') : null;
@@ -317,7 +325,7 @@ function nodeSpec(id, n, s) {
   return {
     id, shape, shape3D: n.shape3D, kind: n.kind, flat, flatStyle, solidStyle, color, cardTint: s.fill || s.heat != null ? color.getStyle() : null, opacity, dashed, outline: !!s.outline, h: s.h || (n.kind === 'client' ? 0.7 : 1), pos: W(n.x, n.y, n.tier),
     icon: S.officialIcons ? svc?.iconUrl : null,
-    label: n.label, selected: VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', abbr: svc && { text: svc.abbr, color: svc.color },
+    label: n.label, selected: id === st.sel || VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', abbr: svc && { text: svc.abbr, color: svc.color },
     // 並列表現：parallel（同じ実行単位が N 個）・slots（同時に走る Task 数）・partitions（データの分割数）
     parallel: n.parallel, slots: n.slots, partitions: n.partitions,
     badge: s.badge || (n.parallel ? { text: `×${n.parallel} 並列`, tone: 'par' } : n.drill ? { text: '▼ 詳細図', tone: 'drill' } : null),
@@ -332,7 +340,7 @@ function projectState(ns, ls) {
     const s = nsV[vid] = Views.mergeNode(parts.map(p => ns[p]));
     const n = P.nodes[vid];
     if (st.view === 'network' && s.badge?.text?.startsWith('×') && n.replicas < 99) s.badge = { text: `×${n.replicas}` }; // AZ ごとの台数
-    if (parts.length > 1 && !s.badge) s.badge = { text: `${parts.length} 部品` };
+    if (parts.length > 1 && !s.badge) s.badge = { text: `${parts.length} ${n.impl ? '機能' : '部品'}` };
     if (st.sel && (vid === st.sel || parts.includes(st.sel))) s.outline = true;
   }
   for (const l of P.links) {
@@ -392,7 +400,7 @@ function drawScene() {
     let { x0, y0, x1, y1 } = gr;
     if (![x0, y0, x1, y1].every(Number.isFinite)) {
       const members = Object.entries(N).filter(([id, n]) => n.tier === t &&
-        (!gr.nodes || P.from[id].some(source => gr.nodes.includes(source))) &&
+        (!gr.nodes || gr.nodes.includes(id) || P.from[id].some(source => gr.nodes.includes(source))) &&
         (gr.kind !== 'az' || !gr.az || n.az?.includes(gr.az))).map(([, n]) => n);
       if (!members.length) continue;
       const xs = members.map(n => n.x), ys = members.map(n => n.y);
@@ -539,8 +547,12 @@ function renderSidebar() {
     const c = k === 'compare' ? CMPR?.changes.length : count;
     return `<button data-mode="${k}" class="${st.mode === k ? 'on' : ''}" ${st.mode === k ? 'aria-current="true"' : ''} title="${n}（${i + 1}）"><span>${n}</span>${c ? `<small>${c}</small>` : ''}</button>`;
   }).join('');
-  $('views').innerHTML = VIEWS.map(v => `<button data-viewmode="${v}" class="${st.view === v ? 'on' : ''}" aria-pressed="${st.view === v}" title="${Views.VIEWS[v].label}（${Views.VIEWS[v].sub}）・V キーで切替"><b>${Views.VIEWS[v].label}</b><small>${Views.VIEWS[v].sub}</small></button>`).join('');
-  $('floors').innerHTML = VW().tiers.map(t => `<label><input type="checkbox" data-tier="${t.id}" ${st.hidden.has(t.id) ? '' : 'checked'}> ${esc(t.label)}</label>`).join('');
+  $('views').innerHTML = VIEWS.map(v => {
+    const view = Views.info(M, v);
+    return `<button data-viewmode="${esc(v)}" class="${st.view === v ? 'on' : ''}" aria-pressed="${st.view === v}" title="${esc(view.label)}（${esc(view.sub)}）・V キーで切替"><b>${esc(view.label)}</b><small>${esc(view.sub)}</small></button>`;
+  }).join('');
+  $('views').closest('.vc-row').hidden = VIEWS.length < 2;
+  $('floors').innerHTML = VW().tiers.map(t => `<label><input type="checkbox" data-tier="${esc(t.id)}" ${st.hidden.has(t.id) ? '' : 'checked'}> ${esc(t.label)}</label>`).join('');
   $('nbr').checked = st.nbr;
   $('nbr').disabled = !st.sel;
   $('minimap').checked = st.minimap;
@@ -548,27 +560,31 @@ function renderSidebar() {
 
 /* 凡例：線の意味 + このモデルに登場するクラウド・枠の種類 */
 function contextLegend() {
-  const provs = [...new Set(Object.values(M.nodes).map(n => Catalog.providerOf(n)).filter(Boolean))];
-  const kinds = [...new Set((M.groups || []).map(g => g.kind))];
+  const { nodes, groups } = VW();
+  const provs = [...new Set([...Object.values(nodes).map(n => Catalog.providerOf(n)), ...groups.map(g => g.provider)].filter(p => Object.hasOwn(Catalog.PROVIDERS, p)))];
+  const kinds = [...new Set(groups.map(g => g.kind))];
   const KIND = { cloud: 'クラウド', region: 'リージョン', vpc: 'VPC', vnet: 'VNet', vcn: 'VCN', az: 'AZ', subnet: 'サブネット', cluster: 'クラスタ', namespace: 'Namespace', datacenter: 'データセンター', parallel: '並列に実行' };
   return (provs.length ? '<span class="lg-sep"></span>' + provs.map(p => `<span><b class="sw" style="background:${Catalog.PROVIDERS[p].color}"></b>${esc(Catalog.PROVIDERS[p].label)}</span>`).join('') : '') +
     (kinds.length ? '<span class="lg-sep"></span>' + kinds.map(k => `<span><b class="fr fr-${k}"></b>${KIND[k] || k}</span>`).join('') : '');
 }
 
 /* ================= 統計・凡例 ================= */
-const stat = (lab, v, bad) => `<div class="stat ${bad ? 'bad' : ''}"><small>${lab}</small><b>${v}</b></div>`;
+const stat = (lab, v, bad) => `<div class="stat ${bad ? 'bad' : ''}"><small>${esc(lab)}</small><b>${esc(v)}</b></div>`;
 const count = (o, s) => Object.values(o).filter(r => r.status === s).length;
 function renderStats() {
   let h = '';
   if (st.mode === 'struct') h = stat('ノード', Object.keys(M.nodes).length) + stat('同期 / 非同期', `${M.links.filter(l => l.sync).length} / ${M.links.filter(l => !l.sync).length}`) + stat('指摘', ISSUES.length, ISSUES.length) + stat('点検', GATES.pass ? '合格' : '不合格', !GATES.pass);
-  if (st.mode === 'struct' && ENTRY.reference) h = stat('構成部品', Object.keys(M.nodes).length) + stat('接続', M.links.length);
-  if (st.mode === 'scenario' && M.scenarios?.length) { const sc = M.scenarios[st.scen], p = syncP95(sc); h = stat('シナリオ', esc(sc.label)) + stat('ステップ', `${st.step + 1} / ${sc.steps.length}`) + (PIPE || ENTRY.reference ? '' : stat('同期経路 p95 合計', `${p} ms`, p > 1000)); }
+  if (st.mode === 'struct' && ENTRY.reference) {
+    const { nodes, links } = VW();
+    h = stat('構成部品', Object.keys(nodes).length) + stat('接続', links.length);
+  }
+  if (st.mode === 'scenario' && M.scenarios?.length) { const sc = M.scenarios[st.scen], p = syncP95(sc); h = stat('シナリオ', sc.label) + stat('ステップ', `${st.step + 1} / ${sc.steps.length}`) + (PIPE || ENTRY.reference ? '' : stat('同期経路 p95 合計', `${p} ms`, p > 1000)); }
   if (st.mode === 'fail') { const r = Analyze.impact(M, st.down); h = stat('停止', st.down.length, st.down.length) + stat('影響', r.impacted.length, r.impacted.length) + stat('滞留', r.delayed.length) + stat('止まるシナリオ', `${r.brokenScenarios.length} / ${M.scenarios?.length || 0}`, r.brokenScenarios.length); }
   if (st.mode === 'lint') h = stat('重大', ISSUES.filter(i => i.sev === 'high').length, 1) + stat('注意', ISSUES.filter(i => i.sev === 'mid').length) + stat('無効にしたルール', S.disabledRules.length);
   if (st.mode === 'metric') { const vs = Object.values(M.nodes).map(n => n.metrics?.[st.metric]).filter(v => v != null), sum = ['cost', 'duration'].includes(st.metric); h = stat('指標', METRICS.find(x => x[0] === st.metric)[1]) + (vs.length ? stat(sum ? '合計' : '最大', fmt(st.metric, sum ? vs.reduce((a, b) => a + b, 0) : Math.max(...vs))) : ''); }
   if (st.mode === 'evidence') { const all = { ...CLS.nodes, ...CLS.links }; h = stat('事実', count(all, 'fact')) + stat('主張', count(all, 'claim')) + stat('不明', count(all, 'unknown'), count(all, 'unknown')) + stat('ずれ', CLS.drifts.length, CLS.drifts.length) + stat('網羅率', `${COV.total ? Math.round(COV.covered / COV.total * 100) : 100}%`, COV.covered < COV.total); }
   if (st.mode === 'req') h = Object.entries(REQ_KIND).map(([k, n]) => stat(n, M.requirements.filter(q => q.kind === k).length)).join('');
-  if (st.mode === 'compare') h = CMPR ? stat('比較対象', esc(CMP.label)) + ['added', 'removed', 'changed'].map(k => stat({ added: '追加', removed: '削除', changed: '変更' }[k], CMPR.changes.filter(c => c.kind === k).length)).join('') : stat('比較対象', 'なし');
+  if (st.mode === 'compare') h = CMPR ? stat('比較対象', CMP.label) + ['added', 'removed', 'changed'].map(k => stat({ added: '追加', removed: '削除', changed: '変更' }[k], CMPR.changes.filter(c => c.kind === k).length)).join('') : stat('比較対象', 'なし');
   $('stats').innerHTML = h;
   const leg = {
     evidence: '<span><i></i>事実（実装で確認）</span><span><i class="dash"></i>主張（設計書のみ）</span><span><i class="dot warn"></i>不明</span><span><i class="acc"></i>ずれ</span>',
@@ -583,23 +599,43 @@ function syncP95(sc) {
 }
 
 /* ================= パネル ================= */
-const tag = s => `<span class="tag st-${s}">${Analyze.STATUS[s]}</span>`;
+const tag = s => `<span class="tag st-${esc(s)}">${esc(Analyze.STATUS[s])}</span>`;
 const evList = ev => (ev || []).map(e => `<div class="ev"><span class="mono">${esc(e.type)}</span> ${esc(e.at || e.ref)}${e.quote ? `<blockquote>${esc(e.quote)}</blockquote>` : ''}${e.says ? ` <span class="mono acc-t">says ${esc(JSON.stringify(e.says))}</span>` : ''}</div>`).join('') || '<div class="sub">根拠なし</div>';
 const none = '<div class="sub">なし</div>';
 
 /* 論理構成でまとめた機能（複数の物理部品） */
 function componentDetail(id) {
   const P = VW(), c = P.nodes[id]; if (!c) return '';
+  if (c.impl) return implDetail(id);
   const parts = P.from[id] || [], ins = P.links.filter(l => l.to === id), outs = P.links.filter(l => l.from === id);
   const iss = ISSUES.filter(i => i.nodes.some(n => parts.includes(n)));
   const ln = l => `${esc(P.nodes[l.from]?.label)} → ${esc(P.nodes[l.to]?.label)} <span class="mono mute">${(P.linkFrom[l.id] || []).length} 経路</span>`;
   return `<h4>選択中の機能</h4><h3>${esc(c.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">論理構成の機能 / ${esc(TI(c.tier).label || '')}</div>
     ${c.description ? `<p>${esc(c.description)}</p>` : ''}
-    <div class="row"><button class="b small" data-focus="${id}">この機能に寄る（F）</button><button class="b small" data-viewmode="cloud">物理構成で見る</button><button class="b small" data-sel="">選択を解除</button></div>
+    <div class="row"><button class="b small" data-focus="${esc(id)}">この機能に寄る（F）</button><button class="b small" data-viewmode="cloud">物理構成で見る</button><button class="b small" data-sel="">選択を解除</button></div>
     <h4>担う物理部品（${parts.length}）</h4>${parts.map(p => `<div class="item">${esc(M.nodes[p]?.label || p)} <span class="mono mute">${esc(p)}</span> ${CLS.nodes[p] ? tag(CLS.nodes[p].status) : ''}</div>`).join('')}
-    <h4>呼び出し元</h4>${ins.map(l => `<div class="item" data-sel="${l.from}">${ln(l)}</div>`).join('') || none}
-    <h4>呼び出し先</h4>${outs.map(l => `<div class="item" data-sel="${l.to}">${ln(l)}</div>`).join('') || none}
+    <h4>呼び出し元</h4>${ins.map(l => `<div class="item" data-sel="${esc(l.from)}">${ln(l)}</div>`).join('') || none}
+    <h4>呼び出し先</h4>${outs.map(l => `<div class="item" data-sel="${esc(l.to)}">${ln(l)}</div>`).join('') || none}
     ${iss.length ? '<h4>関連する指摘</h4>' + iss.map(i => `<div class="item"><span class="tag ${i.sev}">${esc(i.title)}</span><p>${esc(i.msg)}</p></div>`).join('') : ''}`;
+}
+
+/* 実装例の部品（リファレンスの機能を担うサービス・実装で加わる部品） */
+function implDetail(id) {
+  const P = VW(), c = P.nodes[id], impl = Views.implOf(M, st.view);
+  const parts = P.from[id] || [], ins = P.links.filter(l => l.to === id), outs = P.links.filter(l => l.from === id);
+  const type = serviceLabel(Catalog.lookup(c.svc)) || kindLabel(c.kind);
+  const ln = (l, other) => `${esc(P.nodes[other]?.label || other)}${l.label ? ` <span class="mute">${esc(l.label)}</span>` : ''}`;
+  const srcs = (impl?.sources || []).filter(s => /^https?:\/\//i.test(s.url))
+    .map(s => `<div class="item"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a></div>`).join('');
+  return `<h4>実装例の部品</h4><h3>${esc(c.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${type ? esc(type) + ' / ' : ''}${esc(Views.info(M, st.view).label)}</div>
+    ${c.description ? `<p>${esc(c.description)}</p>` : ''}
+    <div class="row"><button class="b small" data-focus="${esc(id)}">この部品に寄る（F）</button><button class="b small" data-viewmode="cloud">機能配置で見る</button><button class="b small" data-sel="">選択を解除</button></div>
+    <h4>担う機能（${parts.length}）</h4>${parts.map(p => `<div class="item">${esc(M.nodes[p]?.label || p)} <span class="mono mute">${esc(p)}</span></div>`).join('') || '<div class="sub">機能配置にはない、実装で加わる部品</div>'}
+    <h4>接続元</h4>${ins.map(l => `<div class="item" data-sel="${esc(l.from)}">${ln(l, l.from)}</div>`).join('') || none}
+    <h4>接続先</h4>${outs.map(l => `<div class="item" data-sel="${esc(l.to)}">${ln(l, l.to)}</div>`).join('') || none}
+    ${c.evidence?.length ? `<h4>根拠</h4>${evList(c.evidence)}` : ''}
+    ${srcs ? `<h4>実装例の資料</h4>${srcs}` : ''}
+    <p class="sub">実装例はサービスの組み合わせの一例です。製品の選択や設定は要件に合わせて確かめてください。</p>`;
 }
 
 function nodeDetail(id) {
@@ -607,19 +643,19 @@ function nodeDetail(id) {
   const n = allNodes()[id];
   const ins = allLinks().filter(l => l.to === id), outs = allLinks().filter(l => l.from === id);
   const iss = ISSUES.filter(i => i.nodes.includes(id)), c = CLS.nodes[id];
-  const kind = n.kind === 'actor' ? `登場人物：${(ROLES[n.role] || ROLES.user).label}${n.team ? `（${esc(n.team)}・${n.headcount ?? 1}名）` : ''}` : esc(serviceLabel(Catalog.lookup(n.svc)) || n.kind);
-  const ln = l => `${esc(linkLabel(l))} <span class="mono mute">${l.sync ? 'sync' : 'async'}${l.timeoutMs ? ' ' + l.timeoutMs / 1000 + 's' : ''}${l.retry ? ' retry' + l.retry : ''}</span> ${CLS.links[l.id] ? tag(CLS.links[l.id].status) : ''}`;
+  const kind = n.kind === 'actor' ? `登場人物：${(ROLES[n.role] || ROLES.user).label}${n.team ? `（${n.team}・${n.headcount ?? 1}名）` : ''}` : serviceLabel(Catalog.lookup(n.svc)) || kindLabel(n.kind);
+  const ln = l => `${esc(linkLabel(l))} <span class="mono mute">${l.sync ? 'sync' : 'async'}${l.timeoutMs ? ' ' + l.timeoutMs / 1000 + 's' : ''}${l.retry ? ' retry' + esc(l.retry) : ''}</span> ${CLS.links[l.id] ? tag(CLS.links[l.id].status) : ''}`;
   const reqs = (M.requirements || []).filter(q => q.nodes?.includes(id));
-  return `<h4>選択中の部品</h4><h3>${esc(n.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${esc(n.subnet)} subnet` : ''} / ${esc(TI(n.tier).label || '')}</div>
+  return `<h4>選択中の部品</h4><h3>${esc(n.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${esc(kind)}${n.az ? ` / AZ ${esc(n.az.join(','))}` : ''}${n.subnet ? ` / ${esc(n.subnet)} subnet` : ''} / ${esc(TI(n.tier).label || '')}</div>
     ${n.description ? `<p>${esc(n.description)}</p>` : ''}
-    ${n.drill && REGISTRY.some(r => r.id === n.drill) ? `<a class="b drill" href="#/m/${encodeURIComponent(n.drill)}/struct" data-drill="${id}">▼ 内部構造を見る：${esc(REGISTRY.find(r => r.id === n.drill).name || n.drill)}</a>` : ''}
-    <div class="row"><button class="b small" data-focus="${id}">この部品に寄る（F）</button><button class="b small ${st.nbr ? 'on' : ''}" data-nbr>周辺だけ表示（N）</button><button class="b small" data-sel="">選択を解除</button></div>
+    ${n.drill && REGISTRY.some(r => r.id === n.drill) ? `<a class="b drill" href="#/m/${encodeURIComponent(n.drill)}/struct" data-drill="${esc(id)}">▼ 内部構造を見る：${esc(REGISTRY.find(r => r.id === n.drill).name || n.drill)}</a>` : ''}
+    <div class="row"><button class="b small" data-focus="${esc(id)}">この部品に寄る（F）</button><button class="b small ${st.nbr ? 'on' : ''}" data-nbr>周辺だけ表示（N）</button><button class="b small" data-sel="">選択を解除</button></div>
     ${c ? `<div class="row">${tag(c.status)}<span class="sub m0">${esc(c.why)}</span></div>` : ''}
-    <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${n.parallel ? `<tr><td>並列数</td><td>${esc(n.parallel)}（同じ実行単位が並列に動く）</td></tr>` : ''}${n.slots ? `<tr><td>同時 Task</td><td>${esc(n.slots)}（例）</td></tr>` : ''}${n.partitions ? `<tr><td>分割数</td><td>${esc(n.partitions)}（例）</td></tr>` : ''}${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
+    <table class="kv"><tr><td>台数</td><td>${esc(n.replicas ?? '—')}</td></tr>${n.parallel ? `<tr><td>並列数</td><td>${esc(n.parallel)}（同じ実行単位が並列に動く）</td></tr>` : ''}${n.slots ? `<tr><td>同時 Task</td><td>${esc(n.slots)}（例）</td></tr>` : ''}${n.partitions ? `<tr><td>分割数</td><td>${esc(n.partitions)}（例）</td></tr>` : ''}${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(fmt(k, v))}</td></tr>`).join('')}</table>
     <h4>根拠</h4>${evList(n.evidence)}
-    <h4>呼び出し元</h4>${ins.map(l => `<div class="item" data-sel="${l.from}">${ln(l)}</div>`).join('') || none}
-    <h4>呼び出し先</h4>${outs.map(l => `<div class="item" data-sel="${l.to}">${ln(l)}</div>`).join('') || none}
-    ${reqs.length ? '<h4>関係する要件</h4>' + reqs.map(q => `<div class="item" data-req="${q.id}"><b class="mono">${q.id}</b> ${esc(q.title)}</div>`).join('') : ''}
+    <h4>呼び出し元</h4>${ins.map(l => `<div class="item" data-sel="${esc(l.from)}">${ln(l)}</div>`).join('') || none}
+    <h4>呼び出し先</h4>${outs.map(l => `<div class="item" data-sel="${esc(l.to)}">${ln(l)}</div>`).join('') || none}
+    ${reqs.length ? '<h4>関係する要件</h4>' + reqs.map(q => `<div class="item" data-req="${esc(q.id)}"><b class="mono">${esc(q.id)}</b> ${esc(q.title)}</div>`).join('') : ''}
     ${iss.length ? '<h4>関連する指摘</h4>' + iss.map(i => `<div class="item"><span class="tag ${i.sev}">${esc(i.title)}</span><p>${esc(i.msg)}</p></div>`).join('') : ''}`;
 }
 
@@ -737,7 +773,9 @@ function renderPanel() {
 function resolveSel(id) {
   if (!id) return null;
   if (allNodes()[id]) return id;
-  const parts = VW().from[id];
+  const view = VW();
+  if (view.nodes[id]?.impl) return id;
+  const parts = view.from[id];
   return parts ? (parts.length === 1 ? parts[0] : id) : null;
 }
 function select(id, { focus = false } = {}) {
@@ -761,9 +799,13 @@ function onPick(id) {
 }
 function setView(v) {
   if (!VIEWS.includes(v) || v === st.view) return;
+  const previous = st.sel && VW().nodes[st.sel]?.impl ? VW().from[st.sel][0] : st.sel;
   st.view = v; scene.fitted = false; // 配置が変わるので全体が収まるよう視点を合わせ直す
+  st.sel = resolveSel(previous);
+  if (!st.sel) st.nbr = false;
   draw();
-  toast(`${Views.VIEWS[v].label}（${Views.VIEWS[v].sub}）`);
+  const vi = Views.info(M, v);
+  toast(`${vi.label}（${vi.sub}）`);
 }
 async function setMode(m) {
   st.mode = m; st.issue = null; st.req = null; stopPlay();

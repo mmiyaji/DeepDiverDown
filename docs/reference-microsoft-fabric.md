@@ -23,3 +23,21 @@ OneLake catalog から Fabric の資産を探す。発見できることと、SQ
 - [Microsoft Learn · SQL analytics endpoint](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)
 - [Microsoft Learn · Fabric Lakehouse](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview)
 - [Microsoft Learn · OneLake catalog](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)
+
+## 5. 実装例 Microsoft Fabric の注文レイクハウス
+
+Fabric の同一ワークスペースに取込パイプライン、Lakehouse、ノートブック、Power BI レポートを置く例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 受注データ | 受注 CSV の外部保存先 | 取込接続からファイルを読み出す。 |
+| 取込パイプライン | Fabric Data Factory の Copy activity | 原本ファイルを OneLake の Lakehouse にコピーする。 |
+| 取込ファイルの保管領域・分析用の Delta テーブル | OneLake の Lakehouse Files と Tables | 原本ファイルは Files、整備済み Delta は Tables に分ける。 |
+| データ変換ノートブック | Fabric Spark ノートブック | 型変換や品質チェックを行い、分析用 Delta を書き込む。 |
+| SQL 読み取り口 | Lakehouse SQL 分析エンドポイント | Lakehouse のテーブルを読み取り専用 SQL で提供する。 |
+| BI レポート | Power BI 受注レポート | 公開されたセマンティックモデルの指標を表示する。 |
+| データ資産カタログ | OneLake カタログ | Lakehouse などの資産を確認する。 |
+
+Lakehouse の更新にはノートブックを使う。SQL 分析エンドポイントは Lakehouse のテーブルの参照経路である。レポートに合わせてセマンティックモデルを明示的に作成する。
+
+出典 [Microsoft Learn · Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview)、[Microsoft Learn · OneLake](https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview)、[Microsoft Learn · SQL analytics endpoint](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)、[Microsoft Learn · Fabric Lakehouse](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview)、[Microsoft Learn · OneLake catalog](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)、[Fabric の Copy activity](https://learn.microsoft.com/en-us/fabric/data-factory/copy-data-activity)、[Power BI セマンティックモデルの作成](https://learn.microsoft.com/en-us/fabric/data-warehouse/create-semantic-model)

@@ -2,88 +2,88 @@
   "model": "bigquery",
   "name": "BigQuery のストレージ・コンピュート分離アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "client": {
       "type": "node",
-      "label": "Client / bq",
+      "label": "ジョブ実行クライアント",
       "status": "claim"
     },
     "api": {
       "type": "node",
-      "label": "Query stages",
+      "label": "SQL 計画とステージ分割",
       "status": "claim"
     },
     "bi": {
       "type": "node",
-      "label": "BI user",
+      "label": "BI 利用者",
       "status": "claim"
     },
     "dataset": {
       "type": "node",
-      "label": "Dataset / tables",
+      "label": "分析テーブルの名前空間",
       "status": "claim"
     },
     "storage": {
       "type": "node",
-      "label": "Managed storage",
+      "label": "管理された列指向ストレージ",
       "status": "claim"
     },
     "engine": {
       "type": "node",
-      "label": "Slots / stage workers",
+      "label": "並列クエリ実行枠",
       "status": "claim"
     },
     "workers": {
       "type": "node",
-      "label": "Distributed shuffle",
+      "label": "分散シャッフル",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "Client / bq → Query stages",
+      "label": "ジョブ実行クライアント → SQL 計画とステージ分割",
       "status": "claim"
     },
     "bi-submit": {
       "type": "link",
-      "label": "BI user → Query stages",
+      "label": "BI 利用者 → SQL 計画とステージ分割",
       "status": "claim"
     },
     "organize": {
       "type": "link",
-      "label": "Query stages → Dataset / tables",
+      "label": "SQL 計画とステージ分割 → 分析テーブルの名前空間",
       "status": "claim"
     },
     "persist": {
       "type": "link",
-      "label": "Dataset / tables → Managed storage",
+      "label": "分析テーブルの名前空間 → 管理された列指向ストレージ",
       "status": "claim"
     },
     "plan": {
       "type": "link",
-      "label": "Query stages → Slots / stage workers",
+      "label": "SQL 計画とステージ分割 → 並列クエリ実行枠",
       "status": "claim"
     },
     "scan": {
       "type": "link",
-      "label": "Slots / stage workers → Managed storage",
+      "label": "並列クエリ実行枠 → 管理された列指向ストレージ",
       "status": "claim"
     },
     "distribute": {
       "type": "link",
-      "label": "Slots / stage workers → Distributed shuffle",
+      "label": "並列クエリ実行枠 → 分散シャッフル",
       "status": "claim"
     },
     "aggregate": {
       "type": "link",
-      "label": "Distributed shuffle → Slots / stage workers",
+      "label": "分散シャッフル → 並列クエリ実行枠",
       "status": "claim"
     },
     "serve": {
       "type": "link",
-      "label": "Slots / stage workers → BI user",
+      "label": "並列クエリ実行枠 → BI 利用者",
       "status": "claim"
     },
     "load-query": {
@@ -109,6 +109,54 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のプロジェクト、リージョン、予約スロット、権限設定は未確定。"
+    },
+    "example-client": {
+      "type": "implementation",
+      "impl": "bq-reservation",
+      "label": "bq CLI とロードジョブ",
+      "realizes": [
+        "client"
+      ]
+    },
+    "example-api": {
+      "type": "implementation",
+      "impl": "bq-reservation",
+      "label": "BigQuery ジョブとクエリ計画",
+      "realizes": [
+        "api"
+      ]
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "bq-reservation",
+      "label": "BI 利用者",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-dataset": {
+      "type": "implementation",
+      "impl": "bq-reservation",
+      "label": "BigQuery sales データセットと管理表",
+      "realizes": [
+        "dataset",
+        "storage"
+      ]
+    },
+    "example-engine": {
+      "type": "implementation",
+      "impl": "bq-reservation",
+      "label": "BigQuery の分析用予約と実行",
+      "realizes": [
+        "engine",
+        "workers"
+      ]
+    },
+    "example-gcs": {
+      "type": "implementation",
+      "impl": "bq-reservation",
+      "label": "Cloud Storage の取込バケット",
+      "realizes": []
     }
   },
   "byRef": {
@@ -139,7 +187,13 @@
       "load-query",
       "independent-scale",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "example-client",
+      "example-api",
+      "example-bi",
+      "example-dataset",
+      "example-engine",
+      "example-gcs"
     ],
     "docs/reference-bigquery.md#§7": [
       "model",
@@ -182,11 +236,21 @@
       "load-query",
       "independent-scale",
       "NFR-01"
+    ],
+    "docs/reference-bigquery.md#§9": [
+      "example-client",
+      "example-api",
+      "example-bi",
+      "example-dataset",
+      "example-engine",
+      "example-gcs"
     ]
   },
   "reference": {
     "category": "クラウド分析基盤",
     "order": 30,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "BigQuery のリソース階層とデータセットの役割を区別する。",
       "管理ストレージとクエリコンピュートが独立して伸縮する理由を理解する。",

@@ -34,3 +34,19 @@ Amazon Redshift のプロビジョンドクラスターを、クライアント�
 - [Amazon Redshift provisioned clusters overview](https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html)
 - [Data warehouse system architecture](https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html)
 - [Architecture components of an Amazon Redshift data warehouse](https://docs.aws.amazon.com/prescriptive-guidance/latest/query-best-practices-redshift/data-warehouse-arch-components.html)
+
+## 8. 実装例 Amazon Redshift RA3 のプライベートクラスター
+
+プライベートサブネットのプロビジョンド RA3 クラスターに接続し、Amazon S3 から受注をロードする構成。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| SQL client | VPC 接続済みの SQL クライアント | Redshift クラスターの SQL エンドポイントに接続する。 |
+| BI user | BI 担当者 | 集計済みの結果を参照する。 |
+| クエリ計画・結果調整ノード | RA3 クラスターの Leader node | 実行計画を作り分散処理を調整する。 |
+| 分散計算ノード・ノード内の並列処理単位 | RA3 コンピュートノードとスライス | 各ノード内の並列処理単位で計画の一部を実行する。 |
+| 分析データベース・分離された管理ストレージ | Redshift データベースと Redshift Managed Storage | 論理データベースのテーブルを管理ストレージ上に保持する。 |
+
+プライベート接続用のサブネットとセキュリティグループを設定する。S3 への COPY 経路を VPC 側で制御する場合は拡張 VPC ルーティングの到達先も構成する。図の計算ノードとスライスはプロビジョンドクラスターの例を示す。
+
+出典 [Amazon Redshift provisioned clusters overview](https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html)、[Data warehouse system architecture](https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html)、[Architecture components of an Amazon Redshift data warehouse](https://docs.aws.amazon.com/prescriptive-guidance/latest/query-best-practices-redshift/data-warehouse-arch-components.html)、[VPC 内の Redshift リソース](https://docs.aws.amazon.com/redshift/latest/mgmt/managing-clusters-vpc.html)、[Enhanced VPC routing](https://docs.aws.amazon.com/redshift/latest/mgmt/enhanced-vpc-enabling-cluster.html)

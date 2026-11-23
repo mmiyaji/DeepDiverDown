@@ -40,7 +40,7 @@ tiers:
       - 15
       - 3
   - id: catalog
-    label: Knowledge Catalog
+    label: メタデータ管理とデータ製品
     z: 1
     size:
       - 15
@@ -80,7 +80,7 @@ nodes:
     tier: catalog
     x: 2
     y: 1
-    description: Google Cloud 資産や取り込んだ外部資産を登録する。
+    description: 分析基盤や外部ソースから取り込んだ資産を登録する。
     evidence:
       - type: doc
         ref: docs/reference-google-cloud-knowledge-catalog.md#§2
@@ -116,7 +116,7 @@ nodes:
       - type: doc
         ref: docs/reference-google-cloud-knowledge-catalog.md#§5
   bigquery:
-    label: BigQuery の資産
+    label: 分析基盤の資産
     kind: db
     tier: sources
     x: 3
@@ -131,12 +131,12 @@ nodes:
       - type: doc
         ref: docs/reference-google-cloud-knowledge-catalog.md#§5
   group:
-    label: Google グループ・IAM
+    label: グループと資産の利用権限
     kind: external
     tier: sources
     x: 12
     y: 1
-    description: 承認経路に応じて利用者を追加し、資産の IAM に対応付ける。
+    description: 承認経路に応じて利用者をグループに追加し、資産のアクセス権限と対応付ける。
     evidence:
       - type: doc
         ref: docs/reference-google-cloud-knowledge-catalog.md#§5
@@ -261,7 +261,7 @@ scenarios:
       - links:
           - enforce
           - read
-        note: BigQuery が IAM を評価し、許可されたデータを読み込む。
+        note: 分析基盤が資産の権限を評価し、許可されたデータを読み込む。
 treeLayout:
   title: 注文データ製品から資産の文脈へ
   unit: 情報項目
@@ -277,7 +277,7 @@ treeLayout:
     node: products
     children:
       - id: orders-entry
-        label: BigQuery / orders
+        label: 注文テーブル / orders
         kind: snapshot
         node: entries
         children:
@@ -313,3 +313,133 @@ requirements:
     evidence:
       - type: doc
         ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+implementations:
+  - id: gcp-bigquery
+    label: Knowledge Catalog・BigQuery
+    description: BigQuery の注文テーブルと承認付きアクセスグループを結び付ける Google Cloud の例。
+    sources:
+      - title: About Metadata in Knowledge Catalog
+        url: https://docs.cloud.google.com/knowledge-catalog/docs/metadata-overview
+      - title: About Data Lineage
+        url: https://docs.cloud.google.com/knowledge-catalog/docs/about-data-lineage
+      - title: Manage Data Products
+        url: https://docs.cloud.google.com/knowledge-catalog/docs/manage-data-products
+      - title: Use data products
+        url: https://docs.cloud.google.com/knowledge-catalog/docs/use-data-products
+    nodes:
+      gcp-bigquery-owner:
+        label: データ製品の担当者
+        kind: actor
+        tier: people
+        x: 5
+        y: 1
+        description: Google Cloud コンソールでアクセスグループとメタデータを管理する。
+        realizes:
+          - owner
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+      gcp-bigquery-user:
+        label: BigQuery の利用者
+        kind: actor
+        tier: people
+        x: 11
+        y: 1
+        description: 個人 ID でデータ製品の申請を行う。
+        realizes:
+          - consumer
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+      gcp-bigquery-metadata:
+        label: Knowledge Catalog（Entry・Aspect）
+        kind: catalog
+        tier: catalog
+        x: 3
+        y: 1
+        description: BigQuery テーブルの自動 Entry とカスタム Aspect を管理する。
+        realizes:
+          - entries
+          - aspects
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+      gcp-bigquery-lineage:
+        label: Google Cloud Data Lineage API
+        kind: service
+        tier: catalog
+        x: 8
+        y: 1
+        description: 対応する BigQuery ジョブの入出力を記録する。
+        realizes:
+          - lineage
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+        drill: openlineage
+      gcp-bigquery-products:
+        label: Knowledge Catalog データ製品
+        kind: catalog
+        tier: catalog
+        x: 12
+        y: 1
+        description: 関連資産とアクセス要求を管理する。
+        realizes:
+          - products
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+      gcp-bigquery-bigquery:
+        label: BigQuery テーブル
+        kind: table
+        tier: sources
+        x: 3
+        y: 1
+        description: スキーマを公開し、クエリ時に資産の IAM を評価する。
+        svc: gcp:bigquery
+        realizes:
+          - bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+        drill: bigquery
+      gcp-bigquery-google-group:
+        label: Google グループと IAM ロール
+        kind: external
+        tier: sources
+        x: 12
+        y: 1
+        description: アクセスグループから利用者と資産権限を対応付ける。
+        realizes:
+          - group
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+      gcp-bigquery-job-project:
+        label: BigQuery ジョブ実行プロジェクト
+        kind: service
+        tier: sources
+        x: 7
+        y: 1
+        description: BigQuery Job User などクエリを実行するための権限を持つ。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+    links:
+      - id: gcp-bigquery-query-job
+        from: gcp-bigquery-job-project
+        to: gcp-bigquery-bigquery
+        label: 実行プロジェクトからクエリする
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-knowledge-catalog.md#§7
+    groups:
+      - label: Google Cloud プロジェクト
+        kind: cloud
+        provider: gcp
+        nodes:
+          - gcp-bigquery-metadata
+          - gcp-bigquery-lineage
+          - gcp-bigquery-products
+          - gcp-bigquery-bigquery
+          - gcp-bigquery-job-project

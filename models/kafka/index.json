@@ -2,98 +2,98 @@
   "model": "kafka",
   "name": "Apache Kafka の基本アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "producer": {
       "type": "node",
-      "label": "Producer",
+      "label": "イベント送信元",
       "status": "claim"
     },
     "controller": {
       "type": "node",
-      "label": "KRaft Controller",
+      "label": "クラスターのメタデータ管理",
       "status": "claim"
     },
     "broker-1": {
       "type": "node",
-      "label": "Broker 1 · P0 リーダー",
+      "label": "ログノード 1 · P0 リーダー",
       "status": "claim"
     },
     "broker-2": {
       "type": "node",
-      "label": "Broker 2 · P1 リーダー",
+      "label": "ログノード 2 · P1 リーダー",
       "status": "claim"
     },
     "broker-3": {
       "type": "node",
-      "label": "Broker 3 · P2 リーダー",
+      "label": "ログノード 3 · P2 リーダー",
       "status": "claim"
     },
     "consumer-1": {
       "type": "node",
-      "label": "Consumer 1",
+      "label": "購読プロセス 1",
       "status": "claim"
     },
     "consumer-2": {
       "type": "node",
-      "label": "Consumer 2",
+      "label": "購読プロセス 2",
       "status": "claim"
     },
     "produce": {
       "type": "link",
-      "label": "Producer → Broker 1 · P0 リーダー",
+      "label": "イベント送信元 → ログノード 1 · P0 リーダー",
       "status": "claim"
     },
     "replicate-2": {
       "type": "link",
-      "label": "Broker 1 · P0 リーダー → Broker 2 · P1 リーダー",
+      "label": "ログノード 1 · P0 リーダー → ログノード 2 · P1 リーダー",
       "status": "claim"
     },
     "replicate-3": {
       "type": "link",
-      "label": "Broker 1 · P0 リーダー → Broker 3 · P2 リーダー",
+      "label": "ログノード 1 · P0 リーダー → ログノード 3 · P2 リーダー",
       "status": "claim"
     },
     "ack": {
       "type": "link",
-      "label": "Broker 1 · P0 リーダー → Producer",
+      "label": "ログノード 1 · P0 リーダー → イベント送信元",
       "status": "claim"
     },
     "read-p0": {
       "type": "link",
-      "label": "Broker 1 · P0 リーダー → Consumer 1",
+      "label": "ログノード 1 · P0 リーダー → 購読プロセス 1",
       "status": "claim"
     },
     "read-p1": {
       "type": "link",
-      "label": "Broker 2 · P1 リーダー → Consumer 1",
+      "label": "ログノード 2 · P1 リーダー → 購読プロセス 1",
       "status": "claim"
     },
     "read-p2": {
       "type": "link",
-      "label": "Broker 3 · P2 リーダー → Consumer 2",
+      "label": "ログノード 3 · P2 リーダー → 購読プロセス 2",
       "status": "claim"
     },
     "commit": {
       "type": "link",
-      "label": "Consumer 1 → Broker 2 · P1 リーダー",
+      "label": "購読プロセス 1 → ログノード 2 · P1 リーダー",
       "status": "claim"
     },
     "elect": {
       "type": "link",
-      "label": "KRaft Controller → Broker 2 · P1 リーダー",
+      "label": "クラスターのメタデータ管理 → ログノード 2 · P1 リーダー",
       "status": "claim"
     },
     "retry": {
       "type": "link",
-      "label": "Producer → Broker 2 · P1 リーダー",
+      "label": "イベント送信元 → ログノード 2 · P1 リーダー",
       "status": "claim"
     },
     "replicate-after": {
       "type": "link",
-      "label": "Broker 2 · P1 リーダー → Broker 3 · P2 リーダー",
+      "label": "ログノード 2 · P1 リーダー → ログノード 3 · P2 リーダー",
       "status": "claim"
     },
     "kafka-normal": {
@@ -107,6 +107,68 @@
     "rebalance": {
       "type": "scenario",
       "label": "Consumer の追加と離脱（リバランス）"
+    },
+    "kraft-producer": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "KafkaProducer",
+      "realizes": [
+        "producer"
+      ]
+    },
+    "kraft-controllers": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "KRaft コントローラー群",
+      "realizes": [
+        "controller"
+      ]
+    },
+    "kraft-b1": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "Kafka Broker 1",
+      "realizes": [
+        "broker-1"
+      ]
+    },
+    "kraft-b2": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "Kafka Broker 2",
+      "realizes": [
+        "broker-2"
+      ]
+    },
+    "kraft-b3": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "Kafka Broker 3",
+      "realizes": [
+        "broker-3"
+      ]
+    },
+    "kraft-c1": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "KafkaConsumer 1",
+      "realizes": [
+        "consumer-1"
+      ]
+    },
+    "kraft-c2": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "KafkaConsumer 2",
+      "realizes": [
+        "consumer-2"
+      ]
+    },
+    "kraft-topic": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "orders のトピック設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -139,7 +201,15 @@
       "replicate-after",
       "kafka-normal",
       "kafka-failover",
-      "rebalance"
+      "rebalance",
+      "kraft-producer",
+      "kraft-controllers",
+      "kraft-b1",
+      "kraft-b2",
+      "kraft-b3",
+      "kraft-c1",
+      "kraft-c2",
+      "kraft-topic"
     ],
     "docs/reference-kafka.md#§7": [
       "model"
@@ -182,11 +252,23 @@
     ],
     "docs/reference-kafka.md#§8": [
       "rebalance"
+    ],
+    "docs/reference-kafka.md#§9": [
+      "kraft-producer",
+      "kraft-controllers",
+      "kraft-b1",
+      "kraft-b2",
+      "kraft-b3",
+      "kraft-c1",
+      "kraft-c2",
+      "kraft-topic"
     ]
   },
   "reference": {
     "category": "ストリーム処理",
-    "order": 20,
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Topic、パーティション、Broker、Controller の役割を区別する。",
       "書き込み、複製、ACK、読み出し、オフセットの保存を順に追う。",

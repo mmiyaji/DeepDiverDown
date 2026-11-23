@@ -18,3 +18,23 @@ Deployment が注文 API の Pod を用意し、スケジューラーが配置�
 - [RKE2 · High Availability](https://docs.rke2.io/install/ha)
 - [SUSE Rancher Manager · Rancher Architecture](https://ranchermanager.docs.rancher.com/reference-guides/rancher-manager-architecture/)
 - [Kubernetes · Node heartbeats](https://kubernetes.io/docs/concepts/architecture/nodes/#node-heartbeats)
+
+## 4. 実装例：RKE2 の高可用性構成
+データセンター内の仮想マシンに 3 台の server と agent を配備し、外部ロードバランサーで登録先を固定する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| デプロイ担当 | kubectl を使う運用端末 |
+| 固定登録アドレス | 外部 L4 ロードバランサー |
+| クラスタ制御部・API | rke2-server VM × 3 |
+| クラスタ状態ストア | rke2-server VM × 3 |
+| ノード参加・実行エージェント | rke2-agent VM |
+| 注文 API の実行単位 | 注文 API Deployment / Pod |
+
+- **ノード登録トークン**。同じクラスターへ agent を参加させるため、登録時にトークンを渡す。
+
+TLS の SAN に固定アドレスを含める。トークンは秘密情報として扱う。RKE2 の構成自体は Rancher Manager なしでも成立する。
+
+公式資料
+- [RKE2 High Availability](https://docs.rke2.io/install/ha)
+- [RKE2 Architecture](https://docs.rke2.io/architecture)

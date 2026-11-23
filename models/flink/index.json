@@ -2,73 +2,120 @@
   "model": "flink",
   "name": "Apache Flink の基本アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "source": {
       "type": "node",
-      "label": "Kafka Source",
+      "label": "再読できるイベント入力",
       "status": "claim"
     },
     "watermark": {
       "type": "node",
-      "label": "Watermark Generator",
+      "label": "イベント時刻の進捗生成",
       "status": "claim"
     },
     "operator": {
       "type": "node",
-      "label": "Window Operator",
+      "label": "窓集計の実行",
       "status": "claim"
     },
     "sink": {
       "type": "node",
-      "label": "Sink",
+      "label": "結果の出力先",
       "status": "claim"
     },
     "state": {
       "type": "node",
-      "label": "Keyed State",
+      "label": "キー別の作業状態",
       "status": "claim"
     },
     "checkpoint": {
       "type": "node",
-      "label": "Checkpoint",
+      "label": "永続チェックポイント",
       "status": "claim"
     },
     "ingest": {
       "type": "link",
-      "label": "Kafka Source → Watermark Generator",
+      "label": "再読できるイベント入力 → イベント時刻の進捗生成",
       "status": "claim"
     },
     "advance": {
       "type": "link",
-      "label": "Watermark Generator → Window Operator",
+      "label": "イベント時刻の進捗生成 → 窓集計の実行",
       "status": "claim"
     },
     "aggregate": {
       "type": "link",
-      "label": "Window Operator → Keyed State",
+      "label": "窓集計の実行 → キー別の作業状態",
       "status": "claim"
     },
     "emit": {
       "type": "link",
-      "label": "Window Operator → Sink",
+      "label": "窓集計の実行 → 結果の出力先",
       "status": "claim"
     },
     "snapshot": {
       "type": "link",
-      "label": "Window Operator → Checkpoint",
+      "label": "窓集計の実行 → 永続チェックポイント",
       "status": "claim"
     },
     "restore": {
       "type": "link",
-      "label": "Checkpoint → Window Operator",
+      "label": "永続チェックポイント → 窓集計の実行",
       "status": "claim"
     },
     "flink-window-recovery": {
       "type": "scenario",
       "label": "イベント時刻の窓集計と復旧"
+    },
+    "kafka-managed-state-source": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "Flink KafkaSource と注文トピック",
+      "realizes": [
+        "source"
+      ]
+    },
+    "kafka-managed-state-tasks": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "TaskManager 上の時刻処理と Window Operator",
+      "realizes": [
+        "watermark",
+        "operator"
+      ]
+    },
+    "kafka-managed-state-rocks": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "EmbeddedRocksDBStateBackend",
+      "realizes": [
+        "state"
+      ]
+    },
+    "kafka-managed-state-checkpoint": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "HDFS のチェックポイントディレクトリー",
+      "realizes": [
+        "checkpoint"
+      ]
+    },
+    "kafka-managed-state-out": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "Kafka の出力トピック",
+      "realizes": [
+        "sink"
+      ]
+    },
+    "kafka-managed-state-coordinator": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "JobManager のチェックポイント調整",
+      "realizes": []
     }
   },
   "byRef": {
@@ -90,7 +137,13 @@
       "emit",
       "snapshot",
       "restore",
-      "flink-window-recovery"
+      "flink-window-recovery",
+      "kafka-managed-state-source",
+      "kafka-managed-state-tasks",
+      "kafka-managed-state-rocks",
+      "kafka-managed-state-checkpoint",
+      "kafka-managed-state-out",
+      "kafka-managed-state-coordinator"
     ],
     "docs/reference-flink.md#§2": [
       "source",
@@ -117,11 +170,21 @@
     ],
     "docs/reference-flink.md#§7": [
       "flink-window-recovery"
+    ],
+    "docs/reference-flink.md#§8": [
+      "kafka-managed-state-source",
+      "kafka-managed-state-tasks",
+      "kafka-managed-state-rocks",
+      "kafka-managed-state-checkpoint",
+      "kafka-managed-state-out",
+      "kafka-managed-state-coordinator"
     ]
   },
   "reference": {
     "category": "ストリーム処理",
-    "order": 50,
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Source、ウォーターマーク、状態付き演算子、Sink の役割を区別する。",
       "イベント時刻とウォーターマークで窓を閉じる流れを理解する。",

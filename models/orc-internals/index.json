@@ -2,13 +2,13 @@
   "model": "orc-internals",
   "name": "ORC ファイルの内部：Postscript から Stream まで",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "reader": {
       "type": "node",
-      "label": "ORC Reader",
+      "label": "Stripe と列を読む処理",
       "status": "claim"
     },
     "magic": {
@@ -53,17 +53,17 @@
     },
     "read-ps": {
       "type": "link",
-      "label": "ORC Reader → Postscript + 長さ",
+      "label": "Stripe と列を読む処理 → Postscript + 長さ",
       "status": "claim"
     },
     "read-footer": {
       "type": "link",
-      "label": "ORC Reader → File Footer",
+      "label": "Stripe と列を読む処理 → File Footer",
       "status": "claim"
     },
     "read-meta": {
       "type": "link",
-      "label": "ORC Reader → Metadata（Stripe 統計）",
+      "label": "Stripe と列を読む処理 → Metadata（Stripe 統計）",
       "status": "claim"
     },
     "skip-stripe": {
@@ -73,17 +73,17 @@
     },
     "read-sfooter": {
       "type": "link",
-      "label": "ORC Reader → Stripe Footer",
+      "label": "Stripe と列を読む処理 → Stripe Footer",
       "status": "claim"
     },
     "read-index": {
       "type": "link",
-      "label": "ORC Reader → Index Data（Row Index）",
+      "label": "Stripe と列を読む処理 → Index Data（Row Index）",
       "status": "claim"
     },
     "read-streams": {
       "type": "link",
-      "label": "ORC Reader → Row Data（Streams）",
+      "label": "Stripe と列を読む処理 → Row Data（Streams）",
       "status": "claim"
     },
     "open-orc": {
@@ -103,6 +103,35 @@
     "UNK-01": {
       "type": "unknown",
       "label": "書き手の版、Stripe サイズ、ブルームフィルターの有無、圧縮方式は未確定。"
+    },
+    "trino-orc-trino": {
+      "type": "implementation",
+      "impl": "trino-orc",
+      "label": "Trino Worker の ORC Reader",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "trino-orc-file": {
+      "type": "implementation",
+      "impl": "trino-orc",
+      "label": "S3 上の ORC オブジェクト",
+      "realizes": [
+        "magic",
+        "stripes",
+        "metadata",
+        "footer",
+        "postscript",
+        "index",
+        "streams",
+        "sfooter"
+      ]
+    },
+    "trino-orc-hive": {
+      "type": "implementation",
+      "impl": "trino-orc",
+      "label": "Hive カタログの ORC 設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -129,7 +158,10 @@
       "read-streams",
       "open-orc",
       "orc-predicate",
-      "ORC-01"
+      "ORC-01",
+      "trino-orc-trino",
+      "trino-orc-file",
+      "trino-orc-hive"
     ],
     "docs/reference-orc-internals.md#§5": [
       "model"
@@ -161,11 +193,19 @@
     ],
     "docs/reference-orc-internals.md#§6": [
       "open-orc"
+    ],
+    "docs/reference-orc-internals.md#§7": [
+      "trino-orc-trino",
+      "trino-orc-file",
+      "trino-orc-hive"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 29,
+    "category": "ファイル形式",
+    "order": 12,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "file-formats",
     "objectives": [
       "ORC のバイト配置（マジック、Stripe、Metadata、File Footer、Postscript、最後の 1 バイト）を説明する。",
       "Postscript → フッター → Stripe 統計 → Row Index の順に読む範囲を絞る流れを追う。",

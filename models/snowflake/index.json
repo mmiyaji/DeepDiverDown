@@ -2,8 +2,8 @@
   "model": "snowflake",
   "name": "Snowflake のクラウドデータ基盤アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "source": {
@@ -13,22 +13,22 @@
     },
     "services": {
       "type": "node",
-      "label": "Cloud services",
+      "label": "認証・メタデータ調整",
       "status": "claim"
     },
     "load": {
       "type": "node",
-      "label": "Load warehouse",
+      "label": "バッチ取込用の計算資源",
       "status": "claim"
     },
     "storage": {
       "type": "node",
-      "label": "Cloud storage",
+      "label": "永続テーブル保存",
       "status": "claim"
     },
     "biwh": {
       "type": "node",
-      "label": "BI warehouse",
+      "label": "BI 用の SQL 計算資源",
       "status": "claim"
     },
     "bi": {
@@ -38,57 +38,57 @@
     },
     "metadata": {
       "type": "node",
-      "label": "Horizon Catalog",
+      "label": "データカタログと統制",
       "status": "claim"
     },
     "sharing": {
       "type": "node",
-      "label": "Secure Data Sharing",
+      "label": "読み取り専用データ共有",
       "status": "claim"
     },
     "partner": {
       "type": "node",
-      "label": "受領アカウント",
+      "label": "データ受領者",
       "status": "claim"
     },
     "ingest": {
       "type": "link",
-      "label": "Source → Load warehouse",
+      "label": "Source → バッチ取込用の計算資源",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "Load warehouse → Cloud storage",
+      "label": "バッチ取込用の計算資源 → 永続テーブル保存",
       "status": "claim"
     },
     "govern": {
       "type": "link",
-      "label": "Cloud services → Horizon Catalog",
+      "label": "認証・メタデータ調整 → データカタログと統制",
       "status": "claim"
     },
     "query": {
       "type": "link",
-      "label": "BI warehouse → Cloud storage",
+      "label": "BI 用の SQL 計算資源 → 永続テーブル保存",
       "status": "claim"
     },
     "serve": {
       "type": "link",
-      "label": "BI warehouse → BI users",
+      "label": "BI 用の SQL 計算資源 → BI users",
       "status": "claim"
     },
     "coordinate": {
       "type": "link",
-      "label": "Cloud services → BI warehouse",
+      "label": "認証・メタデータ調整 → BI 用の SQL 計算資源",
       "status": "claim"
     },
     "expose": {
       "type": "link",
-      "label": "Cloud storage → Secure Data Sharing",
+      "label": "永続テーブル保存 → 読み取り専用データ共有",
       "status": "claim"
     },
     "share": {
       "type": "link",
-      "label": "Secure Data Sharing → 受領アカウント",
+      "label": "読み取り専用データ共有 → データ受領者",
       "status": "claim"
     },
     "ingest-bi": {
@@ -114,6 +114,77 @@
     "UNK-01": {
       "type": "unknown",
       "label": "クラウド、ウェアハウスサイズ、権限設定は未確定。"
+    },
+    "example-source": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "Amazon S3 注文ファイル",
+      "realizes": [
+        "source"
+      ]
+    },
+    "example-services": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "Snowflake Cloud Services と Horizon Catalog",
+      "realizes": [
+        "services",
+        "metadata"
+      ]
+    },
+    "example-load": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "LOAD_WH",
+      "realizes": [
+        "load"
+      ]
+    },
+    "example-storage": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "Snowflake ORDERS テーブル",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "example-biwh": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "BI_WH",
+      "realizes": [
+        "biwh"
+      ]
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "BI クライアント",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-sharing": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "Snowflake Direct Share",
+      "realizes": [
+        "sharing"
+      ]
+    },
+    "example-partner": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "同一リージョンの受領アカウント",
+      "realizes": [
+        "partner"
+      ]
+    },
+    "example-stage": {
+      "type": "implementation",
+      "impl": "snowflake-s3",
+      "label": "S3 外部ステージとストレージ統合",
+      "realizes": []
     }
   },
   "byRef": {
@@ -144,7 +215,16 @@
       "ingest-bi",
       "govern-share",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "example-source",
+      "example-services",
+      "example-load",
+      "example-storage",
+      "example-biwh",
+      "example-bi",
+      "example-sharing",
+      "example-partner",
+      "example-stage"
     ],
     "docs/reference-snowflake.md#§6": [
       "model"
@@ -177,6 +257,17 @@
       "expose",
       "share",
       "govern-share"
+    ],
+    "docs/reference-snowflake.md#§8": [
+      "example-source",
+      "example-services",
+      "example-load",
+      "example-storage",
+      "example-biwh",
+      "example-bi",
+      "example-sharing",
+      "example-partner",
+      "example-stage"
     ]
   },
   "reference": {

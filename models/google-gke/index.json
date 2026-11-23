@@ -2,8 +2,8 @@
   "model": "google-gke",
   "name": "Google GKE Standard regional node pools",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "operator": {
@@ -13,67 +13,67 @@
     },
     "api": {
       "type": "node",
-      "label": "GKE / Kubernetes API",
+      "label": "マネージド制御 API",
       "status": "claim"
     },
     "system": {
       "type": "node",
-      "label": "Base workload pool (example)",
+      "label": "基盤用ノード群（配置例）",
       "status": "claim"
     },
     "user": {
       "type": "node",
-      "label": "Application workload pool (example)",
+      "label": "アプリ用ノード群（配置例）",
       "status": "claim"
     },
     "workload": {
       "type": "node",
-      "label": "Deployment / Pods",
+      "label": "注文 API の実行単位",
       "status": "claim"
     },
     "lb": {
       "type": "node",
-      "label": "External Load Balancer / Service",
+      "label": "アプリ公開・振り分け",
       "status": "claim"
     },
     "registry": {
       "type": "node",
-      "label": "Artifact Registry",
+      "label": "コンテナイメージの保管",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "運用者 → GKE / Kubernetes API",
+      "label": "運用者 → マネージド制御 API",
       "status": "claim"
     },
     "system-schedule": {
       "type": "link",
-      "label": "GKE / Kubernetes API → Base workload pool (example)",
+      "label": "マネージド制御 API → 基盤用ノード群（配置例）",
       "status": "claim"
     },
     "user-schedule": {
       "type": "link",
-      "label": "GKE / Kubernetes API → Application workload pool (example)",
+      "label": "マネージド制御 API → アプリ用ノード群（配置例）",
       "status": "claim"
     },
     "pull": {
       "type": "link",
-      "label": "Application workload pool (example) → Artifact Registry",
+      "label": "アプリ用ノード群（配置例） → コンテナイメージの保管",
       "status": "claim"
     },
     "run": {
       "type": "link",
-      "label": "Application workload pool (example) → Deployment / Pods",
+      "label": "アプリ用ノード群（配置例） → 注文 API の実行単位",
       "status": "claim"
     },
     "expose": {
       "type": "link",
-      "label": "Deployment / Pods → External Load Balancer / Service",
+      "label": "注文 API の実行単位 → アプリ公開・振り分け",
       "status": "claim"
     },
     "replace": {
       "type": "link",
-      "label": "GKE / Kubernetes API → Application workload pool (example)",
+      "label": "マネージド制御 API → アプリ用ノード群（配置例）",
       "status": "claim"
     },
     "api-deploy-replace": {
@@ -95,6 +95,68 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のプロジェクト、リージョン、ゾーン、マシンタイプ、ノード数、更新戦略、PDB は未確定。"
+    },
+    "gcp-operator": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "gcloud と kubectl",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "gcp-api": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "GKE リージョン制御プレーン",
+      "realizes": [
+        "api"
+      ]
+    },
+    "gcp-system": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "Compute Engine 基盤用プール",
+      "realizes": [
+        "system"
+      ]
+    },
+    "gcp-user": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "Compute Engine アプリ用プール",
+      "realizes": [
+        "user"
+      ]
+    },
+    "gcp-workload": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "注文 API Deployment / Pod",
+      "realizes": [
+        "workload"
+      ]
+    },
+    "gcp-lb": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "外部パススルー Network Load Balancer",
+      "realizes": [
+        "lb"
+      ]
+    },
+    "gcp-registry": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "Artifact Registry",
+      "realizes": [
+        "registry"
+      ]
+    },
+    "gcp-svc": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "注文 API の LoadBalancer Service",
+      "realizes": []
     }
   },
   "byRef": {
@@ -120,7 +182,15 @@
       "replace",
       "api-deploy-replace",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "gcp-operator",
+      "gcp-api",
+      "gcp-system",
+      "gcp-user",
+      "gcp-workload",
+      "gcp-lb",
+      "gcp-registry",
+      "gcp-svc"
     ],
     "docs/reference-google-gke.md#§6": [
       "model"
@@ -156,11 +226,23 @@
     "docs/reference-google-gke.md#§5": [
       "replace",
       "NFR-01"
+    ],
+    "docs/reference-google-gke.md#§9": [
+      "gcp-operator",
+      "gcp-api",
+      "gcp-system",
+      "gcp-user",
+      "gcp-workload",
+      "gcp-lb",
+      "gcp-registry",
+      "gcp-svc"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
-    "order": 70,
+    "category": "マネージド Kubernetes",
+    "order": 30,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "GKE のコントロールプレーン管理と Standard/Autopilot の責任境界を区別する。",
       "Standard node pool の構成と更新戦略を理解する。",

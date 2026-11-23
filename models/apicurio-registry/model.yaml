@@ -31,7 +31,7 @@ tiers:
 nodes:
   producer: {"label":"Avro Producer","kind":"actor","tier":"kafka","x":0,"y":1.5,"description":"Order スキーマを使って注文イベントを作る。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§1"}]}
   serialize: {"label":"Avro Serializer","kind":"worker","tier":"kafka","x":4,"y":1.5,"description":"writer schema でエンコードし、レコードに対応するスキーマ ID を付ける。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
-  topic: {"label":"Kafka Topic","kind":"queue","tier":"kafka","x":8,"y":1.5,"description":"複数バージョンの writer schema で書かれた履歴を保持する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
+  topic: {"label":"注文イベントのトピック","kind":"queue","tier":"kafka","x":8,"y":1.5,"description":"シリアライズしたメッセージとスキーマ参照を保持する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
   deserialize: {"label":"Avro Deserializer","kind":"worker","tier":"kafka","x":12,"y":1.5,"description":"メッセージの ID から writer schema を決めてレコードを復号する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
   app: {"label":"Consumer / reader schema","kind":"external","tier":"kafka","x":15,"y":1.5,"description":"この例では v2 の reader schema で注文を読む。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
   submitter: {"label":"スキーマの登録者","kind":"actor","tier":"registry","x":1,"y":1.5,"description":"Order の新バージョンを提案する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§4"}]}
@@ -170,6 +170,99 @@ requirements:
   - {"id":"BR-02","kind":"rule","title":"登録時に運用上の互換性を検査","text":"更新順序と再読対象の履歴に必要な範囲で互換性を確認する。","links":["propose","check"],"evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§5"}]}
 unknowns:
   - {"id":"UNK-01","text":"実環境の ID の種別・配置、比較対象のバージョン、保持中の Kafka 履歴、互換性ルールの設定は未確認。","refs":["topic","versions","policy"]}
+implementations:
+  - id: apicurio-postgres
+    label: Kafka・Apicurio Registry・PostgreSQL
+    description: Kafka Java クライアント用の Avro SerDes と、PostgreSQL を使う Apicurio Registry を分けて配置する例。
+    sources:
+      - title: Apicurio Registry 3.4 Kafka SerDes
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html
+      - title: Apicurio Registry 3.4 Schema Compatibility Modes
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html
+      - title: Apicurio Registry Docker Deployment
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html
+    nodes:
+      apicurio-postgres-writer:
+        label: Java Kafka Producer（Avro Serializer）
+        kind: actor
+        tier: kafka
+        x: 2
+        y: 1.5
+        description: Registry からスキーマを解決し、Avro データと参照 ID を送る。
+        realizes:
+          - producer
+          - serialize
+        evidence:
+          - type: doc
+            ref: docs/reference-apicurio-registry.md#§7
+      apicurio-postgres-kafka:
+        label: Apache Kafka の注文トピック
+        kind: queue
+        tier: kafka
+        x: 8
+        y: 1.5
+        description: Avro メッセージを保持する。
+        realizes:
+          - topic
+        evidence:
+          - type: doc
+            ref: docs/reference-apicurio-registry.md#§7
+      apicurio-postgres-reader:
+        label: Java Kafka Consumer（Avro Deserializer）
+        kind: worker
+        tier: kafka
+        x: 10
+        y: 1.5
+        description: スキーマ参照を解決し、読取側スキーマで展開する。
+        realizes:
+          - deserialize
+          - app
+        evidence:
+          - type: doc
+            ref: docs/reference-apicurio-registry.md#§7
+      apicurio-postgres-publisher:
+        label: スキーマ登録用 REST クライアント
+        kind: actor
+        tier: registry
+        x: 1
+        y: 1.5
+        description: 変更候補を登録 API へ送る。
+        realizes:
+          - submitter
+        evidence:
+          - type: doc
+            ref: docs/reference-apicurio-registry.md#§7
+      apicurio-postgres-registry:
+        label: Apicurio Registry Server
+        kind: catalog
+        tier: registry
+        x: 5
+        y: 1.5
+        description: 互換性を評価してバージョンと内容 ID を解決する。
+        realizes:
+          - policy
+          - versions
+        evidence:
+          - type: doc
+            ref: docs/reference-apicurio-registry.md#§7
+      apicurio-postgres-postgres:
+        label: PostgreSQL（Registry の SQL ストレージ）
+        kind: service
+        tier: registry
+        x: 10
+        y: 1.5
+        description: スキーマ本文とレジストリの永続状態を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-apicurio-registry.md#§7
+    links:
+      - id: apicurio-postgres-persist
+        from: apicurio-postgres-registry
+        to: apicurio-postgres-postgres
+        label: スキーマと対応する識別情報を保存
+        evidence:
+          - type: doc
+            ref: docs/reference-apicurio-registry.md#§7
 gates: {maxDrift: 0, maxHigh: 0}
 blocks:
   - id: decode

@@ -48,6 +48,32 @@ test('ビューごとにクラウド・クラスタ・ネットワークの枠�
   assert.equal(V.project(base(model), model, 'network').groups.length, groups.length);
 });
 
+test('リファレンス：自動の論理構成は出さず、機能配置と実装例を並べる', () => {
+  const m = M.debezium;
+  assert.deepEqual([...V.available(m)], ['cloud', 'impl:aws']);
+  assert.equal(V.info(m, 'cloud').label, '機能配置');
+  assert.equal(V.info(m, 'impl:aws').label, '実装例：AWS');
+});
+
+test('実装例：機能をサービスに写し、同じサービスに収まる接続は消え、実装で加わる部品と接続が出る', () => {
+  const m = M.debezium, v = V.project(base(m), m, 'impl:aws');
+  assert.deepEqual([...v.from['aws-rds']].sort(), ['database', 'logical'], 'DB と論理レプリケーションを RDS が担う');
+  assert.ok(!v.nodes.database && !v.nodes.topic, '機能の部品は実装の部品に置き換わる');
+  assert.ok(has(v, 'aws-rds', 'aws-connector'));
+  assert.ok(!v.links.some(l => l.from === l.to), 'DB → 論理レプリケーションは RDS の中に収まる');
+  assert.ok(v.linkFrom['I:aws-rds>aws-connector'].includes('snapshot') && v.linkFrom['I:aws-rds>aws-connector'].includes('capture'), 'シナリオの接続を引き継ぐ');
+  assert.deepEqual([...v.from['aws-plugin']], [], 'S3 は実装で加わる部品');
+  assert.ok(has(v, 'aws-plugin', 'aws-worker'));
+});
+
+test('点検：実装例が機能配置を覆い、資料を持つ', () => {
+  const m = M.debezium;
+  assert.equal(A.gates(m, null, {}).results.find(r => r.id === 'IMPL').pass, true);
+  const broken = { ...m, implementations: [{ id: 'x', label: 'X', nodes: { a: { realizes: ['nope'] } } }] };
+  const items = A.gates(broken, null, {}).results.find(r => r.id === 'IMPL').items;
+  assert.ok(items.some(s => s.includes('公式資料')) && items.some(s => s.includes('nope')) && items.some(s => s.includes('担う部品がない')));
+});
+
 test('mergeNode：停止 > 影響、ずれ > 主張、強調は 1 つでもあれば', () => {
   const r = V.mergeNode([{ fill: 'impact', status: 'claim' }, { fill: 'down', status: 'drift', outline: true }, { dim: true }]);
   assert.equal(r.fill, 'down'); assert.equal(r.status, 'drift'); assert.equal(r.outline, true); assert.equal(r.dim, false);

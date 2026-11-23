@@ -2,8 +2,8 @@
   "model": "amazon-eks",
   "name": "Amazon EKS マネージドノードグループ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "operator": {
@@ -13,67 +13,67 @@
     },
     "api": {
       "type": "node",
-      "label": "EKS / Kubernetes API",
+      "label": "マネージド制御 API",
       "status": "claim"
     },
     "managed": {
       "type": "node",
-      "label": "Managed node group",
+      "label": "アプリ用の管理対象ノード群",
       "status": "claim"
     },
     "workload": {
       "type": "node",
-      "label": "Deployment / Pods",
+      "label": "注文 API の実行単位",
       "status": "claim"
     },
     "lb": {
       "type": "node",
-      "label": "Load Balancer / Service",
+      "label": "アプリ公開・振り分け",
       "status": "claim"
     },
     "registry": {
       "type": "node",
-      "label": "Amazon ECR",
+      "label": "コンテナイメージの保管",
       "status": "claim"
     },
     "observer": {
       "type": "node",
-      "label": "CloudWatch / operator",
+      "label": "実行状態の監視",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "運用者 → EKS / Kubernetes API",
+      "label": "運用者 → マネージド制御 API",
       "status": "claim"
     },
     "schedule": {
       "type": "link",
-      "label": "EKS / Kubernetes API → Managed node group",
+      "label": "マネージド制御 API → アプリ用の管理対象ノード群",
       "status": "claim"
     },
     "pull": {
       "type": "link",
-      "label": "Managed node group → Amazon ECR",
+      "label": "アプリ用の管理対象ノード群 → コンテナイメージの保管",
       "status": "claim"
     },
     "run": {
       "type": "link",
-      "label": "Managed node group → Deployment / Pods",
+      "label": "アプリ用の管理対象ノード群 → 注文 API の実行単位",
       "status": "claim"
     },
     "expose": {
       "type": "link",
-      "label": "Deployment / Pods → Load Balancer / Service",
+      "label": "注文 API の実行単位 → アプリ公開・振り分け",
       "status": "claim"
     },
     "replace": {
       "type": "link",
-      "label": "EKS / Kubernetes API → Managed node group",
+      "label": "マネージド制御 API → アプリ用の管理対象ノード群",
       "status": "claim"
     },
     "observe": {
       "type": "link",
-      "label": "Managed node group → CloudWatch / operator",
+      "label": "アプリ用の管理対象ノード群 → 実行状態の監視",
       "status": "claim"
     },
     "api-deploy-replace": {
@@ -95,6 +95,68 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際の AWS リージョン、AZ、ノード数、インスタンスタイプ、PDB、IAM/VPC 設定は未確定。"
+    },
+    "aws-operator": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "kubectl と IAM の運用ロール",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "aws-api": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon EKS マネージド制御プレーン",
+      "realizes": [
+        "api"
+      ]
+    },
+    "aws-managed": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Managed Node Group の EC2",
+      "realizes": [
+        "managed"
+      ]
+    },
+    "aws-workload": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "注文 API Deployment / Pod",
+      "realizes": [
+        "workload"
+      ]
+    },
+    "aws-lb": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Application Load Balancer",
+      "realizes": [
+        "lb"
+      ]
+    },
+    "aws-registry": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon ECR リポジトリ",
+      "realizes": [
+        "registry"
+      ]
+    },
+    "aws-observer": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "CloudWatch Container Insights",
+      "realizes": [
+        "observer"
+      ]
+    },
+    "aws-controller": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "AWS Load Balancer Controller",
+      "realizes": []
     }
   },
   "byRef": {
@@ -119,7 +181,15 @@
       "observe",
       "api-deploy-replace",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "aws-operator",
+      "aws-api",
+      "aws-managed",
+      "aws-workload",
+      "aws-lb",
+      "aws-registry",
+      "aws-observer",
+      "aws-controller"
     ],
     "docs/reference-amazon-eks.md#§6": [
       "model"
@@ -155,11 +225,23 @@
       "replace",
       "observe",
       "NFR-01"
+    ],
+    "docs/reference-amazon-eks.md#§9": [
+      "aws-operator",
+      "aws-api",
+      "aws-managed",
+      "aws-workload",
+      "aws-lb",
+      "aws-registry",
+      "aws-observer",
+      "aws-controller"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
-    "order": 50,
+    "category": "マネージド Kubernetes",
+    "order": 10,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "EKS が管理するコントロールプレーンと利用者が管理するデータプレーンの境界を区別する。",
       "managed node group のノード更新・ドレイン・置換の流れを追う。",

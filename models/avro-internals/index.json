@@ -2,18 +2,18 @@
   "model": "avro-internals",
   "name": "Avro ファイルの内部：ヘッダー・ブロック・同期マーカー",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "task-a": {
       "type": "node",
-      "label": "タスク A（前半を担当）",
+      "label": "入力の前半を読むタスク",
       "status": "claim"
     },
     "task-b": {
       "type": "node",
-      "label": "タスク B（後半を担当）",
+      "label": "入力の後半を読むタスク",
       "status": "claim"
     },
     "header": {
@@ -33,27 +33,27 @@
     },
     "a-header": {
       "type": "link",
-      "label": "タスク A（前半を担当） → ヘッダー（スキーマ）",
+      "label": "入力の前半を読むタスク → ヘッダー（スキーマ）",
       "status": "claim"
     },
     "a-blocks": {
       "type": "link",
-      "label": "タスク A（前半を担当） → データブロック",
+      "label": "入力の前半を読むタスク → データブロック",
       "status": "claim"
     },
     "b-header": {
       "type": "link",
-      "label": "タスク B（後半を担当） → ヘッダー（スキーマ）",
+      "label": "入力の後半を読むタスク → ヘッダー（スキーマ）",
       "status": "claim"
     },
     "b-sync": {
       "type": "link",
-      "label": "タスク B（後半を担当） → 同期マーカー",
+      "label": "入力の後半を読むタスク → 同期マーカー",
       "status": "claim"
     },
     "b-blocks": {
       "type": "link",
-      "label": "タスク B（後半を担当） → データブロック",
+      "label": "入力の後半を読むタスク → データブロック",
       "status": "claim"
     },
     "avro-scan": {
@@ -73,6 +73,38 @@
     "UNK-01": {
       "type": "unknown",
       "label": "書き手のブロックサイズ（同期間隔）とコーデックは未確定。"
+    },
+    "hadoop-mapreduce-front": {
+      "type": "implementation",
+      "impl": "hadoop-mapreduce",
+      "label": "Map タスク A の Avro レコード読取",
+      "realizes": [
+        "task-a"
+      ]
+    },
+    "hadoop-mapreduce-tail": {
+      "type": "implementation",
+      "impl": "hadoop-mapreduce",
+      "label": "Map タスク B の Avro レコード読取",
+      "realizes": [
+        "task-b"
+      ]
+    },
+    "hadoop-mapreduce-hdfs": {
+      "type": "implementation",
+      "impl": "hadoop-mapreduce",
+      "label": "HDFS 上の Avro Object Container File",
+      "realizes": [
+        "header",
+        "blocks",
+        "sync"
+      ]
+    },
+    "hadoop-mapreduce-input": {
+      "type": "implementation",
+      "impl": "hadoop-mapreduce",
+      "label": "AvroKeyInputFormat のジョブ設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -93,7 +125,11 @@
       "b-blocks",
       "avro-scan",
       "avro-split",
-      "AV-01"
+      "AV-01",
+      "hadoop-mapreduce-front",
+      "hadoop-mapreduce-tail",
+      "hadoop-mapreduce-hdfs",
+      "hadoop-mapreduce-input"
     ],
     "docs/reference-avro-internals.md#§4": [
       "model"
@@ -119,11 +155,20 @@
     ],
     "docs/reference-avro-internals.md#§6": [
       "avro-scan"
+    ],
+    "docs/reference-avro-internals.md#§7": [
+      "hadoop-mapreduce-front",
+      "hadoop-mapreduce-tail",
+      "hadoop-mapreduce-hdfs",
+      "hadoop-mapreduce-input"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 29.5,
+    "category": "ファイル形式",
+    "order": 13,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "file-formats",
     "objectives": [
       "Avro Object Container File のバイト配置（ヘッダー、ブロック、同期マーカー）を説明する。",
       "説明が先頭にありフッターが無い、行の追記に向いた構造を Parquet・ORC と比べる。",

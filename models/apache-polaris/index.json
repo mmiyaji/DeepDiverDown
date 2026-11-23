@@ -2,8 +2,8 @@
   "model": "apache-polaris",
   "name": "Apache Polaris の Iceberg カタログ",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "admin": {
@@ -38,12 +38,12 @@
     },
     "sts": {
       "type": "node",
-      "label": "AWS STS",
+      "label": "認証情報の発行",
       "status": "claim"
     },
     "bucket": {
       "type": "node",
-      "label": "S3 ファイル",
+      "label": "オブジェクトストレージ",
       "status": "claim"
     },
     "setup": {
@@ -73,17 +73,17 @@
     },
     "vend": {
       "type": "link",
-      "label": "Iceberg REST API → AWS STS",
+      "label": "Iceberg REST API → 認証情報の発行",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "処理エンジン → S3 ファイル",
+      "label": "処理エンジン → オブジェクトストレージ",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "処理エンジン → S3 ファイル",
+      "label": "処理エンジン → オブジェクトストレージ",
       "status": "claim"
     },
     "submit": {
@@ -109,6 +109,62 @@
       "kind": "rule",
       "label": "ストレージ権限の有効範囲",
       "status": "claim"
+    },
+    "polaris-aws-operator": {
+      "type": "implementation",
+      "impl": "polaris-aws",
+      "label": "運用者の管理 CLI",
+      "realizes": [
+        "admin"
+      ]
+    },
+    "polaris-aws-spark": {
+      "type": "implementation",
+      "impl": "polaris-aws",
+      "label": "Apache Spark SQL",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "polaris-aws-server": {
+      "type": "implementation",
+      "impl": "polaris-aws",
+      "label": "Polaris Server",
+      "realizes": [
+        "management",
+        "api",
+        "rbac"
+      ]
+    },
+    "polaris-aws-postgres": {
+      "type": "implementation",
+      "impl": "polaris-aws",
+      "label": "PostgreSQL（JDBC 永続化）",
+      "realizes": [
+        "catalog-db"
+      ]
+    },
+    "polaris-aws-sts": {
+      "type": "implementation",
+      "impl": "polaris-aws",
+      "label": "AWS STS",
+      "realizes": [
+        "sts"
+      ]
+    },
+    "polaris-aws-s3": {
+      "type": "implementation",
+      "impl": "polaris-aws",
+      "label": "Amazon S3",
+      "realizes": [
+        "bucket"
+      ]
+    },
+    "polaris-aws-iam": {
+      "type": "implementation",
+      "impl": "polaris-aws",
+      "label": "カタログ用 IAM ロール",
+      "realizes": []
     }
   },
   "byRef": {
@@ -140,7 +196,14 @@
       "commit",
       "load-orders",
       "commit-orders",
-      "R-01"
+      "R-01",
+      "polaris-aws-operator",
+      "polaris-aws-spark",
+      "polaris-aws-server",
+      "polaris-aws-postgres",
+      "polaris-aws-sts",
+      "polaris-aws-s3",
+      "polaris-aws-iam"
     ],
     "docs/reference-apache-polaris.md#§2": [
       "engine",
@@ -167,6 +230,15 @@
     "docs/reference-apache-polaris.md#§5": [
       "load-orders",
       "commit-orders"
+    ],
+    "docs/reference-apache-polaris.md#§6": [
+      "polaris-aws-operator",
+      "polaris-aws-spark",
+      "polaris-aws-server",
+      "polaris-aws-postgres",
+      "polaris-aws-sts",
+      "polaris-aws-s3",
+      "polaris-aws-iam"
     ]
   },
   "reference": {

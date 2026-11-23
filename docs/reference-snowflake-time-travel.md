@@ -22,3 +22,19 @@ DROP した対応オブジェクトの復元には保持期間内の UNDROP を�
 - [Time Travel](https://docs.snowflake.com/en/user-guide/data-time-travel)
 - [Fail-safe](https://docs.snowflake.com/en/user-guide/data-failsafe)
 - [クローンの考慮点](https://docs.snowflake.com/en/user-guide/object-clone)
+
+## 4. 実装例 Snowflake Enterprise の誤更新調査
+
+永続テーブルの保持期間を事前に設定し、誤更新の直前から検証用クローンを作る例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 復旧担当 | データ復旧担当ロール | 誤更新のクエリ ID と利用可能な履歴を確認する。 |
+| 本番の注文テーブル・保持期間内の履歴 | Snowflake 永続テーブル ORDERS と Time Travel | DATA_RETENTION_TIME_IN_DAYS を例として 7 日に設定する。 |
+| 復旧確認用クローン | ORDERS_RECOVERY クローン | クエリ ID を使い、BEFORE STATEMENT で誤更新直前の状態を複製する。 |
+| 差分検証・修復 | 検証用ウェアハウスの SQL | 検証済みの影響行を現行表へ反映する。 |
+| サービス事業者による回復期間 | Snowflake Fail-safe | Time Travel 後に該当する永続データを Snowflake が回復するための期間。 |
+
+検証用クローンで差分と対象キーを確認してから、本番の影響行を修復する。Fail-safe は利用者が SQL で照会できる履歴とは別に、適用条件を満たすデータの回復を Snowflake が支援する仕組み。
+
+出典 [Time Travel](https://docs.snowflake.com/en/user-guide/data-time-travel)、[Fail-safe](https://docs.snowflake.com/en/user-guide/data-failsafe)、[クローンの考慮点](https://docs.snowflake.com/en/user-guide/object-clone)、[Snowflake パラメーター](https://docs.snowflake.com/en/sql-reference/parameters#data-retention-time-in-days)、[QUERY_HISTORY ビュー](https://docs.snowflake.com/en/sql-reference/account-usage/query_history)

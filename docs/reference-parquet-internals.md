@@ -73,3 +73,25 @@ Iceberg の既定では Row Group は 128 MB、ページは 1 MB が目安（`wr
 - `open-file`：末尾 8 バイト→フッター→スキーマと位置を得る。
 - `prune-and-read`：統計とブルームフィルターで Row Group を捨て、ページ索引で必要なページだけ取ってデコードする。
 - `point-lookup`：ID の等値検索で、min/max では捨てられない Row Group をブルームフィルターで捨てる。
+
+## 9. 実装例：S3 上の Parquet を Trino Hive で読む
+
+Trino Hive カタログから S3 の Parquet ファイルを読む例。索引の動作はファイルの書き手、利用できる統計、述語、読取側の設定に依存する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 列データの読み取り役、列データの解凍・復号 | Trino Worker の Parquet Reader | 対象の列、行グループ、索引が使えるページを見つけ、取得したデータを解凍して復号する。 |
+| Header "PAR1"、Row Groups、Column Chunks、Bloom / Column / Offset Index、Footer (FileMetaData)、Footer length + "PAR1"、Dictionary Page、Data Pages | S3 上の Parquet オブジェクト | ファイルの末尾と各区画を同じオブジェクト内に保持する。辞書や索引は存在する場合に使う。 |
+
+実装で加わる部品を以下に示す。
+
+- Hive カタログの読取設定。Parquet の列索引やブルームフィルターを使用する設定を確認する。
+
+公式資料
+
+- [Parquet File Format](https://parquet.apache.org/docs/file-format/)
+- [Parquet Page Index](https://parquet.apache.org/docs/file-format/pageindex/)
+- [Parquet Bloom Filter](https://parquet.apache.org/docs/file-format/bloomfilter/)
+- [Parquet Data Pages](https://parquet.apache.org/docs/file-format/data-pages/)
+- [Trino object storage file formats](https://trino.io/docs/current/object-storage/file-formats.html)
+- [Trino Hive connector](https://trino.io/docs/current/connector/hive.html)

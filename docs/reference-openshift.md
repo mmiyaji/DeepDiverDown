@@ -35,3 +35,24 @@ Service は注文 API Pod への内部の入口を提供する。OpenShift の R
 Deployment の更新では新しい ReplicaSet を作り、ロールアウトの状態を確認できる。OpenShift では `oc rollout status` などの CLI で進行を観察し、必要なら履歴に基づくロールバックを検討する。
 
 出典 [OpenShift Container Platform 4.21 Building applications](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index)・[Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+
+## 7. 実装例：OpenShift と Ingress Controller
+自前の OpenShift Container Platform クラスタで、注文 API を標準の Ingress Controller から公開する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 構成の投入クライアント | oc CLI |
+| クラスタ管理 API | OpenShift コントロールプレーン |
+| レプリカ調整・配置先の決定 | OpenShift コントロールプレーン |
+| ノード実行エージェント | RHCOS worker の kubelet / CRI-O |
+| 注文 API の実行単位 | 注文 API Deployment / Pod |
+| 注文 API の内部公開 | 注文 API の ClusterIP Service |
+| 外部公開ルート | TLS Route と HAProxy Router |
+
+- **apps ドメインのワイルドカード DNS**。ルートのホスト名を Ingress Controller の到達先で解決する。
+
+TLS の終端方式は Route で選択する。エッジ終端を使う場合、Router からバックエンドまでの暗号化要件を別途決める。
+
+公式資料
+- [OpenShift Ingress and load balancing](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/ingress_and_load_balancing/index)
+- [OpenShift Networking Operators](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/networking_operators/index)

@@ -23,3 +23,26 @@ Rego は構造化された入力に対する条件を記述する。例の `deny
 CI ジョブが Conftest の失敗をチェックの失敗として報告し、保護ブランチがそのチェックを必須にする。修正後は最新の評価対象コミットでチェックが成功して初めて、このマージ条件を満たす。承認などの他のマージ条件はそれぞれ適用される。
 
 出典 [GitHub About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、[GitHub Troubleshooting required status checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)
+
+## 5. 実装例：GitHub Actions のマージ前ポリシー検査
+GitHub の PR で注文 API 用の Kubernetes マニフェストを Conftest で評価し、検査成功を main のマージ条件にする例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 注文 API の開発者 | GitHub の開発者 |
+| レビュー対象の変更 | GitHub Pull Request |
+| 注文 API の配備定義 | Git 内の deployment.yaml |
+| 配備条件のポリシー | Git 内の policy/*.rego |
+| CI ジョブ | GitHub Actions runner の policy-ci ジョブ |
+| ポリシーの評価 | GitHub Actions runner の policy-ci ジョブ |
+| マージ可否に使う検査結果 | policy-ci の必須チェック |
+| 保護されたブランチ | 保護された main |
+
+- **GitHub Actions workflow YAML**。.github/workflows で対象イベントとジョブを定義する。
+
+再現性のため CLI とアクションの版を固定する。GitHub がマージ条件として参照するチェック名とジョブ名を揃え、評価対象の PR に書き込み権限を渡す必要がない構成にする。
+
+公式資料
+- [Conftest](https://www.conftest.dev/)
+- [GitHub Actions: Events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)
+- [GitHub protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)

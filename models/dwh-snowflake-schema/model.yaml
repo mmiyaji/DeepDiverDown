@@ -44,3 +44,28 @@ scenarios:
       - {"links":["star-dim"],"note":"スター案では同じカテゴリに属する商品行へ名称を反映する。"}
       - {"links":["category","product"],"note":"階層分離案ではカテゴリ表の名称を更新する。"}
       - {"links":["compare-star","compare-snow"],"note":"当時の名称を残す必要があれば、どちらの案でも履歴ポリシーを設計する。"}
+
+implementations:
+  - id: postgres-schema-comparison
+    label: "PostgreSQL の商品階層比較"
+    description: "同じ受注明細から平坦な商品ディメンションとカテゴリを分けたディメンションを別スキーマに作り、同じ問いで比較する例。"
+    sources:
+      - {title: "Snowflaked Dimensions", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/snowflake-dimension/"}
+      - {title: "Power BI のスタースキーマ設計", url: "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
+      - {title: "PostgreSQL CREATE TABLE", url: "https://www.postgresql.org/docs/current/sql-createtable.html"}
+      - {title: "PostgreSQL EXPLAIN", url: "https://www.postgresql.org/docs/current/sql-explain.html"}
+    tiers:
+      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [15.5,4.5]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+    nodes:
+      example-star-category: {label: "star.dim_product", kind: "table", tier: "flow", x: 3, y: 0, realizes: ["star-category"], description: "商品キーとカテゴリ名・属性を同じ行に保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-star-fact: {label: "star.fact_order_line", kind: "table", tier: "flow", x: 7, y: 0, realizes: ["star-fact"], description: "明細の粒度を固定して商品キーを参照する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-star-report: {label: "star.sales_by_category ビュー", kind: "table", tier: "flow", x: 12, y: 0, realizes: ["star-report"], description: "ファクトから商品表に結合して集計する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-norm-category: {label: "hierarchy.dim_category", kind: "table", tier: "flow", x: 0, y: 4, realizes: ["norm-category"], description: "カテゴリキーとカテゴリの説明属性を持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-norm-product: {label: "hierarchy.dim_product", kind: "table", tier: "flow", x: 3, y: 4, realizes: ["norm-product"], description: "カテゴリキーを外部キーとして持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-norm-fact: {label: "hierarchy.fact_order_line", kind: "table", tier: "flow", x: 7, y: 4, realizes: ["norm-fact"], description: "スター側と同じ受注明細粒度を持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-norm-report: {label: "hierarchy.sales_by_category ビュー", kind: "table", tier: "flow", x: 12, y: 4, realizes: ["norm-report"], description: "商品からカテゴリ表をたどって集計する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-review: {label: "二つの SQL 結果と実行計画", kind: "monitor", tier: "flow", x: 15, y: 2, realizes: ["review"], description: "同じ期間で売上を集計し、結果と結合経路を比較する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-fixtures: {label: "比較共通の明細・商品入力表", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "両方式に同じデータをロードする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+    links:
+      - {id: "example-fixtures-connection", from: "example-fixtures", to: "example-star-fact", label: "同じ粒度の比較用データを供給", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}

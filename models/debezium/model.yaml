@@ -14,13 +14,13 @@ tiers:
   - {id: flow, label: CDC データフロー, z: 0, size: [18, 3]}
   - {id: control, label: 実行と再開, z: 1, origin: [4, 0], size: [10, 3]}
 nodes:
-  database: {label: PostgreSQL 注文DB, kind: db, tier: flow, x: 0, y: 1.5, description: 受注テーブルとWALを持つ。, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}]}
+  database: {label: 変更元の注文 DB, kind: db, tier: flow, x: 0, y: 1.5, description: 受注テーブルと変更ログを持つ。, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}]}
   logical: {label: 論理レプリケーション, kind: service, tier: flow, x: 3, y: 1.5, drill: postgresql-logical-decoding, description: WALの変更を公開する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§3}]}
-  connector: {label: Debezium Source Connector, kind: worker, tier: flow, x: 6, y: 1.5, description: スナップショットと変更をイベント化する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}, {type: doc, ref: docs/reference-debezium.md#§4}]}
-  worker: {label: Kafka Connect Worker, kind: service, tier: control, x: 5, y: 1.5, description: Connector Taskを実行する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
-  topic: {label: Kafka Topic, kind: queue, tier: flow, x: 10, y: 1.5, description: CDCイベントを保持する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  connector: {label: CDC コネクター, kind: worker, tier: flow, x: 6, y: 1.5, description: スナップショットと変更をイベント化する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}, {type: doc, ref: docs/reference-debezium.md#§4}]}
+  worker: {label: コネクター実行基盤, kind: service, tier: control, x: 5, y: 1.5, description: データ取り込みのタスクを起動・管理する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  topic: {label: CDC イベントの配信先, kind: queue, tier: flow, x: 10, y: 1.5, description: CDC イベントを保持する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
   offset: {label: CDC オフセット, kind: db, tier: control, x: 10, y: 1.5, description: ログの読み取り位置を保持する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§5}]}
-  consumer: {label: 下流 Consumer, kind: service, tier: flow, x: 14, y: 1.5, description: Topicのイベントを購読する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
+  consumer: {label: 下流のイベント処理, kind: service, tier: flow, x: 14, y: 1.5, description: 変更イベントを購読する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§4}]}
 links:
   - {id: snapshot, from: database, to: connector, label: 初期スナップショット, evidence: [{type: doc, ref: docs/reference-debezium.md#§2}]}
   - {id: repl, from: database, to: logical, label: WALの変更を公開, evidence: [{type: doc, ref: docs/reference-debezium.md#§3}]}
@@ -38,4 +38,36 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 再開可能性, text: 記録済み位置を使って再開できる前提を明示する。, links: [position, resume], evidence: [{type: doc, ref: docs/reference-debezium.md#§5}]}
 unknowns:
   - {id: UNK-01, text: 実環境のスナップショットモード、topic命名、重複排除方式は未確定。, refs: [capture, publish]}
+# 実装例：機能配置（nodes）の各機能を担うサービスの組み合わせ。realizes で担う機能を指す
+implementations:
+  - id: aws
+    label: AWS
+    description: RDS・MSK Connect・MSK・Lambda で組む例
+    sources:
+      - {title: Working with logical replication（Amazon RDS for PostgreSQL）, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html}
+      - {title: MSK Connect, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect.html}
+      - {title: MSK Connect のプラグイン, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html}
+      - {title: MSK Connect の認証情報を外部化する, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-config-provider.html}
+      - {title: MSK Connect のオフセットストレージ, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-set-offset-storage-topic.html}
+      - {title: MSK Connect のログ, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-logging.html}
+      - {title: Using Lambda with Amazon MSK, url: https://docs.aws.amazon.com/lambda/latest/dg/with-msk.html}
+    tiers:
+      - {id: flow, label: CDC データフロー, z: 0, size: [16, 3]}
+      - {id: control, label: 実行・設定・運用, z: 1, origin: [0, 0], size: [14, 3]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [flow, control]}
+      - {kind: vpc, label: VPC, tier: flow, nodes: [aws-rds, aws-connector, aws-msk]}
+    nodes:
+      aws-rds: {label: RDS for PostgreSQL, svc: rds, kind: db, tier: flow, x: 0, y: 1.5, realizes: [database, logical], description: 注文テーブルを持ち、rds.logical_replication を有効にして論理レプリケーションを公開する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-connector: {label: Debezium コネクタ（カスタムプラグイン）, svc: mskconnect, kind: worker, tier: flow, x: 5, y: 1.5, realizes: [connector], description: MSK Connect に登録した Debezium の PostgreSQL コネクタ。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-msk: {label: Amazon MSK（CDC トピック・オフセット）, svc: msk, kind: queue, tier: flow, x: 10, y: 1.5, realizes: [topic, offset], description: CDC イベントのトピックと、コネクタのオフセットを保存するトピックを持つ。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-lambda: {label: Lambda（MSK イベントソース）, svc: lambda, kind: service, tier: flow, x: 14, y: 1.5, realizes: [consumer], description: MSK のトピックをイベントソースにして変更を処理する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-worker: {label: MSK Connect（ワーカー管理）, svc: mskconnect, kind: service, tier: control, x: 5, y: 1.5, realizes: [worker], description: Kafka Connect のワーカーを AWS が管理し、コネクタのタスクを動かす。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-plugin: {label: S3（プラグインの zip）, svc: s3, kind: file, tier: control, x: 1, y: 1.5, description: 実装で加わる部品。Debezium のプラグインを置く。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-secrets: {label: Secrets Manager（DB 認証情報）, svc: secrets, kind: service, tier: control, x: 9, y: 0.5, description: 実装で加わる部品。設定プロバイダーで DB の認証情報を渡す。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-logs: {label: CloudWatch Logs（ワーカーのログ）, svc: cloudwatch, kind: monitor, tier: control, x: 9, y: 2.5, description: 実装で加わる部品。ワーカーのログの送り先。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+    links:
+      - {id: aws-load-plugin, from: aws-plugin, to: aws-worker, label: プラグインを読み込む}
+      - {id: aws-credentials, from: aws-secrets, to: aws-connector, label: DB 認証情報を渡す}
+      - {id: aws-log, from: aws-worker, to: aws-logs, label: ログを送る}
 gates: {maxDrift: 0, maxHigh: 0}

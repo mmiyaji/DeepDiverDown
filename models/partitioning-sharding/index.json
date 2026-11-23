@@ -2,8 +2,8 @@
   "model": "partitioning-sharding",
   "name": "データ配置と並列性：パーティショニングとシャーディング",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "order-api": {
@@ -92,6 +92,55 @@
     "add-node": {
       "type": "scenario",
       "label": "ノードを追加してスロットを移す"
+    },
+    "clickhouse-cluster-app": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "注文 API の ClickHouse クライアント",
+      "realizes": [
+        "order-api"
+      ]
+    },
+    "clickhouse-cluster-dist": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "ClickHouse の Distributed 表と調整ノード",
+      "realizes": [
+        "partition-router",
+        "orders-table"
+      ]
+    },
+    "clickhouse-cluster-a": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "シャード A のローカル MergeTree 表",
+      "realizes": [
+        "time-partition",
+        "hash-shard-a"
+      ]
+    },
+    "clickhouse-cluster-b": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "シャード B のローカル MergeTree 表",
+      "realizes": [
+        "time-partition",
+        "hash-shard-b"
+      ]
+    },
+    "clickhouse-cluster-workers": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "各シャードでの読取と部分集計",
+      "realizes": [
+        "query-worker"
+      ]
+    },
+    "clickhouse-cluster-config": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "remote_servers とシャード式の設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -118,7 +167,13 @@
       "merge",
       "order-routing",
       "parallel-aggregation",
-      "add-node"
+      "add-node",
+      "clickhouse-cluster-app",
+      "clickhouse-cluster-dist",
+      "clickhouse-cluster-a",
+      "clickhouse-cluster-b",
+      "clickhouse-cluster-workers",
+      "clickhouse-cluster-config"
     ],
     "docs/reference-partitioning-sharding.md#§4": [
       "order-api",
@@ -160,11 +215,21 @@
     ],
     "docs/reference-partitioning-sharding.md#§8": [
       "add-node"
+    ],
+    "docs/reference-partitioning-sharding.md#§9": [
+      "clickhouse-cluster-app",
+      "clickhouse-cluster-dist",
+      "clickhouse-cluster-a",
+      "clickhouse-cluster-b",
+      "clickhouse-cluster-workers",
+      "clickhouse-cluster-config"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
+    "category": "データ配置と読み取り",
     "order": 10,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
     "objectives": [
       "時間パーティション、ファイル／テーブル保存単位、ハッシュシャードを区別する。",
       "order_date と customer_id から書き込み・読み出し先を決める流れを説明する。",

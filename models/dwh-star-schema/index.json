@@ -2,8 +2,8 @@
   "model": "dwh-star-schema",
   "name": "DWH のスタースキーマとファクトの粒度",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "source": {
@@ -13,27 +13,27 @@
     },
     "fact": {
       "type": "node",
-      "label": "fact_order_line",
+      "label": "受注明細ファクト",
       "status": "claim"
     },
     "date": {
       "type": "link",
-      "label": "dim_date → fact_order_line",
+      "label": "日付ディメンション → 受注明細ファクト",
       "status": "claim"
     },
     "customer": {
       "type": "link",
-      "label": "dim_customer → fact_order_line",
+      "label": "顧客ディメンション → 受注明細ファクト",
       "status": "claim"
     },
     "product": {
       "type": "link",
-      "label": "dim_product → fact_order_line",
+      "label": "商品ディメンション → 受注明細ファクト",
       "status": "claim"
     },
     "tag": {
       "type": "link",
-      "label": "商品と販促タグの関係 → dim_product",
+      "label": "商品と販促タグの関係 → 商品ディメンション",
       "status": "claim"
     },
     "bi": {
@@ -43,17 +43,17 @@
     },
     "load": {
       "type": "link",
-      "label": "受注イベント → fact_order_line",
+      "label": "受注イベント → 受注明細ファクト",
       "status": "claim"
     },
     "report": {
       "type": "link",
-      "label": "fact_order_line → BI／集計結果",
+      "label": "受注明細ファクト → BI／集計結果",
       "status": "claim"
     },
     "guard": {
       "type": "link",
-      "label": "商品と販促タグの関係 → fact_order_line",
+      "label": "商品と販促タグの関係 → 受注明細ファクト",
       "status": "claim"
     },
     "sales": {
@@ -69,6 +69,68 @@
       "kind": "usecase",
       "label": "売上を注文明細から再現する",
       "status": "claim"
+    },
+    "example-source": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "landing.order_events",
+      "realizes": [
+        "source"
+      ]
+    },
+    "example-fact": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "sales.fact_order_line",
+      "realizes": [
+        "fact"
+      ]
+    },
+    "example-date": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "sales.dim_date",
+      "realizes": [
+        "date"
+      ]
+    },
+    "example-customer": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "sales.dim_customer",
+      "realizes": [
+        "customer"
+      ]
+    },
+    "example-product": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "sales.dim_product",
+      "realizes": [
+        "product"
+      ]
+    },
+    "example-tag": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "sales.bridge_product_promo_tag",
+      "realizes": [
+        "tag"
+      ]
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "sales.monthly_sales SQL ビュー",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-validation": {
+      "type": "implementation",
+      "impl": "bq-order-star",
+      "label": "明細粒度の検査クエリ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -92,7 +154,15 @@
       "guard",
       "sales",
       "fanout",
-      "REQ-1"
+      "REQ-1",
+      "example-source",
+      "example-fact",
+      "example-date",
+      "example-customer",
+      "example-product",
+      "example-tag",
+      "example-bi",
+      "example-validation"
     ],
     "docs/reference-dwh-star-schema.md#§2": [
       "date",
@@ -109,6 +179,16 @@
       "report",
       "sales",
       "REQ-1"
+    ],
+    "docs/reference-dwh-star-schema.md#§5": [
+      "example-source",
+      "example-fact",
+      "example-date",
+      "example-customer",
+      "example-product",
+      "example-tag",
+      "example-bi",
+      "example-validation"
     ]
   },
   "reference": {

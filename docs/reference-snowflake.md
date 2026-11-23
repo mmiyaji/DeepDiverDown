@@ -33,3 +33,22 @@ Snowflake のストレージ、仮想ウェアハウス、クラウドサービ�
 ## 7. 社内の利用とアカウント間共有
 
 Horizon Catalog の機能で社内利用者に対する分類やマスキングを検討し、外部に提供する集合は共有用ビューで明示する。同一リージョンの直接共有の例では、受領側が Share から読み取り専用データベースを作り、共有対象を自分の計算資源で参照する。 [Horizon Catalog](https://docs.snowflake.com/en/user-guide/snowflake-horizon) · [Secure Data Sharing](https://docs.snowflake.com/en/user-guide/data-sharing-intro)
+
+## 8. 実装例 Snowflake と Amazon S3
+
+注文ファイルを Amazon S3 に置き、Snowflake の別々の仮想ウェアハウスで取込と BI を実行する例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| Source | Amazon S3 注文ファイル | CSV を入力バケットに着地させる。 |
+| 認証・メタデータ調整・データカタログと統制 | Snowflake Cloud Services と Horizon Catalog | 認証・調整と資産調査の入口を同じ Snowflake アカウントに置く。 |
+| バッチ取込用の計算資源 | LOAD_WH | 仮想ウェアハウスで COPY INTO を実行する。 |
+| 永続テーブル保存 | Snowflake ORDERS テーブル | 注文を内部管理テーブルに格納する。 |
+| BI 用の SQL 計算資源 | BI_WH | BI クエリに別の仮想ウェアハウスを使う。 |
+| BI users | BI クライアント | BI_WH を指定して SQL を実行する。 |
+| 読み取り専用データ共有 | Snowflake Direct Share | 許可した公開ビューを共有オブジェクトとして指定する。 |
+| データ受領者 | 同一リージョンの受領アカウント | 共有から読み取り専用データベースを作る。 |
+
+外部ステージには S3 の許可パスを指定する。`LOAD_WH` と `BI_WH` は同じテーブルデータを使える。取込と BI の処理能力は別々に設定し、受領側クエリの計算資源は受領側が手配する。
+
+出典 [Snowflake key concepts and architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)、[Secure Data Sharing](https://docs.snowflake.com/en/user-guide/data-sharing-intro)、[Snowflake S3 ストレージ統合](https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration)

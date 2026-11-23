@@ -2,8 +2,8 @@
   "model": "azure-aks",
   "name": "Azure AKS system/user node pools",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "operator": {
@@ -13,67 +13,67 @@
     },
     "api": {
       "type": "node",
-      "label": "AKS / Kubernetes API",
+      "label": "マネージド制御 API",
       "status": "claim"
     },
     "system": {
       "type": "node",
-      "label": "System node pool",
+      "label": "基盤用ノード群",
       "status": "claim"
     },
     "user": {
       "type": "node",
-      "label": "User node pool",
+      "label": "アプリ用ノード群",
       "status": "claim"
     },
     "workload": {
       "type": "node",
-      "label": "Deployment / Pods",
+      "label": "注文 API の実行単位",
       "status": "claim"
     },
     "lb": {
       "type": "node",
-      "label": "Azure Load Balancer / Service",
+      "label": "アプリ公開・振り分け",
       "status": "claim"
     },
     "registry": {
       "type": "node",
-      "label": "Azure Container Registry",
+      "label": "コンテナイメージの保管",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "運用者 → AKS / Kubernetes API",
+      "label": "運用者 → マネージド制御 API",
       "status": "claim"
     },
     "system-schedule": {
       "type": "link",
-      "label": "AKS / Kubernetes API → System node pool",
+      "label": "マネージド制御 API → 基盤用ノード群",
       "status": "claim"
     },
     "user-schedule": {
       "type": "link",
-      "label": "AKS / Kubernetes API → User node pool",
+      "label": "マネージド制御 API → アプリ用ノード群",
       "status": "claim"
     },
     "pull": {
       "type": "link",
-      "label": "User node pool → Azure Container Registry",
+      "label": "アプリ用ノード群 → コンテナイメージの保管",
       "status": "claim"
     },
     "run": {
       "type": "link",
-      "label": "User node pool → Deployment / Pods",
+      "label": "アプリ用ノード群 → 注文 API の実行単位",
       "status": "claim"
     },
     "expose": {
       "type": "link",
-      "label": "Deployment / Pods → Azure Load Balancer / Service",
+      "label": "注文 API の実行単位 → アプリ公開・振り分け",
       "status": "claim"
     },
     "replace": {
       "type": "link",
-      "label": "AKS / Kubernetes API → User node pool",
+      "label": "マネージド制御 API → アプリ用ノード群",
       "status": "claim"
     },
     "api-deploy-replace": {
@@ -95,6 +95,68 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のサブスクリプション、リージョン、ゾーン、VM SKU、ノード数、PDB、ネットワーク設定は未確定。"
+    },
+    "azure-operator": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "kubectl と Microsoft Entra ID",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "azure-api": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "AKS マネージド制御プレーン",
+      "realizes": [
+        "api"
+      ]
+    },
+    "azure-system": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Azure VM Scale Set（System）",
+      "realizes": [
+        "system"
+      ]
+    },
+    "azure-user": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Azure VM Scale Set（User）",
+      "realizes": [
+        "user"
+      ]
+    },
+    "azure-workload": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "注文 API Deployment / Pod",
+      "realizes": [
+        "workload"
+      ]
+    },
+    "azure-lb": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Azure Standard Load Balancer",
+      "realizes": [
+        "lb"
+      ]
+    },
+    "azure-registry": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Azure Container Registry",
+      "realizes": [
+        "registry"
+      ]
+    },
+    "azure-svc": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "注文 API の LoadBalancer Service",
+      "realizes": []
     }
   },
   "byRef": {
@@ -119,7 +181,15 @@
       "replace",
       "api-deploy-replace",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "azure-operator",
+      "azure-api",
+      "azure-system",
+      "azure-user",
+      "azure-workload",
+      "azure-lb",
+      "azure-registry",
+      "azure-svc"
     ],
     "docs/reference-azure-aks.md#§6": [
       "model"
@@ -156,11 +226,23 @@
     "docs/reference-azure-aks.md#§5": [
       "replace",
       "NFR-01"
+    ],
+    "docs/reference-azure-aks.md#§9": [
+      "azure-operator",
+      "azure-api",
+      "azure-system",
+      "azure-user",
+      "azure-workload",
+      "azure-lb",
+      "azure-registry",
+      "azure-svc"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
-    "order": 60,
+    "category": "マネージド Kubernetes",
+    "order": 20,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "AKS のマネージドコントロールプレーンとサブスクリプション側ノードの境界を区別する。",
       "system node pool と user node pool の役割を区別する。",

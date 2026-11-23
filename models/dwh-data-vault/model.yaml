@@ -53,3 +53,32 @@ scenarios:
       - {links: ["capture","parent-key"], note: "Raw Vault の注文 Satellite で、O-101 は出荷済み S、O-102 は返品済み R が最新の状態として記録されている。"}
       - {links: ["derive"], note: "Business Vault の出荷処理済み区分に返品済み R を含める。元の状態コードを読み、O-102 の区分も再計算する。"}
       - {links: ["publish-order","publish-customer"], note: "派生区分と顧客との関係を使って注文ごとにマートの行を生成する。O-101 と O-102 が出荷処理済みとして集計される。"}
+
+implementations:
+  - id: snowflake-vault
+    label: "Snowflake の Raw Vault と出荷状態マート"
+    description: "ステージング、Raw Vault、Business Vault、配信マートを Snowflake の別スキーマに置く実装例。"
+    sources:
+      - {title: "Data Vault 2.0 Introduction", url: "https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/"}
+      - {title: "Data Vault Alliance: Data Vault, Data Mesh, and Polysemes", url: "https://datavaultalliance.com/architecture-data/data-vault-data-mesh-and-polysemes/"}
+      - {title: "Data Vault Alliance: Building a Real-Time Data Vault", url: "https://datavaultalliance.com/engineering/building-a-real-time-data-vault-in-snowflake/"}
+      - {title: "Data Vault Alliance: Centralized Architecture vs Decentralized Architecture", url: "https://datavaultalliance.com/strategy-operating/centralized-vs-decentralized-architecture/"}
+      - {title: "Snowflake MERGE", url: "https://docs.snowflake.com/en/sql-reference/sql/merge"}
+      - {title: "Snowflake task graph", url: "https://docs.snowflake.com/en/user-guide/tasks-graphs"}
+    tiers:
+      - {id: "intake", label: "業務システムと取込", z: 2, size: [16,4], kind: "origin"}
+      - {id: "raw", label: "Raw Vault", z: 1, size: [17,4]}
+      - {id: "delivery", label: "Business Vault と Information Mart", z: 0, size: [17,4]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 3, size: [8,3]}
+    nodes:
+      example-orders: {label: "LANDING.ORDERS 入力行", kind: "table", tier: "intake", x: 2, y: 1.5, realizes: ["orders"], description: "取込可能になった注文変更を保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-stage: {label: "STAGING.ORDERS_LOAD ビュー", kind: "table", tier: "intake", x: 7, y: 1.5, realizes: ["stage"], description: "業務キーを整形し、取込時刻と出所を付けて後段に渡す。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-order-hub: {label: "RAW.HUB_ORDER", kind: "table", tier: "raw", x: 0, y: 1.5, realizes: ["order-hub"], description: "注文業務キーを一意に登録する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-customer-hub: {label: "RAW.HUB_CUSTOMER", kind: "table", tier: "raw", x: 4, y: 1.5, realizes: ["customer-hub"], description: "顧客業務キーを一意に登録する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-order-customer: {label: "RAW.LINK_ORDER_CUSTOMER", kind: "table", tier: "raw", x: 8, y: 1.5, realizes: ["order-customer"], description: "注文と顧客のキーの組を保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-order-sat: {label: "RAW.SAT_ORDER_STATE", kind: "table", tier: "raw", x: 12, y: 1.5, realizes: ["order-sat"], description: "状態が変わった行を履歴として追記する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-business: {label: "BUSINESS.ORDER_SHIPMENT_STATUS ビュー", kind: "table", tier: "delivery", x: 6, y: 1.5, realizes: ["business"], description: "出荷処理済みを示す区分を計算する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-mart: {label: "MART.ORDER_STATUS テーブル", kind: "table", tier: "delivery", x: 12, y: 1.5, realizes: ["mart"], description: "分析基準時点を決めて注文ごとに展開する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+      example-task: {label: "Snowflake Task グラフ", kind: "workflow", tier: "implementation-setup", x: 1, y: 1.5, description: "入力に対する Hub・Link・Satellite のロードと下流マート更新を順序づける。", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}
+    links:
+      - {id: "example-task-connection", from: "example-task", to: "example-stage", label: "ロード処理を実行", evidence: [{"type":"doc","ref":"docs/reference-dwh-data-vault.md#§7"}]}

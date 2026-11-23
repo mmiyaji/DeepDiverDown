@@ -35,3 +35,28 @@ Dataflow Runner は Beam グラフを Dataflow ジョブとして実行する。
 - [Use Apache Beam to build pipelines](https://cloud.google.com/dataflow/docs/guides/use-beam)
 - [Dataflow monitoring interface](https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf)
 - [Dataflow product overview](https://cloud.google.com/products/dataflow)
+
+## 8. 実装例：Pub/Sub → Beam SDK → BigQuery
+
+Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例。Pub/Sub から読み、BigQuery に出力するパイプラインを専用ワーカーサービスアカウントで実行する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 注文イベントの入力 | Pub/Sub サブスクリプション | 注文トピックから Dataflow ジョブへ配信する。 |
+| 処理グラフの定義、分散データの集合、キー付けと時間窓の集計 | Beam SDK の Pipeline・PCollection・Transform | イベント検証、イベント時刻の窓、キーごとの集計を処理グラフとして記述する。 |
+| 処理グラフの実行調整、分散タスクの実行基盤 | Dataflow Runner と管理ワーカー | Beam グラフをストリーミングジョブとして分散実行する。 |
+| 分析用テーブル | BigQuery の集計テーブル | BigQueryIO でスキーマに合わせて書き込む。 |
+| ジョブの監視 | Dataflow Monitoring | ステージ指標とジョブの状態を確認する。 |
+
+実装で加わる部品を以下に示す。
+
+- ワーカーサービスアカウント。Pub/Sub の読み取り、対象 BigQuery への書き込み、実行に必要な権限を割り当てる。
+
+公式資料
+
+- [Dataflow documentation](https://cloud.google.com/dataflow/docs/overview)
+- [Use Apache Beam to build pipelines](https://cloud.google.com/dataflow/docs/guides/use-beam)
+- [Dataflow monitoring interface](https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf)
+- [Dataflow product overview](https://cloud.google.com/products/dataflow)
+- [Dataflow security and permissions](https://docs.cloud.google.com/dataflow/docs/concepts/security-and-permissions)
+- [Beam Programming Guide](https://beam.apache.org/documentation/programming-guide/)

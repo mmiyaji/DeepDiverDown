@@ -1,6 +1,7 @@
+import { NODE_KINDS } from './node-kinds.js';
+
 const kinds = {
   requirements: ['usecase', 'rule', 'nfr'],
-  nodes: ['actor', 'client', 'cdn', 'external', 'lb', 'service', 'worker', 'db', 'queue', 'cache'],
 };
 const prefix = { requirements: 'req-', nodes: 'node-', links: 'link-' };
 const clean = value => typeof value === 'string' ? value.trim().slice(0, 2000) : '';
@@ -40,7 +41,7 @@ export function applyInterview(draft, proposal, { approved = false, document } =
   }
   apply('nodes', (n, current) => {
     const label = clean(n.label);
-    if (!label || (!kinds.nodes.includes(n.kind) && n.kind !== current?.kind) || !model.tiers.some(t => t.id === n.tier)) return null;
+    if (!label || (!Object.hasOwn(NODE_KINDS, n.kind) && n.kind !== current?.kind) || !model.tiers.some(t => t.id === n.tier)) return null;
     const next = { ...current, label, kind: n.kind, tier: n.tier, description: clean(n.description), status: 'claim' };
     if (Number.isSafeInteger(n.replicas) && n.replicas > 0) next.replicas = n.replicas;
     if (Array.isArray(n.az) && n.az.length) next.az = n.az.map(clean).filter(Boolean);

@@ -11,16 +11,16 @@ sources: [docs/reference-apache-airflow.md]
 evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§1}, {type: doc, ref: docs/reference-apache-airflow.md#§6}]
 tiers: [{id: orchestration, label: オーケストレーション, z: 1, size: [16, 3]}, {id: data, label: タスクと状態, z: 0, size: [18, 3]}]
 nodes:
-  dag: {label: DAG, kind: service, tier: orchestration, x: 0, y: 1.5, description: Taskと依存関係を定義。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
-  scheduler: {label: Scheduler, kind: service, tier: orchestration, x: 3, y: 1.5, description: Taskを提出。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
-  executor: {label: Executor, kind: worker, tier: orchestration, x: 6, y: 1.5, description: 実行方式を提供。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
-  worker: {label: Worker, kind: worker, tier: data, x: 9, y: 1.5, description: Taskを実行。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
-  metadata: {label: Metadata DB, kind: db, tier: data, x: 6, y: 1.5, description: DAGと状態を保持。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
-  ingest: {label: Raw ingest, kind: service, tier: data, x: 12, y: 1.5, description: 取り込みTask。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
-  transform: {label: Transform, kind: service, tier: data, x: 15, y: 1.5, description: 変換Task。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
-  quality: {label: Quality check, kind: service, tier: data, x: 18, y: 1.5, description: 品質チェックTask。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+  dag: {label: 作業手順の依存グラフ, kind: service, tier: orchestration, x: 0, 'y': 1.5, description: Taskと依存関係を定義。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
+  scheduler: {label: スケジューラー, kind: service, tier: orchestration, x: 3, 'y': 1.5, description: Taskを提出。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
+  executor: {label: タスクの配布, kind: worker, tier: orchestration, x: 6, 'y': 1.5, description: 実行方式を提供。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
+  worker: {label: タスクの実行プロセス, kind: worker, tier: data, x: 9, 'y': 1.5, description: Taskを実行。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
+  metadata: {label: 実行メタデータの保存先, kind: db, tier: data, x: 6, 'y': 1.5, description: DAGと状態を保持。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
+  ingest: {label: 元データの取り込み, kind: service, tier: data, x: 12, 'y': 1.5, description: 取り込みTask。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+  transform: {label: データ変換, kind: service, tier: data, x: 15, 'y': 1.5, description: 変換Task。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
+  quality: {label: 品質検査, kind: service, tier: data, x: 18, 'y': 1.5, description: 品質チェックTask。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
 links:
-  - {id: schedule, from: dag, to: scheduler, label: DAGを解析, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
+  - {id: schedule, from: dag, to: scheduler, label: 依存グラフを参照, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§2}]}
   - {id: submit, from: scheduler, to: executor, label: Taskを提出, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
   - {id: dispatch, from: executor, to: worker, label: 実行を割り当て, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§3}]}
   - {id: run-ingest, from: worker, to: ingest, label: 取り込み, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§5}]}
@@ -34,3 +34,31 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 失敗からの再試行, text: Task失敗を記録し再試行できる。, links: [state, dispatch], evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§4}]}
 unknowns: [{id: UNK-01, text: Executor種別、Worker台数、リトライ回数は未確定。, refs: [executor, worker, dispatch]}]
 gates: {maxDrift: 0, maxHigh: 0}
+
+implementations:
+  - id: celery-redis
+    label: "Airflow CeleryExecutor と Redis"
+    description: "Airflow 3 のスケジューラーと Celery ワーカーを分け、Redis にタスクをキューイングする例。DAG の解析は専用プロセスで行い、タスクの実行状態は Execution API を経由してメタデータ DB に保存する。"
+    sources:
+      - {title: Airflow Architecture Overview, url: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html}
+      - {title: Airflow Celery Executor, url: https://airflow.apache.org/docs/apache-airflow-providers-celery/stable/celery_executor.html}
+      - {title: DAG Serialization, url: https://airflow.apache.org/docs/apache-airflow/stable/dag-serialization.html}
+      - {title: Airflow Security Model, url: https://airflow.apache.org/docs/apache-airflow/stable/security/security_model.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      celery-redis-dag: {label: Python の DAG ファイル, kind: file, tier: processing, x: 1, y: 1.15, realizes: [dag], description: 取込・変換・検査のタスクと依存関係を定義する。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
+      celery-redis-scheduler: {label: Airflow Scheduler と CeleryExecutor, kind: service, tier: processing, x: 1, y: 3.65, realizes: [scheduler, executor], description: 依存関係を見て実行可能なタスクを Redis に送る。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
+      celery-redis-worker: {label: Airflow Celery Worker と三つの業務タスク, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [worker, ingest, transform, quality], description: キューからタスクを受け取り、必要な依存ライブラリーと接続で処理する。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
+      celery-redis-api: {label: Airflow API Server の Execution API, kind: service, tier: processing, x: 9, y: 1.15, realizes: [metadata], description: タスク実行プロセスとメタデータ DB の橋渡しをする。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
+      celery-redis-db: {label: PostgreSQL メタデータ DB, kind: db, tier: processing, x: 9, y: 3.65, description: DAG Run や Task Instance、シリアライズされた DAG を保存する。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
+      celery-redis-processor: {label: Airflow DAG Processor, kind: worker, tier: setup, x: 5, y: 1.5, description: Python の DAG を解析し、シリアライズした定義をメタデータ DB に渡す。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
+      celery-redis-redis: {label: Redis Celery ブローカー, kind: queue, tier: setup, x: 1, y: 1.5, description: CeleryExecutor から受け取った実行依頼をキューで保持する。Airflow の実行履歴はメタデータ DB に保存する。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
+    links:
+      - {id: celery-redis-redis-connection, from: celery-redis-redis, to: celery-redis-worker, label: キューからタスクを取得, realizes: [dispatch], replace: true}
+      - {id: celery-redis-queue-task, from: celery-redis-scheduler, to: celery-redis-redis, label: 実行可能なタスクをキューへ送る, realizes: [dispatch], replace: true}
+      - {id: celery-redis-read-definition, from: celery-redis-dag, to: celery-redis-processor, label: DAG 定義を渡す, realizes: [schedule], replace: true}
+      - {id: celery-redis-serialize-definition, from: celery-redis-processor, to: celery-redis-db, label: シリアライズした DAG を保存, realizes: [schedule], replace: true}
+      - {id: celery-redis-load-definition, from: celery-redis-db, to: celery-redis-scheduler, label: スケジューリング用の DAG を参照, realizes: [schedule], replace: true}
+      - {id: celery-redis-save-task-state, from: celery-redis-api, to: celery-redis-db, label: タスクの状態を永続化, realizes: [state]}

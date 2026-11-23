@@ -12,12 +12,18 @@
   });
 })();
 
-/* 書き出しメニュー：項目を選んだら閉じる。外側クリック・Esc でも閉じる */
+/* 一覧と書き出しのメニュー。外側クリック・Esc で閉じ、開くのは 1 つだけ。 */
 (() => {
-  const menu = document.querySelector('details.menu');
-  menu.addEventListener('click', e => { if (e.target.closest('[role="menuitem"]')) menu.open = false; });
-  document.addEventListener('click', e => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && menu.open) { menu.open = false; menu.querySelector('summary').focus(); } });
+  const menus = [...document.querySelectorAll('details.menu')];
+  for (const menu of menus) {
+    menu.addEventListener('click', e => { if (e.target.closest('[role^="menuitem"]')) menu.open = false; });
+    menu.addEventListener('toggle', () => { if (menu.open) menus.forEach(m => { if (m !== menu) m.open = false; }); });
+  }
+  document.addEventListener('click', e => { menus.forEach(m => { if (m.open && !m.contains(e.target)) m.open = false; }); });
+  document.addEventListener('keydown', e => {
+    const open = menus.find(m => m.open);
+    if (e.key === 'Escape' && open) { e.stopPropagation(); open.open = false; open.querySelector('summary').focus(); }
+  }, true);
 })();
 
 /* 詳細ペインは広い画面では右列、狭い画面では下から開く。 */

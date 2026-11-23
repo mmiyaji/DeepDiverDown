@@ -31,20 +31,20 @@ nodes:
   wal: {"label":"WAL","kind":"queue","tier":"database","x":3,"y":1.5,"description":"永続化のための更新記録を保持する。LSN は WAL 上の位置。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
   slot: {"label":"論理スロット","kind":"db","tier":"database","x":6,"y":0.4,"description":"接続とは独立して進捗を持ち、必要な WAL を保持する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§3"}]}
   publication: {"label":"Publication","kind":"service","tier":"database","x":6,"y":2.6,"description":"公開するテーブルと操作を定義する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  decoder: {"label":"論理デコーダ / pgoutput","kind":"worker","tier":"database","x":10,"y":1.5,"description":"WAL から行変更を復元し、pgoutput がレプリケーション用に出力する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  connector: {"label":"Debezium Source Task","kind":"worker","tier":"client","x":7,"y":1.5,"description":"行変更を Kafka に発行する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  offset: {"label":"Kafka Connect ソースオフセット","kind":"db","tier":"client","x":10,"y":0.4,"description":"コネクタが再開を要求するための位置を保持する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
-  kafka: {"label":"Kafka の変更イベント","kind":"queue","tier":"client","x":13,"y":1.5,"description":"下流で消費する変更イベント。再開時には重複し得る。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
+  decoder: {label: 論理デコーダと出力プラグイン, kind: worker, tier: database, x: 10, 'y': 1.5, description: WAL から行変更を復元し、公開された論理形式で渡す。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§2}]}
+  connector: {label: 変更データ捕捉タスク, kind: worker, tier: client, x: 7, 'y': 1.5, description: 行変更を購読し、下流のイベントログに発行する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§2}]}
+  offset: {label: 捕捉タスクの永続オフセット, kind: db, tier: client, x: 10, 'y': 0.4, description: コネクタが再開を要求するための位置を保持する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§4}]}
+  kafka: {label: 下流の変更イベントログ, kind: queue, tier: client, x: 13, 'y': 1.5, description: 下流で消費する変更イベント。再開時には重複し得る。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§4}]}
 links:
-  - {"id":"log","from":"orders","to":"wal","label":"WAL を生成してコミットする","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  - {"id":"retain","from":"slot","to":"wal","label":"必要な WAL を保持する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§3"}]}
-  - {"id":"decode","from":"wal","to":"decoder","label":"WAL から行変更を復元する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  - {"id":"select","from":"publication","to":"decoder","label":"公開設定を適用する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  - {"id":"stream","from":"decoder","to":"connector","label":"pgoutput の変更を送る","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  - {"id":"publish","from":"connector","to":"kafka","label":"CDC イベントを発行する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
-  - {"id":"feedback","from":"connector","to":"slot","label":"受信済み位置を通知する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§3"}]}
-  - {"id":"persist","from":"connector","to":"offset","label":"処理済みオフセットを保存する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
-  - {"id":"resume","from":"offset","to":"connector","label":"最後の記録位置から再開する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
+  - {id: log, from: orders, to: wal, label: WAL を生成してコミットする, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§2}]}
+  - {id: retain, from: slot, to: wal, label: 必要な WAL を保持する, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§3}]}
+  - {id: decode, from: wal, to: decoder, label: WAL から行変更を復元する, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§2}]}
+  - {id: select, from: publication, to: decoder, label: 公開設定を適用する, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§2}]}
+  - {id: stream, from: decoder, to: connector, label: 公開された行変更を送る, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§2}]}
+  - {id: publish, from: connector, to: kafka, label: 変更イベントを下流へ発行, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§2}]}
+  - {id: feedback, from: connector, to: slot, label: 受信済み位置を通知する, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§3}]}
+  - {id: persist, from: connector, to: offset, label: 処理済みオフセットを保存する, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§4}]}
+  - {id: resume, from: offset, to: connector, label: 最後の記録位置から再開する, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§4}]}
 scenarios:
   - id: stream-update
     label: 注文 42 の更新を Kafka へ配信する
@@ -239,3 +239,24 @@ blocks:
           label: 保存済み · T1
           k: 2
       kafka: []
+
+implementations:
+  - id: pg-connect
+    label: "PostgreSQL 18・Debezium・Kafka Connect"
+    description: "PostgreSQL 18 の論理デコードを pgoutput で公開し、Debezium を配置した分散 Kafka Connect が注文の変更を送る例。データベースの保持状態とコネクターの進捗を分ける。"
+    sources:
+      - {title: PostgreSQL 18 Logical Decoding Concepts, url: https://www.postgresql.org/docs/18/logicaldecoding-explanation.html}
+      - {title: PostgreSQL 18 pg_replication_slots, url: https://www.postgresql.org/docs/18/view-pg-replication-slots.html}
+      - {title: PostgreSQL 18 Logical Replication Publications, url: https://www.postgresql.org/docs/18/logical-replication-publication.html}
+      - {title: Debezium PostgreSQL Connector, url: https://debezium.io/documentation/reference/stable/connectors/postgresql.html}
+      - {title: Kafka Connect Distributed mode, url: https://kafka.apache.org/44/kafka-connect/user-guide/}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      pg-connect-postgres: {label: PostgreSQL 18 Primary と pgoutput, kind: db, tier: processing, x: 1, y: 1.15, realizes: [orders, wal, slot, publication, decoder], description: 注文テーブル、WAL、論理スロット、Publication、組み込みプラグインは同じ PostgreSQL インスタンスが担う。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
+      pg-connect-connect: {label: 分散 Kafka Connect の Debezium Source Task, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [connector], description: 確認済みの進捗を保持し、変更イベントを Kafka へ発行する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
+      pg-connect-kafka: {label: Kafka の CDC トピックと Connect 内部トピック, kind: queue, tier: processing, x: 5, y: 1.15, realizes: [offset, kafka], description: 業務イベントと、分散 Connect のソースオフセットを別のトピックに保持する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
+      pg-connect-health: {label: pg_replication_slots の監視, kind: monitor, tier: setup, x: 1, y: 1.5, description: restart_lsn と confirmed_flush_lsn、wal_status を監視し、停止中の保持と消失の兆候を区別する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
+    links:
+      - {id: pg-connect-health-connection, from: pg-connect-health, to: pg-connect-postgres, label: スロットの保持状態を確認}

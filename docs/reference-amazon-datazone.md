@@ -33,3 +33,24 @@ Lake Formation 管理下の Glue テーブルや対応する Redshift テーブ�
 ## 6. シナリオの見方
 
 「Glue 資産を公開して Athena で使う」は注文テーブルの取り込みから管理対象の権限付与までを追う。「非管理対象の購読を反映する」は外部ハンドラーが承認を受けてソース権限を与える例。
+
+## 7. 実装例：DataZone のデータレイク環境
+
+提供・購読プロジェクトを DataZone の DefaultDataLake ブループリントで作る構成例。非管理対象資産の通知経路も描く。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| 提供プロジェクト・所有者 | 提供側 DataZone プロジェクト | 資産を公開し、購読申請を審査する。 |
+| 購読プロジェクト | 購読側 DataZone プロジェクト | 提供されたデータを利用する環境を持つ。 |
+| プロジェクトのインベントリ・ビジネスデータカタログ・購読・権限付与処理 | Amazon DataZone（ドメイン・ポータル） | インベントリ、公開カタログ、購読状態を一つのドメインで管理する。 |
+| 承認イベントの配信 | Amazon EventBridge | 非管理対象の承認イベントを配信する。 |
+| ソースのテーブルカタログ | AWS Glue Data Catalog | Lake Formation 管理下の注文テーブルを登録する。 |
+| OpenLineage 対応ジョブ | AWS Glue Spark ETL | 対応バージョンで OpenLineage のイベントを出す。 |
+| データレイクの権限制御 | AWS Lake Formation | 購読側のデータアクセスを付与する。 |
+| 購読環境・クエリエンジン | Amazon Athena ワークグループ | 購読環境が付与済みテーブルをクエリする。 |
+| 外部処理・非管理対象ソース | 外部の購読処理 | 承認イベントに従ってソース側の権限変更を担当する。 |
+| 実装で追加 | DefaultDataLake ブループリント | Glue 管理アクセスロールとデータレイク環境を構成する。 |
+
+ブループリントで都度構成する Glue 管理アクセスロールには Lake Formation と Glue を操作できる権限が要る。非管理対象の権限処理は EventBridge を受ける外部担当・実装で行う。
+
+[AWS Reference Architecture: Building a Unified Catalog with Amazon DataZone](https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html)、[Grant Access to Unmanaged Assets](https://docs.aws.amazon.com/datazone/latest/userguide/grant-access-to-unmanaged-asset.html)、[Data Lineage in Amazon DataZone](https://docs.aws.amazon.com/datazone/latest/userguide/datazone-data-lineage.html)、[Amazon DataZone built-in blueprints](https://docs.aws.amazon.com/datazone/latest/userguide/working-with-blueprints.html)

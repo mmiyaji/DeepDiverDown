@@ -13,10 +13,10 @@ tiers:
 nodes:
   orders: {"label": "受注明細・日付範囲", "kind": "db", "tier": "flow", "x": 0, "y": 1, "description": "日付で絞った同じ期間の受注明細。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
   customers: {"label": "顧客マスタ", "kind": "db", "tier": "flow", "x": 0, "y": 4, "description": "customer_id で対応する属性を保持。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
-  shuffle: {"label": "Shuffle Exchange", "kind": "service", "tier": "flow", "x": 4, "y": 2.5, "description": "結合キーに従って両入力を再配分。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§2"}]}
-  join: {"label": "Join タスク・通常", "kind": "worker", "tier": "flow", "x": 8, "y": 1, "description": "その他の結合キーの担当範囲を処理する。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§2"}]}
-  hot: {"label": "Join タスク・偏りあり", "kind": "worker", "tier": "flow", "x": 8, "y": 4, "description": "一部の顧客キーに受注明細が集中し、担当する入力が大きい。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§3"}]}
-  metrics: {"label": "タスク実行指標", "kind": "service", "tier": "flow", "x": 12, "y": 0, "description": "タスクごとの入力バイト・処理時間を確認。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§3"}]}
+  shuffle: {label: 結合キーでのデータ再分配, kind: service, tier: flow, x: 4, 'y': 2.5, description: 結合キーに従って両入力を再配分。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§2}]}
+  join: {label: 均等な分割の結合タスク, kind: worker, tier: flow, x: 8, 'y': 1, description: その他の結合キーの担当範囲を処理する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§2}]}
+  hot: {label: 偏った分割の結合タスク, kind: worker, tier: flow, x: 8, 'y': 4, description: 一部の顧客キーに受注明細が集中し、担当する入力が大きい。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§3}]}
+  metrics: {label: 実行タスクの観測, kind: service, tier: flow, x: 12, 'y': 0, description: タスクごとの入力バイト・処理時間を確認。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§3}]}
   result: {"label": "結合結果", "kind": "db", "tier": "flow", "x": 16, "y": 2.5, "description": "受注明細に顧客属性を付加した結果。", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
 links:
   - {"id": "scan-orders", "from": "orders", "to": "shuffle", "label": "対象日の明細を送る", "evidence": [{"type": "doc", "ref": "docs/reference-shuffle-skew.md#§1"}]}
@@ -53,3 +53,26 @@ distribution:
   note: "customer_id で振り分けた 12 パーティションの例（数値は説明用）。"
   bars: [{id: p00, label: "パーティション 0", short: "P0", value: 150, node: join}, {id: p01, label: "パーティション 1", short: "P1", value: 132, node: join}, {id: p02, label: "パーティション 2", short: "P2", value: 171, node: join}, {id: p03, label: "パーティション 3", short: "P3", value: 118, node: join}, {id: p04, label: "パーティション 4", short: "P4", value: 160, node: join}, {id: p05, label: "パーティション 5", short: "P5", value: 144, node: join}, {id: p06, label: "パーティション 6", short: "P6", value: 126, node: join}, {id: p07, label: "パーティション 7", short: "P7", value: 1920, node: hot, description: "customer_id = C-0001 の大口顧客の明細が集中したパーティション。このタスクが終わるまでステージ全体が終わらない。"}, {id: p08, label: "パーティション 8", short: "P8", value: 138, node: join}, {id: p09, label: "パーティション 9", short: "P9", value: 165, node: join}, {id: p10, label: "パーティション 10", short: "P10", value: 121, node: join}, {id: p11, label: "パーティション 11", short: "P11", value: 149, node: join}]
 blocks: [{"id":"shuffle","title":"シャッフル：Map から Reduce への振り分け","legend":{"0":"C-0412・C-0128","1":"C-0001（大口）","2":"C-0233","3":"C-0907"},"note":"各 Map タスクの出力が customer_id のハッシュで Reduce タスクへ送られる。数値は説明用。","lanes":[{"id":"m1","label":"Map 1","sub":"受注明細を読む","node":"orders"},{"id":"m2","label":"Map 2","sub":"受注明細を読む","node":"orders"},{"id":"m3","label":"Map 3","sub":"受注明細を読む","node":"orders"},{"id":"r1","label":"Reduce 1","sub":"hash % 4 = 0","node":"join"},{"id":"r2","label":"Reduce 2","sub":"hash % 4 = 1","node":"hot"},{"id":"r3","label":"Reduce 3","sub":"hash % 4 = 2","node":"join"},{"id":"r4","label":"Reduce 4","sub":"hash % 4 = 3","node":"join"}],"items":{"m1":[{"id":"m1-0","label":"C-0001","k":1},{"id":"m1-1","label":"C-0412","k":0},{"id":"m1-2","label":"C-0001","k":1},{"id":"m1-3","label":"C-0233","k":2},{"id":"m1-4","label":"C-0907","k":3},{"id":"m1-5","label":"C-0001","k":1},{"id":"m1-6","label":"C-0128","k":0},{"id":"m1-7","label":"C-0001","k":1}],"m2":[{"id":"m2-0","label":"C-0001","k":1},{"id":"m2-1","label":"C-0412","k":0},{"id":"m2-2","label":"C-0001","k":1},{"id":"m2-3","label":"C-0233","k":2},{"id":"m2-4","label":"C-0907","k":3},{"id":"m2-5","label":"C-0001","k":1},{"id":"m2-6","label":"C-0128","k":0},{"id":"m2-7","label":"C-0001","k":1}],"m3":[{"id":"m3-0","label":"C-0001","k":1},{"id":"m3-1","label":"C-0412","k":0},{"id":"m3-2","label":"C-0001","k":1},{"id":"m3-3","label":"C-0233","k":2},{"id":"m3-4","label":"C-0907","k":3},{"id":"m3-5","label":"C-0001","k":1},{"id":"m3-6","label":"C-0128","k":0},{"id":"m3-7","label":"C-0001","k":1}],"r1":[],"r2":[],"r3":[],"r4":[]}},{"id":"broadcast","title":"ブロードキャスト結合：小さい表を全 Worker に配る","legend":{"0":"受注明細（大きい側）","2":"顧客マスタ（小さい側）","5":"結合結果"},"note":"大きい側は動かさず、小さい側だけを全 Worker に複製する。数値は説明用。","lanes":[{"id":"driver","label":"ドライバー","sub":"小さい表を集める","node":"customers"},{"id":"w1","label":"Worker 1","node":"join"},{"id":"w2","label":"Worker 2","node":"join"},{"id":"w3","label":"Worker 3","node":"join"}],"items":{"driver":[{"id":"d1","label":"顧客 A","k":2,"note":"小さい側（顧客マスタ）の塊"},{"id":"d2","label":"顧客 B","k":2}],"w1":[{"id":"o1","label":"明細 1","k":0},{"id":"o2","label":"明細 2","k":0}],"w2":[{"id":"o3","label":"明細 3","k":0},{"id":"o4","label":"明細 4","k":0}],"w3":[{"id":"o5","label":"明細 5","k":0},{"id":"o6","label":"明細 6","k":0}]}}]
+
+implementations:
+  - id: spark-aqe
+    label: "Spark SQL Adaptive Query Execution"
+    description: "Spark SQL で受注明細と顧客マスタを結合する例。Adaptive Query Execution が対象の結合で偏ったシャッフル分割を分けられる場合を示す。"
+    sources:
+      - {title: Apache Spark · Shuffle operations, url: https://spark.apache.org/docs/latest/rdd-programming-guide.html#shuffle-operations}
+      - {title: Apache Spark · Performance Tuning, url: https://spark.apache.org/docs/latest/sql-performance-tuning.html#optimizing-skew-join}
+      - {title: Google Cloud · Query plan and timeline, url: https://cloud.google.com/bigquery/docs/query-plan-explanation}
+      - {title: Spark Web UI, url: https://spark.apache.org/docs/latest/web-ui.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      spark-aqe-orders: {label: 日付で分けた Parquet 受注明細, kind: db, tier: processing, x: 1, y: 1.15, realizes: [orders], description: 対象期間の注文を読む。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-customers: {label: Parquet の顧客マスタ, kind: file, tier: processing, x: 1, y: 3.65, realizes: [customers], description: 顧客キーと属性を読み込む。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-shuffle: {label: Spark SQL の Shuffle Exchange, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [shuffle], description: customer_id で関連する行を同じ分割へ送る。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-join: {label: Spark Executor 上の結合タスク, kind: worker, tier: processing, x: 5, y: 3.65, realizes: [join, hot], description: 対象となる偏りを AQE が検出すると、必要に応じて再分割し反対側を複製する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-metrics: {label: Spark UI の SQL と Stage, kind: monitor, tier: processing, x: 9, y: 1.15, realizes: [metrics], description: 物理計画やタスクのシャッフル読取量、時間を確認する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-result: {label: 出力用 Parquet テーブル, kind: table, tier: processing, x: 9, y: 3.65, realizes: [result], description: 顧客属性を付けた注文を保存する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-config: {label: AQE と偏り検出の設定, kind: policy, tier: setup, x: 1, y: 1.5, description: spark.sql.adaptive.skewJoin.enabled を使い、分割サイズのしきい値と中央値に対する倍率を確認する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+    links:
+      - {id: spark-aqe-config-connection, from: spark-aqe-config, to: spark-aqe-join, label: 偏りを検出する条件を設定}

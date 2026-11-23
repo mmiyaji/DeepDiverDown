@@ -2,8 +2,8 @@
   "model": "data-lakehouse",
   "name": "データレイクハウスの基本アーキテクチャ（Apache Iceberg 例）",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "engine": {
@@ -73,6 +73,53 @@
     "tiering": {
       "type": "scenario",
       "label": "古いデータを安い保存先へ移す"
+    },
+    "aws-athena-athena": {
+      "type": "implementation",
+      "impl": "aws-athena",
+      "label": "Amazon Athena エンジン v3",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "aws-athena-glue": {
+      "type": "implementation",
+      "impl": "aws-athena",
+      "label": "AWS Glue Data Catalog",
+      "realizes": [
+        "catalog"
+      ]
+    },
+    "aws-athena-metadata": {
+      "type": "implementation",
+      "impl": "aws-athena",
+      "label": "S3 の Iceberg メタデータと Snapshot",
+      "realizes": [
+        "snapshot",
+        "metadata"
+      ]
+    },
+    "aws-athena-manifest": {
+      "type": "implementation",
+      "impl": "aws-athena",
+      "label": "S3 の Manifest List と Manifest",
+      "realizes": [
+        "manifests"
+      ]
+    },
+    "aws-athena-data": {
+      "type": "implementation",
+      "impl": "aws-athena",
+      "label": "S3 の Parquet ファイル",
+      "realizes": [
+        "data"
+      ]
+    },
+    "aws-athena-lifecycle": {
+      "type": "implementation",
+      "impl": "aws-athena",
+      "label": "S3 Lifecycle ルール",
+      "realizes": []
     }
   },
   "byRef": {
@@ -95,7 +142,13 @@
       "write-data",
       "write-meta",
       "iceberg-read-write",
-      "tiering"
+      "tiering",
+      "aws-athena-athena",
+      "aws-athena-glue",
+      "aws-athena-metadata",
+      "aws-athena-manifest",
+      "aws-athena-data",
+      "aws-athena-lifecycle"
     ],
     "docs/reference-data-lakehouse.md#§2": [
       "engine",
@@ -122,11 +175,21 @@
     ],
     "docs/reference-data-lakehouse.md#§7": [
       "tiering"
+    ],
+    "docs/reference-data-lakehouse.md#§8": [
+      "aws-athena-athena",
+      "aws-athena-glue",
+      "aws-athena-metadata",
+      "aws-athena-manifest",
+      "aws-athena-data",
+      "aws-athena-lifecycle"
     ]
   },
   "reference": {
-    "category": "構成概念",
-    "order": 30,
+    "category": "構成パターン",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
     "objectives": [
       "計算エンジン、Catalog、snapshot/manifest、データファイルの役割を区別する。",
       "Iceberg の metadata tree から必要なデータファイルを選ぶ流れを理解する。",

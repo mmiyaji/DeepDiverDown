@@ -24,19 +24,19 @@ tiers:
   - {id: network, label: Service ネットワーク, z: 0, origin: [9, 0], size: [3, 3]}
 nodes:
   kubectl:
-    {label: kubectl / 利用者, kind: client, tier: client, x: 0, y: 1.5, description: K3s API を通じて注文 API のリソースを操作する。, evidence: [{type: doc, ref: "docs/reference-k3s.md#§3"}]}
+    {label: 構成の投入クライアント, kind: client, tier: client, x: 0, 'y': 1.5, description: K3s API を通じて注文 API のリソースを操作する。, evidence: [{type: doc, ref: docs/reference-k3s.md#§3}]}
   server:
-    {label: K3s server, kind: service, tier: server, x: 1, y: 1.5, description: control-plane と datastore を管理し、K3s API を提供する。, evidence: [{type: doc, ref: "docs/reference-k3s.md#§2"}, {type: doc, ref: "docs/reference-k3s.md#§3"}]}
+    {label: クラスタ制御部, kind: service, tier: server, x: 1, 'y': 1.5, description: control-plane と datastore を管理し、K3s API を提供する。, evidence: [{type: doc, ref: docs/reference-k3s.md#§2}, {type: doc, ref: docs/reference-k3s.md#§3}]}
   datastore:
-    {label: K3s datastore, kind: db, tier: server, x: 4, y: 1.5, description: server が管理するクラスタ状態のデータストア。選択トポロジーの論理表現。, evidence: [{type: doc, ref: "docs/reference-k3s.md#§2"}]}
+    {label: クラスタ状態ストア, kind: db, tier: server, x: 4, 'y': 1.5, description: server が管理するクラスタ状態のデータストア。選択トポロジーの論理表現。, evidence: [{type: doc, ref: docs/reference-k3s.md#§2}]}
   agent:
-    {label: K3s agent, kind: worker, tier: agent, x: 1, y: 1.5, description: control-plane と datastore を持たず server に登録されるホスト。, evidence: [{type: doc, ref: "docs/reference-k3s.md#§2"}]}
+    {label: ノード参加エージェント, kind: worker, tier: agent, x: 1, 'y': 1.5, description: control-plane と datastore を持たず server に登録されるホスト。, evidence: [{type: doc, ref: docs/reference-k3s.md#§2}]}
   runtime:
-    {label: kubelet / runtime / CNI, kind: worker, tier: agent, x: 4, y: 1.5, description: K3s agent 上で実行され、Pod の起動とネットワークを担う構成要素群。, evidence: [{type: doc, ref: "docs/reference-k3s.md#§2"}, {type: doc, ref: "docs/reference-k3s.md#§3"}]}
+    {label: ノード実行・ネットワーク, kind: worker, tier: agent, x: 4, 'y': 1.5, description: K3s agent 上で実行され、Pod の起動とネットワークを担う構成要素群。, evidence: [{type: doc, ref: docs/reference-k3s.md#§2}, {type: doc, ref: docs/reference-k3s.md#§3}]}
   order-api:
-    {label: 注文 API Pod, kind: service, tier: agent, x: 7, y: 1.5, description: agent 側で起動される注文 API の Pod。, evidence: [{type: doc, ref: "docs/reference-k3s.md#§3"}, {type: doc, ref: "docs/reference-k3s.md#§4"}]}
+    {label: 注文 API の実行単位, kind: service, tier: agent, x: 7, 'y': 1.5, description: agent 側で起動される注文 API の Pod。, evidence: [{type: doc, ref: docs/reference-k3s.md#§3}, {type: doc, ref: docs/reference-k3s.md#§4}]}
   service:
-    {label: 注文 API Service, kind: lb, tier: network, x: 1.5, y: 1.5, description: 注文 API Pod への安定したネットワーク入口。, evidence: [{type: doc, ref: "docs/reference-k3s.md#§4"}]}
+    {label: 注文 API の公開, kind: lb, tier: network, x: 1.5, 'y': 1.5, description: 注文 API Pod への安定したネットワーク入口。, evidence: [{type: doc, ref: docs/reference-k3s.md#§4}]}
 links:
   - {id: apply, from: kubectl, to: server, label: リソースを適用, evidence: [{type: doc, ref: "docs/reference-k3s.md#§3"}]}
   - {id: persist, from: server, to: datastore, label: 状態を保存, evidence: [{type: doc, ref: "docs/reference-k3s.md#§2"}]}
@@ -59,3 +59,131 @@ scenarios:
     steps:
       - {links: [agent-loss], note: "agent ホスト障害が server 側の control-plane に扱われ、注文 API Pod に影響する。"}
       - {links: [schedule, start, expose], note: "Deployment の差分調整により新しい配置を試みる。結果と時間は構成・リソース・設定に依存する。"}
+implementations:
+  - id: ha
+    label: K3s の組み込み etcd 構成
+    description: 小規模なオンプレミス環境で、3 台の K3s server と複数の agent に注文 API を配備する例。
+    sources:
+      - title: K3s High Availability Embedded etcd
+        url: https://docs.k3s.io/datastore/ha-embedded
+      - title: K3s Networking Services
+        url: https://docs.k3s.io/networking/networking-services
+    tiers:
+      - id: client
+        label: 利用者
+        kind: origin
+        z: 1
+        origin:
+          - -4
+          - 0
+      - id: server
+        label: K3s server
+        z: 1
+      - id: agent
+        label: K3s agent
+        z: 0
+      - id: network
+        label: Service ネットワーク
+        z: 0
+        origin:
+          - 9
+          - 0
+    groups:
+      - kind: cluster
+        label: K3s クラスタ
+        provider: k8s
+        tier:
+          - server
+          - agent
+          - network
+        nodes:
+          - ha-server
+          - ha-agent
+          - ha-order-api
+          - ha-service
+    nodes:
+      ha-kubectl:
+        label: kubectl
+        kind: client
+        tier: client
+        realizes:
+          - kubectl
+        description: クラスタ共通の API アドレスに接続する。
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6
+      ha-server:
+        label: K3s server VM × 3
+        kind: worker
+        tier: server
+        svc: onprem:vm
+        realizes:
+          - server
+          - datastore
+        description: K3s server と組み込み etcd を同じサーバーに配置し、クラスタ状態を複製する。
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6
+      ha-agent:
+        label: K3s agent VM
+        kind: worker
+        tier: agent
+        svc: onprem:vm
+        realizes:
+          - agent
+          - runtime
+        description: K3s agent、kubelet、containerd、CNI の実行を担う。
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6
+      ha-order-api:
+        label: 注文 API Deployment
+        kind: service
+        tier: agent
+        svc: k8s:deployment
+        realizes:
+          - order-api
+        description: agent ノードで注文 API の Pod を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6
+      ha-service:
+        label: LoadBalancer Service / ServiceLB
+        kind: lb
+        tier: network
+        svc: k8s:service
+        realizes:
+          - service
+        description: 利用可能なノードの公開ポートを ServiceLB が使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6
+      ha-registration:
+        label: 固定 API・登録アドレス
+        kind: lb
+        tier: network
+        svc: onprem:lb
+        description: 外部 TCP ロードバランサーを介して server に接続する。
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6
+    links:
+      - {id: ha-kubectl-api, from: ha-kubectl, to: ha-registration, label: 固定 API エンドポイントへ接続, realizes: [apply], replace: true, evidence: [{type: doc, ref: docs/reference-k3s.md#§6}]}
+      - id: ha-register
+        from: ha-agent
+        to: ha-registration
+        label: 固定アドレスへ接続
+        realizes: [register]
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6
+      - id: ha-forward
+        from: ha-registration
+        to: ha-server
+        label: 健全な server へ中継
+        realizes: [register, apply]
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-k3s.md#§6

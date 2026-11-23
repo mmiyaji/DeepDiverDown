@@ -2,103 +2,103 @@
   "model": "databricks",
   "name": "Databricks レイクハウス参照アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "source": {
       "type": "node",
-      "label": "Source",
+      "label": "外部データ源",
       "status": "claim"
     },
     "ingest": {
       "type": "node",
-      "label": "Lakeflow・取り込み",
+      "label": "増分データ取り込み",
       "status": "claim"
     },
     "storage": {
       "type": "node",
-      "label": "Object storage",
+      "label": "オブジェクトストレージ",
       "status": "claim"
     },
     "transform": {
       "type": "node",
-      "label": "Transform",
+      "label": "変換・品質管理",
       "status": "claim"
     },
     "catalog": {
       "type": "node",
-      "label": "Unity Catalog",
+      "label": "権限・リネージカタログ",
       "status": "claim"
     },
     "query": {
       "type": "node",
-      "label": "Databricks SQL",
+      "label": "SQL クエリの計算資源",
       "status": "claim"
     },
     "serving": {
       "type": "node",
-      "label": "BI / Serving",
+      "label": "分析結果の利用先",
       "status": "claim"
     },
     "sharing": {
       "type": "node",
-      "label": "OpenSharing",
+      "label": "別組織へのデータ公開",
       "status": "claim"
     },
     "ml": {
       "type": "node",
-      "label": "MLflow と Model Serving",
+      "label": "モデルの登録・配備",
       "status": "claim"
     },
     "ingest-data": {
       "type": "link",
-      "label": "Source → Lakeflow・取り込み",
+      "label": "外部データ源 → 増分データ取り込み",
       "status": "claim"
     },
     "land": {
       "type": "link",
-      "label": "Lakeflow・取り込み → Object storage",
+      "label": "増分データ取り込み → オブジェクトストレージ",
       "status": "claim"
     },
     "refine": {
       "type": "link",
-      "label": "Object storage → Transform",
+      "label": "オブジェクトストレージ → 変換・品質管理",
       "status": "claim"
     },
     "govern": {
       "type": "link",
-      "label": "Transform → Unity Catalog",
+      "label": "変換・品質管理 → 権限・リネージカタログ",
       "status": "claim"
     },
     "query-data": {
       "type": "link",
-      "label": "Databricks SQL → Unity Catalog",
+      "label": "SQL クエリの計算資源 → 権限・リネージカタログ",
       "status": "claim"
     },
     "read-storage": {
       "type": "link",
-      "label": "Databricks SQL → Object storage",
+      "label": "SQL クエリの計算資源 → オブジェクトストレージ",
       "status": "claim"
     },
     "serve": {
       "type": "link",
-      "label": "Databricks SQL → BI / Serving",
+      "label": "SQL クエリの計算資源 → 分析結果の利用先",
       "status": "claim"
     },
     "share": {
       "type": "link",
-      "label": "Unity Catalog → OpenSharing",
+      "label": "権限・リネージカタログ → 別組織へのデータ公開",
       "status": "claim"
     },
     "train": {
       "type": "link",
-      "label": "Object storage → MLflow と Model Serving",
+      "label": "オブジェクトストレージ → モデルの登録・配備",
       "status": "claim"
     },
     "model": {
       "type": "link",
-      "label": "MLflow と Model Serving → Unity Catalog",
+      "label": "モデルの登録・配備 → 権限・リネージカタログ",
       "status": "claim"
     },
     "lakehouse-flow": {
@@ -124,6 +124,77 @@
     "UNK-01": {
       "type": "unknown",
       "label": "クラウドサービス、テーブル形式、計算サイズは未確定。"
+    },
+    "example-source": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "Amazon S3 の到着ファイル",
+      "realizes": [
+        "source"
+      ]
+    },
+    "example-ingest": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "Lakeflow Spark Declarative Pipelines",
+      "realizes": [
+        "ingest",
+        "transform"
+      ]
+    },
+    "example-storage": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "Delta テーブルのストレージ",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "example-catalog": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "Unity Catalog",
+      "realizes": [
+        "catalog"
+      ]
+    },
+    "example-query": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "Databricks SQL Warehouse",
+      "realizes": [
+        "query"
+      ]
+    },
+    "example-serving": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "Databricks ダッシュボード",
+      "realizes": [
+        "serving"
+      ]
+    },
+    "example-sharing": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "OpenSharing の Share と Recipient",
+      "realizes": [
+        "sharing"
+      ]
+    },
+    "example-ml": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "MLflow と Model Serving",
+      "realizes": [
+        "ml"
+      ]
+    },
+    "example-iam": {
+      "type": "implementation",
+      "impl": "databricks-aws",
+      "label": "IAM ロールと外部ロケーション",
+      "realizes": []
     }
   },
   "byRef": {
@@ -153,7 +224,16 @@
       "lakehouse-flow",
       "reuse",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "example-source",
+      "example-ingest",
+      "example-storage",
+      "example-catalog",
+      "example-query",
+      "example-serving",
+      "example-sharing",
+      "example-ml",
+      "example-iam"
     ],
     "docs/reference-databricks.md#§6": [
       "model"
@@ -192,6 +272,17 @@
       "train",
       "model",
       "reuse"
+    ],
+    "docs/reference-databricks.md#§9": [
+      "example-source",
+      "example-ingest",
+      "example-storage",
+      "example-catalog",
+      "example-query",
+      "example-serving",
+      "example-sharing",
+      "example-ml",
+      "example-iam"
     ]
   },
   "reference": {

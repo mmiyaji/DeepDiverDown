@@ -24,19 +24,19 @@ tiers:
   - {id: edge, label: 外部公開, z: 0, origin: [9, 0], size: [3, 3]}
 nodes:
   oc:
-    {label: oc / 利用者, kind: client, tier: client, x: 0, y: 1.5, description: プロジェクトを選択し注文 API の Deployment を送る。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§2"}]}
+    {label: 構成の投入クライアント, kind: client, tier: client, x: 0, 'y': 1.5, description: プロジェクトを選択し注文 API の Deployment を送る。, evidence: [{type: doc, ref: docs/reference-openshift.md#§2}]}
   api:
-    {label: OpenShift API, kind: service, tier: control, x: 0, y: 1.5, description: プロジェクト内のリソース操作を受け付ける API 入口。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§2"}]}
+    {label: クラスタ管理 API, kind: service, tier: control, x: 0, 'y': 1.5, description: プロジェクト内のリソース操作を受け付ける API 入口。, evidence: [{type: doc, ref: docs/reference-openshift.md#§2}]}
   controller:
-    {label: Controller / Scheduler, kind: service, tier: control, x: 4, y: 1.5, description: Deployment の差分を調整し、Pod の配置を決める制御部品群。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}, {type: doc, ref: "docs/reference-openshift.md#§5"}]}
+    {label: レプリカ調整・配置先の決定, kind: service, tier: control, x: 4, 'y': 1.5, description: Deployment の差分を調整し、Pod の配置を決める制御部品群。, evidence: [{type: doc, ref: docs/reference-openshift.md#§3}, {type: doc, ref: docs/reference-openshift.md#§5}]}
   kubelet:
-    {label: worker の kubelet, kind: worker, tier: worker, x: 1, y: 1.5, description: ノード上で割り当てられた注文 API Pod を起動する。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}]}
+    {label: ノード実行エージェント, kind: worker, tier: worker, x: 1, 'y': 1.5, description: ノード上で割り当てられた注文 API Pod を起動する。, evidence: [{type: doc, ref: docs/reference-openshift.md#§3}]}
   order-api:
-    {label: 注文 API Pod, kind: service, tier: worker, x: 5, y: 1.5, description: Deployment の Pod テンプレートから起動される注文 API。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}, {type: doc, ref: "docs/reference-openshift.md#§4"}]}
+    {label: 注文 API の実行単位, kind: service, tier: worker, x: 5, 'y': 1.5, description: Deployment の Pod テンプレートから起動される注文 API。, evidence: [{type: doc, ref: docs/reference-openshift.md#§3}, {type: doc, ref: docs/reference-openshift.md#§4}]}
   service:
-    {label: 注文 API Service, kind: lb, tier: edge, x: 0.5, y: 1.5, description: 注文 API Pod への内部エンドポイント。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
+    {label: 注文 API の内部公開, kind: lb, tier: edge, x: 0.5, 'y': 1.5, description: 注文 API Pod への内部エンドポイント。, evidence: [{type: doc, ref: docs/reference-openshift.md#§4}]}
   route:
-    {label: OpenShift Route, kind: lb, tier: edge, x: 2.2, y: 1.5, description: Service をホスト名で外部公開する入口。DNS は別途構成する。, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
+    {label: 外部公開ルート, kind: lb, tier: edge, x: 2.2, 'y': 1.5, description: Service をホスト名で外部公開する入口。DNS は別途構成する。, evidence: [{type: doc, ref: docs/reference-openshift.md#§4}]}
 links:
   - {id: apply, from: oc, to: api, label: Deployment を適用, evidence: [{type: doc, ref: "docs/reference-openshift.md#§2"}]}
   - {id: reconcile, from: api, to: controller, label: 状態を調整, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}]}
@@ -44,7 +44,7 @@ links:
   - {id: start, from: kubelet, to: order-api, label: Pod を起動, evidence: [{type: doc, ref: "docs/reference-openshift.md#§3"}]}
   - {id: service-route, from: route, to: service, label: Service を公開, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
   - {id: route-pod, from: service, to: order-api, label: Pod へ転送, evidence: [{type: doc, ref: "docs/reference-openshift.md#§4"}]}
-  - {id: worker-loss, from: order-api, to: controller, label: worker 障害後に再調整, evidence: [{type: doc, ref: "docs/reference-openshift.md#§5"}]}
+  - {id: worker-loss, from: kubelet, to: api, label: ノードの状態とハートビート, evidence: [{type: doc, ref: "docs/reference-openshift.md#§5"}]}
 scenarios:
   - id: deploy-order-api
     label: OpenShift に注文 API を公開
@@ -57,5 +57,130 @@ scenarios:
     label: worker 障害後の再調整
     evidence: [{type: doc, ref: "docs/reference-openshift.md#§5"}]
     steps:
-      - {links: [worker-loss], note: "注文 API Pod が載る worker 障害を検知し、Deployment の状態との差分が生じる。"}
+      - {links: [worker-loss], note: "制御プレーンが注文 API を実行するノードのハートビート途絶を検知し、望ましい状態との差分を認識する。"}
       - {links: [reconcile, schedule, start], note: "Controller と Scheduler が再配置を試みる。残存ノード・リソース・条件に依存する。"}
+implementations:
+  - id: ocp
+    label: OpenShift と Ingress Controller
+    description: 自前の OpenShift Container Platform クラスタで、注文 API を標準の Ingress Controller から公開する例。
+    sources:
+      - title: OpenShift Ingress and load balancing
+        url: https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/ingress_and_load_balancing/index
+      - title: OpenShift Networking Operators
+        url: https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/networking_operators/index
+    tiers:
+      - id: client
+        label: 利用者
+        kind: origin
+        z: 1
+        origin:
+          - -4
+          - 0
+      - id: control
+        label: OpenShift 制御
+        z: 1
+      - id: worker
+        label: ワーカーノード
+        z: 0
+      - id: edge
+        label: 外部公開
+        z: 0
+        origin:
+          - 9
+          - 0
+    groups:
+      - kind: cluster
+        label: OpenShift クラスタ
+        provider: k8s
+        tier:
+          - control
+          - worker
+          - edge
+        nodes:
+          - ocp-api
+          - ocp-kubelet
+          - ocp-order-api
+          - ocp-service
+          - ocp-route
+    nodes:
+      ocp-oc:
+        label: oc CLI
+        kind: client
+        tier: client
+        realizes:
+          - oc
+        description: 注文 API のマニフェストを適用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7
+      ocp-api:
+        label: OpenShift コントロールプレーン
+        kind: worker
+        tier: control
+        svc: onprem:vm
+        realizes:
+          - api
+          - controller
+        description: API と調整・スケジューリングのプロセスを配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7
+      ocp-kubelet:
+        label: RHCOS worker の kubelet / CRI-O
+        kind: worker
+        tier: worker
+        svc: onprem:vm
+        realizes:
+          - kubelet
+        description: Pod の割り当てを取得しコンテナを動かす。
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7
+      ocp-order-api:
+        label: 注文 API Deployment / Pod
+        kind: service
+        tier: worker
+        svc: k8s:deployment
+        realizes:
+          - order-api
+        description: 同一の注文 API を複数レプリカで実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7
+      ocp-service:
+        label: 注文 API の ClusterIP Service
+        kind: lb
+        tier: edge
+        svc: k8s:service
+        realizes:
+          - service
+        description: Route の参照先を定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7
+      ocp-route:
+        label: TLS Route と HAProxy Router
+        kind: lb
+        tier: edge
+        realizes:
+          - route
+        description: Route のホスト名を受け、選択された Service のエンドポイントへ送る。
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7
+      ocp-dns:
+        label: apps ドメインのワイルドカード DNS
+        kind: service
+        tier: edge
+        description: ルートのホスト名を Ingress Controller の到達先で解決する。
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7
+    links:
+      - id: ocp-resolve-router
+        from: ocp-dns
+        to: ocp-route
+        label: 公開ホスト名を解決
+        evidence:
+          - type: doc
+            ref: docs/reference-openshift.md#§7

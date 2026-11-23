@@ -14,12 +14,12 @@ tiers:
   - {id: operation, label: 同期運用, z: 1, origin: [0,0], size: [16,4]}
 nodes:
   source: {label: 基幹 DB, kind: external, tier: flow, x: 1, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§2}]}
-  connector: {label: Fivetran Connector, kind: worker, tier: flow, x: 4, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§3}]}
-  initial: {label: Initial sync, kind: service, tier: flow, x: 7, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§2}]}
-  incremental: {label: Incremental sync, kind: service, tier: flow, x: 10, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
-  destination: {label: クラウドデータウェアハウス, kind: db, tier: flow, x: 13, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§4}]}
-  cursor: {label: 進捗 cursor, kind: db, tier: operation, x: 6, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
-  transform: {label: Destination 上の変換, kind: service, tier: operation, x: 12, y: 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§5}]}
+  connector: {label: 取り込み接続, kind: worker, tier: flow, x: 4, 'y': 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§3}]}
+  initial: {label: 履歴の初回同期, kind: service, tier: flow, x: 7, 'y': 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§2}]}
+  incremental: {label: 更新分の同期, kind: service, tier: flow, x: 10, 'y': 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
+  destination: {label: 分析用ウェアハウス, kind: db, tier: flow, x: 13, 'y': 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}, {type: doc, ref: docs/reference-fivetran.md#§4}]}
+  cursor: {label: 同期の進捗位置, kind: db, tier: operation, x: 6, 'y': 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§3}]}
+  transform: {label: ロード後の SQL 変換, kind: service, tier: operation, x: 12, 'y': 2, evidence: [{type: doc, ref: docs/reference-fivetran.md#§5}]}
 links:
   - {id: extract, from: source, to: connector, label: データを抽出, evidence: [{type: doc, ref: docs/reference-fivetran.md#§1}]}
   - {id: historical, from: connector, to: initial, label: 履歴を初回同期, evidence: [{type: doc, ref: docs/reference-fivetran.md#§2}]}
@@ -50,3 +50,28 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 失敗と再同期を区別, text: 通常の増分同期と整合性修復を混同しない。, links: [position, historical, load], evidence: [{type: doc, ref: docs/reference-fivetran.md#§5}]}
 unknowns: [{id: UNK-01, text: Connector 種別・同期間隔・Destination 製品名は確定していない。, refs: [extract, load-incremental]}]
 gates: {maxDrift: 0, maxHigh: 0}
+
+implementations:
+  - id: postgres-snowflake
+    label: "Fivetran の PostgreSQL → Snowflake 同期"
+    description: "Fivetran のマネージド接続で PostgreSQL を初回同期し、利用条件を満たす環境で論理レプリケーションによる増分同期を行う例。ロード後に dbt 変換を実行する。"
+    sources:
+      - {title: Get Started with Fivetran, url: https://fivetran.com/docs/getting-started/quickstart}
+      - {title: Sync Overview, url: https://fivetran.com/docs/core-concepts/syncoverview}
+      - {title: Fivetran Glossary, url: https://fivetran.com/docs/getting-started/glossary}
+      - {title: Supported Destinations, url: https://fivetran.com/docs/destinations}
+      - {title: Fivetran PostgreSQL Connector, url: https://fivetran.com/docs/connectors/databases/postgresql}
+      - {title: Fivetran Snowflake destination, url: https://fivetran.com/docs/destinations/snowflake}
+      - {title: Fivetran Transformations for dbt, url: https://fivetran.com/docs/transformations/dbt}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      postgres-snowflake-pg: {label: PostgreSQL の業務テーブル, kind: db, tier: processing, x: 1, y: 1.15, realizes: [source], description: 同期対象の注文テーブルと変更を提供する。, evidence: [{type: doc, ref: docs/reference-fivetran.md#§6}]}
+      postgres-snowflake-connection: {label: Fivetran PostgreSQL 接続, kind: service, tier: processing, x: 1, y: 3.65, realizes: [connector, initial, incremental, cursor], description: 初回同期と増分同期を担当し、接続単位の進捗を管理する。, evidence: [{type: doc, ref: docs/reference-fivetran.md#§6}]}
+      postgres-snowflake-snowflake: {label: Snowflake のロード先と変換結果, kind: db, tier: processing, x: 5, y: 1.15, realizes: [destination, transform], description: 同期先を raw スキーマとし、変換 SQL はターゲット側で処理する。, evidence: [{type: doc, ref: docs/reference-fivetran.md#§6}]}
+      postgres-snowflake-publication: {label: PostgreSQL の論理レプリケーション設定, kind: policy, tier: setup, x: 1, y: 1.5, description: 同期テーブルを公開し、コネクターが対象の変更を受け取れるようにする。, evidence: [{type: doc, ref: docs/reference-fivetran.md#§6}]}
+      postgres-snowflake-dbt: {label: Git の dbt プロジェクト, kind: file, tier: setup, x: 5, y: 1.5, description: 同期後に変換を実行する場合のモデル定義を保持する。, evidence: [{type: doc, ref: docs/reference-fivetran.md#§6}]}
+    links:
+      - {id: postgres-snowflake-publication-connection, from: postgres-snowflake-publication, to: postgres-snowflake-connection, label: 変更捕捉の対象を指定}
+      - {id: postgres-snowflake-dbt-connection, from: postgres-snowflake-dbt, to: postgres-snowflake-snowflake, label: 変換モデルを適用}

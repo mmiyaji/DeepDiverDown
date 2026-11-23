@@ -39,3 +39,25 @@ Sink は集計結果をファイルやテーブルなどへ書く。出力モー
 ## 7. シナリオ
 
 「Kafka から窓集計・再開」シナリオをクリックすると、入力、処理、出力、障害復旧の順に追える。
+
+## 8. 実装例：Structured Streaming・Kafka・Parquet
+
+Kafka の注文イベントを窓で集計し、確定した集計行を Parquet に保存するマイクロバッチの例。出力先とクエリ固有のチェックポイント先は別パスにする。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| ストリーム入力 | Kafka orders トピック | Spark Kafka ソースが分割ごとの読み取り位置を管理する。 |
+| クエリの調整プロセス | Spark Driver のストリーミングクエリ | クエリのトリガーごとにマイクロバッチを起動する。 |
+| 分散タスクの実行担当、時間窓ごとの状態 | Executor JVM の窓集計と State Store | ウィンドウとキーに対応する状態をタスクで更新する。 |
+| 集計結果の出力先 | 共有ファイルシステムの Parquet 出力 | ウォーターマークで確定した窓結果を Append モードで保存する。 |
+| 進捗と状態の復旧領域 | クエリ固有の checkpointLocation | クエリ進捗と状態ストアの復旧に必要なデータを保持する。 |
+
+実装で加わる部品を以下に示す。
+
+- Spark SQL 用 Kafka コネクター。Spark と Scala に合う Kafka コネクターをアプリケーションに組み込む。
+
+公式資料
+
+- [Structured Streaming Programming Guide](https://spark.apache.org/docs/latest/streaming/index.html)
+- [Structured Streaming Getting Started](https://spark.apache.org/docs/latest/streaming/getting-started.html)
+- [Structured Streaming + Kafka Integration Guide](https://spark.apache.org/docs/latest/streaming/structured-streaming-kafka-integration.html)

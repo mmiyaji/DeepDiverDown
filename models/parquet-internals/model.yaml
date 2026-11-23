@@ -21,28 +21,28 @@ tiers:
 groups:
   - {kind: parallel, label: 必要な列チャンクを並列に範囲 GET, tier: file, nodes: [rowgroup, colchunk]}
 nodes:
-  reader: {label: Parquet Reader, kind: worker, tier: reader, x: 2, y: 1.5, slots: 4, description: 範囲 GET でフッター、索引、列チャンクを順に取る。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  decoder: {label: Decompress / Decode, kind: worker, tier: reader, x: 10, y: 1.5, description: ページを解凍し、レベルと値（辞書・RLE・差分）をデコードする。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}]}
+  reader: {label: 列データの読み取り役, kind: worker, tier: reader, x: 2, y: 1.5, slots: 4, description: 範囲読み取りでフッター、索引、列チャンクを順に取得する。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  decoder: {label: 列データの解凍・復号, kind: worker, tier: reader, x: 10, 'y': 1.5, description: ページを解凍し、レベルと値（辞書・RLE・差分）をデコードする。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
   magic: {label: "Header \"PAR1\"", kind: segment, tier: file, x: 0, y: 1.5, description: 先頭 4 バイトのマジックだけ。ファイルの説明は持たない。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§2"}]}
   rowgroup: {label: Row Groups, kind: segment, tier: file, x: 3, y: 1.5, partitions: 4, description: 行の塊。分割と並列読みの単位。各 Row Group に列ごとの列チャンクがある。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§2"}, {type: doc, ref: "docs/reference-parquet-internals.md#§7"}]}
-  colchunk: {label: Column Chunks, kind: segment, tier: file, x: 6, y: 1.5, partitions: 3, description: 1 Row Group × 1 列のバイト範囲。必要な列だけを範囲 GET する。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
+  colchunk: {label: Column Chunks, kind: segment, tier: file, x: 6, y: 1.5, partitions: 3, description: 1 行グループの 1 列を格納したバイト範囲。必要な列だけを読む。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
   indexes: {label: Bloom / Column / Offset Index, kind: segment, tier: file, x: 9, y: 0.5, description: 任意の索引。ブルームフィルターで等値検索の Row Group を、ページ索引でページを読み飛ばす。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
   footer: {label: Footer (FileMetaData), kind: segment, tier: file, x: 12, y: 1.5, description: Thrift で符号化されたスキーマ、Row Group と列チャンクの位置、統計、索引の位置。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§3"}]}
   tail: {label: "Footer length + \"PAR1\"", kind: segment, tier: file, x: 14, y: 1.5, description: 末尾 8 バイト。フッターの長さを知るために最初に読む。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§2"}, {type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
   dictpage: {label: Dictionary Page, kind: segment, tier: chunk, x: 3, y: 1.5, description: 列チャンク先頭に最大 1 つ。値の一覧を一度だけ持つ。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}]}
   datapage: {label: Data Pages, kind: segment, tier: chunk, x: 7, y: 1.5, partitions: 4, description: "ページヘッダー＋繰り返しレベル・定義レベル・値。圧縮はページ単位。", evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}, {type: doc, ref: "docs/reference-parquet-internals.md#§6"}]}
 links:
-  - {id: read-tail, from: reader, to: tail, label: ① 末尾 8 バイトを範囲 GET, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  - {id: read-footer, from: reader, to: footer, label: ② フッターを読む, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§3"}, {type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  - {id: prune-rg, from: footer, to: rowgroup, label: ③ 統計で Row Group を選ぶ, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  - {id: read-index, from: reader, to: indexes, label: ④ ブルーム・ページ索引, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  - {id: select-chunk, from: rowgroup, to: colchunk, label: 必要な列だけ, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  - {id: fetch-chunk, from: reader, to: colchunk, label: ⑤ 列チャンクを範囲 GET, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  - {id: chunk-dict, from: colchunk, to: dictpage, label: 先頭の辞書ページ, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}]}
-  - {id: chunk-data, from: colchunk, to: datapage, label: 続くデータページ, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}]}
-  - {id: decode, from: decoder, to: datapage, label: ⑥ 解凍・デコード, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}, {type: doc, ref: "docs/reference-parquet-internals.md#§6"}]}
-  - {id: dict-lookup, from: decoder, to: dictpage, label: 辞書番号を値へ, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}]}
-  - {id: to-decoder, from: reader, to: decoder, label: 取得したバイト列, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
+  - {id: read-tail, from: reader, to: tail, label: ① 末尾 8 バイトを範囲読み取り, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  - {id: read-footer, from: reader, to: footer, label: ② フッターを読む, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§3}, {type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  - {id: prune-rg, from: footer, to: rowgroup, label: ③ 統計で Row Group を選ぶ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  - {id: read-index, from: reader, to: indexes, label: ④ ブルーム・ページ索引, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  - {id: select-chunk, from: rowgroup, to: colchunk, label: 必要な列だけ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  - {id: fetch-chunk, from: reader, to: colchunk, label: ⑤ 列チャンクを範囲読み取り, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  - {id: chunk-dict, from: colchunk, to: dictpage, label: 先頭の辞書ページ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
+  - {id: chunk-data, from: colchunk, to: datapage, label: 続くデータページ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
+  - {id: decode, from: decoder, to: datapage, label: ⑥ 解凍・デコード, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}, {type: doc, ref: docs/reference-parquet-internals.md#§6}]}
+  - {id: dict-lookup, from: decoder, to: dictpage, label: 辞書番号を値へ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
+  - {id: to-decoder, from: reader, to: decoder, label: 取得したバイト列, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
 scenarios:
   - id: open-file
     label: ファイルを開く（フッターを読む）
@@ -194,3 +194,24 @@ fileLayout:
       children:
         - {id: tail-len, label: フッター長, bytes: 4, kind: magic, node: tail, sample: "00 60 00 00    → 24,576 バイト（リトルエンディアン）"}
         - {id: tail-magic, label: "\"PAR1\"", bytes: 4, kind: magic, node: tail, sample: "50 41 52 31    |PAR1|"}
+
+implementations:
+  - id: trino-hive
+    label: "S3 上の Parquet を Trino Hive で読む"
+    description: "Trino Hive カタログから S3 の Parquet ファイルを読む例。索引の動作はファイルの書き手、利用できる統計、述語、読取側の設定に依存する。"
+    sources:
+      - {title: Parquet File Format, url: https://parquet.apache.org/docs/file-format/}
+      - {title: Parquet Page Index, url: https://parquet.apache.org/docs/file-format/pageindex/}
+      - {title: Parquet Bloom Filter, url: https://parquet.apache.org/docs/file-format/bloomfilter/}
+      - {title: Parquet Data Pages, url: https://parquet.apache.org/docs/file-format/data-pages/}
+      - {title: Trino object storage file formats, url: https://trino.io/docs/current/object-storage/file-formats.html}
+      - {title: Trino Hive connector, url: https://trino.io/docs/current/connector/hive.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      trino-hive-trino: {label: Trino Worker の Parquet Reader, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [reader, decoder], description: 対象の列、行グループ、索引が使えるページを見つけ、取得したデータを解凍して復号する。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§9}]}
+      trino-hive-file: {label: S3 上の Parquet オブジェクト, kind: file, tier: processing, x: 1, y: 3.65, svc: s3, realizes: [magic, rowgroup, colchunk, indexes, footer, tail, dictpage, datapage], description: ファイルの末尾と各区画を同じオブジェクト内に保持する。辞書や索引は存在する場合に使う。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§9}]}
+      trino-hive-catalog: {label: Hive カタログの読取設定, kind: catalog, tier: setup, x: 1, y: 1.5, description: Parquet の列索引やブルームフィルターを使用する設定を確認する。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§9}]}
+    links:
+      - {id: trino-hive-catalog-connection, from: trino-hive-catalog, to: trino-hive-trino, label: 読み取りの設定を適用}

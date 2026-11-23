@@ -44,3 +44,25 @@ WHERE slot_type = 'logical';
 - [PostgreSQL 18 pg_replication_slots](https://www.postgresql.org/docs/18/view-pg-replication-slots.html)
 - [PostgreSQL 18 Logical Replication Publications](https://www.postgresql.org/docs/18/logical-replication-publication.html)
 - [Debezium PostgreSQL Connector](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
+
+## 7. 実装例：PostgreSQL 18・Debezium・Kafka Connect
+
+PostgreSQL 18 の論理デコードを pgoutput で公開し、Debezium を配置した分散 Kafka Connect が注文の変更を送る例。データベースの保持状態とコネクターの進捗を分ける。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 注文トランザクション、WAL、論理スロット、Publication、論理デコーダと出力プラグイン | PostgreSQL 18 Primary と pgoutput | 注文テーブル、WAL、論理スロット、Publication、組み込みプラグインは同じ PostgreSQL インスタンスが担う。 |
+| 変更データ捕捉タスク | 分散 Kafka Connect の Debezium Source Task | 確認済みの進捗を保持し、変更イベントを Kafka へ発行する。 |
+| 捕捉タスクの永続オフセット、下流の変更イベントログ | Kafka の CDC トピックと Connect 内部トピック | 業務イベントと、分散 Connect のソースオフセットを別のトピックに保持する。 |
+
+実装で加わる部品を以下に示す。
+
+- pg_replication_slots の監視。restart_lsn と confirmed_flush_lsn、wal_status を監視し、停止中の保持と消失の兆候を区別する。
+
+公式資料
+
+- [PostgreSQL 18 Logical Decoding Concepts](https://www.postgresql.org/docs/18/logicaldecoding-explanation.html)
+- [PostgreSQL 18 pg_replication_slots](https://www.postgresql.org/docs/18/view-pg-replication-slots.html)
+- [PostgreSQL 18 Logical Replication Publications](https://www.postgresql.org/docs/18/logical-replication-publication.html)
+- [Debezium PostgreSQL Connector](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
+- [Kafka Connect Distributed mode](https://kafka.apache.org/44/kafka-connect/user-guide/)

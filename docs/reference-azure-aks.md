@@ -41,3 +41,25 @@ AKS のフルアップグレードはコントロールプレーンを先に更�
 - [Create node pools](https://learn.microsoft.com/azure/aks/create-node-pools)
 - [Use system node pools](https://learn.microsoft.com/azure/aks/use-system-pools)
 - [Upgrade the AKS control plane](https://learn.microsoft.com/azure/aks/upgrade-aks-control-plane)
+
+## 9. 実装例：AKS Standard・ACR・Load Balancer
+AKS のシステムプールとユーザープールを分け、ユーザープール上の注文 API を LoadBalancer Service で公開する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 運用者 | kubectl と Microsoft Entra ID |
+| マネージド制御 API | AKS マネージド制御プレーン |
+| 基盤用ノード群 | Azure VM Scale Set（System） |
+| アプリ用ノード群 | Azure VM Scale Set（User） |
+| 注文 API の実行単位 | 注文 API Deployment / Pod |
+| アプリ公開・振り分け | Azure Standard Load Balancer |
+| コンテナイメージの保管 | Azure Container Registry |
+
+- **注文 API の LoadBalancer Service**。クラウド側ロードバランサーと Kubernetes 側エンドポイントを対応させる。
+
+ユーザープールへの配置はマニフェストで指定する。システムプールへのアプリ配置を厳格に防ぐ場合は taint と toleration の設計も必要。
+
+公式資料
+- [AKS core concepts](https://learn.microsoft.com/azure/aks/core-aks-concepts)
+- [AKS baseline architecture](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks)
+- [Use a Standard Load Balancer in AKS](https://learn.microsoft.com/en-us/azure/aks/load-balancer-standard)

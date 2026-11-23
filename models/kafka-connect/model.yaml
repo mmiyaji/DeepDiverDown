@@ -15,30 +15,24 @@ tiers:
   - {"id": "flow","label": "受注データの流れ","z": 0,"size": [16,3]}
   - {"id": "operation","label": "実行と進捗","z": 1,"origin": [4,0],"size": [8,3]}
 nodes:
-  database:
-    {"label": "外部DB（PostgreSQL）","kind": "db","tier": "flow","x": 0,"y": 1.5,"description": "受注テーブルと変更ログを持つ。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§2"}]}
-  source:
-    {"label": "Source Connector","kind": "worker","shape3D": "plug","tier": "flow","x": 4,"y": 1.5,"description": "Debezium の Source Task が既存データと変更を取り込む例。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§2"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§3"}]}
-  kafka:
-    {"label": "Kafka Topic","kind": "queue","tier": "flow","x": 8,"y": 1.5,"description": "受注データのイベントを保持し、Sink Task から読み出せるようにする。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§3"}]}
-  sink:
-    {"label": "Sink Connector","kind": "worker","shape3D": "plug","tier": "flow","x": 12,"y": 1.5,"description": "Sink Task が Kafka を購読し、保存先へ書き込む。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"},{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
+  database: {label: 外部の業務データベース, kind: db, tier: flow, x: 0, 'y': 1.5, description: 受注テーブルと変更ログを持つ。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§2}]}
+  source: {label: 取り込みアダプター, kind: worker, shape3D: plug, tier: flow, x: 4, y: 1.5, description: 既存データと後続の変更を業務データベースから取り込む。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§1}, {type: doc, ref: docs/reference-kafka-connect.md#§2}, {type: doc, ref: docs/reference-kafka-connect.md#§3}]}
+  kafka: {label: 変更イベントのログ, kind: queue, tier: flow, x: 8, y: 1.5, description: 受注データのイベントを保持し、出力アダプターの読み取りに応じる。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§3}]}
+  sink: {label: 出力アダプター, kind: worker, shape3D: plug, tier: flow, x: 12, y: 1.5, description: イベントログを購読し、対象を保存先へ書き込む。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§1}, {type: doc, ref: docs/reference-kafka-connect.md#§4}]}
   destination:
     {"label": "保存先（オブジェクトストレージ）","kind": "db","shape3D": "crate","tier": "flow","x": 16,"y": 1.5,"description": "受注イベントを下流の処理や分析用に保存する例。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
-  worker:
-    {"label": "Connect Worker","kind": "service","tier": "operation","x": 1,"y": 1.5,"description": "Connector に対応する Task を実行する。図は分散実行基盤の代表点。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"}]}
-  offsets:
-    {"label": "Kafka 上の進捗","kind": "db","tier": "operation","x": 7,"y": 1.5,"description": "Source オフセットと Sink の Consumer Group オフセットを模式的にまとめたもの。","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
+  worker: {label: タスク実行基盤, kind: service, tier: operation, x: 1, y: 1.5, description: アダプターのタスクを起動し、実行を分担する。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§1}]}
+  offsets: {label: 再開位置の保存領域, kind: db, tier: operation, x: 7, y: 1.5, description: 入力元の位置と下流の購読位置を模式的に表す。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§5}]}
 links:
-  - {"id": "start-source","from": "worker","to": "source","label": "Source Task を実行","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"}]}
-  - {"id": "start-sink","from": "worker","to": "sink","label": "Sink Task を実行","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§1"}]}
-  - {"id": "capture","from": "database","to": "source","label": "スナップショット・変更取得","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§2"}]}
-  - {"id": "publish","from": "source","to": "kafka","label": "イベントを発行","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§3"}]}
-  - {"id": "fetch","from": "kafka","to": "sink","label": "取得したイベント","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
-  - {"id": "write","from": "sink","to": "destination","label": "保存先に書き込む","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§4"}]}
-  - {"id": "source-offset","from": "source","to": "offsets","label": "ソース位置を記録","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
-  - {"id": "sink-offset","from": "sink","to": "offsets","label": "Consumer Group の位置をコミット","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
-  - {"id": "resume","from": "offsets","to": "sink","label": "コミット済み位置から再開","evidence": [{"type": "doc","ref": "docs/reference-kafka-connect.md#§5"}]}
+  - {id: start-source, from: worker, to: source, label: 取り込みタスクを起動, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§1}]}
+  - {id: start-sink, from: worker, to: sink, label: 出力タスクを起動, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§1}]}
+  - {id: capture, from: database, to: source, label: スナップショット・変更取得, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§2}]}
+  - {id: publish, from: source, to: kafka, label: イベントを発行, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§3}]}
+  - {id: fetch, from: kafka, to: sink, label: 取得したイベント, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§4}]}
+  - {id: write, from: sink, to: destination, label: 保存先に書き込む, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§4}]}
+  - {id: source-offset, from: source, to: offsets, label: ソース位置を記録, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§5}]}
+  - {id: sink-offset, from: sink, to: offsets, label: 購読グループの位置を記録, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§5}]}
+  - {id: resume, from: offsets, to: sink, label: コミット済み位置から再開, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§5}]}
 scenarios:
   - id: delivery
     label: 外部DBから保存先まで
@@ -57,3 +51,28 @@ scenarios:
       - {"links": ["start-sink","resume"],"note": "再開。Sink Task が再起動すると、コミット済みの位置を参照する。"}
       - {"links": ["fetch","write"],"note": "再取得。保存済みでも進捗が未コミットだった範囲は、再び取得・処理される場合がある。"}
       - {"links": ["sink-offset"],"note": "進捗をコミット。再処理時に重複を防げるかは、コネクターと出力方式に依存する。"}
+
+implementations:
+  - id: distributed
+    label: "Kafka Connect Distributed と S3"
+    description: "PostgreSQL の変更を Debezium で取り込み、Kafka Connect の分散ワーカー上の S3 Sink でバケットへ格納する例。ワーカー設定の内部トピックと業務イベントのトピックは用途が異なる。"
+    sources:
+      - {title: Kafka Connect Overview, url: https://kafka.apache.org/44/kafka-connect/overview/}
+      - {title: Kafka Connect User Guide, url: https://kafka.apache.org/44/kafka-connect/user-guide/}
+      - {title: Debezium Connector for PostgreSQL, url: https://debezium.io/documentation/reference/stable/connectors/postgresql.html}
+      - {title: Confluent S3 Sink Connector, url: https://docs.confluent.io/kafka-connectors/s3-sink/current/overview.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      distributed-pg: {label: PostgreSQL の注文テーブル, kind: db, tier: processing, x: 1, y: 1.15, realizes: [database], description: 論理レプリケーションを有効にしたデータベース。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+      distributed-worker: {label: 分散 Kafka Connect ワーカー, kind: service, tier: processing, x: 1, y: 3.65, realizes: [worker], description: 同じグループに参加し、配置されたソース・シンクタスクを動かす。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+      distributed-source: {label: Debezium PostgreSQL コネクター, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [source], description: 初期同期と WAL の変更イベント化を担う。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+      distributed-sink: {label: Confluent S3 Sink コネクター, kind: worker, tier: processing, x: 5, y: 3.65, realizes: [sink], description: Kafka のイベントを設定した形式でオブジェクトに書く。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+      distributed-kafka: {label: Kafka クラスター, kind: queue, tier: processing, x: 9, y: 1.15, realizes: [kafka, offsets], description: 業務トピック、ソースオフセットトピックおよびコンシューマーグループの位置を保存する。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+      distributed-s3: {label: Amazon S3 バケット, kind: db, tier: processing, x: 9, y: 3.65, svc: s3, realizes: [destination], description: S3 Sink の書き出したオブジェクトを保持する。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+      distributed-plugins: {label: 各ワーカーの plugin.path, kind: file, tier: setup, x: 1, y: 1.5, description: コネクターのプラグインと依存 JAR を各ワーカーに用意する。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+      distributed-configuration: {label: 設定・状態の内部トピック, kind: queue, tier: setup, x: 5, y: 1.5, description: 分散ワーカーのコネクター設定とタスク状態を保存する。, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]}
+    links:
+      - {id: distributed-plugins-connection, from: distributed-plugins, to: distributed-worker, label: ワーカーにプラグインを配置}
+      - {id: distributed-configuration-connection, from: distributed-configuration, to: distributed-worker, label: 設定と状態を共有}

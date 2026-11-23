@@ -2,33 +2,33 @@
   "model": "spark",
   "name": "Apache Spark の基本アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "submitter": {
       "type": "node",
-      "label": "spark-submit",
+      "label": "アプリケーションの投入元",
       "status": "claim"
     },
     "driver": {
       "type": "node",
-      "label": "Driver",
+      "label": "ジョブの調整プロセス",
       "status": "claim"
     },
     "manager": {
       "type": "node",
-      "label": "Cluster Manager",
+      "label": "クラスター資源管理",
       "status": "claim"
     },
     "executor-a": {
       "type": "node",
-      "label": "Executor A",
+      "label": "タスク実行担当 A",
       "status": "claim"
     },
     "executor-b": {
       "type": "node",
-      "label": "Executor B",
+      "label": "タスク実行担当 B",
       "status": "claim"
     },
     "input": {
@@ -43,57 +43,57 @@
     },
     "submit": {
       "type": "link",
-      "label": "spark-submit → Driver",
+      "label": "アプリケーションの投入元 → ジョブの調整プロセス",
       "status": "claim"
     },
     "allocate": {
       "type": "link",
-      "label": "Driver → Cluster Manager",
+      "label": "ジョブの調整プロセス → クラスター資源管理",
       "status": "claim"
     },
     "start-a": {
       "type": "link",
-      "label": "Cluster Manager → Executor A",
+      "label": "クラスター資源管理 → タスク実行担当 A",
       "status": "claim"
     },
     "start-b": {
       "type": "link",
-      "label": "Cluster Manager → Executor B",
+      "label": "クラスター資源管理 → タスク実行担当 B",
       "status": "claim"
     },
     "task-a": {
       "type": "link",
-      "label": "Driver → Executor A",
+      "label": "ジョブの調整プロセス → タスク実行担当 A",
       "status": "claim"
     },
     "task-b": {
       "type": "link",
-      "label": "Driver → Executor B",
+      "label": "ジョブの調整プロセス → タスク実行担当 B",
       "status": "claim"
     },
     "read-a": {
       "type": "link",
-      "label": "入力データ → Executor A",
+      "label": "入力データ → タスク実行担当 A",
       "status": "claim"
     },
     "read-b": {
       "type": "link",
-      "label": "入力データ → Executor B",
+      "label": "入力データ → タスク実行担当 B",
       "status": "claim"
     },
     "shuffle": {
       "type": "link",
-      "label": "Executor A → Executor B",
+      "label": "タスク実行担当 A → タスク実行担当 B",
       "status": "claim"
     },
     "write-a": {
       "type": "link",
-      "label": "Executor A → 集計結果",
+      "label": "タスク実行担当 A → 集計結果",
       "status": "claim"
     },
     "write-b": {
       "type": "link",
-      "label": "Executor B → 集計結果",
+      "label": "タスク実行担当 B → 集計結果",
       "status": "claim"
     },
     "spark-batch": {
@@ -103,6 +103,61 @@
     "spark-recompute": {
       "type": "scenario",
       "label": "パーティション喪失からの再計算"
+    },
+    "standalone-submit": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "spark-submit",
+      "realizes": [
+        "submitter"
+      ]
+    },
+    "standalone-master": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "Standalone Master",
+      "realizes": [
+        "manager"
+      ]
+    },
+    "standalone-driver": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "Worker 上の Driver JVM",
+      "realizes": [
+        "driver"
+      ]
+    },
+    "standalone-host-a": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "Worker A 上の Executor JVM",
+      "realizes": [
+        "executor-a"
+      ]
+    },
+    "standalone-host-b": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "Worker B 上の Executor JVM",
+      "realizes": [
+        "executor-b"
+      ]
+    },
+    "standalone-files": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "HDFS 上の入力・出力パス",
+      "realizes": [
+        "input",
+        "output"
+      ]
+    },
+    "standalone-jar": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "アプリケーション JAR",
+      "realizes": []
     }
   },
   "byRef": {
@@ -131,7 +186,14 @@
       "write-a",
       "write-b",
       "spark-batch",
-      "spark-recompute"
+      "spark-recompute",
+      "standalone-submit",
+      "standalone-master",
+      "standalone-driver",
+      "standalone-host-a",
+      "standalone-host-b",
+      "standalone-files",
+      "standalone-jar"
     ],
     "docs/reference-spark.md#§2": [
       "submitter",
@@ -167,11 +229,22 @@
       "task-b",
       "read-b",
       "spark-recompute"
+    ],
+    "docs/reference-spark.md#§8": [
+      "standalone-submit",
+      "standalone-master",
+      "standalone-driver",
+      "standalone-host-a",
+      "standalone-host-b",
+      "standalone-files",
+      "standalone-jar"
     ]
   },
   "reference": {
-    "category": "バッチ処理",
+    "category": "バッチ・SQL エンジン",
     "order": 10,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Driver、Cluster Manager、Executor の役割を区別する。",
       "バッチ処理の投入から結果保存までを追う。",

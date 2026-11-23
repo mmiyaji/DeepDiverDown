@@ -41,3 +41,25 @@ AWS が API server、scheduler、controller manager、etcd を含むコントロ
 - [Managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
 - [Update a managed node group](https://docs.aws.amazon.com/eks/latest/userguide/update-managed-node-group.html)
 - [What is Amazon EKS?](https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html)
+
+## 9. 実装例：EKS Managed Node Group と ALB
+AWS の EKS クラスタで、プライベートサブネットの Managed Node Group に注文 API を置き、Ingress で公開する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 運用者 | kubectl と IAM の運用ロール |
+| マネージド制御 API | Amazon EKS マネージド制御プレーン |
+| アプリ用の管理対象ノード群 | Managed Node Group の EC2 |
+| 注文 API の実行単位 | 注文 API Deployment / Pod |
+| アプリ公開・振り分け | Application Load Balancer |
+| コンテナイメージの保管 | Amazon ECR リポジトリ |
+| 実行状態の監視 | CloudWatch Container Insights |
+
+- **AWS Load Balancer Controller**。Ingress を監視し、ALB とターゲット登録を調整する。
+
+ALB の IP ターゲット方式を選ぶ。公開ステップではコントローラーによるターゲットの調整と、ALB から Pod IP への HTTP 転送を示す。コントローラーの IAM 権限とサブネットの選択を確認する。
+
+公式資料
+- [Amazon EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
+- [Application Load Balancers on EKS](https://docs.aws.amazon.com/eks/latest/userguide/alb-ingress.html)
+- [CloudWatch Observability EKS add-on](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/install-CloudWatch-Observability-EKS-addon.html)

@@ -2,8 +2,8 @@
   "model": "fabric-onelake-catalog",
   "name": "Microsoft Fabric OneLake catalog の発見とガバナンス",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "consumer": {
@@ -18,22 +18,22 @@
     },
     "explore": {
       "type": "node",
-      "label": "Explore",
+      "label": "資産の発見",
       "status": "claim"
     },
     "govern": {
       "type": "node",
-      "label": "Govern",
+      "label": "ガバナンス状態の管理",
       "status": "claim"
     },
     "secure": {
       "type": "node",
-      "label": "Secure",
+      "label": "アクセス権限の管理",
       "status": "claim"
     },
     "items": {
       "type": "node",
-      "label": "Fabric アイテム",
+      "label": "分析アセット",
       "status": "claim"
     },
     "workspaces": {
@@ -43,7 +43,7 @@
     },
     "roles": {
       "type": "node",
-      "label": "OneLake セキュリティロール",
+      "label": "データアクセスロール",
       "status": "claim"
     },
     "engine": {
@@ -53,42 +53,42 @@
     },
     "search": {
       "type": "link",
-      "label": "データ利用者 → Explore",
+      "label": "データ利用者 → 資産の発見",
       "status": "claim"
     },
     "metadata": {
       "type": "link",
-      "label": "Explore → Fabric アイテム",
+      "label": "資産の発見 → 分析アセット",
       "status": "claim"
     },
     "request": {
       "type": "link",
-      "label": "データ利用者 → Explore",
+      "label": "データ利用者 → 資産の発見",
       "status": "claim"
     },
     "monitor": {
       "type": "link",
-      "label": "管理者・所有者 → Govern",
+      "label": "管理者・所有者 → ガバナンス状態の管理",
       "status": "claim"
     },
     "domains": {
       "type": "link",
-      "label": "Govern → ドメイン・ワークスペース",
+      "label": "ガバナンス状態の管理 → ドメイン・ワークスペース",
       "status": "claim"
     },
     "review": {
       "type": "link",
-      "label": "管理者・所有者 → Secure",
+      "label": "管理者・所有者 → アクセス権限の管理",
       "status": "claim"
     },
     "workspace-role": {
       "type": "link",
-      "label": "Secure → ドメイン・ワークスペース",
+      "label": "アクセス権限の管理 → ドメイン・ワークスペース",
       "status": "claim"
     },
     "configure": {
       "type": "link",
-      "label": "Secure → OneLake セキュリティロール",
+      "label": "アクセス権限の管理 → データアクセスロール",
       "status": "claim"
     },
     "query": {
@@ -98,12 +98,12 @@
     },
     "authorize": {
       "type": "link",
-      "label": "対応クエリエンジン → OneLake セキュリティロール",
+      "label": "対応クエリエンジン → データアクセスロール",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "対応クエリエンジン → Fabric アイテム",
+      "label": "対応クエリエンジン → 分析アセット",
       "status": "claim"
     },
     "discover-report": {
@@ -119,6 +119,70 @@
       "kind": "rule",
       "label": "利用者の権限をクエリに適用すること",
       "status": "claim"
+    },
+    "fabric-managed-reader": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "レポートを探す分析担当者",
+      "realizes": [
+        "consumer"
+      ]
+    },
+    "fabric-managed-admin": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "Fabric ワークスペース管理者",
+      "realizes": [
+        "admin"
+      ]
+    },
+    "fabric-managed-catalog": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "OneLake catalog（Explore・Govern・Secure）",
+      "realizes": [
+        "explore",
+        "govern",
+        "secure"
+      ]
+    },
+    "fabric-managed-items": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "Power BI レポートと Lakehouse",
+      "realizes": [
+        "items"
+      ]
+    },
+    "fabric-managed-workspace": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "Fabric ドメイン・ワークスペース",
+      "realizes": [
+        "workspaces"
+      ]
+    },
+    "fabric-managed-roles": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "OneLake Security",
+      "realizes": [
+        "roles"
+      ]
+    },
+    "fabric-managed-sql": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "SQL 分析エンドポイント",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "fabric-managed-identity": {
+      "type": "implementation",
+      "impl": "fabric-managed",
+      "label": "Microsoft Entra ID",
+      "realizes": []
     }
   },
   "byRef": {
@@ -149,7 +213,15 @@
       "read",
       "discover-report",
       "query-secured",
-      "R-01"
+      "R-01",
+      "fabric-managed-reader",
+      "fabric-managed-admin",
+      "fabric-managed-catalog",
+      "fabric-managed-items",
+      "fabric-managed-workspace",
+      "fabric-managed-roles",
+      "fabric-managed-sql",
+      "fabric-managed-identity"
     ],
     "docs/reference-fabric-onelake-catalog.md#§2": [
       "consumer",
@@ -183,6 +255,16 @@
     "docs/reference-fabric-onelake-catalog.md#§5": [
       "discover-report",
       "query-secured"
+    ],
+    "docs/reference-fabric-onelake-catalog.md#§6": [
+      "fabric-managed-reader",
+      "fabric-managed-admin",
+      "fabric-managed-catalog",
+      "fabric-managed-items",
+      "fabric-managed-workspace",
+      "fabric-managed-roles",
+      "fabric-managed-sql",
+      "fabric-managed-identity"
     ]
   },
   "reference": {

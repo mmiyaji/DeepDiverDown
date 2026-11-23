@@ -2,8 +2,8 @@
   "model": "shuffle-skew",
   "name": "分散実行：シャッフルとデータスキュー",
   "coverage": {
-    "covered": 3,
-    "total": 3
+    "covered": 4,
+    "total": 4
   },
   "byId": {
     "orders": {
@@ -18,22 +18,22 @@
     },
     "shuffle": {
       "type": "node",
-      "label": "Shuffle Exchange",
+      "label": "結合キーでのデータ再分配",
       "status": "claim"
     },
     "join": {
       "type": "node",
-      "label": "Join タスク・通常",
+      "label": "均等な分割の結合タスク",
       "status": "claim"
     },
     "hot": {
       "type": "node",
-      "label": "Join タスク・偏りあり",
+      "label": "偏った分割の結合タスク",
       "status": "claim"
     },
     "metrics": {
       "type": "node",
-      "label": "タスク実行指標",
+      "label": "実行タスクの観測",
       "status": "claim"
     },
     "result": {
@@ -43,42 +43,42 @@
     },
     "scan-orders": {
       "type": "link",
-      "label": "受注明細・日付範囲 → Shuffle Exchange",
+      "label": "受注明細・日付範囲 → 結合キーでのデータ再分配",
       "status": "claim"
     },
     "scan-customers": {
       "type": "link",
-      "label": "顧客マスタ → Shuffle Exchange",
+      "label": "顧客マスタ → 結合キーでのデータ再分配",
       "status": "claim"
     },
     "exchange": {
       "type": "link",
-      "label": "Shuffle Exchange → Join タスク・通常",
+      "label": "結合キーでのデータ再分配 → 均等な分割の結合タスク",
       "status": "claim"
     },
     "exchange-hot": {
       "type": "link",
-      "label": "Shuffle Exchange → Join タスク・偏りあり",
+      "label": "結合キーでのデータ再分配 → 偏った分割の結合タスク",
       "status": "claim"
     },
     "inspect": {
       "type": "link",
-      "label": "Join タスク・通常 → タスク実行指標",
+      "label": "均等な分割の結合タスク → 実行タスクの観測",
       "status": "claim"
     },
     "inspect-hot": {
       "type": "link",
-      "label": "Join タスク・偏りあり → タスク実行指標",
+      "label": "偏った分割の結合タスク → 実行タスクの観測",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "Join タスク・通常 → 結合結果",
+      "label": "均等な分割の結合タスク → 結合結果",
       "status": "claim"
     },
     "write-hot": {
       "type": "link",
-      "label": "Join タスク・偏りあり → 結合結果",
+      "label": "偏った分割の結合タスク → 結合結果",
       "status": "claim"
     },
     "join-orders": {
@@ -92,6 +92,61 @@
     "broadcast-join": {
       "type": "scenario",
       "label": "ブロードキャスト結合（シャッフルしない）"
+    },
+    "spark-aqe-orders": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "日付で分けた Parquet 受注明細",
+      "realizes": [
+        "orders"
+      ]
+    },
+    "spark-aqe-customers": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "Parquet の顧客マスタ",
+      "realizes": [
+        "customers"
+      ]
+    },
+    "spark-aqe-shuffle": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "Spark SQL の Shuffle Exchange",
+      "realizes": [
+        "shuffle"
+      ]
+    },
+    "spark-aqe-join": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "Spark Executor 上の結合タスク",
+      "realizes": [
+        "join",
+        "hot"
+      ]
+    },
+    "spark-aqe-metrics": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "Spark UI の SQL と Stage",
+      "realizes": [
+        "metrics"
+      ]
+    },
+    "spark-aqe-result": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "出力用 Parquet テーブル",
+      "realizes": [
+        "result"
+      ]
+    },
+    "spark-aqe-config": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "AQE と偏り検出の設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -125,7 +180,14 @@
       "write-hot",
       "join-orders",
       "split-skew",
-      "broadcast-join"
+      "broadcast-join",
+      "spark-aqe-orders",
+      "spark-aqe-customers",
+      "spark-aqe-shuffle",
+      "spark-aqe-join",
+      "spark-aqe-metrics",
+      "spark-aqe-result",
+      "spark-aqe-config"
     ],
     "docs/reference-shuffle-skew.md#§2": [
       "shuffle",
@@ -140,11 +202,22 @@
       "inspect-hot",
       "split-skew",
       "broadcast-join"
+    ],
+    "docs/reference-shuffle-skew.md#§4": [
+      "spark-aqe-orders",
+      "spark-aqe-customers",
+      "spark-aqe-shuffle",
+      "spark-aqe-join",
+      "spark-aqe-metrics",
+      "spark-aqe-result",
+      "spark-aqe-config"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 40,
+    "category": "分散実行と保守",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
     "objectives": [
       "シャッフルが必要になる条件とコストを理解する。",
       "タスクごとのデータ量と実行時間を見比べてスキューを特定する。"

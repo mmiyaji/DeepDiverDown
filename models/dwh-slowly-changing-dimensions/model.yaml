@@ -46,3 +46,26 @@ scenarios:
       - {"links":["key"],"note":"イベント時刻で旧行の代理キーを引く。","travel":"east"}
       - {"links":["history-report"],"note":"遅延注文は発生当時の東地区の売上に入る。","highlight":["east"]}
 timeline: {"title":"顧客 C42 の Type 2 有効期間","current":"east","note":"代理キーは例示。期間は開始を含み、終了を含まない。永続的な削除を表す図ではない。","commits":[{"id":"east","label":"東地区・SK 101","time":"[1/01, 1/20)","kind":"append","node":"history"},{"id":"west","label":"西地区・SK 102","time":"[1/20, 現在)","kind":"append","node":"history"}]}
+
+implementations:
+  - id: postgres-customer-history
+    label: "PostgreSQL の顧客属性履歴"
+    description: "顧客の現在値と履歴を別テーブルで保持し、遅れて届いた注文を発生日時点の顧客属性に結び付ける実装例。"
+    sources:
+      - {title: "Kimball Group の Slowly Changing Dimension 技法", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+      - {title: "Power BI の SCD ガイダンス", url: "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
+      - {title: "PostgreSQL CREATE TABLE", url: "https://www.postgresql.org/docs/current/sql-createtable.html"}
+    tiers:
+      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [15.5,4.5]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+    nodes:
+      example-change: {label: "landing.customer_changes", kind: "table", tier: "flow", x: 0, y: 0, realizes: ["change"], description: "顧客の業務キーと新しい地区、変更発生時刻を受け取る。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      example-ingest: {label: "顧客履歴更新トランザクション", kind: "workflow", tier: "flow", x: 3, y: 1, realizes: ["ingest"], description: "旧履歴の終了と新規履歴の追加を更新処理の同じトランザクションで行う。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      example-current: {label: "dim_customer_current", kind: "table", tier: "flow", x: 7, y: 0, realizes: ["current"], description: "顧客業務キーを主キーとし、現在地区だけを上書きする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      example-history: {label: "dim_customer_history", kind: "table", tier: "flow", x: 7, y: 3, realizes: ["history"], description: "版ごとの代理キーと半開区間の有効期間を持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      example-event: {label: "landing.order_line_updates", kind: "table", tier: "flow", x: 0, y: 4, realizes: ["event"], description: "注文明細の注文日と顧客業務キーを保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      example-fact: {label: "fact_order_line", kind: "table", tier: "flow", x: 11, y: 3, realizes: ["fact"], description: "注文発生時刻の有効期間を照合し、該当する顧客の代理キーを外部キーに持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      example-analytics: {label: "地域別売上 SQL ビュー", kind: "table", tier: "flow", x: 15, y: 1, realizes: ["analytics"], description: "現在地区の見方と注文時点の地区の見方を別々に用意する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      example-check: {label: "有効期間の整合性チェック", kind: "monitor", tier: "implementation-setup", x: 1, y: 1.5, description: "同じ顧客で有効期間が重複しないことを照合する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+    links:
+      - {id: "example-check-connection", from: "example-check", to: "example-history", label: "同時点での二重割り当てを検査", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}

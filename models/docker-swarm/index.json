@@ -2,63 +2,63 @@
   "model": "docker-swarm",
   "name": "Docker Swarm mode サービススケジューリング",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "service": {
       "type": "node",
-      "label": "replicated Service（注文 API）",
+      "label": "レプリカ数と設定の宣言",
       "status": "claim"
     },
     "manager": {
       "type": "node",
-      "label": "Swarm manager",
+      "label": "配置制御の入口",
       "status": "claim"
     },
     "scheduler": {
       "type": "node",
-      "label": "Swarm scheduler",
+      "label": "実行先の決定",
       "status": "claim"
     },
     "task": {
       "type": "node",
-      "label": "API task slot",
+      "label": "コンテナの実行単位",
       "status": "claim"
     },
     "worker": {
       "type": "node",
-      "label": "Swarm worker",
+      "label": "コンテナ実行ノード",
       "status": "claim"
     },
     "update": {
       "type": "node",
-      "label": "UpdateConfig",
+      "label": "ローリング更新方針",
       "status": "claim"
     },
     "desired": {
       "type": "link",
-      "label": "replicated Service（注文 API） → Swarm manager",
+      "label": "レプリカ数と設定の宣言 → 配置制御の入口",
       "status": "claim"
     },
     "assign": {
       "type": "link",
-      "label": "Swarm manager → Swarm scheduler",
+      "label": "配置制御の入口 → 実行先の決定",
       "status": "claim"
     },
     "fill": {
       "type": "link",
-      "label": "Swarm scheduler → API task slot",
+      "label": "実行先の決定 → コンテナの実行単位",
       "status": "claim"
     },
     "run": {
       "type": "link",
-      "label": "API task slot → Swarm worker",
+      "label": "コンテナの実行単位 → コンテナ実行ノード",
       "status": "claim"
     },
     "recover": {
       "type": "link",
-      "label": "Swarm manager → Swarm scheduler",
+      "label": "配置制御の入口 → 実行先の決定",
       "status": "claim"
     },
     "order-api": {
@@ -68,6 +68,52 @@
     "replacement": {
       "type": "scenario",
       "label": "注文 API の置き換え"
+    },
+    "vm-service": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "docker service のサービス仕様",
+      "realizes": [
+        "service"
+      ]
+    },
+    "vm-manager": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "Swarm manager VM 群",
+      "realizes": [
+        "manager",
+        "scheduler"
+      ]
+    },
+    "vm-worker": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "worker VM 上の Docker Engine",
+      "realizes": [
+        "task",
+        "worker"
+      ]
+    },
+    "vm-update": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "Service の UpdateConfig",
+      "realizes": [
+        "update"
+      ]
+    },
+    "vm-ingress": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "ingress routing mesh",
+      "realizes": []
+    },
+    "vm-registry": {
+      "type": "implementation",
+      "impl": "vm",
+      "label": "コンテナレジストリ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -92,7 +138,13 @@
       "run",
       "recover",
       "order-api",
-      "replacement"
+      "replacement",
+      "vm-service",
+      "vm-manager",
+      "vm-worker",
+      "vm-update",
+      "vm-ingress",
+      "vm-registry"
     ],
     "docs/reference-docker-swarm.md#§3": [
       "service",
@@ -117,11 +169,21 @@
     "docs/reference-docker-swarm.md#§5": [
       "update",
       "replacement"
+    ],
+    "docs/reference-docker-swarm.md#§6": [
+      "vm-service",
+      "vm-manager",
+      "vm-worker",
+      "vm-update",
+      "vm-ingress",
+      "vm-registry"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
-    "order": 100,
+    "category": "その他のオーケストレーター",
+    "order": 30,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "service の desired state と task slot を区別する",
       "scheduler のノード割り当てを説明する",

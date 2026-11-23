@@ -41,3 +41,28 @@ Driver はクラスタマネージャーを通じて実行資源を確保する�
 RDD は依存関係を使って失われたパーティションを再計算できる。図は、Task を別の Executor に再割り当てし、必要な入力を読み直す例を示す。失われたデータの種類や保存設定によって再計算の範囲は変わる。
 
 出典 [RDD Programming Guide の Overview](https://spark.apache.org/docs/latest/rdd-programming-guide.html#overview)・[RDD Persistence](https://spark.apache.org/docs/latest/rdd-programming-guide.html#rdd-persistence)
+
+## 8. 実装例：Spark Standalone と HDFS
+
+Spark Standalone のクラスターに売上集計を投入し、HDFS を入力・出力で共用する例。Driver は cluster モードで Worker 上に起動し、タスクは各 Executor で動く。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| アプリケーションの投入元 | spark-submit | アプリケーション JAR を cluster モードで投入する。 |
+| クラスター資源管理 | Standalone Master | Worker 登録と Executor の資源割当を担う。 |
+| ジョブの調整プロセス | Worker 上の Driver JVM | ジョブをステージに分けてタスクを割り当てる。 |
+| タスク実行担当 A | Worker A 上の Executor JVM | Worker A のローカルディスクをシャッフルに使う。 |
+| タスク実行担当 B | Worker B 上の Executor JVM | Worker B で独立したタスクを実行する。 |
+| 入力データ、集計結果 | HDFS 上の入力・出力パス | 入力と集計結果を異なる HDFS パスで保持する。 |
+
+実装で加わる部品を以下に示す。
+
+- アプリケーション JAR。注文集計のコードをパッケージ化し、投入時に指定する。
+
+公式資料
+
+- [Apache Spark Cluster Mode Overview](https://spark.apache.org/docs/latest/cluster-overview.html)
+- [Submitting Applications](https://spark.apache.org/docs/latest/submitting-applications.html)
+- [RDD Programming Guide](https://spark.apache.org/docs/latest/rdd-programming-guide.html)
+- [Job Scheduling](https://spark.apache.org/docs/latest/job-scheduling.html)
+- [Spark Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)

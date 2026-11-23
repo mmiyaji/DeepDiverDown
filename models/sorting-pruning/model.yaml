@@ -22,13 +22,13 @@ tiers:
   - {id: plan, label: SQL とクエリ計画, z: 1, size: [15, 3]}
   - {id: storage, label: 保存データ, z: 0, origin: [1, 0], size: [11, 3]}
 nodes:
-  analyst: {label: Analyst / SQL, kind: actor, tier: plan, x: 0, y: 1.5, description: orders を検索する利用者。WHERE と任意の ORDER BY を指定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
-  query: {label: Query engine, kind: worker, tier: plan, x: 4, y: 1.5, description: 述語を解析し、パーティションと保存単位の候補を段階的に絞る。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}, {type: doc, ref: docs/reference-sorting-pruning.md#§5}]}
+  analyst: {label: SQL の利用者, kind: actor, tier: plan, x: 0, 'y': 1.5, description: orders を検索する利用者。WHERE と任意の ORDER BY を指定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
+  query: {label: フィルタを計画する処理, kind: worker, tier: plan, x: 4, 'y': 1.5, description: 述語を解析し、パーティションと保存単位の候補を段階的に絞る。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}, {type: doc, ref: docs/reference-sorting-pruning.md#§5}]}
   orders: {label: orders table, kind: db, tier: storage, x: 5, y: 1.5, description: order_date でパーティション化し、各パーティション内を customer_id の保存順序で整理する論理テーブル。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}]}
   partitions: {label: order_date partitions, kind: db, tier: storage, x: 2, y: 0.2, description: order_date の境界で分けられた候補領域。述語に合うパーティションだけを残す。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
   blocks: {label: customer_id blocks/files, kind: db, tier: storage, x: 7, y: 0.2, description: パーティション内の保存単位。customer_id の局所性と統計を使い、範囲外をスキップできる場合がある。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}, {type: doc, ref: docs/reference-sorting-pruning.md#§5}]}
-  scan: {label: Remaining scan, kind: worker, tier: plan, x: 9, y: 1.5, description: 絞り込み後も必要な保存単位を読み、行条件と列投影を評価する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
-  result: {label: Result / ORDER BY, kind: external, tier: plan, x: 14, y: 1.5, description: 残った行を返す。ORDER BY が指定された場合は結果順序を別途確定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}, {type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+  scan: {label: 候補のデータを読む処理, kind: worker, tier: plan, x: 9, 'y': 1.5, description: 絞り込み後も必要な保存単位を読み、行条件と列投影を評価する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
+  result: {label: 検索結果と並び順, kind: external, tier: plan, x: 14, 'y': 1.5, description: 残った行を返す。ORDER BY が指定された場合は結果順序を別途確定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}, {type: doc, ref: docs/reference-sorting-pruning.md#§4}]}
 links:
   - {id: submit, from: analyst, to: query, label: SQL と述語を送る, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
   - {id: layout, from: orders, to: partitions, label: order_date で分割, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§2}, {type: doc, ref: docs/reference-sorting-pruning.md#§3}]}
@@ -80,3 +80,25 @@ grid:
   cellNote: 1 つのマスは、ある月のパーティションの中で customer_id の範囲が近い行を集めた保存ブロック（ファイルや列チャンク）。統計の min/max がこの範囲になる。
   note: "例：WHERE order_date が 2026-01 かつ customer_id = 42。数値は説明用。"
 blocks: [{"id":"sort-rewrite","title":"保存順序の書き直し（sort rewrite）","note":"色は customer_id の範囲。例：customer_id = 42 は「1千」（1〜5 千）の範囲に入る。数値は説明用。","legend":{"0":"1〜5千","1":"5千〜1万","2":"1万〜1.5万","3":"1.5万〜2万","4":"2万〜2.5万","5":"2.5万〜3万"},"lanes":[{"id":"f1","label":"ファイル 1","node":"blocks"},{"id":"f2","label":"ファイル 2","node":"blocks"},{"id":"f3","label":"ファイル 3","node":"blocks"},{"id":"f4","label":"ファイル 4","node":"blocks"}],"items":{"f1":[{"id":"r0","label":"1千","k":0,"note":"customer_id 1千 台の行の塊"},{"id":"r1","label":"1.6万","k":3,"note":"customer_id 1.6万 台の行の塊"},{"id":"r2","label":"2.6万","k":5,"note":"customer_id 2.6万 台の行の塊"},{"id":"r3","label":"6千","k":1,"note":"customer_id 6千 台の行の塊"},{"id":"r4","label":"1.1万","k":2,"note":"customer_id 1.1万 台の行の塊"},{"id":"r5","label":"2.1万","k":4,"note":"customer_id 2.1万 台の行の塊"}],"f2":[{"id":"r6","label":"2.1万","k":4,"note":"customer_id 2.1万 台の行の塊"},{"id":"r7","label":"1千","k":0,"note":"customer_id 1千 台の行の塊"},{"id":"r8","label":"1.1万","k":2,"note":"customer_id 1.1万 台の行の塊"},{"id":"r9","label":"2.6万","k":5,"note":"customer_id 2.6万 台の行の塊"},{"id":"r10","label":"6千","k":1,"note":"customer_id 6千 台の行の塊"},{"id":"r11","label":"1.6万","k":3,"note":"customer_id 1.6万 台の行の塊"}],"f3":[{"id":"r12","label":"6千","k":1,"note":"customer_id 6千 台の行の塊"},{"id":"r13","label":"2.6万","k":5,"note":"customer_id 2.6万 台の行の塊"},{"id":"r14","label":"1.6万","k":3,"note":"customer_id 1.6万 台の行の塊"},{"id":"r15","label":"1千","k":0,"note":"customer_id 1千 台の行の塊"},{"id":"r16","label":"2.1万","k":4,"note":"customer_id 2.1万 台の行の塊"},{"id":"r17","label":"1.1万","k":2,"note":"customer_id 1.1万 台の行の塊"}],"f4":[{"id":"r18","label":"1.1万","k":2,"note":"customer_id 1.1万 台の行の塊"},{"id":"r19","label":"2.1万","k":4,"note":"customer_id 2.1万 台の行の塊"},{"id":"r20","label":"1千","k":0,"note":"customer_id 1千 台の行の塊"},{"id":"r21","label":"1.6万","k":3,"note":"customer_id 1.6万 台の行の塊"},{"id":"r22","label":"2.6万","k":5,"note":"customer_id 2.6万 台の行の塊"},{"id":"r23","label":"6千","k":1,"note":"customer_id 6千 台の行の塊"}]}}]
+
+implementations:
+  - id: bigquery-clustered
+    label: "BigQuery の月パーティションと顧客クラスタリング"
+    description: "BigQuery の orders テーブルを注文日の月でパーティション化し、customer_id でクラスタリングする例。月の除外とブロックの除外を別々に追える。"
+    sources:
+      - {title: Query partitioned tables, url: https://cloud.google.com/bigquery/docs/querying-partitioned-tables}
+      - {title: Introduction to clustered tables, url: https://cloud.google.com/bigquery/docs/clustered-tables}
+      - {title: Query clustered tables, url: https://cloud.google.com/bigquery/docs/querying-clustered-tables}
+      - {title: Apache Iceberg Specification - Sorting, url: https://iceberg.apache.org/spec/#sorting}
+      - {title: Create partitioned tables, url: https://cloud.google.com/bigquery/docs/creating-partitioned-tables}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      bigquery-clustered-client: {label: BigQuery コンソールの SQL エディター, kind: client, tier: processing, x: 1, y: 1.15, realizes: [analyst], description: 日付範囲と顧客キーを WHERE に指定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§9}]}
+      bigquery-clustered-table: {label: BigQuery orders テーブル, kind: table, tier: processing, x: 1, y: 3.65, svc: gcp:bigquery, realizes: [orders, partitions, blocks], description: DATE_TRUNC で月別にパーティション化し、同じ月では customer_id をクラスタ列にする。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§9}]}
+      bigquery-clustered-engine: {label: BigQuery の SQL 実行, kind: service, tier: processing, x: 5, y: 1.15, realizes: [query, scan], description: 関係する月に絞り、クラスタ列を使う述語で不要なブロックを除外し得る。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§9}]}
+      bigquery-clustered-result: {label: BigQuery のクエリ結果, kind: external, tier: processing, x: 5, y: 3.65, realizes: [result], description: 条件に合う行を返し、順序が必要なら SELECT の ORDER BY を使用する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§9}]}
+      bigquery-clustered-stats: {label: クエリジョブの処理量, kind: monitor, tier: setup, x: 1, y: 1.5, description: パーティションによる見積りと、実行後の処理バイトなどを参照する。クラスタリングの除外量は実行まで確定しない。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§9}]}
+    links:
+      - {id: bigquery-clustered-stats-connection, from: bigquery-clustered-stats, to: bigquery-clustered-engine, label: ジョブの処理量を確認}

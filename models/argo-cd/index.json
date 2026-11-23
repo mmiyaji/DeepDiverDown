@@ -2,8 +2,8 @@
   "model": "argo-cd",
   "name": "Argo CD の GitOps 同期とセルフヒール",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "git": {
@@ -18,67 +18,67 @@
     },
     "application": {
       "type": "node",
-      "label": "Application",
+      "label": "同期対象・方針の宣言",
       "status": "claim"
     },
     "repo-server": {
       "type": "node",
-      "label": "Repository Server",
+      "label": "デプロイ定義の取得と生成",
       "status": "claim"
     },
     "controller": {
       "type": "node",
-      "label": "Application Controller",
+      "label": "望ましい状態と稼働状態の照合",
       "status": "claim"
     },
     "api": {
       "type": "node",
-      "label": "Kubernetes API",
+      "label": "対象クラスタの制御 API",
       "status": "claim"
     },
     "deployment": {
       "type": "node",
-      "label": "注文 API Deployment",
+      "label": "注文 API の稼働構成",
       "status": "claim"
     },
     "app-config": {
       "type": "link",
-      "label": "Application → Application Controller",
+      "label": "同期対象・方針の宣言 → 望ましい状態と稼働状態の照合",
       "status": "claim"
     },
     "manifest-request": {
       "type": "link",
-      "label": "Application Controller → Repository Server",
+      "label": "望ましい状態と稼働状態の照合 → デプロイ定義の取得と生成",
       "status": "claim"
     },
     "fetch": {
       "type": "link",
-      "label": "Repository Server → Git リポジトリ",
+      "label": "デプロイ定義の取得と生成 → Git リポジトリ",
       "status": "claim"
     },
     "desired": {
       "type": "link",
-      "label": "Repository Server → Application Controller",
+      "label": "デプロイ定義の取得と生成 → 望ましい状態と稼働状態の照合",
       "status": "claim"
     },
     "live": {
       "type": "link",
-      "label": "Kubernetes API → Application Controller",
+      "label": "対象クラスタの制御 API → 望ましい状態と稼働状態の照合",
       "status": "claim"
     },
     "apply": {
       "type": "link",
-      "label": "Application Controller → Kubernetes API",
+      "label": "望ましい状態と稼働状態の照合 → 対象クラスタの制御 API",
       "status": "claim"
     },
     "scale": {
       "type": "link",
-      "label": "運用者 → Kubernetes API",
+      "label": "運用者 → 対象クラスタの制御 API",
       "status": "claim"
     },
     "deploy": {
       "type": "link",
-      "label": "Kubernetes API → 注文 API Deployment",
+      "label": "対象クラスタの制御 API → 注文 API の稼働構成",
       "status": "claim"
     },
     "git-change": {
@@ -88,6 +88,68 @@
     "self-heal": {
       "type": "scenario",
       "label": "クラスタだけで変更された差分を修復"
+    },
+    "argocd-git": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "Git 内の注文 API Helm chart",
+      "realizes": [
+        "git"
+      ]
+    },
+    "argocd-operator": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "kubectl を使う運用者",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "argocd-application": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "Argo CD の Application CR",
+      "realizes": [
+        "application"
+      ]
+    },
+    "argocd-repo-server": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "argocd-repo-server Deployment",
+      "realizes": [
+        "repo-server"
+      ]
+    },
+    "argocd-controller": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "argocd-application-controller",
+      "realizes": [
+        "controller"
+      ]
+    },
+    "argocd-api": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "対象 Kubernetes API",
+      "realizes": [
+        "api"
+      ]
+    },
+    "argocd-deployment": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "対象クラスタの注文 API Deployment",
+      "realizes": [
+        "deployment"
+      ]
+    },
+    "argocd-redis": {
+      "type": "implementation",
+      "impl": "argocd",
+      "label": "Argo CD の Redis キャッシュ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -113,7 +175,15 @@
       "scale",
       "deploy",
       "git-change",
-      "self-heal"
+      "self-heal",
+      "argocd-git",
+      "argocd-operator",
+      "argocd-application",
+      "argocd-repo-server",
+      "argocd-controller",
+      "argocd-api",
+      "argocd-deployment",
+      "argocd-redis"
     ],
     "docs/reference-argo-cd.md#§4": [
       "operator",
@@ -140,6 +210,16 @@
       "apply",
       "git-change",
       "self-heal"
+    ],
+    "docs/reference-argo-cd.md#§5": [
+      "argocd-git",
+      "argocd-operator",
+      "argocd-application",
+      "argocd-repo-server",
+      "argocd-controller",
+      "argocd-api",
+      "argocd-deployment",
+      "argocd-redis"
     ]
   },
   "reference": {

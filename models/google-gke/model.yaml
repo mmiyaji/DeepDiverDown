@@ -19,16 +19,16 @@ evidence:
 tiers:
   - {id: interface, label: 利用・管理, z: 2, origin: [-1, 0], size: [12, 3]}
   - {id: edge, label: 公開・レジストリ, z: 1, origin: [0, 0], size: [12, 3]}
-  - {id: control, label: GKE コントロールプレーン, z: 1, origin: [0, 4], size: [12, 3]}
-  - {id: pools, label: Regional Standard node pools, z: 0, origin: [0, 8], size: [12, 3]}
+  - {id: control, label: クラスタ制御, z: 1, origin: [0, 4], size: [12, 3]}
+  - {id: pools, label: ワークロード実行, z: 0, origin: [0, 8], size: [12, 3]}
 nodes:
   operator: {label: 運用者, kind: actor, tier: interface, x: 1, y: 1.5, role: ops, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
-  api: {label: GKE / Kubernetes API, kind: service, svc: gcp:gke, tier: control, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§2}]}
-  system: {label: Base workload pool (example), kind: worker, svc: gcp:gke, tier: pools, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§3}]}
-  user: {label: Application workload pool (example), kind: worker, svc: gcp:gke, tier: pools, x: 6, y: 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§3}]}
-  workload: {label: Deployment / Pods, kind: service, svc: k8s:deployment, tier: pools, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
-  lb: {label: External Load Balancer / Service, kind: lb, svc: gcp:load-balancing, tier: edge, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
-  registry: {label: Artifact Registry, kind: external, svc: gcp:artifact-registry, tier: edge, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
+  api: {label: マネージド制御 API, kind: service, tier: control, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§2}]}
+  system: {label: 基盤用ノード群（配置例）, kind: worker, tier: pools, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§3}]}
+  user: {label: アプリ用ノード群（配置例）, kind: worker, tier: pools, x: 6, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§3}]}
+  workload: {label: 注文 API の実行単位, kind: service, tier: pools, x: 9, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
+  lb: {label: アプリ公開・振り分け, kind: lb, tier: edge, x: 9, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
+  registry: {label: コンテナイメージの保管, kind: external, tier: edge, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
 links:
   - {id: submit, from: operator, to: api, label: API で desired state を送る, evidence: [{type: doc, ref: docs/reference-google-gke.md#§4}]}
   - {id: system-schedule, from: api, to: system, label: 基盤 Pod を配置（例）, evidence: [{type: doc, ref: docs/reference-google-gke.md#§3}, {type: doc, ref: docs/reference-google-gke.md#§4}]}
@@ -51,3 +51,171 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 戦略付きノード置換, text: control plane 更新後に Standard node pool の更新戦略で drain・再作成する。, links: [replace], evidence: [{type: doc, ref: docs/reference-google-gke.md#§5}]}
 unknowns:
   - {id: UNK-01, text: 実際のプロジェクト、リージョン、ゾーン、マシンタイプ、ノード数、更新戦略、PDB は未確定。, refs: [system, user, workload]}
+implementations:
+  - id: gcp
+    label: GKE Standard のリージョンクラスタ
+    description: GKE Standard で基盤用とアプリ用のノードプールを置き、Artifact Registry の注文 API を外部 L4 ロードバランサーで公開する例。
+    sources:
+      - title: GKE cluster modes
+        url: https://cloud.google.com/kubernetes-engine/docs/concepts/choose-cluster-mode
+      - title: GKE node pools
+        url: https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools
+      - title: GKE LoadBalancer Services
+        url: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/service-load-balancer
+      - title: Artifact Registry integration with GKE
+        url: https://cloud.google.com/artifact-registry/docs/integrate-gke
+    tiers:
+      - id: interface
+        label: 利用・管理
+        z: 2
+        origin:
+          - -1
+          - 0
+      - id: edge
+        label: 公開・レジストリ
+        z: 1
+        origin:
+          - 0
+          - 0
+      - id: control
+        label: GKE コントロールプレーン
+        z: 1
+        origin:
+          - 0
+          - 4
+      - id: pools
+        label: Regional Standard node pools
+        z: 0
+        origin:
+          - 0
+          - 8
+    groups:
+      - kind: cloud
+        label: Google Cloud プロジェクト
+        provider: gcp
+        tier:
+          - control
+          - pools
+          - edge
+        nodes:
+          - gcp-api
+          - gcp-system
+          - gcp-user
+          - gcp-workload
+          - gcp-lb
+          - gcp-registry
+          - gcp-svc
+      - kind: cluster
+        label: GKE Standard
+        provider: gcp
+        tier:
+          - control
+          - pools
+          - edge
+        nodes:
+          - gcp-api
+          - gcp-system
+          - gcp-user
+          - gcp-workload
+          - gcp-svc
+    nodes:
+      gcp-operator:
+        label: gcloud と kubectl
+        kind: actor
+        tier: interface
+        realizes:
+          - operator
+        description: クラスタ接続を設定し、マニフェストを適用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      gcp-api:
+        label: GKE リージョン制御プレーン
+        kind: service
+        tier: control
+        svc: gcp:gke
+        realizes:
+          - api
+        description: リージョンクラスタの Kubernetes API を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      gcp-system:
+        label: Compute Engine 基盤用プール
+        kind: worker
+        tier: pools
+        svc: gcp:gce
+        realizes:
+          - system
+        description: 基盤ワークロードを配置するために例で分けたプール。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      gcp-user:
+        label: Compute Engine アプリ用プール
+        kind: worker
+        tier: pools
+        svc: gcp:gce
+        realizes:
+          - user
+        description: 注文 API の Pod を配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      gcp-workload:
+        label: 注文 API Deployment / Pod
+        kind: service
+        tier: pools
+        svc: k8s:deployment
+        realizes:
+          - workload
+        description: ノードプールへの配置条件をマニフェストに定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      gcp-lb:
+        label: 外部パススルー Network Load Balancer
+        kind: lb
+        tier: edge
+        svc: gcp:clb
+        realizes:
+          - lb
+        description: LoadBalancer Service に外部の L4 到達先を割り当てる。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      gcp-registry:
+        label: Artifact Registry
+        kind: external
+        tier: edge
+        svc: gcp:artifact
+        realizes:
+          - registry
+        description: 指定したリポジトリのコンテナイメージをノードが pull する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      gcp-svc:
+        label: 注文 API の LoadBalancer Service
+        kind: lb
+        tier: edge
+        svc: k8s:service
+        description: Service のポートと注文 API のエンドポイントを対応させる。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+    links:
+      - id: gcp-selector
+        from: gcp-workload
+        to: gcp-svc
+        label: Service の対象にする
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9
+      - id: gcp-expose
+        from: gcp-svc
+        to: gcp-lb
+        label: 外部の入口を構成
+        evidence:
+          - type: doc
+            ref: docs/reference-google-gke.md#§9

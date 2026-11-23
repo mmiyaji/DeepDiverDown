@@ -25,3 +25,22 @@
 
 - [Snowflaked Dimensions](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/snowflake-dimension/)
 - [Power BI のスタースキーマ設計](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)
+
+## 5. 実装例 PostgreSQL の商品階層比較
+
+同じ受注明細から平坦な商品ディメンションとカテゴリを分けたディメンションを別スキーマに作り、同じ問いで比較する例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 商品＋カテゴリ | star.dim_product | 商品キーとカテゴリ名・属性を同じ行に保持する。 |
+| 明細ファクト（スター） | star.fact_order_line | 明細の粒度を固定して商品キーを参照する。 |
+| カテゴリ別売上（スター） | star.sales_by_category ビュー | ファクトから商品表に結合して集計する。 |
+| カテゴリ | hierarchy.dim_category | カテゴリキーとカテゴリの説明属性を持つ。 |
+| 商品・カテゴリキー | hierarchy.dim_product | カテゴリキーを外部キーとして持つ。 |
+| 明細ファクト（階層分離） | hierarchy.fact_order_line | スター側と同じ受注明細粒度を持つ。 |
+| カテゴリ別売上（階層分離） | hierarchy.sales_by_category ビュー | 商品からカテゴリ表をたどって集計する。 |
+| 履歴と結合の比較 | 二つの SQL 結果と実行計画 | 同じ期間で売上を集計し、結果と結合経路を比較する。 |
+
+同じデータと条件で `EXPLAIN` の実行計画と金額を確認する。カテゴリ移動が過去の売上にも効くかは、履歴の持ち方と有効時刻の方針で決める。
+
+出典 [Snowflaked Dimensions](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/snowflake-dimension/)、[Power BI のスタースキーマ設計](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)、[PostgreSQL CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)、[PostgreSQL EXPLAIN](https://www.postgresql.org/docs/current/sql-explain.html)

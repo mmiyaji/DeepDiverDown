@@ -38,7 +38,7 @@ tiers:
       - 13
       - 3
   - id: service
-    label: OpenMetadata
+    label: メタデータ管理・検索
     z: 1
     size:
       - 13
@@ -99,7 +99,7 @@ nodes:
       - type: doc
         ref: docs/reference-openmetadata.md#§3
   api:
-    label: OpenMetadata Server
+    label: メタデータ API
     kind: service
     tier: service
     x: 5
@@ -277,3 +277,170 @@ requirements:
     evidence:
       - type: doc
         ref: docs/reference-openmetadata.md#§4
+implementations:
+  - id: openmetadata-compose
+    label: OpenMetadata の Docker Compose
+    description: OpenMetadata Server、取り込み用 Airflow、PostgreSQL、Elasticsearch を分け、BigQuery と Looker を収集対象にする例。
+    sources:
+      - title: Docker Deployment Architecture
+        url: https://docs.open-metadata.org/v1.12.x/deployment/docker
+      - title: Data Contracts API
+        url: https://docs.open-metadata.org/v1.12.x/api-reference/data-contracts
+      - title: OpenMetadata Docker Quickstart
+        url: https://docs.open-metadata.org/v1.12.x/quick-start/local-docker-deployment
+      - title: BigQuery コネクタ
+        url: https://docs.open-metadata.org/v2.0.x/connectors/database/bigquery
+      - title: Looker コネクタ
+        url: https://docs.open-metadata.org/v2.0.x/connectors/dashboard/looker
+      - title: OpenMetadata のリネージ取り込み
+        url: https://docs.open-metadata.org/v2.0.x/connectors/ingestion/lineage
+    nodes:
+      openmetadata-compose-bigquery:
+        label: BigQuery
+        kind: external
+        tier: external
+        x: 1
+        y: 1
+        description: テーブルとリネージ用のクエリログを提供する。
+        svc: gcp:bigquery
+        realizes:
+          - source
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-steward:
+        label: データスチュワード
+        kind: actor
+        tier: external
+        x: 6
+        y: 1
+        description: 分類や契約を担当する。
+        realizes:
+          - steward
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-looker:
+        label: Looker ダッシュボード
+        kind: external
+        tier: external
+        x: 3.8
+        y: 1
+        description: Looker コネクタがダッシュボード・チャートを API から取得する。
+        realizes: [source]
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-lookml:
+        label: GitHub の LookML ファイル
+        kind: file
+        tier: external
+        x: 3.8
+        y: 2.7
+        description: 対応する LookML View と、その参照先テーブルのリネージを収集するために使用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-reader:
+        label: カタログ利用者
+        kind: actor
+        tier: external
+        x: 10
+        y: 1
+        description: 資産と依存関係を検索する。
+        realizes:
+          - consumer
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-ingestion:
+        label: OpenMetadata Ingestion コンテナ
+        kind: worker
+        tier: service
+        x: 1
+        y: 1
+        description: BigQuery のスキーマ・クエリログと Looker のメタデータを、別のコネクタで収集する。
+        realizes:
+          - ingest
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-server:
+        label: OpenMetadata Server（API・Web）
+        kind: catalog
+        tier: service
+        x: 7
+        y: 1
+        description: API と検索画面、契約の取得・検証を提供する。
+        realizes:
+          - api
+          - portal
+          - contracts
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-postgres:
+        label: PostgreSQL
+        kind: db
+        tier: stores
+        x: 5
+        y: 1
+        description: カタログのエンティティと関係を保持する。
+        realizes:
+          - db
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-search:
+        label: Elasticsearch
+        kind: db
+        tier: stores
+        x: 10
+        y: 1
+        description: カタログを索引化する。
+        realizes:
+          - index
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      openmetadata-compose-airflow:
+        label: Airflow スケジューラー
+        kind: workflow
+        tier: service
+        x: 3.8
+        y: 2.6
+        description: 収集ワークフローを起動する。
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+    links:
+      - id: openmetadata-compose-looker-api
+        from: openmetadata-compose-looker
+        to: openmetadata-compose-ingestion
+        label: ダッシュボードのメタデータを収集
+        realizes: [extract]
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      - id: openmetadata-compose-lookml-source
+        from: openmetadata-compose-lookml
+        to: openmetadata-compose-ingestion
+        label: View と参照先テーブルの情報を収集
+        realizes: [extract]
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      - id: openmetadata-compose-dashboard-upstream
+        from: openmetadata-compose-bigquery
+        to: openmetadata-compose-looker
+        label: レポートが参照するテーブル
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7
+      - id: openmetadata-compose-schedule
+        from: openmetadata-compose-airflow
+        to: openmetadata-compose-ingestion
+        label: 収集ワークフローを定期実行
+        evidence:
+          - type: doc
+            ref: docs/reference-openmetadata.md#§7

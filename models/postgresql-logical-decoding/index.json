@@ -2,8 +2,8 @@
   "model": "postgresql-logical-decoding",
   "name": "PostgreSQL の論理デコーディング：WAL・スロット・再開",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "orders": {
@@ -28,22 +28,22 @@
     },
     "decoder": {
       "type": "node",
-      "label": "論理デコーダ / pgoutput",
+      "label": "論理デコーダと出力プラグイン",
       "status": "claim"
     },
     "connector": {
       "type": "node",
-      "label": "Debezium Source Task",
+      "label": "変更データ捕捉タスク",
       "status": "claim"
     },
     "offset": {
       "type": "node",
-      "label": "Kafka Connect ソースオフセット",
+      "label": "捕捉タスクの永続オフセット",
       "status": "claim"
     },
     "kafka": {
       "type": "node",
-      "label": "Kafka の変更イベント",
+      "label": "下流の変更イベントログ",
       "status": "claim"
     },
     "log": {
@@ -58,37 +58,37 @@
     },
     "decode": {
       "type": "link",
-      "label": "WAL → 論理デコーダ / pgoutput",
+      "label": "WAL → 論理デコーダと出力プラグイン",
       "status": "claim"
     },
     "select": {
       "type": "link",
-      "label": "Publication → 論理デコーダ / pgoutput",
+      "label": "Publication → 論理デコーダと出力プラグイン",
       "status": "claim"
     },
     "stream": {
       "type": "link",
-      "label": "論理デコーダ / pgoutput → Debezium Source Task",
+      "label": "論理デコーダと出力プラグイン → 変更データ捕捉タスク",
       "status": "claim"
     },
     "publish": {
       "type": "link",
-      "label": "Debezium Source Task → Kafka の変更イベント",
+      "label": "変更データ捕捉タスク → 下流の変更イベントログ",
       "status": "claim"
     },
     "feedback": {
       "type": "link",
-      "label": "Debezium Source Task → 論理スロット",
+      "label": "変更データ捕捉タスク → 論理スロット",
       "status": "claim"
     },
     "persist": {
       "type": "link",
-      "label": "Debezium Source Task → Kafka Connect ソースオフセット",
+      "label": "変更データ捕捉タスク → 捕捉タスクの永続オフセット",
       "status": "claim"
     },
     "resume": {
       "type": "link",
-      "label": "Kafka Connect ソースオフセット → Debezium Source Task",
+      "label": "捕捉タスクの永続オフセット → 変更データ捕捉タスク",
       "status": "claim"
     },
     "stream-update": {
@@ -114,6 +114,41 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実環境のレプリカアイデンティティ、スロット保持設定、オフセット保存周期、下流の重複処理は未確認。"
+    },
+    "pg-connect-postgres": {
+      "type": "implementation",
+      "impl": "pg-connect",
+      "label": "PostgreSQL 18 Primary と pgoutput",
+      "realizes": [
+        "orders",
+        "wal",
+        "slot",
+        "publication",
+        "decoder"
+      ]
+    },
+    "pg-connect-connect": {
+      "type": "implementation",
+      "impl": "pg-connect",
+      "label": "分散 Kafka Connect の Debezium Source Task",
+      "realizes": [
+        "connector"
+      ]
+    },
+    "pg-connect-kafka": {
+      "type": "implementation",
+      "impl": "pg-connect",
+      "label": "Kafka の CDC トピックと Connect 内部トピック",
+      "realizes": [
+        "offset",
+        "kafka"
+      ]
+    },
+    "pg-connect-health": {
+      "type": "implementation",
+      "impl": "pg-connect",
+      "label": "pg_replication_slots の監視",
+      "realizes": []
     }
   },
   "byRef": {
@@ -142,7 +177,11 @@
       "stream-update",
       "restart",
       "BR-01",
-      "BR-02"
+      "BR-02",
+      "pg-connect-postgres",
+      "pg-connect-connect",
+      "pg-connect-kafka",
+      "pg-connect-health"
     ],
     "docs/reference-postgresql-logical-decoding.md#§2": [
       "model",
@@ -179,6 +218,12 @@
     ],
     "docs/reference-postgresql-logical-decoding.md#§6": [
       "model"
+    ],
+    "docs/reference-postgresql-logical-decoding.md#§7": [
+      "pg-connect-postgres",
+      "pg-connect-connect",
+      "pg-connect-kafka",
+      "pg-connect-health"
     ]
   },
   "reference": {

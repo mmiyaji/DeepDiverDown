@@ -2,8 +2,8 @@
   "model": "etcd-raft",
   "name": "etcd と Raft のクォーラム",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "operator": {
@@ -13,7 +13,7 @@
     },
     "client": {
       "type": "node",
-      "label": "etcd クライアント",
+      "label": "状態更新のクライアント",
       "status": "claim"
     },
     "member-a": {
@@ -33,22 +33,22 @@
     },
     "setting": {
       "type": "node",
-      "label": "コミット済みの設定",
+      "label": "確定した設定値",
       "status": "claim"
     },
     "update": {
       "type": "link",
-      "label": "運用者 → etcd クライアント",
+      "label": "運用者 → 状態更新のクライアント",
       "status": "claim"
     },
     "put-a": {
       "type": "link",
-      "label": "etcd クライアント → メンバー A",
+      "label": "状態更新のクライアント → メンバー A",
       "status": "claim"
     },
     "put-b": {
       "type": "link",
-      "label": "etcd クライアント → メンバー B",
+      "label": "状態更新のクライアント → メンバー B",
       "status": "claim"
     },
     "a-replicate-b": {
@@ -68,12 +68,12 @@
     },
     "apply-a": {
       "type": "link",
-      "label": "メンバー A → コミット済みの設定",
+      "label": "メンバー A → 確定した設定値",
       "status": "claim"
     },
     "apply-b": {
       "type": "link",
-      "label": "メンバー B → コミット済みの設定",
+      "label": "メンバー B → 確定した設定値",
       "status": "claim"
     },
     "catch-up": {
@@ -88,6 +88,60 @@
     "partition": {
       "type": "scenario",
       "label": "リーダーが 1 対 2 の分断で孤立"
+    },
+    "etcd-operator": {
+      "type": "implementation",
+      "impl": "etcd",
+      "label": "設定変更を行う運用者",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "etcd-client": {
+      "type": "implementation",
+      "impl": "etcd",
+      "label": "etcdctl put",
+      "realizes": [
+        "client"
+      ]
+    },
+    "etcd-member-a": {
+      "type": "implementation",
+      "impl": "etcd",
+      "label": "etcd member A の VM",
+      "realizes": [
+        "member-a"
+      ]
+    },
+    "etcd-member-b": {
+      "type": "implementation",
+      "impl": "etcd",
+      "label": "etcd member B の VM",
+      "realizes": [
+        "member-b"
+      ]
+    },
+    "etcd-member-c": {
+      "type": "implementation",
+      "impl": "etcd",
+      "label": "etcd member C の VM",
+      "realizes": [
+        "member-c"
+      ]
+    },
+    "etcd-setting": {
+      "type": "implementation",
+      "impl": "etcd",
+      "label": "etcd MVCC の受付上限キー",
+      "realizes": [
+        "setting"
+      ]
+    },
+    "etcd-health": {
+      "type": "implementation",
+      "impl": "etcd",
+      "label": "etcdctl endpoint status",
+      "realizes": []
     }
   },
   "byRef": {
@@ -114,7 +168,14 @@
       "apply-b",
       "catch-up",
       "write-majority",
-      "partition"
+      "partition",
+      "etcd-operator",
+      "etcd-client",
+      "etcd-member-a",
+      "etcd-member-b",
+      "etcd-member-c",
+      "etcd-setting",
+      "etcd-health"
     ],
     "docs/reference-etcd-raft.md#§2": [
       "client",
@@ -141,6 +202,15 @@
     "docs/reference-etcd-raft.md#§5": [
       "catch-up",
       "partition"
+    ],
+    "docs/reference-etcd-raft.md#§6": [
+      "etcd-operator",
+      "etcd-client",
+      "etcd-member-a",
+      "etcd-member-b",
+      "etcd-member-c",
+      "etcd-setting",
+      "etcd-health"
     ]
   },
   "reference": {

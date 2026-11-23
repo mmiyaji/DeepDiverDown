@@ -45,3 +45,28 @@ P0 のリーダー Broker 1 が停止し、Broker 2 と Broker 3 が ISR に残�
 ## 8. Consumer Group のリバランスと ISR の追い付き
 
 Consumer Group にメンバーが加わる・抜けると、Group Coordinator がパーティションの担当を割り当て直す（リバランス）。担当が移ったパーティションは、新しい担当がコミット済みオフセットから読み始める。協調的リバランス（CooperativeStickyAssignor）では、動かす必要のある担当だけを移し、他の担当は読み続けられる。複製では、フォロワーがリーダーのログを取り込んで追い付き、遅れすぎたフォロワーは ISR から外れる。リーダーが停止すると、ISR に残るフォロワーが新しいリーダーに選ばれ、外れていたフォロワーは新リーダーから追い付いて ISR に戻る。出典 [Apache Kafka Design](https://kafka.apache.org/documentation/#design)、[Consumer Configs](https://kafka.apache.org/documentation/#consumerconfigs)
+
+## 9. 実装例：分離 KRaft クォーラムの Kafka
+
+Kafka のデータブローカー群と KRaft コントローラー群を別プロセスにする例。図の P0・P1・P2 は注文トピックの分割で、トピック設定とコンシューマーグループは別に管理する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| イベント送信元 | KafkaProducer | 注文キーに基づく対象パーティションへレコードを送る。 |
+| クラスターのメタデータ管理 | KRaft コントローラー群 | 専用プロセスでメタデータログのクォーラムを構成する。 |
+| ログノード 1 · P0 リーダー | Kafka Broker 1 | P0 の最初のリーダーを担当する。 |
+| ログノード 2 · P1 リーダー | Kafka Broker 2 | P1 のリーダーと P0 のフォロワーとして開始する。 |
+| ログノード 3 · P2 リーダー | Kafka Broker 3 | P2 のリーダーと P0 のフォロワーとして開始する。 |
+| 購読プロセス 1 | KafkaConsumer 1 | 同じ group.id でパーティションを分担する。 |
+| 購読プロセス 2 | KafkaConsumer 2 | グループ内で割り当てられた分割を読む。 |
+
+実装で加わる部品を以下に示す。
+
+- orders のトピック設定。この例では 3 パーティション・複製係数 3 とし、書き込み時の確認は acks と min.insync.replicas の組み合わせで決まる。
+
+公式資料
+
+- [Apache Kafka Design](https://kafka.apache.org/44/design/design/)
+- [Apache Kafka Protocol](https://kafka.apache.org/44/design/protocol/)
+- [KRaft](https://kafka.apache.org/44/operations/kraft/)
+- [Producer Configs](https://kafka.apache.org/44/configuration/producer-configs/)

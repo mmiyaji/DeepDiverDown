@@ -58,3 +58,35 @@ scenarios:
       - {"links":["integrate","record"],"note":"同じ受注データを統合 EDW と履歴中心の Vault で扱う場合の違いを見る。"}
       - {"links":["mart","derive"],"note":"分析用マートに必要な業務ルールと粒度を整理する。"}
       - {"links":["hierarchy","denormalize","export"],"note":"用途に合わせ、階層の分離や定型配信のワイドテーブルを検討する。"}
+
+implementations:
+  - id: bq-lab
+    label: "BigQuery の DWH 設計比較環境"
+    description: "合成の注文 CSV と明細を共通入力にし、試すパターンごとに別データセットへ SQL の成果物を作る比較環境。表の構成は比較候補で、すべてを一つの本番経路として使う想定ではない。"
+    sources:
+      - {title: "Kimball Group の次元モデリング技法", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+      - {title: "Databricks のメダリオン", url: "https://docs.databricks.com/aws/en/lakehouse/medallion"}
+      - {title: "Bill Inmon の CIF と Data Warehousing 2.0", url: "https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf"}
+      - {title: "Data Vault Alliance", url: "https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/"}
+      - {title: "BigQuery のネストと繰り返し列", url: "https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested"}
+      - {title: "dbt Semantic Layer", url: "https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture"}
+      - {title: "BigQuery データセットの作成", url: "https://docs.cloud.google.com/bigquery/docs/datasets"}
+      - {title: "BigQuery 論理ビュー", url: "https://docs.cloud.google.com/bigquery/docs/views-intro"}
+    tiers:
+      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [20.5,6.5]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+    nodes:
+      example-source: {label: "BigQuery lab_input データセット", kind: "table", tier: "flow", x: 0, y: 4, svc: "gcp:bigquery", realizes: ["source"], description: "比較に使う注文・商品・顧客・返品の表を登録する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-medallion: {label: "lab_layers データセット", kind: "table", tier: "flow", x: 4, y: 0, realizes: ["medallion"], description: "原本、検証済み、業務集計のテーブルを段階別に分ける。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-inmon: {label: "lab_cif データセット", kind: "table", tier: "flow", x: 4, y: 3, realizes: ["inmon"], description: "統合した正規化表から営業と経理の公開ビューを作る。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-vault: {label: "lab_vault データセット", kind: "table", tier: "flow", x: 4, y: 6, realizes: ["vault"], description: "Hub・Link・Satellite と業務派生・公開ビューを作る。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-kimball: {label: "lab_dimensional のディメンション・ファクト", kind: "table", tier: "flow", x: 8, y: 0, realizes: ["kimball","star"], description: "注文と返品から共通ディメンションを再利用し、受注明細のスタースキーマも確認する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-snowflake-schema: {label: "lab_hierarchy の商品とカテゴリ表", kind: "table", tier: "flow", x: 12, y: 0, realizes: ["snowflake-schema"], description: "スタースキーマに対し、カテゴリを分離した構成を比較する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-scd: {label: "lab_history の顧客履歴表", kind: "table", tier: "flow", x: 8, y: 6, realizes: ["scd"], description: "有効期間と代理キーにより時点で顧客属性を参照する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-fact-types: {label: "lab_grain のイベント・日次・進捗表", kind: "table", tier: "flow", x: 12, y: 3, realizes: ["fact-types"], description: "用途ごとに異なる事実の粒度を作って比較する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-wide: {label: "lab_wide の平坦表・ネスト表", kind: "table", tier: "flow", x: 12, y: 6, realizes: ["wide"], description: "明細行と注文行の件数・重複集計を比較する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-aggregates: {label: "lab_rollup の日次集約と公開ビュー", kind: "table", tier: "flow", x: 16, y: 2, realizes: ["aggregates"], description: "注文明細の結果に対し、日次集約を使う場合の結果を照合する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-bi: {label: "比較用の BigQuery SQL 結果", kind: "client", tier: "flow", x: 20, y: 4, realizes: ["bi"], description: "同じ入力範囲と集計指標の結果を記録する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+      example-checks: {label: "比較用 SQL スクリプト", kind: "workflow", tier: "implementation-setup", x: 1, y: 1.5, description: "粒度の一意性、行数、売上の合計を、選んだ比較先ごとに確認する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}
+    links:
+      - {id: "example-checks-connection", from: "example-checks", to: "example-bi", label: "結果の同等性を照合", evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§5"}]}

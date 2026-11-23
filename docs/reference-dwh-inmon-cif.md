@@ -29,3 +29,20 @@ CIF の EDW は統合済みで履歴を持つ詳細データの置き場で、�
 CIF は全社統合の責務を正規化した EDW に置く。Kimball のバスアーキテクチャは業務プロセス単位のファクト表を段階的に提供し、複数のファクト表に共通の適合ディメンションを使って横断分析を成立させる。両者とも共有の定義で統合する設計で、統合を担う構造と公開までのデータ経路が異なる。
 
 出典 [Bill Inmon: A Tale of Two Architectures](https://williaminmon.substack.com/p/a-tale-of-two-architectures-kimball)、[Kimball Group: Enterprise Data Warehouse Bus Architecture](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/kimball-data-warehouse-bus-architecture/)
+
+## 6. 実装例 PostgreSQL の統合 EDW と公開スキーマ
+
+PostgreSQL に入力、統合 EDW、業務別の公開スキーマを用意し、段階的に統合と配信を試す実装例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 注文システム・顧客マスター・返金システム | landing スキーマの 3 ソース表 | 注文・顧客・返金のエクスポートを、元のキーのまま別テーブルで受け取る。 |
+| ソース統合 ETL | 統合 ETL の SQL | 顧客キーを対応表で引き、注文・明細・返金を反映する。 |
+| 統合 EDW（3NF） | edw スキーマの正規化表 | 顧客、注文、明細、返金に主キーと外部キーを設定する。 |
+| マート作成処理 | マート用の SQL リフレッシュ処理 | 統合 EDW を読み、用途別の粒度を再生成する。 |
+| 営業マート | sales.order_line マテリアライズドビュー | 注文明細の粒度で地域と受注金額を提供する。 |
+| 経理マート | finance.daily_amount マテリアライズドビュー | 日別・通貨別に注文金額と返金額を提供する。 |
+
+公開時は EDW に登録済みのデータで両マートを計算する。マテリアライズドビューの更新には再計算が必要なので、翌日到着した返金をどのタイミングで公開するか決める。
+
+出典 [Bill Inmon: Data Warehousing 2.0](https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf)、[Bill Inmon: A Tale of Two Architectures](https://williaminmon.substack.com/p/a-tale-of-two-architectures-kimball)、[Kimball Group: Enterprise Data Warehouse Bus Architecture](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/kimball-data-warehouse-bus-architecture/)、[PostgreSQL CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)、[PostgreSQL CREATE MATERIALIZED VIEW](https://www.postgresql.org/docs/current/sql-creatematerializedview.html)

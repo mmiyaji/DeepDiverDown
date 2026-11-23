@@ -14,14 +14,14 @@ evidence: [{type: doc, ref: docs/reference-snowflake.md#§1}, {type: doc, ref: d
 tiers: [{id: platform, label: Snowflake platform, z: 0, size: [18, 6]}, {id: compute, label: 計算ワークロード, z: 1, origin: [4, 0], size: [12, 3]}]
 nodes:
   source: {label: Source, kind: external, tier: platform, x: 0, y: 1.5, description: 取り込み元。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§1}]}
-  services: {label: Cloud services, kind: service, tier: compute, x: 3, y: 1.5, description: 認証とメタデータ等を調整。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§4}]}
-  load: {parallel: N, label: Load warehouse, kind: worker, tier: compute, x: 6, y: 1.5, drill: snowflake-ingestion-cdc, description: この例ではウェアハウスでバッチをロードする。Snowpipeと連続取り込みの方式は詳細図で比較する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§3}]}
-  storage: {label: Cloud storage, kind: db, tier: platform, x: 9, y: 1.5, drill: snowflake-time-travel, description: 永続データを保持する。履歴参照とクローンは詳細図で確認する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§2}]}
-  biwh: {parallel: N, label: BI warehouse, kind: worker, tier: compute, x: 12, y: 1.5, drill: snowflake-query-performance, description: BIクエリを実行する。待ち行列とスキャン量を詳細図で確認する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§3}]}
+  services: {label: "認証・メタデータ調整", kind: service, tier: compute, x: 3, y: 1.5, description: 認証とメタデータ等を調整。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§4}]}
+  load: {parallel: N, label: "バッチ取込用の計算資源", kind: worker, tier: compute, x: 6, y: 1.5, drill: snowflake-ingestion-cdc, description: "取込専用の計算枠を使う。ファイル到着時と行単位の連続取込も選べる。", evidence: [{type: doc, ref: docs/reference-snowflake.md#§3}]}
+  storage: {label: "永続テーブル保存", kind: db, tier: platform, x: 9, y: 1.5, drill: snowflake-time-travel, description: 永続データを保持する。履歴参照とクローンは詳細図で確認する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§2}]}
+  biwh: {parallel: N, label: "BI 用の SQL 計算資源", kind: worker, tier: compute, x: 12, y: 1.5, drill: snowflake-query-performance, description: BIクエリを実行する。待ち行列とスキャン量を詳細図で確認する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§3}]}
   bi: {label: BI users, kind: actor, tier: platform, x: 15, y: 1.5, description: 分析利用者。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§5}]}
-  metadata: {label: Horizon Catalog, kind: service, tier: platform, x: 6, y: 1.5, drill: snowflake-horizon-catalog, description: 資産の発見・分類・ガバナンスとアクセスの追跡。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§4}]}
-  sharing: {label: Secure Data Sharing, kind: service, tier: platform, x: 9, y: 5, drill: snowflake-secure-sharing, description: 受領者へ許可するビューやテーブルを公開する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§7}]}
-  partner: {label: 受領アカウント, kind: external, tier: platform, x: 15, y: 5, description: 共有したオブジェクトを読み取り専用で利用する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§7}]}
+  metadata: {label: "データカタログと統制", kind: service, tier: platform, x: 6, y: 1.5, drill: snowflake-horizon-catalog, description: 資産の発見・分類・ガバナンスとアクセスの追跡。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§4}]}
+  sharing: {label: "読み取り専用データ共有", kind: service, tier: platform, x: 9, y: 5, drill: snowflake-secure-sharing, description: 受領者へ許可するビューやテーブルを公開する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§7}]}
+  partner: {label: "データ受領者", kind: external, tier: platform, x: 15, y: 5, description: 共有したオブジェクトを読み取り専用で利用する。, evidence: [{type: doc, ref: docs/reference-snowflake.md#§7}]}
 links:
   - {id: ingest, from: source, to: load, label: データをロード, evidence: [{type: doc, ref: docs/reference-snowflake.md#§3}]}
   - {id: write, from: load, to: storage, label: 永続化, evidence: [{type: doc, ref: docs/reference-snowflake.md#§2}]}
@@ -39,3 +39,29 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 管理サービス利用, text: 認証とメタデータ調整をサービス層に委ねる。, links: [govern, coordinate], evidence: [{type: doc, ref: docs/reference-snowflake.md#§4}]}
 unknowns: [{id: UNK-01, text: クラウド、ウェアハウスサイズ、権限設定は未確定。, refs: [load, biwh, services]}]
 gates: {maxDrift: 0, maxHigh: 0}
+
+implementations:
+  - id: snowflake-s3
+    label: "Snowflake と Amazon S3"
+    description: "注文ファイルを Amazon S3 に置き、Snowflake の別々の仮想ウェアハウスで取込と BI を実行する例。"
+    sources:
+      - {title: "Snowflake key concepts and architecture", url: "https://docs.snowflake.com/en/user-guide/intro-key-concepts"}
+      - {title: "Secure Data Sharing", url: "https://docs.snowflake.com/en/user-guide/data-sharing-intro"}
+      - {title: "Snowflake S3 ストレージ統合", url: "https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration"}
+    tiers:
+      - {id: "platform", label: "Snowflake platform", z: 0, size: [18,6]}
+      - {id: "compute", label: "計算ワークロード", z: 1, origin: [4,0], size: [12,3]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 2, size: [8,3]}
+    nodes:
+      example-source: {label: "Amazon S3 注文ファイル", kind: "db", tier: "platform", x: 0, y: 1.5, svc: "s3", realizes: ["source"], description: "CSV を入力バケットに着地させる。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-services: {label: "Snowflake Cloud Services と Horizon Catalog", kind: "service", tier: "compute", x: 3, y: 1.5, realizes: ["services","metadata"], description: "認証・調整と資産調査の入口を同じ Snowflake アカウントに置く。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-load: {label: "LOAD_WH", kind: "worker", tier: "compute", x: 6, y: 1.5, realizes: ["load"], description: "仮想ウェアハウスで COPY INTO を実行する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-storage: {label: "Snowflake ORDERS テーブル", kind: "db", tier: "platform", x: 9, y: 1.5, realizes: ["storage"], description: "注文を内部管理テーブルに格納する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-biwh: {label: "BI_WH", kind: "worker", tier: "compute", x: 12, y: 1.5, realizes: ["biwh"], description: "BI クエリに別の仮想ウェアハウスを使う。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-bi: {label: "BI クライアント", kind: "actor", tier: "platform", x: 15, y: 1.5, realizes: ["bi"], description: "BI_WH を指定して SQL を実行する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-sharing: {label: "Snowflake Direct Share", kind: "service", tier: "platform", x: 9, y: 5, realizes: ["sharing"], description: "許可した公開ビューを共有オブジェクトとして指定する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-partner: {label: "同一リージョンの受領アカウント", kind: "external", tier: "platform", x: 15, y: 5, realizes: ["partner"], description: "共有から読み取り専用データベースを作る。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      example-stage: {label: "S3 外部ステージとストレージ統合", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "許可した S3 パスをステージに登録し、ストレージ統合でアクセスを許可する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+    links:
+      - {id: "example-s3-stage", from: "example-source", to: "example-stage", label: "S3 の着地パスを参照", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}
+      - {id: "example-stage-connection", from: "example-stage", to: "example-load", label: "COPY INTO のファイル参照先", evidence: [{"type":"doc","ref":"docs/reference-snowflake.md#§8"}]}

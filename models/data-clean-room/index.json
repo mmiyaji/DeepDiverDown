@@ -2,8 +2,8 @@
   "model": "data-clean-room",
   "name": "データクリーンルームの基本構成",
   "coverage": {
-    "covered": 3,
-    "total": 3
+    "covered": 4,
+    "total": 4
   },
   "byId": {
     "media": {
@@ -64,6 +64,59 @@
     "measure": {
       "type": "scenario",
       "label": "広告接触後の受注を集計"
+    },
+    "aws-cleanrooms-media": {
+      "type": "implementation",
+      "impl": "aws-cleanrooms",
+      "label": "媒体社の Glue テーブル（S3）",
+      "realizes": [
+        "media"
+      ]
+    },
+    "aws-cleanrooms-retail": {
+      "type": "implementation",
+      "impl": "aws-cleanrooms",
+      "label": "小売社の Glue テーブル（S3）",
+      "realizes": [
+        "sales"
+      ]
+    },
+    "aws-cleanrooms-controls": {
+      "type": "implementation",
+      "impl": "aws-cleanrooms",
+      "label": "AWS Clean Rooms の集計分析ルール",
+      "realizes": [
+        "policy",
+        "release"
+      ]
+    },
+    "aws-cleanrooms-collab": {
+      "type": "implementation",
+      "impl": "aws-cleanrooms",
+      "label": "AWS Clean Rooms コラボレーション",
+      "realizes": [
+        "room"
+      ]
+    },
+    "aws-cleanrooms-member": {
+      "type": "implementation",
+      "impl": "aws-cleanrooms",
+      "label": "結果受領が許可されたメンバー",
+      "realizes": [
+        "recipient"
+      ]
+    },
+    "aws-cleanrooms-iam": {
+      "type": "implementation",
+      "impl": "aws-cleanrooms",
+      "label": "テーブル関連付け用 IAM ロール",
+      "realizes": []
+    },
+    "aws-cleanrooms-output": {
+      "type": "implementation",
+      "impl": "aws-cleanrooms",
+      "label": "結果受領者の Amazon S3",
+      "realizes": []
     }
   },
   "byRef": {
@@ -86,7 +139,14 @@
       "check-query",
       "check-result",
       "receive",
-      "measure"
+      "measure",
+      "aws-cleanrooms-media",
+      "aws-cleanrooms-retail",
+      "aws-cleanrooms-controls",
+      "aws-cleanrooms-collab",
+      "aws-cleanrooms-member",
+      "aws-cleanrooms-iam",
+      "aws-cleanrooms-output"
     ],
     "docs/reference-data-clean-room.md#§2": [
       "media",
@@ -100,11 +160,22 @@
       "check-query",
       "check-result",
       "receive"
+    ],
+    "docs/reference-data-clean-room.md#§4": [
+      "aws-cleanrooms-media",
+      "aws-cleanrooms-retail",
+      "aws-cleanrooms-controls",
+      "aws-cleanrooms-collab",
+      "aws-cleanrooms-member",
+      "aws-cleanrooms-iam",
+      "aws-cleanrooms-output"
     ]
   },
   "reference": {
-    "category": "構成概念",
-    "order": 20,
+    "category": "ユースケース",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
     "objectives": [
       "元データ、実行権限、受領範囲を区別する。",
       "最小件数の制約が適用される場所を確認する。"

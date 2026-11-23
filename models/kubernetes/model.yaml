@@ -26,21 +26,21 @@ tiers:
   - {id: network, label: クラスタネットワーク, z: 0, origin: [9, 0], size: [3, 3]}
 nodes:
   kubectl:
-    {label: kubectl / 利用者, kind: client, tier: client, x: 0, y: 1.5, description: 注文 API の Deployment を API サーバーへ送る。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§2"}]}
+    {label: 構成の投入クライアント, kind: client, tier: client, x: 0, 'y': 1.5, description: 注文 API の Deployment を API サーバーへ送る。, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§2}]}
   apiserver:
     {label: API サーバー, kind: service, tier: control, x: 0, y: 1.5, description: Kubernetes API の入口として宣言を受け付ける。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§2"}, {type: doc, ref: "docs/reference-kubernetes.md#§3"}]}
   controller:
-    {label: Deployment Controller, kind: service, tier: control, x: 3, y: 1.5, description: Deployment と Pod の望ましい状態との差分を調整する。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§3"}, {type: doc, ref: "docs/reference-kubernetes.md#§5"}]}
+    {label: レプリカ調整, kind: service, tier: control, x: 3, 'y': 1.5, description: Deployment と Pod の望ましい状態との差分を調整する。, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§3}, {type: doc, ref: docs/reference-kubernetes.md#§5}]}
   scheduler:
-    {label: Scheduler, kind: service, tier: control, x: 6.5, y: 1.5, description: 未配置の Pod を配置先ノードへ割り当てる。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§3"}, {type: doc, ref: "docs/reference-kubernetes.md#§5"}]}
+    {label: 配置先の決定, kind: service, tier: control, x: 6.5, 'y': 1.5, description: 未配置の Pod を配置先ノードへ割り当てる。, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§3}, {type: doc, ref: docs/reference-kubernetes.md#§5}]}
   etcd:
-    {label: etcd, kind: db, tier: control, x: 8.5, y: 1.5, description: Kubernetes API のクラスタ状態を保持するデータストア。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§1"}, {type: doc, ref: "docs/reference-kubernetes.md#§2"}]}
+    {label: クラスタ状態ストア, kind: db, tier: control, x: 8.5, 'y': 1.5, description: Kubernetes API のクラスタ状態を保持するデータストア。, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§1}, {type: doc, ref: docs/reference-kubernetes.md#§2}]}
   kubelet:
-    {label: worker の kubelet, kind: worker, tier: worker, x: 1, y: 1.5, description: 割り当てられた Pod をコンテナランタイム経由で起動・監視する。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§3"}]}
+    {label: ノード実行エージェント, kind: worker, tier: worker, x: 1, 'y': 1.5, description: 割り当てられた Pod をコンテナランタイム経由で起動・監視する。, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§3}]}
   order-api:
-    {label: 注文 API Pod, kind: service, tier: worker, x: 5, y: 1.5, description: Deployment が管理する注文 API の Pod。配置は説明用の論理表現。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§3"}, {type: doc, ref: "docs/reference-kubernetes.md#§4"}]}
+    {label: 注文 API の実行単位, kind: service, tier: worker, x: 5, 'y': 1.5, description: Deployment が管理する注文 API の Pod。配置は説明用の論理表現。, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§3}, {type: doc, ref: docs/reference-kubernetes.md#§4}]}
   service:
-    {label: 注文 API Service, kind: lb, tier: network, x: 1, y: 1.5, description: ラベルに一致する注文 API Pod への安定したネットワーク入口。, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§4"}]}
+    {label: 注文 API の内部公開, kind: lb, tier: network, x: 1, 'y': 1.5, description: ラベルに一致する注文 API Pod への安定したネットワーク入口。, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§4}]}
 links:
   - {id: apply, from: kubectl, to: apiserver, label: Deployment を適用, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§2"}]}
   - {id: reconcile, from: apiserver, to: controller, label: 望ましい状態を反映, evidence: [{type: doc, ref: "docs/reference-kubernetes.md#§3"}]}
@@ -67,3 +67,133 @@ scenarios:
       - {links: [heartbeat, worker-loss], note: "worker の heartbeat / Node Ready 状態を制御プレーンが観察し、障害により望ましい状態との差分が生じる。Pod が直接 Controller に通知する図ではない。"}
       - {links: [reconcile, schedule], note: "Controller が差分を検知し、Scheduler が配置可能なノードを選ぶ。"}
       - {links: [bind, start, expose], note: "kubelet が新しい Pod を起動し、Service の対象へ反映する。時間や結果は環境依存。"}
+implementations:
+  - id: kubeadm
+    label: kubeadm と stacked etcd
+    description: オンプレミスの仮想マシンで、kubeadm の stacked etcd 構成を使って注文 API を動かす例。
+    sources:
+      - title: Creating Highly Available Clusters with kubeadm
+        url: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/
+      - title: Kubernetes Components
+        url: https://kubernetes.io/docs/concepts/overview/components/
+      - title: Service
+        url: https://kubernetes.io/docs/concepts/services-networking/service/
+    tiers:
+      - id: client
+        label: 利用者
+        kind: origin
+        z: 1
+        origin:
+          - -4
+          - 0
+      - id: control
+        label: コントロールプレーン
+        z: 1
+      - id: worker
+        label: ワーカーノード
+        z: 0
+      - id: network
+        label: クラスタネットワーク
+        z: 0
+        origin:
+          - 9
+          - 0
+    groups:
+      - kind: cluster
+        label: kubeadm クラスタ
+        provider: k8s
+        tier:
+          - control
+          - worker
+          - network
+        nodes:
+          - kubeadm-apiserver
+          - kubeadm-kubelet
+          - kubeadm-order-api
+          - kubeadm-service
+    nodes:
+      kubeadm-kubectl:
+        label: kubectl
+        kind: client
+        tier: client
+        realizes:
+          - kubectl
+        description: 注文 API の Deployment と Service を適用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7
+      kubeadm-apiserver:
+        label: コントロールプレーンVM × 3
+        kind: worker
+        tier: control
+        svc: onprem:vm
+        realizes:
+          - apiserver
+          - controller
+          - scheduler
+          - etcd
+        description: kube-apiserver、kube-controller-manager、kube-scheduler とローカル etcd メンバーを各 VM 上で実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7
+      kubeadm-kubelet:
+        label: worker VM の kubelet と containerd
+        kind: worker
+        tier: worker
+        svc: onprem:vm
+        realizes:
+          - kubelet
+        description: Pod の割り当てを監視し、containerd に実行を依頼する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7
+      kubeadm-order-api:
+        label: 注文 API Deployment / Pod
+        kind: service
+        tier: worker
+        svc: k8s:deployment
+        realizes:
+          - order-api
+        description: レプリカを worker VM 上に配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7
+      kubeadm-service:
+        label: ClusterIP Service
+        kind: lb
+        tier: network
+        svc: k8s:service
+        realizes:
+          - service
+        description: ラベルセレクターに合う Pod をクラスタ内に公開する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7
+      kubeadm-api-lb:
+        label: API 用 TCP ロードバランサー
+        kind: lb
+        tier: client
+        svc: onprem:lb
+        description: 同一 DNS 名から各 API サーバーの 6443 番ポートへ接続を振り分ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7
+    links:
+      - id: kubeadm-admin-endpoint
+        from: kubeadm-kubectl
+        to: kubeadm-api-lb
+        label: 共有 API エンドポイントへ接続
+        realizes: [apply]
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7
+      - id: kubeadm-api-backend
+        from: kubeadm-api-lb
+        to: kubeadm-apiserver
+        label: 正常な API サーバーへ転送
+        realizes: [apply]
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-kubernetes.md#§7

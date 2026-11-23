@@ -2,83 +2,83 @@
   "model": "cilium-hubble",
   "name": "Cilium と Hubble の通信ポリシーと観測",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "checkout": {
       "type": "node",
-      "label": "チェックアウト Pod",
+      "label": "チェックアウトの実行単位",
       "status": "claim"
     },
     "report": {
       "type": "node",
-      "label": "集計 Pod",
+      "label": "集計処理の実行単位",
       "status": "claim"
     },
     "policy": {
       "type": "node",
-      "label": "注文 API NetworkPolicy",
+      "label": "注文 API の着信ポリシー",
       "status": "claim"
     },
     "datapath": {
       "type": "node",
-      "label": "Cilium データパス",
+      "label": "ノードのパケット転送・判定",
       "status": "claim"
     },
     "order": {
       "type": "node",
-      "label": "注文 API Pod",
+      "label": "注文 API の実行単位",
       "status": "claim"
     },
     "hubble": {
       "type": "node",
-      "label": "ノードの Hubble",
+      "label": "ノードのフロー観測",
       "status": "claim"
     },
     "relay": {
       "type": "node",
-      "label": "Hubble Relay",
+      "label": "複数ノードの観測集約",
       "status": "claim"
     },
     "cli": {
       "type": "node",
-      "label": "Hubble CLI",
+      "label": "フロー確認クライアント",
       "status": "claim"
     },
     "allow-attempt": {
       "type": "link",
-      "label": "チェックアウト Pod → Cilium データパス",
+      "label": "チェックアウトの実行単位 → ノードのパケット転送・判定",
       "status": "claim"
     },
     "deny-attempt": {
       "type": "link",
-      "label": "集計 Pod → Cilium データパス",
+      "label": "集計処理の実行単位 → ノードのパケット転送・判定",
       "status": "claim"
     },
     "enforce": {
       "type": "link",
-      "label": "注文 API NetworkPolicy → Cilium データパス",
+      "label": "注文 API の着信ポリシー → ノードのパケット転送・判定",
       "status": "claim"
     },
     "forward": {
       "type": "link",
-      "label": "Cilium データパス → 注文 API Pod",
+      "label": "ノードのパケット転送・判定 → 注文 API の実行単位",
       "status": "claim"
     },
     "flow": {
       "type": "link",
-      "label": "Cilium データパス → ノードの Hubble",
+      "label": "ノードのパケット転送・判定 → ノードのフロー観測",
       "status": "claim"
     },
     "aggregate": {
       "type": "link",
-      "label": "ノードの Hubble → Hubble Relay",
+      "label": "ノードのフロー観測 → 複数ノードの観測集約",
       "status": "claim"
     },
     "inspect": {
       "type": "link",
-      "label": "Hubble Relay → Hubble CLI",
+      "label": "複数ノードの観測集約 → フロー確認クライアント",
       "status": "claim"
     },
     "allowed-flow": {
@@ -88,6 +88,69 @@
     "denied-flow": {
       "type": "scenario",
       "label": "集計 Pod からの通信を拒否"
+    },
+    "cilium-checkout": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "checkout Deployment の Pod",
+      "realizes": [
+        "checkout"
+      ]
+    },
+    "cilium-report": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "report Deployment の Pod",
+      "realizes": [
+        "report"
+      ]
+    },
+    "cilium-policy": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "NetworkPolicy マニフェスト",
+      "realizes": [
+        "policy"
+      ]
+    },
+    "cilium-datapath": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "Cilium Agent DaemonSet / eBPF / Hubble",
+      "realizes": [
+        "datapath",
+        "hubble"
+      ]
+    },
+    "cilium-order": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "order-api Deployment の Pod",
+      "realizes": [
+        "order"
+      ]
+    },
+    "cilium-relay": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "Hubble Relay Deployment",
+      "realizes": [
+        "relay"
+      ]
+    },
+    "cilium-cli": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "hubble CLI",
+      "realizes": [
+        "cli"
+      ]
+    },
+    "cilium-port-forward": {
+      "type": "implementation",
+      "impl": "cilium",
+      "label": "kubectl による Relay の port-forward",
+      "realizes": []
     }
   },
   "byRef": {
@@ -112,7 +175,15 @@
       "aggregate",
       "inspect",
       "allowed-flow",
-      "denied-flow"
+      "denied-flow",
+      "cilium-checkout",
+      "cilium-report",
+      "cilium-policy",
+      "cilium-datapath",
+      "cilium-order",
+      "cilium-relay",
+      "cilium-cli",
+      "cilium-port-forward"
     ],
     "docs/reference-cilium-hubble.md#§2": [
       "checkout",
@@ -142,6 +213,16 @@
       "inspect",
       "allowed-flow",
       "denied-flow"
+    ],
+    "docs/reference-cilium-hubble.md#§6": [
+      "cilium-checkout",
+      "cilium-report",
+      "cilium-policy",
+      "cilium-datapath",
+      "cilium-order",
+      "cilium-relay",
+      "cilium-cli",
+      "cilium-port-forward"
     ]
   },
   "reference": {

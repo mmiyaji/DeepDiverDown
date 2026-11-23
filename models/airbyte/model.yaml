@@ -14,20 +14,20 @@ tiers:
   - {id: control, label: 同期制御, z: 1, origin: [0,0], size: [16,4]}
 nodes:
   source: {label: 受注 API, kind: external, tier: flow, x: 1, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§1}, {type: doc, ref: docs/reference-airbyte.md#§2}]}
-  sourceConnector: {label: Source Connector, kind: worker, tier: flow, x: 4, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§2}]}
-  syncJob: {label: Sync Job, kind: service, tier: flow, x: 7, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}]}
-  destinationConnector: {label: Destination Connector, kind: worker, tier: flow, x: 10, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}]}
-  warehouse: {label: 分析用ウェアハウス, kind: db, tier: flow, x: 13, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}]}
-  connection: {label: Connection 設定, kind: service, tier: control, x: 5, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§1}, {type: doc, ref: docs/reference-airbyte.md#§5}]}
-  state: {label: State / cursor, kind: db, tier: control, x: 11, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§4}, {type: doc, ref: docs/reference-airbyte.md#§5}]}
+  sourceConnector: {label: 入力 API アダプター, kind: worker, tier: flow, x: 4, 'y': 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§2}], description: API のページを取得し、同期対象と進捗を実行担当へ渡す。}
+  syncJob: {label: 同期の実行単位, kind: service, tier: flow, x: 7, 'y': 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}]}
+  destinationConnector: {label: 出力アダプター, kind: worker, tier: flow, x: 10, 'y': 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}]}
+  warehouse: {label: 分析用データベース, kind: db, tier: flow, x: 13, 'y': 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}]}
+  connection: {label: 同期対象と実行設定, kind: service, tier: control, x: 5, 'y': 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§1}, {type: doc, ref: docs/reference-airbyte.md#§5}]}
+  state: {label: 増分の再開位置, kind: db, tier: control, x: 11, 'y': 2, evidence: [{type: doc, ref: docs/reference-airbyte.md#§4}, {type: doc, ref: docs/reference-airbyte.md#§5}]}
 links:
   - {id: configure, from: connection, to: syncJob, label: 同期を設定・起動, evidence: [{type: doc, ref: docs/reference-airbyte.md#§1}]}
-  - {id: read, from: source, to: sourceConnector, label: Stream を読む, evidence: [{type: doc, ref: docs/reference-airbyte.md#§2}]}
-  - {id: execute, from: sourceConnector, to: syncJob, label: レコードと State, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}, {type: doc, ref: docs/reference-airbyte.md#§4}]}
+  - {id: read, from: source, to: sourceConnector, label: 同期対象のレコードを読む, evidence: [{type: doc, ref: docs/reference-airbyte.md#§2}]}
+  - {id: execute, from: sourceConnector, to: syncJob, label: レコードと進捗を渡す, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}, {type: doc, ref: docs/reference-airbyte.md#§4}]}
   - {id: write, from: syncJob, to: destinationConnector, label: レコードを渡す, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}]}
   - {id: commit, from: destinationConnector, to: warehouse, label: Destination にコミット, evidence: [{type: doc, ref: docs/reference-airbyte.md#§3}, {type: doc, ref: docs/reference-airbyte.md#§4}]}
-  - {id: checkpoint, from: destinationConnector, to: state, label: コミット済み State, evidence: [{type: doc, ref: docs/reference-airbyte.md#§4}]}
-  - {id: resume, from: state, to: sourceConnector, label: cursor から再開, evidence: [{type: doc, ref: docs/reference-airbyte.md#§4}, {type: doc, ref: docs/reference-airbyte.md#§5}]}
+  - {id: checkpoint, from: destinationConnector, to: state, label: コミットした進捗を保存, evidence: [{type: doc, ref: docs/reference-airbyte.md#§4}]}
+  - {id: resume, from: state, to: sourceConnector, label: 再開位置から取得, evidence: [{type: doc, ref: docs/reference-airbyte.md#§4}, {type: doc, ref: docs/reference-airbyte.md#§5}]}
 scenarios:
   - id: incremental
     label: 初回と増分同期
@@ -49,3 +49,26 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 未コミットデータを飛ばさない, text: State は Destination のコミット確認後に進める。, links: [commit, checkpoint, resume], evidence: [{type: doc, ref: docs/reference-airbyte.md#§4}]}
 unknowns: [{id: UNK-01, text: 具体的な実行間隔と内部サービス配置は確定していない。, refs: [configure]}]
 gates: {maxDrift: 0, maxHigh: 0}
+
+implementations:
+  - id: builder-postgres
+    label: "Airbyte Connector Builder と PostgreSQL"
+    description: "注文 API の更新日時をカーソルとし、Airbyte の増分接続から PostgreSQL に集める例。API が時刻フィルターと必要な順序を提供する前提で同期範囲を決める。"
+    sources:
+      - {title: Airbyte Protocol, url: https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol}
+      - {title: Connections and streams, url: https://docs.airbyte.com/platform/using-airbyte/getting-started/set-up-a-connection}
+      - {title: Sync Modes, url: https://docs.airbyte.com/platform/using-airbyte/core-concepts/sync-modes}
+      - {title: Incremental Sync, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync}
+      - {title: Airbyte Postgres Destination, url: https://docs.airbyte.com/integrations/destinations/postgres}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      builder-postgres-api: {label: 注文 API の orders エンドポイント, kind: external, tier: processing, x: 1, y: 1.15, realizes: [source], description: 更新日時パラメーターとページングで注文を提供する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+      builder-postgres-builder: {label: Airbyte のカスタム Source, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [sourceConnector], description: Connector Builder でページングと updated_at を使う増分取得を定義する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+      builder-postgres-airbyte: {label: Airbyte の Connection・同期ジョブ・状態, kind: workflow, tier: processing, x: 5, y: 1.15, realizes: [connection, syncJob, state], description: 同期頻度とストリームを設定し、接続ごとの進捗を管理する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+      builder-postgres-adapter: {label: Airbyte Postgres Destination, kind: worker, tier: processing, x: 5, y: 3.65, realizes: [destinationConnector], description: 受け取ったレコードを接続先のデータベースへ書く。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+      builder-postgres-db: {label: PostgreSQL の分析用スキーマ, kind: db, tier: processing, x: 9, y: 1.15, realizes: [warehouse], description: 同期された orders データを保存する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+      builder-postgres-manifest: {label: カスタム Source の宣言ファイル, kind: file, tier: setup, x: 1, y: 1.5, description: API の認証、ページング、ストリームのカーソル設定を定義する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+    links:
+      - {id: builder-postgres-manifest-connection, from: builder-postgres-manifest, to: builder-postgres-builder, label: 入力の仕様を配布}

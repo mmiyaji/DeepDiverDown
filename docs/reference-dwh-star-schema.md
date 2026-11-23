@@ -26,3 +26,21 @@ fact_order_line の1行は「1注文の1明細」。注文ヘッダ、明細、�
 - [Kimball Group の次元モデリング技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)
 - [Fact Tables and Dimension Tables](https://www.kimballgroup.com/2003/01/fact-tables-and-dimension-tables/)
 - [Power BI のスタースキーマ設計](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)
+
+## 5. 実装例 BigQuery の受注明細スタースキーマ
+
+注文明細を日付でパーティション化し、同じ商品に付いた販促タグでファクトを絞り込む例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 受注イベント | landing.order_events | 注文 ID と明細 ID の入力イベントを持つ。 |
+| 受注明細ファクト | sales.fact_order_line | 注文日でパーティション化し、注文 ID と明細 ID の組を一意にロードする。 |
+| 日付ディメンション | sales.dim_date | カレンダー属性を日付キーで参照する。 |
+| 顧客ディメンション | sales.dim_customer | 顧客の属性を顧客キーで参照する。 |
+| 商品ディメンション | sales.dim_product | 商品とカテゴリの属性を商品キーで参照する。 |
+| 商品と販促タグの関係 | sales.bridge_product_promo_tag | 商品と販促タグの対応を管理し、集計時には対象商品の集合を絞る。 |
+| BI／集計結果 | sales.monthly_sales SQL ビュー | 通貨と期間をそろえて売上を集計する。 |
+
+タグの複数一致で明細を増やさないよう、タグ条件を `EXISTS` などの存在判定に使う。売上は単位と通貨をそろえ、ロード時にキーの一意性を検証する。
+
+出典 [Kimball Group の次元モデリング技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[Fact Tables and Dimension Tables](https://www.kimballgroup.com/2003/01/fact-tables-and-dimension-tables/)、[Power BI のスタースキーマ設計](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)、[BigQuery パーティション表](https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)

@@ -2,18 +2,18 @@
   "model": "sorting-pruning",
   "name": "読み取りの絞り込み：ソートとプルーニング",
   "coverage": {
-    "covered": 10,
-    "total": 10
+    "covered": 11,
+    "total": 11
   },
   "byId": {
     "analyst": {
       "type": "node",
-      "label": "Analyst / SQL",
+      "label": "SQL の利用者",
       "status": "claim"
     },
     "query": {
       "type": "node",
-      "label": "Query engine",
+      "label": "フィルタを計画する処理",
       "status": "claim"
     },
     "orders": {
@@ -33,17 +33,17 @@
     },
     "scan": {
       "type": "node",
-      "label": "Remaining scan",
+      "label": "候補のデータを読む処理",
       "status": "claim"
     },
     "result": {
       "type": "node",
-      "label": "Result / ORDER BY",
+      "label": "検索結果と並び順",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "Analyst / SQL → Query engine",
+      "label": "SQL の利用者 → フィルタを計画する処理",
       "status": "claim"
     },
     "layout": {
@@ -58,27 +58,27 @@
     },
     "partition-prune": {
       "type": "link",
-      "label": "Query engine → order_date partitions",
+      "label": "フィルタを計画する処理 → order_date partitions",
       "status": "claim"
     },
     "block-skip": {
       "type": "link",
-      "label": "Query engine → customer_id blocks/files",
+      "label": "フィルタを計画する処理 → customer_id blocks/files",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "customer_id blocks/files → Remaining scan",
+      "label": "customer_id blocks/files → 候補のデータを読む処理",
       "status": "claim"
     },
     "return": {
       "type": "link",
-      "label": "Remaining scan → Result / ORDER BY",
+      "label": "候補のデータを読む処理 → 検索結果と並び順",
       "status": "claim"
     },
     "order": {
       "type": "link",
-      "label": "Query engine → Result / ORDER BY",
+      "label": "フィルタを計画する処理 → 検索結果と並び順",
       "status": "claim"
     },
     "month-customer": {
@@ -118,6 +118,47 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のエンジン、ファイル形式、統計の粒度、再クラスタリング頻度は未確定。"
+    },
+    "bigquery-clustered-client": {
+      "type": "implementation",
+      "impl": "bigquery-clustered",
+      "label": "BigQuery コンソールの SQL エディター",
+      "realizes": [
+        "analyst"
+      ]
+    },
+    "bigquery-clustered-table": {
+      "type": "implementation",
+      "impl": "bigquery-clustered",
+      "label": "BigQuery orders テーブル",
+      "realizes": [
+        "orders",
+        "partitions",
+        "blocks"
+      ]
+    },
+    "bigquery-clustered-engine": {
+      "type": "implementation",
+      "impl": "bigquery-clustered",
+      "label": "BigQuery の SQL 実行",
+      "realizes": [
+        "query",
+        "scan"
+      ]
+    },
+    "bigquery-clustered-result": {
+      "type": "implementation",
+      "impl": "bigquery-clustered",
+      "label": "BigQuery のクエリ結果",
+      "realizes": [
+        "result"
+      ]
+    },
+    "bigquery-clustered-stats": {
+      "type": "implementation",
+      "impl": "bigquery-clustered",
+      "label": "クエリジョブの処理量",
+      "realizes": []
     }
   },
   "byRef": {
@@ -148,7 +189,12 @@
       "sort-rewrite",
       "BR-01",
       "BR-02",
-      "NFR-01"
+      "NFR-01",
+      "bigquery-clustered-client",
+      "bigquery-clustered-table",
+      "bigquery-clustered-engine",
+      "bigquery-clustered-result",
+      "bigquery-clustered-stats"
     ],
     "docs/reference-sorting-pruning.md#§2": [
       "model",
@@ -201,11 +247,20 @@
     ],
     "docs/reference-sorting-pruning.md#§8": [
       "sort-rewrite"
+    ],
+    "docs/reference-sorting-pruning.md#§9": [
+      "bigquery-clustered-client",
+      "bigquery-clustered-table",
+      "bigquery-clustered-engine",
+      "bigquery-clustered-result",
+      "bigquery-clustered-stats"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
+    "category": "データ配置と読み取り",
     "order": 20,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
     "objectives": [
       "保存時のソート／クラスタリングとクエリの ORDER BY を区別する。",
       "order_date のパーティション・プルーニングと customer_id のブロック／ファイル・スキップを別の最適化として追う。",

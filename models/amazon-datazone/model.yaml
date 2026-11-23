@@ -32,7 +32,7 @@ tiers:
       - 15
       - 3
   - id: catalog
-    label: Amazon DataZone ドメイン
+    label: データ公開・購読の管理
     z: 1
     size:
       - 15
@@ -101,7 +101,7 @@ nodes:
       - type: doc
         ref: docs/reference-amazon-datazone.md#§4
   events:
-    label: Amazon EventBridge
+    label: 承認イベントの配信
     kind: queue
     tier: catalog
     x: 13
@@ -111,7 +111,7 @@ nodes:
       - type: doc
         ref: docs/reference-amazon-datazone.md#§4
   glue:
-    label: AWS Glue Data Catalog
+    label: ソースのテーブルカタログ
     kind: external
     tier: sources
     x: 2
@@ -127,23 +127,23 @@ nodes:
     tier: sources
     x: 4
     y: 2.5
-    description: 変換の実行イベントを DataZone に送る。
+    description: 変換の実行イベントをカタログに送る。
     drill: openlineage
     evidence:
       - type: doc
         ref: docs/reference-amazon-datazone.md#§5
   lake:
-    label: AWS Lake Formation
+    label: データレイクの権限制御
     kind: external
     tier: sources
     x: 7
     y: 1
-    description: 管理対象の Glue テーブルに利用権限を反映する。
+    description: 管理対象のテーブルに利用権限を反映する。
     evidence:
       - type: doc
         ref: docs/reference-amazon-datazone.md#§4
   athena:
-    label: Athena・購読の環境
+    label: 購読環境・クエリエンジン
     kind: external
     tier: sources
     x: 10
@@ -249,7 +249,7 @@ links:
         ref: docs/reference-amazon-datazone.md#§4
 scenarios:
   - id: managed-subscription
-    label: Glue 資産を公開して Athena で使う
+    label: データレイクの資産を公開して利用する
     evidence:
       - type: doc
         ref: docs/reference-amazon-datazone.md#§6
@@ -268,7 +268,7 @@ scenarios:
       - links:
           - managed-grant
           - query
-        note: 管理対象の権限を Lake Formation に設定し、購読側の Athena から利用する。
+        note: 利用権限をソースに反映し、購読側の処理エンジンから利用する。
   - id: unmanaged-subscription
     label: 非管理対象の購読を反映する
     evidence:
@@ -283,10 +283,10 @@ scenarios:
       - links:
           - publish-event
           - custom-grant
-        note: EventBridge のイベントで外部の権限付与処理を起動する。
+        note: 配信された承認イベントで外部の権限付与処理を起動する。
       - links:
           - report
-        note: 外部処理が権限付与の状態を DataZone に報告する。
+        note: 外部処理が権限付与の状態を購読管理機能に報告する。
 requirements:
   - id: R-01
     kind: rule
@@ -299,3 +299,158 @@ requirements:
     evidence:
       - type: doc
         ref: docs/reference-amazon-datazone.md#§4
+implementations:
+  - id: aws-datalake
+    label: DataZone のデータレイク環境
+    description: 提供・購読プロジェクトを DataZone の DefaultDataLake ブループリントで作る構成例。非管理対象資産の通知経路も描く。
+    sources:
+      - title: 'AWS Reference Architecture: Building a Unified Catalog with Amazon DataZone'
+        url: https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html
+      - title: Grant Access to Unmanaged Assets
+        url: https://docs.aws.amazon.com/datazone/latest/userguide/grant-access-to-unmanaged-asset.html
+      - title: Data Lineage in Amazon DataZone
+        url: https://docs.aws.amazon.com/datazone/latest/userguide/datazone-data-lineage.html
+      - title: Amazon DataZone built-in blueprints
+        url: https://docs.aws.amazon.com/datazone/latest/userguide/working-with-blueprints.html
+    nodes:
+      aws-datalake-publisher:
+        label: 提供側 DataZone プロジェクト
+        kind: actor
+        tier: people
+        x: 4
+        y: 1
+        description: 資産を公開し、購読申請を審査する。
+        realizes:
+          - owner
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+      aws-datalake-subscriber:
+        label: 購読側 DataZone プロジェクト
+        kind: actor
+        tier: people
+        x: 10
+        y: 1
+        description: 提供されたデータを利用する環境を持つ。
+        realizes:
+          - consumer
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+      aws-datalake-portal:
+        label: Amazon DataZone（ドメイン・ポータル）
+        kind: catalog
+        tier: catalog
+        x: 6
+        y: 1
+        description: インベントリ、公開カタログ、購読状態を一つのドメインで管理する。
+        realizes:
+          - inventory
+          - published
+          - subscription
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+      aws-datalake-eventbridge:
+        label: Amazon EventBridge
+        kind: queue
+        tier: catalog
+        x: 13
+        y: 2.5
+        description: 非管理対象の承認イベントを配信する。
+        svc: eventbridge
+        realizes:
+          - events
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+      aws-datalake-glue:
+        label: AWS Glue Data Catalog
+        kind: external
+        tier: sources
+        x: 2
+        y: 1
+        description: Lake Formation 管理下の注文テーブルを登録する。
+        svc: glue
+        realizes:
+          - glue
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+        drill: aws-glue
+      aws-datalake-job:
+        label: AWS Glue Spark ETL
+        kind: external
+        tier: sources
+        x: 4
+        y: 2.5
+        description: 対応バージョンで OpenLineage のイベントを出す。
+        realizes:
+          - lineage
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+        drill: openlineage
+      aws-datalake-lakeformation:
+        label: AWS Lake Formation
+        kind: policy
+        tier: sources
+        x: 7
+        y: 1
+        description: 購読側のデータアクセスを付与する。
+        realizes:
+          - lake
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+      aws-datalake-athena:
+        label: Amazon Athena ワークグループ
+        kind: external
+        tier: sources
+        x: 10
+        y: 1
+        description: 購読環境が付与済みテーブルをクエリする。
+        svc: athena
+        realizes:
+          - athena
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+      aws-datalake-custom:
+        label: 外部の購読処理
+        kind: external
+        tier: sources
+        x: 13
+        y: 2.5
+        description: 承認イベントに従ってソース側の権限変更を担当する。
+        realizes:
+          - external
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+      aws-datalake-blueprint:
+        label: DefaultDataLake ブループリント
+        kind: workflow
+        tier: catalog
+        x: 2
+        y: 2.5
+        description: Glue 管理アクセスロールとデータレイク環境を構成する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+    links:
+      - id: aws-datalake-provision
+        from: aws-datalake-blueprint
+        to: aws-datalake-portal
+        label: データレイク環境の設定を用意
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-datazone.md#§7
+    groups:
+      - label: AWS データレイク環境
+        kind: cloud
+        provider: aws
+        nodes:
+          - aws-datalake-glue
+          - aws-datalake-lakeformation
+          - aws-datalake-athena

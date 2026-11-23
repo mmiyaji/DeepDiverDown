@@ -23,3 +23,19 @@
 明細2の後着訂正で明細金額が 450 円、総額が 1,150 円になる例を扱う。平坦な表では明細キーで明細を特定し、複製した総額はその注文に属する全行を更新する。ネスト表では注文 ID で当該行を特定し、最新の明細に基づき配列を再生成する。更新に `MERGE` を使う場合、対象行を更新するソースは粒度にあうように重複を除き、変更時刻やソース順序を使って新旧を判定する。
 
 出典 [BigQuery: Data manipulation language](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax)
+
+## 5. 実装例 BigQuery での注文行と明細行
+
+合成の注文データを二つの分析テーブルに生成し、明細の後着訂正を同じ取込単位から反映する例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 注文ヘッダー・注文明細 | landing.orders と landing.order_items | ヘッダーと明細を粒度ごとに別テーブルに置く。 |
+| 注文テーブルの生成 | BigQuery の注文単位の再生成 SQL | 対象注文の最新ヘッダーと明細から、両配置の行を組み立てる。 |
+| 明細粒度のワイドテーブル | reporting.order_lines_wide | 1 明細 1 行で総額を複製し、注文情報で明細を絞れるようにする。 |
+| 注文粒度のネストテーブル | reporting.orders_nested | ARRAY<STRUCT> に注文明細をまとめ、注文 ID ごとに 1 行とする。 |
+| 注文・明細の集計 | 注文用と明細用の BigQuery SQL ビュー | 注文用は注文行を読み、明細用は UNNEST で明細に展開する。 |
+
+平坦表の定型分析とネスト表の注文分析を別々のクエリから確認する。`MERGE` や対象範囲の置き換えには、更新粒度ごとに一意なソースを作る。
+
+出典 [BigQuery: Use nested and repeated fields](https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested)、[BigQuery: Work with arrays](https://docs.cloud.google.com/bigquery/docs/arrays)、[BigQuery: Data manipulation language](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)

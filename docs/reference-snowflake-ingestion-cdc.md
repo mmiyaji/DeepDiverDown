@@ -31,3 +31,23 @@ SELECT を定義し、ベーステーブルに対する目標遅延を設定す�
 - [Snowpipe Streaming](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview)
 - [Streams and Tasks](https://docs.snowflake.com/en/user-guide/data-pipelines-intro)
 - [Dynamic Tables の選択ガイド](https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide)
+
+## 6. 実装例 Snowflake のファイルと行ストリーム取込
+
+外部ステージ経由のファイル取込と SDK による行取込を、別々の入力経路として使う例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 到着した注文ファイル | Amazon S3 外部ステージ | 注文ファイルを外部ステージに関連付ける。 |
+| 通知駆動のファイル取込 | Snowpipe AUTO_INGEST | S3 オブジェクト通知を受けて COPY を行う。 |
+| 注文イベント送信元 | 注文イベント送信アプリ | Snowpipe Streaming SDK でイベントを送る。 |
+| 連続行取込 | Snowpipe Streaming のチャネル | 行をチャネルで取り込み、SDK の進捗管理を行う。 |
+| 注文変更の受入表・未処理変更と読取位置 | RAW_ORDERS と Stream | 同じ Snowflake スキーマで受入表と未消費の変更範囲を管理する。 |
+| 変更適用ジョブ | Task の MERGE | 注文キーとソース順序を使って、対象表に変更を反映する。 |
+| 注文の現在状態表 | ORDERS_CURRENT | 検証済みの受注の現在状態を持つ。 |
+| 鮮度目標付き注文集計 | 日別集計 Dynamic Table | 目標遅延を設定してクエリ結果を更新する。 |
+| BI | BI 用 SQL クライアント | 注文日別の集計を利用する。 |
+
+2 経路は用途で選び、同じイベントが両方に入るなら変更適用時に一意に処理する。Dynamic Table の目標遅延は更新計画の指標で、個々の変更がその時間内に反映される保証とはならない。
+
+出典 [Snowpipe](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro)、[Snowpipe Streaming](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview)、[Streams and Tasks](https://docs.snowflake.com/en/user-guide/data-pipelines-intro)、[Dynamic Tables の選択ガイド](https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide)、[Snowpipe の S3 自動取込](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-auto-s3)

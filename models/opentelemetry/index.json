@@ -2,8 +2,8 @@
   "model": "opentelemetry",
   "name": "OpenTelemetry の分散トレーシングとサンプリング",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "caller": {
@@ -13,67 +13,67 @@
     },
     "order": {
       "type": "node",
-      "label": "注文 API + SDK",
+      "label": "注文 API と計装",
       "status": "claim"
     },
     "inventory": {
       "type": "node",
-      "label": "在庫 API + SDK",
+      "label": "在庫 API と計装",
       "status": "claim"
     },
     "receiver": {
       "type": "node",
-      "label": "OTLP Receiver",
+      "label": "テレメトリ受信",
       "status": "claim"
     },
     "sampling": {
       "type": "node",
-      "label": "Tail Sampling Processor",
+      "label": "トレースの保持判定",
       "status": "claim"
     },
     "exporter": {
       "type": "node",
-      "label": "Collector Exporter",
+      "label": "採用トレースの送信",
       "status": "claim"
     },
     "backend": {
       "type": "node",
-      "label": "トレースバックエンド",
+      "label": "分散トレースの保存と検索",
       "status": "claim"
     },
     "request": {
       "type": "link",
-      "label": "注文クライアント → 注文 API + SDK",
+      "label": "注文クライアント → 注文 API と計装",
       "status": "claim"
     },
     "reserve": {
       "type": "link",
-      "label": "注文 API + SDK → 在庫 API + SDK",
+      "label": "注文 API と計装 → 在庫 API と計装",
       "status": "claim"
     },
     "order-otlp": {
       "type": "link",
-      "label": "注文 API + SDK → OTLP Receiver",
+      "label": "注文 API と計装 → テレメトリ受信",
       "status": "claim"
     },
     "inventory-otlp": {
       "type": "link",
-      "label": "在庫 API + SDK → OTLP Receiver",
+      "label": "在庫 API と計装 → テレメトリ受信",
       "status": "claim"
     },
     "process": {
       "type": "link",
-      "label": "OTLP Receiver → Tail Sampling Processor",
+      "label": "テレメトリ受信 → トレースの保持判定",
       "status": "claim"
     },
     "keep": {
       "type": "link",
-      "label": "Tail Sampling Processor → Collector Exporter",
+      "label": "トレースの保持判定 → 採用トレースの送信",
       "status": "claim"
     },
     "export": {
       "type": "link",
-      "label": "Collector Exporter → トレースバックエンド",
+      "label": "採用トレースの送信 → 分散トレースの保存と検索",
       "status": "claim"
     },
     "keep-error": {
@@ -83,6 +83,61 @@
     "drop-success": {
       "type": "scenario",
       "label": "成功した注文が検索結果に現れない"
+    },
+    "otel-caller": {
+      "type": "implementation",
+      "impl": "otel",
+      "label": "テスト用 HTTP クライアント",
+      "realizes": [
+        "caller"
+      ]
+    },
+    "otel-order": {
+      "type": "implementation",
+      "impl": "otel",
+      "label": "注文 API と OpenTelemetry SDK",
+      "realizes": [
+        "order"
+      ]
+    },
+    "otel-inventory": {
+      "type": "implementation",
+      "impl": "otel",
+      "label": "在庫 API と OpenTelemetry SDK",
+      "realizes": [
+        "inventory"
+      ]
+    },
+    "otel-receiver": {
+      "type": "implementation",
+      "impl": "otel",
+      "label": "Collector 入口 Deployment",
+      "realizes": [
+        "receiver"
+      ]
+    },
+    "otel-sampling": {
+      "type": "implementation",
+      "impl": "otel",
+      "label": "Collector サンプリング Deployment",
+      "realizes": [
+        "sampling",
+        "exporter"
+      ]
+    },
+    "otel-backend": {
+      "type": "implementation",
+      "impl": "otel",
+      "label": "Jaeger Collector / Query",
+      "realizes": [
+        "backend"
+      ]
+    },
+    "otel-routing": {
+      "type": "implementation",
+      "impl": "otel",
+      "label": "第2段 Collector 用 Headless Service",
+      "realizes": []
     }
   },
   "byRef": {
@@ -108,7 +163,14 @@
       "keep",
       "export",
       "keep-error",
-      "drop-success"
+      "drop-success",
+      "otel-caller",
+      "otel-order",
+      "otel-inventory",
+      "otel-receiver",
+      "otel-sampling",
+      "otel-backend",
+      "otel-routing"
     ],
     "docs/reference-opentelemetry.md#§2": [
       "order",
@@ -136,6 +198,15 @@
       "export",
       "keep-error",
       "drop-success"
+    ],
+    "docs/reference-opentelemetry.md#§6": [
+      "otel-caller",
+      "otel-order",
+      "otel-inventory",
+      "otel-receiver",
+      "otel-sampling",
+      "otel-backend",
+      "otel-routing"
     ]
   },
   "reference": {

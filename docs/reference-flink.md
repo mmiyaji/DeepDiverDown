@@ -39,3 +39,26 @@ Sink は集計結果を下流へ書く。復旧時は状態を復元し、ソー
 ## 7. シナリオ
 
 「イベント時刻の窓集計と復旧」シナリオをクリックすると、Source、ウォーターマーク、状態、Sink、チェックポイント復帰を追える。
+
+## 8. 実装例：Flink・Kafka・永続チェックポイント
+
+Kafka の時刻付きイベントをキー別の窓で集計する Flink ジョブ。選んだ状態バックエンドとチェックポイントの保存先は独立に指定する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 再読できるイベント入力 | Flink KafkaSource と注文トピック | 入力の Kafka パーティションと読み取り位置を管理する。 |
+| イベント時刻の進捗生成、窓集計の実行 | TaskManager 上の時刻処理と Window Operator | WatermarkStrategy と窓処理をフローの実行タスクに組み込む。 |
+| キー別の作業状態 | EmbeddedRocksDBStateBackend | TaskManager のローカルディスクを利用し、キー別状態を持つ。 |
+| 永続チェックポイント | HDFS のチェックポイントディレクトリー | ファイルシステム型のチェックポイント保存先にする。 |
+| 結果の出力先 | Kafka の出力トピック | KafkaSink で窓集計の結果を書き込む。 |
+
+実装で加わる部品を以下に示す。
+
+- JobManager のチェックポイント調整。チェックポイントを開始し、各タスクから完了確認を集める。
+
+公式資料
+
+- [Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)
+- [Timely Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/)
+- [Flink Checkpointing](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/)
+- [Flink State Backends](https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/)

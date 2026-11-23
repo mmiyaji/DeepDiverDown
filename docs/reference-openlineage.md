@@ -33,3 +33,21 @@ RunEvent は Job の実行時に送る状態更新で、通常は START と COMP
 ## 6. シナリオ
 
 「原本から日次売上までの lineage」シナリオをクリックすると、Dataset、変換 Job、RunEvent の START/COMPLETE を順に追える。
+
+## 7. 実装例：Apache Spark・Marquez
+
+OpenLineage の Spark Listener から、Docker で起動した Marquez へ HTTP で実行イベントを配信する例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| 受注原本 Dataset | 入力 Parquet（受注原本） | Spark が読み取る入力データセット。 |
+| 整形 Job・集計 Job | Apache Spark（整形・集計） | 両方の変換を同じ実行基盤で動かす。 |
+| 受注明細 Dataset | 中間 Parquet（受注明細） | 整形結果を次の集計処理が読む。 |
+| 日次売上 Dataset | 出力 Parquet（日次売上） | 集計ジョブの出力データセット。 |
+| RunEvent 収集先 | Marquez API | OpenLineage RunEvent を HTTP で受信する。 |
+| 実装で追加 | OpenLineageSparkListener | Spark の実行情報からイベントを組み立てる。 |
+| 実装で追加 | Marquez Web UI | 実行単位のメタデータから、ジョブとデータセットの関係を確認できる。 |
+
+公式のローカル試行構成では Spark と Jupyter、および Marquez の受信 API を用意する。`spark.extraListeners` と HTTP transport を設定し、ジョブの namespace とデータセットの識別子を揃える。
+
+[OpenLineage Object Model](https://openlineage.io/docs/1.47.0/spec/object-model/)、[OpenLineage Getting Started](https://openlineage.io/getting-started/)、[Using OpenLineage with Spark](https://openlineage.io/docs/1.54.0/guides/spark/)

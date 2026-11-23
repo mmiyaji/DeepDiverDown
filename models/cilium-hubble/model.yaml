@@ -16,14 +16,14 @@ tiers:
   - {id: "traffic", label: "Kubernetes ワークロード", z: 1, size: [17,7]}
   - {id: "observe", label: "フローの観測", z: 0, size: [17,4]}
 nodes:
-  checkout: {label: "チェックアウト Pod", kind: "client", tier: "traffic", x: 0, y: 1.5, description: "注文 API の TCP 8080 に接続することを許可された Pod。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
-  report: {label: "集計 Pod", kind: "client", tier: "traffic", x: 0, y: 5, description: "同じ注文 API に接続を試みるが、許可元のセレクターに一致しない。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
-  policy: {label: "注文 API NetworkPolicy", kind: "segment", tier: "traffic", x: 6, y: 5, description: "注文 API Pod への TCP 8080 をチェックアウト Pod から許可する。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
-  datapath: {label: "Cilium データパス", kind: "service", tier: "traffic", x: 6, y: 1.5, description: "対象 Pod の Ingress で、ポリシーに基づいてパケットを転送または破棄する。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§3"}]}
-  order: {label: "注文 API Pod", kind: "service", tier: "traffic", x: 12, y: 1.5, description: "NetworkPolicy の対象となる Pod。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
-  hubble: {label: "ノードの Hubble", kind: "worker", tier: "observe", x: 4, y: 1.5, description: "Cilium のネットワークイベントをフローとして扱う。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§4"}]}
-  relay: {label: "Hubble Relay", kind: "service", tier: "observe", x: 9, y: 1.5, description: "ノードの Hubble API を集約し、クラスタ全体のフローを参照できるようにする。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§4"}]}
-  cli: {label: "Hubble CLI", kind: "client", tier: "observe", x: 14, y: 1.5, description: "フローを送信元・送信先や verdict で絞り込む。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§5"}]}
+  checkout: {label: チェックアウトの実行単位, kind: client, tier: traffic, x: 0, 'y': 1.5, description: 注文 API の TCP 8080 に接続することを許可された Pod。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§2}]}
+  report: {label: 集計処理の実行単位, kind: client, tier: traffic, x: 0, 'y': 5, description: 同じ注文 API に接続を試みるが、許可元のセレクターに一致しない。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§2}]}
+  policy: {label: 注文 API の着信ポリシー, kind: policy, tier: traffic, x: 6, 'y': 5, description: 注文 API Pod への TCP 8080 をチェックアウト Pod から許可する。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§2}]}
+  datapath: {label: ノードのパケット転送・判定, kind: service, tier: traffic, x: 6, 'y': 1.5, description: 対象 Pod の Ingress で、ポリシーに基づいてパケットを転送または破棄する。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§3}]}
+  order: {label: 注文 API の実行単位, kind: service, tier: traffic, x: 12, 'y': 1.5, description: NetworkPolicy の対象となる Pod。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§2}]}
+  hubble: {label: ノードのフロー観測, kind: monitor, tier: observe, x: 4, 'y': 1.5, description: Cilium のネットワークイベントをフローとして扱う。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§4}]}
+  relay: {label: 複数ノードの観測集約, kind: monitor, tier: observe, x: 9, 'y': 1.5, description: ノードの Hubble API を集約し、クラスタ全体のフローを参照できるようにする。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§4}]}
+  cli: {label: フロー確認クライアント, kind: client, tier: observe, x: 14, 'y': 1.5, description: フローを送信元・送信先や verdict で絞り込む。, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§5}]}
 links:
   - {id: "allow-attempt", from: "checkout", to: "datapath", label: "注文 API の TCP 8080 に接続", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
   - {id: "deny-attempt", from: "report", to: "datapath", label: "注文 API の TCP 8080 に接続", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
@@ -45,3 +45,135 @@ scenarios:
     steps:
       - {links: ["deny-attempt","enforce"], note: "集計 Pod が同じ宛先に接続を試みる。この送信元を許可するルールがない。"}
       - {links: ["flow","aggregate","inspect"], note: "Cilium がパケットを破棄する。Hubble で宛先 Pod と DROPPED を絞り込み、Policy denied の理由を確認する。"}
+implementations:
+  - id: cilium
+    label: Kubernetes の Cilium Agent と Hubble Relay
+    description: Kubernetes に Cilium と Hubble Relay を配置し、注文 API への許可・拒否フローを確かめる例。
+    sources:
+      - title: Hubble Observability Setup
+        url: https://docs.cilium.io/en/stable/observability/hubble/setup/index.html
+      - title: Hubble Architecture
+        url: https://docs.cilium.io/en/stable/observability/hubble/
+      - title: Kubernetes Network Policies
+        url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+    tiers:
+      - id: traffic
+        label: Kubernetes ワークロード
+        z: 1
+      - id: observe
+        label: フローの観測
+        z: 0
+    groups:
+      - kind: cluster
+        label: Cilium を使う Kubernetes クラスタ
+        provider: k8s
+        tier:
+          - traffic
+          - observe
+        nodes:
+          - cilium-checkout
+          - cilium-report
+          - cilium-policy
+          - cilium-datapath
+          - cilium-order
+          - cilium-relay
+    nodes:
+      cilium-checkout:
+        label: checkout Deployment の Pod
+        kind: client
+        tier: traffic
+        svc: k8s:deployment
+        realizes:
+          - checkout
+        description: ポリシーで許可する Pod ラベルを付ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      cilium-report:
+        label: report Deployment の Pod
+        kind: client
+        tier: traffic
+        svc: k8s:deployment
+        realizes:
+          - report
+        description: 許可条件を満たさない Pod の比較例。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      cilium-policy:
+        label: NetworkPolicy マニフェスト
+        kind: policy
+        tier: traffic
+        realizes:
+          - policy
+        description: 注文 API Pod を選び、許可する送信元と TCP 8080 を定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      cilium-datapath:
+        label: Cilium Agent DaemonSet / eBPF / Hubble
+        kind: worker
+        tier: traffic
+        svc: k8s:daemonset
+        realizes:
+          - datapath
+          - hubble
+        description: ノード上で eBPF を使って転送・判定し、Agent 内の Hubble がフローを公開する。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      cilium-order:
+        label: order-api Deployment の Pod
+        kind: service
+        tier: traffic
+        svc: k8s:deployment
+        realizes:
+          - order
+        description: ポリシーの対象 Pod で TCP 8080 を待ち受ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      cilium-relay:
+        label: Hubble Relay Deployment
+        kind: monitor
+        tier: observe
+        svc: k8s:deployment
+        realizes:
+          - relay
+        description: 各ノードの Hubble をまとめて読み出す。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      cilium-cli:
+        label: hubble CLI
+        kind: client
+        tier: observe
+        realizes:
+          - cli
+        description: ローカルから Relay へ接続して verdict を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      cilium-port-forward:
+        label: kubectl による Relay の port-forward
+        kind: lb
+        tier: observe
+        description: 検証用に API 経由で Relay のポートへ接続する。
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+    links:
+      - id: cilium-local-connection
+        from: cilium-cli
+        to: cilium-port-forward
+        label: 転送されたローカルポートへ接続
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6
+      - id: cilium-relay-service
+        from: cilium-port-forward
+        to: cilium-relay
+        label: Relay に中継
+        evidence:
+          - type: doc
+            ref: docs/reference-cilium-hubble.md#§6

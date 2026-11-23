@@ -102,3 +102,30 @@ Parquet の列データは、まず**エンコーディング**（値の表現�
 ## 12. 物理読み取りシナリオの見方
 
 `physical-read` では、Avro の Manifest からデータファイルの完全パスとサイズを得て、Parquet のフッター→Row Group→列チャンク（zstd 圧縮のページ）を範囲 GET し、Worker が解凍・デコードするまでを追う。
+
+## 13. 実装例：Trino・Iceberg REST カタログ・S3
+
+Trino が REST カタログを介して Iceberg の events テーブルを解決し、S3 上のメタデータと Parquet ファイルを分散して読む例。削除ファイルと形式のサポートは利用する Trino と Iceberg の組み合わせで確認する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| SQL の利用者 | Trino CLI の SQL クライアント | イベント時刻と利用者 ID の条件を Coordinator に送る。 |
+| SQL とファイル範囲の計画、読み取り範囲の割当待ち | Trino Coordinator と Iceberg Split 管理 | スナップショットの情報から読み取り単位を計画し Worker に割り当てる。 |
+| Manifest List、Manifests、Delete Files、metadata.json、Data Files (Parquet) | S3 上の Iceberg メタデータとデータ | metadata.json、マニフェスト、データファイル、該当する削除ファイルを管理されたパスに持つ。 |
+| 分散タスクの実行、Parquet の列データ読取 | Trino Worker の Iceberg Task と Parquet Reader | 担当範囲から必要な列を読み、該当する削除条件をクエリ処理で適用する。 |
+
+実装で加わる部品を以下に示す。
+
+- Iceberg REST カタログ。テーブルの解決に必要なカタログ API を提供し、Trino 側で接続先を設定する。
+
+公式資料
+
+- [Apache Iceberg Specification](https://iceberg.apache.org/spec/)
+- [Iceberg Partitioning](https://iceberg.apache.org/docs/latest/partitioning/)
+- [Iceberg Performance](https://iceberg.apache.org/docs/latest/performance/)
+- [Iceberg Configuration](https://iceberg.apache.org/docs/latest/configuration/)
+- [Trino Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)
+- [Apache Parquet File Format](https://parquet.apache.org/docs/file-format/)
+- [Apache Avro Specification](https://avro.apache.org/docs/current/specification/)
+- [Iceberg AWS - Object Store File Layout](https://iceberg.apache.org/docs/latest/aws/#object-store-file-layout)
+- [Trino S3 file system support](https://trino.io/docs/current/object-storage/file-system-s3.html)

@@ -2,18 +2,18 @@
   "model": "snowflake-ingestion-cdc",
   "name": "Snowflake の取り込みと増分処理",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "files": {
       "type": "node",
-      "label": "注文ファイル",
+      "label": "到着した注文ファイル",
       "status": "claim"
     },
     "pipe": {
       "type": "node",
-      "label": "Snowpipe",
+      "label": "通知駆動のファイル取込",
       "status": "claim"
     },
     "client": {
@@ -23,32 +23,32 @@
     },
     "streaming": {
       "type": "node",
-      "label": "Snowpipe Streaming",
+      "label": "連続行取込",
       "status": "claim"
     },
     "raw": {
       "type": "node",
-      "label": "RAW_ORDERS",
+      "label": "注文変更の受入表",
       "status": "claim"
     },
     "change": {
       "type": "node",
-      "label": "Stream・消費位置",
+      "label": "未処理変更と読取位置",
       "status": "claim"
     },
     "task": {
       "type": "node",
-      "label": "Task・MERGE",
+      "label": "変更適用ジョブ",
       "status": "claim"
     },
     "orders": {
       "type": "node",
-      "label": "ORDERS_CURRENT",
+      "label": "注文の現在状態表",
       "status": "claim"
     },
     "dynamic": {
       "type": "node",
-      "label": "注文集計 Dynamic Table",
+      "label": "鮮度目標付き注文集計",
       "status": "claim"
     },
     "bi": {
@@ -58,47 +58,47 @@
     },
     "notify": {
       "type": "link",
-      "label": "注文ファイル → Snowpipe",
+      "label": "到着した注文ファイル → 通知駆動のファイル取込",
       "status": "claim"
     },
     "copy": {
       "type": "link",
-      "label": "Snowpipe → RAW_ORDERS",
+      "label": "通知駆動のファイル取込 → 注文変更の受入表",
       "status": "claim"
     },
     "send": {
       "type": "link",
-      "label": "注文イベント送信元 → Snowpipe Streaming",
+      "label": "注文イベント送信元 → 連続行取込",
       "status": "claim"
     },
     "commit": {
       "type": "link",
-      "label": "Snowpipe Streaming → RAW_ORDERS",
+      "label": "連続行取込 → 注文変更の受入表",
       "status": "claim"
     },
     "delta": {
       "type": "link",
-      "label": "RAW_ORDERS → Stream・消費位置",
+      "label": "注文変更の受入表 → 未処理変更と読取位置",
       "status": "claim"
     },
     "consume": {
       "type": "link",
-      "label": "Stream・消費位置 → Task・MERGE",
+      "label": "未処理変更と読取位置 → 変更適用ジョブ",
       "status": "claim"
     },
     "merge": {
       "type": "link",
-      "label": "Task・MERGE → ORDERS_CURRENT",
+      "label": "変更適用ジョブ → 注文の現在状態表",
       "status": "claim"
     },
     "refresh": {
       "type": "link",
-      "label": "RAW_ORDERS → 注文集計 Dynamic Table",
+      "label": "注文変更の受入表 → 鮮度目標付き注文集計",
       "status": "claim"
     },
     "serve": {
       "type": "link",
-      "label": "注文集計 Dynamic Table → BI",
+      "label": "鮮度目標付き注文集計 → BI",
       "status": "claim"
     },
     "load-files": {
@@ -114,6 +114,85 @@
       "kind": "usecase",
       "label": "増分で注文状態を更新",
       "status": "claim"
+    },
+    "example-files": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "Amazon S3 外部ステージ",
+      "realizes": [
+        "files"
+      ]
+    },
+    "example-pipe": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "Snowpipe AUTO_INGEST",
+      "realizes": [
+        "pipe"
+      ]
+    },
+    "example-client": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "注文イベント送信アプリ",
+      "realizes": [
+        "client"
+      ]
+    },
+    "example-streaming": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "Snowpipe Streaming のチャネル",
+      "realizes": [
+        "streaming"
+      ]
+    },
+    "example-raw": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "RAW_ORDERS と Stream",
+      "realizes": [
+        "raw",
+        "change"
+      ]
+    },
+    "example-task": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "Task の MERGE",
+      "realizes": [
+        "task"
+      ]
+    },
+    "example-orders": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "ORDERS_CURRENT",
+      "realizes": [
+        "orders"
+      ]
+    },
+    "example-dynamic": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "日別集計 Dynamic Table",
+      "realizes": [
+        "dynamic"
+      ]
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "BI 用 SQL クライアント",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-notif": {
+      "type": "implementation",
+      "impl": "snowflake-ingest",
+      "label": "S3 イベント通知",
+      "realizes": []
     }
   },
   "byRef": {
@@ -144,7 +223,17 @@
       "serve",
       "load-files",
       "stream-rows",
-      "REQ-1"
+      "REQ-1",
+      "example-files",
+      "example-pipe",
+      "example-client",
+      "example-streaming",
+      "example-raw",
+      "example-task",
+      "example-orders",
+      "example-dynamic",
+      "example-bi",
+      "example-notif"
     ],
     "docs/reference-snowflake-ingestion-cdc.md#§2": [
       "files",
@@ -174,6 +263,18 @@
       "refresh",
       "serve",
       "stream-rows"
+    ],
+    "docs/reference-snowflake-ingestion-cdc.md#§6": [
+      "example-files",
+      "example-pipe",
+      "example-client",
+      "example-streaming",
+      "example-raw",
+      "example-task",
+      "example-orders",
+      "example-dynamic",
+      "example-bi",
+      "example-notif"
     ]
   },
   "reference": {

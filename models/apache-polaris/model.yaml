@@ -32,7 +32,7 @@ tiers:
       - 8
       - 3
   - id: catalog
-    label: Polaris
+    label: カタログ管理・テーブル操作
     z: 1
     size:
       - 11
@@ -105,17 +105,17 @@ nodes:
       - type: doc
         ref: docs/reference-apache-polaris.md#§2
   sts:
-    label: AWS STS
+    label: 認証情報の発行
     kind: external
     tier: storage
     x: 4
     y: 1
-    description: カタログ用 IAM ロールの一時認証情報を発行する。
+    description: ストレージへの一時アクセスに使う認証情報を発行する。
     evidence:
       - type: doc
         ref: docs/reference-apache-polaris.md#§4
   bucket:
-    label: S3 ファイル
+    label: オブジェクトストレージ
     kind: db
     tier: storage
     x: 9
@@ -214,7 +214,7 @@ scenarios:
       - links:
           - vend
           - read
-        note: 一時認証情報を使って必要なファイルを S3 から読む。
+        note: 一時認証情報を使ってストレージから必要なファイルを読む。
   - id: commit-orders
     label: 追加ファイルを公開する
     evidence:
@@ -229,7 +229,7 @@ scenarios:
         note: 書き込み権限を持つエンジンが現在のテーブル状態と認証情報を得る。
       - links:
           - write
-        note: 追加するデータファイルを S3 に書く。
+        note: 追加するデータファイルをストレージに書く。
       - links:
           - submit
           - commit
@@ -246,3 +246,116 @@ requirements:
     evidence:
       - type: doc
         ref: docs/reference-apache-polaris.md#§4
+implementations:
+  - id: polaris-aws
+    label: Spark・Polaris・Amazon S3
+    description: Spark から Polaris に接続し、カタログ状態を JDBC で永続化して S3 を読み書きする例。
+    sources:
+      - title: Role-Based Access Control
+        url: https://polaris.apache.org/releases/1.9.0/managing-security/access-control/
+      - title: Configuring S3 Storage
+        url: https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
+      - title: Polaris JDBC・PostgreSQL・Spark SQL
+        url: https://polaris.apache.org/guides/jdbc/
+    nodes:
+      polaris-aws-operator:
+        label: 運用者の管理 CLI
+        kind: actor
+        tier: client
+        x: 1
+        y: 1
+        description: 管理 API でカタログとロールを作る。
+        realizes:
+          - admin
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-spark:
+        label: Apache Spark SQL
+        kind: client
+        tier: client
+        x: 6
+        y: 1
+        description: Iceberg REST に接続してファイルを読み書きする。
+        realizes:
+          - engine
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-server:
+        label: Polaris Server
+        kind: service
+        tier: catalog
+        x: 5
+        y: 1
+        description: 管理 API と Iceberg REST と権限判定を一つのサーバーで提供する。
+        realizes:
+          - management
+          - api
+          - rbac
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-postgres:
+        label: PostgreSQL（JDBC 永続化）
+        kind: db
+        tier: catalog
+        x: 9
+        y: 2.5
+        description: カタログ状態を永続化する。
+        realizes:
+          - catalog-db
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-sts:
+        label: AWS STS
+        kind: external
+        tier: storage
+        x: 4
+        y: 1
+        description: IAM ロールの短期セッションを発行する。
+        realizes:
+          - sts
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-s3:
+        label: Amazon S3
+        kind: db
+        tier: storage
+        x: 9
+        y: 1
+        description: Iceberg メタデータとデータファイルを置く。
+        svc: s3
+        realizes:
+          - bucket
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-iam:
+        label: カタログ用 IAM ロール
+        kind: policy
+        tier: storage
+        x: 1
+        y: 2.5
+        description: Polaris 実行元を信頼し、対象バケットへの権限を定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+    links:
+      - id: polaris-aws-assume
+        from: polaris-aws-sts
+        to: polaris-aws-iam
+        label: 付与範囲と信頼関係を評価
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+    groups:
+      - label: AWS アカウント
+        kind: cloud
+        provider: aws
+        nodes:
+          - polaris-aws-iam
+          - polaris-aws-sts
+          - polaris-aws-s3

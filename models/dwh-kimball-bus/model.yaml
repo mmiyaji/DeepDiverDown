@@ -44,3 +44,25 @@ scenarios:
       - {"links":["refunds"],"note":"返品明細から同日の返品受付額を別に計算する。"}
       - {"links":["combine-sales","combine-returns"],"note":"共通集計キーで突き合わせる。元の受注月に対する返品率とは定義が異なる。"}
 grid: {"title":"バス・マトリクスの例","rowLabel":"業務プロセス","colLabel":"ディメンション","rows":[{"id":"orders","label":"受注"},{"id":"returns","label":"返品"}],"cols":[{"id":"date","label":"日付"},{"id":"product","label":"商品"}],"values":[[1,1],[1,1]],"note":"1 は利用するディメンション。日付の役割は注文日と返品受付日で異なる。比率は処理量を意味しない。"}
+
+implementations:
+  - id: bq-order-return-bus
+    label: "BigQuery の受注・返品横断集計"
+    description: "受注と返品をそれぞれ別ファクトに持ち、日付と商品を両方から参照する BigQuery での実装例。"
+    sources:
+      - {title: "Kimball Group の Conformed Dimensions／Drilling Across／Bus Matrix", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+      - {title: "BigQuery 論理ビュー", url: "https://docs.cloud.google.com/bigquery/docs/views-intro"}
+      - {title: "BigQuery の主キーと外部キー", url: "https://docs.cloud.google.com/bigquery/docs/primary-foreign-keys"}
+    tiers:
+      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [13.5,5.5]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+    nodes:
+      example-date: {label: "common.dim_calendar", kind: "table", tier: "flow", x: 4, y: 0, realizes: ["date"], description: "同じ日付表を注文日と返品受付日の別名で読む。", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-product: {label: "common.dim_product", kind: "table", tier: "flow", x: 8, y: 0, realizes: ["product"], description: "商品キーとカテゴリ定義を受注・返品で共有する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-orders: {label: "sales.fact_order_line", kind: "table", tier: "flow", x: 3, y: 2, realizes: ["orders"], description: "受注明細ごとの売上金額を保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-returns: {label: "returns.fact_return_line", kind: "table", tier: "flow", x: 3, y: 5, realizes: ["returns"], description: "返品明細ごとの返金金額を保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-sales: {label: "独立した日次集計 SQL ビュー", kind: "table", tier: "flow", x: 8, y: 2, realizes: ["sales","refunds"], description: "売上と返品を別々のビューで日付・カテゴリ・通貨にそろえる。", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-bi: {label: "受注・返品の比較ビュー", kind: "table", tier: "flow", x: 13, y: 3, realizes: ["bi"], description: "共通キーで日次結果を横に並べる。", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-check: {label: "共通ディメンションの照合クエリ", kind: "monitor", tier: "implementation-setup", x: 1, y: 1.5, description: "商品キーが一意で、受注と返品の参照が解決するか確認する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}
+    links:
+      - {id: "example-check-connection", from: "example-check", to: "example-product", label: "欠落または重複キーを検査", evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§5"}]}

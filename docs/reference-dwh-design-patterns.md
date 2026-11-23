@@ -40,3 +40,25 @@
 - [Data Vault Alliance](https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/)
 - [BigQuery のネストと繰り返し列](https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested)
 - [dbt Semantic Layer](https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture)
+
+## 5. 実装例 BigQuery の DWH 設計比較環境
+
+合成の注文 CSV と明細を共通入力にし、試すパターンごとに別データセットへ SQL の成果物を作る比較環境。表の構成は比較候補で、すべてを一つの本番経路として使う想定ではない。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 注文・商品・顧客・返品 | BigQuery lab_input データセット | 比較に使う注文・商品・顧客・返品の表を登録する。 |
+| メダリオン | lab_layers データセット | 原本、検証済み、業務集計のテーブルを段階別に分ける。 |
+| Inmon CIF | lab_cif データセット | 統合した正規化表から営業と経理の公開ビューを作る。 |
+| Data Vault | lab_vault データセット | Hub・Link・Satellite と業務派生・公開ビューを作る。 |
+| Kimball バス・スタースキーマ | lab_dimensional のディメンション・ファクト | 注文と返品から共通ディメンションを再利用し、受注明細のスタースキーマも確認する。 |
+| スノーフレーク | lab_hierarchy の商品とカテゴリ表 | スタースキーマに対し、カテゴリを分離した構成を比較する。 |
+| SCD | lab_history の顧客履歴表 | 有効期間と代理キーにより時点で顧客属性を参照する。 |
+| ファクトテーブルの型 | lab_grain のイベント・日次・進捗表 | 用途ごとに異なる事実の粒度を作って比較する。 |
+| ワイドテーブル | lab_wide の平坦表・ネスト表 | 明細行と注文行の件数・重複集計を比較する。 |
+| 事前集約と指標定義 | lab_rollup の日次集約と公開ビュー | 注文明細の結果に対し、日次集約を使う場合の結果を照合する。 |
+| BI／業務レポート | 比較用の BigQuery SQL 結果 | 同じ入力範囲と集計指標の結果を記録する。 |
+
+比較候補ごとに別データセットで用意し、同じ入力と注文日で事実の粒度や金額を確認する。個別の候補で出荷履歴や事前集約が必要ならその設計を追加する。この比較で使う BigQuery 固有の設定は、各パターンの論理構造と区別する。
+
+出典 [Kimball Group の次元モデリング技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[Databricks のメダリオン](https://docs.databricks.com/aws/en/lakehouse/medallion)、[Bill Inmon の CIF と Data Warehousing 2.0](https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf)、[Data Vault Alliance](https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/)、[BigQuery のネストと繰り返し列](https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested)、[dbt Semantic Layer](https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture)、[BigQuery データセットの作成](https://docs.cloud.google.com/bigquery/docs/datasets)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)

@@ -2,83 +2,83 @@
   "model": "google-cloud-dataflow",
   "name": "Google Cloud Dataflow のパイプラインアーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "pubsub": {
       "type": "node",
-      "label": "Pub/Sub",
+      "label": "注文イベントの入力",
       "status": "claim"
     },
     "beam": {
       "type": "node",
-      "label": "Apache Beam Pipeline",
+      "label": "処理グラフの定義",
       "status": "claim"
     },
     "collection": {
       "type": "node",
-      "label": "PCollection",
+      "label": "分散データの集合",
       "status": "claim"
     },
     "transform": {
       "type": "node",
-      "label": "Beam Transform",
+      "label": "キー付けと時間窓の集計",
       "status": "claim"
     },
     "runner": {
       "type": "node",
-      "label": "Dataflow Runner",
+      "label": "処理グラフの実行調整",
       "status": "claim"
     },
     "workers": {
       "type": "node",
-      "label": "Dataflow Workers",
+      "label": "分散タスクの実行基盤",
       "status": "claim"
     },
     "bigquery": {
       "type": "node",
-      "label": "BigQuery",
+      "label": "分析用テーブル",
       "status": "claim"
     },
     "monitoring": {
       "type": "node",
-      "label": "Dataflow Monitoring",
+      "label": "ジョブの監視",
       "status": "claim"
     },
     "define": {
       "type": "link",
-      "label": "Apache Beam Pipeline → Dataflow Runner",
+      "label": "処理グラフの定義 → 処理グラフの実行調整",
       "status": "claim"
     },
     "ingest": {
       "type": "link",
-      "label": "Pub/Sub → PCollection",
+      "label": "注文イベントの入力 → 分散データの集合",
       "status": "claim"
     },
     "apply": {
       "type": "link",
-      "label": "PCollection → Beam Transform",
+      "label": "分散データの集合 → キー付けと時間窓の集計",
       "status": "claim"
     },
     "dispatch": {
       "type": "link",
-      "label": "Dataflow Runner → Dataflow Workers",
+      "label": "処理グラフの実行調整 → 分散タスクの実行基盤",
       "status": "claim"
     },
     "execute": {
       "type": "link",
-      "label": "Beam Transform → Dataflow Workers",
+      "label": "キー付けと時間窓の集計 → 分散タスクの実行基盤",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "Dataflow Workers → BigQuery",
+      "label": "分散タスクの実行基盤 → 分析用テーブル",
       "status": "claim"
     },
     "observe": {
       "type": "link",
-      "label": "Dataflow Runner → Dataflow Monitoring",
+      "label": "処理グラフの実行調整 → ジョブの監視",
       "status": "claim"
     },
     "stream-aggregation": {
@@ -100,6 +100,55 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際の Beam SDK 言語、ウィンドウ設定、ワーカー構成、BigQuery スキーマは未確定。"
+    },
+    "gcp-pubsub": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "Pub/Sub サブスクリプション",
+      "realizes": [
+        "pubsub"
+      ]
+    },
+    "gcp-pipeline": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "Beam SDK の Pipeline・PCollection・Transform",
+      "realizes": [
+        "beam",
+        "collection",
+        "transform"
+      ]
+    },
+    "gcp-dataflow": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "Dataflow Runner と管理ワーカー",
+      "realizes": [
+        "runner",
+        "workers"
+      ]
+    },
+    "gcp-bigquery": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "BigQuery の集計テーブル",
+      "realizes": [
+        "bigquery"
+      ]
+    },
+    "gcp-monitor": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "Dataflow Monitoring",
+      "realizes": [
+        "monitoring"
+      ]
+    },
+    "gcp-identity": {
+      "type": "implementation",
+      "impl": "gcp",
+      "label": "ワーカーサービスアカウント",
+      "realizes": []
     }
   },
   "byRef": {
@@ -125,7 +174,13 @@
       "observe",
       "stream-aggregation",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "gcp-pubsub",
+      "gcp-pipeline",
+      "gcp-dataflow",
+      "gcp-bigquery",
+      "gcp-monitor",
+      "gcp-identity"
     ],
     "docs/reference-google-cloud-dataflow.md#§7": [
       "model"
@@ -158,11 +213,21 @@
     "docs/reference-google-cloud-dataflow.md#§6": [
       "stream-aggregation",
       "BR-01"
+    ],
+    "docs/reference-google-cloud-dataflow.md#§8": [
+      "gcp-pubsub",
+      "gcp-pipeline",
+      "gcp-dataflow",
+      "gcp-bigquery",
+      "gcp-monitor",
+      "gcp-identity"
     ]
   },
   "reference": {
     "category": "変換とオーケストレーション",
     "order": 50,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Beam Pipeline と PCollection、変換の関係を読む。",
       "Dataflow Runner と分散ワーカーの役割を区別する。",

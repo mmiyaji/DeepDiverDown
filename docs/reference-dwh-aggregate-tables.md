@@ -21,3 +21,20 @@
 
 - [Kimball Group の集約ファクトと加法性](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)
 - [dbt Semantic Layer の構成](https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture)
+
+## 4. 実装例 BigQuery の日次集約と再計算
+
+日付パーティションを持つ明細と集約表を BigQuery に置き、影響日だけをスケジュール SQL で再計算する例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 遅延した注文イベント | 補正対象日の記録 | 遅く到着した明細から再計算日を記録する。 |
+| 受注明細ファクト | sales.fact_order_line | 注文日をパーティション列にした明細表。 |
+| 増分集計・再生成 | BigQuery のスケジュール SQL | 対象日のファクトを再集計し、影響日の集約行だけを置き換える。 |
+| 日・カテゴリ・通貨の集約 | sales.daily_category_currency | 注文日・カテゴリ・通貨の粒度に数量と金額を保存する。 |
+| 指標定義と経路選択 | 集約用と明細用の SQL ビュー | ロールアップ可否でデータ源を選び、購入者数は明細から重複排除する。 |
+| BI／日次レポート | 日次売上と購入者レポート | 登録済みの指標と元データの基準時刻を確認する。 |
+
+日次・カテゴリ・通貨の集約表は加算できる指標に使う。ユニーク購入者数はカテゴリごとの部分集約を足さず、明細から計算する。スケジュールの時刻と対象となる注文日は別に扱う。
+
+出典 [Kimball Group の集約ファクトと加法性](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[dbt Semantic Layer の構成](https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture)、[BigQuery パーティション表](https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables)、[BigQuery スケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)

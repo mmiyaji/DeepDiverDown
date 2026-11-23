@@ -31,3 +31,27 @@ rewrite ジョブは入力を読み、新しいデータファイルをオブジ
 ## 8. シナリオの見方
 
 「注文の日次パーティションを整理する」では、(1) ストリーミングの小ファイルを観測し、(2) 対象パーティションを選び、(3) bin-packing または必要時だけ sort rewrite を実行し、(4) 新スナップショットをコミットしてから保持期間後に旧ファイルを掃除する。`compact-orders` のリンクを順に選ぶと、この流れを追える。[出典: 本文 §1–§7]
+
+## 9. 実装例：Spark プロシージャで Iceberg の小ファイルを整理
+
+注文の Iceberg テーブルへ継続書き込みし、Spark の保守ジョブで小さなファイルをまとめる例。読み手のスナップショットと古いファイルの保持期間を管理する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| マイクロバッチ書き込み | Spark のマイクロバッチ書き込み | Iceberg へ小さな Parquet ファイルを継続して追加する。 |
+| 対象選択プランナー、データファイルの再作成 | Spark の rewrite_data_files | テーブルのファイル群を調べ、binpack 戦略で対象を選んで書き直す。 |
+| 表の状態を管理するメタデータ、orders / order_date、公開された新しい読取時点 | Iceberg のテーブル・メタデータ・スナップショット | 注文データのファイル集合をスナップショットで管理し、再作成をコミットする。 |
+| クエリエンジン | Spark SQL の読み手 | 読み取り時に選択したスナップショットの一貫した状態を参照する。 |
+| 保持期限後の古いデータの整理 | Spark の expire_snapshots | 保護対象のスナップショットを保持し、期限切れのものと参照されなくなったファイルを整理する。 |
+
+実装で加わる部品を以下に示す。
+
+- コンパクションと保持の設定。対象ファイルの基準、出力サイズの目安、履歴を保持する期間を決めてから実行する。
+
+公式資料
+
+- [Apache Iceberg Maintenance](https://iceberg.apache.org/docs/nightly/maintenance/)
+- [Apache Iceberg Spark Procedures](https://iceberg.apache.org/docs/latest/spark-procedures/)
+- [Delta Lake Optimizations](https://docs.delta.io/optimizations-oss/)
+- [Delta Transaction Log Protocol](https://github.com/delta-io/delta/blob/master/PROTOCOL.md)
+- [Iceberg Table Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)

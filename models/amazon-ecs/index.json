@@ -2,33 +2,33 @@
   "model": "amazon-ecs",
   "name": "Amazon ECS サービススケジューリング",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "service": {
       "type": "node",
-      "label": "ECS Service（注文 API）",
+      "label": "長時間稼働サービスの定義",
       "status": "claim"
     },
     "scheduler": {
       "type": "node",
-      "label": "サービススケジューラー",
+      "label": "実行数の維持と再配置",
       "status": "claim"
     },
     "placement": {
       "type": "node",
-      "label": "タスク配置",
+      "label": "実行先の選択と配置",
       "status": "claim"
     },
     "fargate": {
       "type": "node",
-      "label": "Fargate タスク",
+      "label": "利用者がホストを管理しない実行先",
       "status": "claim"
     },
     "ec2": {
       "type": "node",
-      "label": "EC2 コンテナインスタンス",
+      "label": "利用者がホストを管理する実行先",
       "status": "claim"
     },
     "alb": {
@@ -38,32 +38,32 @@
     },
     "define": {
       "type": "link",
-      "label": "ECS Service（注文 API） → サービススケジューラー",
+      "label": "長時間稼働サービスの定義 → 実行数の維持と再配置",
       "status": "claim"
     },
     "choose": {
       "type": "link",
-      "label": "サービススケジューラー → タスク配置",
+      "label": "実行数の維持と再配置 → 実行先の選択と配置",
       "status": "claim"
     },
     "fargate-place": {
       "type": "link",
-      "label": "タスク配置 → Fargate タスク",
+      "label": "実行先の選択と配置 → 利用者がホストを管理しない実行先",
       "status": "claim"
     },
     "ec2-place": {
       "type": "link",
-      "label": "タスク配置 → EC2 コンテナインスタンス",
+      "label": "実行先の選択と配置 → 利用者がホストを管理する実行先",
       "status": "claim"
     },
     "route": {
       "type": "link",
-      "label": "ロードバランサー → ECS Service（注文 API）",
+      "label": "ロードバランサー → 長時間稼働サービスの定義",
       "status": "claim"
     },
     "replace": {
       "type": "link",
-      "label": "サービススケジューラー → タスク配置",
+      "label": "実行数の維持と再配置 → 実行先の選択と配置",
       "status": "claim"
     },
     "order-api": {
@@ -73,6 +73,53 @@
     "replacement": {
       "type": "scenario",
       "label": "注文 API タスクの置き換え"
+    },
+    "ecs-service": {
+      "type": "implementation",
+      "impl": "ecs",
+      "label": "ECS Service の設定 × 2",
+      "realizes": [
+        "service"
+      ]
+    },
+    "ecs-scheduler": {
+      "type": "implementation",
+      "impl": "ecs",
+      "label": "ECS サービス制御と容量戦略",
+      "realizes": [
+        "scheduler",
+        "placement"
+      ]
+    },
+    "ecs-fargate": {
+      "type": "implementation",
+      "impl": "ecs",
+      "label": "Fargate capacity provider のタスク",
+      "realizes": [
+        "fargate"
+      ]
+    },
+    "ecs-ec2": {
+      "type": "implementation",
+      "impl": "ecs",
+      "label": "EC2 Auto Scaling group のコンテナインスタンス",
+      "realizes": [
+        "ec2"
+      ]
+    },
+    "ecs-alb": {
+      "type": "implementation",
+      "impl": "ecs",
+      "label": "Application Load Balancer と別ターゲットグループ",
+      "realizes": [
+        "alb"
+      ]
+    },
+    "ecs-image": {
+      "type": "implementation",
+      "impl": "ecs",
+      "label": "Amazon ECR の共通イメージ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -99,7 +146,13 @@
       "route",
       "replace",
       "order-api",
-      "replacement"
+      "replacement",
+      "ecs-service",
+      "ecs-scheduler",
+      "ecs-fargate",
+      "ecs-ec2",
+      "ecs-alb",
+      "ecs-image"
     ],
     "docs/reference-amazon-ecs.md#§3": [
       "service",
@@ -125,11 +178,21 @@
     ],
     "docs/reference-amazon-ecs.md#§5": [
       "replacement"
+    ],
+    "docs/reference-amazon-ecs.md#§6": [
+      "ecs-service",
+      "ecs-scheduler",
+      "ecs-fargate",
+      "ecs-ec2",
+      "ecs-alb",
+      "ecs-image"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
-    "order": 80,
+    "category": "その他のオーケストレーター",
+    "order": 10,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Fargate と EC2 の実行方式、および capacity provider の違いを区別する",
       "desired count を維持するサービススケジューラーとタスク配置を区別する",

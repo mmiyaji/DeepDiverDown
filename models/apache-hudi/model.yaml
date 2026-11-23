@@ -33,3 +33,124 @@ scenarios:
   - {id: upsert-cdc, label: CDC 更新を取り込む, evidence: [{type: doc, ref: docs/reference-apache-hudi.md#§5}], steps: [{links: [ingest], note: CDC の更新イベントをコミットとして取り込む。}, {links: [cow-write, snapshot], note: CoW ではベースファイルを書き換え、Snapshot query で読む。}, {links: [mor-write, merge-read, compact], note: MoR ではログへ追記し、読み取り時マージまたはコンパクション後のベースを使う。}, {links: [incremental, deliver], note: タイムライン以降の変更または結果を下流へ渡す。}]}
   - {"id":"update-cow-mor","label":"1 件の更新を CoW と MoR で書く","visual":"cow-mor","evidence":[{"type":"doc","ref":"docs/reference-apache-hudi.md#§2"},{"type":"doc","ref":"docs/reference-apache-hudi.md#§3"}],"steps":[{"blocks":{"ev":[{"id":"u1","label":"更新 #42","k":4,"note":"注文 42 の更新イベント"}],"cow":[{"id":"f1","label":"base v1","k":0,"note":"CoW のベースファイル（Parquet）"}],"morb":[{"id":"g1","label":"base v1","k":0,"note":"MoR のベースファイル（Parquet）"}],"morl":[]},"links":["ingest"],"note":"注文 42 の更新イベントが届く。"},{"blocks":{"ev":[],"cow":[{"id":"f2","label":"base v2","k":2,"from":["f1","u1"],"note":"更新を反映して丸ごと書き直したベースファイル"}],"morb":[{"id":"g1","label":"base v1","k":0,"note":"MoR のベースファイル（Parquet）"}],"morl":[{"id":"l1","label":"log #42","k":4,"from":["u1"],"note":"MoR のログファイル（Avro）に追記した更新"}]},"highlight":["f2","l1"],"links":["cow-write","mor-write"],"note":"CoW は更新を含むベースファイルを丸ごと書き直す（書き込みが重い）。MoR はログファイルに追記するだけ（書き込みが軽い）。"},{"blocks":{"ev":[],"cow":[{"id":"f2","label":"base v2","k":2,"from":["f1","u1"],"note":"更新を反映して丸ごと書き直したベースファイル"}],"morb":[{"id":"g1","label":"base v1","k":0,"note":"MoR のベースファイル（Parquet）"}],"morl":[{"id":"l1","label":"log #42","k":4,"from":["u1"],"note":"MoR のログファイル（Avro）に追記した更新"}]},"highlight":["f2","g1","l1"],"links":["snapshot","merge-read"],"note":"読み取りでは、CoW はベースファイルだけを読む。MoR はベースとログを読み、マージしてから返す（読み取りが重い）。"},{"blocks":{"ev":[],"cow":[{"id":"f2","label":"base v2","k":2,"from":["f1","u1"],"note":"更新を反映して丸ごと書き直したベースファイル"}],"morb":[{"id":"g2","label":"base v2","k":2,"from":["g1","l1"],"note":"コンパクションでログを取り込んだ新しいベースファイル"}],"morl":[]},"highlight":["g2"],"links":["compact"],"note":"MoR のコンパクションがログをベースファイルに取り込み、読み取り時のマージを減らす。"}]}
 blocks: [{"id":"cow-mor","title":"Copy-on-Write と Merge-on-Read の更新","legend":{"0":"ベースファイル","2":"書き直したベースファイル","4":"更新・ログ"},"note":"1 件の更新がどこにどう書かれるかを比べる。","lanes":[{"id":"ev","label":"更新イベント","node":"cdc"},{"id":"cow","label":"CoW テーブル","sub":"ベースファイル","node":"cow"},{"id":"morb","label":"MoR テーブル","sub":"ベースファイル","node":"mor"},{"id":"morl","label":"MoR テーブル","sub":"ログファイル","node":"mor"}],"items":{"ev":[{"id":"u1","label":"更新 #42","k":4,"note":"注文 42 の更新イベント"}],"cow":[{"id":"f1","label":"base v1","k":0,"note":"CoW のベースファイル（Parquet）"}],"morb":[{"id":"g1","label":"base v1","k":0,"note":"MoR のベースファイル（Parquet）"}],"morl":[]}}]
+implementations:
+  - id: hudi-spark
+    label: Hudi Streamer・Kafka・Spark
+    description: Hudi の Docker デモをもとに、Kafka の変更を Spark 上の Hudi Streamer で取り込み、表の配置を比較する例。
+    sources:
+      - title: Apache Hudi Concepts
+        url: https://hudi.apache.org/docs/concepts/
+      - title: Hudi Streamer Deployment
+        url: https://hudi.apache.org/docs/deployment/
+      - title: Hudi Compaction
+        url: https://hudi.apache.org/docs/compaction/
+    nodes:
+      hudi-spark-kafka:
+        label: Kafka の注文更新トピック
+        kind: external
+        tier: ingest
+        x: 0
+        y: 1.5
+        description: Hudi Streamer が読む変更を保持する。
+        realizes:
+          - cdc
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      hudi-spark-timeline:
+        label: Hudi のタイムライン（`.hoodie`）
+        kind: file
+        tier: storage
+        x: 3
+        y: 1.5
+        description: コミットとテーブル保守の状態を記録する。
+        realizes:
+          - timeline
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      hudi-spark-cow:
+        label: 分散ファイルシステムの COW テーブル
+        kind: table
+        tier: storage
+        x: 6
+        y: 0.5
+        description: 更新済みベースファイルを置く。
+        realizes:
+          - cow
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      hudi-spark-mor:
+        label: 分散ファイルシステムの MOR テーブル
+        kind: table
+        tier: storage
+        x: 6
+        y: 2.5
+        description: 更新ログとベースファイルを維持する。
+        realizes:
+          - mor
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      hudi-spark-compact:
+        label: Hudi Streamer の非同期コンパクション
+        kind: worker
+        tier: storage
+        x: 9
+        y: 2.5
+        description: MOR の変更ログをベースファイルへ統合する。
+        realizes:
+          - compact
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      hudi-spark-spark:
+        label: Spark SQL
+        kind: service
+        tier: ingest
+        x: 12
+        y: 1.5
+        description: Hudi のテーブルを読む。
+        realizes:
+          - query
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      hudi-spark-output:
+        label: Spark SQL の集計結果
+        kind: external
+        tier: ingest
+        x: 15
+        y: 1.5
+        description: 読み取り後のデータを利用者へ返す。
+        realizes:
+          - output
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      hudi-spark-ingestion:
+        label: Hudi Streamer（Spark）
+        kind: service
+        tier: ingest
+        x: 4
+        y: 2.4
+        description: Kafka から取り込み、キーで更新を適用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+    links:
+      - id: hudi-spark-ingest
+        from: hudi-spark-kafka
+        to: hudi-spark-ingestion
+        label: 変更を読み取る
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6
+      - id: hudi-spark-publish
+        from: hudi-spark-ingestion
+        to: hudi-spark-timeline
+        label: 書き込みをコミットする
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-hudi.md#§6

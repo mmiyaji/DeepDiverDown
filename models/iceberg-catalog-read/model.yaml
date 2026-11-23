@@ -68,4 +68,155 @@ requirements:
   - {id: CR-02, kind: nfr, title: 最小権限の読み取り, text: 一時資格情報でテーブルの場所だけを読めるようにする。, links: [vend, use-creds], evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
 unknowns:
   - {id: UNK-01, text: 実際のカタログ実装、認証方式、資格情報の委任とサーバー側スキャン計画への対応は未確定。, refs: [rest, creds]}
+implementations:
+  - id: trino-rest
+    label: Trino・Polaris・Amazon S3
+    description: Trino の Iceberg REST カタログで委任認証情報を有効化し、Polaris が S3 用の一時認証情報を返す構成例。
+    sources:
+      - title: Iceberg REST Catalog Spec
+        url: https://iceberg.apache.org/rest-catalog-spec/
+      - title: Trino Iceberg connector
+        url: https://trino.io/docs/current/connector/iceberg.html
+      - title: Trino REST Catalog metastores
+        url: https://trino.io/docs/current/object-storage/metastores.html
+      - title: Polaris Configuring S3 Storage
+        url: https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
+    nodes:
+      trino-rest-coord:
+        label: Trino Coordinator
+        kind: service
+        tier: engine
+        x: 2
+        y: 1.5
+        description: カタログ解決、メタデータ読み取りとタスク計画を調停する。
+        realizes:
+          - coordinator
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-workers:
+        label: Trino Workers
+        kind: worker
+        tier: engine
+        x: 10
+        y: 1.5
+        description: 割り当てられたファイルの読み取りとフィルタを実行する。
+        realizes:
+          - worker
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-rest:
+        label: Polaris Iceberg REST API
+        kind: catalog
+        tier: catalog
+        x: 4
+        y: 1.5
+        description: 対象テーブルのメタデータを返す。
+        realizes:
+          - rest
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-sts:
+        label: Polaris と AWS STS の一時認証情報
+        kind: cache
+        tier: catalog
+        x: 9
+        y: 1.5
+        description: カタログ用 IAM ロールの短期認証情報を払い出す。
+        realizes:
+          - creds
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-meta:
+        label: S3 の metadata.json
+        kind: file
+        tier: storage
+        x: 1
+        y: 1.5
+        description: スナップショットとテーブル定義を保持する。
+        realizes:
+          - metajson
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-list:
+        label: S3 の Manifest List（Avro）
+        kind: file
+        tier: storage
+        x: 4
+        y: 1.5
+        description: 対象スナップショットの Manifest を列挙する。
+        realizes:
+          - mlist
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-manifest:
+        label: S3 の Manifest（Avro）
+        kind: file
+        tier: storage
+        x: 7
+        y: 1.5
+        description: ファイル位置と統計を保持する。
+        realizes:
+          - manifest
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-parquet:
+        label: S3 の Parquet ファイル
+        kind: file
+        tier: storage
+        x: 11
+        y: 1.5
+        description: 該当するデータファイルを読む。
+        realizes:
+          - data
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+        drill: parquet-internals
+      trino-rest-delete:
+        label: S3 の位置削除ファイル
+        kind: file
+        tier: storage
+        x: 14
+        y: 1.5
+        description: v2 の削除対象の位置を記録する。
+        realizes:
+          - deletes
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-config:
+        label: etc/catalog/iceberg.properties
+        kind: file
+        tier: catalog
+        x: 1
+        y: 1
+        description: REST URI と一時認証情報取得を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+    links:
+      - id: trino-rest-client-config
+        from: trino-rest-config
+        to: trino-rest-coord
+        label: Iceberg コネクタの接続を設定
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+    groups:
+      - label: Amazon S3 のテーブル
+        kind: cloud
+        provider: aws
+        nodes:
+          - trino-rest-meta
+          - trino-rest-list
+          - trino-rest-manifest
+          - trino-rest-parquet
+          - trino-rest-delete
 gates: {maxDrift: 0, maxHigh: 0}

@@ -2,18 +2,18 @@
   "model": "duckdb",
   "name": "DuckDB の Parquet 読み取り：列投影と行グループの除外",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "query": {
       "type": "node",
-      "label": "SQL / EXPLAIN",
+      "label": "検索 SQL と計画の確認",
       "status": "claim"
     },
     "optimizer": {
       "type": "node",
-      "label": "オプティマイザ",
+      "label": "読取の最適化",
       "status": "claim"
     },
     "scan": {
@@ -28,7 +28,7 @@
     },
     "profile": {
       "type": "node",
-      "label": "実行時プロファイル",
+      "label": "実行時の観測",
       "status": "claim"
     },
     "footer": {
@@ -48,12 +48,12 @@
     },
     "submit": {
       "type": "link",
-      "label": "SQL / EXPLAIN → オプティマイザ",
+      "label": "検索 SQL と計画の確認 → 読取の最適化",
       "status": "claim"
     },
     "push": {
       "type": "link",
-      "label": "オプティマイザ → Parquet スキャン",
+      "label": "読取の最適化 → Parquet スキャン",
       "status": "claim"
     },
     "metadata": {
@@ -78,12 +78,12 @@
     },
     "inspect": {
       "type": "link",
-      "label": "オプティマイザ → SQL / EXPLAIN",
+      "label": "読取の最適化 → 検索 SQL と計画の確認",
       "status": "claim"
     },
     "measure": {
       "type": "link",
-      "label": "Parquet スキャン → 実行時プロファイル",
+      "label": "Parquet スキャン → 実行時の観測",
       "status": "claim"
     },
     "read-week": {
@@ -109,6 +109,41 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実ファイルの統計の有無、除外した行グループ数、物理計画の表示、実行時間は未確認。"
+    },
+    "python-parquet-client": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "Python の DuckDB 接続",
+      "realizes": [
+        "query"
+      ]
+    },
+    "python-parquet-engine": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "同じプロセスの DuckDB エンジン",
+      "realizes": [
+        "optimizer",
+        "scan",
+        "project",
+        "profile"
+      ]
+    },
+    "python-parquet-parquet": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "ローカルの orders.parquet",
+      "realizes": [
+        "footer",
+        "groups",
+        "columns"
+      ]
+    },
+    "python-parquet-metadata": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "parquet_metadata の診断用 SQL",
+      "realizes": []
     }
   },
   "byRef": {
@@ -136,7 +171,11 @@
       "read-week",
       "inspect-plan",
       "BR-01",
-      "BR-02"
+      "BR-02",
+      "python-parquet-client",
+      "python-parquet-engine",
+      "python-parquet-parquet",
+      "python-parquet-metadata"
     ],
     "docs/reference-duckdb.md#§2": [
       "model",
@@ -172,6 +211,12 @@
     ],
     "docs/reference-duckdb.md#§6": [
       "model"
+    ],
+    "docs/reference-duckdb.md#§7": [
+      "python-parquet-client",
+      "python-parquet-engine",
+      "python-parquet-parquet",
+      "python-parquet-metadata"
     ]
   },
   "reference": {

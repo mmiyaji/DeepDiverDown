@@ -29,3 +29,92 @@ links:
   - {id: files, from: data, to: reader, label: 対象ファイルをスキャン, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§1}]}
 scenarios:
   - {id: commit-read, label: 注文をコミットして読む, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§6}], steps: [{links: [write-data, commit], note: 新しいデータファイルを書き、JSON ログへ原子的にコミットする。}, {links: [checkpointing, replay, assemble], note: Checkpoint と後続ログから表のスナップショットを復元する。}, {links: [read, files], note: 読み手が同じバージョンのファイルを読む。}]}
+implementations:
+  - id: spark-s3
+    label: Spark・Delta Lake・Amazon S3
+    description: Delta の `S3DynamoDBLogStore` を構成し、協調する複数の Spark クラスターから同じ S3 のテーブルを更新する例。
+    sources:
+      - title: Delta Transaction Log Protocol
+        url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md
+      - title: 'Delta Lake Storage configuration: Amazon S3'
+        url: https://docs.delta.io/delta-storage/
+      - title: Delta Lake Quick Start
+        url: https://docs.delta.io/quick-start/
+    nodes:
+      spark-s3-writer:
+        label: Delta Lake を導入した Apache Spark
+        kind: service
+        tier: write
+        x: 0
+        y: 1.5
+        description: データファイルを生成し、LogStore でコミットを公開する。
+        realizes:
+          - writer
+        evidence:
+          - type: doc
+            ref: docs/reference-delta-lake.md#§7
+      spark-s3-data:
+        label: S3 の Delta データファイル
+        kind: file
+        tier: table
+        x: 3
+        y: 1.5
+        description: Parquet のデータ本体を保持する。
+        realizes:
+          - data
+        evidence:
+          - type: doc
+            ref: docs/reference-delta-lake.md#§7
+      spark-s3-log:
+        label: S3 の `_delta_log`（コミット・チェックポイント）
+        kind: file
+        tier: table
+        x: 5
+        y: 1.5
+        description: テーブルの履歴と、復元を短縮するチェックポイントを保持する。
+        realizes:
+          - log
+          - checkpoint
+        evidence:
+          - type: doc
+            ref: docs/reference-delta-lake.md#§7
+      spark-s3-reader:
+        label: Apache Spark（ログ再生と読み取り）
+        kind: db
+        tier: write
+        x: 9
+        y: 1.5
+        description: 有効ファイル集合を復元し、対象のデータを読む。
+        realizes:
+          - snapshot
+          - reader
+        evidence:
+          - type: doc
+            ref: docs/reference-delta-lake.md#§7
+      spark-s3-ddb:
+        label: DynamoDB の書き込み調停用テーブル
+        kind: service
+        tier: table
+        x: 9
+        y: 2.5
+        description: 複数クラスター間で新規ログファイル作成を調停する。
+        svc: dynamodb
+        evidence:
+          - type: doc
+            ref: docs/reference-delta-lake.md#§7
+    links:
+      - id: spark-s3-coordinate
+        from: spark-s3-writer
+        to: spark-s3-ddb
+        label: コミットの作成権を調停
+        evidence:
+          - type: doc
+            ref: docs/reference-delta-lake.md#§7
+    groups:
+      - label: AWS の Delta ストレージ
+        kind: cloud
+        provider: aws
+        nodes:
+          - spark-s3-ddb
+          - spark-s3-log
+          - spark-s3-data

@@ -47,3 +47,24 @@ REST カタログの主な呼び出し：
 - `catalog-to-page`：カタログ → metadata.json → Manifest List → Manifest → Parquet のフッター → ページまでの全経路。
 - `vended-credentials`：一時資格情報を受け取り、その範囲だけでストレージを読む。
 - `concurrent-commit`：読み取り中に書き手がコミットしても、読み手は選んだスナップショットを読み続ける。
+
+## 7. 実装例：Trino・Polaris・Amazon S3
+
+Trino の Iceberg REST カタログで委任認証情報を有効化し、Polaris が S3 用の一時認証情報を返す構成例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| Coordinator | Trino Coordinator | カタログ解決、メタデータ読み取りとタスク計画を調停する。 |
+| Worker | Trino Workers | 割り当てられたファイルの読み取りとフィルタを実行する。 |
+| REST Catalog | Polaris Iceberg REST API | 対象テーブルのメタデータを返す。 |
+| Vended Credentials | Polaris と AWS STS の一時認証情報 | カタログ用 IAM ロールの短期認証情報を払い出す。 |
+| metadata.json | S3 の metadata.json | スナップショットとテーブル定義を保持する。 |
+| Manifest List (Avro) | S3 の Manifest List（Avro） | 対象スナップショットの Manifest を列挙する。 |
+| Manifests (Avro) | S3 の Manifest（Avro） | ファイル位置と統計を保持する。 |
+| Data Files (Parquet) | S3 の Parquet ファイル | 該当するデータファイルを読む。 |
+| Delete Files | S3 の位置削除ファイル | v2 の削除対象の位置を記録する。 |
+| 実装で追加 | etc/catalog/iceberg.properties | REST URI と一時認証情報取得を設定する。 |
+
+`iceberg.rest-catalog.vended-credentials-enabled` を有効にし、Coordinator と Worker の両方から分散ストレージへ到達できるよう構成する。対象は Iceberg v2 の位置削除を含む読み取りで、エンジンのフォーマット仕様対応を確認する。
+
+[Iceberg REST Catalog Spec](https://iceberg.apache.org/rest-catalog-spec/)、[Trino Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)、[Trino REST Catalog metastores](https://trino.io/docs/current/object-storage/metastores.html)、[Polaris Configuring S3 Storage](https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/)

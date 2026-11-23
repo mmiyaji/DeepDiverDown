@@ -19,12 +19,12 @@ tiers:
   - {id: "merge", label: "PR の必須チェック", z: 0, size: [16,4]}
 nodes:
   author: {label: "注文 API の開発者", kind: "actor", tier: "source", x: 1, y: 1.5, description: "マニフェスト変更を PR として提出し、違反を修正する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§1"}]}
-  pull-request: {label: "注文 API の PR", kind: "service", tier: "source", x: 5, y: 1.5, description: "評価対象のコミットを持つ。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
-  manifest: {label: "Deployment マニフェスト", kind: "segment", tier: "source", x: 9, y: 1.5, description: "Conftest に渡す構造化 YAML。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
-  policy: {label: "Rego ポリシー", kind: "segment", tier: "source", x: 13, y: 1.5, description: "注文 API のコンテナに CPU request を求めるルール。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§3"}]}
+  pull-request: {label: レビュー対象の変更, kind: service, tier: source, x: 5, 'y': 1.5, description: 評価対象のコミットを持つ。, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§2}]}
+  manifest: {label: 注文 API の配備定義, kind: file, tier: source, x: 9, 'y': 1.5, description: Conftest に渡す構造化 YAML。, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§2}]}
+  policy: {label: 配備条件のポリシー, kind: policy, tier: source, x: 13, 'y': 1.5, description: 注文 API のコンテナに CPU request を求めるルール。, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§3}]}
   runner: {label: "CI ジョブ", kind: "worker", tier: "ci", x: 3, y: 1.5, description: "PR のコミットをチェックアウトして Conftest を実行する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
-  conftest: {label: "Conftest / OPA 評価", kind: "service", tier: "ci", x: 8, y: 1.5, description: "構造化入力を Rego で評価し、違反を出力する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§3"}]}
-  check: {label: "必須ステータスチェック", kind: "service", tier: "merge", x: 5, y: 1.5, description: "CI 結果を対象コミットに関連付け、マージ条件として要求する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§4"}]}
+  conftest: {label: ポリシーの評価, kind: service, tier: ci, x: 8, 'y': 1.5, description: 構造化入力を Rego で評価し、違反を出力する。, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§3}]}
+  check: {label: マージ可否に使う検査結果, kind: service, tier: merge, x: 5, 'y': 1.5, description: CI 結果を対象コミットに関連付け、マージ条件として要求する。, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§4}]}
   branch: {label: "保護されたブランチ", kind: "db", tier: "merge", x: 11, y: 1.5, description: "必須チェックなどのマージ条件が満たされた PR を取り込める。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§4"}]}
 links:
   - {id: "submit", from: "author", to: "pull-request", label: "PR 作成・修正コミット", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
@@ -50,3 +50,116 @@ scenarios:
       - {links: ["submit","trigger","load-yaml"], note: "開発者が CPU request を追加したコミットを PR に送る。CI は更新後のコミットを評価する。"}
       - {links: ["evaluate","load-policy","result","report"], note: "この例の違反が解消され、Conftest が成功し CI が合格を報告する。"}
       - {links: ["merge"], note: "保護ブランチの必須チェックを満たす。ほかの条件も満たせば PR をマージできる。"}
+implementations:
+  - id: github
+    label: GitHub Actions のマージ前ポリシー検査
+    description: GitHub の PR で注文 API 用の Kubernetes マニフェストを Conftest で評価し、検査成功を main のマージ条件にする例。
+    sources:
+      - title: Conftest
+        url: https://www.conftest.dev/
+      - title: 'GitHub Actions: Events that trigger workflows'
+        url: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
+      - title: GitHub protected branches
+        url: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
+    tiers:
+      - id: source
+        label: 変更とポリシー
+        z: 2
+        kind: origin
+      - id: ci
+        label: CI による評価
+        z: 1
+      - id: merge
+        label: PR の必須チェック
+        z: 0
+    nodes:
+      github-author:
+        label: GitHub の開発者
+        kind: actor
+        tier: source
+        realizes:
+          - author
+        description: 注文 API のマニフェスト変更を PR にする。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+      github-pull-request:
+        label: GitHub Pull Request
+        kind: service
+        tier: source
+        svc: github
+        realizes:
+          - pull-request
+        description: PR のレビューと対象コミットのチェック結果をまとめる。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+      github-manifest:
+        label: Git 内の deployment.yaml
+        kind: file
+        tier: source
+        realizes:
+          - manifest
+        description: 対象コミットで変更された評価入力を置く。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+      github-policy:
+        label: Git 内の policy/*.rego
+        kind: policy
+        tier: source
+        realizes:
+          - policy
+        description: 配備条件を Rego で定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+      github-runner:
+        label: GitHub Actions runner の policy-ci ジョブ
+        kind: worker
+        tier: ci
+        svc: github
+        realizes:
+          - runner
+          - conftest
+        description: pull_request イベントで、Conftest CLI をインストールして評価を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+      github-check:
+        label: policy-ci の必須チェック
+        kind: monitor
+        tier: merge
+        realizes:
+          - check
+        description: 終了コードをチェック結果として保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+      github-branch:
+        label: 保護された main
+        kind: db
+        tier: merge
+        svc: github
+        realizes:
+          - branch
+        description: 同名の必須チェックが成功した PR をマージ可能にする。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+      github-workflow:
+        label: GitHub Actions workflow YAML
+        kind: workflow
+        tier: ci
+        description: .github/workflows で対象イベントとジョブを定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5
+    links:
+      - id: github-configure-workflow
+        from: github-workflow
+        to: github-runner
+        label: 検査の手順を定義
+        evidence:
+          - type: doc
+            ref: docs/reference-opa-conftest.md#§5

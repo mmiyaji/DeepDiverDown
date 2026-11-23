@@ -24,14 +24,14 @@ tiers:
   - {"id":"engine","label":"書き込みとクエリ","z":1,"origin":[0,0],"size":[15,3]}
   - {"id":"storage","label":"MergeTree の保存単位","z":0,"origin":[0,0],"size":[15,3]}
 nodes:
-  insert: {"label":"INSERT","kind":"actor","tier":"engine","x":1,"y":1.5,"description":"注文のバッチを書き込む。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
-  planner: {"label":"SELECT / EXPLAIN","kind":"service","tier":"engine","x":5,"y":1.5,"description":"日付と顧客の述語から候補範囲を計画する。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"},{"type":"doc","ref":"docs/reference-clickhouse.md#§5"}]}
-  scan: {"label":"列の読み取り","kind":"worker","tier":"engine","x":9,"y":1.5,"description":"候補グラニュールの必要列を読み、行の述語を評価する。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  insert: {label: 注文データの取り込み元, kind: actor, tier: engine, x: 1, 'y': 1.5, description: 注文のバッチを書き込む。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§2}]}
+  planner: {label: SQL の読取計画, kind: service, tier: engine, x: 5, 'y': 1.5, description: 日付と顧客の述語から候補範囲を計画する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§3}, {type: doc, ref: docs/reference-clickhouse.md#§5}]}
+  scan: {label: 候補範囲の列スキャン, kind: worker, tier: engine, x: 9, 'y': 1.5, description: 候補グラニュールの必要列を読み、行の述語を評価する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§3}]}
   result: {"label":"注文別の金額","kind":"external","tier":"engine","x":14,"y":1.5,"description":"条件を満たす注文の order_id と amount を返す。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§1"}]}
-  partition: {"label":"月パーティション","kind":"db","tier":"storage","x":1,"y":1.5,"description":"toYYYYMM(order_date) でパートを分離する。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
+  partition: {label: 月パーティション, kind: db, tier: storage, x: 1, y: 1.5, description: パートを注文日の月によって分ける。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§2}]}
   parts: {"label":"データパート","kind":"db","tier":"storage","x":5,"y":1.5,"description":"並べ替え済みの列データとインデックスを備えた不変の単位。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
   granules: {"label":"疎主インデックスとマーク","kind":"segment","tier":"storage","x":9,"y":1.5,"description":"グラニュール境界のキーと列データ上の位置を使い、読む範囲を決める。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
-  merger: {"label":"パートのマージ","kind":"worker","tier":"storage","x":14,"y":1.5,"description":"同じパーティションの選択されたパートを新しいパートにまとめる。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
+  merger: {label: 同じパーティション内のデータ統合, kind: worker, tier: storage, x: 14, 'y': 1.5, description: 同じパーティションの選択されたパートを新しいパートにまとめる。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§4}]}
 links:
   - {"id":"store","from":"insert","to":"partition","label":"月ごとに行を振り分ける","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
   - {"id":"sort","from":"partition","to":"parts","label":"ソート済みパートを作る","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
@@ -216,3 +216,24 @@ blocks:
       - id: part-c
         label: パート C
         k: 1
+
+implementations:
+  - id: mergetree
+    label: "単一 ClickHouse サーバーの MergeTree"
+    description: "架空の注文を `PARTITION BY toYYYYMM(order_date)` と `ORDER BY (customer_id, order_date)` の MergeTree に格納する例。クライアントとサーバー、およびディスク上の物理部品を分けて示す。"
+    sources:
+      - {title: ClickHouse MergeTree table engine, url: https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree}
+      - {title: ClickHouse EXPLAIN, url: https://clickhouse.com/docs/reference/statements/explain}
+      - {title: ClickHouse system.parts, url: https://clickhouse.com/docs/operations/system-tables/parts}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      mergetree-insert: {label: clickhouse-client から INSERT, kind: client, tier: processing, x: 1, y: 1.15, realizes: [insert], description: バッチ単位で注文を投入する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
+      mergetree-server: {label: ClickHouse Server の SELECT と MergeTree 読取, kind: service, tier: processing, x: 1, y: 3.65, realizes: [planner, scan], description: 疎索引を調べて読み取り候補を絞る。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
+      mergetree-data: {label: MergeTree の月別パートとマーク, kind: db, tier: processing, x: 5, y: 1.15, realizes: [partition, parts, granules], description: 各パートに列データ、疎主索引とマークを持つ。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
+      mergetree-merge: {label: MergeTree のバックグラウンドマージ, kind: worker, tier: processing, x: 5, y: 3.65, realizes: [merger], description: 同一パーティションの入力パートを統合する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
+      mergetree-result: {label: clickhouse-client の注文結果, kind: external, tier: processing, x: 9, y: 1.15, realizes: [result], description: 条件に合う行を表示する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
+      mergetree-system: {label: system.parts, kind: table, tier: setup, x: 1, y: 1.5, description: active、rows、marks などを調べられるシステムテーブル。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
+    links:
+      - {id: mergetree-system-connection, from: mergetree-system, to: mergetree-server, label: パートの状態を観測}

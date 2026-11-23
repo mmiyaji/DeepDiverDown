@@ -2,8 +2,8 @@
   "model": "trino",
   "name": "Trino の分散クエリアーキテクチャ",
   "coverage": {
-    "covered": 3,
-    "total": 3
+    "covered": 4,
+    "total": 4
   },
   "byId": {
     "client": {
@@ -13,67 +13,107 @@
     },
     "control": {
       "type": "node",
-      "label": "Coordinator",
+      "label": "SQL の計画と調整",
       "status": "claim"
     },
     "connector": {
       "type": "node",
-      "label": "Iceberg Connector",
+      "label": "外部テーブルのメタデータ解決",
       "status": "claim"
     },
     "scan": {
       "type": "node",
-      "label": "Worker・スキャン Task",
+      "label": "分割データの読取タスク",
       "status": "claim"
     },
     "data": {
       "type": "node",
-      "label": "Iceberg・データファイル",
+      "label": "Iceberg テーブルのデータファイル",
       "status": "claim"
     },
     "reduce": {
       "type": "node",
-      "label": "Worker・集約 Task",
+      "label": "集約タスク",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "SQL クライアント → Coordinator",
+      "label": "SQL クライアント → SQL の計画と調整",
       "status": "claim"
     },
     "resolve": {
       "type": "link",
-      "label": "Coordinator → Iceberg Connector",
+      "label": "SQL の計画と調整 → 外部テーブルのメタデータ解決",
       "status": "claim"
     },
     "assign": {
       "type": "link",
-      "label": "Coordinator → Worker・スキャン Task",
+      "label": "SQL の計画と調整 → 分割データの読取タスク",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "Iceberg・データファイル → Worker・スキャン Task",
+      "label": "Iceberg テーブルのデータファイル → 分割データの読取タスク",
       "status": "claim"
     },
     "exchange": {
       "type": "link",
-      "label": "Worker・スキャン Task → Worker・集約 Task",
+      "label": "分割データの読取タスク → 集約タスク",
       "status": "claim"
     },
     "collect": {
       "type": "link",
-      "label": "Worker・集約 Task → Coordinator",
+      "label": "集約タスク → SQL の計画と調整",
       "status": "claim"
     },
     "return": {
       "type": "link",
-      "label": "Coordinator → SQL クライアント",
+      "label": "SQL の計画と調整 → SQL クライアント",
       "status": "claim"
     },
     "orders-by-date": {
       "type": "scenario",
       "label": "Iceberg の受注明細を日別集計"
+    },
+    "trino-iceberg-client": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino CLI",
+      "realizes": [
+        "client"
+      ]
+    },
+    "trino-iceberg-coordinator": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Coordinator と Iceberg Connector",
+      "realizes": [
+        "control",
+        "connector"
+      ]
+    },
+    "trino-iceberg-workers": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Workers の読取と集約タスク",
+      "realizes": [
+        "scan",
+        "reduce"
+      ]
+    },
+    "trino-iceberg-data": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "S3 上の Iceberg データとメタデータ",
+      "realizes": [
+        "data"
+      ]
+    },
+    "trino-iceberg-glue": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "AWS Glue Catalog",
+      "realizes": []
     }
   },
   "byRef": {
@@ -100,7 +140,12 @@
       "exchange",
       "collect",
       "return",
-      "orders-by-date"
+      "orders-by-date",
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue"
     ],
     "docs/reference-trino.md#§2": [
       "connector",
@@ -114,11 +159,20 @@
       "exchange",
       "collect",
       "return"
+    ],
+    "docs/reference-trino.md#§4": [
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue"
     ]
   },
   "reference": {
-    "category": "SQL エンジン",
-    "order": 10,
+    "category": "バッチ・SQL エンジン",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Stage、Task、Split の関係を区別する。",
       "Connector で読み出したデータが Exchange を経て返る流れを追う。"

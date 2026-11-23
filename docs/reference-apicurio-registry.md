@@ -42,3 +42,20 @@ v2 のフィールド追加は v1 に対して両方向に互換。v3 では `cu
 - [Apicurio Registry 3.4 Schema Compatibility Modes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html)
 - [Apache Avro 1.12 Schema Resolution](https://avro.apache.org/docs/1.12.0/specification/#schema-resolution)
 - [Apicurio Registry 3.2 Concepts Glossary](https://www.apicur.io/registry/docs/apicurio-registry/3.2.x/getting-started/assembly-registry-concepts-glossary.html)
+
+## 7. 実装例：Kafka・Apicurio Registry・PostgreSQL
+
+Kafka Java クライアント用の Avro SerDes と、PostgreSQL を使う Apicurio Registry を分けて配置する例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| Avro Producer・Avro Serializer | Java Kafka Producer（Avro Serializer） | Registry からスキーマを解決し、Avro データと参照 ID を送る。 |
+| 注文イベントのトピック | Apache Kafka の注文トピック | Avro メッセージを保持する。 |
+| Avro Deserializer・Consumer / reader schema | Java Kafka Consumer（Avro Deserializer） | スキーマ参照を解決し、読取側スキーマで展開する。 |
+| スキーマの登録者 | スキーマ登録用 REST クライアント | 変更候補を登録 API へ送る。 |
+| 互換性ルール・Order のバージョンと内容 ID | Apicurio Registry Server | 互換性を評価してバージョンと内容 ID を解決する。 |
+| 実装で追加 | PostgreSQL（Registry の SQL ストレージ） | スキーマ本文とレジストリの永続状態を保持する。 |
+
+メッセージを保存する Kafka と、スキーマを保持する PostgreSQL は別の永続化先。レジストリの 3.x コンテナで `APICURIO_STORAGE_KIND=sql` と PostgreSQL 接続を選び、SerDes には Registry の URL を設定する。
+
+[Apicurio Registry 3.4 Kafka SerDes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html)、[Apicurio Registry 3.4 Schema Compatibility Modes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html)、[Apicurio Registry Docker Deployment](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html)

@@ -27,11 +27,11 @@ evidence:
   - {"type":"doc","ref":"docs/reference-apache-paimon.md#§5"}
   - {"type":"doc","ref":"docs/reference-apache-paimon.md#§6"}
 tiers:
-  - {"id":"processing","label":"Flink と下流","z":1,"origin":[0,0],"size":[16,3]}
+  - {"id":"processing","label":"テーブル読み書きと下流","z":1,"origin":[0,0],"size":[16,3]}
   - {"id":"lake","label":"Paimon 主キーテーブル","z":0,"origin":[2,0],"size":[14,3]}
 nodes:
   source: {"label":"上流の注文更新","kind":"external","tier":"processing","x":0,"y":1.5,"description":"order_id=42 の完全な更新行を送る。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§1"}]}
-  writer: {"label":"Flink / Paimon Sink","kind":"worker","tier":"processing","x":4,"y":1.5,"description":"同じ主キーを同じパーティション・バケットへ書き込む。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  writer: {"label":"主キーを使うテーブル書き込み","kind":"worker","tier":"processing","x":4,"y":1.5,"description":"同じ主キーを同じパーティション・バケットへ書き込む。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
   reader: {"label":"スナップショット読み取り","kind":"service","tier":"processing","x":10,"y":0.5,"description":"選択したスナップショットの論理行を取得する。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
   consumer: {"label":"ストリーム利用者","kind":"external","tier":"processing","x":15,"y":2.5,"description":"主キー upsert または更新前後の変更を受け取る。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
   runs: {"label":"バケット内の sorted run","kind":"db","tier":"lake","x":3,"y":1.5,"description":"ソート済みファイルに複数の世代を持ち得る LSM の保存単位。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
@@ -163,6 +163,143 @@ requirements:
   - {"id":"BR-02","kind":"usecase","title":"下流の更新形式を選ぶ","text":"下流が上書きだけで処理できるか、旧値の取り消しが必要かに応じて提供する変更を選ぶ。","links":["upsert","lookup","deliver"],"evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
 unknowns:
   - {"id":"UNK-01","text":"実環境の到着順と業務順、ストレージモード、下流の更新要件、コンパクションの時期は未確認。","refs":["writer","compact","consumer"]}
+implementations:
+  - id: flink-paimon
+    label: Flink SQL・Paimon ファイルカタログ
+    description: ローカル Flink SQL クラスターで Paimon の主キーテーブルを作り、更新とバッチ・ストリーム読み取りを試す例。
+    sources:
+      - title: Paimon 2.1 Primary-Key Table
+        url: https://paimon.apache.org/docs/2.1/primary-key-table/
+      - title: Paimon 2.1 Changelog Producer
+        url: https://paimon.apache.org/docs/2.1/primary-key-table/changelog-producer/
+      - title: Paimon 2.1 Compaction
+        url: https://paimon.apache.org/docs/2.1/primary-key-table/compaction/
+      - title: Flink Quick Start
+        url: https://paimon.apache.org/docs/2.1/flink/quick-start/
+      - title: Understand Files
+        url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/
+    nodes:
+      flink-paimon-source:
+        label: Flink SQL Client の試験用 INSERT
+        kind: external
+        tier: processing
+        x: 0
+        y: 1.5
+        description: 同じ注文キーに対する複数回の更新を入力する。
+        realizes:
+          - source
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-sink:
+        label: Flink SQL・Paimon Sink
+        kind: worker
+        tier: processing
+        x: 4
+        y: 1.5
+        description: Paimon コネクタを使い、パーティションとバケットへ書く。
+        realizes:
+          - writer
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-reader:
+        label: Flink のバッチ読み取り
+        kind: service
+        tier: processing
+        x: 10
+        y: 0.5
+        description: 選んだスナップショットの論理行を確認する。
+        realizes:
+          - reader
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-consumer:
+        label: Flink のストリーム SELECT
+        kind: external
+        tier: processing
+        x: 15
+        y: 2.5
+        description: 生成された更新を増分で受け取る。
+        realizes:
+          - consumer
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-runs:
+        label: warehouse 内のバケットファイル
+        kind: file
+        tier: lake
+        x: 3
+        y: 1.5
+        description: テーブルの sorted run を保持する。
+        realizes:
+          - runs
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-compact:
+        label: Paimon コンパクション
+        kind: worker
+        tier: lake
+        x: 7
+        y: 1.5
+        description: 同一キーの更新を整理する。
+        realizes:
+          - compact
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-snapshot:
+        label: warehouse の snapshot メタデータ
+        kind: file
+        tier: lake
+        x: 10
+        y: 0.3
+        description: コミット済みのファイル集合を記録する。
+        realizes:
+          - snapshots
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-changes:
+        label: Paimon の lookup Changelog
+        kind: service
+        tier: lake
+        x: 12
+        y: 2.4
+        description: '`lookup` を選ぶと旧値を使い更新前後を出す。'
+        realizes:
+          - changelog
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      flink-paimon-config:
+        label: Paimon ファイルカタログ設定
+        kind: catalog
+        tier: processing
+        x: 7
+        y: 2.5
+        description: '`CREATE CATALOG` で warehouse を指定する。'
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+    links:
+      - id: flink-paimon-select-warehouse
+        from: flink-paimon-config
+        to: flink-paimon-sink
+        label: カタログと保存先を選ぶ
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
+      - id: flink-paimon-select-reader
+        from: flink-paimon-config
+        to: flink-paimon-reader
+        label: 同じテーブルを解決
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-paimon.md#§7
 gates: {maxDrift: 0, maxHigh: 0}
 blocks:
   - id: lsm

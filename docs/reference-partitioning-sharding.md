@@ -63,3 +63,29 @@ Trino では、Split はデータセットの読み取り範囲で、Worker 上�
 ## 8. ノード追加とシャードの再配置
 
 保存先のノードを増やすとき、キーをノード数で割った余り（hash mod N）で置き場所を決めていると、N が変わるだけでほとんどのキーの置き場所が変わり、大量のデータ移動が起きる。固定数のスロット（論理シャード）にキーを割り当て、スロットをノードに割り当てる方式や、コンシステントハッシュでは、新しいノードへ一部のスロットだけを移せばよく、移動量はおよそ全体の 1/N に抑えられる。移動中も読み書きを続けるため、移すスロットを順に複製してから担当を切り替える。
+
+## 9. 実装例：ClickHouse Distributed と各シャードの MergeTree
+
+ClickHouse の Distributed 表から、顧客のハッシュで二つのデータシャードへ振り分ける例。各シャードのローカル表では注文日を月で分割する。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 注文 API | 注文 API の ClickHouse クライアント | 顧客 ID と注文日を持つレコードを投入する。 |
+| パーティション／シャードルーター、論理 orders テーブル | ClickHouse の Distributed 表と調整ノード | ハッシュを使って行を分配し、検索時はシャードの部分結果を集める。 |
+| order_date 時間パーティション、customer_id ハッシュシャード A | シャード A のローカル MergeTree 表 | 担当顧客の注文を持ち、その中を注文日の月で分ける。 |
+| order_date 時間パーティション、customer_id ハッシュシャード B | シャード B のローカル MergeTree 表 | 同じパーティション式で別の顧客集合を持つ。 |
+| 並列クエリタスク | 各シャードでの読取と部分集計 | 条件に合うパートを読み、集約の中間状態を送り返す。 |
+
+実装で加わる部品を以下に示す。
+
+- remote_servers とシャード式の設定。シャードの接続先と重み、顧客キーを使う分配式を定義する。選択的読取ではシャード除外が利用可能な述語と設定を確認する。
+
+公式資料
+
+- [PostgreSQL Table Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html)
+- [Apache Iceberg Partitioning](https://iceberg.apache.org/docs/latest/partitioning/)
+- [Amazon DynamoDB Partitions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html)
+- [DynamoDB Partition Key Design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)
+- [Trino・Tasks と Splits](https://trino.io/docs/current/overview/concepts.html#split)
+- [ClickHouse Distributed table engine](https://clickhouse.com/docs/reference/engines/table-engines/special/distributed)
+- [ClickHouse MergeTree table engine](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)

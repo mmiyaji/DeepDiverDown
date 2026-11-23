@@ -12,12 +12,12 @@ evidence: [{type: doc, ref: docs/reference-dbt.md#§1}, {type: doc, ref: docs/re
 tiers: [{id: data, label: データ変換, z: 0, size: [18, 3]}, {id: control, label: 実行と品質, z: 1, origin: [4, 0], size: [14, 3]}]
 nodes:
   raw: {label: Raw table, kind: db, tier: data, x: 0, y: 1.5, description: ロード済み注文データ。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
-  project: {label: dbt project, kind: service, tier: control, x: 3, y: 1.5, description: SQLモデルを管理。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
-  dag: {label: Model DAG, kind: service, tier: control, x: 6, y: 1.5, description: モデル依存関係。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
-  compute: {label: Warehouse compute, kind: worker, tier: control, x: 9, y: 1.5, description: SQLを実行。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
-  staging: {label: Staging models, kind: db, tier: data, x: 10, y: 1.5, description: 整形済みモデル。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
-  mart: {label: Analytics mart, kind: db, tier: data, x: 14, y: 1.5, description: 分析用成果物。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
-  tests: {label: dbt tests, kind: service, tier: control, x: 14, y: 1.5, description: 品質を検証。, evidence: [{type: doc, ref: docs/reference-dbt.md#§4}]}
+  project: {label: 変換プロジェクト, kind: service, tier: control, x: 3, 'y': 1.5, description: SQL モデル、参照宣言、品質検査の定義を持つ。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  dag: {label: モデルの依存グラフ, kind: service, tier: control, x: 6, 'y': 1.5, description: モデル依存関係。, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
+  compute: {label: SQL の実行エンジン, kind: worker, tier: control, x: 9, 'y': 1.5, description: SQLを実行。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  staging: {label: 整形済み中間データ, kind: db, tier: data, x: 10, 'y': 1.5, description: 整形済みモデル。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  mart: {label: 分析用の成果物, kind: db, tier: data, x: 14, 'y': 1.5, description: 分析用成果物。, evidence: [{type: doc, ref: docs/reference-dbt.md#§3}]}
+  tests: {label: データの品質検査, kind: service, tier: control, x: 14, 'y': 1.5, description: 品質を検証。, evidence: [{type: doc, ref: docs/reference-dbt.md#§4}]}
 links:
   - {id: input, from: raw, to: project, label: 入力を参照, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
   - {id: graph, from: project, to: dag, label: 依存関係を構築, evidence: [{type: doc, ref: docs/reference-dbt.md#§2}]}
@@ -32,3 +32,23 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 品質検証, text: 成果物をテストできる。, links: [check], evidence: [{type: doc, ref: docs/reference-dbt.md#§4}]}
 unknowns: [{id: UNK-01, text: 実行環境、スケジュール、テスト定義は未確定。, refs: [execute, check]}]
 gates: {maxDrift: 0, maxHigh: 0}
+
+implementations:
+  - id: core-postgres
+    label: "dbt Core と PostgreSQL"
+    description: "dbt Core を CI ジョブで実行し、PostgreSQL の raw・staging・mart スキーマを使って変換する例。dbt の制御プロセスと SQL を実行するデータベースを分ける。"
+    sources:
+      - {title: What is dbt?, url: https://docs.getdbt.com/docs/introduction}
+      - {title: Connect Postgres to dbt, url: https://docs.getdbt.com/docs/local/connect-data-platform/postgres-setup}
+      - {title: Manifest JSON file, url: https://docs.getdbt.com/reference/artifacts/manifest-json}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      core-postgres-runner: {label: CI 上の dbt Core と dbt-postgres, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [project, dag, tests], description: source と ref から依存順を決め、dbt build でモデル作成とデータテストを実行する。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
+      core-postgres-pg: {label: PostgreSQL の SQL と三つのスキーマ, kind: db, tier: processing, x: 1, y: 3.65, realizes: [raw, compute, staging, mart], description: raw.orders を読み、staging と mart の関係を定義した SQL で作る。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
+      core-postgres-profile: {label: profiles.yml の接続プロファイル, kind: file, tier: setup, x: 1, y: 1.5, description: アダプターの接続先と出力スキーマなどの実行先を指定する。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
+      core-postgres-manifest: {label: manifest.json, kind: file, tier: setup, x: 5, y: 1.5, description: モデル、検査、依存関係を含む解析成果物として保持する。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
+    links:
+      - {id: core-postgres-profile-connection, from: core-postgres-profile, to: core-postgres-runner, label: PostgreSQL の接続先を設定}
+      - {id: core-postgres-manifest-connection, from: core-postgres-manifest, to: core-postgres-runner, label: 依存関係を検査}

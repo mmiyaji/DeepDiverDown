@@ -2,8 +2,8 @@
   "model": "temporal",
   "name": "Temporal のワーカー障害とリプレイ",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "order": {
@@ -13,32 +13,32 @@
     },
     "service": {
       "type": "node",
-      "label": "Temporal Service",
+      "label": "実行履歴・タスクの制御",
       "status": "claim"
     },
     "history": {
       "type": "node",
-      "label": "Event History",
+      "label": "永続的な実行履歴",
       "status": "claim"
     },
     "queue": {
       "type": "node",
-      "label": "Workflow / Activity Task Queue",
+      "label": "ワークフロー・アクティビティの作業待ち行列",
       "status": "claim"
     },
     "workflow-a": {
       "type": "node",
-      "label": "Workflow Worker A",
+      "label": "注文処理の実行担当 A",
       "status": "claim"
     },
     "workflow-b": {
       "type": "node",
-      "label": "Workflow Worker B",
+      "label": "注文処理の実行担当 B",
       "status": "claim"
     },
     "activity": {
       "type": "node",
-      "label": "決済 Activity Worker",
+      "label": "決済処理の実行担当",
       "status": "claim"
     },
     "payment": {
@@ -48,57 +48,57 @@
     },
     "start": {
       "type": "link",
-      "label": "注文 API → Temporal Service",
+      "label": "注文 API → 実行履歴・タスクの制御",
       "status": "claim"
     },
     "append": {
       "type": "link",
-      "label": "Temporal Service → Event History",
+      "label": "実行履歴・タスクの制御 → 永続的な実行履歴",
       "status": "claim"
     },
     "schedule-task": {
       "type": "link",
-      "label": "Temporal Service → Workflow / Activity Task Queue",
+      "label": "実行履歴・タスクの制御 → ワークフロー・アクティビティの作業待ち行列",
       "status": "claim"
     },
     "run-a": {
       "type": "link",
-      "label": "Workflow / Activity Task Queue → Workflow Worker A",
+      "label": "ワークフロー・アクティビティの作業待ち行列 → 注文処理の実行担当 A",
       "status": "claim"
     },
     "decision-a": {
       "type": "link",
-      "label": "Workflow Worker A → Temporal Service",
+      "label": "注文処理の実行担当 A → 実行履歴・タスクの制御",
       "status": "claim"
     },
     "run-b": {
       "type": "link",
-      "label": "Workflow / Activity Task Queue → Workflow Worker B",
+      "label": "ワークフロー・アクティビティの作業待ち行列 → 注文処理の実行担当 B",
       "status": "claim"
     },
     "replay": {
       "type": "link",
-      "label": "Event History → Workflow Worker B",
+      "label": "永続的な実行履歴 → 注文処理の実行担当 B",
       "status": "claim"
     },
     "finish": {
       "type": "link",
-      "label": "Workflow Worker B → Temporal Service",
+      "label": "注文処理の実行担当 B → 実行履歴・タスクの制御",
       "status": "claim"
     },
     "run-activity": {
       "type": "link",
-      "label": "Workflow / Activity Task Queue → 決済 Activity Worker",
+      "label": "ワークフロー・アクティビティの作業待ち行列 → 決済処理の実行担当",
       "status": "claim"
     },
     "charge": {
       "type": "link",
-      "label": "決済 Activity Worker → 外部決済 API",
+      "label": "決済処理の実行担当 → 外部決済 API",
       "status": "claim"
     },
     "complete": {
       "type": "link",
-      "label": "決済 Activity Worker → Temporal Service",
+      "label": "決済処理の実行担当 → 実行履歴・タスクの制御",
       "status": "claim"
     },
     "worker-replay": {
@@ -108,6 +108,69 @@
     "activity-retry": {
       "type": "scenario",
       "label": "完了報告を失った決済 Activity を再試行"
+    },
+    "temporal-order": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "Temporal SDK を使う注文 API",
+      "realizes": [
+        "order"
+      ]
+    },
+    "temporal-service": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "Temporal Server の Frontend・History・Matching",
+      "realizes": [
+        "service",
+        "queue"
+      ]
+    },
+    "temporal-history": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "PostgreSQL の Persistence スキーマ",
+      "realizes": [
+        "history"
+      ]
+    },
+    "temporal-workflow-a": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "注文 Worker Pod A",
+      "realizes": [
+        "workflow-a"
+      ]
+    },
+    "temporal-workflow-b": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "注文 Worker Pod B",
+      "realizes": [
+        "workflow-b"
+      ]
+    },
+    "temporal-activity": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "決済 Worker Deployment",
+      "realizes": [
+        "activity"
+      ]
+    },
+    "temporal-payment": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "外部決済 API（架空）",
+      "realizes": [
+        "payment"
+      ]
+    },
+    "temporal-visibility": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "PostgreSQL の Visibility スキーマ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -138,7 +201,15 @@
       "charge",
       "complete",
       "worker-replay",
-      "activity-retry"
+      "activity-retry",
+      "temporal-order",
+      "temporal-service",
+      "temporal-history",
+      "temporal-workflow-a",
+      "temporal-workflow-b",
+      "temporal-activity",
+      "temporal-payment",
+      "temporal-visibility"
     ],
     "docs/reference-temporal.md#§2": [
       "service",
@@ -170,6 +241,16 @@
       "payment",
       "charge",
       "activity-retry"
+    ],
+    "docs/reference-temporal.md#§6": [
+      "temporal-order",
+      "temporal-service",
+      "temporal-history",
+      "temporal-workflow-a",
+      "temporal-workflow-b",
+      "temporal-activity",
+      "temporal-payment",
+      "temporal-visibility"
     ]
   },
   "reference": {

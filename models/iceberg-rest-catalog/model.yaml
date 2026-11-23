@@ -31,3 +31,83 @@ links:
   - {id: commit-server, from: commit, to: catalog, label: 競合解消して公開, evidence: [{type: doc, ref: docs/reference-iceberg-rest-catalog.md#§4}]}
 scenarios:
   - {id: catalog-read-commit, label: カタログ経由で読み書き, evidence: [{type: doc, ref: docs/reference-iceberg-rest-catalog.md#§6}], steps: [{links: [request, resolve, location], note: エンジンが REST API へ問い合わせ、Catalog Server がテーブルを解決する。}, {links: [read-meta, read-data], note: 返されたメタデータ位置から Manifest とデータファイルを読む。}, {links: [commit-request, commit-server], note: 更新は change-based commit としてサーバーに送る。}]}
+implementations:
+  - id: trino-polaris
+    label: Trino・Polaris・RustFS
+    description: Polaris の公式 Trino ガイドに沿って、Trino Iceberg コネクタから REST API と S3 互換ストレージへ接続する例。
+    sources:
+      - title: Apache Iceberg REST Catalog Spec
+        url: https://iceberg.apache.org/rest-catalog-spec/
+      - title: Getting Started with Apache Polaris and Trino
+        url: https://polaris.apache.org/guides/trino/
+      - title: Trino Iceberg connector
+        url: https://trino.io/docs/current/connector/iceberg.html
+    nodes:
+      trino-polaris-trino:
+        label: Trino Iceberg コネクタ
+        kind: service
+        tier: client
+        x: 0
+        y: 1.5
+        description: SQL 読み書きを Iceberg Catalog 操作に変換する。
+        realizes:
+          - engine
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-rest-catalog.md#§7
+      trino-polaris-polaris:
+        label: Polaris Server（Iceberg REST）
+        kind: catalog
+        tier: service
+        x: 7
+        y: 1.5
+        description: テーブル解決、REST 操作、コミット要求を処理する。
+        realizes:
+          - api
+          - catalog
+          - commit
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-rest-catalog.md#§7
+      trino-polaris-metadata:
+        label: RustFS 上の Iceberg メタデータ
+        kind: file
+        tier: storage
+        x: 10
+        y: 0.5
+        description: スナップショット情報を含むテーブルメタデータを置く。
+        realizes:
+          - metadata
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-rest-catalog.md#§7
+      trino-polaris-data:
+        label: RustFS の Manifest・データファイル
+        kind: file
+        tier: storage
+        x: 13
+        y: 1.5
+        description: 同じストレージ上のテーブルファイル。
+        realizes:
+          - data
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-rest-catalog.md#§7
+      trino-polaris-config:
+        label: polaris.properties
+        kind: file
+        tier: storage
+        x: 3
+        y: 1.5
+        description: REST URI とストレージエンドポイントを持つ。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-rest-catalog.md#§7
+    links:
+      - id: trino-polaris-client-config
+        from: trino-polaris-config
+        to: trino-polaris-trino
+        label: カタログ接続と S3 を設定
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-rest-catalog.md#§7

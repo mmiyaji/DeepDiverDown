@@ -29,3 +29,26 @@ Hubble は Cilium のネットワークイベントを観測できる。ノー�
 許可例では対象フローの転送を `FORWARDED` として追う。拒否例では宛先 Pod と `--verdict DROPPED` で絞り、`Policy denied` のイベントを確認する。TCP の転送イベントから HTTP や注文処理の成功までは判断できない。表示中のフローに該当イベントがなければ、観測範囲とフィルターも確認する。
 
 出典 [Inspecting Network Flows with the CLI](https://docs.cilium.io/en/stable/observability/hubble/hubble-cli/)
+
+## 6. 実装例：Kubernetes の Cilium Agent と Hubble Relay
+Kubernetes に Cilium と Hubble Relay を配置し、注文 API への許可・拒否フローを確かめる例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| チェックアウトの実行単位 | checkout Deployment の Pod |
+| 集計処理の実行単位 | report Deployment の Pod |
+| 注文 API の着信ポリシー | NetworkPolicy マニフェスト |
+| ノードのパケット転送・判定 | Cilium Agent DaemonSet / eBPF / Hubble |
+| 注文 API の実行単位 | order-api Deployment の Pod |
+| ノードのフロー観測 | Cilium Agent DaemonSet / eBPF / Hubble |
+| 複数ノードの観測集約 | Hubble Relay Deployment |
+| フロー確認クライアント | hubble CLI |
+
+- **kubectl による Relay の port-forward**。検証用に API 経由で Relay のポートへ接続する。
+
+port-forward は確認用の接続例。Hubble の verdict は通信の可否を説明するために使い、アプリケーションの正常性は別のテストで測る。
+
+公式資料
+- [Hubble Observability Setup](https://docs.cilium.io/en/stable/observability/hubble/setup/index.html)
+- [Hubble Architecture](https://docs.cilium.io/en/stable/observability/hubble/)
+- [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)

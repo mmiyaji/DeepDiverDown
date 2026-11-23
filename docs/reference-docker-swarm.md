@@ -29,3 +29,25 @@ HTTP listener task が health check に失敗またはクラッシュすると�
 service update の rolling update は scheduler が更新対象を指定された並列度で順に処理する。更新 task が RUNNING になれば次へ進み、失敗時は更新を一時停止できる。運用では replicas、placement constraints、UpdateConfig、障害時の再配置を確認する。
 
 出典 [Apply rolling updates to a service](https://docs.docker.com/engine/swarm/swarm-tutorial/rolling-update)
+
+## 6. 実装例：Docker Engine と routing mesh
+Docker Engine の manager / worker VM 間で注文 API をローリング更新し、公開ポートから同じ名前で到達する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| レプリカ数と設定の宣言 | docker service のサービス仕様 |
+| 配置制御の入口 | Swarm manager VM 群 |
+| 実行先の決定 | Swarm manager VM 群 |
+| コンテナの実行単位 | worker VM 上の Docker Engine |
+| コンテナ実行ノード | worker VM 上の Docker Engine |
+| ローリング更新方針 | Service の UpdateConfig |
+
+- **ingress routing mesh**。タスクの有無に関係なく到達したノードから、実行中のサービスのタスクへ接続を転送する。
+- **コンテナレジストリ**。配備するイメージをノードから取得可能にする。
+
+routing mesh を使う ingress 公開の例。host モードで公開する構成では転送経路が変わる。イメージが private の場合は必要な認証を用意する。
+
+公式資料
+- [Swarm services](https://docs.docker.com/engine/swarm/services/)
+- [Swarm mode routing mesh](https://docs.docker.com/engine/swarm/ingress/)
+- [Rolling updates](https://docs.docker.com/engine/swarm/swarm-tutorial/rolling-update/)

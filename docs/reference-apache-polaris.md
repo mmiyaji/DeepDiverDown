@@ -27,3 +27,21 @@ AWS S3 の例では、Polaris がカタログの IAM ロールを AWS STS で引
 ## 5. シナリオの見方
 
 「注文テーブルを読む」では、読み取り用の権限設定から、テーブル解決、一時認証情報、実ファイルの読み出しまでを追う。「追加ファイルを公開する」では、アップロードからカタログコミットまでの順序を追う。例の名前と権限構成は説明用。
+
+## 6. 実装例：Spark・Polaris・Amazon S3
+
+Spark から Polaris に接続し、カタログ状態を JDBC で永続化して S3 を読み書きする例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| カタログ管理者 | 運用者の管理 CLI | 管理 API でカタログとロールを作る。 |
+| 処理エンジン | Apache Spark SQL | Iceberg REST に接続してファイルを読み書きする。 |
+| 管理 API・Iceberg REST API・ロール・権限判定 | Polaris Server | 管理 API と Iceberg REST と権限判定を一つのサーバーで提供する。 |
+| カタログ状態 | PostgreSQL（JDBC 永続化） | カタログ状態を永続化する。 |
+| 認証情報の発行 | AWS STS | IAM ロールの短期セッションを発行する。 |
+| オブジェクトストレージ | Amazon S3 | Iceberg メタデータとデータファイルを置く。 |
+| 実装で追加 | カタログ用 IAM ロール | Polaris 実行元を信頼し、対象バケットへの権限を定義する。 |
+
+Polaris 実行元をカタログ用 IAM ロールの信頼ポリシーに設定する。Spark の一時認証情報の範囲は IAM と Polaris の権限に依存する。
+
+[Role-Based Access Control](https://polaris.apache.org/releases/1.9.0/managing-security/access-control/)、[Configuring S3 Storage](https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/)、[Polaris JDBC・PostgreSQL・Spark SQL](https://polaris.apache.org/guides/jdbc/)

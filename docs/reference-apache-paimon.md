@@ -39,3 +39,23 @@ Flink SQL で `PRIMARY KEY (order_id) NOT ENFORCED` を宣言した Paimon テ�
 - [Paimon 2.1 Compaction](https://paimon.apache.org/docs/2.1/primary-key-table/compaction/)
 - [Apache Hudi Concepts](https://hudi.apache.org/docs/concepts/)
 - [Paimon 2.1 Table Mode](https://paimon.apache.org/docs/2.1/primary-key-table/table-mode/)
+
+## 7. 実装例：Flink SQL・Paimon ファイルカタログ
+
+ローカル Flink SQL クラスターで Paimon の主キーテーブルを作り、更新とバッチ・ストリーム読み取りを試す例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| 上流の注文更新 | Flink SQL Client の試験用 INSERT | 同じ注文キーに対する複数回の更新を入力する。 |
+| 主キーを使うテーブル書き込み | Flink SQL・Paimon Sink | Paimon コネクタを使い、パーティションとバケットへ書く。 |
+| スナップショット読み取り | Flink のバッチ読み取り | 選んだスナップショットの論理行を確認する。 |
+| ストリーム利用者 | Flink のストリーム SELECT | 生成された更新を増分で受け取る。 |
+| バケット内の sorted run | warehouse 内のバケットファイル | テーブルの sorted run を保持する。 |
+| LSM コンパクション | Paimon コンパクション | 同一キーの更新を整理する。 |
+| コミット済みスナップショット | warehouse の snapshot メタデータ | コミット済みのファイル集合を記録する。 |
+| Changelog Producer | Paimon の lookup Changelog | `lookup` を選ぶと旧値を使い更新前後を出す。 |
+| 実装で追加 | Paimon ファイルカタログ設定 | `CREATE CATALOG` で warehouse を指定する。 |
+
+SQL Client で検証用の更新を入力する。`file:` の warehouse は単一マシンの実験用。分散構成では実行タスクが同じ warehouse に到達できる共有ストレージを使う。`none` と `lookup` の出力差を比較するときは同じ入力の別テーブルを用意する。
+
+[Paimon 2.1 Primary-Key Table](https://paimon.apache.org/docs/2.1/primary-key-table/)、[Paimon 2.1 Changelog Producer](https://paimon.apache.org/docs/2.1/primary-key-table/changelog-producer/)、[Paimon 2.1 Compaction](https://paimon.apache.org/docs/2.1/primary-key-table/compaction/)、[Flink Quick Start](https://paimon.apache.org/docs/2.1/flink/quick-start/)、[Understand Files](https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/)

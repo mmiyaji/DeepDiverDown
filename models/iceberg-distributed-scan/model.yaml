@@ -25,30 +25,30 @@ tiers:
 groups:
   - {kind: parallel, label: Split ごとに Worker が並列に取得, tier: exec, nodes: [worker, reader]}
 nodes:
-  analyst: {label: Analyst / SQL, kind: actor, tier: plan, x: 0, y: 1.5, description: "events を event_ts と user_id で検索する。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§1"}]}
-  planner: {label: Coordinator / Planner, kind: service, tier: plan, x: 4, y: 1.5, description: 述語からパーティション述語を導出し、メタデータだけで読むファイルを決めて Split を作る。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§2"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
-  splits: {label: Split Queue, kind: queue, tier: plan, x: 10, y: 1.5, partitions: 6, description: "split_offsets で分けた・まとめたスキャンタスク。target-size と open-file-cost で大きさが決まる。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
-  worker: {label: Worker, kind: worker, tier: exec, x: 4, y: 1.5, parallel: N, slots: 4, description: 空きに応じて Split を受け取り、Delete ファイルを適用しながら読む。局所性ではなく負荷で割り当てる。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
-  reader: {label: Parquet Reader, kind: worker, tier: exec, x: 9, y: 1.5, parallel: N, description: フッターを読み、残った Row Group の必要な列チャンクだけを範囲 GET し、ページを解凍（zstd など）してデコード（辞書・RLE・差分）する。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}]}
+  analyst: {label: SQL の利用者, kind: actor, tier: plan, x: 0, 'y': 1.5, description: events を event_ts と user_id で検索する。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§1}]}
+  planner: {label: SQL とファイル範囲の計画, kind: service, tier: plan, x: 4, 'y': 1.5, description: 述語からパーティション述語を導出し、メタデータだけで読むファイルを決めて Split を作る。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§2}, {type: doc, ref: docs/reference-iceberg-distributed-scan.md#§3}]}
+  splits: {label: 読み取り範囲の割当待ち, kind: queue, tier: plan, x: 10, 'y': 1.5, partitions: 6, description: split_offsets で分けた・まとめたスキャンタスク。target-size と open-file-cost で大きさが決まる。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§5}]}
+  worker: {label: 分散タスクの実行, kind: worker, tier: exec, x: 4, y: 1.5, parallel: 'N', slots: 4, description: 割り当てられた Split に対して、対応する削除ファイルをクエリ処理で適用する。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§4}, {type: doc, ref: docs/reference-iceberg-distributed-scan.md#§5}]}
+  reader: {label: Parquet の列データ読取, kind: worker, tier: exec, x: 9, y: 1.5, parallel: 'N', description: フッターを参照し、残った行グループの必要な列のバイト範囲を読み、解凍・復号する。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§6}]}
   mlist: {label: Manifest List, kind: db, tier: storage, x: 1, y: 0.5, description: "metadata/snap-*.avro。Manifest ごとのパーティション要約（下限・上限・null）を持つ Avro ファイル。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
   manifest: {label: Manifests, kind: db, tier: storage, x: 4, y: 0.5, description: "metadata/*-m0.avro。データファイルの完全パス・パーティション値・列統計・ファイルサイズ・split_offsets を持つ Avro ファイル。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
   deletes: {label: Delete Files, kind: db, tier: storage, x: 7, y: 0.5, description: 位置削除・等値削除・削除ベクトル。計画時にデータファイルへ対応づける。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}]}
   metajson: {drill: iceberg-catalog-read, label: metadata.json, kind: db, tier: storage, x: 1, y: 2.5, description: "テーブルメタデータ（JSON）。コミットごとに新しく書き、カタログのポインタを差し替える。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§9"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§10"}]}
   data: {drill: parquet-internals, label: "Data Files (Parquet)", kind: db, shape3D: crate, tier: storage, x: 11, y: 1.5, partitions: 6, description: "data/ 以下の Parquet（Row Group → 列チャンク → zstd 圧縮のページ、末尾にフッター）。day(event_ts) × bucket(16, user_id) で分散。完全パスは Manifest に記録され、LIST しない。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§2"}]}
 links:
-  - {id: submit, from: analyst, to: planner, label: SQL と述語, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§2"}]}
-  - {id: resolve, from: planner, to: metajson, label: 現在の metadata.json, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§9"}]}
-  - {id: prune-mlist, from: planner, to: mlist, label: ① Manifest を丸ごと除外, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
-  - {id: prune-manifest, from: planner, to: manifest, label: ② 列統計でファイル除外, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
-  - {id: attach-deletes, from: planner, to: deletes, label: Delete ファイルを対応づけ, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}]}
-  - {id: plan-splits, from: planner, to: splits, label: Split に分割・結合, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
-  - {id: assign, from: splits, to: worker, label: 空いた Worker へ配る, sync: false, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
-  - {id: open, from: worker, to: reader, label: Split を読む, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}]}
-  - {id: footer, from: reader, to: data, label: ③ フッターを範囲 GET, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}]}
-  - {id: chunks, from: reader, to: data, label: 必要な列チャンクだけ GET, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§10"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§11"}]}
-  - {id: decode, from: reader, to: worker, label: 解凍・デコードした列, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§11"}]}
-  - {id: apply-deletes, from: worker, to: deletes, label: 削除行を除く, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}]}
-  - {id: result, from: worker, to: analyst, label: 部分結果を返す, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
+  - {id: submit, from: analyst, to: planner, label: SQL と述語, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§2}]}
+  - {id: resolve, from: planner, to: metajson, label: 現在のテーブルメタデータを解決, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§9}]}
+  - {id: prune-mlist, from: planner, to: mlist, label: ① Manifest を丸ごと除外, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§3}]}
+  - {id: prune-manifest, from: planner, to: manifest, label: ② 列統計でファイル除外, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§3}]}
+  - {id: attach-deletes, from: planner, to: deletes, label: Delete ファイルを対応づけ, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§4}]}
+  - {id: plan-splits, from: planner, to: splits, label: Split に分割・結合, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§5}]}
+  - {id: assign, from: splits, to: worker, label: 空いた Worker へ配る, sync: false, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§5}]}
+  - {id: open, from: worker, to: reader, label: Split を読む, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§6}]}
+  - {id: footer, from: reader, to: data, label: ③ フッターの範囲を読む, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§6}]}
+  - {id: chunks, from: reader, to: data, label: 必要な列チャンクの範囲を読む, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§6}, {type: doc, ref: docs/reference-iceberg-distributed-scan.md#§10}, {type: doc, ref: docs/reference-iceberg-distributed-scan.md#§11}]}
+  - {id: decode, from: reader, to: worker, label: 解凍・デコードした列, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§11}]}
+  - {id: apply-deletes, from: worker, to: deletes, label: 削除行を除く, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§4}]}
+  - {id: result, from: worker, to: analyst, label: 部分結果を返す, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§5}]}
 scenarios:
   - id: pruned-scan
     label: 日付とユーザーで絞って検索する
@@ -166,3 +166,29 @@ treeLayout:
                   - {id: del-1102, label: "…00012-deletes.parquet", kind: delete, node: deletes, sub: "00012 の位置削除", description: 読むデータファイル 00012 の削除行を表す位置削除ファイル。読みながら突き合わせる。, sample: "file_path: …/00012.parquet  pos: 1,204\nfile_path: …/00012.parquet  pos: 88,310"}
                   - {id: dm-1101, label: "…00002-deletes.parquet", kind: delete, node: deletes, sub: "11-01 の位置削除", description: 対象外の日付のデータファイルの削除なので使わない。}
                   - {id: dm-1103, label: "…00022-deletes.parquet", kind: delete, node: deletes, sub: "11-03 の位置削除"}
+
+implementations:
+  - id: trino-rest-s3
+    label: "Trino・Iceberg REST カタログ・S3"
+    description: "Trino が REST カタログを介して Iceberg の events テーブルを解決し、S3 上のメタデータと Parquet ファイルを分散して読む例。削除ファイルと形式のサポートは利用する Trino と Iceberg の組み合わせで確認する。"
+    sources:
+      - {title: Apache Iceberg Specification, url: https://iceberg.apache.org/spec/}
+      - {title: Iceberg Partitioning, url: https://iceberg.apache.org/docs/latest/partitioning/}
+      - {title: Iceberg Performance, url: https://iceberg.apache.org/docs/latest/performance/}
+      - {title: Iceberg Configuration, url: https://iceberg.apache.org/docs/latest/configuration/}
+      - {title: Trino Iceberg connector, url: https://trino.io/docs/current/connector/iceberg.html}
+      - {title: Apache Parquet File Format, url: https://parquet.apache.org/docs/file-format/}
+      - {title: Apache Avro Specification, url: https://avro.apache.org/docs/current/specification/}
+      - {title: Iceberg AWS - Object Store File Layout, url: https://iceberg.apache.org/docs/latest/aws/#object-store-file-layout}
+      - {title: Trino S3 file system support, url: https://trino.io/docs/current/object-storage/file-system-s3.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      trino-rest-s3-client: {label: Trino CLI の SQL クライアント, kind: client, tier: processing, x: 1, y: 1.15, realizes: [analyst], description: イベント時刻と利用者 ID の条件を Coordinator に送る。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§13}]}
+      trino-rest-s3-coord: {label: Trino Coordinator と Iceberg Split 管理, kind: service, tier: processing, x: 1, y: 3.65, realizes: [planner, splits], description: スナップショットの情報から読み取り単位を計画し Worker に割り当てる。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§13}]}
+      trino-rest-s3-storage: {label: S3 上の Iceberg メタデータとデータ, kind: db, tier: processing, x: 5, y: 1.15, svc: s3, realizes: [mlist, manifest, deletes, metajson, data], description: metadata.json、マニフェスト、データファイル、該当する削除ファイルを管理されたパスに持つ。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§13}]}
+      trino-rest-s3-workers: {label: Trino Worker の Iceberg Task と Parquet Reader, kind: worker, tier: processing, x: 5, y: 3.65, realizes: [worker, reader], description: 担当範囲から必要な列を読み、該当する削除条件をクエリ処理で適用する。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§13}]}
+      trino-rest-s3-rest: {label: Iceberg REST カタログ, kind: catalog, tier: setup, x: 1, y: 1.5, description: テーブルの解決に必要なカタログ API を提供し、Trino 側で接続先を設定する。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§13}]}
+    links:
+      - {id: trino-rest-s3-rest-connection, from: trino-rest-s3-rest, to: trino-rest-s3-coord, label: 対象テーブルの情報を解決}

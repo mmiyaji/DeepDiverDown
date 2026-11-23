@@ -2,73 +2,120 @@
   "model": "spark-structured-streaming",
   "name": "Apache Spark Structured Streaming の基本アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "kafka": {
       "type": "node",
-      "label": "Kafka Source",
+      "label": "ストリーム入力",
       "status": "claim"
     },
     "driver": {
       "type": "node",
-      "label": "Query Driver",
+      "label": "クエリの調整プロセス",
       "status": "claim"
     },
     "executor": {
       "type": "node",
-      "label": "Executors",
+      "label": "分散タスクの実行担当",
       "status": "claim"
     },
     "state": {
       "type": "node",
-      "label": "Window State",
+      "label": "時間窓ごとの状態",
       "status": "claim"
     },
     "sink": {
       "type": "node",
-      "label": "Output Sink",
+      "label": "集計結果の出力先",
       "status": "claim"
     },
     "checkpoint": {
       "type": "node",
-      "label": "Checkpoint",
+      "label": "進捗と状態の復旧領域",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "Kafka Source → Query Driver",
+      "label": "ストリーム入力 → クエリの調整プロセス",
       "status": "claim"
     },
     "schedule": {
       "type": "link",
-      "label": "Query Driver → Executors",
+      "label": "クエリの調整プロセス → 分散タスクの実行担当",
       "status": "claim"
     },
     "aggregate": {
       "type": "link",
-      "label": "Executors → Window State",
+      "label": "分散タスクの実行担当 → 時間窓ごとの状態",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "Window State → Output Sink",
+      "label": "時間窓ごとの状態 → 集計結果の出力先",
       "status": "claim"
     },
     "save": {
       "type": "link",
-      "label": "Executors → Checkpoint",
+      "label": "分散タスクの実行担当 → 進捗と状態の復旧領域",
       "status": "claim"
     },
     "resume": {
       "type": "link",
-      "label": "Checkpoint → Query Driver",
+      "label": "進捗と状態の復旧領域 → クエリの調整プロセス",
       "status": "claim"
     },
     "structured-window-recovery": {
       "type": "scenario",
       "label": "Kafka から窓集計・再開"
+    },
+    "kafka-parquet-source": {
+      "type": "implementation",
+      "impl": "kafka-parquet",
+      "label": "Kafka orders トピック",
+      "realizes": [
+        "kafka"
+      ]
+    },
+    "kafka-parquet-driver": {
+      "type": "implementation",
+      "impl": "kafka-parquet",
+      "label": "Spark Driver のストリーミングクエリ",
+      "realizes": [
+        "driver"
+      ]
+    },
+    "kafka-parquet-executors": {
+      "type": "implementation",
+      "impl": "kafka-parquet",
+      "label": "Executor JVM の窓集計と State Store",
+      "realizes": [
+        "executor",
+        "state"
+      ]
+    },
+    "kafka-parquet-parquet": {
+      "type": "implementation",
+      "impl": "kafka-parquet",
+      "label": "共有ファイルシステムの Parquet 出力",
+      "realizes": [
+        "sink"
+      ]
+    },
+    "kafka-parquet-checkpoint": {
+      "type": "implementation",
+      "impl": "kafka-parquet",
+      "label": "クエリ固有の checkpointLocation",
+      "realizes": [
+        "checkpoint"
+      ]
+    },
+    "kafka-parquet-module": {
+      "type": "implementation",
+      "impl": "kafka-parquet",
+      "label": "Spark SQL 用 Kafka コネクター",
+      "realizes": []
     }
   },
   "byRef": {
@@ -90,7 +137,13 @@
       "write",
       "save",
       "resume",
-      "structured-window-recovery"
+      "structured-window-recovery",
+      "kafka-parquet-source",
+      "kafka-parquet-driver",
+      "kafka-parquet-executors",
+      "kafka-parquet-parquet",
+      "kafka-parquet-checkpoint",
+      "kafka-parquet-module"
     ],
     "docs/reference-spark-structured-streaming.md#§2": [
       "kafka",
@@ -116,11 +169,21 @@
     ],
     "docs/reference-spark-structured-streaming.md#§7": [
       "structured-window-recovery"
+    ],
+    "docs/reference-spark-structured-streaming.md#§8": [
+      "kafka-parquet-source",
+      "kafka-parquet-driver",
+      "kafka-parquet-executors",
+      "kafka-parquet-parquet",
+      "kafka-parquet-checkpoint",
+      "kafka-parquet-module"
     ]
   },
   "reference": {
     "category": "ストリーム処理",
-    "order": 30,
+    "order": 40,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Kafka Source、ストリームクエリ、窓集計、Sink の役割を区別する。",
       "ウォーターマークとチェックポイントが遅延データと障害復旧に果たす役割を理解する。",

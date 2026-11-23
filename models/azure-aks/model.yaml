@@ -22,12 +22,12 @@ tiers:
   - {id: pools, label: サブスクリプション側ノードプール, z: 0, origin: [0, 8], size: [12, 3]}
 nodes:
   operator: {label: 運用者, kind: actor, tier: interface, x: 1, y: 1.5, role: ops, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
-  api: {label: AKS / Kubernetes API, kind: service, svc: azure:aks, tier: control, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§2}]}
-  system: {label: System node pool, kind: worker, svc: azure:aks, tier: pools, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}]}
-  user: {label: User node pool, kind: worker, svc: azure:aks, tier: pools, x: 6, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}]}
-  workload: {label: Deployment / Pods, kind: service, svc: k8s:deployment, tier: pools, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
-  lb: {label: Azure Load Balancer / Service, kind: lb, svc: azure:load-balancer, tier: edge, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
-  registry: {label: Azure Container Registry, kind: external, svc: azure:container-registry, tier: edge, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  api: {label: マネージド制御 API, kind: service, tier: control, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§2}]}
+  system: {label: 基盤用ノード群, kind: worker, tier: pools, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}]}
+  user: {label: アプリ用ノード群, kind: worker, tier: pools, x: 6, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}]}
+  workload: {label: 注文 API の実行単位, kind: service, tier: pools, x: 9, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  lb: {label: アプリ公開・振り分け, kind: lb, tier: edge, x: 9, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
+  registry: {label: コンテナイメージの保管, kind: external, tier: edge, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
 links:
   - {id: submit, from: operator, to: api, label: API で desired state を送る, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§4}]}
   - {id: system-schedule, from: api, to: system, label: 基盤 Pod を配置, evidence: [{type: doc, ref: docs/reference-azure-aks.md#§3}, {type: doc, ref: docs/reference-azure-aks.md#§4}]}
@@ -50,3 +50,168 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 順序付きアップグレード, text: フルアップグレードを control plane 先行、node pool 順次で実施する。, links: [replace], evidence: [{type: doc, ref: docs/reference-azure-aks.md#§5}]}
 unknowns:
   - {id: UNK-01, text: 実際のサブスクリプション、リージョン、ゾーン、VM SKU、ノード数、PDB、ネットワーク設定は未確定。, refs: [system, user, workload]}
+implementations:
+  - id: azure
+    label: AKS Standard・ACR・Load Balancer
+    description: AKS のシステムプールとユーザープールを分け、ユーザープール上の注文 API を LoadBalancer Service で公開する例。
+    sources:
+      - title: AKS core concepts
+        url: https://learn.microsoft.com/azure/aks/core-aks-concepts
+      - title: AKS baseline architecture
+        url: https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks
+      - title: Use a Standard Load Balancer in AKS
+        url: https://learn.microsoft.com/en-us/azure/aks/load-balancer-standard
+    tiers:
+      - id: interface
+        label: 利用・管理
+        z: 2
+        origin:
+          - -1
+          - 0
+      - id: edge
+        label: 公開・レジストリ
+        z: 1
+        origin:
+          - 0
+          - 0
+      - id: control
+        label: AKS コントロールプレーン
+        z: 1
+        origin:
+          - 0
+          - 4
+      - id: pools
+        label: サブスクリプション側ノードプール
+        z: 0
+        origin:
+          - 0
+          - 8
+    groups:
+      - kind: cloud
+        label: Azure サブスクリプション
+        provider: azure
+        tier:
+          - control
+          - pools
+          - edge
+        nodes:
+          - azure-api
+          - azure-system
+          - azure-user
+          - azure-workload
+          - azure-lb
+          - azure-registry
+          - azure-svc
+      - kind: vnet
+        label: AKS の仮想ネットワーク
+        provider: azure
+        tier:
+          - pools
+          - edge
+        nodes:
+          - azure-system
+          - azure-user
+          - azure-workload
+          - azure-svc
+    nodes:
+      azure-operator:
+        label: kubectl と Microsoft Entra ID
+        kind: actor
+        tier: interface
+        svc: azure:entra
+        realizes:
+          - operator
+        description: 運用者を認証し、認可は設定済みの RBAC で制御する。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-api:
+        label: AKS マネージド制御プレーン
+        kind: service
+        tier: control
+        svc: azure:aks
+        realizes:
+          - api
+        description: API と制御プロセスを管理サービスとして提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-system:
+        label: Azure VM Scale Set（System）
+        kind: worker
+        tier: pools
+        svc: azure:vm
+        realizes:
+          - system
+        description: システム用 Pod を優先して動かす。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-user:
+        label: Azure VM Scale Set（User）
+        kind: worker
+        tier: pools
+        svc: azure:vm
+        realizes:
+          - user
+        description: 注文 API の Pod を動かす。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-workload:
+        label: 注文 API Deployment / Pod
+        kind: service
+        tier: pools
+        svc: k8s:deployment
+        realizes:
+          - workload
+        description: node selector 等で User プールへ配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-lb:
+        label: Azure Standard Load Balancer
+        kind: lb
+        tier: edge
+        svc: azure:lb
+        realizes:
+          - lb
+        description: Service の定義に基づいて外部到達経路を構成する。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-registry:
+        label: Azure Container Registry
+        kind: external
+        tier: edge
+        svc: azure:acr
+        realizes:
+          - registry
+        description: kubelet のマネージド ID にプル権限を付けて利用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-svc:
+        label: 注文 API の LoadBalancer Service
+        kind: lb
+        tier: edge
+        svc: k8s:service
+        description: クラウド側ロードバランサーと Kubernetes 側エンドポイントを対応させる。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+    links:
+      - id: azure-publish-service
+        from: azure-workload
+        to: azure-svc
+        label: Service の対象にする
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      - id: azure-allocate-lb
+        from: azure-svc
+        to: azure-lb
+        label: 公開フロントエンドを割り当てる
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9

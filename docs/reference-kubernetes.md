@@ -35,3 +35,26 @@ Service は Pod の一時的な IP を利用者から隠し、ラベルに一致
 Deployment の更新では新しい ReplicaSet を作り、古い Pod を段階的に置き換える。`kubectl rollout status` などで状態を確認でき、問題がある場合は Deployment の履歴を使ったロールバックを検討する。
 
 出典 [Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+
+## 7. 実装例：kubeadm と stacked etcd
+オンプレミスの仮想マシンで、kubeadm の stacked etcd 構成を使って注文 API を動かす例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 構成の投入クライアント | kubectl |
+| API サーバー | コントロールプレーンVM × 3 |
+| レプリカ調整 | コントロールプレーンVM × 3 |
+| 配置先の決定 | コントロールプレーンVM × 3 |
+| クラスタ状態ストア | コントロールプレーンVM × 3 |
+| ノード実行エージェント | worker VM の kubelet と containerd |
+| 注文 API の実行単位 | 注文 API Deployment / Pod |
+| 注文 API の内部公開 | ClusterIP Service |
+
+- **API 用 TCP ロードバランサー**。同一 DNS 名から各 API サーバーの 6443 番ポートへ接続を振り分ける。
+
+コントロールプレーン間の通信と Pod ネットワークを開通させ、CNI を別途選定する。etcd を別の VM 群へ置く external etcd 構成も選べる。
+
+公式資料
+- [Creating Highly Available Clusters with kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/)
+- [Kubernetes Components](https://kubernetes.io/docs/concepts/overview/components/)
+- [Service](https://kubernetes.io/docs/concepts/services-networking/service/)

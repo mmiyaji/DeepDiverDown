@@ -9,11 +9,11 @@ sources: [docs/reference-amazon-ecs.md]
 evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}]
 tiers: [{id: control, label: ECS 制御, z: 1, size: [12, 3]}, {id: runtime, label: 実行基盤, z: 0, size: [12, 3]}]
 nodes:
-  service: {label: ECS Service（注文 API）, kind: service, tier: control, x: 1, y: 1.5, description: desired count と更新方針を持つ長時間稼働サービス。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
-  scheduler: {label: サービススケジューラー, kind: scheduler, tier: control, x: 5, y: 1.5, description: desired count を維持し、起動・停止・置き換えを調整する。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§2}, {type: doc, ref: docs/reference-amazon-ecs.md#§4}]}
-  placement: {label: タスク配置, kind: service, tier: control, x: 9, y: 1.5, description: 実行方式、容量、制約、配置戦略を使い候補を選ぶ仕組み。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
-  fargate: {label: Fargate タスク, kind: worker, tier: runtime, x: 2, y: 1.5, description: AWS 管理のサーバーレス実行方式。AZ 間の均衡を試みる。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
-  ec2: {label: EC2 コンテナインスタンス, kind: host, tier: runtime, x: 6, y: 1.5, description: 登録済みインスタンスの CPU・メモリ・属性を使う実行基盤。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  service: {label: 長時間稼働サービスの定義, kind: service, tier: control, x: 1, 'y': 1.5, description: desired count と更新方針を持つ長時間稼働サービス。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
+  scheduler: {label: 実行数の維持と再配置, kind: scheduler, tier: control, x: 5, 'y': 1.5, description: desired count を維持し、起動・停止・置き換えを調整する。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§2}, {type: doc, ref: docs/reference-amazon-ecs.md#§4}]}
+  placement: {label: 実行先の選択と配置, kind: service, tier: control, x: 9, 'y': 1.5, description: 実行方式、容量、制約、配置戦略を使い候補を選ぶ仕組み。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  fargate: {label: 利用者がホストを管理しない実行先, kind: worker, tier: runtime, x: 2, 'y': 1.5, description: AWS 管理のサーバーレス実行方式。AZ 間の均衡を試みる。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
+  ec2: {label: 利用者がホストを管理する実行先, kind: host, tier: runtime, x: 6, 'y': 1.5, description: 登録済みインスタンスの CPU・メモリ・属性を使う実行基盤。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§1}, {type: doc, ref: docs/reference-amazon-ecs.md#§2}]}
   alb: {label: ロードバランサー, kind: gateway, tier: runtime, x: 10, y: 1.5, description: ECS Service の注文 API へリクエストを転送する入口。, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
 links:
   - {id: define, from: service, to: scheduler, label: desired state を登録, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§3}]}
@@ -37,3 +37,114 @@ scenarios:
       - {links: [define], note: 実行中タスクの停止・失敗を ECS Service が検知する。}
       - {links: [replace], note: サービススケジューラーが desired count を満たす置き換えを計画する。}
       - {links: [choose, fargate-place, ec2-place], note: 配置条件を再評価し、Fargate または適合する EC2 へ新タスクを置く。}
+implementations:
+  - id: ecs
+    label: ECS の Fargate サービスと EC2 サービス
+    description: 同じ ECS クラスタの中で注文 API のタスク定義を共有し、Fargate と EC2 を別のサービスとして比較する例。
+    sources:
+      - title: Amazon ECS launch types and capacity providers
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/capacity-launch-type-comparison.html
+      - title: Amazon ECS capacity providers for EC2 workloads
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/asg-capacity-providers.html
+      - title: Use an Application Load Balancer for Amazon ECS
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/alb.html
+    tiers:
+      - id: control
+        label: ECS 制御
+        z: 1
+      - id: runtime
+        label: 実行基盤
+        z: 0
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - control
+          - runtime
+        nodes:
+          - ecs-service
+          - ecs-scheduler
+          - ecs-fargate
+          - ecs-ec2
+          - ecs-alb
+          - ecs-image
+    nodes:
+      ecs-service:
+        label: ECS Service の設定 × 2
+        kind: service
+        tier: control
+        realizes:
+          - service
+        description: 同じタスク定義から Fargate と EC2 を別の ECS サービスとして定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6
+      ecs-scheduler:
+        label: ECS サービス制御と容量戦略
+        kind: workflow
+        tier: control
+        realizes:
+          - scheduler
+          - placement
+        description: 必要なタスク数と、各サービスの capacity provider strategy を適用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6
+      ecs-fargate:
+        label: Fargate capacity provider のタスク
+        kind: worker
+        tier: runtime
+        svc: ecs
+        realizes:
+          - fargate
+        description: インフラの EC2 インスタンスを利用者が管理しない実行先。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6
+      ecs-ec2:
+        label: EC2 Auto Scaling group のコンテナインスタンス
+        kind: host
+        tier: runtime
+        svc: ec2
+        realizes:
+          - ec2
+        description: EC2 capacity provider と関連付け、タスクをコンテナインスタンスへ配備する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6
+      ecs-alb:
+        label: Application Load Balancer と別ターゲットグループ
+        kind: gateway
+        tier: runtime
+        svc: alb
+        realizes:
+          - alb
+        description: リスナールールで 2 つの ECS サービスを比較できるようにする。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6
+      ecs-image:
+        label: Amazon ECR の共通イメージ
+        kind: file
+        tier: runtime
+        svc: ecr
+        description: 両方のサービスが同じバージョンの注文 API イメージを参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6
+    links:
+      - id: ecs-pull-fargate
+        from: ecs-fargate
+        to: ecs-image
+        label: イメージを取得
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6
+      - id: ecs-pull-ec2
+        from: ecs-ec2
+        to: ecs-image
+        label: イメージを取得
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-ecs.md#§6

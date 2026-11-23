@@ -27,3 +27,20 @@ Nessie はカタログの名前付き参照を管理する。ブランチはコ�
 ## 5. シナリオの見方
 
 例では当初 `main` とタグ `close-jun` に同じ確定済みの売上・顧客テーブルがあり、作業ブランチ `review` で両方を更新する。公開後もタグで締め時点の組み合わせを読める。木の各枝はマージ前の参照を展開した概念図。
+
+## 6. 実装例：Spark・Nessie・MinIO
+
+公式のローカル Iceberg REST ガイドに沿って Spark と MinIO を接続し、作業ブランチを試す例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| Iceberg エンジン | Spark SQL | Iceberg REST クライアントからブランチを選ぶ。 |
+| データ運用者 | 運用者の Nessie CLI | ブランチの作成とマージを行う。 |
+| Iceberg REST 接続・ブランチ・タグ・テーブル状態 | Nessie Server | REST 接続、参照とコンテンツキーの解決を担う。 |
+| コミット履歴 | Nessie インメモリ Version Store | 試行用のコミット履歴をプロセス内に保存する。 |
+| Iceberg メタデータ・ファイル | MinIO（S3 互換） | warehouse に Iceberg メタデータとデータを置く。 |
+| 実装で追加 | warehouse 設定 | オブジェクトストレージの接続先とテーブルの既定位置を定義する。 |
+
+warehouse をサーバーで定義する。試行用の履歴はインメモリで、再起動後も保持する運用では永続バックエンドを使う。Iceberg REST 対応は公式ガイドで実験的とされる。
+
+[Nessie Specification](https://projectnessie.org/develop/spec/)、[Configure Nessie with Iceberg REST](https://projectnessie.org/guides/iceberg-rest/)、[Getting Started with Nessie and Iceberg REST](https://projectnessie.org/guides/try-nessie/)

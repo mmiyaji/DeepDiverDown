@@ -2,8 +2,8 @@
   "model": "delta-lake",
   "name": "Delta Lake の基本アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "writer": {
@@ -74,6 +74,46 @@
     "commit-read": {
       "type": "scenario",
       "label": "注文をコミットして読む"
+    },
+    "spark-s3-writer": {
+      "type": "implementation",
+      "impl": "spark-s3",
+      "label": "Delta Lake を導入した Apache Spark",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "spark-s3-data": {
+      "type": "implementation",
+      "impl": "spark-s3",
+      "label": "S3 の Delta データファイル",
+      "realizes": [
+        "data"
+      ]
+    },
+    "spark-s3-log": {
+      "type": "implementation",
+      "impl": "spark-s3",
+      "label": "S3 の `_delta_log`（コミット・チェックポイント）",
+      "realizes": [
+        "log",
+        "checkpoint"
+      ]
+    },
+    "spark-s3-reader": {
+      "type": "implementation",
+      "impl": "spark-s3",
+      "label": "Apache Spark（ログ再生と読み取り）",
+      "realizes": [
+        "snapshot",
+        "reader"
+      ]
+    },
+    "spark-s3-ddb": {
+      "type": "implementation",
+      "impl": "spark-s3",
+      "label": "DynamoDB の書き込み調停用テーブル",
+      "realizes": []
     }
   },
   "byRef": {
@@ -97,7 +137,12 @@
       "assemble",
       "read",
       "files",
-      "commit-read"
+      "commit-read",
+      "spark-s3-writer",
+      "spark-s3-data",
+      "spark-s3-log",
+      "spark-s3-reader",
+      "spark-s3-ddb"
     ],
     "docs/reference-delta-lake.md#§2": [
       "writer",
@@ -121,11 +166,20 @@
     ],
     "docs/reference-delta-lake.md#§6": [
       "commit-read"
+    ],
+    "docs/reference-delta-lake.md#§7": [
+      "spark-s3-writer",
+      "spark-s3-data",
+      "spark-s3-log",
+      "spark-s3-reader",
+      "spark-s3-ddb"
     ]
   },
   "reference": {
     "category": "テーブル形式とカタログ",
     "order": 20,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "データファイルと Delta transaction log の役割を区別する。",
       "MVCC と atomic commit が一貫したスナップショットを作る流れを追う。",

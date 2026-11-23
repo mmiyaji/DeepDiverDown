@@ -2,8 +2,8 @@
   "model": "snowflake-secure-sharing",
   "name": "Snowflake Secure Data Sharing の公開と失効",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "provider": {
@@ -18,22 +18,22 @@
     },
     "view": {
       "type": "node",
-      "label": "共有用 secure view",
+      "label": "共有用のアクセス制御ビュー",
       "status": "claim"
     },
     "share": {
       "type": "node",
-      "label": "Share",
+      "label": "データ公開と受領者の定義",
       "status": "claim"
     },
     "imported": {
       "type": "node",
-      "label": "受領側の読み取り専用 DB",
+      "label": "受領者の読み取り専用参照口",
       "status": "claim"
     },
     "consumer": {
       "type": "node",
-      "label": "受領側のウェアハウス",
+      "label": "受領側のクエリ実行資源",
       "status": "claim"
     },
     "revoke": {
@@ -43,12 +43,12 @@
     },
     "prepare": {
       "type": "link",
-      "label": "提供側の注文集計 → 共有用 secure view",
+      "label": "提供側の注文集計 → 共有用のアクセス制御ビュー",
       "status": "claim"
     },
     "grant": {
       "type": "link",
-      "label": "共有用 secure view → Share",
+      "label": "共有用のアクセス制御ビュー → データ公開と受領者の定義",
       "status": "claim"
     },
     "publish": {
@@ -58,27 +58,82 @@
     },
     "import": {
       "type": "link",
-      "label": "Share → 受領側の読み取り専用 DB",
+      "label": "データ公開と受領者の定義 → 受領者の読み取り専用参照口",
       "status": "claim"
     },
     "query": {
       "type": "link",
-      "label": "受領側のウェアハウス → 受領側の読み取り専用 DB",
+      "label": "受領側のクエリ実行資源 → 受領者の読み取り専用参照口",
       "status": "claim"
     },
     "resolve": {
       "type": "link",
-      "label": "受領側の読み取り専用 DB → 共有用 secure view",
+      "label": "受領者の読み取り専用参照口 → 共有用のアクセス制御ビュー",
       "status": "claim"
     },
     "effect": {
       "type": "link",
-      "label": "共有の取り消し → Share",
+      "label": "共有の取り消し → データ公開と受領者の定義",
       "status": "claim"
     },
     "stop-sharing": {
       "type": "scenario",
       "label": "共有契約の終了"
+    },
+    "example-provider": {
+      "type": "implementation",
+      "impl": "snowflake-direct-share",
+      "label": "提供者側データ管理ロール",
+      "realizes": [
+        "provider"
+      ]
+    },
+    "example-orders": {
+      "type": "implementation",
+      "impl": "snowflake-direct-share",
+      "label": "提供側 SALES.ORDERS_SUMMARY",
+      "realizes": [
+        "orders"
+      ]
+    },
+    "example-view": {
+      "type": "implementation",
+      "impl": "snowflake-direct-share",
+      "label": "SALES.ORDERS_PUBLIC SECURE VIEW",
+      "realizes": [
+        "view"
+      ]
+    },
+    "example-share": {
+      "type": "implementation",
+      "impl": "snowflake-direct-share",
+      "label": "Snowflake SHARE と受領者割当",
+      "realizes": [
+        "share",
+        "revoke"
+      ]
+    },
+    "example-imported": {
+      "type": "implementation",
+      "impl": "snowflake-direct-share",
+      "label": "受領側 ORDERS_SHARED データベース",
+      "realizes": [
+        "imported"
+      ]
+    },
+    "example-consumer": {
+      "type": "implementation",
+      "impl": "snowflake-direct-share",
+      "label": "受領側の BI_WH",
+      "realizes": [
+        "consumer"
+      ]
+    },
+    "example-role": {
+      "type": "implementation",
+      "impl": "snowflake-direct-share",
+      "label": "受領側の BI ロール",
+      "realizes": []
     }
   },
   "byRef": {
@@ -102,7 +157,14 @@
       "query",
       "resolve",
       "effect",
-      "stop-sharing"
+      "stop-sharing",
+      "example-provider",
+      "example-orders",
+      "example-view",
+      "example-share",
+      "example-imported",
+      "example-consumer",
+      "example-role"
     ],
     "docs/reference-snowflake-secure-sharing.md#§2": [
       "orders",
@@ -124,6 +186,15 @@
       "revoke",
       "effect",
       "stop-sharing"
+    ],
+    "docs/reference-snowflake-secure-sharing.md#§5": [
+      "example-provider",
+      "example-orders",
+      "example-view",
+      "example-share",
+      "example-imported",
+      "example-consumer",
+      "example-role"
     ]
   },
   "reference": {

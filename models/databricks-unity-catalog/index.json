@@ -2,8 +2,8 @@
   "model": "databricks-unity-catalog",
   "name": "Databricks Unity Catalog の権限・ストレージ・リネージ",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "workspace": {
@@ -13,27 +13,27 @@
     },
     "metastore": {
       "type": "node",
-      "label": "Unity Catalog メタストア",
+      "label": "統制メタストア",
       "status": "claim"
     },
     "catalog": {
       "type": "node",
-      "label": "prod.sales",
+      "label": "本番カタログと業務スキーマ",
       "status": "claim"
     },
     "managed": {
       "type": "node",
-      "label": "管理テーブル orders",
+      "label": "管理ストレージ上の注文表",
       "status": "claim"
     },
     "external": {
       "type": "link",
-      "label": "prod.sales → 外部テーブル orders_landing",
+      "label": "本番カタログと業務スキーマ → 外部ファイルを登録した注文表",
       "status": "claim"
     },
     "location": {
       "type": "node",
-      "label": "外部ロケーション＋資格情報",
+      "label": "保存パスとアクセス資格情報",
       "status": "claim"
     },
     "storage": {
@@ -53,37 +53,37 @@
     },
     "binding": {
       "type": "link",
-      "label": "分析ワークスペース → Unity Catalog メタストア",
+      "label": "分析ワークスペース → 統制メタストア",
       "status": "claim"
     },
     "namespace": {
       "type": "link",
-      "label": "Unity Catalog メタストア → prod.sales",
+      "label": "統制メタストア → 本番カタログと業務スキーマ",
       "status": "claim"
     },
     "grant": {
       "type": "link",
-      "label": "prod.sales → 管理テーブル orders",
+      "label": "本番カタログと業務スキーマ → 管理ストレージ上の注文表",
       "status": "claim"
     },
     "policy": {
       "type": "link",
-      "label": "管理テーブル orders → 参照クエリ／BI",
+      "label": "管理ストレージ上の注文表 → 参照クエリ／BI",
       "status": "claim"
     },
     "register": {
       "type": "link",
-      "label": "外部ロケーション＋資格情報 → 外部テーブル orders_landing",
+      "label": "保存パスとアクセス資格情報 → 外部ファイルを登録した注文表",
       "status": "claim"
     },
     "data": {
       "type": "link",
-      "label": "外部テーブル orders_landing → クラウドストレージ",
+      "label": "外部ファイルを登録した注文表 → クラウドストレージ",
       "status": "claim"
     },
     "files": {
       "type": "link",
-      "label": "管理テーブル orders → クラウドストレージ",
+      "label": "管理ストレージ上の注文表 → クラウドストレージ",
       "status": "claim"
     },
     "record": {
@@ -98,6 +98,77 @@
     "ownership": {
       "type": "scenario",
       "label": "管理テーブルと外部テーブルの削除範囲を比較"
+    },
+    "example-workspace": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "Databricks 本番ワークスペース",
+      "realizes": [
+        "workspace"
+      ]
+    },
+    "example-metastore": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "Unity Catalog のメタストアと prod.sales",
+      "realizes": [
+        "metastore",
+        "catalog"
+      ]
+    },
+    "example-managed": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "prod.sales.orders 管理 Delta テーブル",
+      "realizes": [
+        "managed"
+      ]
+    },
+    "example-external": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "prod.sales.orders_landing 外部表",
+      "realizes": [
+        "external"
+      ]
+    },
+    "example-location": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "Unity Catalog 外部ロケーションと Storage Credential",
+      "realizes": [
+        "location"
+      ]
+    },
+    "example-storage": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "Amazon S3 の着地・管理領域",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "example-masked": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "分析者用 SQL Warehouse",
+      "realizes": [
+        "masked"
+      ]
+    },
+    "example-lineage": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "Unity Catalog リネージと system.access の履歴",
+      "realizes": [
+        "lineage"
+      ]
+    },
+    "example-iam": {
+      "type": "implementation",
+      "impl": "databricks-governance-aws",
+      "label": "AWS IAM ロール",
+      "realizes": []
     }
   },
   "byRef": {
@@ -126,7 +197,16 @@
       "files",
       "record",
       "access",
-      "ownership"
+      "ownership",
+      "example-workspace",
+      "example-metastore",
+      "example-managed",
+      "example-external",
+      "example-location",
+      "example-storage",
+      "example-masked",
+      "example-lineage",
+      "example-iam"
     ],
     "docs/reference-databricks-unity-catalog.md#§2": [
       "workspace",
@@ -150,6 +230,17 @@
     "docs/reference-databricks-unity-catalog.md#§4": [
       "lineage",
       "record"
+    ],
+    "docs/reference-databricks-unity-catalog.md#§5": [
+      "example-workspace",
+      "example-metastore",
+      "example-managed",
+      "example-external",
+      "example-location",
+      "example-storage",
+      "example-masked",
+      "example-lineage",
+      "example-iam"
     ]
   },
   "reference": {

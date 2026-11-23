@@ -2,18 +2,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { SHAPE_OVERRIDES, nodeGlyph } from './node-kinds.js';
 
 const LABEL_PRIORITY = new Map(['n-lbl', 'n-badge', 'g-lbl', 't-lbl', 'abbr', 'n-sub'].map((name, index) => [name, index]));
 const LABEL_GAP = 2;
-const CARD_ICONS = {
-  plug: '<path d="M8 7h4a5 5 0 0 1 0 10H8zM3 9.5h5M3 14.5h5M17 12h4"/>',
-  crate: '<path d="M3 4h18v4H3zM4 8v12h16V8M8 11v6m4-6v6m4-6v6"/>',
-  cyl: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12a7 3 0 0 0 14 0V6M5 12a7 3 0 0 0 14 0"/>',
-  queue: '<path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Zm-9 9 9 4.5 9-4.5M3 16.5l9 4.5 9-4.5"/>',
-  person: '<circle cx="12" cy="7" r="3"/><path d="M5 20v-2a7 5 0 0 1 14 0v2Z"/>',
-  slab: '<path d="M3 9h18v6H3zM8 9v6m5-6v6m4-6v6"/>',
-  box: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9"/>',
-};
 const overlaps = (a, b, gap = 0) => a.left < b.right + gap && a.right + gap > b.left &&
   a.top < b.bottom + gap && a.bottom + gap > b.top;
 
@@ -513,10 +505,19 @@ export class Scene3D {
     const add = (geo, py, color = s.color, rx = 0) => {
       const m = new THREE.Mesh(geo, mat(color)); m.position.y = py; m.rotation.x = rx; m.userData.id = s.id; g.add(m); this.pick.push(m);
       const e = this.edges(geo, edge, eo, s.dashed); e.position.y = py; e.rotation.x = rx; g.add(e);
-      if (s.outline) { const e2 = this.edges(geo, edge, 1); e2.scale.setScalar(1.04); e2.position.y = py; g.add(e2); }
+      if (s.outline) { const e2 = this.edges(geo, edge, 1); e2.scale.setScalar(1.04); e2.position.y = py; e2.rotation.x = rx; g.add(e2); }
     };
     const silhouette = s.flatStyle === 'silhouette';
     const customShape = silhouette || s.solidStyle === 'components' ? s.shape3D : null;
+    const raised = height => silhouette ? Math.min(height, 0.16) : height;
+    const box = (w, h, d, x = 0, z = 0, base = 0, color = s.color) =>
+      add(new THREE.BoxGeometry(w, h, d).translate(x, 0, z), base + h / 2, color);
+    const plate = (points, height) => {
+      const profile = new THREE.Shape(points.map(([x, z]) => new THREE.Vector2(x, -z)));
+      const geometry = new THREE.ExtrudeGeometry(profile, { depth: height, bevelEnabled: false });
+      geometry.rotateX(-Math.PI / 2);
+      add(geometry, 0);
+    };
     let top = s.h;
     if (customShape === 'plug') {
       if (silhouette) g.rotation.y = Math.PI / 2;
@@ -545,6 +546,44 @@ export class Scene3D {
         }
       }
       top = s.h * 0.81;
+    } else if (s.shape === 'catalog') {
+      top = raised(s.h * 0.76);
+      box(0.22, top, 0.88, -0.38);
+      box(0.7, top * 0.84, 0.76, 0.09, 0, 0, this.color('--paper-l'));
+      box(0.53, top * 0.13, 0.12, 0.08, -0.17, top * 0.84);
+      box(0.36, top * 0.13, 0.12, 0.08, 0.12, top * 0.84);
+    } else if (s.shape === 'file') {
+      top = raised(s.h * 0.48);
+      plate([[-0.36, -0.51], [0.12, -0.51], [0.36, -0.27], [0.36, 0.51], [-0.36, 0.51]], top);
+      box(0.26, 0.035, 0.035, -0.07, -0.03, top, this.color('--ink'));
+      box(0.36, 0.035, 0.035, -0.02, 0.18, top, this.color('--ink'));
+      top += 0.035;
+    } else if (s.shape === 'table') {
+      top = raised(s.h * 0.54);
+      box(1.06, top, 0.78);
+      const grid = this.color('--ink');
+      for (const x of [-0.17, 0.17]) box(0.025, 0.025, 0.5, x, 0.12, top, grid);
+      for (const z of [-0.15, 0.1]) box(1.01, 0.025, 0.025, 0, z, top, grid);
+      top += 0.025;
+    } else if (s.shape === 'policy') {
+      top = raised(s.h * 0.78);
+      plate([[-0.46, -0.34], [0, -0.52], [0.46, -0.34], [0.42, 0.18], [0, 0.54], [-0.42, 0.18]], top);
+    } else if (s.shape === 'workflow') {
+      top = raised(s.h * 0.66);
+      box(0.33, top, 0.34, -0.34, -0.25);
+      box(0.33, top, 0.34, 0.34, 0.25);
+      box(0.42, top * 0.42, 0.1, -0.05, -0.25);
+      box(0.1, top * 0.42, 0.5, 0.11);
+      box(0.18, top * 0.42, 0.1, 0.15, 0.25);
+    } else if (s.shape === 'monitor') {
+      top = raised(s.h * 0.77);
+      box(1, top, 0.68, 0, -0.1);
+      box(0.83, 0.025, 0.49, 0, -0.1, top, this.color('--paper-l'));
+      for (const [x, d] of [[-0.24, 0.15], [0, 0.31], [0.24, 0.22]]) {
+        box(0.095, 0.03, d, x, 0.07 - d / 2, top + 0.025, this.color('--ink'));
+      }
+      box(0.38, top * 0.24, 0.25, 0, 0.34);
+      top += 0.055;
     } else if (s.solidStyle === 'components' && s.shape === 'cyl') {
       const levels = s.partitions ? Math.min(8, Number(s.partitions) || 3) : 3; // 分割数があればその数だけ段にする
       for (let level = 0; level < levels; level++) {
@@ -678,8 +717,8 @@ export class Scene3D {
     const mark = document.createElement('span');
     mark.className = 'n-card-mark';
     mark.setAttribute('aria-hidden', 'true');
-    const shape = Object.hasOwn(CARD_ICONS, s.shape3D) ? s.shape3D : s.shape;
-    const glyph = CARD_ICONS[shape] || CARD_ICONS.box;
+    const shape = Object.hasOwn(SHAPE_OVERRIDES, s.shape3D) ? s.shape3D : s.shape;
+    const glyph = nodeGlyph(shape);
     const symbol = document.createElement('img');
     symbol.className = 'n-card-symbol';
     symbol.alt = '';

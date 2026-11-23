@@ -14,10 +14,10 @@ tiers:
 nodes:
   admin: {"label": "デプロイ担当", "kind": "client", "tier": "flow", "x": 0, "y": 4, "description": "注文 API の Deployment を登録する。", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§1"}]}
   address: {"label": "固定登録アドレス", "kind": "service", "tier": "flow", "x": 0, "y": 1, "description": "Agent の安定した登録先。", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§2"}]}
-  server: {"label": "RKE2 Server・API", "kind": "service", "tier": "flow", "x": 5, "y": 2, "description": "Kubernetes の制御プレーンを実行する。", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§2"}]}
-  etcd: {"label": "etcd", "kind": "db", "tier": "flow", "x": 9, "y": 0, "description": "クラスターの希望状態や現在状態を保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§2"}]}
-  agent: {"label": "RKE2 Agent", "kind": "worker", "tier": "flow", "x": 10, "y": 4, "description": "kubelet と containerd を通じて Pod を実行する。", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§3"}]}
-  pod: {"label": "注文 API Pod", "kind": "service", "tier": "flow", "x": 15, "y": 4, "description": "配置されたコンテナを実行する。", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§3"}]}
+  server: {label: クラスタ制御部・API, kind: service, tier: flow, x: 5, 'y': 2, description: Kubernetes の制御プレーンを実行する。, evidence: [{type: doc, ref: docs/reference-rke2.md#§2}]}
+  etcd: {label: クラスタ状態ストア, kind: db, tier: flow, x: 9, 'y': 0, description: クラスターの希望状態や現在状態を保持する。, evidence: [{type: doc, ref: docs/reference-rke2.md#§2}]}
+  agent: {label: ノード参加・実行エージェント, kind: worker, tier: flow, x: 10, 'y': 4, description: kubelet と containerd を通じて Pod を実行する。, evidence: [{type: doc, ref: docs/reference-rke2.md#§3}]}
+  pod: {label: 注文 API の実行単位, kind: service, tier: flow, x: 15, 'y': 4, description: 配置されたコンテナを実行する。, evidence: [{type: doc, ref: docs/reference-rke2.md#§3}]}
 links:
   - {"id": "register", "from": "agent", "to": "address", "label": "固定アドレスで参加要求", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§2"}]}
   - {"id": "connect", "from": "address", "to": "server", "label": "Server へ登録を中継", "evidence": [{"type": "doc", "ref": "docs/reference-rke2.md#§2"}]}
@@ -42,3 +42,108 @@ scenarios:
       - {"links": ["heartbeat"], "note": "Agent との通信が途絶える。制御プレーンが Node の状態やハートビートの途絶を確認する。"}
       - {"links": ["assign"], "note": "制御プレーンが利用可能で、配置条件を満たす別の Agent に空きがある場合、代替 Pod を割り当てる。"}
       - {"links": ["start"], "note": "割り当て先の kubelet が代替 Pod で注文 API を起動する。"}
+implementations:
+  - id: ha
+    label: RKE2 の高可用性構成
+    description: データセンター内の仮想マシンに 3 台の server と agent を配備し、外部ロードバランサーで登録先を固定する例。
+    sources:
+      - title: RKE2 High Availability
+        url: https://docs.rke2.io/install/ha
+      - title: RKE2 Architecture
+        url: https://docs.rke2.io/architecture
+    tiers:
+      - id: flow
+        label: データと処理
+        z: 0
+    groups:
+      - kind: cluster
+        label: RKE2 クラスタ
+        provider: k8s
+        tier:
+          - flow
+        nodes:
+          - ha-server
+          - ha-agent
+          - ha-pod
+    nodes:
+      ha-admin:
+        label: kubectl を使う運用端末
+        kind: client
+        tier: flow
+        realizes:
+          - admin
+        description: 固定アドレスの Kubernetes API から Deployment を登録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4
+      ha-address:
+        label: 外部 L4 ロードバランサー
+        kind: service
+        tier: flow
+        svc: onprem:lb
+        realizes:
+          - address
+        description: 登録用 9345 と API 用 6443 を server へ転送する。
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4
+      ha-server:
+        label: rke2-server VM × 3
+        kind: worker
+        tier: flow
+        svc: onprem:vm
+        realizes:
+          - server
+          - etcd
+        description: コントロールプレーンと組み込み etcd を各 VM に置く。
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4
+      ha-agent:
+        label: rke2-agent VM
+        kind: worker
+        tier: flow
+        svc: onprem:vm
+        realizes:
+          - agent
+        description: kubelet と containerd で Pod を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4
+      ha-pod:
+        label: 注文 API Deployment / Pod
+        kind: service
+        tier: flow
+        svc: k8s:deployment
+        realizes:
+          - pod
+        description: agent 群に配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4
+      ha-token:
+        label: ノード登録トークン
+        kind: policy
+        tier: flow
+        description: 同じクラスターへ agent を参加させるため、登録時にトークンを渡す。
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4
+    links:
+      - id: ha-kubectl-endpoint
+        from: ha-admin
+        to: ha-address
+        label: 6443 へ接続
+        realizes: [apply]
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4
+      - {id: ha-forward, from: ha-address, to: ha-server, label: 6443 で API・9345 で登録を中継, realizes: [apply, connect], replace: true, evidence: [{type: doc, ref: docs/reference-rke2.md#§4}]}
+      - id: ha-registration-token
+        from: ha-token
+        to: ha-agent
+        label: 設定で参照
+        evidence:
+          - type: doc
+            ref: docs/reference-rke2.md#§4

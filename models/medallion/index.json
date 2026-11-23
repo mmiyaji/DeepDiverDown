@@ -2,8 +2,8 @@
   "model": "medallion",
   "name": "メダリオンアーキテクチャ",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "events": {
@@ -78,6 +78,68 @@
     "replay": {
       "type": "scenario",
       "label": "検証ルールの修正と再処理"
+    },
+    "databricks-ldp-events": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "注文 CDC フィード",
+      "realizes": [
+        "events"
+      ]
+    },
+    "databricks-ldp-bronze": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "Bronze の Delta ストリーミングテーブル",
+      "realizes": [
+        "bronze"
+      ]
+    },
+    "databricks-ldp-pipeline": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "Lakeflow Spark Declarative Pipelines",
+      "realizes": [
+        "prepare"
+      ]
+    },
+    "databricks-ldp-quarantine": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "無効行を保持するストリーミングテーブル",
+      "realizes": [
+        "quarantine"
+      ]
+    },
+    "databricks-ldp-silver": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "Silver の整形済み Delta テーブル",
+      "realizes": [
+        "silver"
+      ]
+    },
+    "databricks-ldp-gold": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "Gold の日次売上マテリアライズドビュー",
+      "realizes": [
+        "gold"
+      ]
+    },
+    "databricks-ldp-dashboard": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "Databricks SQL ダッシュボード",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "databricks-ldp-log": {
+      "type": "implementation",
+      "impl": "databricks-ldp",
+      "label": "Lakeflow パイプラインイベントログ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -103,7 +165,15 @@
       "aggregate",
       "serve",
       "daily-sales",
-      "replay"
+      "replay",
+      "databricks-ldp-events",
+      "databricks-ldp-bronze",
+      "databricks-ldp-pipeline",
+      "databricks-ldp-quarantine",
+      "databricks-ldp-silver",
+      "databricks-ldp-gold",
+      "databricks-ldp-dashboard",
+      "databricks-ldp-log"
     ],
     "docs/reference-medallion.md#§2": [
       "bronze",
@@ -122,11 +192,23 @@
       "bi",
       "aggregate",
       "serve"
+    ],
+    "docs/reference-medallion.md#§5": [
+      "databricks-ldp-events",
+      "databricks-ldp-bronze",
+      "databricks-ldp-pipeline",
+      "databricks-ldp-quarantine",
+      "databricks-ldp-silver",
+      "databricks-ldp-gold",
+      "databricks-ldp-dashboard",
+      "databricks-ldp-log"
     ]
   },
   "reference": {
-    "category": "構成概念",
-    "order": 10,
+    "category": "構成パターン",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
     "objectives": [
       "各層をデータ品質と利用者で区別する。",
       "再処理の起点を確認する。"

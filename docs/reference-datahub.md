@@ -33,3 +33,23 @@ DataHub ではテーブルやビュー、ストリームを Dataset として表
 ## 6. シナリオの見方
 
 「列変更の影響を調べる」は、dbt などから取り込んだ関係を使って下流モデルと所有者を確認する例。「鮮度契約を検証する」は、外部チェックが検証結果を送信し、運用者が確認する例。
+
+## 7. 実装例：DataHub の Docker Compose
+
+DataHub を自己管理し、MySQL、Elasticsearch、イベントブローカーをコンテナで分ける例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| ウェアハウス・変換基盤 | Snowflake と dbt モデル | スキーマと変換情報を提供する。 |
+| 品質・鮮度の検証器 | dbt テスト結果 | 既存のテスト結果を assertion として取り込む。 |
+| 利用者・所有者 | 分析担当者・資産所有者 | ブラウザーで資産と検証結果を確認する。 |
+| 取り込みコネクタ | DataHub Ingestion CLI | ソースのレシピを実行し HTTP で GMS に送る。 |
+| メタデータ API | datahub-gms | Entity、Aspect、関係を扱う。 |
+| 検索・資産 UI | datahub-frontend-react | 検索と資産詳細・リネージを提供する。 |
+| メタデータ保存 | MySQL | バージョン付き Aspect を保存する。 |
+| 検索・関係の索引 | Elasticsearch | 検索と関係クエリを支える。 |
+| 実装で追加 | Kafka ブローカー | メタデータ変更や索引更新の処理を支える。 |
+
+HTTP 取り込みと Kafka を使う変更処理は別の経路。本番の認証、永続ボリューム、冗長構成は導入環境に合わせる。dbt とウェアハウスで資産識別子の設定を揃える。
+
+[Metadata Ingestion Architecture](https://docs.datahub.com/docs/architecture/metadata-ingestion)、[The Metadata Model](https://docs.datahub.com/docs/metadata-modeling/metadata-model)、[Data Contract Metamodel](https://archive.docs.datahub.com/docs/1.8.0/generated/metamodel/entities/datacontract)、[DataHub Docker Container Architecture](https://archive.docs.datahub.com/docs/1.2.0/architecture/docker-containers)

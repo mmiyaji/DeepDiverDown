@@ -2,8 +2,8 @@
   "model": "apicurio-registry",
   "name": "Apicurio Registry の Avro スキーマ管理と互換性",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "producer": {
@@ -18,7 +18,7 @@
     },
     "topic": {
       "type": "node",
-      "label": "Kafka Topic",
+      "label": "注文イベントのトピック",
       "status": "claim"
     },
     "deserialize": {
@@ -58,12 +58,12 @@
     },
     "write": {
       "type": "link",
-      "label": "Avro Serializer → Kafka Topic",
+      "label": "Avro Serializer → 注文イベントのトピック",
       "status": "claim"
     },
     "consume": {
       "type": "link",
-      "label": "Kafka Topic → Avro Deserializer",
+      "label": "注文イベントのトピック → Avro Deserializer",
       "status": "claim"
     },
     "by-id": {
@@ -109,6 +109,55 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実環境の ID の種別・配置、比較対象のバージョン、保持中の Kafka 履歴、互換性ルールの設定は未確認。"
+    },
+    "apicurio-postgres-writer": {
+      "type": "implementation",
+      "impl": "apicurio-postgres",
+      "label": "Java Kafka Producer（Avro Serializer）",
+      "realizes": [
+        "producer",
+        "serialize"
+      ]
+    },
+    "apicurio-postgres-kafka": {
+      "type": "implementation",
+      "impl": "apicurio-postgres",
+      "label": "Apache Kafka の注文トピック",
+      "realizes": [
+        "topic"
+      ]
+    },
+    "apicurio-postgres-reader": {
+      "type": "implementation",
+      "impl": "apicurio-postgres",
+      "label": "Java Kafka Consumer（Avro Deserializer）",
+      "realizes": [
+        "deserialize",
+        "app"
+      ]
+    },
+    "apicurio-postgres-publisher": {
+      "type": "implementation",
+      "impl": "apicurio-postgres",
+      "label": "スキーマ登録用 REST クライアント",
+      "realizes": [
+        "submitter"
+      ]
+    },
+    "apicurio-postgres-registry": {
+      "type": "implementation",
+      "impl": "apicurio-postgres",
+      "label": "Apicurio Registry Server",
+      "realizes": [
+        "policy",
+        "versions"
+      ]
+    },
+    "apicurio-postgres-postgres": {
+      "type": "implementation",
+      "impl": "apicurio-postgres",
+      "label": "PostgreSQL（Registry の SQL ストレージ）",
+      "realizes": []
     }
   },
   "byRef": {
@@ -137,7 +186,13 @@
       "read-history",
       "check-versions",
       "BR-01",
-      "BR-02"
+      "BR-02",
+      "apicurio-postgres-writer",
+      "apicurio-postgres-kafka",
+      "apicurio-postgres-reader",
+      "apicurio-postgres-publisher",
+      "apicurio-postgres-registry",
+      "apicurio-postgres-postgres"
     ],
     "docs/reference-apicurio-registry.md#§2": [
       "model",
@@ -172,6 +227,14 @@
     ],
     "docs/reference-apicurio-registry.md#§6": [
       "model"
+    ],
+    "docs/reference-apicurio-registry.md#§7": [
+      "apicurio-postgres-writer",
+      "apicurio-postgres-kafka",
+      "apicurio-postgres-reader",
+      "apicurio-postgres-publisher",
+      "apicurio-postgres-registry",
+      "apicurio-postgres-postgres"
     ]
   },
   "reference": {

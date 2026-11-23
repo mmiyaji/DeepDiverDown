@@ -60,13 +60,13 @@ tiers:
       - 17
       - 4
   - id: technical-products
-    label: 技術カタログ・統合例
+    label: 技術カタログと統合の比較
     z: 0
     size:
       - 17
       - 3
   - id: governance-products
-    label: メタデータ基盤・マネージド製品例
+    label: ガバナンス機能の比較
     z: -1
     size:
       - 22
@@ -104,7 +104,7 @@ nodes:
         ref: docs/reference-data-catalog-architecture.md#§2
   technical:
     label: Iceberg REST Catalog
-    kind: service
+    kind: catalog
     tier: runtime
     x: 8
     y: 1
@@ -145,7 +145,7 @@ nodes:
         ref: docs/reference-data-catalog-architecture.md#§3
   catalog:
     label: 検索・リネージ・所有者
-    kind: service
+    kind: catalog
     tier: governance
     x: 10
     y: 1
@@ -157,7 +157,7 @@ nodes:
         ref: docs/reference-data-catalog-architecture.md#§4
   policy:
     label: ポリシー・利用申請
-    kind: service
+    kind: policy
     tier: governance
     x: 14
     y: 1
@@ -166,7 +166,7 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§4
   polaris:
-    label: Apache Polaris
+    label: Iceberg REST と権限制御
     kind: external
     tier: technical-products
     x: 2
@@ -177,7 +177,7 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   nessie:
-    label: Project Nessie
+    label: ブランチによる版管理
     kind: external
     tier: technical-products
     x: 6
@@ -188,7 +188,7 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   horizon:
-    label: Snowflake Horizon Catalog
+    label: 外部エンジン接続と統制
     kind: external
     tier: technical-products
     x: 10
@@ -199,7 +199,7 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   unity:
-    label: Databricks Unity Catalog
+    label: 資産管理とプラットフォーム統制
     kind: external
     tier: technical-products
     x: 14
@@ -210,7 +210,7 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   datahub:
-    label: DataHub
+    label: 横断収集と影響の確認
     kind: external
     tier: governance-products
     x: 1
@@ -221,7 +221,7 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   openmetadata:
-    label: OpenMetadata
+    label: 分類とデータ契約の管理
     kind: external
     tier: governance-products
     x: 4
@@ -232,7 +232,7 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   datazone:
-    label: Amazon DataZone
+    label: データ公開と購読
     kind: external
     tier: governance-products
     x: 7
@@ -243,34 +243,34 @@ nodes:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   purview:
-    label: Microsoft Purview
+    label: メタデータスキャンと承認
     kind: external
     tier: governance-products
     x: 10
     y: 1
-    description: 既存環境での Data Map と Unified Catalog の例。ガバナンス機能は Fabric に集約される。
+    description: 既存環境の資産登録と利用承認を扱う方式。
     drill: microsoft-purview
     evidence:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   knowledge:
-    label: Knowledge Catalog
+    label: 構造化メタデータと製品公開
     kind: external
     tier: governance-products
     x: 14
     y: 1
-    description: Google Cloud のメタデータ管理とデータ製品の例。
+    description: 型があるメタデータとデータ製品を管理する方式。
     drill: google-cloud-knowledge-catalog
     evidence:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§6
   onelake:
-    label: Microsoft Fabric OneLake catalog
+    label: 分析資産の発見と権限確認
     kind: external
     tier: governance-products
     x: 18
     y: 1
-    description: Fabric でデータを発見し、ガバナンス状態と権限を確認する例。
+    description: 分析資産を探し、認証済み利用者の権限を管理する方式。
     drill: fabric-onelake-catalog
     evidence:
       - type: doc
@@ -437,3 +437,249 @@ requirements:
     evidence:
       - type: doc
         ref: docs/reference-data-catalog-architecture.md#§4
+implementations:
+  - id: uc-on-aws
+    label: Unity Catalog・Databricks・Amazon S3
+    description: Databricks on AWS で Iceberg テーブル用の REST 入口と、資産検索・リネージ・権限管理を同じ Unity Catalog に配置する例。
+    sources:
+      - title: Databricks Unity Catalog
+        url: https://docs.databricks.com/aws/en/data-governance/unity-catalog
+      - title: Databricks の Iceberg
+        url: https://docs.databricks.com/aws/en/iceberg/
+      - title: Unity Catalog のリネージ
+        url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage
+      - title: Unity Catalog のアクセス申請
+        url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/access-requests
+      - title: Lakeflow Jobs のタスク依存関係
+        url: https://docs.databricks.com/aws/en/jobs/run-if
+      - title: Databricks AWS 参照アーキテクチャ
+        url: https://docs.databricks.com/aws/en/assets/files/reference-architecture-databricks-on-aws-037959ba92a5a1e33e244fbe2e19fd3f.pdf
+    nodes:
+      uc-on-aws-jobs:
+        label: Lakeflow Jobs
+        kind: workflow
+        tier: actors
+        x: 2
+        y: 1
+        description: 検証タスクから公開タスクへ進む。検証ロジックは SQL などで実装する。
+        realizes:
+          - publisher
+          - validation
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+      uc-on-aws-analyst:
+        label: Databricks ワークスペース利用者
+        kind: actor
+        tier: actors
+        x: 13
+        y: 1
+        description: Catalog Explorer で資産を探し、必要な権限を申請する。
+        realizes:
+          - consumer
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+      uc-on-aws-compute:
+        label: Databricks Runtime・外部 Iceberg クライアント
+        kind: service
+        tier: runtime
+        x: 3
+        y: 1
+        description: 対象テーブルを読み書きし、対応する処理のリネージを登録する。
+        realizes:
+          - engine
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+      uc-on-aws-uc:
+        label: Databricks Unity Catalog
+        kind: catalog
+        tier: runtime
+        x: 8
+        y: 1
+        description: REST インターフェース、ワークスペース内のリネージ、検索、権限申請を提供する。
+        realizes:
+          - technical
+          - collect
+          - catalog
+          - policy
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: iceberg-rest-catalog
+      uc-on-aws-s3:
+        label: Amazon S3（管理ストレージ）
+        kind: db
+        tier: runtime
+        x: 13
+        y: 1
+        description: 管理 Iceberg テーブルのファイルを保持する。
+        svc: s3
+        realizes:
+          - storage
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+      uc-on-aws-checks:
+        label: 契約検証結果の表
+        kind: table
+        tier: governance
+        x: 7
+        y: 2.6
+        description: 契約版、対象資産、検証時刻、成否を SQL で確認できるようにする。
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+      uc-on-aws-polaris:
+        label: Apache Polaris（比較）
+        kind: external
+        tier: technical-products
+        x: 2
+        y: 1
+        description: テーブルの技術カタログを別途配置する参照例。
+        realizes:
+          - polaris
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: apache-polaris
+      uc-on-aws-nessie:
+        label: Project Nessie（比較）
+        kind: external
+        tier: technical-products
+        x: 6
+        y: 1
+        description: カタログに版管理を持つ参照例。
+        realizes:
+          - nessie
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: project-nessie
+      uc-on-aws-horizon:
+        label: Snowflake Horizon Catalog（比較）
+        kind: external
+        tier: technical-products
+        x: 10
+        y: 1
+        description: 外部エンジンと統合する参照例。
+        realizes:
+          - horizon
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: snowflake-horizon-catalog
+      uc-on-aws-unity:
+        label: Databricks Unity Catalog（詳細）
+        kind: external
+        tier: technical-products
+        x: 14
+        y: 1
+        description: この構成のサービス詳細を参照する。
+        realizes:
+          - unity
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: databricks-unity-catalog
+      uc-on-aws-datahub:
+        label: DataHub（比較）
+        kind: external
+        tier: governance-products
+        x: 1
+        y: 1
+        description: 横断的なメタデータ収集の参照例。
+        realizes:
+          - datahub
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: datahub
+      uc-on-aws-openmetadata:
+        label: OpenMetadata（比較）
+        kind: external
+        tier: governance-products
+        x: 4
+        y: 1
+        description: 分類・契約の横断管理の参照例。
+        realizes:
+          - openmetadata
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: openmetadata
+      uc-on-aws-datazone:
+        label: Amazon DataZone（比較）
+        kind: external
+        tier: governance-products
+        x: 7
+        y: 1
+        description: 購読と権限付与の参照例。
+        realizes:
+          - datazone
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: amazon-datazone
+      uc-on-aws-purview:
+        label: Microsoft Purview（比較・既存環境）
+        kind: external
+        tier: governance-products
+        x: 10
+        y: 1
+        description: 既存環境の資産登録・アクセス申請の参照例。
+        realizes:
+          - purview
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: microsoft-purview
+      uc-on-aws-knowledge:
+        label: Knowledge Catalog（比較）
+        kind: external
+        tier: governance-products
+        x: 14
+        y: 1
+        description: Google Cloud のメタデータ管理の参照例。
+        realizes:
+          - knowledge
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: google-cloud-knowledge-catalog
+      uc-on-aws-onelake:
+        label: Microsoft Fabric OneLake catalog（比較）
+        kind: external
+        tier: governance-products
+        x: 18
+        y: 1
+        description: Fabric の発見とガバナンスの参照例。
+        realizes:
+          - onelake
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+        drill: fabric-onelake-catalog
+    links:
+      - id: uc-on-aws-persist-results
+        from: uc-on-aws-jobs
+        to: uc-on-aws-checks
+        label: 検証結果を表へ書き出す
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+      - id: uc-on-aws-read-results
+        from: uc-on-aws-analyst
+        to: uc-on-aws-checks
+        label: 資産別の結果を参照
+        evidence:
+          - type: doc
+            ref: docs/reference-data-catalog-architecture.md#§8
+    groups:
+      - label: 実行と管理ストレージの範囲
+        kind: cloud
+        provider: aws
+        nodes:
+          - uc-on-aws-s3
+          - uc-on-aws-compute

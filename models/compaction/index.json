@@ -2,8 +2,8 @@
   "model": "compaction",
   "name": "小ファイルの整理：コンパクション",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "stream_writer": {
@@ -18,12 +18,12 @@
     },
     "rewrite": {
       "type": "node",
-      "label": "Rewrite ジョブ",
+      "label": "データファイルの再作成",
       "status": "claim"
     },
     "metadata": {
       "type": "node",
-      "label": "テーブルメタデータ",
+      "label": "表の状態を管理するメタデータ",
       "status": "claim"
     },
     "orders": {
@@ -38,12 +38,12 @@
     },
     "snapshot": {
       "type": "node",
-      "label": "新スナップショット",
+      "label": "公開された新しい読取時点",
       "status": "claim"
     },
     "cleanup": {
       "type": "node",
-      "label": "保持期間後の掃除",
+      "label": "保持期限後の古いデータの整理",
       "status": "claim"
     },
     "ingest": {
@@ -58,32 +58,32 @@
     },
     "plan": {
       "type": "link",
-      "label": "対象選択プランナー → Rewrite ジョブ",
+      "label": "対象選択プランナー → データファイルの再作成",
       "status": "claim"
     },
     "rewrite-files": {
       "type": "link",
-      "label": "Rewrite ジョブ → orders / order_date",
+      "label": "データファイルの再作成 → orders / order_date",
       "status": "claim"
     },
     "commit": {
       "type": "link",
-      "label": "Rewrite ジョブ → テーブルメタデータ",
+      "label": "データファイルの再作成 → 表の状態を管理するメタデータ",
       "status": "claim"
     },
     "publish": {
       "type": "link",
-      "label": "テーブルメタデータ → 新スナップショット",
+      "label": "表の状態を管理するメタデータ → 公開された新しい読取時点",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "クエリエンジン → 新スナップショット",
+      "label": "クエリエンジン → 公開された新しい読取時点",
       "status": "claim"
     },
     "expire": {
       "type": "link",
-      "label": "新スナップショット → 保持期間後の掃除",
+      "label": "公開された新しい読取時点 → 保持期限後の古いデータの整理",
       "status": "claim"
     },
     "compact-orders": {
@@ -111,6 +111,55 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際の target file size、閾値、保持日数、実行スケジュールは利用環境ごとに決める。"
+    },
+    "iceberg-spark-write": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "Spark のマイクロバッチ書き込み",
+      "realizes": [
+        "stream_writer"
+      ]
+    },
+    "iceberg-spark-action": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "Spark の rewrite_data_files",
+      "realizes": [
+        "planner",
+        "rewrite"
+      ]
+    },
+    "iceberg-spark-iceberg": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "Iceberg のテーブル・メタデータ・スナップショット",
+      "realizes": [
+        "metadata",
+        "orders",
+        "snapshot"
+      ]
+    },
+    "iceberg-spark-query": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "Spark SQL の読み手",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "iceberg-spark-expire": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "Spark の expire_snapshots",
+      "realizes": [
+        "cleanup"
+      ]
+    },
+    "iceberg-spark-policy": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "コンパクションと保持の設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -142,7 +191,13 @@
       "compact-orders",
       "BR-01",
       "BR-02",
-      "NFR-01"
+      "NFR-01",
+      "iceberg-spark-write",
+      "iceberg-spark-action",
+      "iceberg-spark-iceberg",
+      "iceberg-spark-query",
+      "iceberg-spark-expire",
+      "iceberg-spark-policy"
     ],
     "docs/reference-compaction.md#§3": [
       "planner",
@@ -178,11 +233,21 @@
     ],
     "docs/reference-compaction.md#§7": [
       "NFR-01"
+    ],
+    "docs/reference-compaction.md#§9": [
+      "iceberg-spark-write",
+      "iceberg-spark-action",
+      "iceberg-spark-iceberg",
+      "iceberg-spark-query",
+      "iceberg-spark-expire",
+      "iceberg-spark-policy"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 30,
+    "category": "分散実行と保守",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
     "objectives": [
       "コンパクション（データファイルの再書き込み）とバイト列の圧縮を区別する。",
       "bin-packing と、必要な場合だけ選ぶ sort rewrite の費用・効果を比較する。",

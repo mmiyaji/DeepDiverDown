@@ -2,8 +2,8 @@
   "model": "etl-elt",
   "name": "ETL と ELT の比較アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "source": {
@@ -13,7 +13,7 @@
     },
     "etl-job": {
       "type": "node",
-      "label": "ETL Job（Glue 等）",
+      "label": "ロード前の変換処理",
       "status": "claim"
     },
     "curated": {
@@ -28,7 +28,7 @@
     },
     "dbt": {
       "type": "node",
-      "label": "SQL Models（dbt 等）",
+      "label": "ロード後の SQL 変換",
       "status": "claim"
     },
     "mart": {
@@ -43,12 +43,12 @@
     },
     "etl-extract": {
       "type": "link",
-      "label": "注文データソース → ETL Job（Glue 等）",
+      "label": "注文データソース → ロード前の変換処理",
       "status": "claim"
     },
     "etl-load": {
       "type": "link",
-      "label": "ETL Job（Glue 等） → Curated Table",
+      "label": "ロード前の変換処理 → Curated Table",
       "status": "claim"
     },
     "etl-mart": {
@@ -63,12 +63,12 @@
     },
     "elt-transform": {
       "type": "link",
-      "label": "Raw Landing → SQL Models（dbt 等）",
+      "label": "Raw Landing → ロード後の SQL 変換",
       "status": "claim"
     },
     "elt-mart": {
       "type": "link",
-      "label": "SQL Models（dbt 等） → Analytics Mart",
+      "label": "ロード後の SQL 変換 → Analytics Mart",
       "status": "claim"
     },
     "consume": {
@@ -79,6 +79,68 @@
     "compare-etl-elt": {
       "type": "scenario",
       "label": "注文データの ETL / ELT 比較"
+    },
+    "aws-redshift-source": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "Amazon S3 の入力バケット",
+      "realizes": [
+        "source"
+      ]
+    },
+    "aws-redshift-etl": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "AWS Glue ETL ジョブ",
+      "realizes": [
+        "etl-job"
+      ]
+    },
+    "aws-redshift-curated": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "Redshift の ETL 整形済みテーブル",
+      "realizes": [
+        "curated"
+      ]
+    },
+    "aws-redshift-raw": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "Redshift の raw スキーマ",
+      "realizes": [
+        "raw"
+      ]
+    },
+    "aws-redshift-dbt": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "dbt-redshift と Redshift SQL",
+      "realizes": [
+        "dbt"
+      ]
+    },
+    "aws-redshift-marts": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "Redshift の分析マート",
+      "realizes": [
+        "mart"
+      ]
+    },
+    "aws-redshift-bi": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "Redshift 対応の BI クライアント",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "aws-redshift-stage": {
+      "type": "implementation",
+      "impl": "aws-redshift",
+      "label": "Amazon S3 の Glue 一時領域",
+      "realizes": []
     }
   },
   "byRef": {
@@ -102,7 +164,15 @@
       "elt-transform",
       "elt-mart",
       "consume",
-      "compare-etl-elt"
+      "compare-etl-elt",
+      "aws-redshift-source",
+      "aws-redshift-etl",
+      "aws-redshift-curated",
+      "aws-redshift-raw",
+      "aws-redshift-dbt",
+      "aws-redshift-marts",
+      "aws-redshift-bi",
+      "aws-redshift-stage"
     ],
     "docs/reference-etl-elt.md#§5": [
       "source"
@@ -128,11 +198,23 @@
       "bi",
       "consume",
       "compare-etl-elt"
+    ],
+    "docs/reference-etl-elt.md#§7": [
+      "aws-redshift-source",
+      "aws-redshift-etl",
+      "aws-redshift-curated",
+      "aws-redshift-raw",
+      "aws-redshift-dbt",
+      "aws-redshift-marts",
+      "aws-redshift-bi",
+      "aws-redshift-stage"
     ]
   },
   "reference": {
-    "category": "構成概念",
-    "order": 40,
+    "category": "構成パターン",
+    "order": 30,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
     "objectives": [
       "ETL と ELT の変換タイミングの違いを説明する。",
       "ETL の curated 出力と ELT の raw 保持・後段モデル化を比較する。",

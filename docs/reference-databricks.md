@@ -37,3 +37,22 @@ Unity Catalog はデータを統治し、Databricks SQLなどからクエリで�
 ## 8. 機械学習と配備
 
 整備したテーブルを学習に利用し、MLflow で実験と成果物を追跡する。選んだモデルを Unity Catalog に版として登録し、必要な場合は明示した版で Model Serving に配備する。 [モデルライフサイクル](https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/) · [Model Serving](https://docs.databricks.com/aws/en/machine-learning/model-serving/)
+
+## 9. 実装例 Databricks on AWS の注文レイクハウス
+
+S3 の着地先を登録し、取込から BI・共有・モデル配備までを一つの Databricks ワークスペースの運用単位として構成する例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 外部データ源 | Amazon S3 の到着ファイル | 入力ファイルをソース別プレフィックスに配置する。 |
+| 増分データ取り込み・変換・品質管理 | Lakeflow Spark Declarative Pipelines | Auto Loader で到着ファイルを取得し、同じパイプラインの後続段で品質ルールを適用する。 |
+| オブジェクトストレージ | Delta テーブルのストレージ | 管理テーブルの保存領域はカタログの設定に従う。 |
+| 権限・リネージカタログ | Unity Catalog | アクセス許可、データの名前空間、リネージを管理する。 |
+| SQL クエリの計算資源 | Databricks SQL Warehouse | 注文集計を提供する。 |
+| 分析結果の利用先 | Databricks ダッシュボード | SQL Warehouse の集計を表示する。 |
+| 別組織へのデータ公開 | OpenSharing の Share と Recipient | 公開用資産と受領者を管理する。 |
+| モデルの登録・配備 | MLflow と Model Serving | モデル成果物を登録し承認済みの版を配備する。 |
+
+着地ファイルの外部ロケーションと、整備済み Delta 管理テーブルの保存領域を分ける。BI、共有、モデル配備には用途に応じたアクセス権を付与する。
+
+出典 [Databricks reference architectures](https://docs.databricks.com/aws/en/lakehouse-architecture/reference)、[OpenSharing](https://docs.databricks.com/aws/en/opensharing)、[Model Serving](https://docs.databricks.com/aws/en/machine-learning/model-serving/)、[Databricks の S3 外部ロケーション](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3)、[Auto Loader](https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/)

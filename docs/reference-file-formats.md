@@ -93,3 +93,30 @@ Arrow は**メモリ上の列指向形式**の標準で、ファイル形式（A
 - `ingest-convert`：CSV／Avro で着地したデータを、Parquet に変換して分析層へ置く。
 - `interchange`：Parquet から読み込んだデータを Arrow で別の処理系へ渡す。
 - `gzip-trap`：ファイル全体を gzip した CSV が 1 タスクでしか読めない様子。
+
+## 11. 実装例：Apache Spark のファイル変換と PyArrow IPC
+
+注文データの取り込み、分析ファイルへの変換、Python への受け渡しを Apache Spark と PyArrow で試す例。各形式は別用途のサンプルで、全データを毎回すべての形式に複製する必要はない。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 元の業務イベント | 注文アプリの入力イベント | CSV・JSON Lines または Avro で例示用のイベントを用意する。 |
+| CSV / JSON Lines、Avro | 共有保存先の CSV・JSON Lines・Avro | 交換用のテキストまたはスキーマ付きの Avro コンテナを保持する。 |
+| 取り込みと形式変換、分析ファイルの照会 | Spark SQL のデータソースと照会 | 型を解決し、Parquet に書いて、Parquet と ORC のサンプルを別々に SQL で読む。 |
+| Parquet、ORC | Parquet と ORC の分析ファイル | それぞれのファイル形式に沿って列を保持する。 |
+| Python の列データ利用側 | PySpark Driver 上の PyArrow | 小サイズの結果を toArrow で Table として取得する。 |
+| Arrow IPC / Feather | Arrow IPC / Feather の受け渡しファイル | PyArrow で書き出し、対応する読み手が受け取る。 |
+
+実装で加わる部品を以下に示す。
+
+- Spark Avro データソースのモジュール。Avro 入力を使う環境では Spark と Scala に対応するモジュールを用意する。
+
+公式資料
+
+- [Apache Parquet File Format](https://parquet.apache.org/docs/file-format/)
+- [Apache ORC Specification v1](https://orc.apache.org/specification/ORCv1/)
+- [Apache Avro Specification](https://avro.apache.org/docs/current/specification/)
+- [Apache Arrow Columnar Format](https://arrow.apache.org/docs/format/Columnar.html)
+- [Spark Avro Data Source Guide](https://spark.apache.org/docs/latest/sql-data-sources-avro.html)
+- [Apache Arrow in PySpark](https://spark.apache.org/docs/latest/api/python/tutorial/sql/arrow_pandas.html)
+- [Apache Arrow streaming, serialization, and IPC](https://arrow.apache.org/docs/python/ipc.html)

@@ -18,11 +18,11 @@ tiers:
 nodes:
   git: {label: "Git リポジトリ", kind: "db", tier: "inputs", x: 2, y: 1.5, description: "注文 API の Deployment マニフェストを保持する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§1"}]}
   operator: {label: "運用者", kind: "actor", tier: "inputs", x: 10, y: 1.5, description: "障害対応を想定し、クラスタでレプリカ数を一時変更する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§4"}]}
-  application: {label: "Application", kind: "segment", tier: "gitops", x: 1, y: 1.5, description: "管理対象のリポジトリ、パス、行き先と同期方針を表す。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
-  repo-server: {label: "Repository Server", kind: "service", tier: "gitops", x: 5, y: 1.5, description: "対象リビジョンから Kubernetes マニフェストを生成する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
-  controller: {label: "Application Controller", kind: "worker", tier: "gitops", x: 10, y: 1.5, description: "目標状態と実状態を比較し、同期を実行する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
-  api: {label: "Kubernetes API", kind: "service", tier: "cluster", x: 7, y: 1.5, description: "実状態を提供し、対象リソースの変更を受け付ける。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
-  deployment: {label: "注文 API Deployment", kind: "service", tier: "cluster", x: 11, y: 1.5, description: "例では Git 管理下の spec.replicas を持つ。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§4"}]}
+  application: {label: 同期対象・方針の宣言, kind: workflow, tier: gitops, x: 1, 'y': 1.5, description: 管理対象のリポジトリ、パス、行き先と同期方針を表す。, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§2}]}
+  repo-server: {label: デプロイ定義の取得と生成, kind: service, tier: gitops, x: 5, 'y': 1.5, description: 対象リビジョンから Kubernetes マニフェストを生成する。, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§2}]}
+  controller: {label: 望ましい状態と稼働状態の照合, kind: worker, tier: gitops, x: 10, 'y': 1.5, description: 目標状態と実状態を比較し、同期を実行する。, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§2}]}
+  api: {label: 対象クラスタの制御 API, kind: service, tier: cluster, x: 7, 'y': 1.5, description: 実状態を提供し、対象リソースの変更を受け付ける。, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§2}]}
+  deployment: {label: 注文 API の稼働構成, kind: service, tier: cluster, x: 11, 'y': 1.5, description: 例では Git 管理下の spec.replicas を持つ。, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§4}]}
 links:
   - {id: "app-config", from: "application", to: "controller", label: "ソース・同期方針", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
   - {id: "manifest-request", from: "controller", to: "repo-server", label: "目標マニフェストを要求", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
@@ -47,3 +47,141 @@ scenarios:
       - {links: ["scale","deploy"], note: "Git の値は 3 のまま、クラスタ側でレプリカ数を 1 に変更する。"}
       - {links: ["manifest-request","desired","live"], note: "Application Controller が目標 3 と実状態 1 の差分を検出する。"}
       - {links: ["apply","deploy"], note: "自動同期と selfHeal が有効なので、同じ Git リビジョンの目標状態 3 を再適用する。"}
+implementations:
+  - id: argocd
+    label: Argo CD と Helm の宣言同期
+    description: 運用クラスタに Argo CD をインストールし、Git 内の Helm chart を注文 API のクラスタへ同期する例。
+    sources:
+      - title: Argo CD Architecture
+        url: https://argo-cd.readthedocs.io/en/stable/operator-manual/architecture/
+      - title: Argo CD Helm guide
+        url: https://argo-cd.readthedocs.io/en/stable/user-guide/helm/
+      - title: Argo CD High Availability
+        url: https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/
+    tiers:
+      - id: inputs
+        label: 変更の入力
+        z: 2
+        kind: origin
+      - id: gitops
+        label: Argo CD
+        z: 1
+      - id: cluster
+        label: Kubernetes
+        z: 0
+    groups:
+      - kind: cluster
+        label: Argo CD 運用クラスタ
+        provider: k8s
+        tier:
+          - gitops
+        nodes:
+          - argocd-application
+          - argocd-repo-server
+          - argocd-controller
+          - argocd-redis
+      - kind: cluster
+        label: 注文 API の対象クラスタ
+        provider: k8s
+        tier:
+          - cluster
+        nodes:
+          - argocd-api
+          - argocd-deployment
+    nodes:
+      argocd-git:
+        label: Git 内の注文 API Helm chart
+        kind: file
+        tier: inputs
+        realizes:
+          - git
+        description: Chart と values をレビューして同期対象にする。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      argocd-operator:
+        label: kubectl を使う運用者
+        kind: actor
+        tier: inputs
+        realizes:
+          - operator
+        description: 手変更時にドリフト検知を試す。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      argocd-application:
+        label: Argo CD の Application CR
+        kind: workflow
+        tier: gitops
+        realizes:
+          - application
+        description: repoURL、対象 revision、path、同期方針を宣言する。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      argocd-repo-server:
+        label: argocd-repo-server Deployment
+        kind: service
+        tier: gitops
+        svc: k8s:deployment
+        realizes:
+          - repo-server
+        description: Git の Helm chart から目的状態のマニフェストを生成する。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      argocd-controller:
+        label: argocd-application-controller
+        kind: worker
+        tier: gitops
+        svc: k8s:statefulset
+        realizes:
+          - controller
+        description: 目的状態と対象クラスタの状態を比較して同期する。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      argocd-api:
+        label: 対象 Kubernetes API
+        kind: service
+        tier: cluster
+        realizes:
+          - api
+        description: Argo CD が権限を持つ名前空間の API を監視・更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      argocd-deployment:
+        label: 対象クラスタの注文 API Deployment
+        kind: service
+        tier: cluster
+        svc: k8s:deployment
+        realizes:
+          - deployment
+        description: Helm で生成したマニフェストが API 経由で適用される。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      argocd-redis:
+        label: Argo CD の Redis キャッシュ
+        kind: cache
+        tier: gitops
+        description: マニフェストや計算結果のキャッシュに使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+    links:
+      - id: argocd-cache-manifests
+        from: argocd-repo-server
+        to: argocd-redis
+        label: 取得・生成結果をキャッシュ
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5
+      - id: argocd-cache-diff
+        from: argocd-controller
+        to: argocd-redis
+        label: 比較結果のキャッシュを使う
+        evidence:
+          - type: doc
+            ref: docs/reference-argo-cd.md#§5

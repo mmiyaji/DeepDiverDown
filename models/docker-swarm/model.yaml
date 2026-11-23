@@ -10,12 +10,12 @@ sources: [docs/reference-docker-swarm.md]
 evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}]
 tiers: [{id: control, label: Swarm 制御, z: 1, size: [12, 3]}, {id: runtime, label: ノード実行, z: 0, size: [12, 3]}]
 nodes:
-  service: {label: replicated Service（注文 API）, kind: service, tier: control, x: 1, y: 1.5, description: replicas と更新方針を持つ desired state。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}, {type: doc, ref: docs/reference-docker-swarm.md#§3}]}
-  manager: {label: Swarm manager, kind: scheduler, tier: control, x: 5, y: 1.5, description: オーケストレーターと scheduler を実行する管理ノード。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}, {type: doc, ref: docs/reference-docker-swarm.md#§2}]}
-  scheduler: {label: Swarm scheduler, kind: scheduler, tier: control, x: 9, y: 1.5, description: task slot を条件適合 worker に割り当てる機構。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}, {type: doc, ref: docs/reference-docker-swarm.md#§3}]}
-  task: {label: API task slot, kind: service, tier: runtime, x: 2, y: 1.5, description: scheduler が container を起動するための一方向の slot。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}]}
-  worker: {label: Swarm worker, kind: host, tier: runtime, x: 6, y: 1.5, description: task に割り当てられ container を実行するノード。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§3}, {type: doc, ref: docs/reference-docker-swarm.md#§4}]}
-  update: {label: UpdateConfig, kind: service, tier: runtime, x: 10, y: 1.5, description: 更新並列度・遅延・失敗時動作を定める方針。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§5}]}
+  service: {label: レプリカ数と設定の宣言, kind: service, tier: control, x: 1, 'y': 1.5, description: replicas と更新方針を持つ desired state。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}, {type: doc, ref: docs/reference-docker-swarm.md#§3}]}
+  manager: {label: 配置制御の入口, kind: scheduler, tier: control, x: 5, 'y': 1.5, description: オーケストレーターと scheduler を実行する管理ノード。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}, {type: doc, ref: docs/reference-docker-swarm.md#§2}]}
+  scheduler: {label: 実行先の決定, kind: scheduler, tier: control, x: 9, 'y': 1.5, description: task slot を条件適合 worker に割り当てる機構。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}, {type: doc, ref: docs/reference-docker-swarm.md#§3}]}
+  task: {label: コンテナの実行単位, kind: service, tier: runtime, x: 2, 'y': 1.5, description: scheduler が container を起動するための一方向の slot。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}]}
+  worker: {label: コンテナ実行ノード, kind: host, tier: runtime, x: 6, 'y': 1.5, description: task に割り当てられ container を実行するノード。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§3}, {type: doc, ref: docs/reference-docker-swarm.md#§4}]}
+  update: {label: ローリング更新方針, kind: policy, tier: runtime, x: 10, 'y': 1.5, description: 更新並列度・遅延・失敗時動作を定める方針。, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§5}]}
 links:
   - {id: desired, from: service, to: manager, label: desired state, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§1}]}
   - {id: assign, from: manager, to: scheduler, label: task を計画, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§2}]}
@@ -37,3 +37,108 @@ scenarios:
       - {links: [recover], note: health check 失敗または worker drain を検知する。}
       - {links: [assign, fill], note: scheduler が利用可能な worker へ新 task を割り当てる。}
       - {links: [run], note: 新 container が RUNNING になり、更新なら UpdateConfig の順序で次へ進む。}
+implementations:
+  - id: vm
+    label: Docker Engine と routing mesh
+    description: Docker Engine の manager / worker VM 間で注文 API をローリング更新し、公開ポートから同じ名前で到達する例。
+    sources:
+      - title: Swarm services
+        url: https://docs.docker.com/engine/swarm/services/
+      - title: Swarm mode routing mesh
+        url: https://docs.docker.com/engine/swarm/ingress/
+      - title: Rolling updates
+        url: https://docs.docker.com/engine/swarm/swarm-tutorial/rolling-update/
+    tiers:
+      - id: control
+        label: Swarm 制御
+        z: 1
+      - id: runtime
+        label: ノード実行
+        z: 0
+    groups:
+      - kind: cluster
+        label: Docker Swarm
+        provider: onprem
+        tier:
+          - control
+          - runtime
+        nodes:
+          - vm-manager
+          - vm-worker
+          - vm-ingress
+    nodes:
+      vm-service:
+        label: docker service のサービス仕様
+        kind: file
+        tier: control
+        realizes:
+          - service
+        description: 注文 API のイメージ、レプリカ数、公開ポートを宣言する。
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6
+      vm-manager:
+        label: Swarm manager VM 群
+        kind: worker
+        tier: control
+        svc: onprem:vm
+        realizes:
+          - manager
+          - scheduler
+        description: Docker Engine の manager が状態を管理し、タスクの配置を決める。
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6
+      vm-worker:
+        label: worker VM 上の Docker Engine
+        kind: worker
+        tier: runtime
+        svc: onprem:vm
+        realizes:
+          - task
+          - worker
+        description: 割り当てられた Service タスクをコンテナとして実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6
+      vm-update:
+        label: Service の UpdateConfig
+        kind: policy
+        tier: runtime
+        realizes:
+          - update
+        description: 同時に更新するタスク数や失敗時の扱いを設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6
+      vm-ingress:
+        label: ingress routing mesh
+        kind: lb
+        tier: runtime
+        description: タスクの有無に関係なく到達したノードから、実行中のサービスのタスクへ接続を転送する。
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6
+      vm-registry:
+        label: コンテナレジストリ
+        kind: catalog
+        tier: runtime
+        description: 配備するイメージをノードから取得可能にする。
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6
+    links:
+      - id: vm-route
+        from: vm-ingress
+        to: vm-worker
+        label: 稼働中のタスクに転送
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6
+      - id: vm-pull
+        from: vm-worker
+        to: vm-registry
+        label: 配備イメージを取得
+        evidence:
+          - type: doc
+            ref: docs/reference-docker-swarm.md#§6

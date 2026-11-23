@@ -17,11 +17,11 @@ tiers:
   - {id: "cluster", label: "etcd クラスタ", z: 0, size: [14,7]}
 nodes:
   operator: {label: "運用者", kind: "actor", tier: "client", x: 0, y: 1.5, description: "注文 API の受付上限を設定変更する。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§1"}]}
-  client: {label: "etcd クライアント", kind: "client", tier: "client", x: 5, y: 1.5, description: "設定キーへの Put と完了を確認する。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§2"}]}
+  client: {label: 状態更新のクライアント, kind: client, tier: client, x: 5, 'y': 1.5, description: 設定キーへの Put と完了を確認する。, evidence: [{type: doc, ref: docs/reference-etcd-raft.md#§2}]}
   member-a: {label: "メンバー A", kind: "db", tier: "cluster", x: 2, y: 1.5, description: "初期状態のリーダー。分断時には単独になる。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§3"}]}
   member-b: {label: "メンバー B", kind: "db", tier: "cluster", x: 6, y: 1.5, description: "初期状態のフォロワー。例では分断後にリーダーとなる。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§4"}]}
   member-c: {label: "メンバー C", kind: "db", tier: "cluster", x: 10, y: 1.5, description: "初期状態のフォロワー。分断中も B と通信できる。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§4"}]}
-  setting: {label: "コミット済みの設定", kind: "segment", tier: "cluster", x: 6, y: 5, description: "各メンバーの状態機械で反映される注文 API の設定キーを論理的に表す。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§2"}]}
+  setting: {label: 確定した設定値, kind: segment, tier: cluster, x: 6, 'y': 5, description: 各メンバーの状態機械で反映される注文 API の設定キーを論理的に表す。, evidence: [{type: doc, ref: docs/reference-etcd-raft.md#§2}]}
 links:
   - {id: "update", from: "operator", to: "client", label: "受付上限の更新を指示", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§1"}]}
   - {id: "put-a", from: "client", to: "member-a", label: "A に Put", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§2"}]}
@@ -90,3 +90,127 @@ blocks:
     - {id: b, label: メンバー B, sub: 初期フォロワー, node: member-b}
     - {id: c, label: メンバー C, sub: 初期フォロワー, node: member-c}
   items: {a: [], b: [], c: []}
+implementations:
+  - id: etcd
+    label: 3 台の VM で運用する etcd
+    description: 受付上限のキーを 3 台の etcd メンバーに保持し、書き込み後の状態を etcdctl で確認する例。
+    sources:
+      - title: etcd Clustering Guide
+        url: https://etcd.io/docs/v3.6/op-guide/clustering/
+      - title: etcd Cluster Status
+        url: https://etcd.io/docs/v3.6/tasks/operator/how-to-check-cluster-status/
+      - title: etcd API guarantees
+        url: https://etcd.io/docs/v3.6/learning/api_guarantees/
+    tiers:
+      - id: client
+        label: 設定の更新
+        z: 1
+        kind: origin
+      - id: cluster
+        label: etcd クラスタ
+        z: 0
+    groups:
+      - kind: cluster
+        label: etcd の 3 投票メンバー
+        provider: onprem
+        tier:
+          - cluster
+        nodes:
+          - etcd-member-a
+          - etcd-member-b
+          - etcd-member-c
+          - etcd-setting
+    nodes:
+      etcd-operator:
+        label: 設定変更を行う運用者
+        kind: actor
+        tier: client
+        realizes:
+          - operator
+        description: テスト用の受付上限キーの値を変更する。
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      etcd-client:
+        label: etcdctl put
+        kind: client
+        tier: client
+        realizes:
+          - client
+        description: 認証済みクライアントから複数のクライアントエンドポイントを指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      etcd-member-a:
+        label: etcd member A の VM
+        kind: db
+        tier: cluster
+        svc: onprem:vm
+        realizes:
+          - member-a
+        description: 初期リーダーの例。Raft ログとローカルデータを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      etcd-member-b:
+        label: etcd member B の VM
+        kind: db
+        tier: cluster
+        svc: onprem:vm
+        realizes:
+          - member-b
+        description: A 停止後にリーダーとなる候補。
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      etcd-member-c:
+        label: etcd member C の VM
+        kind: db
+        tier: cluster
+        svc: onprem:vm
+        realizes:
+          - member-c
+        description: 同じ Raft グループに参加する。
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      etcd-setting:
+        label: etcd MVCC の受付上限キー
+        kind: table
+        tier: cluster
+        realizes:
+          - setting
+        description: 各メンバーの適用済み状態に存在する同じキーを表す。別ストレージへの複製を示す箱ではない。
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      etcd-health:
+        label: etcdctl endpoint status
+        kind: monitor
+        tier: client
+        description: リーダーの識別と各エンドポイントの状態確認に使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+    links:
+      - id: etcd-observe-a
+        from: etcd-health
+        to: etcd-member-a
+        label: 状態を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      - id: etcd-observe-b
+        from: etcd-health
+        to: etcd-member-b
+        label: 状態を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6
+      - id: etcd-observe-c
+        from: etcd-health
+        to: etcd-member-c
+        label: 状態を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-etcd-raft.md#§6

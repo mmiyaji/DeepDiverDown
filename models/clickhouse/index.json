@@ -2,23 +2,23 @@
   "model": "clickhouse",
   "name": "ClickHouse の MergeTree：疎インデックスとパートのマージ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "insert": {
       "type": "node",
-      "label": "INSERT",
+      "label": "注文データの取り込み元",
       "status": "claim"
     },
     "planner": {
       "type": "node",
-      "label": "SELECT / EXPLAIN",
+      "label": "SQL の読取計画",
       "status": "claim"
     },
     "scan": {
       "type": "node",
-      "label": "列の読み取り",
+      "label": "候補範囲の列スキャン",
       "status": "claim"
     },
     "result": {
@@ -43,12 +43,12 @@
     },
     "merger": {
       "type": "node",
-      "label": "パートのマージ",
+      "label": "同じパーティション内のデータ統合",
       "status": "claim"
     },
     "store": {
       "type": "link",
-      "label": "INSERT → 月パーティション",
+      "label": "注文データの取り込み元 → 月パーティション",
       "status": "claim"
     },
     "sort": {
@@ -58,32 +58,32 @@
     },
     "partition-prune": {
       "type": "link",
-      "label": "SELECT / EXPLAIN → 月パーティション",
+      "label": "SQL の読取計画 → 月パーティション",
       "status": "claim"
     },
     "index-prune": {
       "type": "link",
-      "label": "SELECT / EXPLAIN → 疎主インデックスとマーク",
+      "label": "SQL の読取計画 → 疎主インデックスとマーク",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "疎主インデックスとマーク → 列の読み取り",
+      "label": "疎主インデックスとマーク → 候補範囲の列スキャン",
       "status": "claim"
     },
     "return": {
       "type": "link",
-      "label": "列の読み取り → 注文別の金額",
+      "label": "候補範囲の列スキャン → 注文別の金額",
       "status": "claim"
     },
     "pick": {
       "type": "link",
-      "label": "データパート → パートのマージ",
+      "label": "データパート → 同じパーティション内のデータ統合",
       "status": "claim"
     },
     "replace": {
       "type": "link",
-      "label": "パートのマージ → データパート",
+      "label": "同じパーティション内のデータ統合 → データパート",
       "status": "claim"
     },
     "query-week": {
@@ -109,6 +109,55 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実環境のパート数、グラニュール境界、索引による除外数、マージの時期は未確認。"
+    },
+    "mergetree-insert": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "clickhouse-client から INSERT",
+      "realizes": [
+        "insert"
+      ]
+    },
+    "mergetree-server": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "ClickHouse Server の SELECT と MergeTree 読取",
+      "realizes": [
+        "planner",
+        "scan"
+      ]
+    },
+    "mergetree-data": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "MergeTree の月別パートとマーク",
+      "realizes": [
+        "partition",
+        "parts",
+        "granules"
+      ]
+    },
+    "mergetree-merge": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "MergeTree のバックグラウンドマージ",
+      "realizes": [
+        "merger"
+      ]
+    },
+    "mergetree-result": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "clickhouse-client の注文結果",
+      "realizes": [
+        "result"
+      ]
+    },
+    "mergetree-system": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "system.parts",
+      "realizes": []
     }
   },
   "byRef": {
@@ -137,7 +186,13 @@
       "query-week",
       "merge-parts",
       "BR-01",
-      "BR-02"
+      "BR-02",
+      "mergetree-insert",
+      "mergetree-server",
+      "mergetree-data",
+      "mergetree-merge",
+      "mergetree-result",
+      "mergetree-system"
     ],
     "docs/reference-clickhouse.md#§2": [
       "model",
@@ -173,6 +228,14 @@
     ],
     "docs/reference-clickhouse.md#§6": [
       "model"
+    ],
+    "docs/reference-clickhouse.md#§7": [
+      "mergetree-insert",
+      "mergetree-server",
+      "mergetree-data",
+      "mergetree-merge",
+      "mergetree-result",
+      "mergetree-system"
     ]
   },
   "reference": {

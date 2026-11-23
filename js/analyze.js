@@ -274,6 +274,7 @@
     m.links.forEach(l => push(l.id, 'link', `${m.nodes[l.from].label} → ${m.nodes[l.to].label}`, l.evidence));
     (m.scenarios || []).forEach(s => push(s.id, 'scenario', s.label, s.evidence));
     (m.requirements || []).forEach(q => push(q.id, 'req', q.title, q.evidence));
+    (m.implementations || []).forEach(i => Object.entries(i.nodes || {}).forEach(([id, n]) => push(id, 'impl', `実装例 ${i.label}：${n.label}`, n.evidence)));
     return own;
   }
 
@@ -293,6 +294,28 @@
     return { items, total: items.length, covered: items.filter(i => i.ok).length, missing: items.filter(i => !i.ok), broken };
   }
 
+  /* 実装例（implementations）の点検：公式資料があり、すべての機能に担い手がいて、参照先が存在する */
+  function implementationProblems(m) {
+    const bad = [], linkIds = new Set((m.links || []).map(l => l.id));
+    for (const impl of m.implementations) {
+      const tag = `実装例 ${impl.id}`, nodes = impl.nodes || {};
+      if (!impl.label) bad.push(`${tag}：label がない`);
+      if (!(impl.sources || []).some(s => /^https?:\/\//.test(s.url || ''))) bad.push(`${tag}：公式資料（sources の url）がない`);
+      const covered = new Set();
+      for (const [id, n] of Object.entries(nodes)) {
+        if (m.nodes[id]) bad.push(`${tag}：部品 ID ${id} が機能配置の部品と重なる`);
+        for (const p of [].concat(n.realizes || [])) { if (!m.nodes[p]) bad.push(`${tag}：${id} の realizes ${p} が機能配置にない`); covered.add(p); }
+      }
+      for (const id of Object.keys(m.nodes)) if (!covered.has(id)) bad.push(`${tag}：機能 ${id}（${m.nodes[id].label}）を担う部品がない`);
+      for (const l of impl.links || []) {
+        if (!nodes[l.from] || !nodes[l.to]) bad.push(`${tag}：接続 ${l.id} の端点が実装例の部品にない`);
+        if (l.replace && ![].concat(l.realizes || []).length) bad.push(`${tag}：接続 ${l.id} の置き換え先（realizes）がない`);
+        for (const r of [].concat(l.realizes || [])) if (!linkIds.has(r)) bad.push(`${tag}：接続 ${l.id} の realizes ${r} が機能配置にない`);
+      }
+    }
+    return bad;
+  }
+
   /* 点検（gates）：合否は AI の報告ではなくこの判定で決める */
   function gates(m, a, docs, opts = {}) {
     const cls = classify(m, a), cov = coverage(m, a, docs), issues = lint(m, opts), g = { ...(m.gates || {}), ...(opts.gates || {}) };
@@ -310,6 +333,10 @@
       { id: 'REQ_TRACE', label: '要件がすべて構成要素に紐付く', pass: !reqNoTrace.length, detail: `${reqNoTrace.length} 件`, items: reqNoTrace.map(q => `${q.id} ${q.title}`) },
       { id: 'HIGH_ISSUES', label: `重大な指摘 ${g.maxHigh ?? 0} 件以下`, pass: high.length <= (g.maxHigh ?? 0), detail: `${high.length} 件`, items: high.map(i => i.msg) },
     ];
+    if (m.implementations?.length) {
+      const bad = implementationProblems(m);
+      res.push({ id: 'IMPL', label: '実装例が機能配置と資料に対応する', pass: !bad.length, detail: `${bad.length} 件`, items: bad });
+    }
     return { pass: res.every(r => r.pass), results: res, cls, cov, issues };
   }
 
@@ -321,6 +348,7 @@
     (m.scenarios || []).forEach(s => byId[s.id] = { type: 'scenario', label: s.label });
     (m.requirements || []).forEach(q => byId[q.id] = { type: 'requirement', kind: q.kind, label: q.title });
     (m.unknowns || []).forEach(u => byId[u.id] = { type: 'unknown', label: u.text });
+    (m.implementations || []).forEach(i => Object.entries(i.nodes || {}).forEach(([id, n]) => byId[id] = { type: 'implementation', impl: i.id, label: n.label, realizes: [].concat(n.realizes || []) }));
     evidenceOwners(m).forEach(o => {
       const keys = [o.e.ref, o.e.at && o.e.at.split(':')[0], o.e.ref.split('#')[0]].filter((k, i, a) => k && a.indexOf(k) === i);
       keys.forEach(k => { (byRef[k] = byRef[k] || []).includes(o.id) || byRef[k].push(o.id); });

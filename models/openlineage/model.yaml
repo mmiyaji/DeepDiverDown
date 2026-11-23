@@ -35,3 +35,118 @@ scenarios:
       - {links: [normalize-input, normalize-events], note: 整形 Job が原本を読み、START/COMPLETE の RunEvent を収集先へ送る。}
       - {links: [detail-output, aggregate-input], note: 受注明細 Dataset が生成され、集計 Job の入力になる。}
       - {links: [aggregate-events, sales-output], note: 集計 Job の実行を記録し、日次売上 Dataset を生成する。}
+implementations:
+  - id: spark-marquez
+    label: Apache Spark・Marquez
+    description: OpenLineage の Spark Listener から、Docker で起動した Marquez へ HTTP で実行イベントを配信する例。
+    sources:
+      - title: OpenLineage Object Model
+        url: https://openlineage.io/docs/1.47.0/spec/object-model/
+      - title: OpenLineage Getting Started
+        url: https://openlineage.io/getting-started/
+      - title: Using OpenLineage with Spark
+        url: https://openlineage.io/docs/1.54.0/guides/spark/
+    nodes:
+      spark-marquez-raw:
+        label: 入力 Parquet（受注原本）
+        kind: file
+        tier: flow
+        x: 0
+        y: 1.5
+        description: Spark が読み取る入力データセット。
+        realizes:
+          - raw
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      spark-marquez-spark:
+        label: Apache Spark（整形・集計）
+        kind: service
+        tier: flow
+        x: 5
+        y: 1.5
+        description: 両方の変換を同じ実行基盤で動かす。
+        realizes:
+          - normalize
+          - aggregate
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      spark-marquez-detail:
+        label: 中間 Parquet（受注明細）
+        kind: file
+        tier: flow
+        x: 8
+        y: 1.5
+        description: 整形結果を次の集計処理が読む。
+        realizes:
+          - detail
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      spark-marquez-result:
+        label: 出力 Parquet（日次売上）
+        kind: file
+        tier: flow
+        x: 16
+        y: 1.5
+        description: 集計ジョブの出力データセット。
+        realizes:
+          - sales
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      spark-marquez-api:
+        label: Marquez API
+        kind: service
+        tier: lineage
+        x: 8
+        y: 1.5
+        description: OpenLineage RunEvent を HTTP で受信する。
+        realizes:
+          - events
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      spark-marquez-listener:
+        label: OpenLineageSparkListener
+        kind: service
+        tier: lineage
+        x: 2
+        y: 1.5
+        description: Spark の実行情報からイベントを組み立てる。
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      spark-marquez-ui:
+        label: Marquez Web UI
+        kind: monitor
+        tier: lineage
+        x: 10
+        y: 1.5
+        description: 実行単位のメタデータから、ジョブとデータセットの関係を確認できる。
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+    links:
+      - id: spark-marquez-capture
+        from: spark-marquez-spark
+        to: spark-marquez-listener
+        label: ジョブの実行情報を捕捉
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      - id: spark-marquez-deliver
+        from: spark-marquez-listener
+        to: spark-marquez-api
+        label: RunEvent を HTTP で送信
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7
+      - id: spark-marquez-view
+        from: spark-marquez-ui
+        to: spark-marquez-api
+        label: 受信した関係を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-openlineage.md#§7

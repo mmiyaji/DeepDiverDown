@@ -13,12 +13,12 @@ tiers:
   - {id: app, label: Kafka 入力と Streams アプリケーション, kind: origin, z: 0, size: [14, 3]}
   - {id: durability, label: 状態と復旧, z: 1, origin: [0, 0], size: [14, 3]}
 nodes:
-  topic: {label: Input Topic, kind: queue, tier: app, x: 0, y: 1.5, description: パーティション化された受注イベントを保持する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§2"}]}
-  task: {parallel: N, label: Stream Task, kind: worker, tier: app, x: 4, y: 1.5, description: 入力パーティションを担当し、トポロジーを実行する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§2"}]}
-  topology: {label: Processor Topology, kind: service, tier: app, x: 7, y: 1.5, description: Source、変換、集計プロセッサの処理グラフ。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§3"}]}
-  state: {partitions: 3, label: Local State Store, kind: db, tier: app, x: 10, y: 2.7, description: Task ごとの集計状態を保持・照会する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§4"}]}
-  output: {label: Output Topic, kind: queue, tier: app, x: 13, y: 1.5, description: トポロジーが生成した結果を公開する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§3"}]}
-  changelog: {label: Changelog Topic, kind: queue, tier: durability, x: 10, y: 1.5, description: 状態ストアの更新を複製して記録する。, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§5"}]}
+  topic: {label: 入力ログ, kind: queue, tier: app, x: 0, 'y': 1.5, description: パーティション化された受注イベントを保持する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§2}]}
+  task: {parallel: 'N', label: 分割ごとの実行単位, kind: worker, tier: app, x: 4, 'y': 1.5, description: 入力パーティションを担当し、トポロジーを実行する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§2}]}
+  topology: {label: ストリームの処理グラフ, kind: service, tier: app, x: 7, 'y': 1.5, description: Source、変換、集計プロセッサの処理グラフ。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§3}]}
+  state: {partitions: 3, label: ローカル状態ストア, kind: db, tier: app, x: 10, 'y': 2.7, description: Task ごとの集計状態を保持・照会する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§4}]}
+  output: {label: 出力ログ, kind: queue, tier: app, x: 13, 'y': 1.5, description: トポロジーが生成した結果を公開する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§3}]}
+  changelog: {label: 状態の変更ログ, kind: queue, tier: durability, x: 10, 'y': 1.5, description: 状態ストアの更新を複製して記録する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§5}]}
 links:
   - {id: consume, from: topic, to: task, label: パーティションを割り当て, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§2"}]}
   - {id: process, from: task, to: topology, label: レコードを処理, evidence: [{type: doc, ref: "docs/reference-kafka-streams.md#§3"}]}
@@ -35,3 +35,22 @@ scenarios:
       - {links: [update, produce], note: 集計状態を更新し、結果を Output Topic へ発行する。}
       - {links: [log], note: State Store の更新を changelog Topic に記録する。}
       - {links: [restore], note: Task 再配置時に changelog を再生して状態を復元する。}
+
+implementations:
+  - id: java-rocksdb
+    label: "Kafka Streams JVM と RocksDB"
+    description: "Kafka Streams を組み込んだ JVM アプリケーションを複数起動する例。分割・タスク・状態はアプリケーション ID の範囲で管理する。"
+    sources:
+      - {title: Kafka Streams Architecture, url: https://kafka.apache.org/44/streams/architecture/}
+      - {title: Configuring a Streams Application, url: https://kafka.apache.org/44/streams/developer-guide/config-streams/}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      java-rocksdb-input: {label: Kafka 入力トピック, kind: queue, tier: processing, x: 1, y: 1.15, realizes: [topic], description: 注文イベントをパーティションに分ける。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§8}]}
+      java-rocksdb-java: {label: Java アプリの Stream Task と Topology, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [task, topology], description: 各 JVM 内のタスクが処理グラフを実行する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§8}]}
+      java-rocksdb-kv: {label: ローカルの RocksDB ストア, kind: db, tier: processing, x: 5, y: 1.15, realizes: [state], description: 永続ストアを使用し、担当タスクの集計状態を保持する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§8}]}
+      java-rocksdb-topics: {label: Kafka 出力トピックと内部 changelog トピック, kind: queue, tier: processing, x: 5, y: 3.65, realizes: [output, changelog], description: 結果と復旧用の状態変更を異なるトピックで保持する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§8}]}
+      java-rocksdb-config: {label: application.id と state.dir, kind: file, tier: setup, x: 1, y: 1.5, description: 同じアプリケーションの実行個体で ID を揃え、ローカル状態の保存先を設定する。, evidence: [{type: doc, ref: docs/reference-kafka-streams.md#§8}]}
+    links:
+      - {id: java-rocksdb-config-connection, from: java-rocksdb-config, to: java-rocksdb-java, label: グループと状態ディレクトリーを設定}

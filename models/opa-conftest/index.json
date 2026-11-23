@@ -2,8 +2,8 @@
   "model": "opa-conftest",
   "name": "OPA と Conftest による PR のポリシーチェック",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "author": {
@@ -13,17 +13,17 @@
     },
     "pull-request": {
       "type": "node",
-      "label": "注文 API の PR",
+      "label": "レビュー対象の変更",
       "status": "claim"
     },
     "manifest": {
       "type": "node",
-      "label": "Deployment マニフェスト",
+      "label": "注文 API の配備定義",
       "status": "claim"
     },
     "policy": {
       "type": "node",
-      "label": "Rego ポリシー",
+      "label": "配備条件のポリシー",
       "status": "claim"
     },
     "runner": {
@@ -33,12 +33,12 @@
     },
     "conftest": {
       "type": "node",
-      "label": "Conftest / OPA 評価",
+      "label": "ポリシーの評価",
       "status": "claim"
     },
     "check": {
       "type": "node",
-      "label": "必須ステータスチェック",
+      "label": "マージ可否に使う検査結果",
       "status": "claim"
     },
     "branch": {
@@ -48,42 +48,42 @@
     },
     "submit": {
       "type": "link",
-      "label": "注文 API の開発者 → 注文 API の PR",
+      "label": "注文 API の開発者 → レビュー対象の変更",
       "status": "claim"
     },
     "trigger": {
       "type": "link",
-      "label": "注文 API の PR → CI ジョブ",
+      "label": "レビュー対象の変更 → CI ジョブ",
       "status": "claim"
     },
     "load-yaml": {
       "type": "link",
-      "label": "Deployment マニフェスト → CI ジョブ",
+      "label": "注文 API の配備定義 → CI ジョブ",
       "status": "claim"
     },
     "evaluate": {
       "type": "link",
-      "label": "CI ジョブ → Conftest / OPA 評価",
+      "label": "CI ジョブ → ポリシーの評価",
       "status": "claim"
     },
     "load-policy": {
       "type": "link",
-      "label": "Rego ポリシー → Conftest / OPA 評価",
+      "label": "配備条件のポリシー → ポリシーの評価",
       "status": "claim"
     },
     "result": {
       "type": "link",
-      "label": "Conftest / OPA 評価 → CI ジョブ",
+      "label": "ポリシーの評価 → CI ジョブ",
       "status": "claim"
     },
     "report": {
       "type": "link",
-      "label": "CI ジョブ → 必須ステータスチェック",
+      "label": "CI ジョブ → マージ可否に使う検査結果",
       "status": "claim"
     },
     "merge": {
       "type": "link",
-      "label": "必須ステータスチェック → 保護されたブランチ",
+      "label": "マージ可否に使う検査結果 → 保護されたブランチ",
       "status": "claim"
     },
     "reject-missing-cpu": {
@@ -93,6 +93,69 @@
     "pass-corrected": {
       "type": "scenario",
       "label": "修正コミットを再評価して合格"
+    },
+    "github-author": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "GitHub の開発者",
+      "realizes": [
+        "author"
+      ]
+    },
+    "github-pull-request": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "GitHub Pull Request",
+      "realizes": [
+        "pull-request"
+      ]
+    },
+    "github-manifest": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "Git 内の deployment.yaml",
+      "realizes": [
+        "manifest"
+      ]
+    },
+    "github-policy": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "Git 内の policy/*.rego",
+      "realizes": [
+        "policy"
+      ]
+    },
+    "github-runner": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "GitHub Actions runner の policy-ci ジョブ",
+      "realizes": [
+        "runner",
+        "conftest"
+      ]
+    },
+    "github-check": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "policy-ci の必須チェック",
+      "realizes": [
+        "check"
+      ]
+    },
+    "github-branch": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "保護された main",
+      "realizes": [
+        "branch"
+      ]
+    },
+    "github-workflow": {
+      "type": "implementation",
+      "impl": "github",
+      "label": "GitHub Actions workflow YAML",
+      "realizes": []
     }
   },
   "byRef": {
@@ -119,7 +182,15 @@
       "report",
       "merge",
       "reject-missing-cpu",
-      "pass-corrected"
+      "pass-corrected",
+      "github-author",
+      "github-pull-request",
+      "github-manifest",
+      "github-policy",
+      "github-runner",
+      "github-check",
+      "github-branch",
+      "github-workflow"
     ],
     "docs/reference-opa-conftest.md#§2": [
       "pull-request",
@@ -147,6 +218,16 @@
       "merge",
       "reject-missing-cpu",
       "pass-corrected"
+    ],
+    "docs/reference-opa-conftest.md#§5": [
+      "github-author",
+      "github-pull-request",
+      "github-manifest",
+      "github-policy",
+      "github-runner",
+      "github-check",
+      "github-branch",
+      "github-workflow"
     ]
   },
   "reference": {

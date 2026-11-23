@@ -17,11 +17,11 @@ tiers:
   - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[14.5,4.5]}
 nodes:
   bi: {"label":"注文集計 SQL","kind":"client","tier":"flow","x":0,"y":2,"description":"条件付き集計を送信。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§1"}]}
-  warehouse: {"label":"SQL Warehouse","kind":"service","tier":"flow","x":3,"y":2,"description":"処理需要に合わせる実行先。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§2"}]}
-  engine: {"label":"Photon 対応演算","kind":"worker","tier":"flow","x":6,"y":2,"description":"対応するスキャンや結合を処理。","parallel":"N","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§2"}]}
-  scan: {"label":"Delta テーブルのファイル","kind":"db","tier":"flow","x":10,"y":0,"description":"配置と統計が読み取りに影響。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§4"}]}
+  warehouse: {"label":"SQL 実行の計算資源","kind":"service","tier":"flow","x":3,"y":2,"description":"処理需要に合わせる実行先。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§2"}]}
+  engine: {"label":"最適化された演算エンジン","kind":"worker","tier":"flow","x":6,"y":2,"description":"対応するスキャンや結合を処理。","parallel":"N","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§2"}]}
+  scan: {"label":"列指向テーブルのデータファイル","kind":"db","tier":"flow","x":10,"y":0,"description":"配置と統計が読み取りに影響。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§4"}]}
   shuffle: {"label":"結合・再分配","kind":"worker","tier":"flow","x":10,"y":4,"description":"結合時に必要なら行を集め直す。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
-  profile: {"label":"Query Profile","kind":"service","tier":"flow","x":14,"y":2,"description":"演算子の時間やデータ量を確認。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
+  profile: {"label":"クエリの演算子プロファイル","kind":"service","tier":"flow","x":14,"y":2,"description":"演算子の時間やデータ量を確認。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
   optimizer: {"label":"テーブル保守","kind":"worker","tier":"flow","x":14,"y":0,"description":"クラスタリングなどの配置の調整。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§4"}]}
 links:
   - {"id":"submit","from":"bi","to":"warehouse","label":"SQL を発行","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§1"}]}
@@ -45,3 +45,27 @@ scenarios:
     steps:
       - {"links":["submit","execute"],"note":"複数のテーブルを使う集計を実行する。"}
       - {"links":["join","observe"],"note":"再分配が大きい演算子と入力行数を調べ、次に見直す条件を決める。"}
+
+implementations:
+  - id: databricks-sql-serverless
+    label: "Databricks Serverless SQL のクエリ調査"
+    description: "注文の管理 Delta テーブルを Serverless SQL Warehouse で読み、Query Profile と履歴を使って改善前後を調べる例。"
+    sources:
+      - {title: "SQL Warehouse の種類", url: "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types"}
+      - {title: "Photon", url: "https://docs.databricks.com/aws/en/compute/photon"}
+      - {title: "クエリプロファイル", url: "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"}
+      - {title: "Liquid clustering", url: "https://docs.databricks.com/aws/en/tables/clustering"}
+      - {title: "Predictive optimization", url: "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"}
+      - {title: "Query history system table", url: "https://docs.databricks.com/aws/en/admin/system-tables/query-history"}
+    tiers:
+      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [14.5,4.5]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+    nodes:
+      example-bi: {label: "Databricks SQL Editor", kind: "client", tier: "flow", x: 0, y: 2, realizes: ["bi"], description: "条件と集計が明示された注文クエリを実行する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§5"}]}
+      example-warehouse: {label: "Serverless SQL Warehouse と Photon", kind: "service", tier: "flow", x: 3, y: 2, realizes: ["warehouse","engine","shuffle"], description: "対応するスキャン・結合を処理し、必要な並列実行と再分配をサービス側で行う。", evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§5"}]}
+      example-scan: {label: "Unity Catalog 管理 Delta テーブル", kind: "db", tier: "flow", x: 10, y: 0, realizes: ["scan"], description: "注文日の絞り込みに利用できる統計とファイルを持つ。", evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§5"}]}
+      example-profile: {label: "Databricks Query Profile", kind: "service", tier: "flow", x: 14, y: 2, realizes: ["profile"], description: "時間や読み取り行数などの演算子指標を確認する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§5"}]}
+      example-optimizer: {label: "Liquid Clustering のテーブル設定", kind: "worker", tier: "flow", x: 14, y: 0, realizes: ["optimizer"], description: "注文日などのアクセス条件を踏まえてクラスタリング方法を選ぶ。", evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§5"}]}
+      example-history: {label: "system.query.history", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "比較対象のクエリ識別子や実行指標を SQL で調べる。", evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§5"}]}
+    links:
+      - {id: "example-history-connection", from: "example-history", to: "example-profile", label: "調査対象の実行を照合", evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§5"}]}

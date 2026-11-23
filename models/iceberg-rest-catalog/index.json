@@ -2,8 +2,8 @@
   "model": "iceberg-rest-catalog",
   "name": "Iceberg REST Catalog の基本アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "engine": {
@@ -74,6 +74,46 @@
     "catalog-read-commit": {
       "type": "scenario",
       "label": "カタログ経由で読み書き"
+    },
+    "trino-polaris-trino": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "Trino Iceberg コネクタ",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "trino-polaris-polaris": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "Polaris Server（Iceberg REST）",
+      "realizes": [
+        "api",
+        "catalog",
+        "commit"
+      ]
+    },
+    "trino-polaris-metadata": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "RustFS 上の Iceberg メタデータ",
+      "realizes": [
+        "metadata"
+      ]
+    },
+    "trino-polaris-data": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "RustFS の Manifest・データファイル",
+      "realizes": [
+        "data"
+      ]
+    },
+    "trino-polaris-config": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "polaris.properties",
+      "realizes": []
     }
   },
   "byRef": {
@@ -98,7 +138,12 @@
       "read-data",
       "commit-request",
       "commit-server",
-      "catalog-read-commit"
+      "catalog-read-commit",
+      "trino-polaris-trino",
+      "trino-polaris-polaris",
+      "trino-polaris-metadata",
+      "trino-polaris-data",
+      "trino-polaris-config"
     ],
     "docs/reference-iceberg-rest-catalog.md#§2": [
       "catalog",
@@ -121,11 +166,20 @@
     ],
     "docs/reference-iceberg-rest-catalog.md#§6": [
       "catalog-read-commit"
+    ],
+    "docs/reference-iceberg-rest-catalog.md#§7": [
+      "trino-polaris-trino",
+      "trino-polaris-polaris",
+      "trino-polaris-metadata",
+      "trino-polaris-data",
+      "trino-polaris-config"
     ]
   },
   "reference": {
     "category": "テーブル形式とカタログ",
     "order": 40,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "REST Catalog API がクライアントとカタログ実装を分離することを理解する。",
       "カタログによるテーブル解決とストレージ直接読み取りを区別する。",

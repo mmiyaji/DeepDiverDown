@@ -2,8 +2,8 @@
   "model": "redshift",
   "name": "Amazon Redshift のクラスター・マネージドストレージアーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "client": {
@@ -18,62 +18,62 @@
     },
     "leader": {
       "type": "node",
-      "label": "Leader node",
+      "label": "クエリ計画・結果調整ノード",
       "status": "claim"
     },
     "compute": {
       "type": "node",
-      "label": "Compute node",
+      "label": "分散計算ノード",
       "status": "claim"
     },
     "slice": {
       "type": "node",
-      "label": "Node slices",
+      "label": "ノード内の並列処理単位",
       "status": "claim"
     },
     "database": {
       "type": "node",
-      "label": "Redshift database",
+      "label": "分析データベース",
       "status": "claim"
     },
     "rms": {
       "type": "node",
-      "label": "Redshift Managed Storage",
+      "label": "分離された管理ストレージ",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "SQL client → Leader node",
+      "label": "SQL client → クエリ計画・結果調整ノード",
       "status": "claim"
     },
     "plan": {
       "type": "link",
-      "label": "Leader node → Compute node",
+      "label": "クエリ計画・結果調整ノード → 分散計算ノード",
       "status": "claim"
     },
     "parallel": {
       "type": "link",
-      "label": "Compute node → Node slices",
+      "label": "分散計算ノード → ノード内の並列処理単位",
       "status": "claim"
     },
     "read-db": {
       "type": "link",
-      "label": "Node slices → Redshift database",
+      "label": "ノード内の並列処理単位 → 分析データベース",
       "status": "claim"
     },
     "read-rms": {
       "type": "link",
-      "label": "Redshift database → Redshift Managed Storage",
+      "label": "分析データベース → 分離された管理ストレージ",
       "status": "claim"
     },
     "intermediate": {
       "type": "link",
-      "label": "Compute node → Leader node",
+      "label": "分散計算ノード → クエリ計画・結果調整ノード",
       "status": "claim"
     },
     "result": {
       "type": "link",
-      "label": "Leader node → BI user",
+      "label": "クエリ計画・結果調整ノード → BI user",
       "status": "claim"
     },
     "query": {
@@ -99,6 +99,54 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のリージョン、ノードタイプ、分散キー、ワークロード設定は未確定。"
+    },
+    "example-client": {
+      "type": "implementation",
+      "impl": "redshift-ra3",
+      "label": "VPC 接続済みの SQL クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "redshift-ra3",
+      "label": "BI 担当者",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-leader": {
+      "type": "implementation",
+      "impl": "redshift-ra3",
+      "label": "RA3 クラスターの Leader node",
+      "realizes": [
+        "leader"
+      ]
+    },
+    "example-compute": {
+      "type": "implementation",
+      "impl": "redshift-ra3",
+      "label": "RA3 コンピュートノードとスライス",
+      "realizes": [
+        "compute",
+        "slice"
+      ]
+    },
+    "example-database": {
+      "type": "implementation",
+      "impl": "redshift-ra3",
+      "label": "Redshift データベースと Redshift Managed Storage",
+      "realizes": [
+        "database",
+        "rms"
+      ]
+    },
+    "example-s3": {
+      "type": "implementation",
+      "impl": "redshift-ra3",
+      "label": "Amazon S3 の着地ファイル",
+      "realizes": []
     }
   },
   "byRef": {
@@ -125,7 +173,13 @@
       "query",
       "storage-scale",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "example-client",
+      "example-bi",
+      "example-leader",
+      "example-compute",
+      "example-database",
+      "example-s3"
     ],
     "docs/reference-redshift.md#§6": [
       "model",
@@ -166,11 +220,21 @@
       "read-rms",
       "storage-scale",
       "NFR-01"
+    ],
+    "docs/reference-redshift.md#§8": [
+      "example-client",
+      "example-bi",
+      "example-leader",
+      "example-compute",
+      "example-database",
+      "example-s3"
     ]
   },
   "reference": {
     "category": "クラウド分析基盤",
     "order": 40,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "リーダーノードとコンピュートノードの役割を区別する。",
       "スライスと分散スタイルが並列処理に関係することを理解する。",

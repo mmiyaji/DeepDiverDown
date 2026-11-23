@@ -2,8 +2,8 @@
   "model": "microsoft-purview",
   "name": "Microsoft Purview の Data Map と Unified Catalog",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "steward": {
@@ -28,12 +28,12 @@
     },
     "map": {
       "type": "node",
-      "label": "Data Map",
+      "label": "資産メタデータ・分類の集約",
       "status": "claim"
     },
     "unified": {
       "type": "node",
-      "label": "Unified Catalog",
+      "label": "データ製品カタログ",
       "status": "claim"
     },
     "workflow": {
@@ -48,12 +48,12 @@
     },
     "factory": {
       "type": "node",
-      "label": "Azure Data Factory",
+      "label": "連携するデータ変換基盤",
       "status": "claim"
     },
     "fabric": {
       "type": "node",
-      "label": "Microsoft Fabric OneLake catalog",
+      "label": "後継のガバナンス基盤",
       "status": "claim"
     },
     "inspect": {
@@ -63,27 +63,27 @@
     },
     "ingest": {
       "type": "link",
-      "label": "登録・スキャン → Data Map",
+      "label": "登録・スキャン → 資産メタデータ・分類の集約",
       "status": "claim"
     },
     "lineage": {
       "type": "link",
-      "label": "Azure Data Factory → Data Map",
+      "label": "連携するデータ変換基盤 → 資産メタデータ・分類の集約",
       "status": "claim"
     },
     "surface": {
       "type": "link",
-      "label": "Data Map → Unified Catalog",
+      "label": "資産メタデータ・分類の集約 → データ製品カタログ",
       "status": "claim"
     },
     "curate": {
       "type": "link",
-      "label": "データ製品の所有者 → Unified Catalog",
+      "label": "データ製品の所有者 → データ製品カタログ",
       "status": "claim"
     },
     "search": {
       "type": "link",
-      "label": "データ利用者 → Unified Catalog",
+      "label": "データ利用者 → データ製品カタログ",
       "status": "claim"
     },
     "request": {
@@ -113,7 +113,7 @@
     },
     "transition": {
       "type": "link",
-      "label": "Unified Catalog → Microsoft Fabric OneLake catalog",
+      "label": "データ製品カタログ → 後継のガバナンス基盤",
       "status": "claim"
     },
     "publish-product": {
@@ -129,6 +129,85 @@
       "kind": "rule",
       "label": "付与完了の記録",
       "status": "claim"
+    },
+    "azure-purview-owner": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "データ製品所有者",
+      "realizes": [
+        "steward"
+      ]
+    },
+    "azure-purview-reader": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "分析担当者",
+      "realizes": [
+        "consumer"
+      ]
+    },
+    "azure-purview-sql-admin": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "データベースの権限付与担当者",
+      "realizes": [
+        "provider"
+      ]
+    },
+    "azure-purview-scanner": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "Purview スキャン",
+      "realizes": [
+        "scan"
+      ]
+    },
+    "azure-purview-map": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "Purview Data Map",
+      "realizes": [
+        "map"
+      ]
+    },
+    "azure-purview-portal": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "Unified Catalog（データ製品・アクセス）",
+      "realizes": [
+        "unified",
+        "workflow"
+      ]
+    },
+    "azure-purview-database": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "Azure SQL Database",
+      "realizes": [
+        "source"
+      ]
+    },
+    "azure-purview-factory": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "Azure Data Factory",
+      "realizes": [
+        "factory"
+      ]
+    },
+    "azure-purview-fabric": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "Microsoft Fabric OneLake catalog",
+      "realizes": [
+        "fabric"
+      ]
+    },
+    "azure-purview-runtime": {
+      "type": "implementation",
+      "impl": "azure-purview",
+      "label": "Azure Integration Runtime（マネージド VNet）",
+      "realizes": []
     }
   },
   "byRef": {
@@ -163,7 +242,17 @@
       "transition",
       "publish-product",
       "request-product",
-      "R-01"
+      "R-01",
+      "azure-purview-owner",
+      "azure-purview-reader",
+      "azure-purview-sql-admin",
+      "azure-purview-scanner",
+      "azure-purview-map",
+      "azure-purview-portal",
+      "azure-purview-database",
+      "azure-purview-factory",
+      "azure-purview-fabric",
+      "azure-purview-runtime"
     ],
     "docs/reference-microsoft-purview.md#§3": [
       "steward",
@@ -196,6 +285,18 @@
     "docs/reference-microsoft-purview.md#§5": [
       "publish-product",
       "request-product"
+    ],
+    "docs/reference-microsoft-purview.md#§6": [
+      "azure-purview-owner",
+      "azure-purview-reader",
+      "azure-purview-sql-admin",
+      "azure-purview-scanner",
+      "azure-purview-map",
+      "azure-purview-portal",
+      "azure-purview-database",
+      "azure-purview-factory",
+      "azure-purview-fabric",
+      "azure-purview-runtime"
     ]
   },
   "reference": {

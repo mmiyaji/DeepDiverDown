@@ -2,8 +2,8 @@
   "model": "azure-data-factory",
   "name": "Azure Data Factory のデータ統合アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "source": {
@@ -13,22 +13,22 @@
     },
     "trigger": {
       "type": "node",
-      "label": "Trigger",
+      "label": "定期起動の条件",
       "status": "claim"
     },
     "pipeline": {
       "type": "node",
-      "label": "Pipeline",
+      "label": "データ処理のワークフロー",
       "status": "claim"
     },
     "copy": {
       "type": "node",
-      "label": "Copy Activity",
+      "label": "ファイルのコピー処理",
       "status": "claim"
     },
     "ir": {
       "type": "node",
-      "label": "Integration Runtime",
+      "label": "アクティビティの実行基盤",
       "status": "claim"
     },
     "landing": {
@@ -38,62 +38,62 @@
     },
     "flow": {
       "type": "node",
-      "label": "Mapping Data Flow",
+      "label": "列と型の変換処理",
       "status": "claim"
     },
     "lake": {
       "type": "node",
-      "label": "Azure Data Lake Storage",
+      "label": "整形済みデータの保存先",
       "status": "claim"
     },
     "monitor": {
       "type": "node",
-      "label": "Azure Monitor",
+      "label": "処理状態の監視",
       "status": "claim"
     },
     "trigger-pipeline": {
       "type": "link",
-      "label": "Trigger → Pipeline",
+      "label": "定期起動の条件 → データ処理のワークフロー",
       "status": "claim"
     },
     "pipeline-activity": {
       "type": "link",
-      "label": "Pipeline → Copy Activity",
+      "label": "データ処理のワークフロー → ファイルのコピー処理",
       "status": "claim"
     },
     "read-source": {
       "type": "link",
-      "label": "注文ファイル → Copy Activity",
+      "label": "注文ファイル → ファイルのコピー処理",
       "status": "claim"
     },
     "land-raw": {
       "type": "link",
-      "label": "Copy Activity → 一時配置された注文ファイル",
+      "label": "ファイルのコピー処理 → 一時配置された注文ファイル",
       "status": "claim"
     },
     "read-raw": {
       "type": "link",
-      "label": "一時配置された注文ファイル → Mapping Data Flow",
+      "label": "一時配置された注文ファイル → 列と型の変換処理",
       "status": "claim"
     },
     "copy-ir": {
       "type": "link",
-      "label": "Copy Activity → Integration Runtime",
+      "label": "ファイルのコピー処理 → アクティビティの実行基盤",
       "status": "claim"
     },
     "ir-flow": {
       "type": "link",
-      "label": "Integration Runtime → Mapping Data Flow",
+      "label": "アクティビティの実行基盤 → 列と型の変換処理",
       "status": "claim"
     },
     "flow-lake": {
       "type": "link",
-      "label": "Mapping Data Flow → Azure Data Lake Storage",
+      "label": "列と型の変換処理 → 整形済みデータの保存先",
       "status": "claim"
     },
     "observe": {
       "type": "link",
-      "label": "Pipeline → Azure Monitor",
+      "label": "データ処理のワークフロー → 処理状態の監視",
       "status": "claim"
     },
     "ingestion": {
@@ -115,6 +115,56 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のトリガー周期、接続資格情報、Data Flow の変換規則は未確定。"
+    },
+    "azure-source": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Azure Blob Storage 入力コンテナー",
+      "realizes": [
+        "source"
+      ]
+    },
+    "azure-pipeline": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "ADF のスケジュール Trigger・Pipeline・Copy Activity",
+      "realizes": [
+        "trigger",
+        "pipeline",
+        "copy"
+      ]
+    },
+    "azure-ir": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Azure Integration Runtime と Mapping Data Flow",
+      "realizes": [
+        "ir",
+        "flow"
+      ]
+    },
+    "azure-lake": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "ADLS Gen2 の raw と curated",
+      "realizes": [
+        "landing",
+        "lake"
+      ]
+    },
+    "azure-monitor": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Azure Monitor / ADF の監視画面",
+      "realizes": [
+        "monitor"
+      ]
+    },
+    "azure-linked": {
+      "type": "implementation",
+      "impl": "azure",
+      "label": "Linked Service と Dataset",
+      "realizes": []
     }
   },
   "byRef": {
@@ -144,7 +194,13 @@
       "observe",
       "ingestion",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "azure-source",
+      "azure-pipeline",
+      "azure-ir",
+      "azure-lake",
+      "azure-monitor",
+      "azure-linked"
     ],
     "docs/reference-azure-data-factory.md#§7": [
       "model"
@@ -179,11 +235,21 @@
     ],
     "docs/reference-azure-data-factory.md#§3": [
       "pipeline-activity"
+    ],
+    "docs/reference-azure-data-factory.md#§8": [
+      "azure-source",
+      "azure-pipeline",
+      "azure-ir",
+      "azure-lake",
+      "azure-monitor",
+      "azure-linked"
     ]
   },
   "reference": {
     "category": "変換とオーケストレーション",
     "order": 40,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Pipeline と Activity の依存関係を読む。",
       "Linked Service、Dataset、Integration Runtime の役割を区別する。",

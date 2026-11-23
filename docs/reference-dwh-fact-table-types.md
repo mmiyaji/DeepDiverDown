@@ -63,3 +63,22 @@
 - [Kimball Group Accumulating Snapshot Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/accumulating-snapshot-fact-table/)
 - [Kimball Group Factless Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/factless-fact-table/)
 - [Kimball Group Additive, Semi-Additive, and Non-Additive Facts](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/)
+
+## 8. 実装例 BigQuery の出荷工程ファクト
+
+出荷の工程イベントから、異なる粒度でトランザクション・日次・進捗・発生有無の表を作る実装例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 出荷工程のイベント | landing.shipping_events | 発生時刻と一意なイベント識別子を保持する。 |
+| イベント取り込み | BigQuery の増分ロード SQL | 一意なイベントを追記し、工程が進んだ注文を特定する。 |
+| 倉庫別の日次締め | スケジュールされた日次締め SQL | 倉庫と営業日の組ごとに出荷数と残数を計算する。 |
+| 分析者 | 集計・工程分析用 SQL ビュー | 指標に対応する粒度の表をクエリする。 |
+| トランザクションファクト | warehouse.fact_shipping_event | 発生日で区切る 1 工程イベントごとの表。 |
+| 定期スナップショット | warehouse.fact_warehouse_day | 1 倉庫・営業日ごとに出荷数と残数を保持する。 |
+| 累積スナップショット | warehouse.fact_order_line_progress | 1 受注明細の工程時刻を MERGE 相当の DML で更新する。 |
+| 数値尺度のないファクト | warehouse.fact_coverage | 実施した明細と工程のキーの組み合わせを保持する。 |
+
+出荷量は日別で加算できる。日末の未出荷残を日付方向に足すと期間末の残数にならないため、その指標は日次表の時点を指定して読む。
+
+出典 [Kimball Group Transaction Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/transaction-fact-table/)、[Kimball Group Periodic Snapshot Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/periodic-snapshot-fact-table/)、[Kimball Group Accumulating Snapshot Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/accumulating-snapshot-fact-table/)、[Kimball Group Factless Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/factless-fact-table/)、[Kimball Group Additive, Semi-Additive, and Non-Additive Facts](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/)、[BigQuery パーティション表](https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables)、[BigQuery スケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)、[BigQuery DML](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax)

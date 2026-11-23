@@ -18,32 +18,25 @@ tiers:
   - {"id": "consumers","label": "読み出し側 · 同じ Consumer Group","kind": "origin","z": 0,"origin": [10,0],"size": [3,9]}
   - {"id": "metadata","label": "メタデータ管理","z": 1,"origin": [2,0],"size": [4,2]}
 nodes:
-  producer:
-    {"label": "Producer","kind": "client","tier": "producer","x": 0.5,"y": 2,"description": "Topic にイベントを書き込む。対象パーティションのリーダーに接続する。","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§2"}]}
-  controller:
-    {"label": "KRaft Controller","kind": "service","tier": "metadata","x": 1.5,"y": 0.5,"description": "メタデータ管理とパーティションのリーダー選出。図は Controller の役割を1点で表す。","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§1"},{"type": "doc","ref": "docs/reference-kafka.md#§6"}]}
-  broker-1:
-    {"label": "Broker 1 · P0 リーダー","kind": "db","tier": "brokers","x": 3,"y": 1.5,"description": "開始時に P0 のリーダーを担当し、他のパーティションのレプリカも保持する。","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§1"},{"type": "doc","ref": "docs/reference-kafka.md#§3"}]}
-  broker-2:
-    {"label": "Broker 2 · P1 リーダー","kind": "db","tier": "brokers","x": 3,"y": 4.5,"description": "開始時に P1 のリーダーを担当する。図では Group Coordinator も担当し、障害例で P0 のリーダーを引き継ぐ。","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§1"},{"type": "doc","ref": "docs/reference-kafka.md#§5"},{"type": "doc","ref": "docs/reference-kafka.md#§6"}]}
-  broker-3:
-    {"label": "Broker 3 · P2 リーダー","kind": "db","tier": "brokers","x": 3,"y": 7.5,"description": "開始時に P2 のリーダーを担当する。図の障害例では稼働を継続し、P0 のフォロワーとして追随する。","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§1"},{"type": "doc","ref": "docs/reference-kafka.md#§3"},{"type": "doc","ref": "docs/reference-kafka.md#§6"}]}
-  consumer-1:
-    {"label": "Consumer 1","kind": "client","tier": "consumers","x": 0.5,"y": 2.5,"description": "同じ Consumer Group の一員。例では P0 と P1 を担当する。","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§4"},{"type": "doc","ref": "docs/reference-kafka.md#§5"}]}
-  consumer-2:
-    {"label": "Consumer 2","kind": "client","tier": "consumers","x": 0.5,"y": 7.5,"description": "同じ Consumer Group の一員。例では P2 を担当する。","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§4"}]}
+  producer: {label: イベント送信元, kind: client, tier: producer, x: 0.5, 'y': 2, description: Topic にイベントを書き込む。対象パーティションのリーダーに接続する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§2}]}
+  controller: {label: クラスターのメタデータ管理, kind: service, tier: metadata, x: 1.5, 'y': 0.5, description: トピック、パーティションの割り当てとリーダーの選出を管理する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§1}, {type: doc, ref: docs/reference-kafka.md#§6}]}
+  broker-1: {label: ログノード 1 · P0 リーダー, kind: db, tier: brokers, x: 3, 'y': 1.5, description: 開始時に P0 のリーダーを担当し、他のパーティションのレプリカも保持する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§1}, {type: doc, ref: docs/reference-kafka.md#§3}]}
+  broker-2: {label: ログノード 2 · P1 リーダー, kind: db, tier: brokers, x: 3, 'y': 4.5, description: 開始時に P1 のリーダーを担当する。図では Group Coordinator も担当し、障害例で P0 のリーダーを引き継ぐ。, evidence: [{type: doc, ref: docs/reference-kafka.md#§1}, {type: doc, ref: docs/reference-kafka.md#§5}, {type: doc, ref: docs/reference-kafka.md#§6}]}
+  broker-3: {label: ログノード 3 · P2 リーダー, kind: db, tier: brokers, x: 3, 'y': 7.5, description: 開始時に P2 のリーダーを担当する。図の障害例では稼働を継続し、P0 のフォロワーとして追随する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§1}, {type: doc, ref: docs/reference-kafka.md#§3}, {type: doc, ref: docs/reference-kafka.md#§6}]}
+  consumer-1: {label: 購読プロセス 1, kind: client, tier: consumers, x: 0.5, 'y': 2.5, description: 同じ Consumer Group の一員。例では P0 と P1 を担当する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§4}, {type: doc, ref: docs/reference-kafka.md#§5}]}
+  consumer-2: {label: 購読プロセス 2, kind: client, tier: consumers, x: 0.5, 'y': 7.5, description: 同じ Consumer Group の一員。例では P2 を担当する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§4}]}
 links:
-  - {"id": "produce","from": "producer","to": "broker-1","label": "P0 に追記","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§2"}]}
-  - {"id": "replicate-2","from": "broker-1","to": "broker-2","label": "P0 の複製データ","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§3"}]}
-  - {"id": "replicate-3","from": "broker-1","to": "broker-3","label": "P0 の複製データ","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§3"}]}
-  - {"id": "ack","from": "broker-1","to": "producer","label": "書き込み成功応答","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§3"}]}
-  - {"id": "read-p0","from": "broker-1","to": "consumer-1","label": "P0 の取得結果","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§4"}]}
-  - {"id": "read-p1","from": "broker-2","to": "consumer-1","label": "P1 の取得結果","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§4"}]}
-  - {"id": "read-p2","from": "broker-3","to": "consumer-2","label": "P2 の取得結果","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§4"}]}
-  - {"id": "commit","from": "consumer-1","to": "broker-2","label": "オフセットをコミット","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§5"}]}
-  - {"id": "elect","from": "controller","to": "broker-2","label": "Broker 2 を P0 リーダーに選出","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§6"}]}
-  - {"id": "retry","from": "producer","to": "broker-2","label": "新リーダーに P0 を再送","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§6"}]}
-  - {"id": "replicate-after","from": "broker-2","to": "broker-3","label": "新リーダーから P0 を複製","evidence": [{"type": "doc","ref": "docs/reference-kafka.md#§6"}]}
+  - {id: produce, from: producer, to: broker-1, label: P0 に追記, evidence: [{type: doc, ref: docs/reference-kafka.md#§2}]}
+  - {id: replicate-2, from: broker-1, to: broker-2, label: P0 の複製データ, evidence: [{type: doc, ref: docs/reference-kafka.md#§3}]}
+  - {id: replicate-3, from: broker-1, to: broker-3, label: P0 の複製データ, evidence: [{type: doc, ref: docs/reference-kafka.md#§3}]}
+  - {id: ack, from: broker-1, to: producer, label: 書き込み成功応答, evidence: [{type: doc, ref: docs/reference-kafka.md#§3}]}
+  - {id: read-p0, from: broker-1, to: consumer-1, label: P0 の取得結果, evidence: [{type: doc, ref: docs/reference-kafka.md#§4}]}
+  - {id: read-p1, from: broker-2, to: consumer-1, label: P1 の取得結果, evidence: [{type: doc, ref: docs/reference-kafka.md#§4}]}
+  - {id: read-p2, from: broker-3, to: consumer-2, label: P2 の取得結果, evidence: [{type: doc, ref: docs/reference-kafka.md#§4}]}
+  - {id: commit, from: consumer-1, to: broker-2, label: オフセットをコミット, evidence: [{type: doc, ref: docs/reference-kafka.md#§5}]}
+  - {id: elect, from: controller, to: broker-2, label: ログノード 2 を P0 リーダーに選出, evidence: [{type: doc, ref: docs/reference-kafka.md#§6}]}
+  - {id: retry, from: producer, to: broker-2, label: 新リーダーに P0 を再送, evidence: [{type: doc, ref: docs/reference-kafka.md#§6}]}
+  - {id: replicate-after, from: broker-2, to: broker-3, label: 新リーダーから P0 を複製, evidence: [{type: doc, ref: docs/reference-kafka.md#§6}]}
 scenarios:
   - id: kafka-normal
     label: 書き込みから消費まで
@@ -107,3 +100,27 @@ fileLayout:
         - {id: seg2-index, label: .index, bytes: 1258291, kind: index, node: broker-1, description: "オフセット → .log 内の位置の疎な索引。指定オフセットから読むときに使う。", sample: "offset 1048576 → position 0\noffset 1052672 → position 4194304\noffset 1056768 → position 8392011\n…（約 4 KB ごとに 1 件）"}
         - {id: seg2-time, label: .timeindex, bytes: 1887437, kind: index, node: broker-1, description: "タイムスタンプ → オフセットの索引。時刻を指定した巻き戻しや、時間による保持期限の判定に使う。"}
 blocks: [{"id":"rebalance","title":"Consumer Group のパーティション担当","legend":{},"note":"6 パーティションの Topic を同じ Consumer Group で読む例。","lanes":[{"id":"c1","label":"Consumer 1","node":"consumer-1"},{"id":"c2","label":"Consumer 2","node":"consumer-2"},{"id":"c3","label":"Consumer 3","node":"consumer-2","optional":true}],"items":{"c1":[{"id":"p0","label":"P0","k":0,"note":"パーティション 0"},{"id":"p1","label":"P1","k":1,"note":"パーティション 1"},{"id":"p2","label":"P2","k":2,"note":"パーティション 2"}],"c2":[{"id":"p3","label":"P3","k":3,"note":"パーティション 3"},{"id":"p4","label":"P4","k":4,"note":"パーティション 4"},{"id":"p5","label":"P5","k":5,"note":"パーティション 5"}]}},{"id":"replicas","title":"P0 の複製（各 Broker のログ）","legend":{"0":"複製済みのバッチ","4":"新リーダーが受けたバッチ"},"note":"Broker 3 は遅れていて ISR から外れている例。数値は説明用。","lanes":[{"id":"b1","label":"Broker 1","sub":"リーダー","node":"broker-1"},{"id":"b2","label":"Broker 2","sub":"フォロワー（ISR）","node":"broker-2"},{"id":"b3","label":"Broker 3","sub":"フォロワー（遅れ・ISR 外）","node":"broker-3"}],"items":{"b1":[{"id":"b1@1","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 1 の複製）"},{"id":"b2@1","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 1 の複製）"},{"id":"b3@1","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 1 の複製）"},{"id":"b4@1","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 1 の複製）"},{"id":"b5@1","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 1 の複製）"},{"id":"b6@1","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 1 の複製）"}],"b2":[{"id":"b1@2","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 2 の複製）"},{"id":"b2@2","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 2 の複製）"},{"id":"b3@2","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 2 の複製）"},{"id":"b4@2","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 2 の複製）"},{"id":"b5@2","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 2 の複製）"},{"id":"b6@2","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 2 の複製）"}],"b3":[{"id":"b1@3","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 3 の複製）"},{"id":"b2@3","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 3 の複製）"},{"id":"b3@3","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 3 の複製）"},{"id":"b4@3","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 3 の複製）"}]}}]
+
+implementations:
+  - id: kraft
+    label: "分離 KRaft クォーラムの Kafka"
+    description: "Kafka のデータブローカー群と KRaft コントローラー群を別プロセスにする例。図の P0・P1・P2 は注文トピックの分割で、トピック設定とコンシューマーグループは別に管理する。"
+    sources:
+      - {title: Apache Kafka Design, url: https://kafka.apache.org/44/design/design/}
+      - {title: Apache Kafka Protocol, url: https://kafka.apache.org/44/design/protocol/}
+      - {title: KRaft, url: https://kafka.apache.org/44/operations/kraft/}
+      - {title: Producer Configs, url: https://kafka.apache.org/44/configuration/producer-configs/}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [16, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      kraft-producer: {label: KafkaProducer, kind: client, tier: processing, x: 1, y: 1.15, realizes: [producer], description: 注文キーに基づく対象パーティションへレコードを送る。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+      kraft-controllers: {label: KRaft コントローラー群, kind: service, tier: processing, x: 1, y: 3.65, realizes: [controller], description: 専用プロセスでメタデータログのクォーラムを構成する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+      kraft-b1: {label: Kafka Broker 1, kind: db, tier: processing, x: 5, y: 1.15, realizes: [broker-1], description: P0 の最初のリーダーを担当する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+      kraft-b2: {label: Kafka Broker 2, kind: db, tier: processing, x: 5, y: 3.65, realizes: [broker-2], description: P1 のリーダーと P0 のフォロワーとして開始する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+      kraft-b3: {label: Kafka Broker 3, kind: db, tier: processing, x: 9, y: 1.15, realizes: [broker-3], description: P2 のリーダーと P0 のフォロワーとして開始する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+      kraft-c1: {label: KafkaConsumer 1, kind: client, tier: processing, x: 9, y: 3.65, realizes: [consumer-1], description: 同じ group.id でパーティションを分担する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+      kraft-c2: {label: KafkaConsumer 2, kind: client, tier: processing, x: 13, y: 1.15, realizes: [consumer-2], description: グループ内で割り当てられた分割を読む。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+      kraft-topic: {label: orders のトピック設定, kind: file, tier: setup, x: 1, y: 1.5, description: この例では 3 パーティション・複製係数 3 とし、書き込み時の確認は acks と min.insync.replicas の組み合わせで決まる。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
+    links:
+      - {id: kraft-topic-connection, from: kraft-topic, to: kraft-controllers, label: トピック設定を管理}

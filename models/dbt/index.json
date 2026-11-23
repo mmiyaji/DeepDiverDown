@@ -2,8 +2,8 @@
   "model": "dbt",
   "name": "dbt の ELT アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "raw": {
@@ -13,57 +13,57 @@
     },
     "project": {
       "type": "node",
-      "label": "dbt project",
+      "label": "変換プロジェクト",
       "status": "claim"
     },
     "dag": {
       "type": "node",
-      "label": "Model DAG",
+      "label": "モデルの依存グラフ",
       "status": "claim"
     },
     "compute": {
       "type": "node",
-      "label": "Warehouse compute",
+      "label": "SQL の実行エンジン",
       "status": "claim"
     },
     "staging": {
       "type": "node",
-      "label": "Staging models",
+      "label": "整形済み中間データ",
       "status": "claim"
     },
     "mart": {
       "type": "link",
-      "label": "Staging models → Analytics mart",
+      "label": "整形済み中間データ → 分析用の成果物",
       "status": "claim"
     },
     "tests": {
       "type": "node",
-      "label": "dbt tests",
+      "label": "データの品質検査",
       "status": "claim"
     },
     "input": {
       "type": "link",
-      "label": "Raw table → dbt project",
+      "label": "Raw table → 変換プロジェクト",
       "status": "claim"
     },
     "graph": {
       "type": "link",
-      "label": "dbt project → Model DAG",
+      "label": "変換プロジェクト → モデルの依存グラフ",
       "status": "claim"
     },
     "execute": {
       "type": "link",
-      "label": "Model DAG → Warehouse compute",
+      "label": "モデルの依存グラフ → SQL の実行エンジン",
       "status": "claim"
     },
     "stage": {
       "type": "link",
-      "label": "Warehouse compute → Staging models",
+      "label": "SQL の実行エンジン → 整形済み中間データ",
       "status": "claim"
     },
     "check": {
       "type": "link",
-      "label": "Analytics mart → dbt tests",
+      "label": "分析用の成果物 → データの品質検査",
       "status": "claim"
     },
     "build": {
@@ -85,6 +85,39 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実行環境、スケジュール、テスト定義は未確定。"
+    },
+    "core-postgres-runner": {
+      "type": "implementation",
+      "impl": "core-postgres",
+      "label": "CI 上の dbt Core と dbt-postgres",
+      "realizes": [
+        "project",
+        "dag",
+        "tests"
+      ]
+    },
+    "core-postgres-pg": {
+      "type": "implementation",
+      "impl": "core-postgres",
+      "label": "PostgreSQL の SQL と三つのスキーマ",
+      "realizes": [
+        "raw",
+        "compute",
+        "staging",
+        "mart"
+      ]
+    },
+    "core-postgres-profile": {
+      "type": "implementation",
+      "impl": "core-postgres",
+      "label": "profiles.yml の接続プロファイル",
+      "realizes": []
+    },
+    "core-postgres-manifest": {
+      "type": "implementation",
+      "impl": "core-postgres",
+      "label": "manifest.json",
+      "realizes": []
     }
   },
   "byRef": {
@@ -107,7 +140,11 @@
       "check",
       "build",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "core-postgres-runner",
+      "core-postgres-pg",
+      "core-postgres-profile",
+      "core-postgres-manifest"
     ],
     "docs/reference-dbt.md#§6": [
       "model"
@@ -134,11 +171,19 @@
     ],
     "docs/reference-dbt.md#§5": [
       "build"
+    ],
+    "docs/reference-dbt.md#§7": [
+      "core-postgres-runner",
+      "core-postgres-pg",
+      "core-postgres-profile",
+      "core-postgres-manifest"
     ]
   },
   "reference": {
     "category": "変換とオーケストレーション",
     "order": 10,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "SQLモデルと依存関係を追う。",
       "実行と品質テストを区別する。",

@@ -2,8 +2,8 @@
   "model": "apache-iceberg",
   "name": "Apache Iceberg の基本アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "engine": {
@@ -85,6 +85,53 @@
     "remove-orphans": {
       "type": "scenario",
       "label": "孤立ファイルを掃除する"
+    },
+    "spark-minio-spark": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "Spark SQL・Iceberg Runtime",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "spark-minio-meta": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "MinIO の metadata.json と Snapshot",
+      "realizes": [
+        "metadata",
+        "snapshot"
+      ]
+    },
+    "spark-minio-list": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "MinIO の Manifest List",
+      "realizes": [
+        "list"
+      ]
+    },
+    "spark-minio-manifests": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "MinIO の Manifest",
+      "realizes": [
+        "manifest"
+      ]
+    },
+    "spark-minio-parquet": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "MinIO の Parquet",
+      "realizes": [
+        "data"
+      ]
+    },
+    "spark-minio-rest": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "REST Catalog コンテナ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -111,7 +158,13 @@
       "expire-snapshots",
       "snapshot-read",
       "partition-evolution",
-      "remove-orphans"
+      "remove-orphans",
+      "spark-minio-spark",
+      "spark-minio-meta",
+      "spark-minio-list",
+      "spark-minio-manifests",
+      "spark-minio-parquet",
+      "spark-minio-rest"
     ],
     "docs/reference-apache-iceberg.md#§2": [
       "metadata",
@@ -141,11 +194,21 @@
     "docs/reference-apache-iceberg.md#§8": [
       "partition-evolution",
       "remove-orphans"
+    ],
+    "docs/reference-apache-iceberg.md#§9": [
+      "spark-minio-spark",
+      "spark-minio-meta",
+      "spark-minio-list",
+      "spark-minio-manifests",
+      "spark-minio-parquet",
+      "spark-minio-rest"
     ]
   },
   "reference": {
     "category": "テーブル形式とカタログ",
     "order": 10,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "テーブルメタデータとスナップショットの関係を説明する。",
       "Manifest List と Manifest を経由してデータファイルを絞り込む流れを追う。",

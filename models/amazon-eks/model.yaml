@@ -22,12 +22,12 @@ tiers:
   - {id: data, label: 利用者アカウントのデータプレーン, z: 0, origin: [0, 8], size: [12, 3]}
 nodes:
   operator: {label: 運用者, kind: actor, tier: interface, x: 1, y: 1.5, role: ops, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
-  api: {label: EKS / Kubernetes API, kind: service, svc: aws:eks, tier: control, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§2}]}
-  managed: {label: Managed node group, kind: worker, svc: aws:eks, tier: data, x: 5, y: 1.5, description: EKS がライフサイクルを自動化する EC2 ノードグループ。, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§3}]}
-  workload: {label: Deployment / Pods, kind: service, svc: k8s:deployment, tier: data, x: 8, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
-  lb: {label: Load Balancer / Service, kind: lb, svc: aws:elb, tier: edge, x: 9, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
-  registry: {label: Amazon ECR, kind: external, svc: aws:ecr, tier: edge, x: 3, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
-  observer: {label: CloudWatch / operator, kind: external, svc: aws:cloudwatch, tier: interface, x: 7, y: 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§5}]}
+  api: {label: マネージド制御 API, kind: service, tier: control, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§2}]}
+  managed: {label: アプリ用の管理対象ノード群, kind: worker, tier: data, x: 5, 'y': 1.5, description: 実行ノード群を管理し、更新時に順次置換する。, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§3}]}
+  workload: {label: 注文 API の実行単位, kind: service, tier: data, x: 8, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  lb: {label: アプリ公開・振り分け, kind: lb, tier: edge, x: 9, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  registry: {label: コンテナイメージの保管, kind: external, tier: edge, x: 3, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
+  observer: {label: 実行状態の監視, kind: monitor, tier: interface, x: 7, 'y': 1.5, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§5}]}
 links:
   - {id: submit, from: operator, to: api, label: API で desired state を送る, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
   - {id: schedule, from: api, to: managed, label: Pod をスケジュール, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§4}]}
@@ -50,3 +50,169 @@ requirements:
   - {id: NFR-01, kind: nfr, title: ドレイン付き置換, text: ノード更新・障害時に Pod をドレインして新ノードへ置換する。, links: [replace], evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§5}]}
 unknowns:
   - {id: UNK-01, text: 実際の AWS リージョン、AZ、ノード数、インスタンスタイプ、PDB、IAM/VPC 設定は未確定。, refs: [managed, workload]}
+implementations:
+  - id: aws
+    label: EKS Managed Node Group と ALB
+    description: AWS の EKS クラスタで、プライベートサブネットの Managed Node Group に注文 API を置き、Ingress で公開する例。
+    sources:
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: Application Load Balancers on EKS
+        url: https://docs.aws.amazon.com/eks/latest/userguide/alb-ingress.html
+      - title: CloudWatch Observability EKS add-on
+        url: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/install-CloudWatch-Observability-EKS-addon.html
+    tiers:
+      - id: interface
+        label: 利用・管理
+        z: 2
+        origin:
+          - -1
+          - 0
+      - id: edge
+        label: 公開境界
+        z: 1
+        origin:
+          - 0
+          - 0
+      - id: control
+        label: EKS コントロールプレーン
+        z: 1
+        origin:
+          - 0
+          - 4
+      - id: data
+        label: 利用者アカウントのデータプレーン
+        z: 0
+        origin:
+          - 0
+          - 8
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - control
+          - data
+          - edge
+          - interface
+        nodes:
+          - aws-api
+          - aws-managed
+          - aws-workload
+          - aws-lb
+          - aws-registry
+          - aws-observer
+          - aws-controller
+      - kind: vpc
+        label: 顧客 VPC
+        provider: aws
+        tier:
+          - data
+          - edge
+        nodes:
+          - aws-managed
+          - aws-workload
+          - aws-lb
+          - aws-controller
+    nodes:
+      aws-operator:
+        label: kubectl と IAM の運用ロール
+        kind: actor
+        tier: interface
+        realizes:
+          - operator
+        description: 権限を割り当てた AWS IAM プリンシパルでクラスタを操作する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      aws-api:
+        label: Amazon EKS マネージド制御プレーン
+        kind: service
+        tier: control
+        svc: eks
+        realizes:
+          - api
+        description: Kubernetes の API と制御プロセスを AWS が管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      aws-managed:
+        label: Managed Node Group の EC2
+        kind: worker
+        tier: data
+        svc: ec2
+        realizes:
+          - managed
+        description: アプリ用 EC2 を複数 AZ のプライベートサブネットに配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      aws-workload:
+        label: 注文 API Deployment / Pod
+        kind: service
+        tier: data
+        svc: k8s:deployment
+        realizes:
+          - workload
+        description: ALB から Pod の IP をターゲットにできる。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      aws-lb:
+        label: Application Load Balancer
+        kind: lb
+        tier: edge
+        svc: alb
+        realizes:
+          - lb
+        description: Ingress が定義したルールで注文 API への到達経路を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      aws-registry:
+        label: Amazon ECR リポジトリ
+        kind: external
+        tier: edge
+        svc: ecr
+        realizes:
+          - registry
+        description: 注文 API のイメージを格納し、ノードが pull する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      aws-observer:
+        label: CloudWatch Container Insights
+        kind: monitor
+        tier: interface
+        svc: cloudwatch
+        realizes:
+          - observer
+        description: Observability アドオン経由で集める実行状態を表示する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      aws-controller:
+        label: AWS Load Balancer Controller
+        kind: workflow
+        tier: data
+        description: Ingress を監視し、ALB とターゲット登録を調整する。
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+    links:
+      - id: aws-watch-ingress
+        from: aws-api
+        to: aws-controller
+        label: Ingress を監視
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      - id: aws-create-load-balancer
+        from: aws-controller
+        to: aws-lb
+        label: ALB とターゲットを調整
+        realizes: [expose]
+        evidence:
+          - type: doc
+            ref: docs/reference-amazon-eks.md#§9
+      - {id: aws-request, from: aws-lb, to: aws-workload, label: 登録された Pod IP へ HTTP を転送, realizes: [expose], replace: true, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§9}]}

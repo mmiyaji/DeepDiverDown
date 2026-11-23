@@ -2,73 +2,128 @@
   "model": "aws-glue",
   "name": "AWS Glue の基本アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "source": {
       "type": "node",
-      "label": "データソース（S3 等）",
+      "label": "変換前のデータ置き場",
       "status": "claim"
     },
     "crawler": {
       "type": "node",
-      "label": "Glue Crawler",
+      "label": "入力スキーマの発見",
       "status": "claim"
     },
     "catalog": {
       "type": "link",
-      "label": "Glue Crawler → Glue Data Catalog",
+      "label": "入力スキーマの発見 → テーブルの定義台帳",
       "status": "claim"
     },
     "trigger": {
       "type": "link",
-      "label": "Trigger / Workflow → Glue ETL Job",
+      "label": "処理の起動と依存制御 → 抽出・変換の実行",
       "status": "claim"
     },
     "job": {
       "type": "node",
-      "label": "Glue ETL Job",
+      "label": "抽出・変換の実行",
       "status": "claim"
     },
     "target": {
       "type": "node",
-      "label": "分析用ターゲット",
+      "label": "分析データの保存先",
       "status": "claim"
     },
     "monitor": {
       "type": "node",
-      "label": "Logs / Monitoring",
+      "label": "実行ログと監視",
       "status": "claim"
     },
     "crawl": {
       "type": "link",
-      "label": "データソース（S3 等） → Glue Crawler",
+      "label": "変換前のデータ置き場 → 入力スキーマの発見",
       "status": "claim"
     },
     "metadata": {
       "type": "link",
-      "label": "Glue Data Catalog → Glue ETL Job",
+      "label": "テーブルの定義台帳 → 抽出・変換の実行",
       "status": "claim"
     },
     "process": {
       "type": "link",
-      "label": "データソース（S3 等） → Glue ETL Job",
+      "label": "変換前のデータ置き場 → 抽出・変換の実行",
       "status": "claim"
     },
     "load": {
       "type": "link",
-      "label": "Glue ETL Job → 分析用ターゲット",
+      "label": "抽出・変換の実行 → 分析データの保存先",
       "status": "claim"
     },
     "observe": {
       "type": "link",
-      "label": "Glue ETL Job → Logs / Monitoring",
+      "label": "抽出・変換の実行 → 実行ログと監視",
       "status": "claim"
     },
     "catalog-etl": {
       "type": "scenario",
       "label": "Catalog から分析用データへ"
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon S3 の raw・curated プレフィックス",
+      "realizes": [
+        "source",
+        "target"
+      ]
+    },
+    "aws-crawler": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue Crawler",
+      "realizes": [
+        "crawler"
+      ]
+    },
+    "aws-catalog": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue Data Catalog",
+      "realizes": [
+        "catalog"
+      ]
+    },
+    "aws-workflow": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue Workflow と Trigger",
+      "realizes": [
+        "trigger"
+      ]
+    },
+    "aws-spark": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue Spark ETL ジョブ",
+      "realizes": [
+        "job"
+      ]
+    },
+    "aws-logs": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon CloudWatch Logs",
+      "realizes": [
+        "monitor"
+      ]
+    },
+    "aws-role": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue の IAM 実行ロール",
+      "realizes": []
     }
   },
   "byRef": {
@@ -93,7 +148,14 @@
       "process",
       "load",
       "observe",
-      "catalog-etl"
+      "catalog-etl",
+      "aws-s3",
+      "aws-crawler",
+      "aws-catalog",
+      "aws-workflow",
+      "aws-spark",
+      "aws-logs",
+      "aws-role"
     ],
     "docs/reference-aws-glue.md#§2": [
       "catalog",
@@ -114,11 +176,22 @@
     ],
     "docs/reference-aws-glue.md#§6": [
       "catalog-etl"
+    ],
+    "docs/reference-aws-glue.md#§7": [
+      "aws-s3",
+      "aws-crawler",
+      "aws-catalog",
+      "aws-workflow",
+      "aws-spark",
+      "aws-logs",
+      "aws-role"
     ]
   },
   "reference": {
     "category": "変換とオーケストレーション",
     "order": 30,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Crawler と Data Catalog の役割を区別する。",
       "AWS Glue Job がサーバーレス実行環境で抽出・変換・ロードする流れを追う。",

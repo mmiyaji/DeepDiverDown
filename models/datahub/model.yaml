@@ -38,7 +38,7 @@ tiers:
       - 13
       - 3
   - id: datahub
-    label: DataHub
+    label: メタデータ処理と検索画面
     z: 1
     size:
       - 13
@@ -95,7 +95,7 @@ nodes:
       - type: doc
         ref: docs/reference-datahub.md#§2
   gms:
-    label: Metadata Service（GMS）
+    label: メタデータ API
     kind: service
     tier: datahub
     x: 5
@@ -258,3 +258,138 @@ requirements:
     evidence:
       - type: doc
         ref: docs/reference-datahub.md#§5
+implementations:
+  - id: datahub-compose
+    label: DataHub の Docker Compose
+    description: DataHub を自己管理し、MySQL、Elasticsearch、イベントブローカーをコンテナで分ける例。
+    sources:
+      - title: Metadata Ingestion Architecture
+        url: https://docs.datahub.com/docs/architecture/metadata-ingestion
+      - title: The Metadata Model
+        url: https://docs.datahub.com/docs/metadata-modeling/metadata-model
+      - title: Data Contract Metamodel
+        url: https://archive.docs.datahub.com/docs/1.8.0/generated/metamodel/entities/datacontract
+      - title: DataHub Docker Container Architecture
+        url: https://archive.docs.datahub.com/docs/1.2.0/architecture/docker-containers
+    nodes:
+      datahub-compose-warehouse:
+        label: Snowflake と dbt モデル
+        kind: external
+        tier: people
+        x: 1
+        y: 1
+        description: スキーマと変換情報を提供する。
+        realizes:
+          - source
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-assertions:
+        label: dbt テスト結果
+        kind: worker
+        tier: people
+        x: 5
+        y: 1
+        description: 既存のテスト結果を assertion として取り込む。
+        realizes:
+          - test
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-user:
+        label: 分析担当者・資産所有者
+        kind: actor
+        tier: people
+        x: 10
+        y: 1
+        description: ブラウザーで資産と検証結果を確認する。
+        realizes:
+          - user
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-cli:
+        label: DataHub Ingestion CLI
+        kind: worker
+        tier: datahub
+        x: 1
+        y: 1
+        description: ソースのレシピを実行し HTTP で GMS に送る。
+        realizes:
+          - ingest
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-gms:
+        label: datahub-gms
+        kind: service
+        tier: datahub
+        x: 5
+        y: 1
+        description: Entity、Aspect、関係を扱う。
+        realizes:
+          - gms
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-ui:
+        label: datahub-frontend-react
+        kind: catalog
+        tier: datahub
+        x: 10
+        y: 1
+        description: 検索と資産詳細・リネージを提供する。
+        realizes:
+          - portal
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-mysql:
+        label: MySQL
+        kind: db
+        tier: stores
+        x: 5
+        y: 1
+        description: バージョン付き Aspect を保存する。
+        realizes:
+          - meta-store
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-search:
+        label: Elasticsearch
+        kind: db
+        tier: stores
+        x: 10
+        y: 1
+        description: 検索と関係クエリを支える。
+        realizes:
+          - index
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-kafka:
+        label: Kafka ブローカー
+        kind: service
+        tier: stores
+        x: 1
+        y: 1
+        description: メタデータ変更や索引更新の処理を支える。
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+    links:
+      - id: datahub-compose-metadata-change
+        from: datahub-compose-gms
+        to: datahub-compose-kafka
+        label: メタデータ変更を送る
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      - id: datahub-compose-index-change
+        from: datahub-compose-kafka
+        to: datahub-compose-search
+        label: 変更を受けて索引に反映
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7

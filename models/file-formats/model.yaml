@@ -18,26 +18,26 @@ tiers:
   - {id: row, label: 行指向・テキスト, z: 1, size: [14, 3]}
   - {id: col, label: 列指向, z: 0, size: [14, 3]}
 nodes:
-  source: {label: Source / Events, kind: external, tier: compute, x: 0, y: 1.5, description: 外部システム、Kafka、CDC などの生データの出どころ。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
-  converter: {label: Ingest / Convert Job, kind: worker, tier: compute, x: 5, y: 1.5, parallel: N, description: 着地した CSV・Avro を読み、Parquet に変換して分析層に書く。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§9"}]}
-  engine: {label: Query Engine, kind: worker, tier: compute, x: 10, y: 1.5, parallel: N, slots: 4, description: Parquet・ORC をフッターと統計で絞って並列に読む。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}, {type: doc, ref: "docs/reference-file-formats.md#§4"}]}
-  dataframe: {label: DataFrame / Python, kind: service, tier: compute, x: 14, y: 1.5, description: Pandas・Polars・DuckDB など Arrow で受け取る処理系。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
+  source: {label: 元の業務イベント, kind: external, tier: compute, x: 0, y: 1.5, description: 外部システムから届く元の業務イベント。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§7}]}
+  converter: {label: 取り込みと形式変換, kind: worker, tier: compute, x: 5, 'y': 1.5, parallel: 'N', description: 着地した CSV・Avro を読み、Parquet に変換して分析層に書く。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§9}]}
+  engine: {label: 分析ファイルの照会, kind: worker, tier: compute, x: 10, 'y': 1.5, parallel: 'N', slots: 4, description: Parquet・ORC をフッターと統計で絞って並列に読む。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§3}, {type: doc, ref: docs/reference-file-formats.md#§4}]}
+  dataframe: {label: Python の列データ利用側, kind: service, tier: compute, x: 14, y: 1.5, description: 表データを列バッファの形で受け取る分析処理。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§6}]}
   csv: {label: CSV / JSON Lines, kind: db, tier: row, x: 1, y: 1.5, description: "スキーマ・統計なしのテキスト。ファイル全体の gzip は分割できない。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
   avro: {drill: avro-internals, label: Avro, kind: db, tier: row, x: 5, y: 1.5, partitions: 4, description: "ヘッダーにスキーマ、ブロックごとに圧縮、16 バイトの同期マーカーで分割可能。スキーマ進化に強い。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
   parquet: {drill: parquet-internals, label: Parquet, kind: db, shape3D: crate, tier: col, x: 2, y: 1.5, partitions: 4, description: "Row Group → 列チャンク → ページ。末尾フッターに位置と統計、ページ索引・ブルームフィルターも持てる。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}]}
   orc: {drill: orc-internals, label: ORC, kind: db, shape3D: crate, tier: col, x: 7, y: 1.5, partitions: 4, description: "Stripe → Index/Row Data。ファイル・Stripe・10,000 行ごとの 3 段の統計。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§4"}]}
-  arrow: {label: Arrow IPC / Feather, kind: cache, tier: col, x: 12, y: 1.5, description: メモリ配置そのままの列指向。デコード不要・ゼロコピーで処理系間を受け渡す。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
+  arrow: {label: Arrow IPC / Feather, kind: cache, tier: col, x: 12, y: 1.5, description: メモリの列配置を明示し、対応する環境ではバッファのコピーを避けて渡せる。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§6}]}
 links:
-  - {id: land-csv, from: source, to: csv, label: テキストで着地, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
-  - {id: land-avro, from: source, to: avro, label: 行単位で追記, sync: false, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
-  - {id: parse, from: converter, to: csv, label: パース・型推論, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
-  - {id: decode-avro, from: converter, to: avro, label: スキーマ解決して読む, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
-  - {id: write-parquet, from: converter, to: parquet, label: 列指向に変換して書く, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§9"}]}
-  - {id: scan-parquet, from: engine, to: parquet, label: フッター→統計→必要な列, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}]}
-  - {id: scan-orc, from: engine, to: orc, label: Stripe と行グループ索引で絞る, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§4"}]}
-  - {id: to-arrow, from: engine, to: arrow, label: Arrow で受け渡し, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
-  - {id: zero-copy, from: dataframe, to: arrow, label: ゼロコピーで読む, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
-  - {id: gzip-scan, from: engine, to: csv, label: gzip 全体は 1 タスクで読む, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}, {type: doc, ref: "docs/reference-file-formats.md#§8"}]}
+  - {id: land-csv, from: source, to: csv, label: テキストで着地, evidence: [{type: doc, ref: docs/reference-file-formats.md#§7}]}
+  - {id: land-avro, from: source, to: avro, label: 行単位で追記, sync: false, evidence: [{type: doc, ref: docs/reference-file-formats.md#§5}]}
+  - {id: parse, from: converter, to: csv, label: パース・型推論, evidence: [{type: doc, ref: docs/reference-file-formats.md#§7}]}
+  - {id: decode-avro, from: converter, to: avro, label: スキーマ解決して読む, evidence: [{type: doc, ref: docs/reference-file-formats.md#§5}]}
+  - {id: write-parquet, from: converter, to: parquet, label: 列指向に変換して書く, evidence: [{type: doc, ref: docs/reference-file-formats.md#§9}]}
+  - {id: scan-parquet, from: engine, to: parquet, label: フッター→統計→必要な列, evidence: [{type: doc, ref: docs/reference-file-formats.md#§3}]}
+  - {id: scan-orc, from: engine, to: orc, label: Stripe と行グループ索引で絞る, evidence: [{type: doc, ref: docs/reference-file-formats.md#§4}]}
+  - {id: to-arrow, from: engine, to: arrow, label: Arrow で受け渡し, evidence: [{type: doc, ref: docs/reference-file-formats.md#§6}]}
+  - {id: zero-copy, from: dataframe, to: arrow, label: 対応するバッファを条件付きで共有, evidence: [{type: doc, ref: docs/reference-file-formats.md#§6}]}
+  - {id: gzip-scan, from: engine, to: csv, label: gzip 全体は 1 タスクで読む, evidence: [{type: doc, ref: docs/reference-file-formats.md#§7}, {type: doc, ref: docs/reference-file-formats.md#§8}]}
 scenarios:
   - id: analytic-scan
     label: 列指向ファイルを分析スキャンする
@@ -71,3 +71,29 @@ requirements:
 unknowns:
   - {id: UNK-01, text: 実際のエンジン、各形式の版と既定コーデック、Row Group／Stripe サイズは未確定。, refs: [engine, converter, parquet, orc]}
 gates: {maxDrift: 0, maxHigh: 0}
+
+implementations:
+  - id: spark-pyarrow
+    label: "Apache Spark のファイル変換と PyArrow IPC"
+    description: "注文データの取り込み、分析ファイルへの変換、Python への受け渡しを Apache Spark と PyArrow で試す例。各形式は別用途のサンプルで、全データを毎回すべての形式に複製する必要はない。"
+    sources:
+      - {title: Apache Parquet File Format, url: https://parquet.apache.org/docs/file-format/}
+      - {title: Apache ORC Specification v1, url: https://orc.apache.org/specification/ORCv1/}
+      - {title: Apache Avro Specification, url: https://avro.apache.org/docs/current/specification/}
+      - {title: Apache Arrow Columnar Format, url: https://arrow.apache.org/docs/format/Columnar.html}
+      - {title: Spark Avro Data Source Guide, url: https://spark.apache.org/docs/latest/sql-data-sources-avro.html}
+      - {title: Apache Arrow in PySpark, url: https://spark.apache.org/docs/latest/api/python/tutorial/sql/arrow_pandas.html}
+      - {title: 'Apache Arrow streaming, serialization, and IPC', url: https://arrow.apache.org/docs/python/ipc.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      spark-pyarrow-source: {label: 注文アプリの入力イベント, kind: external, tier: processing, x: 1, y: 1.15, realizes: [source], description: CSV・JSON Lines または Avro で例示用のイベントを用意する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-landing: {label: 共有保存先の CSV・JSON Lines・Avro, kind: file, tier: processing, x: 1, y: 3.65, realizes: [csv, avro], description: 交換用のテキストまたはスキーマ付きの Avro コンテナを保持する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-spark: {label: Spark SQL のデータソースと照会, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [converter, engine], description: 型を解決し、Parquet に書いて、Parquet と ORC のサンプルを別々に SQL で読む。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-columnar: {label: Parquet と ORC の分析ファイル, kind: file, tier: processing, x: 5, y: 3.65, realizes: [parquet, orc], description: それぞれのファイル形式に沿って列を保持する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-python: {label: PySpark Driver 上の PyArrow, kind: worker, tier: processing, x: 9, y: 1.15, realizes: [dataframe], description: 小サイズの結果を toArrow で Table として取得する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-ipc: {label: Arrow IPC / Feather の受け渡しファイル, kind: file, tier: processing, x: 9, y: 3.65, realizes: [arrow], description: PyArrow で書き出し、対応する読み手が受け取る。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-avro: {label: Spark Avro データソースのモジュール, kind: file, tier: setup, x: 1, y: 1.5, description: Avro 入力を使う環境では Spark と Scala に対応するモジュールを用意する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+    links:
+      - {id: spark-pyarrow-avro-connection, from: spark-pyarrow-avro, to: spark-pyarrow-spark, label: Avro データソースを利用}

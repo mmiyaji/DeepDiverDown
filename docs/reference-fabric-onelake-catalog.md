@@ -27,3 +27,22 @@ Secure でワークスペースロールと OneLake セキュリティロール�
 ## 5. シナリオの見方
 
 「認定済みレポートの上流を確認する」では、Explore から資産の認定や由来を確認する。「制限付きのデータを読む」では、ワークスペースと資産の権限を管理し、対応エンジンがクエリ時に行・列の制限を適用する。
+
+## 6. 実装例：OneLake・SQL 分析エンドポイント
+
+OneLake catalog を使い、Fabric の Lakehouse と関連レポートを検索し、クエリ時に細かな権限を適用する例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| データ利用者 | レポートを探す分析担当者 | 認定、上流、利用条件を確認する。 |
+| 管理者・所有者 | Fabric ワークスペース管理者 | 資産の認定とユーザーの権限を設定する。 |
+| 資産の発見・ガバナンス状態の管理・アクセス権限の管理 | OneLake catalog（Explore・Govern・Secure） | 発見、運用状況、ロール管理を統合した入口。 |
+| 分析アセット | Power BI レポートと Lakehouse | 探す対象のレポートと、基になるテーブルを持つ。 |
+| ドメイン・ワークスペース | Fabric ドメイン・ワークスペース | アイテムの整理とワークスペースロールの範囲。 |
+| データアクセスロール | OneLake Security | テーブルの行・列のアクセスを Entra ID に結び付ける。 |
+| 対応クエリエンジン | SQL 分析エンドポイント | ユーザー ID の実効権限でクエリを実行する。 |
+| 実装で追加 | Microsoft Entra ID | 利用者・グループの ID を認証する。 |
+
+SQL 分析エンドポイントはユーザー ID アクセスモードにする。行・列のアクセス制御を適用したテーブルは、エンジンの対応範囲や認証モードを確認する。サードパーティーの認可済みエンジン経由は公開プレビュー。
+
+[OneLake Catalog Overview](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)、[OneLake Catalog Item Details](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-item-details)、[Secure Your Fabric Data](https://learn.microsoft.com/en-us/fabric/governance/secure-your-data)、[Read Data Secured with OneLake Security](https://learn.microsoft.com/en-us/fabric/onelake/security/read-secured-data)、[OneLake security overview](https://learn.microsoft.com/en-us/fabric/onelake/security/fabric-onelake-security)

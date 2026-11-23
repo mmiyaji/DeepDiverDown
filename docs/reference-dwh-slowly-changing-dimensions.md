@@ -25,3 +25,21 @@
 
 - [Kimball Group の Slowly Changing Dimension 技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)
 - [Power BI の SCD ガイダンス](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)
+
+## 5. 実装例 PostgreSQL の顧客属性履歴
+
+顧客の現在値と履歴を別テーブルで保持し、遅れて届いた注文を発生日時点の顧客属性に結び付ける実装例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 顧客 C42 の移転 | landing.customer_changes | 顧客の業務キーと新しい地区、変更発生時刻を受け取る。 |
+| 履歴を反映する変換 | 顧客履歴更新トランザクション | 旧履歴の終了と新規履歴の追加を更新処理の同じトランザクションで行う。 |
+| Type 1 現在行 | dim_customer_current | 顧客業務キーを主キーとし、現在地区だけを上書きする。 |
+| Type 2 の有効期間 | dim_customer_history | 版ごとの代理キーと半開区間の有効期間を持つ。 |
+| 遅れて届いた注文明細 | landing.order_line_updates | 注文明細の注文日と顧客業務キーを保持する。 |
+| 明細ファクト | fact_order_line | 注文発生時刻の有効期間を照合し、該当する顧客の代理キーを外部キーに持つ。 |
+| 地域別売上 | 地域別売上 SQL ビュー | 現在地区の見方と注文時点の地区の見方を別々に用意する。 |
+
+区間は開始を含み終了を含まない形で統一する。後着の顧客履歴が過去を変更する場合は、その有効期間に入るファクトの参照キーも再確認する。
+
+出典 [Kimball Group の Slowly Changing Dimension 技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[Power BI の SCD ガイダンス](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)、[PostgreSQL CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)

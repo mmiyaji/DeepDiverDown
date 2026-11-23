@@ -2,18 +2,18 @@
   "model": "parquet-internals",
   "name": "Parquet ファイルの内部：フッターからページまで",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "reader": {
       "type": "node",
-      "label": "Parquet Reader",
+      "label": "列データの読み取り役",
       "status": "claim"
     },
     "decoder": {
       "type": "node",
-      "label": "Decompress / Decode",
+      "label": "列データの解凍・復号",
       "status": "claim"
     },
     "magic": {
@@ -58,12 +58,12 @@
     },
     "read-tail": {
       "type": "link",
-      "label": "Parquet Reader → Footer length + \"PAR1\"",
+      "label": "列データの読み取り役 → Footer length + \"PAR1\"",
       "status": "claim"
     },
     "read-footer": {
       "type": "link",
-      "label": "Parquet Reader → Footer (FileMetaData)",
+      "label": "列データの読み取り役 → Footer (FileMetaData)",
       "status": "claim"
     },
     "prune-rg": {
@@ -73,7 +73,7 @@
     },
     "read-index": {
       "type": "link",
-      "label": "Parquet Reader → Bloom / Column / Offset Index",
+      "label": "列データの読み取り役 → Bloom / Column / Offset Index",
       "status": "claim"
     },
     "select-chunk": {
@@ -83,7 +83,7 @@
     },
     "fetch-chunk": {
       "type": "link",
-      "label": "Parquet Reader → Column Chunks",
+      "label": "列データの読み取り役 → Column Chunks",
       "status": "claim"
     },
     "chunk-dict": {
@@ -98,17 +98,17 @@
     },
     "decode": {
       "type": "link",
-      "label": "Decompress / Decode → Data Pages",
+      "label": "列データの解凍・復号 → Data Pages",
       "status": "claim"
     },
     "dict-lookup": {
       "type": "link",
-      "label": "Decompress / Decode → Dictionary Page",
+      "label": "列データの解凍・復号 → Dictionary Page",
       "status": "claim"
     },
     "to-decoder": {
       "type": "link",
-      "label": "Parquet Reader → Decompress / Decode",
+      "label": "列データの読み取り役 → 列データの解凍・復号",
       "status": "claim"
     },
     "open-file": {
@@ -138,6 +138,36 @@
     "UNK-01": {
       "type": "unknown",
       "label": "書き手のバージョン、ページ索引とブルームフィルターの有無、Row Group とページのサイズは未確定。"
+    },
+    "trino-hive-trino": {
+      "type": "implementation",
+      "impl": "trino-hive",
+      "label": "Trino Worker の Parquet Reader",
+      "realizes": [
+        "reader",
+        "decoder"
+      ]
+    },
+    "trino-hive-file": {
+      "type": "implementation",
+      "impl": "trino-hive",
+      "label": "S3 上の Parquet オブジェクト",
+      "realizes": [
+        "magic",
+        "rowgroup",
+        "colchunk",
+        "indexes",
+        "footer",
+        "tail",
+        "dictpage",
+        "datapage"
+      ]
+    },
+    "trino-hive-catalog": {
+      "type": "implementation",
+      "impl": "trino-hive",
+      "label": "Hive カタログの読取設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -171,7 +201,10 @@
       "prune-and-read",
       "point-lookup",
       "PQ-01",
-      "PQ-02"
+      "PQ-02",
+      "trino-hive-trino",
+      "trino-hive-file",
+      "trino-hive-catalog"
     ],
     "docs/reference-parquet-internals.md#§6": [
       "model",
@@ -219,11 +252,19 @@
     ],
     "docs/reference-parquet-internals.md#§8": [
       "open-file"
+    ],
+    "docs/reference-parquet-internals.md#§9": [
+      "trino-hive-trino",
+      "trino-hive-file",
+      "trino-hive-catalog"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 28,
+    "category": "ファイル形式",
+    "order": 11,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "file-formats",
     "objectives": [
       "Parquet のバイト配置（先頭マジック、Row Group、索引、フッター、フッター長、末尾マジック）を説明する。",
       "末尾からフッターを読み、統計・ブルームフィルター・ページ索引で読む範囲を絞る順序を追う。",

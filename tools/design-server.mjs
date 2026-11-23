@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ROOT } from './load.mjs';
+import { NODE_KINDS } from '../js/node-kinds.js';
 
 const string = { type: 'string' };
 const choice = (...values) => ({ type: 'string', enum: values });
@@ -16,7 +17,7 @@ const schema = object({
   unknowns: array(string),
   question: string,
   requirements: array(object({ id: string, title: string, kind: choice('usecase', 'rule', 'nfr'), text: string, nodes: array(string), links: array(string), quote: string })),
-  nodes: array(object({ id: string, label: string, kind: choice('actor', 'client', 'cdn', 'external', 'lb', 'service', 'worker', 'db', 'queue', 'cache'),
+  nodes: array(object({ id: string, label: string, kind: choice(...Object.keys(NODE_KINDS)),
     tier: string, description: string, replicas: integer, az: array(string), subnet: string, quote: string })),
   links: array(object({ id: string, from: string, to: string, sync: { type: 'boolean' }, label: string, timeoutMs: integer, retry: integer, quote: string })),
 });
@@ -120,7 +121,7 @@ createServer(async (req, res) => {
     if (pathname === '/api/design-interview') return await interview(req, res);
     const file = pathname === '/' ? '/index.html' : pathname;
     if (!['GET', 'HEAD'].includes(req.method) ||
-        !/^\/(?:index\.html$|(?:css|js|vendor|models|docs|icons)\/)/.test(file) ||
+        !/^\/(?:(?:index|research|objects)\.html$|README\.md$|(?:css|js|vendor|models|docs|icons)\/)/.test(file) ||
         /[\\:]/.test(file) || file.split('/').some(part => part.startsWith('.'))) {
       return send(res, 404, { error: 'ファイルが見つかりません。' });
     }

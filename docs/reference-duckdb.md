@@ -51,3 +51,25 @@ DuckDB は Parquet に既に保存された行グループ単位の列統計を�
 - [DuckDB Querying Parquet Metadata](https://duckdb.org/docs/current/data/parquet/metadata)
 - [DuckDB EXPLAIN](https://duckdb.org/docs/stable/guides/meta/explain)
 - [DuckDB Profiling](https://duckdb.org/docs/current/dev/profiling)
+
+## 7. 実装例：Python に組み込む DuckDB と Parquet
+
+Python プロセス内の DuckDB がローカルの orders.parquet を直接読む例。必要な列と行グループを絞り、データの読取と性能の観測は同じ埋め込みエンジンで行う。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 検索 SQL と計画の確認 | Python の DuckDB 接続 | duckdb.connect で作った接続から SQL を実行する。 |
+| 読取の最適化、Parquet スキャン、結果の投影、実行時の観測 | 同じプロセスの DuckDB エンジン | read_parquet へ述語と列要求を渡し、EXPLAIN ANALYZE で実行を観測する。 |
+| フッター統計、行グループ、列チャンク | ローカルの orders.parquet | フッターと列チャンクを持ち、直接読み取れる。 |
+
+実装で加わる部品を以下に示す。
+
+- parquet_metadata の診断用 SQL。日付と顧客 ID の min/max を確認して候補グループの説明に使う。
+
+公式資料
+
+- [DuckDB Reading and Writing Parquet Files](https://duckdb.org/docs/data/parquet)
+- [DuckDB Querying Parquet Metadata](https://duckdb.org/docs/current/data/parquet/metadata)
+- [DuckDB EXPLAIN](https://duckdb.org/docs/stable/guides/meta/explain)
+- [DuckDB Profiling](https://duckdb.org/docs/current/dev/profiling)
+- [DuckDB Python API](https://duckdb.org/docs/stable/clients/python/overview)

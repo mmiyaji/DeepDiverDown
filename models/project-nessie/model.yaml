@@ -28,7 +28,7 @@ tiers:
       - 10
       - 3
   - id: catalog
-    label: Nessie のカタログ状態
+    label: バージョン管理カタログ
     z: 1
     size:
       - 12
@@ -293,3 +293,95 @@ treeLayout:
             kind: data
             node: contents
             sub: 顧客 C1
+implementations:
+  - id: nessie-local
+    label: Spark・Nessie・MinIO
+    description: 公式のローカル Iceberg REST ガイドに沿って Spark と MinIO を接続し、作業ブランチを試す例。
+    sources:
+      - title: Nessie Specification
+        url: https://projectnessie.org/develop/spec/
+      - title: Configure Nessie with Iceberg REST
+        url: https://projectnessie.org/guides/iceberg-rest/
+      - title: Getting Started with Nessie and Iceberg REST
+        url: https://projectnessie.org/guides/try-nessie/
+    nodes:
+      nessie-local-spark:
+        label: Spark SQL
+        kind: client
+        tier: clients
+        x: 7
+        y: 1
+        description: Iceberg REST クライアントからブランチを選ぶ。
+        realizes:
+          - engine
+        evidence:
+          - type: doc
+            ref: docs/reference-project-nessie.md#§6
+      nessie-local-cli:
+        label: 運用者の Nessie CLI
+        kind: actor
+        tier: clients
+        x: 2
+        y: 1
+        description: ブランチの作成とマージを行う。
+        realizes:
+          - operator
+        evidence:
+          - type: doc
+            ref: docs/reference-project-nessie.md#§6
+      nessie-local-server:
+        label: Nessie Server
+        kind: service
+        tier: catalog
+        x: 8
+        y: 1
+        description: REST 接続、参照とコンテンツキーの解決を担う。
+        realizes:
+          - api
+          - refs
+          - contents
+        evidence:
+          - type: doc
+            ref: docs/reference-project-nessie.md#§6
+      nessie-local-history:
+        label: Nessie インメモリ Version Store
+        kind: db
+        tier: catalog
+        x: 5
+        y: 2
+        description: 試行用のコミット履歴をプロセス内に保存する。
+        realizes:
+          - version-store
+        evidence:
+          - type: doc
+            ref: docs/reference-project-nessie.md#§6
+      nessie-local-minio:
+        label: MinIO（S3 互換）
+        kind: db
+        tier: storage
+        x: 7
+        y: 1
+        description: warehouse に Iceberg メタデータとデータを置く。
+        realizes:
+          - files
+        evidence:
+          - type: doc
+            ref: docs/reference-project-nessie.md#§6
+      nessie-local-warehouse:
+        label: warehouse 設定
+        kind: file
+        tier: storage
+        x: 2
+        y: 1
+        description: オブジェクトストレージの接続先とテーブルの既定位置を定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-project-nessie.md#§6
+    links:
+      - id: nessie-local-bind
+        from: nessie-local-warehouse
+        to: nessie-local-server
+        label: warehouse を選べるように設定
+        evidence:
+          - type: doc
+            ref: docs/reference-project-nessie.md#§6

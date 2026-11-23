@@ -41,3 +41,19 @@ BigQuery のストレージは管理サービスで、分析向けの列指向�
 - [Introduction to the resource hierarchy](https://cloud.google.com/bigquery/docs/resource-hierarchy)
 - [Query plan and timeline](https://cloud.google.com/bigquery/docs/query-plan-explanation)
 - [Overview of BigQuery analytics](https://cloud.google.com/bigquery/docs/query-overview)
+
+## 9. 実装例 BigQuery と Cloud Storage の受注分析
+
+Cloud Storage から同一ロケーションの BigQuery データセットへロードし、分析プロジェクトのクエリに予約を割り当てる例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| ジョブ実行クライアント | bq CLI とロードジョブ | 受注ファイルの URI と出力テーブル名を指定する。 |
+| SQL 計画とステージ分割 | BigQuery ジョブとクエリ計画 | ジョブを受け付け、クエリのステージを作る。 |
+| BI 利用者 | BI 利用者 | 分析プロジェクトの資格情報でクエリする。 |
+| 分析テーブルの名前空間・管理された列指向ストレージ | BigQuery sales データセットと管理表 | ロケーションを設定し、受注データを BigQuery の管理ストレージに保持する。 |
+| 並列クエリ実行枠・分散シャッフル | BigQuery の分析用予約と実行 | 分析プロジェクトにクエリジョブの予約割当を付け、実行時のステージとシャッフルはクエリ計画で確認する。 |
+
+容量予約と分析用の割当は入力 CSV の保存や管理表と独立して設定する。データセットのロケーションと予約の割当要件をそろえる。シャッフルはクエリ計画から観測する。
+
+出典 [BigQuery overview](https://cloud.google.com/bigquery/docs/introduction)、[Overview of BigQuery storage](https://cloud.google.com/bigquery/docs/storage_overview)、[Introduction to the resource hierarchy](https://cloud.google.com/bigquery/docs/resource-hierarchy)、[Query plan and timeline](https://cloud.google.com/bigquery/docs/query-plan-explanation)、[Overview of BigQuery analytics](https://cloud.google.com/bigquery/docs/query-overview)、[BigQuery のワークロード管理](https://docs.cloud.google.com/bigquery/docs/reservations-intro)、[Cloud Storage の CSV をロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)

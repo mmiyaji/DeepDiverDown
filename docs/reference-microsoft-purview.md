@@ -27,3 +27,24 @@
 ## 5. シナリオの見方
 
 既存テナントの注文データ製品を例に、テーブルとジョブの収集、カタログからの発見、承認から権限反映までを追う。図の Microsoft Fabric OneLake catalog は移行先の詳細図を開く入口。
+
+## 6. 実装例：既存 Purview・Azure SQL・Data Factory
+
+稼働中の Purview Data Governance テナントで、Azure SQL Database をスキャンし、Data Factory の入出力を関連付ける例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| データ製品の所有者 | データ製品所有者 | Unified Catalog の製品説明と申請条件を整える。 |
+| データ利用者 | 分析担当者 | 注文データ製品の閲覧・申請を行う。 |
+| 権限付与担当者 | データベースの権限付与担当者 | 承認内容に従い Azure SQL の権限を付ける。 |
+| 登録・スキャン | Purview スキャン | Azure SQL を収集し、Data Map に反映する。 |
+| 資産メタデータ・分類の集約 | Purview Data Map | 自動分類と Data Factory の実行関係を集約する。 |
+| データ製品カタログ・アクセス申請・承認 | Unified Catalog（データ製品・アクセス） | 製品の検索画面に申請と承認の履歴を関連付ける。 |
+| データソース | Azure SQL Database | 注文データを保持し、接続時にアクセス権を評価する。 |
+| 連携するデータ変換基盤 | Azure Data Factory | 対応するアクティビティの入出力を Purview へ送る。 |
+| 後継のガバナンス基盤 | Microsoft Fabric OneLake catalog | 既存サービスの移行先への参照。 |
+| 実装で追加 | Azure Integration Runtime（マネージド VNet） | 閉域ソースへのスキャン経路を提供する。 |
+
+スキャン用 ID に Azure SQL Database の読み取り権限とネットワーク到達性が必要。閉域接続の例ではマネージド仮想ネットワークの Azure Integration Runtime を使う。新規ガバナンスアカウントの作成受付は終了し、サポート終了予定は 2027年11月12日。
+
+[Microsoft Data Governance Strategy Update](https://learn.microsoft.com/partner-center/announcements/2026-november#update-on-the-microsoft-data-governance-strategy)、[Microsoft Purview Data Map Scans and Ingestion](https://learn.microsoft.com/en-us/purview/data-map-scan-ingestion)、[Unified Catalog Data Product Access Policies](https://learn.microsoft.com/en-us/purview/unified-catalog-data-product-access-policies)、[Azure SQL Database の登録とスキャン](https://learn.microsoft.com/en-us/purview/register-scan-azure-sql-database)

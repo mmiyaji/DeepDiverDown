@@ -2,73 +2,73 @@
   "model": "openshift",
   "name": "OpenShift の基本アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "oc": {
       "type": "node",
-      "label": "oc / 利用者",
+      "label": "構成の投入クライアント",
       "status": "claim"
     },
     "api": {
       "type": "node",
-      "label": "OpenShift API",
+      "label": "クラスタ管理 API",
       "status": "claim"
     },
     "controller": {
       "type": "node",
-      "label": "Controller / Scheduler",
+      "label": "レプリカ調整・配置先の決定",
       "status": "claim"
     },
     "kubelet": {
       "type": "node",
-      "label": "worker の kubelet",
+      "label": "ノード実行エージェント",
       "status": "claim"
     },
     "order-api": {
       "type": "node",
-      "label": "注文 API Pod",
+      "label": "注文 API の実行単位",
       "status": "claim"
     },
     "service": {
       "type": "node",
-      "label": "注文 API Service",
+      "label": "注文 API の内部公開",
       "status": "claim"
     },
     "route": {
       "type": "node",
-      "label": "OpenShift Route",
+      "label": "外部公開ルート",
       "status": "claim"
     },
     "apply": {
       "type": "link",
-      "label": "oc / 利用者 → OpenShift API",
+      "label": "構成の投入クライアント → クラスタ管理 API",
       "status": "claim"
     },
     "reconcile": {
       "type": "link",
-      "label": "OpenShift API → Controller / Scheduler",
+      "label": "クラスタ管理 API → レプリカ調整・配置先の決定",
       "status": "claim"
     },
     "schedule": {
       "type": "link",
-      "label": "Controller / Scheduler → worker の kubelet",
+      "label": "レプリカ調整・配置先の決定 → ノード実行エージェント",
       "status": "claim"
     },
     "start": {
       "type": "link",
-      "label": "worker の kubelet → 注文 API Pod",
+      "label": "ノード実行エージェント → 注文 API の実行単位",
       "status": "claim"
     },
     "service-route": {
       "type": "link",
-      "label": "OpenShift Route → 注文 API Service",
+      "label": "外部公開ルート → 注文 API の内部公開",
       "status": "claim"
     },
     "route-pod": {
       "type": "link",
-      "label": "注文 API Service → 注文 API Pod",
+      "label": "注文 API の内部公開 → 注文 API の実行単位",
       "status": "claim"
     },
     "worker-loss": {
@@ -79,6 +79,61 @@
     "deploy-order-api": {
       "type": "scenario",
       "label": "OpenShift に注文 API を公開"
+    },
+    "ocp-oc": {
+      "type": "implementation",
+      "impl": "ocp",
+      "label": "oc CLI",
+      "realizes": [
+        "oc"
+      ]
+    },
+    "ocp-api": {
+      "type": "implementation",
+      "impl": "ocp",
+      "label": "OpenShift コントロールプレーン",
+      "realizes": [
+        "api",
+        "controller"
+      ]
+    },
+    "ocp-kubelet": {
+      "type": "implementation",
+      "impl": "ocp",
+      "label": "RHCOS worker の kubelet / CRI-O",
+      "realizes": [
+        "kubelet"
+      ]
+    },
+    "ocp-order-api": {
+      "type": "implementation",
+      "impl": "ocp",
+      "label": "注文 API Deployment / Pod",
+      "realizes": [
+        "order-api"
+      ]
+    },
+    "ocp-service": {
+      "type": "implementation",
+      "impl": "ocp",
+      "label": "注文 API の ClusterIP Service",
+      "realizes": [
+        "service"
+      ]
+    },
+    "ocp-route": {
+      "type": "implementation",
+      "impl": "ocp",
+      "label": "TLS Route と HAProxy Router",
+      "realizes": [
+        "route"
+      ]
+    },
+    "ocp-dns": {
+      "type": "implementation",
+      "impl": "ocp",
+      "label": "apps ドメインのワイルドカード DNS",
+      "realizes": []
     }
   },
   "byRef": {
@@ -101,7 +156,14 @@
       "service-route",
       "route-pod",
       "worker-loss",
-      "deploy-order-api"
+      "deploy-order-api",
+      "ocp-oc",
+      "ocp-api",
+      "ocp-kubelet",
+      "ocp-order-api",
+      "ocp-service",
+      "ocp-route",
+      "ocp-dns"
     ],
     "docs/reference-openshift.md#§2": [
       "model",
@@ -135,11 +197,22 @@
     ],
     "docs/reference-openshift.md#§6": [
       "model"
+    ],
+    "docs/reference-openshift.md#§7": [
+      "ocp-oc",
+      "ocp-api",
+      "ocp-kubelet",
+      "ocp-order-api",
+      "ocp-service",
+      "ocp-route",
+      "ocp-dns"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
+    "category": "Kubernetes 系",
     "order": 20,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "OpenShift の API、Controller、Scheduler、Route の役割を区別する。",
       "注文 API を Deployment から Pod にし、Service と Route で公開する流れを追う。",

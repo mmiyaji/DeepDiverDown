@@ -2,83 +2,83 @@
   "model": "apache-airflow",
   "name": "Apache Airflow のワークフローアーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "dag": {
       "type": "node",
-      "label": "DAG",
+      "label": "作業手順の依存グラフ",
       "status": "claim"
     },
     "scheduler": {
       "type": "node",
-      "label": "Scheduler",
+      "label": "スケジューラー",
       "status": "claim"
     },
     "executor": {
       "type": "node",
-      "label": "Executor",
+      "label": "タスクの配布",
       "status": "claim"
     },
     "worker": {
       "type": "node",
-      "label": "Worker",
+      "label": "タスクの実行プロセス",
       "status": "claim"
     },
     "metadata": {
       "type": "node",
-      "label": "Metadata DB",
+      "label": "実行メタデータの保存先",
       "status": "claim"
     },
     "ingest": {
       "type": "node",
-      "label": "Raw ingest",
+      "label": "元データの取り込み",
       "status": "claim"
     },
     "transform": {
       "type": "node",
-      "label": "Transform",
+      "label": "データ変換",
       "status": "claim"
     },
     "quality": {
       "type": "node",
-      "label": "Quality check",
+      "label": "品質検査",
       "status": "claim"
     },
     "schedule": {
       "type": "link",
-      "label": "DAG → Scheduler",
+      "label": "作業手順の依存グラフ → スケジューラー",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "Scheduler → Executor",
+      "label": "スケジューラー → タスクの配布",
       "status": "claim"
     },
     "dispatch": {
       "type": "link",
-      "label": "Executor → Worker",
+      "label": "タスクの配布 → タスクの実行プロセス",
       "status": "claim"
     },
     "run-ingest": {
       "type": "link",
-      "label": "Worker → Raw ingest",
+      "label": "タスクの実行プロセス → 元データの取り込み",
       "status": "claim"
     },
     "run-transform": {
       "type": "link",
-      "label": "Raw ingest → Transform",
+      "label": "元データの取り込み → データ変換",
       "status": "claim"
     },
     "run-quality": {
       "type": "link",
-      "label": "Transform → Quality check",
+      "label": "データ変換 → 品質検査",
       "status": "claim"
     },
     "state": {
       "type": "link",
-      "label": "Worker → Metadata DB",
+      "label": "タスクの実行プロセス → 実行メタデータの保存先",
       "status": "claim"
     },
     "pipeline": {
@@ -100,6 +100,60 @@
     "UNK-01": {
       "type": "unknown",
       "label": "Executor種別、Worker台数、リトライ回数は未確定。"
+    },
+    "celery-redis-dag": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Python の DAG ファイル",
+      "realizes": [
+        "dag"
+      ]
+    },
+    "celery-redis-scheduler": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Airflow Scheduler と CeleryExecutor",
+      "realizes": [
+        "scheduler",
+        "executor"
+      ]
+    },
+    "celery-redis-worker": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Airflow Celery Worker と三つの業務タスク",
+      "realizes": [
+        "worker",
+        "ingest",
+        "transform",
+        "quality"
+      ]
+    },
+    "celery-redis-api": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Airflow API Server の Execution API",
+      "realizes": [
+        "metadata"
+      ]
+    },
+    "celery-redis-db": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "PostgreSQL メタデータ DB",
+      "realizes": []
+    },
+    "celery-redis-processor": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Airflow DAG Processor",
+      "realizes": []
+    },
+    "celery-redis-redis": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Redis Celery ブローカー",
+      "realizes": []
     }
   },
   "byRef": {
@@ -125,7 +179,14 @@
       "state",
       "pipeline",
       "BR-01",
-      "NFR-01"
+      "NFR-01",
+      "celery-redis-dag",
+      "celery-redis-scheduler",
+      "celery-redis-worker",
+      "celery-redis-api",
+      "celery-redis-db",
+      "celery-redis-processor",
+      "celery-redis-redis"
     ],
     "docs/reference-apache-airflow.md#§6": [
       "model"
@@ -155,11 +216,22 @@
       "run-ingest",
       "run-quality",
       "pipeline"
+    ],
+    "docs/reference-apache-airflow.md#§7": [
+      "celery-redis-dag",
+      "celery-redis-scheduler",
+      "celery-redis-worker",
+      "celery-redis-api",
+      "celery-redis-db",
+      "celery-redis-processor",
+      "celery-redis-redis"
     ]
   },
   "reference": {
     "category": "変換とオーケストレーション",
     "order": 20,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "DAGとTaskの依存関係を読む。",
       "SchedulerとExecutorを区別する。",

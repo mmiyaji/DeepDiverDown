@@ -15,17 +15,17 @@ sources: [docs/reference-temporal.md]
 evidence: [{type: doc, ref: "docs/reference-temporal.md#§1"}]
 tiers:
   - {id: "entry", label: "注文受付", z: 3, size: [16,4], kind: "origin"}
-  - {id: "service", label: "Temporal Service", z: 2, size: [16,4]}
+  - {id: "service", label: "実行制御と永続化", z: 2, size: [16,4]}
   - {id: "worker", label: "実行 Worker", z: 1, size: [16,4]}
   - {id: "outside", label: "副作用の記録先", z: 0, size: [16,4]}
 nodes:
   order: {label: "注文 API", kind: "client", tier: "entry", x: 3, y: 1.5, description: "注文を受け付け、注文 Workflow を開始する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§1"}]}
-  service: {label: "Temporal Service", kind: "service", tier: "service", x: 2, y: 1.5, description: "コマンドを受けタスク管理と Event History の永続化を行う。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
-  history: {label: "Event History", kind: "db", tier: "service", x: 7, y: 1.5, description: "Workflow の進行をイベントとして保持する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
-  queue: {label: "Workflow / Activity Task Queue", kind: "queue", tier: "service", x: 12, y: 1.5, description: "Workflow Task と Activity Task の取得先を図上でまとめて示す。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
-  workflow-a: {label: "Workflow Worker A", kind: "worker", tier: "worker", x: 2, y: 1.5, description: "注文 Workflow を最初に処理する Worker。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
-  workflow-b: {label: "Workflow Worker B", kind: "worker", tier: "worker", x: 7, y: 1.5, description: "A の停止後、履歴から Workflow の状態を再構築する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
-  activity: {label: "決済 Activity Worker", kind: "worker", tier: "worker", x: 12, y: 1.5, description: "決済 API を呼び、Activity の完了を報告する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§4"}]}
+  service: {label: 実行履歴・タスクの制御, kind: workflow, tier: service, x: 2, 'y': 1.5, description: コマンドを受けタスク管理と Event History の永続化を行う。, evidence: [{type: doc, ref: docs/reference-temporal.md#§2}]}
+  history: {label: 永続的な実行履歴, kind: db, tier: service, x: 7, 'y': 1.5, description: Workflow の進行をイベントとして保持する。, evidence: [{type: doc, ref: docs/reference-temporal.md#§2}]}
+  queue: {label: ワークフロー・アクティビティの作業待ち行列, kind: queue, tier: service, x: 12, 'y': 1.5, description: Workflow Task と Activity Task の取得先を図上でまとめて示す。, evidence: [{type: doc, ref: docs/reference-temporal.md#§2}]}
+  workflow-a: {label: 注文処理の実行担当 A, kind: worker, tier: worker, x: 2, 'y': 1.5, description: 注文 Workflow を最初に処理する Worker。, evidence: [{type: doc, ref: docs/reference-temporal.md#§3}]}
+  workflow-b: {label: 注文処理の実行担当 B, kind: worker, tier: worker, x: 7, 'y': 1.5, description: A の停止後、履歴から Workflow の状態を再構築する。, evidence: [{type: doc, ref: docs/reference-temporal.md#§3}]}
+  activity: {label: 決済処理の実行担当, kind: worker, tier: worker, x: 12, 'y': 1.5, description: 決済 API を呼び、Activity の完了を報告する。, evidence: [{type: doc, ref: docs/reference-temporal.md#§4}]}
   payment: {label: "外部決済 API", kind: "external", tier: "outside", x: 12, y: 1.5, description: "同一操作キーで既存の決済を再利用する架空の API。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§5"}]}
 links:
   - {id: "start", from: "order", to: "service", label: "注文 Workflow を開始", evidence: [{type: doc, ref: "docs/reference-temporal.md#§1"}]}
@@ -93,3 +93,135 @@ blocks:
     - {id: history, label: Event History, node: history}
     - {id: payment, label: 外部決済 API, node: payment}
   items: {history: [], payment: []}
+implementations:
+  - id: temporal
+    label: 自己管理 Temporal と PostgreSQL
+    description: Kubernetes の Temporal Service と PostgreSQL を使い、注文処理の Worker と決済 Worker を別のワークロードで実行する例。
+    sources:
+      - title: Self-hosted Temporal Service
+        url: https://docs.temporal.io/self-hosted-guide
+      - title: Temporal Visibility setup
+        url: https://docs.temporal.io/self-hosted-guide/visibility
+      - title: Temporal Task Queues
+        url: https://docs.temporal.io/task-queue
+    tiers:
+      - id: entry
+        label: 注文受付
+        z: 3
+        kind: origin
+      - id: service
+        label: Temporal Service
+        z: 2
+      - id: worker
+        label: 実行 Worker
+        z: 1
+      - id: outside
+        label: 副作用の記録先
+        z: 0
+    groups:
+      - kind: cluster
+        label: Temporal を実行する Kubernetes クラスタ
+        provider: k8s
+        tier:
+          - entry
+          - service
+          - worker
+        nodes:
+          - temporal-order
+          - temporal-service
+          - temporal-workflow-a
+          - temporal-workflow-b
+          - temporal-activity
+    nodes:
+      temporal-order:
+        label: Temporal SDK を使う注文 API
+        kind: client
+        tier: entry
+        svc: k8s:deployment
+        realizes:
+          - order
+        description: Temporal Workflow を開始する。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+      temporal-service:
+        label: Temporal Server の Frontend・History・Matching
+        kind: workflow
+        tier: service
+        realizes:
+          - service
+          - queue
+        description: SDK の要求を受け、履歴と Task Queue を同じ運用境界内で管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+      temporal-history:
+        label: PostgreSQL の Persistence スキーマ
+        kind: db
+        tier: service
+        svc: onprem:db
+        realizes:
+          - history
+        description: Temporal の永続化先として実行履歴を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+      temporal-workflow-a:
+        label: 注文 Worker Pod A
+        kind: worker
+        tier: worker
+        svc: k8s:deployment
+        realizes:
+          - workflow-a
+        description: orders キューをポーリングして最初の Workflow Task を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+      temporal-workflow-b:
+        label: 注文 Worker Pod B
+        kind: worker
+        tier: worker
+        svc: k8s:deployment
+        realizes:
+          - workflow-b
+        description: 同じ orders キューをポーリングし、必要なら受けた履歴をリプレイする。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+      temporal-activity:
+        label: 決済 Worker Deployment
+        kind: worker
+        tier: worker
+        svc: k8s:deployment
+        realizes:
+          - activity
+        description: payments キューを処理し、決済 API に操作キーを渡す。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+      temporal-payment:
+        label: 外部決済 API（架空）
+        kind: external
+        tier: outside
+        realizes:
+          - payment
+        description: 同一操作キーの再試行に同じ結果を返す契約とする。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+      temporal-visibility:
+        label: PostgreSQL の Visibility スキーマ
+        kind: table
+        tier: service
+        description: Web UI / CLI で実行一覧を絞り込むための参照データを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6
+    links:
+      - id: temporal-index-executions
+        from: temporal-service
+        to: temporal-visibility
+        label: 検索用の実行状態を記録
+        evidence:
+          - type: doc
+            ref: docs/reference-temporal.md#§6

@@ -2,8 +2,8 @@
   "model": "amazon-datazone",
   "name": "Amazon DataZone のデータ公開と購読",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "owner": {
@@ -33,12 +33,12 @@
     },
     "events": {
       "type": "node",
-      "label": "Amazon EventBridge",
+      "label": "承認イベントの配信",
       "status": "claim"
     },
     "glue": {
       "type": "node",
-      "label": "AWS Glue Data Catalog",
+      "label": "ソースのテーブルカタログ",
       "status": "claim"
     },
     "lineage": {
@@ -48,12 +48,12 @@
     },
     "lake": {
       "type": "node",
-      "label": "AWS Lake Formation",
+      "label": "データレイクの権限制御",
       "status": "claim"
     },
     "athena": {
       "type": "node",
-      "label": "Athena・購読の環境",
+      "label": "購読環境・クエリエンジン",
       "status": "claim"
     },
     "external": {
@@ -63,7 +63,7 @@
     },
     "import": {
       "type": "link",
-      "label": "AWS Glue Data Catalog → プロジェクトのインベントリ",
+      "label": "ソースのテーブルカタログ → プロジェクトのインベントリ",
       "status": "claim"
     },
     "curate": {
@@ -98,22 +98,22 @@
     },
     "managed-grant": {
       "type": "link",
-      "label": "購読・権限付与処理 → AWS Lake Formation",
+      "label": "購読・権限付与処理 → データレイクの権限制御",
       "status": "claim"
     },
     "query": {
       "type": "link",
-      "label": "Athena・購読の環境 → AWS Lake Formation",
+      "label": "購読環境・クエリエンジン → データレイクの権限制御",
       "status": "claim"
     },
     "publish-event": {
       "type": "link",
-      "label": "購読・権限付与処理 → Amazon EventBridge",
+      "label": "購読・権限付与処理 → 承認イベントの配信",
       "status": "claim"
     },
     "custom-grant": {
       "type": "link",
-      "label": "Amazon EventBridge → 外部処理・非管理対象ソース",
+      "label": "承認イベントの配信 → 外部処理・非管理対象ソース",
       "status": "claim"
     },
     "report": {
@@ -123,7 +123,7 @@
     },
     "managed-subscription": {
       "type": "scenario",
-      "label": "Glue 資産を公開して Athena で使う"
+      "label": "データレイクの資産を公開して利用する"
     },
     "unmanaged-subscription": {
       "type": "scenario",
@@ -134,6 +134,86 @@
       "kind": "rule",
       "label": "申請と実際の付与を追跡すること",
       "status": "claim"
+    },
+    "aws-datalake-publisher": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "提供側 DataZone プロジェクト",
+      "realizes": [
+        "owner"
+      ]
+    },
+    "aws-datalake-subscriber": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "購読側 DataZone プロジェクト",
+      "realizes": [
+        "consumer"
+      ]
+    },
+    "aws-datalake-portal": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "Amazon DataZone（ドメイン・ポータル）",
+      "realizes": [
+        "inventory",
+        "published",
+        "subscription"
+      ]
+    },
+    "aws-datalake-eventbridge": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "Amazon EventBridge",
+      "realizes": [
+        "events"
+      ]
+    },
+    "aws-datalake-glue": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "AWS Glue Data Catalog",
+      "realizes": [
+        "glue"
+      ]
+    },
+    "aws-datalake-job": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "AWS Glue Spark ETL",
+      "realizes": [
+        "lineage"
+      ]
+    },
+    "aws-datalake-lakeformation": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "AWS Lake Formation",
+      "realizes": [
+        "lake"
+      ]
+    },
+    "aws-datalake-athena": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "Amazon Athena ワークグループ",
+      "realizes": [
+        "athena"
+      ]
+    },
+    "aws-datalake-custom": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "外部の購読処理",
+      "realizes": [
+        "external"
+      ]
+    },
+    "aws-datalake-blueprint": {
+      "type": "implementation",
+      "impl": "aws-datalake",
+      "label": "DefaultDataLake ブループリント",
+      "realizes": []
     }
   },
   "byRef": {
@@ -167,7 +247,17 @@
       "report",
       "managed-subscription",
       "unmanaged-subscription",
-      "R-01"
+      "R-01",
+      "aws-datalake-publisher",
+      "aws-datalake-subscriber",
+      "aws-datalake-portal",
+      "aws-datalake-eventbridge",
+      "aws-datalake-glue",
+      "aws-datalake-job",
+      "aws-datalake-lakeformation",
+      "aws-datalake-athena",
+      "aws-datalake-custom",
+      "aws-datalake-blueprint"
     ],
     "docs/reference-amazon-datazone.md#§2": [
       "owner",
@@ -207,6 +297,18 @@
     "docs/reference-amazon-datazone.md#§6": [
       "managed-subscription",
       "unmanaged-subscription"
+    ],
+    "docs/reference-amazon-datazone.md#§7": [
+      "aws-datalake-publisher",
+      "aws-datalake-subscriber",
+      "aws-datalake-portal",
+      "aws-datalake-eventbridge",
+      "aws-datalake-glue",
+      "aws-datalake-job",
+      "aws-datalake-lakeformation",
+      "aws-datalake-athena",
+      "aws-datalake-custom",
+      "aws-datalake-blueprint"
     ]
   },
   "reference": {

@@ -15,11 +15,11 @@ tiers:
   - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[12.5,4.5]}
 nodes:
   source: {"label":"受注イベント","kind":"external","tier":"flow","x":0,"y":2,"description":"注文IDと明細ID、売上を取り込む。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]}
-  fact: {"label":"fact_order_line","kind":"db","tier":"flow","x":6,"y":2,"description":"一行を一注文の一明細とする。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]}
-  date: {"label":"dim_date","kind":"db","tier":"flow","x":3,"y":0,"description":"日付とカレンダー属性。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
-  customer: {"label":"dim_customer","kind":"db","tier":"flow","x":6,"y":0,"description":"顧客の説明属性。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
-  product: {"label":"dim_product","kind":"db","tier":"flow","x":9,"y":0,"description":"商品とカテゴリを引く。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
-  tag: {"label":"商品と販促タグの関係","kind":"db","tier":"flow","x":11,"y":4,"description":"1商品に複数タグがある。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§4"}]}
+  fact: {"label":"受注明細ファクト","kind":"table","tier":"flow","x":6,"y":2,"description":"一行を一注文の一明細とする。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]}
+  date: {"label":"日付ディメンション","kind":"table","tier":"flow","x":3,"y":0,"description":"日付とカレンダー属性。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  customer: {"label":"顧客ディメンション","kind":"table","tier":"flow","x":6,"y":0,"description":"顧客の説明属性。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  product: {"label":"商品ディメンション","kind":"table","tier":"flow","x":9,"y":0,"description":"商品とカテゴリを引く。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  tag: {"label":"商品と販促タグの関係","kind":"table","tier":"flow","x":11,"y":4,"description":"1商品に複数タグがある。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§4"}]}
   bi: {"label":"BI／集計結果","kind":"client","tier":"flow","x":12,"y":2,"description":"月・顧客・カテゴリ別に集計。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§3"}]}
 links:
   - {"id":"load","from":"source","to":"fact","label":"明細の粒度でロード","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]}
@@ -46,3 +46,28 @@ scenarios:
       - {"links":["guard","report"],"note":"対象タグを持つ商品の集合として明細を絞り、元の粒度で集計する。"}
 requirements:
   - {"id":"REQ-1","kind":"usecase","title":"売上を注文明細から再現する","text":"明細金額の合計と注文IDの件数を区別する。","scenario":"sales","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§3"}]}
+
+implementations:
+  - id: bq-order-star
+    label: "BigQuery の受注明細スタースキーマ"
+    description: "注文明細を日付でパーティション化し、同じ商品に付いた販促タグでファクトを絞り込む例。"
+    sources:
+      - {title: "Kimball Group の次元モデリング技法", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+      - {title: "Fact Tables and Dimension Tables", url: "https://www.kimballgroup.com/2003/01/fact-tables-and-dimension-tables/"}
+      - {title: "Power BI のスタースキーマ設計", url: "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
+      - {title: "BigQuery パーティション表", url: "https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables"}
+      - {title: "BigQuery 論理ビュー", url: "https://docs.cloud.google.com/bigquery/docs/views-intro"}
+    tiers:
+      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [12.5,4.5]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+    nodes:
+      example-source: {label: "landing.order_events", kind: "table", tier: "flow", x: 0, y: 2, realizes: ["source"], description: "注文 ID と明細 ID の入力イベントを持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+      example-fact: {label: "sales.fact_order_line", kind: "table", tier: "flow", x: 6, y: 2, realizes: ["fact"], description: "注文日でパーティション化し、注文 ID と明細 ID の組を一意にロードする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+      example-date: {label: "sales.dim_date", kind: "table", tier: "flow", x: 3, y: 0, realizes: ["date"], description: "カレンダー属性を日付キーで参照する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+      example-customer: {label: "sales.dim_customer", kind: "table", tier: "flow", x: 6, y: 0, realizes: ["customer"], description: "顧客の属性を顧客キーで参照する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+      example-product: {label: "sales.dim_product", kind: "table", tier: "flow", x: 9, y: 0, realizes: ["product"], description: "商品とカテゴリの属性を商品キーで参照する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+      example-tag: {label: "sales.bridge_product_promo_tag", kind: "table", tier: "flow", x: 11, y: 4, realizes: ["tag"], description: "商品と販促タグの対応を管理し、集計時には対象商品の集合を絞る。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+      example-bi: {label: "sales.monthly_sales SQL ビュー", kind: "table", tier: "flow", x: 12, y: 2, realizes: ["bi"], description: "通貨と期間をそろえて売上を集計する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+      example-validation: {label: "明細粒度の検査クエリ", kind: "monitor", tier: "implementation-setup", x: 1, y: 1.5, description: "重複する明細キーを検出して、集計前にロード結果を確かめる。", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}
+    links:
+      - {id: "example-validation-connection", from: "example-validation", to: "example-fact", label: "一意な明細粒度を検証", evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§5"}]}

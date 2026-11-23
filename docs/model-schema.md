@@ -15,7 +15,7 @@ tiers: [...]                       # 後述
 nodes:
   order:
     label: 注文サービス
-    kind: service                  # client | cdn | lb | service | worker | db | queue | cache | external | actor
+    kind: service                  # 機能上の種別。後述
     shape3D: plug                  # 任意。3D 案1と 2D のシルエット・カード内アイコンの形状を指定（plug | crate）
     tier: app
     x: 3
@@ -37,6 +37,19 @@ unknowns:                          # 確かめられなかったこと。推測�
   - { id: UNK-01, text: Web → 注文 のタイムアウト値が不明, refs: [w2o] }
 gates: { maxDrift: 0, maxHigh: 0 } # 点検のしきい値
 ```
+
+## 部品の種別
+
+`kind` は役割、`svc` は具体的なクラウドサービスや基盤を表す。ビューアの「オブジェクト一覧」で種別、記号、サービスの指定値を確認できる。
+
+| kind | 図で区別するもの |
+|---|---|
+| `actor`・`client`・`external` | 操作する人、要求を送る側、管理範囲外の接続先 |
+| `service`・`worker`・`scheduler`・`host` | 処理や API、実行担当、配置や時刻の制御、実行環境 |
+| `cdn`・`gateway`・`lb` | コンテンツ配信、境界をまたぐ入口、接続の振り分け |
+| `db`・`cache`・`queue` | 永続ストア、一時キャッシュ、処理待ちや順序付きイベント |
+| `catalog`・`table`・`file`・`segment` | 資産の台帳、データの表、個別の成果物、ファイル内の区画 |
+| `policy`・`workflow`・`monitor` | 許可条件、実行順や状態の制御、ログ・メトリクス・トレースの観測 |
 
 ## 確度の判定（js/analyze.js `classify`）
 1. `status` があればそれ
@@ -90,11 +103,11 @@ tiers: [
 `models/registry.json` の登録例
 
 ```json
-{ "id": "spark", "name": "Apache Spark の基本アーキテクチャ", "actual": false, "reference": { "category": "バッチ処理", "order": 10 } }
+{ "id": "spark", "name": "Apache Spark の基本アーキテクチャ", "actual": false, "reference": { "domain": "データ基盤", "kind": "製品・技術のアーキテクチャ", "category": "バッチ・SQL エンジン", "order": 10 } }
 ```
 
 - `name` はモデルを開く前に一覧に出す表示名。設計モデルにも指定でき、省略時は ID を表示する。
-- `category` はサイドバー上の分野名。同じ分野を使うリファレンスは同じ文字列で登録する。分野は登録一覧での初出順。
+- `domain`、`kind`、`category` はサイドバーの領域・種別・分類。同じ分類を使うリファレンスは同じ文字列で登録する。
 - `order` は同じ分野内の表示順。小さい数字から表示し、省略時は末尾に置く。
 - モデル YAML の `reference` には学習目標と公式資料を保持できる。次のフィールドは解説文の根拠を指すトップレベルの `sources` と独立している。
 
@@ -107,7 +120,39 @@ reference:
       url: https://spark.apache.org/docs/latest/cluster-overview.html
 ```
 
-`npm run index` で分野・順序・学習目標・資料リンクも索引に格納する。点検は参照先やモデル形式の確認に使える。運用を想定したルールは、個別の運用環境を定義しない解説モデルにも適用される。
+### 機能配置と実装例（implementations）
+
+リファレンスの `nodes` / `links` は**機能配置**（製品やクラウドに依存しない役割と流れ）として書く。部品がもともと機能の単位なので、設計モデルの「論理構成」は作らない（画面にも出さない）。代わりに、各機能を実際のサービスで組んだ**実装例**を `implementations` に書くと、ビューの一覧に「機能配置」「実装例：AWS」などが並ぶ。
+
+```yaml
+implementations:
+  - id: aws                      # ビュー ID は impl:aws（URL は ?w=impl:aws）
+    label: AWS                   # 一覧に「実装例：AWS」と出す
+    description: RDS・MSK Connect・MSK・Lambda で組む例
+    sources:                     # 必須。サービスの組み合わせの根拠になる公式資料
+      - {title: MSK Connect, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect.html}
+    tiers: [...]                 # 省略時は機能配置のフロア
+    groups:                      # クラウド・リージョン・VPC などの枠。nodes は実装例の部品 ID で書ける
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [flow, control]}
+    nodes:
+      aws-rds: {label: RDS for PostgreSQL, svc: rds, kind: db, tier: flow, x: 0, y: 1.5, realizes: [database, logical], evidence: [...]}
+      aws-plugin: {label: S3（プラグインの zip）, svc: s3, kind: db, tier: control, x: 1, y: 1.5, evidence: [...]}   # realizes なし＝実装で加わる部品
+    links:                       # 実装で加わる接続。機能どうしの接続は自動で写す
+      - {id: aws-load-plugin, from: aws-plugin, to: aws-worker, label: プラグインを読み込む}
+```
+
+- `realizes` は担う機能の部品 ID。1 つの機能を複数のサービスで、複数の機能を 1 つのサービスで担える。機能どうしの接続は、各機能を最初に担う部品どうしの接続に写し、同じ部品の中に収まる接続は消える。シナリオの接続も写した先で光る。
+- 実装の接続に `realizes: [機能配置の接続 ID]` を付けると、そのシナリオのステップで光る。ロードバランサーなどを経由する経路を描く場合は、各区間に同じ接続 ID と `replace: true` を付ける。実装図では自動の直結が消え、指定した区間が光る。
+- **違いが見える実装例にする**：ラベルの言い換えだけにしない。サービスへのまとまり方（例：DB と論理レプリケーションを RDS が担う）、実装で加わる部品（カタログ・認証情報・プラグイン置き場・ログなど）、クラウドの枠とサービスのアイコンを入れる。
+- 部品 ID は機能配置の ID と重ねない（`aws-` などの接頭辞を付ける）。`svc` はカタログ（js/catalog.js）の ID を使い、ない場合はカタログに追加する。
+- 解説（`docs/reference-<id>.md`）に「実装例：AWS」の節を設け、機能と担い手の対応表・加わる部品・公式資料を書き、実装例の部品の `evidence` からその節を参照する。
+- 実装例はあくまで一例として書く。断定せず、別の組み方（自前運用・ほかのクラウド）があれば解説に添える。
+- 点検の `IMPL` が、公式資料の有無・全機能に担い手がいるか・参照先の存在・ID の重なりを確かめる。
+- 製品そのものを解説するリファレンス（Kafka・Spark など）で、製品の役割とプロセス・ノードの配置を描き分けたい場合も、同じ `implementations` で配置例（例：「EKS 上の配置」「MSK」）として書ける。
+
+`npm run index` で登録一覧の分類・順序と、モデル YAML の学習目標・資料リンクを索引に格納する。`npm run index -- --check` は書き込まずに差分を確認する。点検は参照先やモデル形式の確認に使える。運用を想定したルールは、個別の運用環境を定義しない解説モデルにも適用される。
+
+調査一覧に使う `models/research-index.json` も同時に生成する。収録・見直しの履歴を表示するときは、日付とその時点の対象 ID を `models/research-history.json` に登録する。
 
 ## クラウド構成の表現（js/catalog.js）
 - `node.svc` は `gcp:gke`、`azure:aks`、`oci:adb`、`cloudflare:waf`、`onprem:fw`、`k8s:deployment` のように指定する。`ecs` のように接頭辞を省略すると AWS として扱う。
@@ -171,6 +216,9 @@ lead: { label:'テックリード', kind:'actor', role:'approver', team:'決済�
 | `logical` 論理構成（機能配置） | 基盤部品（CDN・LB・NAT・WAF・Route 53・Secrets Manager など）を隠し、通り抜けた接続を機能どうしの接続にする。配置は自動 | 常に |
 | `cloud` 物理構成（サービス） | クラウドサービス単位。クラウド・リージョン・クラスタ・仮想ネットワーク・データセンターの枠。既定 | 常に |
 | `network` 物理構成（ネットワーク） | すべての境界の枠と、複数 AZ の部品を AZ ごとの実体（`ecs@a`）に展開。台数は AZ で割る。AZ をまたぐ接続は黄色 | AZ / サブネット / 名前空間の情報があるとき |
+| `impl:<id>` 実装例 | 機能配置の各機能を、サービスの組み合わせに置き換える（[機能配置と実装例](#機能配置と実装例implementations)） | `implementations` があるとき |
+
+リファレンス（モデル YAML に `reference` があるもの）では、`logical` は `views.logical` を指定したときだけ出し、`cloud` を「機能配置」と表示する（部品にサービスの指定があり実装例がない場合は「物理構成」のまま）。切り替え先が 1 つしかなければ、ビューのプルダウンを出さない。
 
 ```yaml
 groups:

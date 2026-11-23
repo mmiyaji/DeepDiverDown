@@ -2,6 +2,7 @@
  *   logical  論理構成（機能配置）：基盤部品（CDN / LB / NAT / WAF …）を隠し、機能どうしの関係にまとめる
  *   cloud    物理構成（サービス）：クラウドサービス単位。クラウド・クラスタ・仮想ネットワークなどの境界
  *   network  物理構成（ネットワーク）：VPC / AZ / サブネットと、複数 AZ の部品を AZ ごとの実体に展開
+ *   impl:<id> 実装例（リファレンス）：機能配置の各機能を、クラウドサービスなどの組み合わせに置き換える
  * 変換結果は { tiers, groups, nodes, links, from, linkFrom }。from[ビューの部品] = [物理の部品 ID …] */
 (function () {
   const INFRA_KIND = ['cdn', 'lb'];
@@ -13,11 +14,26 @@
     network: { label: '物理構成', sub: 'ネットワーク' },
   };
   const clone = o => JSON.parse(JSON.stringify(o));
+  const IMPL = 'impl:';
+  const implOf = (m, view) => typeof view === 'string' && view.startsWith(IMPL) ? (m.implementations || []).find(i => i.id === view.slice(IMPL.length)) : null;
 
+  /* 使えるビュー。リファレンスは部品がもともと機能の単位なので、自動の論理構成は物理と同じ図になる。
+     そこで「機能配置（モデルそのもの）」と「実装例（implementations）」を並べ、論理は指定があるときだけ出す */
   function available(m) {
-    const v = ['logical', 'cloud'];
-    if ((m.groups || []).some(g => ['az', 'subnet', 'namespace'].includes(g.kind)) || Object.values(m.nodes).some(n => n.az)) v.push('network');
-    return v;
+    const net = (m.groups || []).some(g => ['az', 'subnet', 'namespace'].includes(g.kind)) || Object.values(m.nodes).some(n => n.az);
+    const impls = (m.implementations || []).map(i => IMPL + i.id);
+    const v = m.reference ? [...(m.views?.logical ? ['logical'] : []), 'cloud'] : ['logical', 'cloud'];
+    if (net) v.push('network');
+    return [...v, ...impls];
+  }
+
+  /* ビューの表示名。label（一覧の見出し）・sub（補足）・short（ツールバーに出す今の値） */
+  function info(m, view) {
+    const impl = implOf(m, view);
+    if (impl) return { label: `実装例：${impl.label}`, sub: impl.description || 'サービスの組み合わせ例', short: `実装例：${impl.label}` };
+    if (view === 'cloud' && m.reference && (m.implementations?.length || !Object.values(m.nodes).some(n => n.svc))) return { label: '機能配置', sub: '製品に依存しない役割と流れ', short: '機能配置' };
+    const x = VIEWS[view] || VIEWS.cloud;
+    return { ...x, short: x.label };
   }
 
   /* 物理（サービス）：AZ / サブネット / 名前空間の枠は出さない */
@@ -115,7 +131,47 @@
   }
   function stripPos(n) { delete n.x; delete n.y; return n; }
 
+  /* 実装例（リファレンスの機能配置を、クラウドサービスなどの組み合わせに置き換えた図）
+   *   nodes[実装の部品].realizes = [機能の部品 ID …]。1 つの機能を複数のサービスで、複数の機能を 1 つのサービスで担える
+   *   realizes のない部品は、実装で加わる部品（カタログ・認証情報・監視など）
+   *   機能どうしの接続は、各機能を最初に担う部品どうしの接続に写す（同じ部品の中に収まる接続は消える）
+   *   links には実装で加わる接続を書く。realizes でシナリオに連動し、replace で自動接続を置き換える */
+  function implementation(base, impl) {
+    const nodes = {}, from = {}, main = {};
+    for (const [id, n] of Object.entries(impl.nodes || {})) {
+      const parts = [].concat(n.realizes || []).filter(p => base.nodes[p]);
+      nodes[id] = { ...n, impl: true, realizes: parts };
+      from[id] = parts;
+      for (const p of parts) main[p] ??= id;
+    }
+    // 実装例で担い手が決まっていない機能は、そのまま残す（図から消えないように）
+    for (const [id, n] of Object.entries(base.nodes)) if (!main[id] && !nodes[id]) { nodes[id] = { ...n }; from[id] = [id]; main[id] = id; }
+    const explicit = (impl.links || []).filter(l => nodes[l.from] && nodes[l.to]);
+    const replaced = new Set(explicit.filter(l => l.replace).flatMap(l => l.realizes || []));
+    const agg = {};
+    for (const l of base.links) {
+      if (replaced.has(l.id)) continue;
+      const A = main[l.from], B = main[l.to];
+      if (!A || !B || A === B) continue;
+      const key = `${A}>${B}`, e = agg[key] = agg[key] || { id: `I:${key}`, from: A, to: B, sync: false, ids: [], labels: [] };
+      e.sync ||= !!l.sync; e.ids.push(l.id); if (l.label && !e.labels.includes(l.label)) e.labels.push(l.label);
+    }
+    const links = Object.values(agg).map(e => ({ id: e.id, from: e.from, to: e.to, sync: e.sync, ...(e.labels.length ? { label: e.labels.join(' / ') } : {}) }));
+    const linkFrom = Object.fromEntries(Object.values(agg).map(e => [e.id, e.ids]));
+    for (const l of explicit) {
+      const { realizes, replace, ...rest } = l;
+      links.push({ ...rest, impl: true });
+      linkFrom[l.id] = [].concat(realizes || []).filter(id => base.links.some(x => x.id === id));
+    }
+    const tiers = clone(impl.tiers || base.tiers);
+    const v = { tiers, groups: clone(impl.groups || []), nodes, links, from, linkFrom };
+    window.Layout.apply(v);
+    return v;
+  }
+
   function project(base, m, view) {
+    const impl = implOf(m, view);
+    if (impl) return implementation(base, impl);
     if (view === 'network') return network(base);
     if (view === 'logical') return logical(base, m.views?.logical);
     return cloud(base);
@@ -140,5 +196,5 @@
     return on ? { ...on, packets: s.some(x => x.packets) } : { dim: s.length > 0 && s.every(x => x.dim), dashed: s.find(x => x.dashed)?.dashed };
   }
 
-  window.Views = { VIEWS, available, project, mergeNode, mergeLink, isInfra };
+  window.Views = { VIEWS, available, info, implOf, project, mergeNode, mergeLink, isInfra };
 })();

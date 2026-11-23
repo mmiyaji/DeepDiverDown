@@ -2,8 +2,8 @@
   "model": "apache-paimon",
   "name": "Apache Paimon の主キーテーブル：Flink 更新と変更ログ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "source": {
@@ -13,7 +13,7 @@
     },
     "writer": {
       "type": "node",
-      "label": "Flink / Paimon Sink",
+      "label": "主キーを使うテーブル書き込み",
       "status": "claim"
     },
     "reader": {
@@ -48,12 +48,12 @@
     },
     "ingest": {
       "type": "link",
-      "label": "上流の注文更新 → Flink / Paimon Sink",
+      "label": "上流の注文更新 → 主キーを使うテーブル書き込み",
       "status": "claim"
     },
     "flush": {
       "type": "link",
-      "label": "Flink / Paimon Sink → バケット内の sorted run",
+      "label": "主キーを使うテーブル書き込み → バケット内の sorted run",
       "status": "claim"
     },
     "commit": {
@@ -114,6 +114,76 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実環境の到着順と業務順、ストレージモード、下流の更新要件、コンパクションの時期は未確認。"
+    },
+    "flink-paimon-source": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "Flink SQL Client の試験用 INSERT",
+      "realizes": [
+        "source"
+      ]
+    },
+    "flink-paimon-sink": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "Flink SQL・Paimon Sink",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "flink-paimon-reader": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "Flink のバッチ読み取り",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "flink-paimon-consumer": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "Flink のストリーム SELECT",
+      "realizes": [
+        "consumer"
+      ]
+    },
+    "flink-paimon-runs": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "warehouse 内のバケットファイル",
+      "realizes": [
+        "runs"
+      ]
+    },
+    "flink-paimon-compact": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "Paimon コンパクション",
+      "realizes": [
+        "compact"
+      ]
+    },
+    "flink-paimon-snapshot": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "warehouse の snapshot メタデータ",
+      "realizes": [
+        "snapshots"
+      ]
+    },
+    "flink-paimon-changes": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "Paimon の lookup Changelog",
+      "realizes": [
+        "changelog"
+      ]
+    },
+    "flink-paimon-config": {
+      "type": "implementation",
+      "impl": "flink-paimon",
+      "label": "Paimon ファイルカタログ設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -143,7 +213,16 @@
       "state",
       "changes",
       "BR-01",
-      "BR-02"
+      "BR-02",
+      "flink-paimon-source",
+      "flink-paimon-sink",
+      "flink-paimon-reader",
+      "flink-paimon-consumer",
+      "flink-paimon-runs",
+      "flink-paimon-compact",
+      "flink-paimon-snapshot",
+      "flink-paimon-changes",
+      "flink-paimon-config"
     ],
     "docs/reference-apache-paimon.md#§2": [
       "model",
@@ -179,6 +258,17 @@
     ],
     "docs/reference-apache-paimon.md#§6": [
       "model"
+    ],
+    "docs/reference-apache-paimon.md#§7": [
+      "flink-paimon-source",
+      "flink-paimon-sink",
+      "flink-paimon-reader",
+      "flink-paimon-consumer",
+      "flink-paimon-runs",
+      "flink-paimon-compact",
+      "flink-paimon-snapshot",
+      "flink-paimon-changes",
+      "flink-paimon-config"
     ]
   },
   "reference": {

@@ -40,3 +40,24 @@ Parquet・ORC と違い、**説明（スキーマ）は先頭のヘッダーに�
 
 - `avro-scan`：ヘッダーから順にブロックを読む全件読み取り。
 - `avro-split`：ファイルの途中から担当するタスクが、同期マーカーでブロック境界に揃える分割読み。
+
+## 7. 実装例：Hadoop MapReduce の Avro 分割読み取り
+
+HDFS 上の Avro Object Container File を AvroKeyInputFormat で二つの Map タスクに分担させる例。Split の開始点がブロック途中なら、同期マーカーで読み始めを合わせる。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 入力の前半を読むタスク | Map タスク A の Avro レコード読取 | 先頭側の Split を読み、ブロックの所有範囲で止める。 |
+| 入力の後半を読むタスク | Map タスク B の Avro レコード読取 | 後半側の Split を受け取り、次の同期位置に合わせる。 |
+| ヘッダー（スキーマ）、データブロック、同期マーカー | HDFS 上の Avro Object Container File | 同一ファイルのヘッダー、データブロック、同期マーカーを二つのタスクが読む。 |
+
+実装で加わる部品を以下に示す。
+
+- AvroKeyInputFormat のジョブ設定。入力パスと形式を Hadoop ジョブに登録し、Map タスク用に Split を用意する。
+
+公式資料
+
+- [Avro Specification - Object Container Files](https://avro.apache.org/docs/current/specification/#object-container-files)
+- [Avro Schema Resolution](https://avro.apache.org/docs/current/specification/#schema-resolution)
+- [AvroKeyInputFormat](https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/mapreduce/AvroKeyInputFormat.html)
+- [Avro DataFileReader](https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/file/DataFileReader.html)

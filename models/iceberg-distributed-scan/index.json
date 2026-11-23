@@ -2,33 +2,33 @@
   "model": "iceberg-distributed-scan",
   "name": "Iceberg の分散スキャン：データ分散とファイル取得",
   "coverage": {
-    "covered": 12,
-    "total": 12
+    "covered": 13,
+    "total": 13
   },
   "byId": {
     "analyst": {
       "type": "node",
-      "label": "Analyst / SQL",
+      "label": "SQL の利用者",
       "status": "claim"
     },
     "planner": {
       "type": "node",
-      "label": "Coordinator / Planner",
+      "label": "SQL とファイル範囲の計画",
       "status": "claim"
     },
     "splits": {
       "type": "node",
-      "label": "Split Queue",
+      "label": "読み取り範囲の割当待ち",
       "status": "claim"
     },
     "worker": {
       "type": "node",
-      "label": "Worker",
+      "label": "分散タスクの実行",
       "status": "claim"
     },
     "reader": {
       "type": "node",
-      "label": "Parquet Reader",
+      "label": "Parquet の列データ読取",
       "status": "claim"
     },
     "mlist": {
@@ -58,67 +58,67 @@
     },
     "submit": {
       "type": "link",
-      "label": "Analyst / SQL → Coordinator / Planner",
+      "label": "SQL の利用者 → SQL とファイル範囲の計画",
       "status": "claim"
     },
     "resolve": {
       "type": "link",
-      "label": "Coordinator / Planner → metadata.json",
+      "label": "SQL とファイル範囲の計画 → metadata.json",
       "status": "claim"
     },
     "prune-mlist": {
       "type": "link",
-      "label": "Coordinator / Planner → Manifest List",
+      "label": "SQL とファイル範囲の計画 → Manifest List",
       "status": "claim"
     },
     "prune-manifest": {
       "type": "link",
-      "label": "Coordinator / Planner → Manifests",
+      "label": "SQL とファイル範囲の計画 → Manifests",
       "status": "claim"
     },
     "attach-deletes": {
       "type": "link",
-      "label": "Coordinator / Planner → Delete Files",
+      "label": "SQL とファイル範囲の計画 → Delete Files",
       "status": "claim"
     },
     "plan-splits": {
       "type": "link",
-      "label": "Coordinator / Planner → Split Queue",
+      "label": "SQL とファイル範囲の計画 → 読み取り範囲の割当待ち",
       "status": "claim"
     },
     "assign": {
       "type": "link",
-      "label": "Split Queue → Worker",
+      "label": "読み取り範囲の割当待ち → 分散タスクの実行",
       "status": "claim"
     },
     "open": {
       "type": "link",
-      "label": "Worker → Parquet Reader",
+      "label": "分散タスクの実行 → Parquet の列データ読取",
       "status": "claim"
     },
     "footer": {
       "type": "link",
-      "label": "Parquet Reader → Data Files (Parquet)",
+      "label": "Parquet の列データ読取 → Data Files (Parquet)",
       "status": "claim"
     },
     "chunks": {
       "type": "link",
-      "label": "Parquet Reader → Data Files (Parquet)",
+      "label": "Parquet の列データ読取 → Data Files (Parquet)",
       "status": "claim"
     },
     "decode": {
       "type": "link",
-      "label": "Parquet Reader → Worker",
+      "label": "Parquet の列データ読取 → 分散タスクの実行",
       "status": "claim"
     },
     "apply-deletes": {
       "type": "link",
-      "label": "Worker → Delete Files",
+      "label": "分散タスクの実行 → Delete Files",
       "status": "claim"
     },
     "result": {
       "type": "link",
-      "label": "Worker → Analyst / SQL",
+      "label": "分散タスクの実行 → SQL の利用者",
       "status": "claim"
     },
     "pruned-scan": {
@@ -164,6 +164,50 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のエンジン、Worker 数、Split サイズ設定、統計の有無とソート順、圧縮コーデックと Row Group サイズは未確定。"
+    },
+    "trino-rest-s3-client": {
+      "type": "implementation",
+      "impl": "trino-rest-s3",
+      "label": "Trino CLI の SQL クライアント",
+      "realizes": [
+        "analyst"
+      ]
+    },
+    "trino-rest-s3-coord": {
+      "type": "implementation",
+      "impl": "trino-rest-s3",
+      "label": "Trino Coordinator と Iceberg Split 管理",
+      "realizes": [
+        "planner",
+        "splits"
+      ]
+    },
+    "trino-rest-s3-storage": {
+      "type": "implementation",
+      "impl": "trino-rest-s3",
+      "label": "S3 上の Iceberg メタデータとデータ",
+      "realizes": [
+        "mlist",
+        "manifest",
+        "deletes",
+        "metajson",
+        "data"
+      ]
+    },
+    "trino-rest-s3-workers": {
+      "type": "implementation",
+      "impl": "trino-rest-s3",
+      "label": "Trino Worker の Iceberg Task と Parquet Reader",
+      "realizes": [
+        "worker",
+        "reader"
+      ]
+    },
+    "trino-rest-s3-rest": {
+      "type": "implementation",
+      "impl": "trino-rest-s3",
+      "label": "Iceberg REST カタログ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -203,7 +247,12 @@
       "IS-01",
       "IS-02",
       "IS-03",
-      "IS-04"
+      "IS-04",
+      "trino-rest-s3-client",
+      "trino-rest-s3-coord",
+      "trino-rest-s3-storage",
+      "trino-rest-s3-workers",
+      "trino-rest-s3-rest"
     ],
     "docs/reference-iceberg-distributed-scan.md#§2": [
       "planner",
@@ -263,11 +312,20 @@
     ],
     "docs/reference-iceberg-distributed-scan.md#§12": [
       "physical-read"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§13": [
+      "trino-rest-s3-client",
+      "trino-rest-s3-coord",
+      "trino-rest-s3-storage",
+      "trino-rest-s3-workers",
+      "trino-rest-s3-rest"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 25,
+    "category": "データ配置と読み取り",
+    "order": 30,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
     "objectives": [
       "隠しパーティション（day・bucket 変換）がデータをどう分散し、どの述語で効くかを説明する。",
       "Manifest List・Manifest・ファイル内統計の 3 段階で読まないファイルを決める流れを追う。",

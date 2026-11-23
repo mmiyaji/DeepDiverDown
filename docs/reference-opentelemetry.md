@@ -29,3 +29,25 @@ Head Sampling は Trace の初期段階で決め、Tail Sampling は収集した
 バックエンドで確認できるのは届いた Span である。成功した注文を検索できない場合、設計と照合するときには保持条件、計装やコンテキスト伝播、収集経路を確認する。エラーだけを保持するこの例から、全リクエストに占めるエラー率を読み取ることはできない。
 
 出典 [OpenTelemetry Context propagation](https://opentelemetry.io/docs/concepts/context-propagation/)、[Collector Configuration](https://opentelemetry.io/docs/collector/configuration/)、[OpenTelemetry Sampling](https://opentelemetry.io/docs/concepts/sampling/)
+
+## 6. 実装例：Kubernetes の分配・サンプリング Gateway
+OpenTelemetry Collector を Kubernetes に 2 段で配置し、注文処理のトレースを Jaeger へ送る例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 注文クライアント | テスト用 HTTP クライアント |
+| 注文 API と計装 | 注文 API と OpenTelemetry SDK |
+| 在庫 API と計装 | 在庫 API と OpenTelemetry SDK |
+| テレメトリ受信 | Collector 入口 Deployment |
+| トレースの保持判定 | Collector サンプリング Deployment |
+| 採用トレースの送信 | Collector サンプリング Deployment |
+| 分散トレースの保存と検索 | Jaeger Collector / Query |
+
+- **第2段 Collector 用 Headless Service**。サンプリング側レプリカの集合を入口側が解決する。
+
+同一 Trace の Span が同じサンプリングインスタンスに集まるようにする。スケールや再起動時の到着遅延・判定漏れは観測対象とし、保持するすべての Trace の完全性を仮定しない。
+
+公式資料
+- [OpenTelemetry Collector gateway pattern](https://opentelemetry.io/docs/collector/deploy/gateway/)
+- [Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
+- [Jaeger APIs](https://www.jaegertracing.io/docs/latest/apis/)

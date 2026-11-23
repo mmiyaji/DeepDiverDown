@@ -18,12 +18,12 @@ tiers:
   - {id: "collect", label: "テレメトリー収集", z: 0, size: [16,4]}
 nodes:
   caller: {label: "注文クライアント", kind: "client", tier: "app", x: 0, y: 1.5, description: "注文リクエストを送る。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§1"}]}
-  order: {label: "注文 API + SDK", kind: "service", tier: "app", x: 4, y: 1.5, description: "サーバー Span と下流呼び出しの Span を生成する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}]}
-  inventory: {label: "在庫 API + SDK", kind: "service", tier: "app", x: 8, y: 1.5, description: "受け取った Trace Context に基づき子 Span を生成する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}]}
-  receiver: {label: "OTLP Receiver", kind: "service", tier: "collect", x: 0, y: 1.5, description: "SDK 等からトレースデータを受信する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§3"}]}
-  sampling: {label: "Tail Sampling Processor", kind: "worker", tier: "collect", x: 4, y: 1.5, description: "同じ Trace ID の Span を集め、設定した条件で保持を判定する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§4"}]}
-  exporter: {label: "Collector Exporter", kind: "worker", tier: "collect", x: 8, y: 1.5, description: "保持されたトレースをバックエンドに送る。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§3"}]}
-  backend: {label: "トレースバックエンド", kind: "db", tier: "collect", x: 12, y: 1.5, description: "届いた Span を検索・表示できる状態にする。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§5"}]}
+  order: {label: 注文 API と計装, kind: service, tier: app, x: 4, 'y': 1.5, description: サーバー Span と下流呼び出しの Span を生成する。, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§2}]}
+  inventory: {label: 在庫 API と計装, kind: service, tier: app, x: 8, 'y': 1.5, description: 受け取った Trace Context に基づき子 Span を生成する。, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§2}]}
+  receiver: {label: テレメトリ受信, kind: service, tier: collect, x: 0, 'y': 1.5, description: SDK 等からトレースデータを受信する。, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§3}]}
+  sampling: {label: トレースの保持判定, kind: worker, tier: collect, x: 4, 'y': 1.5, description: 同じ Trace ID の Span を集め、設定した条件で保持を判定する。, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§4}]}
+  exporter: {label: 採用トレースの送信, kind: worker, tier: collect, x: 8, 'y': 1.5, description: 保持されたトレースをバックエンドに送る。, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§3}]}
+  backend: {label: 分散トレースの保存と検索, kind: monitor, tier: collect, x: 12, 'y': 1.5, description: 届いた Span を検索・表示できる状態にする。, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§5}]}
 links:
   - {id: "request", from: "caller", to: "order", label: "注文リクエスト", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§1"}]}
   - {id: "reserve", from: "order", to: "inventory", label: "在庫引当 + Trace Context", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}]}
@@ -47,3 +47,125 @@ scenarios:
       - {links: ["request","reserve"], note: "在庫引当を含む注文処理が成功する。設計上の依存先を実際に呼び出している。"}
       - {links: ["order-otlp","inventory-otlp","process"], note: "Collector は両サービスの Span を受信する。例の保持条件に一致しない Trace を破棄する。"}
       - {links: [], note: "バックエンドにこの注文の Trace は届かない。検索結果を設計と照合する際は、サンプリング方針と計装範囲を確認する。"}
+implementations:
+  - id: otel
+    label: Kubernetes の分配・サンプリング Gateway
+    description: OpenTelemetry Collector を Kubernetes に 2 段で配置し、注文処理のトレースを Jaeger へ送る例。
+    sources:
+      - title: OpenTelemetry Collector gateway pattern
+        url: https://opentelemetry.io/docs/collector/deploy/gateway/
+      - title: Tail Sampling Processor
+        url: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor
+      - title: Jaeger APIs
+        url: https://www.jaegertracing.io/docs/latest/apis/
+    tiers:
+      - id: app
+        label: アプリケーション
+        z: 1
+        kind: origin
+      - id: collect
+        label: テレメトリー収集
+        z: 0
+    groups:
+      - kind: cluster
+        label: 計装アプリと Collector の Kubernetes クラスタ
+        provider: k8s
+        tier:
+          - app
+          - collect
+        nodes:
+          - otel-order
+          - otel-inventory
+          - otel-receiver
+          - otel-sampling
+          - otel-routing
+    nodes:
+      otel-caller:
+        label: テスト用 HTTP クライアント
+        kind: client
+        tier: app
+        realizes:
+          - caller
+        description: 注文 API を呼ぶ。
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+      otel-order:
+        label: 注文 API と OpenTelemetry SDK
+        kind: service
+        tier: app
+        svc: k8s:deployment
+        realizes:
+          - order
+        description: 在庫 API 呼び出しを計装し、トレースの Span を OTLP で送信する。
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+      otel-inventory:
+        label: 在庫 API と OpenTelemetry SDK
+        kind: service
+        tier: app
+        svc: k8s:deployment
+        realizes:
+          - inventory
+        description: 受け取った Trace Context を使い、同じ Trace に Span を送る。
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+      otel-receiver:
+        label: Collector 入口 Deployment
+        kind: service
+        tier: collect
+        svc: k8s:deployment
+        realizes:
+          - receiver
+        description: OTLP Receiver と loadbalancing exporter を置き、Trace ID で次の段へ分配する。
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+      otel-sampling:
+        label: Collector サンプリング Deployment
+        kind: worker
+        tier: collect
+        svc: k8s:deployment
+        realizes:
+          - sampling
+          - exporter
+        description: Trace ID ごとに受けた Span を tail_sampling で選別し、OTLP exporter で送る。
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+      otel-backend:
+        label: Jaeger Collector / Query
+        kind: monitor
+        tier: collect
+        realizes:
+          - backend
+        description: OTLP で受けたトレースを保存し検索できるようにする。
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+      otel-routing:
+        label: 第2段 Collector 用 Headless Service
+        kind: lb
+        tier: collect
+        svc: k8s:service
+        description: サンプリング側レプリカの集合を入口側が解決する。
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+    links:
+      - id: otel-resolve
+        from: otel-receiver
+        to: otel-routing
+        label: サンプリング側の宛先を解決
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6
+      - id: otel-sampling-endpoints
+        from: otel-routing
+        to: otel-sampling
+        label: レプリカを発見
+        evidence:
+          - type: doc
+            ref: docs/reference-opentelemetry.md#§6

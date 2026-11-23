@@ -27,3 +27,21 @@ ACCESS_HISTORY で直接・間接に参照されたオブジェクトや列な�
 - [データガバナンス](https://docs.snowflake.com/en/guides-overview-govern)
 - [タグベースのマスキング](https://docs.snowflake.com/en/user-guide/tag-based-masking-policies)
 - [アクセス履歴](https://docs.snowflake.com/en/user-guide/access-history)
+
+## 5. 実装例 Snowflake での列分類とタグマスク
+
+受注メール列に分類タグとマスキングポリシーを適用し、分析権限と監査権限を分離する例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| データ管理者 | 分類設定用ロール | 分類プロファイルと結果を管理する。 |
+| 機微データ分類 | Sensitive Data Classification | 機微情報候補の分類結果を確認する。 |
+| 列の分類ラベル・列の値を保護するポリシー | 分類タグとマスキングポリシー | 文字列用ポリシーをタグに関連付ける。 |
+| 分析担当ロール | SALES_READER ロール | 許可された分析ビューだけを参照する。 |
+| 注文のメールアドレス列 | ORDERS.CUSTOMER_EMAIL | メール列に分類タグを設定する。 |
+| 注文分析ビュー | SALES.ORDERS_ANALYSIS | 注文分析に必要な列を公開する。 |
+| 列アクセスの監査履歴 | ACCOUNT_USAGE.ACCESS_HISTORY | アクセスした資産と列を、対応するクエリで確認する。 |
+
+タグに関連付けるポリシーと列の型をそろえ、分析ロールと監査ロールの権限を個別に付与する。分類、タグベースのマスキング、アクセス履歴を使えるエディションと権限はそれぞれ公式資料を確認する。
+
+出典 [Snowflake Horizon Catalog](https://docs.snowflake.com/en/user-guide/snowflake-horizon)、[データガバナンス](https://docs.snowflake.com/en/guides-overview-govern)、[タグベースのマスキング](https://docs.snowflake.com/en/user-guide/tag-based-masking-policies)、[アクセス履歴](https://docs.snowflake.com/en/user-guide/access-history)、[Snowflake アクセス制御](https://docs.snowflake.com/en/user-guide/security-access-control-overview)

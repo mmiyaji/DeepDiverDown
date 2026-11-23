@@ -2,28 +2,28 @@
   "model": "file-formats",
   "name": "物理ファイルフォーマット：Parquet・ORC・Avro・Arrow・CSV/JSON",
   "coverage": {
-    "covered": 10,
-    "total": 10
+    "covered": 11,
+    "total": 11
   },
   "byId": {
     "source": {
       "type": "node",
-      "label": "Source / Events",
+      "label": "元の業務イベント",
       "status": "claim"
     },
     "converter": {
       "type": "node",
-      "label": "Ingest / Convert Job",
+      "label": "取り込みと形式変換",
       "status": "claim"
     },
     "engine": {
       "type": "node",
-      "label": "Query Engine",
+      "label": "分析ファイルの照会",
       "status": "claim"
     },
     "dataframe": {
       "type": "node",
-      "label": "DataFrame / Python",
+      "label": "Python の列データ利用側",
       "status": "claim"
     },
     "csv": {
@@ -53,52 +53,52 @@
     },
     "land-csv": {
       "type": "link",
-      "label": "Source / Events → CSV / JSON Lines",
+      "label": "元の業務イベント → CSV / JSON Lines",
       "status": "claim"
     },
     "land-avro": {
       "type": "link",
-      "label": "Source / Events → Avro",
+      "label": "元の業務イベント → Avro",
       "status": "claim"
     },
     "parse": {
       "type": "link",
-      "label": "Ingest / Convert Job → CSV / JSON Lines",
+      "label": "取り込みと形式変換 → CSV / JSON Lines",
       "status": "claim"
     },
     "decode-avro": {
       "type": "link",
-      "label": "Ingest / Convert Job → Avro",
+      "label": "取り込みと形式変換 → Avro",
       "status": "claim"
     },
     "write-parquet": {
       "type": "link",
-      "label": "Ingest / Convert Job → Parquet",
+      "label": "取り込みと形式変換 → Parquet",
       "status": "claim"
     },
     "scan-parquet": {
       "type": "link",
-      "label": "Query Engine → Parquet",
+      "label": "分析ファイルの照会 → Parquet",
       "status": "claim"
     },
     "scan-orc": {
       "type": "link",
-      "label": "Query Engine → ORC",
+      "label": "分析ファイルの照会 → ORC",
       "status": "claim"
     },
     "to-arrow": {
       "type": "link",
-      "label": "Query Engine → Arrow IPC / Feather",
+      "label": "分析ファイルの照会 → Arrow IPC / Feather",
       "status": "claim"
     },
     "zero-copy": {
       "type": "link",
-      "label": "DataFrame / Python → Arrow IPC / Feather",
+      "label": "Python の列データ利用側 → Arrow IPC / Feather",
       "status": "claim"
     },
     "gzip-scan": {
       "type": "link",
-      "label": "Query Engine → CSV / JSON Lines",
+      "label": "分析ファイルの照会 → CSV / JSON Lines",
       "status": "claim"
     },
     "analytic-scan": {
@@ -138,6 +138,63 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のエンジン、各形式の版と既定コーデック、Row Group／Stripe サイズは未確定。"
+    },
+    "spark-pyarrow-source": {
+      "type": "implementation",
+      "impl": "spark-pyarrow",
+      "label": "注文アプリの入力イベント",
+      "realizes": [
+        "source"
+      ]
+    },
+    "spark-pyarrow-landing": {
+      "type": "implementation",
+      "impl": "spark-pyarrow",
+      "label": "共有保存先の CSV・JSON Lines・Avro",
+      "realizes": [
+        "csv",
+        "avro"
+      ]
+    },
+    "spark-pyarrow-spark": {
+      "type": "implementation",
+      "impl": "spark-pyarrow",
+      "label": "Spark SQL のデータソースと照会",
+      "realizes": [
+        "converter",
+        "engine"
+      ]
+    },
+    "spark-pyarrow-columnar": {
+      "type": "implementation",
+      "impl": "spark-pyarrow",
+      "label": "Parquet と ORC の分析ファイル",
+      "realizes": [
+        "parquet",
+        "orc"
+      ]
+    },
+    "spark-pyarrow-python": {
+      "type": "implementation",
+      "impl": "spark-pyarrow",
+      "label": "PySpark Driver 上の PyArrow",
+      "realizes": [
+        "dataframe"
+      ]
+    },
+    "spark-pyarrow-ipc": {
+      "type": "implementation",
+      "impl": "spark-pyarrow",
+      "label": "Arrow IPC / Feather の受け渡しファイル",
+      "realizes": [
+        "arrow"
+      ]
+    },
+    "spark-pyarrow-avro": {
+      "type": "implementation",
+      "impl": "spark-pyarrow",
+      "label": "Spark Avro データソースのモジュール",
+      "realizes": []
     }
   },
   "byRef": {
@@ -171,7 +228,14 @@
       "gzip-trap",
       "FF-01",
       "FF-02",
-      "FF-03"
+      "FF-03",
+      "spark-pyarrow-source",
+      "spark-pyarrow-landing",
+      "spark-pyarrow-spark",
+      "spark-pyarrow-columnar",
+      "spark-pyarrow-python",
+      "spark-pyarrow-ipc",
+      "spark-pyarrow-avro"
     ],
     "docs/reference-file-formats.md#§2": [
       "model"
@@ -219,11 +283,22 @@
     ],
     "docs/reference-file-formats.md#§10": [
       "analytic-scan"
+    ],
+    "docs/reference-file-formats.md#§11": [
+      "spark-pyarrow-source",
+      "spark-pyarrow-landing",
+      "spark-pyarrow-spark",
+      "spark-pyarrow-columnar",
+      "spark-pyarrow-python",
+      "spark-pyarrow-ipc",
+      "spark-pyarrow-avro"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 27,
+    "category": "ファイル形式",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
     "objectives": [
       "行指向と列指向、Row Group／Stripe のようなハイブリッド構造の違いを説明する。",
       "Parquet と ORC がフッターと統計で読む範囲を絞る仕組みを比べる。",

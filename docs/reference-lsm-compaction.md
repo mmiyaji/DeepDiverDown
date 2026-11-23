@@ -24,3 +24,24 @@ MemTable が一定サイズに達すると、キー順に並んだ不変のフ�
 
 - `flush-compact`：書き込み → フラッシュ → L0 から L1 へのコンパクション → L1 から L2 へのコンパクション。
 - `lsm-read`：キーを探して MemTable と各階層を順に確認する。
+
+## 7. 実装例：RocksDB の leveled compaction
+
+ローカルの永続ディレクトリーに RocksDB を組み込み、列ファミリーの leveled compaction を使う例。キーの世代は LSM 木に保存され、名前や状態は RocksDB の設定とファイル配置に現れる。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| キー値を書き読むアプリ | RocksDB を組み込むアプリプロセス | Get と Put によりキー・値を読み書きする。 |
+| WAL、MemTable | RocksDB の共有 WAL と列ファミリーの MemTable | 書き込みのログをディスクへ残し、読み取り可能な作業状態を MemTable に持つ。 |
+| L0 SSTables、L1、L2 | RocksDB DB パスの SST ファイル群 | L0 はキー範囲が重なり得る。上位レベルでは同じレベルのファイルを重ならないキー範囲に整理する。 |
+
+実装で加わる部品を以下に示す。
+
+- RocksDB MANIFEST。各レベルを構成するファイルの変更を記録し、復旧時に現在の版を組み立てる。
+
+公式資料
+
+- [RocksDB Wiki - Compaction](https://github.com/facebook/rocksdb/wiki/Compaction)
+- [Apache Cassandra - Compaction](https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/index.html)
+- [RocksDB Leveled Compaction](https://github.com/meta/rocksdb/wiki/Leveled-Compaction)
+- [RocksDB MANIFEST](https://github.com/meta/rocksdb/wiki/MANIFEST)

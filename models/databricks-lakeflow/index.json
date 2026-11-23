@@ -2,8 +2,8 @@
   "model": "databricks-lakeflow",
   "name": "Databricks Lakeflow の CDC と品質管理",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "db": {
@@ -13,12 +13,12 @@
     },
     "gateway": {
       "type": "node",
-      "label": "Lakeflow Connect ゲートウェイ",
+      "label": "データベース変更の収集ゲートウェイ",
       "status": "claim"
     },
     "stage": {
       "type": "node",
-      "label": "ステージング Volume",
+      "label": "変更の一時保存領域",
       "status": "claim"
     },
     "connector": {
@@ -33,17 +33,17 @@
     },
     "auto-loader": {
       "type": "node",
-      "label": "Auto Loader",
+      "label": "新着ファイルの増分読み込み",
       "status": "claim"
     },
     "raw": {
       "type": "node",
-      "label": "RAW Delta テーブル",
+      "label": "注文変更の受入テーブル",
       "status": "claim"
     },
     "sdp": {
       "type": "node",
-      "label": "Lakeflow パイプライン",
+      "label": "宣言型の変換・品質処理",
       "status": "claim"
     },
     "clean": {
@@ -53,7 +53,7 @@
     },
     "jobs": {
       "type": "node",
-      "label": "Lakeflow Jobs",
+      "label": "ジョブのスケジューラー",
       "status": "claim"
     },
     "event-log": {
@@ -63,57 +63,144 @@
     },
     "capture": {
       "type": "link",
-      "label": "注文DB → Lakeflow Connect ゲートウェイ",
+      "label": "注文DB → データベース変更の収集ゲートウェイ",
       "status": "claim"
     },
     "spool": {
       "type": "link",
-      "label": "Lakeflow Connect ゲートウェイ → ステージング Volume",
+      "label": "データベース変更の収集ゲートウェイ → 変更の一時保存領域",
       "status": "claim"
     },
     "consume": {
       "type": "link",
-      "label": "ステージング Volume → 取り込みパイプライン",
+      "label": "変更の一時保存領域 → 取り込みパイプライン",
       "status": "claim"
     },
     "ingest": {
       "type": "link",
-      "label": "取り込みパイプライン → RAW Delta テーブル",
+      "label": "取り込みパイプライン → 注文変更の受入テーブル",
       "status": "claim"
     },
     "discover": {
       "type": "link",
-      "label": "到着ファイル → Auto Loader",
+      "label": "到着ファイル → 新着ファイルの増分読み込み",
       "status": "claim"
     },
     "load": {
       "type": "link",
-      "label": "Auto Loader → RAW Delta テーブル",
+      "label": "新着ファイルの増分読み込み → 注文変更の受入テーブル",
       "status": "claim"
     },
     "validate": {
       "type": "link",
-      "label": "RAW Delta テーブル → Lakeflow パイプライン",
+      "label": "注文変更の受入テーブル → 宣言型の変換・品質処理",
       "status": "claim"
     },
     "apply": {
       "type": "link",
-      "label": "Lakeflow パイプライン → 分析用注文テーブル",
+      "label": "宣言型の変換・品質処理 → 分析用注文テーブル",
       "status": "claim"
     },
     "schedule": {
       "type": "link",
-      "label": "Lakeflow Jobs → Lakeflow パイプライン",
+      "label": "ジョブのスケジューラー → 宣言型の変換・品質処理",
       "status": "claim"
     },
     "observe": {
       "type": "link",
-      "label": "Lakeflow パイプライン → イベントログ",
+      "label": "宣言型の変換・品質処理 → イベントログ",
       "status": "claim"
     },
     "cdc": {
       "type": "scenario",
       "label": "変更ログから注文の現在状態を整える"
+    },
+    "example-db": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "PostgreSQL の ORDERS",
+      "realizes": [
+        "db"
+      ]
+    },
+    "example-gateway": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Lakeflow Connect 取り込みゲートウェイ",
+      "realizes": [
+        "gateway"
+      ]
+    },
+    "example-stage": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Unity Catalog ステージングボリューム",
+      "realizes": [
+        "stage"
+      ]
+    },
+    "example-connector": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Lakeflow Connect 取り込みパイプライン",
+      "realizes": [
+        "connector"
+      ]
+    },
+    "example-files": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Amazon S3 の到着ファイル",
+      "realizes": [
+        "files"
+      ]
+    },
+    "example-auto-loader": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Auto Loader",
+      "realizes": [
+        "auto-loader"
+      ]
+    },
+    "example-raw": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "ソース別 RAW Delta テーブル群",
+      "realizes": [
+        "raw"
+      ]
+    },
+    "example-sdp": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Lakeflow パイプラインの宣言と出力表",
+      "realizes": [
+        "sdp",
+        "clean"
+      ]
+    },
+    "example-jobs": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Lakeflow Jobs",
+      "realizes": [
+        "jobs"
+      ]
+    },
+    "example-event-log": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "Lakeflow パイプラインイベントログ",
+      "realizes": [
+        "event-log"
+      ]
+    },
+    "example-publication": {
+      "type": "implementation",
+      "impl": "lakeflow-postgres",
+      "label": "PostgreSQL の論理レプリケーション設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -144,7 +231,18 @@
       "apply",
       "schedule",
       "observe",
-      "cdc"
+      "cdc",
+      "example-db",
+      "example-gateway",
+      "example-stage",
+      "example-connector",
+      "example-files",
+      "example-auto-loader",
+      "example-raw",
+      "example-sdp",
+      "example-jobs",
+      "example-event-log",
+      "example-publication"
     ],
     "docs/reference-databricks-lakeflow.md#§2": [
       "db",
@@ -175,6 +273,19 @@
       "schedule",
       "observe",
       "files"
+    ],
+    "docs/reference-databricks-lakeflow.md#§6": [
+      "example-db",
+      "example-gateway",
+      "example-stage",
+      "example-connector",
+      "example-files",
+      "example-auto-loader",
+      "example-raw",
+      "example-sdp",
+      "example-jobs",
+      "example-event-log",
+      "example-publication"
     ]
   },
   "reference": {

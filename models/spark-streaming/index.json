@@ -2,8 +2,8 @@
   "model": "spark-streaming",
   "name": "Apache Spark Streaming（DStreams）の基本アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "source": {
@@ -13,17 +13,17 @@
     },
     "context": {
       "type": "node",
-      "label": "StreamingContext",
+      "label": "ストリーミング処理の調整役",
       "status": "claim"
     },
     "dstream": {
       "type": "node",
-      "label": "DStream",
+      "label": "区間ごとのデータ集合",
       "status": "claim"
     },
     "executors": {
       "type": "node",
-      "label": "RDD Executors",
+      "label": "分散バッチの実行担当",
       "status": "claim"
     },
     "output": {
@@ -33,42 +33,82 @@
     },
     "checkpoint": {
       "type": "node",
-      "label": "Checkpoint Directory",
+      "label": "復旧用の状態保存先",
       "status": "claim"
     },
     "receive": {
       "type": "link",
-      "label": "Input Stream → StreamingContext",
+      "label": "Input Stream → ストリーミング処理の調整役",
       "status": "claim"
     },
     "batches": {
       "type": "link",
-      "label": "StreamingContext → DStream",
+      "label": "ストリーミング処理の調整役 → 区間ごとのデータ集合",
       "status": "claim"
     },
     "transform": {
       "type": "link",
-      "label": "DStream → RDD Executors",
+      "label": "区間ごとのデータ集合 → 分散バッチの実行担当",
       "status": "claim"
     },
     "emit": {
       "type": "link",
-      "label": "RDD Executors → Batch Output",
+      "label": "分散バッチの実行担当 → Batch Output",
       "status": "claim"
     },
     "save": {
       "type": "link",
-      "label": "StreamingContext → Checkpoint Directory",
+      "label": "ストリーミング処理の調整役 → 復旧用の状態保存先",
       "status": "claim"
     },
     "restore": {
       "type": "link",
-      "label": "Checkpoint Directory → StreamingContext",
+      "label": "復旧用の状態保存先 → ストリーミング処理の調整役",
       "status": "claim"
     },
     "dstream-recovery": {
       "type": "scenario",
       "label": "DStream のバッチ処理と復旧"
+    },
+    "dstream-files-input": {
+      "type": "implementation",
+      "impl": "dstream-files",
+      "label": "HDFS 入力ディレクトリー",
+      "realizes": [
+        "source"
+      ]
+    },
+    "dstream-files-driver": {
+      "type": "implementation",
+      "impl": "dstream-files",
+      "label": "Driver 内の StreamingContext と DStream",
+      "realizes": [
+        "context",
+        "dstream"
+      ]
+    },
+    "dstream-files-executors": {
+      "type": "implementation",
+      "impl": "dstream-files",
+      "label": "Spark Executor JVM",
+      "realizes": [
+        "executors"
+      ]
+    },
+    "dstream-files-hdfs": {
+      "type": "implementation",
+      "impl": "dstream-files",
+      "label": "HDFS 内の出力とチェックポイント",
+      "realizes": [
+        "output",
+        "checkpoint"
+      ]
+    },
+    "dstream-files-batch": {
+      "type": "implementation",
+      "impl": "dstream-files",
+      "label": "バッチ間隔の設定",
+      "realizes": []
     }
   },
   "byRef": {
@@ -90,7 +130,12 @@
       "emit",
       "save",
       "restore",
-      "dstream-recovery"
+      "dstream-recovery",
+      "dstream-files-input",
+      "dstream-files-driver",
+      "dstream-files-executors",
+      "dstream-files-hdfs",
+      "dstream-files-batch"
     ],
     "docs/reference-spark-streaming.md#§2": [
       "source",
@@ -116,11 +161,20 @@
     ],
     "docs/reference-spark-streaming.md#§7": [
       "dstream-recovery"
+    ],
+    "docs/reference-spark-streaming.md#§8": [
+      "dstream-files-input",
+      "dstream-files-driver",
+      "dstream-files-executors",
+      "dstream-files-hdfs",
+      "dstream-files-batch"
     ]
   },
   "reference": {
     "category": "ストリーム処理",
-    "order": 40,
+    "order": 50,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "DStream、RDD、StreamingContext、出力操作の関係を区別する。",
       "バッチ間隔ごとの変換と状態付き集計を追う。",

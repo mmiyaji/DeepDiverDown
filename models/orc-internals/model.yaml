@@ -17,13 +17,13 @@ tiers:
   - {id: file, label: ファイル（バイト順：先頭 → 末尾）, z: 1, size: [14, 3]}
   - {id: stripe, label: Stripe の中, z: 0, size: [14, 3]}
 nodes:
-  reader: {label: ORC Reader, kind: worker, tier: reader, x: 6, y: 1.5, description: 末尾から Postscript とフッターを読み、Stripe と行グループを選んで必要な Stream を取る。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  reader: {label: Stripe と列を読む処理, kind: worker, tier: reader, x: 6, 'y': 1.5, description: 末尾から Postscript とフッターを読み、Stripe と行グループを選んで必要な Stream を取る。, evidence: [{type: doc, ref: docs/reference-orc-internals.md#§3}]}
   magic: {label: "Header \"ORC\"", kind: segment, tier: file, x: 0, y: 1.5, description: 先頭 3 バイトのマジック。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
-  stripes: {label: Stripes, kind: segment, tier: file, x: 3, y: 1.5, partitions: 2, description: 行の塊（既定 64 MB）。それぞれが索引・データ・フッターを持つ。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
+  stripes: {label: Stripes, kind: segment, tier: file, x: 3, y: 1.5, partitions: 2, description: 行のまとまり。Stripe ごとに索引、データとフッターを持つ。, evidence: [{type: doc, ref: docs/reference-orc-internals.md#§2}]}
   metadata: {label: Metadata（Stripe 統計）, kind: segment, tier: file, x: 7, y: 1.5, description: Stripe ごとの列統計。Stripe を丸ごと捨てる判断に使う。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
   footer: {label: File Footer, kind: segment, tier: file, x: 10, y: 1.5, description: "スキーマ、Stripe の一覧と位置、ファイル全体の列統計（Protocol Buffers）。", evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
   postscript: {label: Postscript + 長さ, kind: segment, tier: file, x: 13, y: 1.5, description: 圧縮しない。圧縮方式とフッター長を持つ。最後の 1 バイトがこの長さ。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}, {type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
-  index: {label: Index Data（Row Index）, kind: segment, tier: stripe, x: 2, y: 1.5, description: 列ごとに 10,000 行ごとの min/max と位置。任意でブルームフィルター。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  index: {label: Index Data（Row Index）, kind: segment, tier: stripe, x: 2, y: 1.5, description: 列ごとに、設定された行数間隔の最小値・最大値と読み出し位置を持つ。ブルームフィルターは任意。, evidence: [{type: doc, ref: docs/reference-orc-internals.md#§3}]}
   streams: {label: Row Data（Streams）, kind: segment, tier: stripe, x: 7, y: 1.5, partitions: 4, description: "列ごとの PRESENT／DATA／LENGTH／DICTIONARY_DATA。", evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§4"}]}
   sfooter: {label: Stripe Footer, kind: segment, tier: stripe, x: 12, y: 1.5, description: この Stripe の Stream の一覧・位置・エンコーディング。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
 links:
@@ -96,3 +96,22 @@ fileLayout:
     - {id: footer, label: File Footer, bytes: 8192, kind: footer, node: footer, sample: "Footer {\n  numberOfRows: 4,000,000\n  types: struct<event_ts:timestamp,user_id:bigint,event_type:string,payload:string>\n  stripes: [ {offset: 3, indexLength: 393216, dataLength: 67108864, footerLength: 2048}, … ]\n  statistics: [ … ファイル全体の列統計 … ]\n}"}
     - {id: ps, label: Postscript, bytes: 24, kind: header, node: postscript, description: 圧縮しないので、そのまま読める。, sample: "PostScript {\n  footerLength: 8192, compression: ZSTD,\n  compressionBlockSize: 262144, version: [0, 12], magic: \"ORC\"\n}"}
     - {id: ps-len, label: 長さ（1 バイト）, bytes: 1, kind: magic, node: postscript, sample: "18    → Postscript は 24 バイト"}
+
+implementations:
+  - id: trino-orc
+    label: "Trino Hive と S3 上の ORC"
+    description: "ORC を使う Hive テーブルを Trino で検索する例。ファイルは S3 に置き、対応する述語と利用可能な統計で不要な Stripe や行グループを除外する。"
+    sources:
+      - {title: ORC Specification v1, url: https://orc.apache.org/specification/ORCv1/}
+      - {title: ORC Indexes, url: https://orc.apache.org/docs/indexes.html}
+      - {title: Trino object storage file formats, url: https://trino.io/docs/current/object-storage/file-formats.html}
+      - {title: Trino Hive connector, url: https://trino.io/docs/current/connector/hive.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      trino-orc-trino: {label: Trino Worker の ORC Reader, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [reader], description: Postscript から圧縮・メタデータを解釈し、述語と投影を読取に適用する。, evidence: [{type: doc, ref: docs/reference-orc-internals.md#§7}]}
+      trino-orc-file: {label: S3 上の ORC オブジェクト, kind: file, tier: processing, x: 1, y: 3.65, svc: s3, realizes: [magic, stripes, metadata, footer, postscript, index, streams, sfooter], description: Header、Stripe、Index、Stream、各フッターを同じファイル内に保持する。, evidence: [{type: doc, ref: docs/reference-orc-internals.md#§7}]}
+      trino-orc-hive: {label: Hive カタログの ORC 設定, kind: catalog, tier: setup, x: 1, y: 1.5, description: ブルームフィルターも使う場合はファイルにインデックスがあることと orc.bloom-filters.enabled を確認する。, evidence: [{type: doc, ref: docs/reference-orc-internals.md#§7}]}
+    links:
+      - {id: trino-orc-hive-connection, from: trino-orc-hive, to: trino-orc-trino, label: 使用する索引を設定}

@@ -45,3 +45,25 @@ SELECT の先頭に `EXPLAIN indexes = 1` を付け、`ReadFromMergeTree` の索
 - [ClickHouse MergeTree table engine](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
 - [ClickHouse EXPLAIN](https://clickhouse.com/docs/reference/statements/explain)
 - [ClickHouse system.parts](https://clickhouse.com/docs/operations/system-tables/parts)
+
+## 7. 実装例：単一 ClickHouse サーバーの MergeTree
+
+架空の注文を `PARTITION BY toYYYYMM(order_date)` と `ORDER BY (customer_id, order_date)` の MergeTree に格納する例。クライアントとサーバー、およびディスク上の物理部品を分けて示す。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| 注文データの取り込み元 | clickhouse-client から INSERT | バッチ単位で注文を投入する。 |
+| SQL の読取計画、候補範囲の列スキャン | ClickHouse Server の SELECT と MergeTree 読取 | 疎索引を調べて読み取り候補を絞る。 |
+| 月パーティション、データパート、疎主インデックスとマーク | MergeTree の月別パートとマーク | 各パートに列データ、疎主索引とマークを持つ。 |
+| 同じパーティション内のデータ統合 | MergeTree のバックグラウンドマージ | 同一パーティションの入力パートを統合する。 |
+| 注文別の金額 | clickhouse-client の注文結果 | 条件に合う行を表示する。 |
+
+実装で加わる部品を以下に示す。
+
+- system.parts。active、rows、marks などを調べられるシステムテーブル。
+
+公式資料
+
+- [ClickHouse MergeTree table engine](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
+- [ClickHouse EXPLAIN](https://clickhouse.com/docs/reference/statements/explain)
+- [ClickHouse system.parts](https://clickhouse.com/docs/operations/system-tables/parts)

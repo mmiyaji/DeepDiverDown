@@ -29,3 +29,26 @@ Temporal Service に決済 Activity の完了が記録された後で Workflow W
 決済 Activity には決済操作を一意に識別するキーを渡し、再試行でも同じキーを送る。例の決済 API は同じキーで新たな決済を作らず、初回の成功結果を返す契約を持つ。外部状態と Activity の完了記録は別々に更新されるため、重複した副作用を防ぐには外部操作の冪等性が必要になる。
 
 出典 [Temporal Activity Definition](https://docs.temporal.io/activity-definition)、[Temporal Retry Policy](https://docs.temporal.io/encyclopedia/retry-policies)
+
+## 6. 実装例：自己管理 Temporal と PostgreSQL
+Kubernetes の Temporal Service と PostgreSQL を使い、注文処理の Worker と決済 Worker を別のワークロードで実行する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 注文 API | Temporal SDK を使う注文 API |
+| 実行履歴・タスクの制御 | Temporal Server の Frontend・History・Matching |
+| 永続的な実行履歴 | PostgreSQL の Persistence スキーマ |
+| ワークフロー・アクティビティの作業待ち行列 | Temporal Server の Frontend・History・Matching |
+| 注文処理の実行担当 A | 注文 Worker Pod A |
+| 注文処理の実行担当 B | 注文 Worker Pod B |
+| 決済処理の実行担当 | 決済 Worker Deployment |
+| 外部決済 API | 外部決済 API（架空） |
+
+- **PostgreSQL の Visibility スキーマ**。Web UI / CLI で実行一覧を絞り込むための参照データを保持する。
+
+注文 Worker は同じ Deployment の Pod の例で、B への割り当ては固定されない。Persistence と Visibility のスキーマを用意し、外部決済の冪等性は決済先との契約で確保する。
+
+公式資料
+- [Self-hosted Temporal Service](https://docs.temporal.io/self-hosted-guide)
+- [Temporal Visibility setup](https://docs.temporal.io/self-hosted-guide/visibility)
+- [Temporal Task Queues](https://docs.temporal.io/task-queue)

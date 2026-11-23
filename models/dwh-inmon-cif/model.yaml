@@ -47,3 +47,29 @@ scenarios:
     steps:
       - {links: ["refund-input","integrated-write"], note: "返金 R-21 が後から届く。統合処理は元の注文明細と突合し、独立した返金取引として EDW に記録する。"}
       - {links: ["integrated-read","finance-output"], note: "経理マートの集計を返金取引日・通貨の粒度で再計算する。営業マートの受注金額は受注時金額の定義で集計する。"}
+
+implementations:
+  - id: postgres-cif
+    label: "PostgreSQL の統合 EDW と公開スキーマ"
+    description: "PostgreSQL に入力、統合 EDW、業務別の公開スキーマを用意し、段階的に統合と配信を試す実装例。"
+    sources:
+      - {title: "Bill Inmon: Data Warehousing 2.0", url: "https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf"}
+      - {title: "Bill Inmon: A Tale of Two Architectures", url: "https://williaminmon.substack.com/p/a-tale-of-two-architectures-kimball"}
+      - {title: "Kimball Group: Enterprise Data Warehouse Bus Architecture", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/kimball-data-warehouse-bus-architecture/"}
+      - {title: "PostgreSQL CREATE TABLE", url: "https://www.postgresql.org/docs/current/sql-createtable.html"}
+      - {title: "PostgreSQL CREATE MATERIALIZED VIEW", url: "https://www.postgresql.org/docs/current/sql-creatematerializedview.html"}
+    tiers:
+      - {id: "inputs", label: "業務システム", z: 2, size: [17,4], kind: "origin"}
+      - {id: "edw", label: "統合処理と EDW", z: 1, size: [17,5]}
+      - {id: "marts", label: "依存型データマート", z: 0, size: [17,4]}
+      - {id: "implementation-setup", label: "実装時の設定・観測", z: 3, size: [8,3]}
+    nodes:
+      example-orders: {label: "landing スキーマの 3 ソース表", kind: "table", tier: "inputs", x: 1, y: 1.5, realizes: ["orders","customers","refunds"], description: "注文・顧客・返金のエクスポートを、元のキーのまま別テーブルで受け取る。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+      example-integrate: {label: "統合 ETL の SQL", kind: "workflow", tier: "edw", x: 2, y: 2, realizes: ["integrate"], description: "顧客キーを対応表で引き、注文・明細・返金を反映する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+      example-core: {label: "edw スキーマの正規化表", kind: "table", tier: "edw", x: 7, y: 2, realizes: ["core"], description: "顧客、注文、明細、返金に主キーと外部キーを設定する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+      example-serve: {label: "マート用の SQL リフレッシュ処理", kind: "workflow", tier: "edw", x: 12, y: 2, realizes: ["serve"], description: "統合 EDW を読み、用途別の粒度を再生成する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+      example-sales: {label: "sales.order_line マテリアライズドビュー", kind: "table", tier: "marts", x: 4, y: 1.5, realizes: ["sales"], description: "注文明細の粒度で地域と受注金額を提供する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+      example-finance: {label: "finance.daily_amount マテリアライズドビュー", kind: "table", tier: "marts", x: 11, y: 1.5, realizes: ["finance"], description: "日別・通貨別に注文金額と返金額を提供する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+      example-keymap: {label: "EDW の顧客キー対応表", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "ソース名とソース顧客キーの組を企業顧客キーに関連付ける。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+    links:
+      - {id: "example-keymap-connection", from: "example-keymap", to: "example-integrate", label: "入力ごとの顧客 ID を統合", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}

@@ -2,8 +2,8 @@
   "model": "snowflake-time-travel",
   "name": "Snowflake Time Travel とゼロコピークローン",
   "coverage": {
-    "covered": 3,
-    "total": 3
+    "covered": 4,
+    "total": 4
   },
   "byId": {
     "operator": {
@@ -13,7 +13,7 @@
     },
     "current": {
       "type": "node",
-      "label": "本番 ORDERS",
+      "label": "本番の注文テーブル",
       "status": "claim"
     },
     "history": {
@@ -33,17 +33,17 @@
     },
     "failsafe": {
       "type": "node",
-      "label": "Fail-safe",
+      "label": "サービス事業者による回復期間",
       "status": "claim"
     },
     "inspect": {
       "type": "link",
-      "label": "復旧担当 → 本番 ORDERS",
+      "label": "復旧担当 → 本番の注文テーブル",
       "status": "claim"
     },
     "before": {
       "type": "link",
-      "label": "本番 ORDERS → 保持期間内の履歴",
+      "label": "本番の注文テーブル → 保持期間内の履歴",
       "status": "claim"
     },
     "verify": {
@@ -53,12 +53,12 @@
     },
     "restore": {
       "type": "link",
-      "label": "差分検証・修復 → 本番 ORDERS",
+      "label": "差分検証・修復 → 本番の注文テーブル",
       "status": "claim"
     },
     "expire": {
       "type": "link",
-      "label": "保持期間内の履歴 → Fail-safe",
+      "label": "保持期間内の履歴 → サービス事業者による回復期間",
       "status": "claim"
     },
     "recover": {
@@ -68,6 +68,53 @@
     "retention": {
       "type": "scenario",
       "label": "保持期間を超えた場合"
+    },
+    "example-operator": {
+      "type": "implementation",
+      "impl": "snowflake-recovery",
+      "label": "データ復旧担当ロール",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "example-current": {
+      "type": "implementation",
+      "impl": "snowflake-recovery",
+      "label": "Snowflake 永続テーブル ORDERS と Time Travel",
+      "realizes": [
+        "current",
+        "history"
+      ]
+    },
+    "example-clone": {
+      "type": "implementation",
+      "impl": "snowflake-recovery",
+      "label": "ORDERS_RECOVERY クローン",
+      "realizes": [
+        "clone"
+      ]
+    },
+    "example-repair": {
+      "type": "implementation",
+      "impl": "snowflake-recovery",
+      "label": "検証用ウェアハウスの SQL",
+      "realizes": [
+        "repair"
+      ]
+    },
+    "example-failsafe": {
+      "type": "implementation",
+      "impl": "snowflake-recovery",
+      "label": "Snowflake Fail-safe",
+      "realizes": [
+        "failsafe"
+      ]
+    },
+    "example-querylog": {
+      "type": "implementation",
+      "impl": "snowflake-recovery",
+      "label": "Snowflake クエリ履歴",
+      "realizes": []
     }
   },
   "byRef": {
@@ -91,7 +138,13 @@
       "restore",
       "expire",
       "recover",
-      "retention"
+      "retention",
+      "example-operator",
+      "example-current",
+      "example-clone",
+      "example-repair",
+      "example-failsafe",
+      "example-querylog"
     ],
     "docs/reference-snowflake-time-travel.md#§2": [
       "history",
@@ -106,6 +159,14 @@
       "expire",
       "recover",
       "retention"
+    ],
+    "docs/reference-snowflake-time-travel.md#§4": [
+      "example-operator",
+      "example-current",
+      "example-clone",
+      "example-repair",
+      "example-failsafe",
+      "example-querylog"
     ]
   },
   "reference": {

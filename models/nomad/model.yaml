@@ -11,11 +11,11 @@ evidence: [{type: doc, ref: docs/reference-nomad.md#§1}]
 tiers: [{id: control, label: Nomad 制御, z: 1, size: [12, 3]}, {id: runtime, label: ノード実行, z: 0, size: [12, 3]}]
 nodes:
   job: {label: 注文 API ジョブ, kind: service, tier: control, x: 1, y: 1.5, description: task group と count を宣言する desired state。, evidence: [{type: doc, ref: docs/reference-nomad.md#§1}, {type: doc, ref: docs/reference-nomad.md#§3}]}
-  evaluation: {label: Evaluation, kind: scheduler, tier: control, x: 4, y: 1.5, description: 状態変化を契機に作られるスケジューリング判断単位。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
-  scheduler: {label: Nomad scheduler, kind: scheduler, tier: control, x: 7, y: 1.5, description: feasible node を絞り ranking して Allocation plan を作る。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}, {type: doc, ref: docs/reference-nomad.md#§3}]}
-  allocation: {label: Allocation, kind: service, tier: runtime, x: 2, y: 1.5, description: task group と client node の対応を表す割り当て。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
-  client: {label: Nomad client node, kind: host, tier: runtime, x: 6, y: 1.5, description: Allocation を受け注文 API task を実行するノード。, evidence: [{type: doc, ref: docs/reference-nomad.md#§1}, {type: doc, ref: docs/reference-nomad.md#§4}]}
-  deployment: {label: Deployment, kind: service, tier: runtime, x: 10, y: 1.5, description: update と健全性に従い段階的な変更を監視する。, evidence: [{type: doc, ref: docs/reference-nomad.md#§4}]}
+  evaluation: {label: 配置の再評価, kind: scheduler, tier: control, x: 4, 'y': 1.5, description: 状態変化を契機に作られるスケジューリング判断単位。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
+  scheduler: {label: 配置先の決定, kind: scheduler, tier: control, x: 7, 'y': 1.5, description: feasible node を絞り ranking して Allocation plan を作る。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}, {type: doc, ref: docs/reference-nomad.md#§3}]}
+  allocation: {label: クライアントへの作業割当, kind: service, tier: runtime, x: 2, 'y': 1.5, description: task group と client node の対応を表す割り当て。, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
+  client: {label: 実行ノード, kind: host, tier: runtime, x: 6, 'y': 1.5, description: Allocation を受け注文 API task を実行するノード。, evidence: [{type: doc, ref: docs/reference-nomad.md#§1}, {type: doc, ref: docs/reference-nomad.md#§4}]}
+  deployment: {label: 更新の進行管理, kind: workflow, tier: runtime, x: 10, 'y': 1.5, description: update と健全性に従い段階的な変更を監視する。, evidence: [{type: doc, ref: docs/reference-nomad.md#§4}]}
 links:
   - {id: submit, from: job, to: evaluation, label: ジョブを評価, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
   - {id: plan, from: evaluation, to: scheduler, label: 評価を処理, evidence: [{type: doc, ref: docs/reference-nomad.md#§2}]}
@@ -37,3 +37,91 @@ scenarios:
       - {links: [replace], note: 更新または障害で次の Evaluation を発行する。}
       - {links: [plan, allocate], note: scheduler が停止・更新・新規 Allocation を計画する。}
       - {links: [run], note: client が新 Allocation を実行し、Deployment が健全性を確認する。}
+implementations:
+  - id: vm
+    label: Nomad の Docker ドライバーと Consul
+    description: 自己管理の Nomad server と複数の client VM に、注文 API を Docker コンテナとして段階展開する例。
+    sources:
+      - title: Nomad rolling updates
+        url: https://developer.hashicorp.com/nomad/docs/job-declare/strategy/rolling
+      - title: Nomad scheduling
+        url: https://developer.hashicorp.com/nomad/docs/concepts/scheduling/how-scheduling-works
+      - title: Docker task driver
+        url: https://developer.hashicorp.com/nomad/docs/drivers/docker
+    tiers:
+      - id: control
+        label: Nomad 制御
+        z: 1
+      - id: runtime
+        label: ノード実行
+        z: 0
+    groups:
+      - kind: datacenter
+        label: 自己管理データセンター
+        provider: onprem
+        tier:
+          - control
+          - runtime
+        nodes:
+          - vm-scheduler
+          - vm-client
+          - vm-consul
+    nodes:
+      vm-job:
+        label: 注文 API の Nomad jobspec
+        kind: file
+        tier: control
+        realizes:
+          - job
+        description: Docker イメージとタスクグループの台数、update 設定を記述する。
+        evidence:
+          - type: doc
+            ref: docs/reference-nomad.md#§6
+      vm-scheduler:
+        label: Nomad server VM 群
+        kind: worker
+        tier: control
+        svc: onprem:vm
+        realizes:
+          - evaluation
+          - scheduler
+          - allocation
+          - deployment
+        description: Evaluation を処理して Allocation を作り、Deployment の進行も管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-nomad.md#§6
+      vm-client:
+        label: Nomad client VM 群の Docker driver
+        kind: host
+        tier: runtime
+        svc: onprem:vm
+        realizes:
+          - client
+        description: 割り当てが決まると注文 API のコンテナを起動する。
+        evidence:
+          - type: doc
+            ref: docs/reference-nomad.md#§6
+      vm-consul:
+        label: Consul サービス登録とヘルスチェック
+        kind: monitor
+        tier: runtime
+        description: HTTP ヘルスチェックの判定をローリング更新に使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-nomad.md#§6
+    links:
+      - id: vm-register-health
+        from: vm-client
+        to: vm-consul
+        label: サービスを登録・監視
+        evidence:
+          - type: doc
+            ref: docs/reference-nomad.md#§6
+      - id: vm-report-health
+        from: vm-consul
+        to: vm-scheduler
+        label: ヘルスチェックで次の更新を判定
+        evidence:
+          - type: doc
+            ref: docs/reference-nomad.md#§6

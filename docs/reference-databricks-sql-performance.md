@@ -28,3 +28,19 @@ Liquid clustering はテーブルのデータ配置を条件列に合わせて�
 - [クエリプロファイル](https://docs.databricks.com/aws/en/sql/user/queries/query-profile)
 - [Liquid clustering](https://docs.databricks.com/aws/en/tables/clustering)
 - [Predictive optimization](https://docs.databricks.com/aws/en/optimizations/predictive-optimization)
+
+## 5. 実装例 Databricks Serverless SQL のクエリ調査
+
+注文の管理 Delta テーブルを Serverless SQL Warehouse で読み、Query Profile と履歴を使って改善前後を調べる例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 注文集計 SQL | Databricks SQL Editor | 条件と集計が明示された注文クエリを実行する。 |
+| SQL 実行の計算資源・最適化された演算エンジン・結合・再分配 | Serverless SQL Warehouse と Photon | 対応するスキャン・結合を処理し、必要な並列実行と再分配をサービス側で行う。 |
+| 列指向テーブルのデータファイル | Unity Catalog 管理 Delta テーブル | 注文日の絞り込みに利用できる統計とファイルを持つ。 |
+| クエリの演算子プロファイル | Databricks Query Profile | 時間や読み取り行数などの演算子指標を確認する。 |
+| テーブル保守 | Liquid Clustering のテーブル設定 | 注文日などのアクセス条件を踏まえてクラスタリング方法を選ぶ。 |
+
+スキャンの対象範囲と並行負荷を個別に比較する。テーブルに適用できる保守機能と履歴の利用範囲は、Unity Catalog の管理形態や権限に従う。
+
+出典 [SQL Warehouse の種類](https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types)、[Photon](https://docs.databricks.com/aws/en/compute/photon)、[クエリプロファイル](https://docs.databricks.com/aws/en/sql/user/queries/query-profile)、[Liquid clustering](https://docs.databricks.com/aws/en/tables/clustering)、[Predictive optimization](https://docs.databricks.com/aws/en/optimizations/predictive-optimization)、[Query history system table](https://docs.databricks.com/aws/en/admin/system-tables/query-history)

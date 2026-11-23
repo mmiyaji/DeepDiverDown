@@ -26,3 +26,20 @@ Model Serving のカスタムモデルエンドポイントに登録済みのバ
 - [MLflow のモデル記録](https://docs.databricks.com/aws/en/mlflow/models)
 - [Unity Catalog のモデルライフサイクル](https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/)
 - [Model Serving エンドポイントの作成](https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints)
+
+## 5. 実装例 Unity Catalog モデルのオンライン配備
+
+実験結果から承認済みの版を選び、注文アプリから Databricks のカスタムモデルエンドポイントを呼ぶ構成。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 学習用の注文テーブル | Unity Catalog のモデル学習用テーブル | 注文時点の特徴量を読み取れるようにする。 |
+| 学習ジョブ・実験記録とモデル成果物 | Databricks 学習ジョブと MLflow Experiment | モデルの学習、パラメータ、検証結果、成果物を同じ Run に記録する。 |
+| モデル版のレジストリ | Unity Catalog の登録モデル | 選んだ成果物を新しいモデル版として登録する。 |
+| 検証・配備ジョブ | モデル配備ジョブ | モデル名と承認済みバージョンをエンドポイント設定へ渡す。 |
+| オンライン推論エンドポイント | Databricks Model Serving | 設定した Unity Catalog モデルをオンラインで実行する。 |
+| 注文アプリ | 注文アプリのエンドポイントクライアント | 推論 API を呼んでスコアを取得する。 |
+
+配備ジョブが承認したバージョンを明示する。注文アプリは配備ジョブと別の主体で、推論 API の利用に必要な権限を持つ。
+
+出典 [MLflow のモデル記録](https://docs.databricks.com/aws/en/mlflow/models)、[Unity Catalog のモデルライフサイクル](https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/)、[Model Serving エンドポイントの作成](https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints)、[Query serving endpoints for custom models](https://docs.databricks.com/aws/en/machine-learning/model-serving/score-custom-model-endpoints)

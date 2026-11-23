@@ -26,3 +26,19 @@ Snowflake はマイクロパーティションごとに値の範囲などを記�
 - [マイクロパーティション](https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions)
 - [マルチクラスターウェアハウス](https://docs.snowflake.com/en/user-guide/warehouses-multicluster)
 - [永続化されたクエリ結果](https://docs.snowflake.com/en/user-guide/querying-persisted-results)
+
+## 5. 実装例 Snowflake Enterprise の BI 負荷調査
+
+BI 専用のマルチクラスターウェアハウスで、待ち時間、区画の読み取り、結果再利用を調べる例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| BI クエリ | 注文集計 SQL クライアント | 注文日を条件に、同一の SQL を実行する。 |
+| クエリ受付と計画 | Snowflake Cloud Services | クエリを受付け、計画や結果再利用の判断を調整する。 |
+| 実行待ち行列・並列クエリ実行資源 | BI_WH マルチクラスターウェアハウス | 最小・最大クラスター数とスケーリングポリシーを設定する。 |
+| 区画メタデータ・列指向のストレージ区画 | Snowflake ORDERS のマイクロパーティション | サービスが管理する区画メタデータで不要な区画を除外する。 |
+| 永続化済み結果 | Snowflake の永続化クエリ結果 | 同一クエリなど、再利用の条件を満たすときに使う。 |
+
+調査では `QUEUED_OVERLOAD_TIME` と `PARTITIONS_SCANNED` を別々に比較する。マルチクラスターは主に並行クエリの需要に対応する構成である。永続化結果を使える条件も確認する。
+
+出典 [マイクロパーティション](https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions)、[マルチクラスターウェアハウス](https://docs.snowflake.com/en/user-guide/warehouses-multicluster)、[永続化されたクエリ結果](https://docs.snowflake.com/en/user-guide/querying-persisted-results)、[QUERY_HISTORY ビュー](https://docs.snowflake.com/en/sql-reference/account-usage/query_history)

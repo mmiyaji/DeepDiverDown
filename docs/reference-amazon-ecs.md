@@ -29,3 +29,24 @@ REPLICA スケジューリングは指定した desired count のタスクを維
 サービス更新では deployment configuration により新旧タスクの置き換え方を制御できる。運用時は desired count、実行方式（Fargate/EC2）、capacity provider、配置制約、Availability Zone の分散を確認する。Fargate は DAEMON スケジューリングをサポートせず、EC2 の DAEMON は各条件適合コンテナインスタンスに 1 タスクを置くため、注文 API の REPLICA と役割が異なる。
 
 出典 [Amazon ECS service deployment controllers and strategies](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_service-options.html)
+
+## 6. 実装例：ECS の Fargate サービスと EC2 サービス
+同じ ECS クラスタの中で注文 API のタスク定義を共有し、Fargate と EC2 を別のサービスとして比較する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 長時間稼働サービスの定義 | ECS Service の設定 × 2 |
+| 実行数の維持と再配置 | ECS サービス制御と容量戦略 |
+| 実行先の選択と配置 | ECS サービス制御と容量戦略 |
+| 利用者がホストを管理しない実行先 | Fargate capacity provider のタスク |
+| 利用者がホストを管理する実行先 | EC2 Auto Scaling group のコンテナインスタンス |
+| ロードバランサー | Application Load Balancer と別ターゲットグループ |
+
+- **Amazon ECR の共通イメージ**。両方のサービスが同じバージョンの注文 API イメージを参照する。
+
+Fargate と Auto Scaling group の capacity provider は、同一の capacity provider strategy に混在させない。例では経路を切り替えて両方式を比較する。
+
+公式資料
+- [Amazon ECS launch types and capacity providers](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/capacity-launch-type-comparison.html)
+- [Amazon ECS capacity providers for EC2 workloads](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/asg-capacity-providers.html)
+- [Use an Application Load Balancer for Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/alb.html)

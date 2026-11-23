@@ -31,3 +31,20 @@ SQL エンジンはテーブルの現在のメタデータを読み、そこか�
 ## 8. パーティションの進化と孤立ファイル
 
 パーティション仕様は変更でき（partition evolution）、変更はメタデータに新しい仕様を追加するだけで、既存のデータファイルは書き直さない。古いファイルは古い仕様（例：月）のまま残り、新しく書くファイルだけが新しい仕様（例：日）で置かれる。クエリは各ファイルに記録された仕様ごとにプルーニングする。また、スナップショットを失効させると、失効した版だけが参照していたファイルが削除される。どのメタデータからも参照されないまま残ったファイル（書き込み失敗の残骸など）は `remove_orphan_files` で掃除する。出典 [Iceberg Partitioning](https://iceberg.apache.org/docs/latest/partitioning/)、[Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
+
+## 9. 実装例：Spark・Iceberg REST・MinIO
+
+Apache Iceberg の Spark Quickstart に沿って、Spark と REST カタログを起動し、MinIO へテーブルファイルを置く例。
+
+| 機能 | 具体的な担い手 | 配置・設定 |
+| --- | --- | --- |
+| SQL エンジン | Spark SQL・Iceberg Runtime | テーブルをロードし、計画と読み書きを行う。 |
+| Table Metadata・Snapshot | MinIO の metadata.json と Snapshot | 表定義と各スナップショットの参照情報を同じメタデータに保持する。 |
+| Manifest List | MinIO の Manifest List | スナップショットで使う Manifest の一覧を保持する。 |
+| Manifest | MinIO の Manifest | 対象データファイルの位置と統計を保持する。 |
+| Data Files | MinIO の Parquet | クエリに必要なデータ本体。 |
+| 実装で追加 | REST Catalog コンテナ | Spark が使う現在のテーブルメタデータを解決する。 |
+
+テーブル作成の後、書き込みごとに Iceberg のスナップショットが公開される。カタログの REST エンドポイントを Spark に設定し、初期化処理で S3 互換バケットを用意する。ローカル確認用の認証情報と運用用の認証設定は分ける。
+
+[Apache Iceberg Specification](https://iceberg.apache.org/spec/)、[Spark and Iceberg Quickstart](https://iceberg.apache.org/spark-quickstart/)

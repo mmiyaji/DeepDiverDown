@@ -2,8 +2,8 @@
   "model": "microsoft-fabric",
   "name": "Microsoft Fabric の基本アーキテクチャ",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "source": {
@@ -13,72 +13,72 @@
     },
     "pipeline": {
       "type": "node",
-      "label": "Fabric パイプライン",
+      "label": "取込パイプライン",
       "status": "claim"
     },
     "files": {
       "type": "node",
-      "label": "OneLake・Files",
+      "label": "取込ファイルの保管領域",
       "status": "claim"
     },
     "spark": {
       "type": "node",
-      "label": "Spark ノートブック",
+      "label": "データ変換ノートブック",
       "status": "claim"
     },
     "delta": {
       "type": "node",
-      "label": "OneLake・Delta テーブル",
+      "label": "分析用の Delta テーブル",
       "status": "claim"
     },
     "sql": {
       "type": "node",
-      "label": "SQL 分析エンドポイント",
+      "label": "SQL 読み取り口",
       "status": "claim"
     },
     "bi": {
       "type": "node",
-      "label": "Power BI",
+      "label": "BI レポート",
       "status": "claim"
     },
     "catalog": {
       "type": "node",
-      "label": "OneLake catalog",
+      "label": "データ資産カタログ",
       "status": "claim"
     },
     "extract": {
       "type": "link",
-      "label": "受注データ → Fabric パイプライン",
+      "label": "受注データ → 取込パイプライン",
       "status": "claim"
     },
     "copy": {
       "type": "link",
-      "label": "Fabric パイプライン → OneLake・Files",
+      "label": "取込パイプライン → 取込ファイルの保管領域",
       "status": "claim"
     },
     "load": {
       "type": "link",
-      "label": "OneLake・Files → Spark ノートブック",
+      "label": "取込ファイルの保管領域 → データ変換ノートブック",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "Spark ノートブック → OneLake・Delta テーブル",
+      "label": "データ変換ノートブック → 分析用の Delta テーブル",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "OneLake・Delta テーブル → SQL 分析エンドポイント",
+      "label": "分析用の Delta テーブル → SQL 読み取り口",
       "status": "claim"
     },
     "report": {
       "type": "link",
-      "label": "SQL 分析エンドポイント → Power BI",
+      "label": "SQL 読み取り口 → BI レポート",
       "status": "claim"
     },
     "discover": {
       "type": "link",
-      "label": "OneLake catalog → OneLake・Delta テーブル",
+      "label": "データ資産カタログ → 分析用の Delta テーブル",
       "status": "claim"
     },
     "report-sales": {
@@ -88,6 +88,69 @@
     "discover-asset": {
       "type": "scenario",
       "label": "カタログから Lakehouse を探して利用する"
+    },
+    "example-source": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "受注 CSV の外部保存先",
+      "realizes": [
+        "source"
+      ]
+    },
+    "example-pipeline": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "Fabric Data Factory の Copy activity",
+      "realizes": [
+        "pipeline"
+      ]
+    },
+    "example-files": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "OneLake の Lakehouse Files と Tables",
+      "realizes": [
+        "files",
+        "delta"
+      ]
+    },
+    "example-spark": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "Fabric Spark ノートブック",
+      "realizes": [
+        "spark"
+      ]
+    },
+    "example-sql": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "Lakehouse SQL 分析エンドポイント",
+      "realizes": [
+        "sql"
+      ]
+    },
+    "example-bi": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "Power BI 受注レポート",
+      "realizes": [
+        "bi"
+      ]
+    },
+    "example-catalog": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "OneLake カタログ",
+      "realizes": [
+        "catalog"
+      ]
+    },
+    "example-semantic": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "Power BI セマンティックモデル",
+      "realizes": []
     }
   },
   "byRef": {
@@ -114,7 +177,15 @@
       "report",
       "discover",
       "report-sales",
-      "discover-asset"
+      "discover-asset",
+      "example-source",
+      "example-pipeline",
+      "example-files",
+      "example-spark",
+      "example-sql",
+      "example-bi",
+      "example-catalog",
+      "example-semantic"
     ],
     "docs/reference-microsoft-fabric.md#§2": [
       "source",
@@ -136,6 +207,16 @@
       "catalog",
       "discover",
       "discover-asset"
+    ],
+    "docs/reference-microsoft-fabric.md#§5": [
+      "example-source",
+      "example-pipeline",
+      "example-files",
+      "example-spark",
+      "example-sql",
+      "example-bi",
+      "example-catalog",
+      "example-semantic"
     ]
   },
   "reference": {

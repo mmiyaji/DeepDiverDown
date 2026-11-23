@@ -2,13 +2,13 @@
   "model": "lsm-compaction",
   "name": "LSM ツリーのフラッシュとコンパクション",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "client": {
       "type": "node",
-      "label": "Writer / Reader",
+      "label": "キー値を書き読むアプリ",
       "status": "claim"
     },
     "wal": {
@@ -38,12 +38,12 @@
     },
     "write-wal": {
       "type": "link",
-      "label": "Writer / Reader → WAL",
+      "label": "キー値を書き読むアプリ → WAL",
       "status": "claim"
     },
     "write-mem": {
       "type": "link",
-      "label": "Writer / Reader → MemTable",
+      "label": "キー値を書き読むアプリ → MemTable",
       "status": "claim"
     },
     "flush": {
@@ -63,17 +63,17 @@
     },
     "read-mem": {
       "type": "link",
-      "label": "Writer / Reader → MemTable",
+      "label": "キー値を書き読むアプリ → MemTable",
       "status": "claim"
     },
     "read-l0": {
       "type": "link",
-      "label": "Writer / Reader → L0 SSTables",
+      "label": "キー値を書き読むアプリ → L0 SSTables",
       "status": "claim"
     },
     "read-l1": {
       "type": "link",
-      "label": "Writer / Reader → L1",
+      "label": "キー値を書き読むアプリ → L1",
       "status": "claim"
     },
     "flush-compact": {
@@ -93,6 +93,39 @@
     "UNK-01": {
       "type": "unknown",
       "label": "実際のエンジン、コンパクション方式（レベル型・サイズ階層型）、階層の数とサイズは未確定。"
+    },
+    "rocksdb-level-app": {
+      "type": "implementation",
+      "impl": "rocksdb-level",
+      "label": "RocksDB を組み込むアプリプロセス",
+      "realizes": [
+        "client"
+      ]
+    },
+    "rocksdb-level-memory": {
+      "type": "implementation",
+      "impl": "rocksdb-level",
+      "label": "RocksDB の共有 WAL と列ファミリーの MemTable",
+      "realizes": [
+        "wal",
+        "memtable"
+      ]
+    },
+    "rocksdb-level-sst": {
+      "type": "implementation",
+      "impl": "rocksdb-level",
+      "label": "RocksDB DB パスの SST ファイル群",
+      "realizes": [
+        "l0",
+        "l1",
+        "l2"
+      ]
+    },
+    "rocksdb-level-manifest": {
+      "type": "implementation",
+      "impl": "rocksdb-level",
+      "label": "RocksDB MANIFEST",
+      "realizes": []
     }
   },
   "byRef": {
@@ -117,7 +150,11 @@
       "read-l1",
       "flush-compact",
       "lsm-read",
-      "LSM-01"
+      "LSM-01",
+      "rocksdb-level-app",
+      "rocksdb-level-memory",
+      "rocksdb-level-sst",
+      "rocksdb-level-manifest"
     ],
     "docs/reference-lsm-compaction.md#§2": [
       "client",
@@ -145,11 +182,19 @@
     ],
     "docs/reference-lsm-compaction.md#§6": [
       "flush-compact"
+    ],
+    "docs/reference-lsm-compaction.md#§7": [
+      "rocksdb-level-app",
+      "rocksdb-level-memory",
+      "rocksdb-level-sst",
+      "rocksdb-level-manifest"
     ]
   },
   "reference": {
-    "category": "大規模データ分析の基本概念",
-    "order": 35,
+    "category": "分散実行と保守",
+    "order": 30,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
     "objectives": [
       "WAL と MemTable による速い書き込みと、フラッシュで SSTable ができる流れを説明する。",
       "L0 の重なり、レベル型コンパクションで階層を下りながらマージする理由を理解する。",

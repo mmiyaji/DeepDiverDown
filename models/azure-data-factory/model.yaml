@@ -17,22 +17,22 @@ tiers:
   - {id: data, label: データ移動と変換, z: 0, size: [22, 3]}
 nodes:
   source: {label: 注文ファイル, kind: external, tier: data, x: 0, y: 1.5, description: 外部ストレージに届く入力データ。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§1}]}
-  trigger: {label: Trigger, kind: service, tier: orchestration, x: 0, y: 1.5, description: スケジュールまたはイベントで実行を開始する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§5}]}
-  pipeline: {label: Pipeline, kind: service, tier: orchestration, x: 4, y: 1.5, description: 複数のアクティビティを一つの作業単位にまとめる。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§2}]}
-  copy: {label: Copy Activity, kind: worker, tier: data, x: 5, y: 1.5, description: ソースから取り込み先へデータを移動する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§2}]}
-  ir: {label: Integration Runtime, kind: worker, tier: data, x: 9, y: 0, description: アクティビティと接続先を橋渡しする計算基盤。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
-  landing: {label: 一時配置された注文ファイル, kind: db, tier: data, x: 9, y: 2.5, description: Copy Activity の出力と Data Flow の入力。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§6}]}
-  flow: {label: Mapping Data Flow, kind: worker, tier: data, x: 13, y: 1.5, description: 管理された Spark 環境でデータを変換する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
-  lake: {label: Azure Data Lake Storage, kind: db, tier: data, x: 18, y: 1.5, description: 整形済みデータを保持する出力先。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§6}]}
-  monitor: {label: Azure Monitor, kind: service, tier: orchestration, x: 13, y: 1.5, description: パイプラインとアクティビティの状態を監視する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§5}]}
+  trigger: {label: 定期起動の条件, kind: service, tier: orchestration, x: 0, 'y': 1.5, description: スケジュールまたはイベントで実行を開始する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§5}]}
+  pipeline: {label: データ処理のワークフロー, kind: service, tier: orchestration, x: 4, 'y': 1.5, description: 複数のアクティビティを一つの作業単位にまとめる。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§2}]}
+  copy: {label: ファイルのコピー処理, kind: worker, tier: data, x: 5, 'y': 1.5, description: ソースから取り込み先へデータを移動する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§2}]}
+  ir: {label: アクティビティの実行基盤, kind: worker, tier: data, x: 9, 'y': 0, description: アクティビティと接続先を橋渡しする計算基盤。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
+  landing: {label: 一時配置された注文ファイル, kind: db, tier: data, x: 9, y: 2.5, description: コピー処理の出力と変換処理の入力を保持する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§6}]}
+  flow: {label: 列と型の変換処理, kind: worker, tier: data, x: 13, y: 1.5, description: 入力の列、データ型や値を整形する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
+  lake: {label: 整形済みデータの保存先, kind: db, tier: data, x: 18, 'y': 1.5, description: 整形済みデータを保持する出力先。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§6}]}
+  monitor: {label: 処理状態の監視, kind: service, tier: orchestration, x: 13, 'y': 1.5, description: パイプラインとアクティビティの状態を監視する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§5}]}
 links:
   - {id: trigger-pipeline, from: trigger, to: pipeline, label: パイプラインを起動, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§5}]}
-  - {id: pipeline-activity, from: pipeline, to: copy, label: Activity を実行（接続と Dataset を解決）, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§2}, {type: doc, ref: docs/reference-azure-data-factory.md#§3}]}
+  - {id: pipeline-activity, from: pipeline, to: copy, label: 入力・出力定義を解決してコピー, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§2}, {type: doc, ref: docs/reference-azure-data-factory.md#§3}]}
   - {id: read-source, from: source, to: copy, label: 注文ファイルを読む, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§2}]}
   - {id: land-raw, from: copy, to: landing, label: 変換前のファイルを配置, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§6}]}
   - {id: read-raw, from: landing, to: flow, label: 変換前のファイルを読む, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§6}]}
-  - {id: copy-ir, from: copy, to: ir, label: IR へディスパッチ, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
-  - {id: ir-flow, from: ir, to: flow, label: Data Flow を実行, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
+  - {id: copy-ir, from: copy, to: ir, label: 実行基盤へ処理を割り当てる, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
+  - {id: ir-flow, from: ir, to: flow, label: 列と型の変換を実行, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§4}]}
   - {id: flow-lake, from: flow, to: lake, label: 整形済みデータを書き込む, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§6}]}
   - {id: observe, from: pipeline, to: monitor, label: 実行状態を監視, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§5}]}
 scenarios:
@@ -42,3 +42,28 @@ requirements:
   - {id: NFR-01, kind: nfr, title: 実行可視化, text: パイプラインとアクティビティの成功・失敗を監視できる。, links: [observe], evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§5}]}
 unknowns: [{id: UNK-01, text: 実際のトリガー周期、接続資格情報、Data Flow の変換規則は未確定。, refs: [trigger, pipeline, flow]}]
 gates: {maxDrift: 0, maxHigh: 0}
+
+implementations:
+  - id: azure
+    label: "ADF と Azure Data Lake Storage Gen2"
+    description: "Azure Blob Storage の注文ファイルを Azure Integration Runtime でコピーし、変換前と整形済みの領域を分けた ADLS Gen2 に保存する例。"
+    sources:
+      - {title: Introduction to Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/introduction}
+      - {title: Pipelines and activities, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-pipelines-activities}
+      - {title: Linked services, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-linked-services}
+      - {title: Integration runtime, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime}
+      - {title: Monitor Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/monitor-data-factory}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    groups:
+      - {kind: cloud, label: Azure サブスクリプション, provider: azure, tier: [processing, setup]}
+    nodes:
+      azure-source: {label: Azure Blob Storage 入力コンテナー, kind: db, tier: processing, x: 1, y: 1.15, svc: azure:storage, realizes: [source], description: 注文ファイルの投入元。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
+      azure-pipeline: {label: ADF のスケジュール Trigger・Pipeline・Copy Activity, kind: workflow, tier: processing, x: 1, y: 3.65, realizes: [trigger, pipeline, copy], description: 定期的にコピーを始め、成功後に変換を依存実行する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
+      azure-ir: {label: Azure Integration Runtime と Mapping Data Flow, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [ir, flow], description: コピーのデータ移動と、管理 Spark 上のマッピング変換を担う。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
+      azure-lake: {label: ADLS Gen2 の raw と curated, kind: db, tier: processing, x: 5, y: 3.65, svc: azure:storage, realizes: [landing, lake], description: 変換前の中間結果と整形データを別のパスに保存する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
+      azure-monitor: {label: Azure Monitor / ADF の監視画面, kind: monitor, tier: processing, x: 9, y: 1.15, realizes: [monitor], description: パイプラインやアクティビティの実行状態を確認する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
+      azure-linked: {label: Linked Service と Dataset, kind: catalog, tier: setup, x: 1, y: 1.5, description: 入力・出力の接続とパスを宣言し、コピーと変換で参照する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
+    links:
+      - {id: azure-linked-connection, from: azure-linked, to: azure-pipeline, label: 接続・パスの定義を読む}

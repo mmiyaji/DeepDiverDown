@@ -17,8 +17,8 @@ tiers:
 groups:
   - {kind: parallel, label: 範囲ごとにタスクが並列に読む, tier: reader, nodes: [task-a, task-b]}
 nodes:
-  task-a: {label: タスク A（前半を担当）, kind: worker, tier: reader, x: 2, y: 1.5, description: ファイルの先頭から中央までを担当する。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
-  task-b: {label: タスク B（後半を担当）, kind: worker, tier: reader, x: 10, y: 1.5, description: ファイルの中央から末尾までを担当する。途中から読み始める。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+  task-a: {label: 入力の前半を読むタスク, kind: worker, tier: reader, x: 2, 'y': 1.5, description: ファイルの先頭から中央までを担当する。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§3}]}
+  task-b: {label: 入力の後半を読むタスク, kind: worker, tier: reader, x: 10, 'y': 1.5, description: ファイルの中央から末尾までを担当する。途中から読み始める。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§3}]}
   header: {label: ヘッダー（スキーマ）, kind: segment, tier: file, x: 0, y: 1.5, description: マジック、JSON のスキーマ、コーデック、同期マーカー。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§2"}]}
   blocks: {label: データブロック, kind: segment, tier: file, x: 5, y: 1.5, partitions: 4, description: レコード数・バイト数・圧縮したレコード本体。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§2"}]}
   sync: {label: 同期マーカー, kind: segment, tier: file, x: 10, y: 1.5, description: 各ブロックの後ろに置く 16 バイト。ヘッダーと同じ値。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
@@ -83,3 +83,23 @@ fileLayout:
         - {id: b3-head, label: 件数・長さ, bytes: 8, kind: header, node: blocks}
         - {id: b3-data, label: レコード（圧縮）, bytes: 262144, kind: page, node: blocks}
         - {id: b3-sync, label: 同期マーカー, bytes: 16, kind: magic, node: sync}
+
+implementations:
+  - id: hadoop-mapreduce
+    label: "Hadoop MapReduce の Avro 分割読み取り"
+    description: "HDFS 上の Avro Object Container File を AvroKeyInputFormat で二つの Map タスクに分担させる例。Split の開始点がブロック途中なら、同期マーカーで読み始めを合わせる。"
+    sources:
+      - {title: Avro Specification - Object Container Files, url: https://avro.apache.org/docs/current/specification/#object-container-files}
+      - {title: Avro Schema Resolution, url: https://avro.apache.org/docs/current/specification/#schema-resolution}
+      - {title: AvroKeyInputFormat, url: https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/mapreduce/AvroKeyInputFormat.html}
+      - {title: Avro DataFileReader, url: https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/file/DataFileReader.html}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      hadoop-mapreduce-front: {label: Map タスク A の Avro レコード読取, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [task-a], description: 先頭側の Split を読み、ブロックの所有範囲で止める。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
+      hadoop-mapreduce-tail: {label: Map タスク B の Avro レコード読取, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [task-b], description: 後半側の Split を受け取り、次の同期位置に合わせる。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
+      hadoop-mapreduce-hdfs: {label: HDFS 上の Avro Object Container File, kind: file, tier: processing, x: 5, y: 1.15, realizes: [header, blocks, sync], description: 同一ファイルのヘッダー、データブロック、同期マーカーを二つのタスクが読む。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
+      hadoop-mapreduce-input: {label: AvroKeyInputFormat のジョブ設定, kind: file, tier: setup, x: 1, y: 1.5, description: 入力パスと形式を Hadoop ジョブに登録し、Map タスク用に Split を用意する。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
+    links:
+      - {id: hadoop-mapreduce-input-connection, from: hadoop-mapreduce-input, to: hadoop-mapreduce-front, label: Avro 入力を割り当てる}

@@ -29,3 +29,24 @@ service ジョブに注文 API の task group と count を定義して登録す
 既定の scheduler は bin packing で資源利用率を高め、task group の複数インスタンスには自動 anti-affinity を適用して同一ノードへの集中を抑える。必要なら spread でデータセンター、ラック、ノード属性にまたがる分散を指定する。Allocation（割り当て）と scheduler（評価から計画を作る機構）は別の概念として扱う。
 
 出典 [Advanced job scheduling](https://developer.hashicorp.com/nomad/docs/job-scheduling)
+
+## 6. 実装例：Nomad の Docker ドライバーと Consul
+自己管理の Nomad server と複数の client VM に、注文 API を Docker コンテナとして段階展開する例。
+
+| 機能配置 | この例での担い手 |
+|---|---|
+| 注文 API ジョブ | 注文 API の Nomad jobspec |
+| 配置の再評価 | Nomad server VM 群 |
+| 配置先の決定 | Nomad server VM 群 |
+| クライアントへの作業割当 | Nomad server VM 群 |
+| 実行ノード | Nomad client VM 群の Docker driver |
+| 更新の進行管理 | Nomad server VM 群 |
+
+- **Consul サービス登録とヘルスチェック**。HTTP ヘルスチェックの判定をローリング更新に使う。
+
+更新並列数とヘルス条件は jobspec で定義する。タスクの配置可否は Docker driver の起動条件と各 VM の容量にも依存する。
+
+公式資料
+- [Nomad rolling updates](https://developer.hashicorp.com/nomad/docs/job-declare/strategy/rolling)
+- [Nomad scheduling](https://developer.hashicorp.com/nomad/docs/concepts/scheduling/how-scheduling-works)
+- [Docker task driver](https://developer.hashicorp.com/nomad/docs/drivers/docker)

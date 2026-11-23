@@ -69,3 +69,26 @@ BigQuery は `PARTITION BY` と `CLUSTER BY` を組み合わせ、パーティ�
 ## 8. 保存順序の書き直し（sort rewrite）
 
 ランダムな順で書かれたファイルは、どのファイルも customer_id の最小値〜最大値がほぼ全範囲になり、統計で 1 つも除外できない。テーブル形式の sort rewrite（Iceberg の `rewrite_data_files` の sort 戦略、Delta Lake の Z-order など）で customer_id の順に並べ替えて書き直すと、各ファイルの範囲が狭くなり、customer_id = 42 を含むファイルだけを読めばよくなる。書き直しは読み取りとは別の保守作業で、計算とストレージ書き込みの費用がかかる。出典 [Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
+
+## 9. 実装例：BigQuery の月パーティションと顧客クラスタリング
+
+BigQuery の orders テーブルを注文日の月でパーティション化し、customer_id でクラスタリングする例。月の除外とブロックの除外を別々に追える。
+
+| 機能 | 実装での担い手 | 配置・設定 |
+| --- | --- | --- |
+| SQL の利用者 | BigQuery コンソールの SQL エディター | 日付範囲と顧客キーを WHERE に指定する。 |
+| orders table、order_date partitions、customer_id blocks/files | BigQuery orders テーブル | DATE_TRUNC で月別にパーティション化し、同じ月では customer_id をクラスタ列にする。 |
+| フィルタを計画する処理、候補のデータを読む処理 | BigQuery の SQL 実行 | 関係する月に絞り、クラスタ列を使う述語で不要なブロックを除外し得る。 |
+| 検索結果と並び順 | BigQuery のクエリ結果 | 条件に合う行を返し、順序が必要なら SELECT の ORDER BY を使用する。 |
+
+実装で加わる部品を以下に示す。
+
+- クエリジョブの処理量。パーティションによる見積りと、実行後の処理バイトなどを参照する。クラスタリングの除外量は実行まで確定しない。
+
+公式資料
+
+- [Query partitioned tables](https://cloud.google.com/bigquery/docs/querying-partitioned-tables)
+- [Introduction to clustered tables](https://cloud.google.com/bigquery/docs/clustered-tables)
+- [Query clustered tables](https://cloud.google.com/bigquery/docs/querying-clustered-tables)
+- [Apache Iceberg Specification - Sorting](https://iceberg.apache.org/spec/#sorting)
+- [Create partitioned tables](https://cloud.google.com/bigquery/docs/creating-partitioned-tables)

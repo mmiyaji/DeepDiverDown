@@ -25,3 +25,21 @@
 
 - [OpenSharing の概念](https://docs.databricks.com/aws/en/opensharing)
 - [OpenSharing の SQL リファレンス](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-sharing)
+
+## 5. 実装例 OpenSharing の受領者別公開
+
+同じ集計表を、別 Databricks アカウントと外部ツールに向けた二つの受領者設定で公開する例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 提供側管理者 | 提供側 Unity Catalog 管理者 | 集計表と提供相手を決める。 |
+| 注文集計テーブル | sales.orders_summary | 提供側で整備した集計テーブル。 |
+| 公開資産と受領者の定義・失効 | OpenSharing の SHARE・RECIPIENT・権限 | 受領者を経路別に登録して、Share へのアクセスを付与・取り消しする。 |
+| 受領側のデータカタログ | 受領者の Unity Catalog 共有カタログ | Databricks-to-Databricks の提供者と Share を指定して作る。 |
+| 受領側のクエリ実行 | 受領者の Databricks SQL Warehouse | 受領側で共有カタログを読む。 |
+| 外部クライアント向け共有接続口 | オープン共有の Delta Sharing 接続口 | 外部ツール向けの共有プロトコルを提供する。 |
+| 外部分析クライアント | 外部 Delta Sharing 対応クライアント | 許可された接続情報で集計を参照する。 |
+
+Databricks-to-Databricks と外部クライアントで受領者設定を分ける。取り消しの対象は共有を経由する将来の利用で、すでに受領者が書き出した複製は各受領者が管理する。
+
+出典 [OpenSharing の概念](https://docs.databricks.com/aws/en/opensharing)、[OpenSharing の SQL リファレンス](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-sharing)、[OpenSharing 受領者の作成](https://docs.databricks.com/aws/en/opensharing/create-recipient)、[OpenSharing Share の作成](https://docs.databricks.com/aws/en/opensharing/create-share)

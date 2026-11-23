@@ -2,73 +2,73 @@
   "model": "k3s",
   "name": "K3s の基本アーキテクチャ",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "kubectl": {
       "type": "node",
-      "label": "kubectl / 利用者",
+      "label": "構成の投入クライアント",
       "status": "claim"
     },
     "server": {
       "type": "node",
-      "label": "K3s server",
+      "label": "クラスタ制御部",
       "status": "claim"
     },
     "datastore": {
       "type": "node",
-      "label": "K3s datastore",
+      "label": "クラスタ状態ストア",
       "status": "claim"
     },
     "agent": {
       "type": "node",
-      "label": "K3s agent",
+      "label": "ノード参加エージェント",
       "status": "claim"
     },
     "runtime": {
       "type": "node",
-      "label": "kubelet / runtime / CNI",
+      "label": "ノード実行・ネットワーク",
       "status": "claim"
     },
     "order-api": {
       "type": "node",
-      "label": "注文 API Pod",
+      "label": "注文 API の実行単位",
       "status": "claim"
     },
     "service": {
       "type": "node",
-      "label": "注文 API Service",
+      "label": "注文 API の公開",
       "status": "claim"
     },
     "apply": {
       "type": "link",
-      "label": "kubectl / 利用者 → K3s server",
+      "label": "構成の投入クライアント → クラスタ制御部",
       "status": "claim"
     },
     "persist": {
       "type": "link",
-      "label": "K3s server → K3s datastore",
+      "label": "クラスタ制御部 → クラスタ状態ストア",
       "status": "claim"
     },
     "register": {
       "type": "link",
-      "label": "K3s agent → K3s server",
+      "label": "ノード参加エージェント → クラスタ制御部",
       "status": "claim"
     },
     "schedule": {
       "type": "link",
-      "label": "K3s server → kubelet / runtime / CNI",
+      "label": "クラスタ制御部 → ノード実行・ネットワーク",
       "status": "claim"
     },
     "start": {
       "type": "link",
-      "label": "kubelet / runtime / CNI → 注文 API Pod",
+      "label": "ノード実行・ネットワーク → 注文 API の実行単位",
       "status": "claim"
     },
     "expose": {
       "type": "link",
-      "label": "注文 API Service → 注文 API Pod",
+      "label": "注文 API の公開 → 注文 API の実行単位",
       "status": "claim"
     },
     "agent-loss": {
@@ -79,6 +79,54 @@
     "deploy-order-api": {
       "type": "scenario",
       "label": "K3s に注文 API をデプロイ"
+    },
+    "ha-kubectl": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "kubectl",
+      "realizes": [
+        "kubectl"
+      ]
+    },
+    "ha-server": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "K3s server VM × 3",
+      "realizes": [
+        "server",
+        "datastore"
+      ]
+    },
+    "ha-agent": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "K3s agent VM",
+      "realizes": [
+        "agent",
+        "runtime"
+      ]
+    },
+    "ha-order-api": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "注文 API Deployment",
+      "realizes": [
+        "order-api"
+      ]
+    },
+    "ha-service": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "LoadBalancer Service / ServiceLB",
+      "realizes": [
+        "service"
+      ]
+    },
+    "ha-registration": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "固定 API・登録アドレス",
+      "realizes": []
     }
   },
   "byRef": {
@@ -101,7 +149,13 @@
       "start",
       "expose",
       "agent-loss",
-      "deploy-order-api"
+      "deploy-order-api",
+      "ha-kubectl",
+      "ha-server",
+      "ha-agent",
+      "ha-order-api",
+      "ha-service",
+      "ha-registration"
     ],
     "docs/reference-k3s.md#§2": [
       "model",
@@ -133,11 +187,21 @@
     "docs/reference-k3s.md#§5": [
       "model",
       "agent-loss"
+    ],
+    "docs/reference-k3s.md#§6": [
+      "ha-kubectl",
+      "ha-server",
+      "ha-agent",
+      "ha-order-api",
+      "ha-service",
+      "ha-registration"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
+    "category": "Kubernetes 系",
     "order": 30,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "K3s server と agent の責務と構成差を区別する。",
       "server の API を通じて注文 API Pod を agent で起動する流れを追う。",

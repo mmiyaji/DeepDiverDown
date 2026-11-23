@@ -2,8 +2,8 @@
   "model": "rke2",
   "name": "RKE2 の基本アーキテクチャ",
   "coverage": {
-    "covered": 3,
-    "total": 3
+    "covered": 4,
+    "total": 4
   },
   "byId": {
     "admin": {
@@ -18,57 +18,57 @@
     },
     "server": {
       "type": "node",
-      "label": "RKE2 Server・API",
+      "label": "クラスタ制御部・API",
       "status": "claim"
     },
     "etcd": {
       "type": "node",
-      "label": "etcd",
+      "label": "クラスタ状態ストア",
       "status": "claim"
     },
     "agent": {
       "type": "node",
-      "label": "RKE2 Agent",
+      "label": "ノード参加・実行エージェント",
       "status": "claim"
     },
     "pod": {
       "type": "node",
-      "label": "注文 API Pod",
+      "label": "注文 API の実行単位",
       "status": "claim"
     },
     "register": {
       "type": "link",
-      "label": "RKE2 Agent → 固定登録アドレス",
+      "label": "ノード参加・実行エージェント → 固定登録アドレス",
       "status": "claim"
     },
     "connect": {
       "type": "link",
-      "label": "固定登録アドレス → RKE2 Server・API",
+      "label": "固定登録アドレス → クラスタ制御部・API",
       "status": "claim"
     },
     "apply": {
       "type": "link",
-      "label": "デプロイ担当 → RKE2 Server・API",
+      "label": "デプロイ担当 → クラスタ制御部・API",
       "status": "claim"
     },
     "persist": {
       "type": "link",
-      "label": "RKE2 Server・API → etcd",
+      "label": "クラスタ制御部・API → クラスタ状態ストア",
       "status": "claim"
     },
     "assign": {
       "type": "link",
-      "label": "RKE2 Server・API → RKE2 Agent",
+      "label": "クラスタ制御部・API → ノード参加・実行エージェント",
       "status": "claim"
     },
     "start": {
       "type": "link",
-      "label": "RKE2 Agent → 注文 API Pod",
+      "label": "ノード参加・実行エージェント → 注文 API の実行単位",
       "status": "claim"
     },
     "heartbeat": {
       "type": "link",
-      "label": "RKE2 Agent → RKE2 Server・API",
+      "label": "ノード参加・実行エージェント → クラスタ制御部・API",
       "status": "claim"
     },
     "agent-to-workload": {
@@ -78,6 +78,53 @@
     "agent-loss": {
       "type": "scenario",
       "label": "Agent 停止後の Pod の再配置"
+    },
+    "ha-admin": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "kubectl を使う運用端末",
+      "realizes": [
+        "admin"
+      ]
+    },
+    "ha-address": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "外部 L4 ロードバランサー",
+      "realizes": [
+        "address"
+      ]
+    },
+    "ha-server": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "rke2-server VM × 3",
+      "realizes": [
+        "server",
+        "etcd"
+      ]
+    },
+    "ha-agent": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "rke2-agent VM",
+      "realizes": [
+        "agent"
+      ]
+    },
+    "ha-pod": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "注文 API Deployment / Pod",
+      "realizes": [
+        "pod"
+      ]
+    },
+    "ha-token": {
+      "type": "implementation",
+      "impl": "ha",
+      "label": "ノード登録トークン",
+      "realizes": []
     }
   },
   "byRef": {
@@ -103,7 +150,13 @@
       "start",
       "heartbeat",
       "agent-to-workload",
-      "agent-loss"
+      "agent-loss",
+      "ha-admin",
+      "ha-address",
+      "ha-server",
+      "ha-agent",
+      "ha-pod",
+      "ha-token"
     ],
     "docs/reference-rke2.md#§2": [
       "address",
@@ -120,11 +173,21 @@
       "start",
       "heartbeat",
       "agent-loss"
+    ],
+    "docs/reference-rke2.md#§4": [
+      "ha-admin",
+      "ha-address",
+      "ha-server",
+      "ha-agent",
+      "ha-pod",
+      "ha-token"
     ]
   },
   "reference": {
-    "category": "コンテナオーケストレーション",
+    "category": "Kubernetes 系",
     "order": 40,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "Server と Agent の分担、固定登録アドレスの用途を区別する。",
       "Kubernetes の希望状態が Agent 上の Pod として実現するまでを追う。"

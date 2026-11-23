@@ -35,3 +35,22 @@
 例では注文1件を1行とし、選んだ基準時刻の出荷処理済み区分と顧客を提供する。Business Vault の派生値に Raw Vault の関連を組み合わせる。利用側の注文数や状態別の集計は、このマートの粒度に基づく。
 
 出典 [Data Vault 2.0 Introduction](https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/)、[Data Vault Alliance: Centralized Architecture vs Decentralized Architecture](https://datavaultalliance.com/strategy-operating/centralized-vs-decentralized-architecture/)
+
+## 7. 実装例 Snowflake の Raw Vault と出荷状態マート
+
+ステージング、Raw Vault、Business Vault、配信マートを Snowflake の別スキーマに置く実装例。
+
+| 機能 | 具体的な担い手 | 設定・成果物 |
+|---|---|---|
+| 注文・顧客データ | LANDING.ORDERS 入力行 | 取込可能になった注文変更を保持する。 |
+| ステージング | STAGING.ORDERS_LOAD ビュー | 業務キーを整形し、取込時刻と出所を付けて後段に渡す。 |
+| 注文 Hub | RAW.HUB_ORDER | 注文業務キーを一意に登録する。 |
+| 顧客 Hub | RAW.HUB_CUSTOMER | 顧客業務キーを一意に登録する。 |
+| 注文・顧客 Link | RAW.LINK_ORDER_CUSTOMER | 注文と顧客のキーの組を保持する。 |
+| 注文 Satellite | RAW.SAT_ORDER_STATE | 状態が変わった行を履歴として追記する。 |
+| Business Vault | BUSINESS.ORDER_SHIPMENT_STATUS ビュー | 出荷処理済みを示す区分を計算する。 |
+| 注文 Information Mart | MART.ORDER_STATUS テーブル | 分析基準時点を決めて注文ごとに展開する。 |
+
+Snowflake Task グラフを専用スキーマに置き、各ロードとマート更新の依存順序を設定する。Hub と Link の再処理は重複登録を避ける。Satellite は元の値と取得時刻を保存し、出荷処理済み区分の変更時には Business Vault の計算結果とマートを更新する。
+
+出典 [Data Vault 2.0 Introduction](https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/)、[Data Vault Alliance: Data Vault, Data Mesh, and Polysemes](https://datavaultalliance.com/architecture-data/data-vault-data-mesh-and-polysemes/)、[Data Vault Alliance: Building a Real-Time Data Vault](https://datavaultalliance.com/engineering/building-a-real-time-data-vault-in-snowflake/)、[Data Vault Alliance: Centralized Architecture vs Decentralized Architecture](https://datavaultalliance.com/strategy-operating/centralized-vs-decentralized-architecture/)、[Snowflake MERGE](https://docs.snowflake.com/en/sql-reference/sql/merge)、[Snowflake task graph](https://docs.snowflake.com/en/user-guide/tasks-graphs)
