@@ -44,3 +44,29 @@ Nessie はカタログの名前付き参照を管理する。ブランチはコ�
 warehouse をサーバーで定義する。試行用の履歴はインメモリで、再起動後も保持する運用では永続バックエンドを使う。Iceberg REST 対応は公式ガイドで実験的とされる。
 
 [Nessie Specification](https://projectnessie.org/develop/spec/)、[Configure Nessie with Iceberg REST](https://projectnessie.org/guides/iceberg-rest/)、[Getting Started with Nessie and Iceberg REST](https://projectnessie.org/guides/try-nessie/)
+
+公式ローカル Compose は Nessie、MinIO と Keycloak を起動し、バケットを用意する。Spark SQL はホストから OAuth で接続し、Nessie の署名を使って S3 互換ストレージへアクセスする。インメモリ履歴は再起動時に失われる。これは学習用構成で、本構成のブランチ操作は未検証。[公式 Compose](https://github.com/projectnessie/nessie/blob/main/docker/catalog-auth-s3/docker-compose.yml)
+
+## 7. 実装例：AWS の EKS・RDS for PostgreSQL・S3
+
+同じ AWS アカウントに Amazon EKS クラスタを用意し、マネージドノードグループの EC2 で Nessie の Helm チャートと Spark on Kubernetes を実行する。RDS for PostgreSQL に Nessie 用のデータベースとスキーマを作成し、Nessie の JDBC バックエンドから接続する。Iceberg REST の warehouse は Amazon S3 に置く。
+
+| 機能配置 | AWS での担い手 |
+|---|---|
+| Iceberg エンジン | EKS 上の Spark Driver・Executor Pod |
+| データ運用者 | クラスタ内の Nessie API に到達できる環境から Nessie CLI を利用 |
+| Iceberg REST・参照・テーブル状態の解決 | EKS 上の Nessie Server Pod |
+| コミット履歴と参照の永続化 | Amazon RDS for PostgreSQL の Nessie Version Store |
+| Iceberg メタデータとデータファイル | Amazon S3 の warehouse プレフィックス |
+
+運用者は Nessie API でブランチとタグを管理し、Spark は Iceberg REST で対象ブランチを指定してテーブルを解決する。Nessie Pod はサービスアカウントで AWS の権限を取得し、S3 にアクセスするロールを引き受ける。この例ではクライアント向けの credential vending を有効にし、Nessie が AWS STS から取得した短期資格情報で Spark が S3 を直接読み書きする。
+
+- [Project Nessie — Nessie on Kubernetes](https://projectnessie.org/guides/kubernetes/)
+- [Project Nessie — Server configuration](https://projectnessie.org/nessie-0-107-4/configuration/)
+- [Project Nessie — Configure Nessie with Iceberg REST](https://projectnessie.org/guides/iceberg-rest/)
+- [Apache Spark — Running Spark on Kubernetes](https://spark.apache.org/docs/3.5.7/running-on-kubernetes.html)
+- [Amazon EKS — Managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
+- [Amazon EKS — IAM roles for service accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+- [Amazon RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html)
+
+EKS の制御プレーン基盤は AWS が運用し、利用者は Kubernetes API、ノードグループ設定、Spark と Nessie の Pod を管理する。制御プレーンサーバーは直接操作しない。RDS・S3 の基盤は AWS が運用し、利用者はデータ、権限と設定を管理する。資料を組み合わせた例であり、Nessie のバージョン、JDBC、credential vending と Spark の組み合わせは実動作未検証。[AWS shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

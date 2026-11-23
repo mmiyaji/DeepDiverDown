@@ -34,3 +34,5 @@ Slack Engineering が 2023 年 4 月 11 日に公開した [Real-time Messaging]
 | オンライン状態 | Presence Server と Gateway |
 
 [Slack Engineering: Real-time Messaging](https://slack.engineering/real-time-messaging/)、[Envoy overview](https://www.envoyproxy.io/docs/envoy/latest/intro/what_is_envoy)、[Consul service discovery](https://developer.hashicorp.com/consul/docs/discover)。
+
+2D・3D の領域は公開記事に基づく論理配置であり、サーバーの実ホスト、クラウド、ネットワークの包含関係や現在の構成を表さない。Gateway 以外のサーバーを複数地域に置くことも推定していない。

@@ -89,3 +89,22 @@ ClickHouse の Distributed 表から、顧客のハッシュで二つのデー�
 - [Trino・Tasks と Splits](https://trino.io/docs/current/overview/concepts.html#split)
 - [ClickHouse Distributed table engine](https://clickhouse.com/docs/reference/engines/table-engines/special/distributed)
 - [ClickHouse MergeTree table engine](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
+
+## 10. 実装例：AWS（ClickHouse on EC2・Amazon EBS）
+
+同じ VPC に Linux の EC2 を3台配置し、1台を ClickHouse の調整ノード、残りをシャード A と B とする。各シャードには同じ AZ 内の専用 EBS ボリュームを接続し、ローカル MergeTree のデータディレクトリを置く。
+
+| 機能 | 担い手 |
+|---|---|
+| 書き込み先の決定と部分結果の統合 | 調整ノードの ClickHouse Distributed 表 |
+| ローカルの保存と部分集計 | A、B の ClickHouse Server と MergeTree |
+| 月パーティション内のデータパートの保存 | シャードごとの Amazon EBS |
+
+調整ノードの `remote_servers` に二つのシャードを定義し、Distributed 表の分配式に `cityHash64(customer_id)`、ローカル表のパーティション式に `toYYYYMM(order_date)` を使う。書き込みは `distributed_foreground_insert=1` とし、先に顧客キーでシャードを選び、その中で注文月のパートに格納する。読み取り時は各シャードで月を絞る。顧客条件から対象シャードを限定できる場合は、`optimize_skip_unused_shards` の設定と実行計画を確認する。この例は各シャード1台のため、運用者がバックアップと復旧を管理する。
+
+- [ClickHouse Distributed](https://clickhouse.com/docs/reference/engines/table-engines/special/distributed)
+- [ClickHouse MergeTree](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
+- [ClickHouse の Debian・Ubuntu 導入](https://clickhouse.com/docs/get-started/setup/self-managed/debian-ubuntu)
+- [Amazon EBS ボリュームのアタッチ](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html)
+
+自前例は調整ノードと二つのシャードを別の Linux ホストに置き、利用者が ClickHouse とローカルディスクを管理する。AWS 例は AWS が EC2・EBS の基盤を運用し、利用者が OS、ClickHouse、ネットワーク、データ、バックアップと復旧を管理する。いずれも公式資料を組み合わせた代表例で、各シャードのレプリカや冗長性は仮定せず、具体的な接続・性能・バージョンは未検証。

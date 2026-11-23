@@ -42,3 +42,27 @@ Airflow 3 のスケジューラーと Celery ワーカーを分け、Redis に�
 - [Airflow Celery Executor](https://airflow.apache.org/docs/apache-airflow-providers-celery/stable/celery_executor.html)
 - [DAG Serialization](https://airflow.apache.org/docs/apache-airflow/stable/dag-serialization.html)
 - [Airflow Security Model](https://airflow.apache.org/docs/apache-airflow/stable/security/security_model.html)
+
+公式 Docker Compose の試行環境を基に、ローカルホストのコンテナで Airflow、Redis と PostgreSQL を動かし、共有ボリューム上の入力と出力をタスクで扱う例。業務タスクと共有ボリュームの追加は動作未検証。公式 Compose は学習・探索用で、本番向けのセキュリティを保証しない。[Airflow Docker Compose](https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html)
+
+## 8. 実装例：Amazon MWAA・Fargate・S3
+
+Amazon MWAA の Airflow 2 系 CeleryExecutor 環境で、S3 の受注データを取り込み、変換と品質検査を実行する例。
+
+| 機能 | 担い手 |
+| --- | --- |
+| 依存グラフ | 利用者アカウントの S3 に置く DAG ファイル。 |
+| タスク配布 | AWS が管理する Fargate 上の Scheduler と CeleryExecutor、および SQS。 |
+| 取り込み・変換・品質検査 | MWAA の Fargate ワーカーで動く Airflow タスク。 |
+| 実行メタデータ | AWS 管理の Aurora PostgreSQL。 |
+| データとログ | 利用者側の S3 に受注データを置き、環境のログを CloudWatch Logs に送る。 |
+
+対象の MWAA Airflow バージョンに合わせて DAG と Python の依存関係を固定する。運用者の IAM アクセスと MWAA の実行ロールを分け、実行ロールに必要な S3・SQS・CloudWatch への権限を付与する。AWS 管理のメタデータ DB へは環境内のコンポーネントがプライベート接続する。
+
+公式資料
+
+- [Amazon MWAA のネットワークとコンポーネント](https://docs.aws.amazon.com/mwaa/latest/migrationguide/mwaa-architecture.html)
+- [Amazon MWAA の概要](https://docs.aws.amazon.com/mwaa/latest/userguide/what-is-mwaa.html)
+- [Amazon MWAA の実行ロール](https://docs.aws.amazon.com/mwaa/latest/userguide/mwaa-create-role.html)
+
+MWAA は Scheduler と Worker の Fargate、タスクキューとメタデータ DB を AWS が管理する領域で運用する。利用者は環境設定、DAG、依存関係、実行ロールや Airflow UI/API の許可を設定できるが、管理 DB や内部コンテナを直接管理するものではない。入力・出力を同一バケットの別プレフィックスとした処理は資料を組み合わせた例で、実動作は未検証。[AWS 共有責任](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

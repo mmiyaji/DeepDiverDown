@@ -42,11 +42,37 @@ implementations:
     sources:
       - title: OpenLineage Object Model
         url: https://openlineage.io/docs/1.47.0/spec/object-model/
+      - title: Marquez Docker Compose
+        url: https://github.com/MarquezProject/marquez/blob/main/docker-compose.yml
       - title: OpenLineage Getting Started
         url: https://openlineage.io/getting-started/
       - title: Using OpenLineage with Spark
         url: https://openlineage.io/docs/1.54.0/guides/spark/
     nodes:
+      spark-marquez-host:
+        label: 自前 Linux ホスト（Spark local）
+        kind: host
+        tier: flow
+        x: 3
+        y: 0
+        description: ローカルモードの Spark Driver JVM を起動する。
+        evidence: [{type: doc, ref: docs/reference-openlineage.md#§7}]
+      spark-marquez-docker:
+        label: 自前 Linux ホストの Docker Compose
+        kind: host
+        tier: lineage
+        x: 6
+        y: 0
+        description: Marquez API と Web UI、PostgreSQL コンテナーを実行する。
+        evidence: [{type: doc, ref: docs/reference-openlineage.md#§7}]
+      spark-marquez-db:
+        label: Marquez PostgreSQL
+        kind: db
+        tier: lineage
+        x: 15
+        y: 1.5
+        description: Marquez のメタデータを保持する PostgreSQL。
+        evidence: [{type: doc, ref: docs/reference-openlineage.md#§7}]
       spark-marquez-raw:
         label: 入力 Parquet（受注原本）
         kind: file
@@ -59,6 +85,7 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-openlineage.md#§7
+
       spark-marquez-spark:
         label: Apache Spark（整形・集計）
         kind: service
@@ -129,6 +156,11 @@ implementations:
           - type: doc
             ref: docs/reference-openlineage.md#§7
     links:
+      - {id: spark-marquez-spark-host, from: spark-marquez-host, to: spark-marquez-spark, label: Spark JVM を実行}
+      - {id: spark-marquez-docker-api, from: spark-marquez-docker, to: spark-marquez-api, label: API を実行}
+      - {id: spark-marquez-docker-ui, from: spark-marquez-docker, to: spark-marquez-ui, label: UI を実行}
+      - {id: spark-marquez-docker-db, from: spark-marquez-docker, to: spark-marquez-db, label: DB を実行}
+      - {id: spark-marquez-store, from: spark-marquez-api, to: spark-marquez-db, label: リネージを保存・取得}
       - id: spark-marquez-capture
         from: spark-marquez-spark
         to: spark-marquez-listener
@@ -150,3 +182,104 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-openlineage.md#§7
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 16]}
+      nodes:
+        spark-marquez-host: {tier: diagram, x: 3, y: 2}
+        spark-marquez-spark: {tier: diagram, x: 3, y: 5}
+        spark-marquez-listener: {tier: diagram, x: 3, y: 8}
+        spark-marquez-raw: {tier: diagram, x: 9, y: 2}
+        spark-marquez-detail: {tier: diagram, x: 9, y: 5}
+        spark-marquez-result: {tier: diagram, x: 9, y: 8}
+        spark-marquez-docker: {tier: diagram, x: 15, y: 2}
+        spark-marquez-api: {tier: diagram, x: 15, y: 5}
+        spark-marquez-ui: {tier: diagram, x: 15, y: 8}
+        spark-marquez-db: {tier: diagram, x: 15, y: 11}
+      groups:
+        - {kind: nodegroup, label: "Spark ホスト", tier: [diagram], x0: 1, y0: 0, x1: 5, y1: 12, nodes: [spark-marquez-host, spark-marquez-spark, spark-marquez-listener]}
+        - {kind: nodegroup, label: "Marquez Docker ホスト", tier: [diagram], x0: 13, y0: 0, x1: 17, y1: 15, nodes: [spark-marquez-docker, spark-marquez-api, spark-marquez-ui, spark-marquez-db]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Spark ホスト", z: 0, origin: [0, 0], size: [5, 9]}
+        - {id: zone1, label: "Spark データ", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "Marquez Docker ホスト", z: 0, origin: [14, 0], size: [5, 12]}
+      nodes:
+        spark-marquez-host: {tier: zone0, x: 2, y: 1}
+        spark-marquez-spark: {tier: zone0, x: 2, y: 4}
+        spark-marquez-listener: {tier: zone0, x: 2, y: 7}
+        spark-marquez-raw: {tier: zone1, x: 2, y: 1}
+        spark-marquez-detail: {tier: zone1, x: 2, y: 4}
+        spark-marquez-result: {tier: zone1, x: 2, y: 7}
+        spark-marquez-docker: {tier: zone2, x: 2, y: 1}
+        spark-marquez-api: {tier: zone2, x: 2, y: 4}
+        spark-marquez-ui: {tier: zone2, x: 2, y: 7}
+        spark-marquez-db: {tier: zone2, x: 2, y: 10}
+      groups:
+        - {kind: nodegroup, label: "Spark ホスト", tier: [zone0], nodes: [spark-marquez-host, spark-marquez-spark, spark-marquez-listener]}
+        - {kind: nodegroup, label: "Marquez Docker ホスト", tier: [zone2], nodes: [spark-marquez-docker, spark-marquez-api, spark-marquez-ui, spark-marquez-db]}
+
+  - id: aws-glue-datazone
+    label: "AWS Glue Spark と Amazon DataZone"
+    description: "AWS Glue のマネージド Spark ジョブで S3 上の受注データを変換し、OpenLineage の RunEvent を Amazon DataZone に送る。"
+    sources:
+      - {title: "Amazon DataZone のデータリネージ", url: https://docs.aws.amazon.com/datazone/latest/userguide/datazone-data-lineage.html}
+      - {title: "AWS Glue の ETL ジョブ管理", url: https://docs.aws.amazon.com/glue/latest/dg/managing-jobs-chapter.html}
+      - {title: "AWS Glue の ETL ジョブ実行権限", url: https://docs.aws.amazon.com/glue/latest/dg/getting-started-min-privs-job.html}
+      - {title: "Amazon DataZone PostLineageEvent API", url: https://docs.aws.amazon.com/datazone/latest/APIReference/API_PostLineageEvent.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-glue-datazone-control, aws-glue-datazone-normalize, aws-glue-datazone-aggregate, aws-glue-datazone-collector, aws-glue-datazone-raw, aws-glue-datazone-detail, aws-glue-datazone-sales]}
+      - {kind: cluster, label: "AWS Glue マネージド Spark 実行環境", provider: aws, tier: [runtime], nodes: [aws-glue-datazone-normalize, aws-glue-datazone-aggregate]}
+    nodes:
+      aws-glue-datazone-agent: {label: "データ運用者", kind: client, tier: entry, x: 1, y: 1.5, description: "Glue のジョブを起動し、DataZone のポータルからリネージを確認する。", evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      aws-glue-datazone-control: {label: "AWS Glue ジョブ管理", kind: scheduler, tier: runtime, x: 2, y: 1.3, svc: glue, description: "設定した IAM ロール、スクリプト、Glue バージョンでジョブを起動する。", management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がジョブと実行ロールを設定する。"}, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      aws-glue-datazone-normalize: {label: "Glue Spark 受注整形ジョブ", kind: worker, tier: runtime, x: 7, y: 1.3, svc: glue, realizes: [normalize], description: "受注原本を読み、明細を生成する。リスナーと amazon_datazone_api transport から RunEvent を発行する。", management: {type: shared, scope: "AWS が Spark 基盤を運用し、利用者がスクリプトとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      aws-glue-datazone-aggregate: {label: "Glue Spark 日次集計ジョブ", kind: worker, tier: runtime, x: 12, y: 1.3, svc: glue, realizes: [aggregate], description: "明細を読み、日次売上を生成する。リスナーと amazon_datazone_api transport から RunEvent を発行する。", management: {type: shared, scope: "AWS が Spark 基盤を運用し、利用者がスクリプトとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      aws-glue-datazone-collector: {label: "DataZone ドメイン", kind: catalog, tier: runtime, x: 10, y: 5, svc: datazone, realizes: [events], description: "PostLineageEvent でリネージメタデータを受け取り、関係と履歴を保持する。", management: {type: shared, scope: "AWS が DataZone 基盤を運用し、利用者がドメインとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      aws-glue-datazone-raw: {label: "S3 受注原本", kind: db, tier: data, x: 2, y: 1.5, svc: s3, realizes: [raw], description: "受注原本のプレフィックス。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      aws-glue-datazone-detail: {label: "S3 受注明細", kind: db, tier: data, x: 8, y: 1.5, svc: s3, realizes: [detail], description: "整形済みのデータを保持するプレフィックス。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      aws-glue-datazone-sales: {label: "S3 日次売上", kind: db, tier: data, x: 14, y: 1.5, svc: s3, realizes: [sales], description: "集計結果を保持するプレフィックス。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+    links:
+      - {id: aws-glue-datazone-start, from: aws-glue-datazone-agent, to: aws-glue-datazone-control, label: "ジョブを投入", evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      - {id: aws-glue-datazone-start-norm, from: aws-glue-datazone-control, to: aws-glue-datazone-normalize, label: "整形ジョブを開始", evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      - {id: aws-glue-datazone-start-agg, from: aws-glue-datazone-control, to: aws-glue-datazone-aggregate, label: "集計ジョブを開始", evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      - {id: aws-glue-datazone-catalog, from: aws-glue-datazone-agent, to: aws-glue-datazone-collector, label: "リネージ履歴を参照", evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      - {id: aws-glue-datazone-send-norm, from: aws-glue-datazone-normalize, to: aws-glue-datazone-collector, label: "PostLineageEvent で整形 RunEvent を送信", realizes: [normalize-events], replace: true, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+      - {id: aws-glue-datazone-send-agg, from: aws-glue-datazone-aggregate, to: aws-glue-datazone-collector, label: "PostLineageEvent で集計 RunEvent を送信", realizes: [aggregate-events], replace: true, evidence: [{type: doc, ref: docs/reference-openlineage.md#§8}]}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 19]}
+      nodes:
+        aws-glue-datazone-agent: {tier: diagram, x: 3, y: 2}
+        aws-glue-datazone-control: {tier: diagram, x: 9, y: 2}
+        aws-glue-datazone-normalize: {tier: diagram, x: 9, y: 5}
+        aws-glue-datazone-aggregate: {tier: diagram, x: 9, y: 8}
+        aws-glue-datazone-collector: {tier: diagram, x: 15, y: 2}
+        aws-glue-datazone-raw: {tier: diagram, x: 21, y: 2}
+        aws-glue-datazone-detail: {tier: diagram, x: 21, y: 5}
+        aws-glue-datazone-sales: {tier: diagram, x: 21, y: 8}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 6, y0: 0, x1: 30, y1: 18, nodes: [aws-glue-datazone-control, aws-glue-datazone-normalize, aws-glue-datazone-aggregate, aws-glue-datazone-collector, aws-glue-datazone-raw, aws-glue-datazone-detail, aws-glue-datazone-sales]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "操作元", z: 0, origin: [0, 0], size: [5, 4]}
+        - {id: zone1, label: "AWS Glue", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "Amazon DataZone", z: 0, origin: [14, 0], size: [5, 4]}
+        - {id: zone3, label: "Amazon S3", z: 0, origin: [21, 0], size: [5, 9]}
+      nodes:
+        aws-glue-datazone-agent: {tier: zone0, x: 2, y: 1}
+        aws-glue-datazone-control: {tier: zone1, x: 2, y: 1}
+        aws-glue-datazone-normalize: {tier: zone1, x: 2, y: 4}
+        aws-glue-datazone-aggregate: {tier: zone1, x: 2, y: 7}
+        aws-glue-datazone-collector: {tier: zone2, x: 2, y: 1}
+        aws-glue-datazone-raw: {tier: zone3, x: 2, y: 1}
+        aws-glue-datazone-detail: {tier: zone3, x: 2, y: 4}
+        aws-glue-datazone-sales: {tier: zone3, x: 2, y: 7}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [zone1, zone2, zone3], nodes: [aws-glue-datazone-control, aws-glue-datazone-normalize, aws-glue-datazone-aggregate, aws-glue-datazone-collector, aws-glue-datazone-raw, aws-glue-datazone-detail, aws-glue-datazone-sales]}

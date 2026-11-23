@@ -1,0 +1,172 @@
+{
+  "model": "time-series-tiering",
+  "name": "時系列データの保持と階層化",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "時系列の観測値",
+      "status": "claim"
+    },
+    "hot": {
+      "type": "node",
+      "label": "Hot：最近の生データ",
+      "status": "claim"
+    },
+    "rollup": {
+      "type": "node",
+      "label": "時間幅別の集計",
+      "status": "claim"
+    },
+    "warm": {
+      "type": "node",
+      "label": "Warm：集計済みデータ",
+      "status": "claim"
+    },
+    "cold": {
+      "type": "node",
+      "label": "Cold：長期保存",
+      "status": "claim"
+    },
+    "step-1": {
+      "type": "link",
+      "label": "時系列の観測値 → Hot：最近の生データ",
+      "status": "claim"
+    },
+    "step-2": {
+      "type": "link",
+      "label": "Hot：最近の生データ → 時間幅別の集計",
+      "status": "claim"
+    },
+    "step-3": {
+      "type": "link",
+      "label": "時間幅別の集計 → Warm：集計済みデータ",
+      "status": "claim"
+    },
+    "step-4": {
+      "type": "link",
+      "label": "Warm：集計済みデータ → Cold：長期保存",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "入力から結果まで"
+    },
+    "impl-source": {
+      "type": "implementation",
+      "impl": "timescaledb-export",
+      "label": "SQL 投入クライアント",
+      "realizes": [
+        "source"
+      ]
+    },
+    "impl-hot": {
+      "type": "implementation",
+      "impl": "timescaledb-export",
+      "label": "生データの hypertable",
+      "realizes": [
+        "hot"
+      ]
+    },
+    "impl-rollup": {
+      "type": "implementation",
+      "impl": "timescaledb-export",
+      "label": "continuous aggregate 更新",
+      "realizes": [
+        "rollup"
+      ]
+    },
+    "impl-warm": {
+      "type": "implementation",
+      "impl": "timescaledb-export",
+      "label": "集計結果の hypertable",
+      "realizes": [
+        "warm"
+      ]
+    },
+    "impl-cold": {
+      "type": "implementation",
+      "impl": "timescaledb-export",
+      "label": "利用者が書き出すアーカイブファイル",
+      "realizes": [
+        "cold"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-time-series-tiering.md#§1": [
+      "model"
+    ],
+    "docs/reference-time-series-tiering.md": [
+      "model",
+      "source",
+      "hot",
+      "rollup",
+      "warm",
+      "cold",
+      "step-1",
+      "step-2",
+      "step-3",
+      "step-4",
+      "flow",
+      "impl-source",
+      "impl-hot",
+      "impl-rollup",
+      "impl-warm",
+      "impl-cold"
+    ],
+    "docs/reference-time-series-tiering.md#§3": [
+      "model"
+    ],
+    "docs/reference-time-series-tiering.md#§5": [
+      "model"
+    ],
+    "docs/reference-time-series-tiering.md#§2": [
+      "source",
+      "hot",
+      "rollup",
+      "warm",
+      "cold",
+      "step-1",
+      "step-2",
+      "step-3",
+      "step-4",
+      "flow"
+    ],
+    "docs/reference-time-series-tiering.md#§4": [
+      "impl-source",
+      "impl-hot",
+      "impl-rollup",
+      "impl-warm",
+      "impl-cold"
+    ]
+  },
+  "reference": {
+    "category": "時系列データ",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "objectives": [
+      "データのアクセス頻度と保持要件に応じて保存層を分ける。",
+      "生データと集計値の保持期間や遅延到着を考慮する。",
+      "層間の移動・復元の担い手を特定する。"
+    ],
+    "sources": [
+      {
+        "title": "Timescale hypertables",
+        "url": "https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables"
+      },
+      {
+        "title": "Timescale continuous aggregates",
+        "url": "https://www.tigerdata.com/docs/learn/continuous-aggregates"
+      },
+      {
+        "title": "PostgreSQL COPY",
+        "url": "https://www.postgresql.org/docs/current/sql-copy.html"
+      }
+    ]
+  }
+}

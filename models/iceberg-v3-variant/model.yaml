@@ -215,6 +215,10 @@ implementations:
     label: Spark 4.1・Iceberg 1.11・Parquet
     description: v3 表の Variant を Parquet に保存する例。shredding と統計は設定および各ファイルに依存する。
     sources:
+      - title: Spark Standalone Mode
+        url: https://spark.apache.org/docs/latest/spark-standalone.html
+      - title: Iceberg Spark Configuration
+        url: https://iceberg.apache.org/docs/latest/spark-configuration/
       - title: Iceberg Variant
         url: https://iceberg.apache.org/blog/variant-in-apache-iceberg/
       - title: Iceberg specification
@@ -241,6 +245,22 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host:
+        label: 自前 Linux Spark クラスター
+        kind: host
+        tier: schema
+        x: 3
+        y: 0
+        description: Spark Standalone で Driver と Executor を実行する。
+        evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§5}]
+      ex-storage:
+        label: 自前 HDFS と Hadoop カタログ
+        kind: db
+        tier: metadata
+        x: 3
+        y: 0
+        description: Iceberg メタデータと Parquet を保持する。
+        evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§5}]
       ex-engine:
         label: Spark SQL 4.1 / Iceberg 1.11
         kind: service
@@ -352,3 +372,98 @@ implementations:
             ref: docs/reference-iceberg-v3-variant.md#§5
         realizes:
           - manifest
+    links:
+      - {id: ex-host-spark, from: ex-host, to: ex-engine, label: Spark ジョブを実行}
+      - {id: ex-catalog-files, from: ex-engine, to: ex-storage, label: Iceberg 表を解決・読み書き}
+      - {id: ex-parquet-location, from: ex-storage, to: ex-file, label: Parquet を保持}
+      - {id: ex-manifest-location, from: ex-storage, to: ex-manifest, label: Manifest を保持}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 19]}
+      nodes:
+        ex-host: {tier: diagram, x: 2, y: 2}
+        ex-engine: {tier: diagram, x: 2, y: 5}
+        ex-plan: {tier: diagram, x: 2, y: 8}
+        ex-reader: {tier: diagram, x: 2, y: 11}
+        ex-storage: {tier: diagram, x: 8, y: 2}
+        ex-schema: {tier: diagram, x: 8, y: 5}
+        ex-manifest: {tier: diagram, x: 8, y: 8}
+        ex-file: {tier: diagram, x: 14, y: 2}
+        ex-meta: {tier: diagram, x: 14, y: 5}
+        ex-value: {tier: diagram, x: 14, y: 8}
+        ex-typed: {tier: diagram, x: 14, y: 11}
+      groups:
+        - {kind: cluster, label: "Spark クラスター", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 15, nodes: [ex-host, ex-engine, ex-plan, ex-reader]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Spark クラスター", z: 0, origin: [0, 0], size: [5, 12]}
+        - {id: zone1, label: "自前 HDFS", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "Parquet の Variant", z: 0, origin: [14, 0], size: [5, 12]}
+      nodes:
+        ex-host: {tier: zone0, x: 2, y: 1}
+        ex-engine: {tier: zone0, x: 2, y: 4}
+        ex-plan: {tier: zone0, x: 2, y: 7}
+        ex-reader: {tier: zone0, x: 2, y: 10}
+        ex-storage: {tier: zone1, x: 2, y: 1}
+        ex-schema: {tier: zone1, x: 2, y: 4}
+        ex-manifest: {tier: zone1, x: 2, y: 7}
+        ex-file: {tier: zone2, x: 2, y: 1}
+        ex-meta: {tier: zone2, x: 2, y: 4}
+        ex-value: {tier: zone2, x: 2, y: 7}
+        ex-typed: {tier: zone2, x: 2, y: 10}
+      groups:
+        - {kind: cluster, label: "Spark クラスター", tier: [zone0], nodes: [ex-host, ex-engine, ex-plan, ex-reader]}
+  - id: aws-emr-serverless
+    label: AWS（EMR Serverless・Glue・S3）
+    description: 対応ランタイムの EMR Serverless で Iceberg v3 の Variant を書き込み、S3 上の Parquet を読む例。
+    sources:
+      - {title: EMR Serverless emr-spark-8.2.0, url: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/release-version-emr-spark-8.2.0.html}
+      - {title: Amazon EMR Spark の Iceberg 対応, url: https://docs.aws.amazon.com/prescriptive-guidance/latest/apache-iceberg-on-aws/working-with-iceberg-in-amazon-emr-spark.html}
+      - {title: Apache Iceberg の Variant, url: https://iceberg.apache.org/blog/variant-in-apache-iceberg/}
+    tiers:
+      - {id: compute, label: Spark SQL の計画と読み書き, z: 1, size: [19, 4]}
+      - {id: storage, label: カタログと Iceberg ファイル, z: 0, size: [19, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [compute, storage], nodes: [aws-emr, aws-driver, aws-executor, aws-glue, aws-metadata, aws-parquet]}
+      - {kind: cluster, label: EMR Serverless の Spark アプリケーション, tier: compute, nodes: [aws-driver, aws-executor]}
+    nodes:
+      aws-emr: {label: Amazon EMR Serverless, svc: emr, kind: service, tier: compute, x: 2, y: 1.5, description: emr-spark-8.2.0 を使って Spark ジョブとワーカーを管理する。, management: {type: shared, scope: "AWS がサービス基盤を運用し、利用者がアプリケーションとジョブを設定する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§6}]}
+      aws-driver: {label: Spark 4.1（Driver）, kind: service, tier: compute, x: 8, y: 1.5, realizes: [engine, plan], description: Variant の SQL と Iceberg のスキャン計画を処理する。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者が SQL とジョブ設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§6}]}
+      aws-executor: {label: Spark 4.1（Executor）, kind: worker, tier: compute, x: 14, y: 1.5, realizes: [reader], description: Parquet 上の Variant をデコードし、列やパスを評価する。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者がジョブ設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§6}]}
+      aws-glue: {label: AWS Glue Data Catalog, svc: glue, kind: catalog, tier: storage, x: 2, y: 1.5, description: 論理表名から現在の Iceberg メタデータの場所を取得する。, management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§6}]}
+      aws-metadata: {label: Amazon S3（Iceberg メタデータ）, svc: s3, kind: db, tier: storage, x: 8, y: 1.5, realizes: [schema, manifest], description: 表スキーマとファイル参照および任意のファイル統計を保存する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§6}]}
+      aws-parquet: {label: Amazon S3（Variant の Parquet）, svc: s3, kind: db, tier: storage, x: 14, y: 1.5, realizes: [meta, value, typed, file], description: Variant の metadata・value と書き込みに応じた typed_value を保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-v3-variant.md#§6}]}
+    links:
+      - {id: aws-metadata-read, from: aws-driver, to: aws-metadata, label: 表メタデータと Manifest を読む}
+      - {id: aws-executors, from: aws-emr, to: aws-executor, label: Executor ワーカーを確保}
+      - {id: aws-manage, from: aws-emr, to: aws-driver, label: Spark ジョブを起動}
+      - {id: aws-catalog, from: aws-driver, to: aws-glue, label: 現行メタデータの位置を取得}
+      - {id: aws-write, from: aws-executor, to: aws-parquet, label: Variant を含む Parquet を保存}
+      - {id: aws-variant-read, from: aws-parquet, to: aws-executor, label: Parquet の辞書と Variant の値を読む, realizes: [dict, raw, shred, layout], replace: true}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 19]}
+      nodes:
+        aws-emr: {tier: diagram, x: 2, y: 2}
+        aws-driver: {tier: diagram, x: 2, y: 5}
+        aws-executor: {tier: diagram, x: 2, y: 8}
+        aws-glue: {tier: diagram, x: 8, y: 2}
+        aws-metadata: {tier: diagram, x: 14, y: 2}
+        aws-parquet: {tier: diagram, x: 14, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-emr, aws-driver, aws-executor, aws-glue, aws-metadata, aws-parquet]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "EMR Serverless", z: 0, origin: [0, 0], size: [5, 9]}
+        - {id: zone1, label: "Glue カタログ", z: 0, origin: [7, 0], size: [5, 5]}
+        - {id: zone2, label: "S3 ファイル", z: 0, origin: [14, 0], size: [5, 6]}
+      nodes:
+        aws-emr: {tier: zone0, x: 2, y: 1}
+        aws-driver: {tier: zone0, x: 2, y: 4}
+        aws-executor: {tier: zone0, x: 2, y: 7}
+        aws-glue: {tier: zone1, x: 2, y: 1}
+        aws-metadata: {tier: zone2, x: 2, y: 1}
+        aws-parquet: {tier: zone2, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2], nodes: [aws-emr, aws-driver, aws-executor, aws-glue, aws-metadata, aws-parquet]}

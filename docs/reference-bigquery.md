@@ -48,12 +48,20 @@ Cloud Storage から同一ロケーションの BigQuery データセットへ�
 
 | 機能 | 具体的な担い手 | 設定・成果物 |
 |---|---|---|
-| ジョブ実行クライアント | bq CLI とロードジョブ | 受注ファイルの URI と出力テーブル名を指定する。 |
+| ジョブ実行クライアント | bq CLI を使う投入端末 | 受注ファイルの URI と出力テーブル名を指定する。 |
+| CSV の取り込み | BigQuery のロードジョブ | Cloud Storage から受注ファイルを取り込む。 |
 | SQL 計画とステージ分割 | BigQuery ジョブとクエリ計画 | ジョブを受け付け、クエリのステージを作る。 |
-| BI 利用者 | BI 利用者 | 分析プロジェクトの資格情報でクエリする。 |
+| 分析者 | BigQuery Studio | 分析プロジェクトに対する権限を使ってクエリする。 |
 | 分析テーブルの名前空間・管理された列指向ストレージ | BigQuery sales データセットと管理表 | ロケーションを設定し、受注データを BigQuery の管理ストレージに保持する。 |
 | 並列クエリ実行枠・分散シャッフル | BigQuery の分析用予約と実行 | 分析プロジェクトにクエリジョブの予約割当を付け、実行時のステージとシャッフルはクエリ計画で確認する。 |
 
 容量予約と分析用の割当は入力 CSV の保存や管理表と独立して設定する。データセットのロケーションと予約の割当要件をそろえる。シャッフルはクエリ計画から観測する。
 
+運用者が `bq load` で登録したロードジョブが Cloud Storage の CSV を読み、BigQuery の管理テーブルに書き込む。分析者は BigQuery Studio から SQL を送信する。容量管理者はデータセットと同じロケーションに予約を作成し、分析クエリを実行するプロジェクトへ `QUERY` タイプを割り当てる。この例のロードジョブは `PIPELINE` の予約を割り当てず、既定の共有枠を使う。
+
+- [BigQuery の予約割り当て](https://docs.cloud.google.com/bigquery/docs/reservations-assignments)
+- [BigQuery のバッチロードと容量](https://docs.cloud.google.com/bigquery/docs/batch-loading-data)
+
 出典 [BigQuery overview](https://cloud.google.com/bigquery/docs/introduction)、[Overview of BigQuery storage](https://cloud.google.com/bigquery/docs/storage_overview)、[Introduction to the resource hierarchy](https://cloud.google.com/bigquery/docs/resource-hierarchy)、[Query plan and timeline](https://cloud.google.com/bigquery/docs/query-plan-explanation)、[Overview of BigQuery analytics](https://cloud.google.com/bigquery/docs/query-overview)、[BigQuery のワークロード管理](https://docs.cloud.google.com/bigquery/docs/reservations-intro)、[Cloud Storage の CSV をロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
+
+この例は分析・データ・予約を同一プロジェクトに置く選択である。Google が BigQuery と Cloud Storage の基盤を運用し、利用者はロード・クエリ API、データセットと表、QUERY 予約と割り当て、IAM 権限を操作する。クエリ計画は確認できるが、内部ワーカーやストレージサーバーへの直接アクセスは想定しない。ロードジョブは既定の共有スロットプールを使い、QUERY 予約と区別する。対象データと予約のロケーション、具体的 IAM と実行性能は未指定で、公式資料を組み合わせた未検証例である。

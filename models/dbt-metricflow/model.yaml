@@ -289,3 +289,99 @@ implementations:
         from: example-auth
         to: example-request
         label: 接続を認可
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        example-request: {tier: diagram, x: 1, y: 1}
+        example-model: {tier: diagram, x: 4, y: 1}
+        example-planner: {tier: diagram, x: 7, y: 1}
+        example-gateway: {tier: diagram, x: 1, y: 4}
+        example-auth: {tier: diagram, x: 4, y: 4}
+        example-warehouse: {tier: diagram, x: 14, y: 1}
+        example-user: {tier: diagram, x: -3, y: 1}
+        example-result: {tier: diagram, x: 0, y: 1}
+      groups:
+        - {kind: cloud, label: dbt platform, tier: [diagram], x0: -1, y0: 0, x1: 10, y1: 12, nodes: [example-request, example-model, example-planner, example-gateway, example-auth]}
+    layout3d:
+      tiers:
+        - {id: platform, label: 実行基盤・サービス, z: 0, size: [10, 11]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 11]}
+        - {id: storage, label: 独立した保存・データ基盤, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 7]}
+      nodes:
+        example-request: {tier: platform, x: 1, y: 1}
+        example-model: {tier: platform, x: 4, y: 1}
+        example-planner: {tier: platform, x: 7, y: 1}
+        example-gateway: {tier: platform, x: 1, y: 4}
+        example-auth: {tier: platform, x: 4, y: 4}
+        example-warehouse: {tier: storage, x: 1, y: 1}
+        example-user: {tier: user, x: 1, y: 1}
+        example-result: {tier: user, x: 4, y: 1}
+      groups:
+        - {kind: cloud, label: dbt platform, tier: [platform, apps], nodes: [example-request, example-model, example-planner, example-gateway, example-auth]}
+
+  - id: dbt-redshift
+    label: "dbt Semantic Layer と Amazon Redshift"
+    description: "dbt の SaaS 上で指標定義をデプロイし、GraphQL API から得た指標の問い合わせを Amazon Redshift で実行する。"
+    sources:
+      - {title: "dbt Semantic Layer の構成", url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture}
+      - {title: "dbt Semantic Layer の対応 DB と資格情報", url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/setup-sl}
+      - {title: "dbt のデプロイジョブ", url: https://docs.getdbt.com/docs/deploy/deploy-jobs}
+      - {title: "Redshift のデータ読み込み", url: https://docs.aws.amazon.com/redshift/latest/dg/t_Loading-data-from-S3.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "dbt の SaaS（本番環境）", tier: [runtime], nodes: [dbt-redshift-api, dbt-redshift-job, dbt-redshift-semantic, dbt-redshift-metricflow, dbt-redshift-gateway, dbt-redshift-result]}
+      - {kind: cloud, label: "利用者の AWS アカウント", provider: aws, tier: [data], nodes: [dbt-redshift-s3, dbt-redshift-warehouse]}
+    nodes:
+      dbt-redshift-bi: {label: "BI／分析アプリ", kind: client, tier: entry, x: 1, y: 1.5, realizes: [user], description: "売上指標と集計次元を指定し、応答を表示する。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-api: {label: "Semantic Layer GraphQL API", kind: gateway, tier: runtime, x: 2, y: 1.5, realizes: [request], description: "プロジェクト用サービストークンで認証し、利用可能な指標の要求を受け付ける。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-job: {label: "dbt 本番デプロイジョブ", kind: worker, tier: runtime, x: 2, y: 5, description: "dbt build でモデルを構築し、指標定義をデプロイする。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-semantic: {label: "デプロイ済みの指標定義", kind: file, tier: runtime, x: 6, y: 5, realizes: [model], description: "メトリクス、エンティティ、日付の次元を定義する。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-metricflow: {label: "MetricFlow", kind: service, tier: runtime, x: 7, y: 1.5, realizes: [planner], description: "問い合わせとセマンティックモデルから Redshift 向け SQL を生成する。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-gateway: {label: "dbt Semantic Layer Gateway", kind: service, tier: runtime, x: 12, y: 1.5, realizes: [gateway], description: "紐付けられた読み取り用 Redshift 資格情報で SQL を実行する。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-result: {label: "GraphQL 応答", kind: service, tier: runtime, x: 12, y: 5, realizes: [result], description: "SQL の結果から指標と次元を返す。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-s3: {label: "S3 の受注ファイル", kind: db, tier: data, x: 4, y: 1.5, svc: s3, description: "指標の元になる受注の取り込みファイルを保持する。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      dbt-redshift-warehouse: {label: "Redshift のモデルと SQL 実行", kind: db, tier: data, x: 12, y: 1.5, svc: redshift, realizes: [warehouse], description: "S3 から取り込んだ受注の本番モデルを保持し、生成 SQL を実行する。", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+    links:
+      - {id: dbt-redshift-load, from: dbt-redshift-s3, to: dbt-redshift-warehouse, label: "COPY で受注原本をロード", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      - {id: dbt-redshift-build, from: dbt-redshift-job, to: dbt-redshift-warehouse, label: "本番の dbt モデルを構築", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+      - {id: dbt-redshift-publish, from: dbt-redshift-job, to: dbt-redshift-semantic, label: "指標定義をデプロイ", evidence: [{type: doc, ref: docs/reference-dbt-metricflow.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        dbt-redshift-api: {tier: diagram, x: 1, y: 1}
+        dbt-redshift-job: {tier: diagram, x: 4, y: 1}
+        dbt-redshift-semantic: {tier: diagram, x: 7, y: 1}
+        dbt-redshift-metricflow: {tier: diagram, x: 1, y: 4}
+        dbt-redshift-gateway: {tier: diagram, x: 4, y: 4}
+        dbt-redshift-result: {tier: diagram, x: 7, y: 4}
+        dbt-redshift-s3: {tier: diagram, x: 14, y: 1}
+        dbt-redshift-warehouse: {tier: diagram, x: 17, y: 1}
+        dbt-redshift-bi: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: cloud, label: dbt platform, tier: [diagram], x0: -1, y0: 0, x1: 10, y1: 12, nodes: [dbt-redshift-api, dbt-redshift-job, dbt-redshift-semantic, dbt-redshift-metricflow, dbt-redshift-gateway, dbt-redshift-result]}
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [diagram], x0: 12, y0: 0, x1: 22, y1: 8, nodes: [dbt-redshift-s3, dbt-redshift-warehouse]}
+    layout3d:
+      tiers:
+        - {id: platform, label: 実行基盤・サービス, z: 0, size: [10, 11]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 11]}
+        - {id: storage, label: 独立した保存・データ基盤, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 7]}
+      nodes:
+        dbt-redshift-api: {tier: platform, x: 1, y: 1}
+        dbt-redshift-job: {tier: platform, x: 4, y: 1}
+        dbt-redshift-semantic: {tier: platform, x: 7, y: 1}
+        dbt-redshift-metricflow: {tier: platform, x: 1, y: 4}
+        dbt-redshift-gateway: {tier: platform, x: 4, y: 4}
+        dbt-redshift-result: {tier: platform, x: 7, y: 4}
+        dbt-redshift-s3: {tier: storage, x: 1, y: 1}
+        dbt-redshift-warehouse: {tier: storage, x: 4, y: 1}
+        dbt-redshift-bi: {tier: user, x: 1, y: 1}
+      groups:
+        - {kind: cloud, label: dbt platform, tier: [platform, apps], nodes: [dbt-redshift-api, dbt-redshift-job, dbt-redshift-semantic, dbt-redshift-metricflow, dbt-redshift-gateway, dbt-redshift-result]}
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [storage], nodes: [dbt-redshift-s3, dbt-redshift-warehouse]}

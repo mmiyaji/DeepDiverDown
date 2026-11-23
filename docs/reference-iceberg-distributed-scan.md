@@ -129,3 +129,25 @@ Trino が REST カタログを介して Iceberg の events テーブルを解決
 - [Apache Avro Specification](https://avro.apache.org/docs/current/specification/)
 - [Iceberg AWS - Object Store File Layout](https://iceberg.apache.org/docs/latest/aws/#object-store-file-layout)
 - [Trino S3 file system support](https://trino.io/docs/current/object-storage/file-system-s3.html)
+
+## 14. 実装例：AWS（Trino on EKS・Glue・S3）
+
+Amazon EKS のマネージドノードグループに Amazon EC2 を使い、Trino の Helm チャートで Coordinator と Worker の Pod を配備する。AWS が EKS のコントロールプレーンとノードグループを管理し、利用者が Trino の構成とバージョンを管理する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| SQL の受け付け、メタデータの絞り込み、Split の計画 | Trino Coordinator Pod |
+| Split の実行、Parquet と削除ファイルの読み取り | Trino Worker Pods |
+| テーブル名と現在のメタデータ位置の解決 | AWS Glue Data Catalog |
+| メタデータ JSON、マニフェスト、データファイル、削除ファイル | Amazon S3 |
+
+Trino の Iceberg Connector に `iceberg.catalog.type=glue` と `fs.s3.enabled=true` を設定し、Glue と S3 に必要な権限を Pod に付与する。ここでは Iceberg format version 2 の Parquet テーブルを使う。Split の計画とファイル取得は Trino が行う。
+
+- [Trino on Kubernetes with Helm](https://trino.io/docs/current/installation/kubernetes.html)
+- [Trino Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)
+- [Trino native S3 file system](https://trino.io/docs/current/object-storage/file-system-s3.html)
+- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
+
+REST カタログ例は利用者管理の Linux ホストで Trino Coordinator と Worker、別ホストで REST カタログを実行する。カタログの製品、永続バックエンドと認証方式は未指定である。AWS 例は AWS が EKS 制御プレーン・EC2・Glue・S3 の基盤を運用し、利用者が Kubernetes API、ノード、Trino、カタログと権限を管理する。内部制御プレーンサーバーは直接操作しない。いずれも公式資料を組み合わせた代表例で、ネットワーク、削除形式、バージョンと実動作は未検証。
+
+- [Trino deployment](https://trino.io/docs/current/installation/deployment.html)

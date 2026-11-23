@@ -1,0 +1,237 @@
+name: Ansible の構成管理とリモート実行
+description: 制御ノードから SSH で Linux 管理対象に接続し、Python を使うモジュールでパッケージと設定を適用する例。対象に常駐エージェントは不要。モジュールやタスクによって冪等性は異なる。
+reference:
+  objectives:
+    - 構成要素と実行場所を理解する。
+    - 定義から変更の反映までの流れと状態管理を追う。
+  sources:
+    - title: Ansible architecture
+      url: https://docs.ansible.com/projects/ansible/latest/dev_guide/overview_architecture.html
+    - title: Installing Ansible
+      url: https://docs.ansible.com/projects/ansible/latest/installation_guide/intro_installation.html
+    - title: Playbooks
+      url: https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_intro.html
+sources:
+  - docs/reference-ansible.md
+evidence:
+  - type: doc
+    ref: docs/reference-ansible.md#§1
+  - type: doc
+    ref: docs/reference-ansible.md#§3
+  - type: doc
+    ref: docs/reference-ansible.md#§4
+tiers:
+  - id: flow
+    label: 定義・処理・対象
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: storage
+    label: 状態・補助情報
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  n0:
+    label: 手順と対象の定義
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: playbook はタスク、inventory は接続対象を表す。
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+  n1:
+    label: 実行制御
+    kind: service
+    tier: flow
+    x: 5
+    'y': 1.5
+    description: 対象を選びタスクを順に起動する。
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+  n2:
+    label: 接続とモジュール
+    kind: file
+    tier: storage
+    x: 8
+    'y': 1.5
+    description: 通常 SSH で接続し、モジュールを対象で実行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+  n3:
+    label: 対象ホスト
+    kind: service
+    tier: flow
+    x: 15
+    'y': 1.5
+    description: 認証と必要な権限、対象に応じた Python が必要。
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+  n4:
+    label: 設定されたサービス
+    kind: service
+    tier: flow
+    x: 20
+    'y': 1.5
+    description: タスクがパッケージや設定に変更を加える。
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+links:
+  - id: l0
+    from: n0
+    to: n1
+    label: 対象とタスクを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+  - id: l1
+    from: n1
+    to: n2
+    label: SSH でモジュール実行
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+  - id: l2
+    from: n2
+    to: n3
+    label: ホスト上で処理
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+  - id: l3
+    from: n3
+    to: n4
+    label: パッケージと設定を反映
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+scenarios:
+  - id: operation
+    label: 定義から反映まで
+    evidence:
+      - type: doc
+        ref: docs/reference-ansible.md#§2
+    steps:
+      - links:
+          - l0
+        note: 対象とタスクを読む。
+      - links:
+          - l1
+        note: SSH でモジュール実行。
+      - links:
+          - l2
+        note: ホスト上で処理。
+      - links:
+          - l3
+        note: パッケージと設定を反映。
+implementations:
+  - id: example
+    label: Linux 制御ノードと Linux 管理対象
+    description: 制御ノードから SSH で Linux 管理対象に接続し、Python を使うモジュールでパッケージと設定を適用する例。対象に常駐エージェントは不要。モジュールやタスクによって冪等性は異なる。
+    sources:
+      - title: Ansible architecture
+        url: https://docs.ansible.com/projects/ansible/latest/dev_guide/overview_architecture.html
+      - title: Installing Ansible
+        url: https://docs.ansible.com/projects/ansible/latest/installation_guide/intro_installation.html
+      - title: Playbooks
+        url: https://docs.ansible.com/projects/ansible/latest/playbook_guide/playbooks_intro.html
+    tiers:
+      - id: flow
+        label: 定義・処理・対象
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: storage
+        label: 状態・補助情報
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-n0:
+        label: playbook と inventory
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: playbook はタスク、inventory は接続対象を表す。
+        realizes:
+          - n0
+        evidence:
+          - type: doc
+            ref: docs/reference-ansible.md#§4
+      ex-n1:
+        label: Linux 上の ansible-playbook
+        kind: service
+        tier: flow
+        x: 5
+        'y': 1.5
+        description: 対象を選びタスクを順に起動する。
+        realizes:
+          - n1
+        evidence:
+          - type: doc
+            ref: docs/reference-ansible.md#§4
+      ex-n2:
+        label: SSH と対象上の Python モジュール
+        kind: file
+        tier: storage
+        x: 8
+        'y': 1.5
+        description: 通常 SSH で接続し、モジュールを対象で実行する。
+        realizes:
+          - n2
+        evidence:
+          - type: doc
+            ref: docs/reference-ansible.md#§4
+      ex-n3:
+        label: Linux 管理対象ホスト
+        kind: service
+        tier: flow
+        x: 15
+        'y': 1.5
+        description: 認証と必要な権限、対象に応じた Python が必要。
+        realizes:
+          - n3
+        evidence:
+          - type: doc
+            ref: docs/reference-ansible.md#§4
+      ex-n4:
+        label: 対象上の nginx と設定
+        kind: service
+        tier: flow
+        x: 20
+        'y': 1.5
+        description: タスクがパッケージや設定に変更を加える。
+        realizes:
+          - n4
+        evidence:
+          - type: doc
+            ref: docs/reference-ansible.md#§4
+    groups:
+      - kind: cluster
+        label: Linux 制御ノード
+        tier:
+          - flow
+          - storage
+        nodes:
+          - ex-n0
+          - ex-n1
+      - kind: cluster
+        label: Linux 管理対象ホスト
+        tier:
+          - flow
+          - storage
+        nodes:
+          - ex-n2
+          - ex-n3
+          - ex-n4

@@ -171,7 +171,7 @@ scenarios:
 implementations:
   - id: example
     label: Apache Jena Fuseki と RDFS
-    description: RDF データと語彙を使い、明示的に設定した RDFS 推論を通して SPARQL で問い合わせる。
+    description: 利用者管理の Linux ホストで Fuseki を実行し、同ホストの TDB2 データと RDFS 推論を SPARQL で問い合わせる例。
     sources:
       - title: RDF 1.1 Concepts
         url: https://www.w3.org/TR/rdf-concepts/
@@ -195,6 +195,7 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host: {label: "利用者管理の Linux ホスト", kind: host, tier: definition, x: 15, y: 1.5, description: "利用者が OS、Java と Fusekiを導入・運用する。"}
       ex-owner:
         label: 語彙の管理者
         kind: actor
@@ -229,7 +230,7 @@ implementations:
         realizes:
           - data
       ex-graph:
-        label: Fuseki RDF データセット
+        label: ホスト上の TDB2 RDF データセット
         kind: db
         tier: flow
         x: 0
@@ -272,3 +273,249 @@ implementations:
             ref: docs/reference-semantic-ontology.md#§4
         realizes:
           - client
+    links:
+      - {id: ex-host-run, from: ex-host, to: ex-query, label: プロセスを実行}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        ex-owner: {tier: diagram, x: 2, y: 1}
+        ex-vocab: {tier: diagram, x: 2, y: 5}
+        ex-data: {tier: diagram, x: 8, y: 5}
+        ex-client: {tier: diagram, x: 8, y: 1}
+        ex-host: {tier: diagram, x: 14, y: 5}
+        ex-graph: {tier: diagram, x: 20, y: 5}
+        ex-infer: {tier: diagram, x: 2, y: 9}
+        ex-query: {tier: diagram, x: 8, y: 9}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理環境, tier: [diagram], nodes: [ex-vocab, ex-data, ex-host, ex-graph, ex-infer, ex-query]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [ex-host, ex-graph, ex-infer, ex-query]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        ex-owner: {tier: diagram, x: 2, y: 1}
+        ex-vocab: {tier: diagram, x: 2, y: 5}
+        ex-data: {tier: diagram, x: 8, y: 5}
+        ex-client: {tier: diagram, x: 8, y: 1}
+        ex-host: {tier: diagram, x: 14, y: 5}
+        ex-graph: {tier: diagram, x: 20, y: 5}
+        ex-infer: {tier: diagram, x: 2, y: 9}
+        ex-query: {tier: diagram, x: 8, y: 9}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理環境, tier: [diagram], nodes: [ex-vocab, ex-data, ex-host, ex-graph, ex-infer, ex-query]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [ex-host, ex-graph, ex-infer, ex-query]}
+  - id: aws-fuseki-ec2
+    label: AWS（Fuseki on EC2・Amazon EBS）
+    description: EC2 上の Fuseki が EBS 上の TDB2 から RDF を読み、RDFS 推論を適用して SPARQL の結果を返す例。
+    sources:
+      - title: Fuseki の推論構成
+        url: https://jena.apache.org/documentation/fuseki2/fuseki-configuration
+      - title: Apache Jena TDB2
+        url: https://jena.apache.org/documentation/tdb2/index.html
+      - title: Amazon EBS ボリュームのアタッチ
+        url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html
+    tiers:
+      - id: people
+        label: 担当者と利用者
+        z: 0
+        size:
+          - 4
+          - 6
+      - id: exec
+        label: Fuseki の実行と RDF の保存
+        z: 0
+        size:
+          - 19
+          - 4
+      - id: inputs
+        label: 投入する RDF と語彙
+        z: 1
+        size:
+          - 19
+          - 3
+    groups:
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - exec
+          - inputs
+        nodes:
+          - aws-ec2
+          - aws-fuseki
+          - aws-tdb
+          - aws-vocab
+          - aws-data
+          - aws-ebs
+      - kind: cluster
+        label: 単一 EC2 インスタンス
+        tier: exec
+        nodes:
+          - aws-ec2
+          - aws-fuseki
+    nodes:
+      aws-owner:
+        label: 業務語彙の担当者
+        kind: actor
+        tier: people
+        x: 1
+        'y': 1.5
+        realizes:
+          - owner
+        description: 業務概念を RDFS で記述する。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+      aws-client:
+        label: SPARQL クライアント
+        kind: client
+        tier: people
+        x: 1
+        'y': 4.5
+        realizes:
+          - client
+        description: 許可された経路から Fuseki を問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+      aws-ec2:
+        management: {type: customer, scope: "利用者が OS、Java、Fuseki、ネットワーク設定を管理。AWS は EC2 基盤を運用する。"}
+        label: Amazon EC2（Linux）
+        svc: ec2
+        kind: host
+        tier: exec
+        x: 2
+        'y': 1.5
+        description: 利用者が Java と Fuseki を導入・更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+      aws-fuseki:
+        management: {type: customer, scope: "利用者が Fuseki と RDFS 設定、認証と更新を管理。"}
+        label: Apache Jena Fuseki（RDFS と SPARQL）
+        kind: service
+        tier: exec
+        x: 8
+        'y': 1.5
+        realizes:
+          - infer
+          - query
+        description: TDB2 上の基礎グラフに RDFS の推論ビューを重ね、SPARQL を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+      aws-tdb:
+        management: {type: customer, scope: "利用者が TDB2 のデータ、復旧とファイルシステムを管理。"}
+        label: Jena TDB2 の RDF データ
+        kind: db
+        tier: exec
+        x: 15
+        'y': 1.5
+        realizes:
+          - graph
+        description: EBS のファイルシステムに TDB2 のファイルを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+      aws-vocab:
+        management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が語彙とアクセス権を管理。"}
+        label: Amazon S3（RDFS 語彙 TTL）
+        svc: s3
+        kind: file
+        tier: inputs
+        x: 6
+        'y': 1.5
+        realizes:
+          - vocab
+        description: 取り込み時に RDF の業務語彙を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+      aws-data:
+        management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータとアクセス権を管理。"}
+        label: Amazon S3（データ TTL）
+        svc: s3
+        kind: file
+        tier: inputs
+        x: 13
+        'y': 1.5
+        realizes:
+          - data
+        description: 取り込み対象の RDF を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+      aws-ebs:
+        management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がボリューム設定とデータ保護を管理。"}
+        label: Amazon EBS ボリューム
+        svc: ebs
+        kind: db
+        tier: inputs
+        x: 1
+        'y': 1.5
+        description: EC2 にアタッチし、TDB2 が使うファイルシステムを保存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§5
+    links:
+      - id: aws-run
+        from: aws-ec2
+        to: aws-fuseki
+        label: Fuseki を起動
+      - id: aws-load-data
+        from: aws-data
+        to: aws-fuseki
+        label: 取り込み用の RDF を渡す
+        realizes:
+          - data-load
+        replace: true
+      - id: aws-load-vocab
+        from: aws-vocab
+        to: aws-fuseki
+        label: RDFS 語彙を読み込む
+        realizes:
+          - vocab-load
+        replace: true
+      - id: aws-store
+        from: aws-fuseki
+        to: aws-tdb
+        label: 基礎グラフに RDF を格納
+        realizes:
+          - vocab-load
+          - data-load
+        replace: true
+      - id: aws-tdb-ebs
+        from: aws-tdb
+        to: aws-ebs
+        label: データファイルを保存
+    layout2d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [29, 12]}
+      nodes:
+        aws-owner: {tier: diagram, x: 1, y: 2}
+        aws-client: {tier: diagram, x: 1, y: 8}
+        aws-ec2: {tier: diagram, x: 8, y: 2}
+        aws-fuseki: {tier: diagram, x: 14, y: 2}
+        aws-tdb: {tier: diagram, x: 20, y: 2}
+        aws-ebs: {tier: diagram, x: 8, y: 8}
+        aws-vocab: {tier: diagram, x: 14, y: 8}
+        aws-data: {tier: diagram, x: 20, y: 8}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 5, y0: 0, x1: 25, y1: 11, nodes: [aws-ec2, aws-fuseki, aws-tdb, aws-ebs, aws-vocab, aws-data]}
+        - {kind: cluster, label: EC2 インスタンス, tier: [diagram], nodes: [aws-ec2, aws-fuseki, aws-tdb]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [29, 12]}
+      nodes:
+        aws-owner: {tier: diagram, x: 1, y: 2}
+        aws-client: {tier: diagram, x: 1, y: 8}
+        aws-ec2: {tier: diagram, x: 8, y: 2}
+        aws-fuseki: {tier: diagram, x: 14, y: 2}
+        aws-tdb: {tier: diagram, x: 20, y: 2}
+        aws-ebs: {tier: diagram, x: 8, y: 8}
+        aws-vocab: {tier: diagram, x: 14, y: 8}
+        aws-data: {tier: diagram, x: 20, y: 8}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 5, y0: 0, x1: 25, y1: 11, nodes: [aws-ec2, aws-fuseki, aws-tdb, aws-ebs, aws-vocab, aws-data]}
+        - {kind: cluster, label: EC2 インスタンス, tier: [diagram], nodes: [aws-ec2, aws-fuseki, aws-tdb]}

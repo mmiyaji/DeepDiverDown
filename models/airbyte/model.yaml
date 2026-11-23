@@ -56,6 +56,7 @@ implementations:
     description: "注文 API の更新日時をカーソルとし、Airbyte の増分接続から PostgreSQL に集める例。API が時刻フィルターと必要な順序を提供する前提で同期範囲を決める。"
     sources:
       - {title: Airbyte Protocol, url: https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol}
+      - {title: Deploying Airbyte, url: https://docs.airbyte.com/platform/deploying-airbyte}
       - {title: Connections and streams, url: https://docs.airbyte.com/platform/using-airbyte/getting-started/set-up-a-connection}
       - {title: Sync Modes, url: https://docs.airbyte.com/platform/using-airbyte/core-concepts/sync-modes}
       - {title: Incremental Sync, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync}
@@ -64,11 +65,126 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      builder-postgres-host: {label: 自前 Linux Kubernetes ノード群, kind: host, tier: processing, x: 3, y: 0, description: 利用者が Kubernetes と Airbyte の管理・同期ワークロードを運用する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+      builder-postgres-platform-db: {label: Airbyte 設定・State 用 PostgreSQL, realizes: [state], kind: db, tier: processing, x: 10, y: 4, description: 利用者が Airbyte 接続設定と確定済み State の保存先を管理する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
       builder-postgres-api: {label: 注文 API の orders エンドポイント, kind: external, tier: processing, x: 1, y: 1.15, realizes: [source], description: 更新日時パラメーターとページングで注文を提供する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
       builder-postgres-builder: {label: Airbyte のカスタム Source, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [sourceConnector], description: Connector Builder でページングと updated_at を使う増分取得を定義する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
-      builder-postgres-airbyte: {label: Airbyte の Connection・同期ジョブ・状態, kind: workflow, tier: processing, x: 5, y: 1.15, realizes: [connection, syncJob, state], description: 同期頻度とストリームを設定し、接続ごとの進捗を管理する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
+      builder-postgres-airbyte: {label: Airbyte の Connection・同期ジョブ・状態, kind: workflow, tier: processing, x: 5, y: 1.15, realizes: [connection, syncJob], description: 同期頻度とストリームを設定し、接続ごとの進捗を管理する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
       builder-postgres-adapter: {label: Airbyte Postgres Destination, kind: worker, tier: processing, x: 5, y: 3.65, realizes: [destinationConnector], description: 受け取ったレコードを接続先のデータベースへ書く。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
       builder-postgres-db: {label: PostgreSQL の分析用スキーマ, kind: db, tier: processing, x: 9, y: 1.15, realizes: [warehouse], description: 同期された orders データを保存する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
       builder-postgres-manifest: {label: カスタム Source の宣言ファイル, kind: file, tier: setup, x: 1, y: 1.5, description: API の認証、ページング、ストリームのカーソル設定を定義する。, evidence: [{type: doc, ref: docs/reference-airbyte.md#§6}]}
     links:
+      - {id: builder-postgres-host-runtime, from: builder-postgres-host, to: builder-postgres-airbyte, label: Airbyte ワークロードを実行}
+      - {id: builder-postgres-host-source, from: builder-postgres-host, to: builder-postgres-builder, label: Source を実行}
+      - {id: builder-postgres-host-destination, from: builder-postgres-host, to: builder-postgres-adapter, label: Destination を実行}
       - {id: builder-postgres-manifest-connection, from: builder-postgres-manifest, to: builder-postgres-builder, label: 入力の仕様を配布}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 16]}
+      nodes:
+        builder-postgres-api: {tier: diagram, x: 3, y: 2}
+        builder-postgres-host: {tier: diagram, x: 9, y: 2}
+        builder-postgres-airbyte: {tier: diagram, x: 9, y: 5}
+        builder-postgres-builder: {tier: diagram, x: 9, y: 8}
+        builder-postgres-adapter: {tier: diagram, x: 9, y: 11}
+        builder-postgres-manifest: {tier: diagram, x: 9, y: 14}
+        builder-postgres-platform-db: {tier: diagram, x: 15, y: 2}
+        builder-postgres-db: {tier: diagram, x: 15, y: 5}
+      groups:
+        - {kind: cluster, label: "自前 Kubernetes", tier: [diagram], x0: 7, y0: 0, x1: 11, y1: 18, nodes: [builder-postgres-host, builder-postgres-airbyte, builder-postgres-builder, builder-postgres-adapter, builder-postgres-manifest]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "外部 API", z: 0, origin: [0, 0], size: [5, 4]}
+        - {id: zone1, label: "自前 Kubernetes", z: 0, origin: [7, 0], size: [5, 15]}
+        - {id: zone2, label: "PostgreSQL", z: 0, origin: [14, 0], size: [5, 6]}
+      nodes:
+        builder-postgres-api: {tier: zone0, x: 2, y: 1}
+        builder-postgres-host: {tier: zone1, x: 2, y: 1}
+        builder-postgres-airbyte: {tier: zone1, x: 2, y: 4}
+        builder-postgres-builder: {tier: zone1, x: 2, y: 7}
+        builder-postgres-adapter: {tier: zone1, x: 2, y: 10}
+        builder-postgres-manifest: {tier: zone1, x: 2, y: 13}
+        builder-postgres-platform-db: {tier: zone2, x: 2, y: 1}
+        builder-postgres-db: {tier: zone2, x: 2, y: 4}
+      groups:
+        - {kind: cluster, label: "自前 Kubernetes", tier: [zone1], nodes: [builder-postgres-host, builder-postgres-airbyte, builder-postgres-builder, builder-postgres-adapter, builder-postgres-manifest]}
+
+  - id: aws-eks-airbyte
+    label: "Amazon EKS 上の Airbyte・RDS・S3"
+    description: "EC2 ノードを持つ EKS に Helm で Airbyte を自己管理展開する。カスタム Source で注文 API を増分取得し、分析用の RDS for PostgreSQL に格納する。"
+    sources:
+      - {title: "Airbyte の Kubernetes への導入", url: https://docs.airbyte.com/platform/deploying-airbyte}
+      - {title: "Airbyte の状態・ログ用オブジェクトストレージ", url: https://docs.airbyte.com/platform/deploying-airbyte/integrations/storage}
+      - {title: "Airbyte 設定 DB の接続と同期 State", url: https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections}
+      - {title: "EKS マネージドノードグループ", url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html}
+      - {title: "Connector Builder", url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview}
+      - {title: "Postgres Destination", url: https://docs.airbyte.com/integrations/destinations/postgres}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-eks-airbyte-eks, aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination, aws-eks-airbyte-metadata, aws-eks-airbyte-s3, aws-eks-airbyte-warehouse]}
+      - {kind: cluster, label: "EKS クラスター", provider: k8s, tier: [runtime], nodes: [aws-eks-airbyte-eks, aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination]}
+      - {kind: namespace, label: "Airbyte の名前空間", provider: k8s, tier: [runtime], nodes: [aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination]}
+      - {kind: vpc, label: "RDS のプライベート接続先", provider: aws, tier: [data], nodes: [aws-eks-airbyte-metadata, aws-eks-airbyte-warehouse]}
+    nodes:
+      aws-eks-airbyte-source: {label: "外部の受注 API", kind: external, tier: entry, x: 1, y: 1.5, realizes: [source], description: "HTTPS で受注を提供する。", evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-eks: {label: "EKS Kubernetes API", kind: service, tier: runtime, x: 1, y: 0.4, svc: eks, description: "Helm のリソースを受け付ける。", management: {type: shared, scope: "AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-ec2: {label: "EKS の EC2 ノード", kind: host, tier: runtime, x: 5, y: 0.4, svc: ec2, description: "Airbyte の管理 Pod と同期ワークロードを動かす。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-server: {label: "Airbyte Server と接続設定", kind: service, tier: runtime, x: 10, y: 2.4, realizes: [connection], description: "接続と同期頻度を管理する。", management: {type: customer, scope: "利用者が Airbyte の導入、設定と更新を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-source-pod: {label: "Source Connector", kind: worker, tier: runtime, x: 1, y: 5, realizes: [sourceConnector], description: "カーソルとページングの宣言に沿って取得する。", management: {type: customer, scope: "利用者が Source の設定と認証を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-worker: {label: "Airbyte 同期ワークロード", kind: worker, tier: runtime, x: 6, y: 5, realizes: [syncJob], description: "読み取り元と出力先の間でレコードと状態を仲介する。", management: {type: customer, scope: "利用者が同期ジョブと Airbyte の設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-destination: {label: "Postgres Destination", kind: worker, tier: runtime, x: 12.5, y: 5, realizes: [destinationConnector], description: "レコードを PostgreSQL へ書き込む。", management: {type: customer, scope: "利用者が Destination と接続設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-metadata: {label: "Airbyte 用 RDS PostgreSQL", kind: db, tier: data, x: 8.5, y: 1.5, svc: rds, realizes: [state], description: "接続設定などのプラットフォーム情報と確定した同期 State を永続化する。", management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者がデータ、DB 設定と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-s3: {label: "S3 ログ・ワークロード出力", kind: db, tier: data, x: 3, y: 1.5, svc: s3, description: "Helm で指定したオブジェクトストレージにジョブログとワークロード出力などを保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      aws-eks-airbyte-warehouse: {label: "分析用 RDS PostgreSQL", kind: db, tier: data, x: 14, y: 1.5, svc: rds, realizes: [warehouse], description: "注文テーブルを分析用スキーマに保存する。", management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者がデータ、DB 設定と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+    links:
+      - {id: aws-eks-airbyte-provision, from: aws-eks-airbyte-eks, to: aws-eks-airbyte-ec2, label: "Pod を EC2 ノードに割り当て", evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      - {id: aws-eks-airbyte-logs, from: aws-eks-airbyte-worker, to: aws-eks-airbyte-s3, label: "実行ログを書き込む", evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      - {id: aws-eks-airbyte-state-ack, from: aws-eks-airbyte-destination, to: aws-eks-airbyte-worker, label: "確定済み State を返す", realizes: [checkpoint], replace: true, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      - {id: aws-eks-airbyte-state-save, from: aws-eks-airbyte-worker, to: aws-eks-airbyte-metadata, label: "同期の再開位置を記録", realizes: [checkpoint], replace: true, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      - {id: aws-eks-airbyte-state-fetch, from: aws-eks-airbyte-metadata, to: aws-eks-airbyte-worker, label: "確定済みの再開位置を読み込む", realizes: [resume], replace: true, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+      - {id: aws-eks-airbyte-state-seed, from: aws-eks-airbyte-worker, to: aws-eks-airbyte-source-pod, label: "Source に再開位置を渡す", realizes: [resume], replace: true, evidence: [{type: doc, ref: docs/reference-airbyte.md#§7}]}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 19]}
+      nodes:
+        aws-eks-airbyte-source: {tier: diagram, x: 3, y: 2}
+        aws-eks-airbyte-eks: {tier: diagram, x: 9, y: 2}
+        aws-eks-airbyte-ec2: {tier: diagram, x: 15, y: 2}
+        aws-eks-airbyte-server: {tier: diagram, x: 15, y: 5}
+        aws-eks-airbyte-source-pod: {tier: diagram, x: 15, y: 8}
+        aws-eks-airbyte-worker: {tier: diagram, x: 15, y: 11}
+        aws-eks-airbyte-destination: {tier: diagram, x: 15, y: 14}
+        aws-eks-airbyte-metadata: {tier: diagram, x: 21, y: 2}
+        aws-eks-airbyte-warehouse: {tier: diagram, x: 21, y: 5}
+        aws-eks-airbyte-s3: {tier: diagram, x: 27, y: 2}
+      groups:
+        - {kind: vpc, label: EKS ノードと RDS の利用者 VPC, provider: aws, tier: [diagram], x0: 13, y0: 0, x1: 23, y1: 18, nodes: [aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination, aws-eks-airbyte-metadata, aws-eks-airbyte-warehouse]}
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 6, y0: 0, x1: 30, y1: 18, nodes: [aws-eks-airbyte-eks, aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination, aws-eks-airbyte-metadata, aws-eks-airbyte-warehouse, aws-eks-airbyte-s3]}
+        - {kind: cluster, label: "EKS ノードと Airbyte", tier: [diagram], x0: 13, y0: 0, x1: 17, y1: 18, nodes: [aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "外部 API", z: 0, origin: [0, 0], size: [5, 4]}
+        - {id: zone1, label: "EKS 制御プレーン", z: 0, origin: [7, 0], size: [5, 4]}
+        - {id: zone2, label: "EKS ノードと Airbyte", z: 0, origin: [14, 0], size: [5, 15]}
+        - {id: zone3, label: "RDS", z: 0, origin: [21, 0], size: [5, 6]}
+        - {id: zone4, label: "S3", z: 0, origin: [28, 0], size: [5, 4]}
+      nodes:
+        aws-eks-airbyte-source: {tier: zone0, x: 2, y: 1}
+        aws-eks-airbyte-eks: {tier: zone1, x: 2, y: 1}
+        aws-eks-airbyte-ec2: {tier: zone2, x: 2, y: 1}
+        aws-eks-airbyte-server: {tier: zone2, x: 2, y: 4}
+        aws-eks-airbyte-source-pod: {tier: zone2, x: 2, y: 7}
+        aws-eks-airbyte-worker: {tier: zone2, x: 2, y: 10}
+        aws-eks-airbyte-destination: {tier: zone2, x: 2, y: 13}
+        aws-eks-airbyte-metadata: {tier: zone3, x: 2, y: 1}
+        aws-eks-airbyte-warehouse: {tier: zone3, x: 2, y: 4}
+        aws-eks-airbyte-s3: {tier: zone4, x: 2, y: 1}
+      groups:
+        - {kind: vpc, label: EKS ノードと RDS の利用者 VPC, provider: aws, tier: [zone2, zone3], nodes: [aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination, aws-eks-airbyte-metadata, aws-eks-airbyte-warehouse]}
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [zone1, zone2, zone3, zone4], nodes: [aws-eks-airbyte-eks, aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination, aws-eks-airbyte-metadata, aws-eks-airbyte-warehouse, aws-eks-airbyte-s3]}
+        - {kind: cluster, label: "EKS ノードと Airbyte", tier: [zone2], nodes: [aws-eks-airbyte-ec2, aws-eks-airbyte-server, aws-eks-airbyte-source-pod, aws-eks-airbyte-worker, aws-eks-airbyte-destination]}

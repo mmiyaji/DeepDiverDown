@@ -444,6 +444,8 @@ implementations:
     label: Unity Catalog・Databricks・Amazon S3
     description: Databricks on AWS で Iceberg テーブル用の REST 入口と、資産検索・リネージ・権限管理を同じ Unity Catalog に配置する例。
     sources:
+      - {title: Databricks deployment architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
       - title: Databricks Unity Catalog
         url: https://docs.databricks.com/aws/en/data-governance/unity-catalog
       - title: Databricks の Iceberg
@@ -457,7 +459,10 @@ implementations:
       - title: Databricks AWS 参照アーキテクチャ
         url: >-
           https://docs.databricks.com/aws/en/assets/files/reference-architecture-databricks-on-aws-037959ba92a5a1e33e244fbe2e19fd3f.pdf
+      - title: Databricks on AWS high-level architecture
+        url: https://docs.databricks.com/aws/en/getting-started/high-level-architecture
     nodes:
+      uc-on-aws-role: {label: AWS IAM storage role, svc: iam, kind: policy, tier: runtime, x: 17, y: 1, management: {type: customer, scope: "Customer manages S3 role and permissions."}, evidence: [{type: doc, ref: "docs/reference-data-catalog-architecture.md#§8"}]}
       uc-on-aws-jobs:
         label: Lakeflow Jobs
         kind: workflow
@@ -485,13 +490,13 @@ implementations:
           - type: doc
             ref: docs/reference-data-catalog-architecture.md#§8
       uc-on-aws-compute:
-        label: Databricks Runtime
+        label: Databricks Jobs サーバーレス コンピュート
         kind: service
         tier: runtime
         svc: databricks:platform
         x: 3
         'y': 1
-        description: 対象テーブルを読み書きし、対応する処理のリネージを登録する。
+        description: Databricks アカウントで検証・公開タスクを実行し、Iceberg テーブルを読み書きする。
         realizes:
           - engine
         evidence:
@@ -530,7 +535,7 @@ implementations:
         tier: runtime
         x: 13
         'y': 1
-        description: 管理 Iceberg テーブルのファイルを保持する。
+        description: 利用組織の AWS アカウントに置き、管理 Iceberg テーブルのファイルを保持する。
         svc: s3
         realizes:
           - storage
@@ -684,6 +689,8 @@ implementations:
             ref: docs/reference-data-catalog-architecture.md#§8
         drill: fabric-onelake-catalog
     links:
+      - {id: uc-on-aws-role-storage, from: uc-on-aws-role, to: uc-on-aws-s3, label: "Authorize managed storage", evidence: [{type: doc, ref: "docs/reference-data-catalog-architecture.md#§8"}]}
+      - {id: uc-on-aws-run-jobs, from: uc-on-aws-jobs, to: uc-on-aws-compute, label: "Run validation and publication", evidence: [{type: doc, ref: "docs/reference-data-catalog-architecture.md#§8"}]}
       - id: uc-on-aws-external-catalog
         from: uc-on-aws-external-client
         to: uc-on-aws-uc
@@ -708,11 +715,12 @@ implementations:
     groups:
       - kind: cloud
         provider: aws
-        label: AWS サービス
+        label: 利用組織の AWS アカウント
         tier:
           - runtime
         nodes:
           - uc-on-aws-s3
+          - uc-on-aws-role
       - kind: cloud
         provider: databricks
         label: Databricks サービス
@@ -722,7 +730,7 @@ implementations:
           - uc-on-aws-jobs
       - kind: cloud
         provider: databricks
-        label: Databricks サービス
+        label: Databricks アカウント（制御・サーバーレス計算）
         tier:
           - runtime
         nodes:
@@ -764,3 +772,67 @@ implementations:
         label: Knowledge Catalog
         tier: [governance-products]
         nodes: [uc-on-aws-knowledge]
+    layout2d:
+      tiers: [{id: diagram, label: Catalog implementation and comparisons, z: 0, size: [30, 20]}]
+      nodes:
+        uc-on-aws-jobs: {tier: diagram, x: 3, y: 2}
+        uc-on-aws-analyst: {tier: diagram, x: 0, y: 2}
+        uc-on-aws-compute: {tier: diagram, x: 7, y: 2}
+        uc-on-aws-external-client: {tier: diagram, x: 0, y: 6}
+        uc-on-aws-uc: {tier: diagram, x: 11, y: 2}
+        uc-on-aws-s3: {tier: diagram, x: 20, y: 2}
+        uc-on-aws-checks: {tier: diagram, x: 11, y: 6}
+        uc-on-aws-polaris: {tier: diagram, x: 2, y: 11}
+        uc-on-aws-nessie: {tier: diagram, x: 6, y: 11}
+        uc-on-aws-horizon: {tier: diagram, x: 10, y: 11}
+        uc-on-aws-unity: {tier: diagram, x: 14, y: 11}
+        uc-on-aws-datahub: {tier: diagram, x: 2, y: 16}
+        uc-on-aws-openmetadata: {tier: diagram, x: 6, y: 16}
+        uc-on-aws-datazone: {tier: diagram, x: 10, y: 16}
+        uc-on-aws-purview: {tier: diagram, x: 14, y: 16}
+        uc-on-aws-knowledge: {tier: diagram, x: 18, y: 16}
+        uc-on-aws-onelake: {tier: diagram, x: 22, y: 16}
+        uc-on-aws-role: {tier: diagram, x: 24, y: 2}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: diagram, nodes: [uc-on-aws-jobs, uc-on-aws-compute, uc-on-aws-uc, uc-on-aws-checks]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [uc-on-aws-s3, uc-on-aws-role]}
+        - {kind: cloud, provider: snowflake, label: Snowflake comparison, tier: diagram, nodes: [uc-on-aws-horizon]}
+        - {kind: cloud, provider: databricks, label: Databricks comparison, tier: diagram, nodes: [uc-on-aws-unity]}
+        - {kind: cloud, provider: aws, label: DataZone comparison, tier: diagram, nodes: [uc-on-aws-datazone]}
+        - {kind: cloud, provider: purview, label: Microsoft Purview, tier: diagram, nodes: [uc-on-aws-purview]}
+        - {kind: cloud, provider: gcp, label: Google Cloud comparison, tier: diagram, nodes: [uc-on-aws-knowledge]}
+        - {kind: cloud, provider: fabric, label: Fabric comparison, tier: diagram, nodes: [uc-on-aws-onelake]}
+    layout3d:
+      tiers:
+        - {id: main, label: Databricks services, z: 0, size: [16, 5]}
+        - {id: aws, label: Customer AWS, z: 0, origin: [19, 0], size: [8, 3]}
+        - {id: comparisons, label: Comparison references, z: 0, origin: [0, 9], size: [32, 20]}
+        - {id: users, label: Users and clients, kind: origin, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        uc-on-aws-jobs: {tier: main, x: 2, y: 1.5}
+        uc-on-aws-analyst: {tier: users, x: 0, y: 1.5}
+        uc-on-aws-compute: {tier: main, x: 6, y: 1.5}
+        uc-on-aws-external-client: {tier: users, x: 2, y: 1.5}
+        uc-on-aws-uc: {tier: main, x: 10, y: 1.5}
+        uc-on-aws-s3: {tier: aws, x: 2, y: 1.5}
+        uc-on-aws-checks: {tier: main, x: 14, y: 1.5}
+        uc-on-aws-polaris: {tier: comparisons, x: 3, y: 12}
+        uc-on-aws-nessie: {tier: comparisons, x: 14, y: 12}
+        uc-on-aws-horizon: {tier: comparisons, x: 3, y: 2}
+        uc-on-aws-unity: {tier: comparisons, x: 14, y: 2}
+        uc-on-aws-datahub: {tier: comparisons, x: 25, y: 12}
+        uc-on-aws-openmetadata: {tier: comparisons, x: 3, y: 17}
+        uc-on-aws-datazone: {tier: comparisons, x: 25, y: 2}
+        uc-on-aws-purview: {tier: comparisons, x: 3, y: 7}
+        uc-on-aws-knowledge: {tier: comparisons, x: 14, y: 7}
+        uc-on-aws-onelake: {tier: comparisons, x: 25, y: 7}
+        uc-on-aws-role: {tier: aws, x: 6, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: main, nodes: [uc-on-aws-jobs, uc-on-aws-compute, uc-on-aws-uc, uc-on-aws-checks]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: aws, nodes: [uc-on-aws-s3, uc-on-aws-role]}
+        - {kind: cloud, provider: snowflake, label: Snowflake comparison, tier: comparisons, nodes: [uc-on-aws-horizon]}
+        - {kind: cloud, provider: databricks, label: Databricks comparison, tier: comparisons, nodes: [uc-on-aws-unity]}
+        - {kind: cloud, provider: aws, label: DataZone comparison, tier: comparisons, nodes: [uc-on-aws-datazone]}
+        - {kind: cloud, provider: purview, label: Microsoft Purview, tier: comparisons, nodes: [uc-on-aws-purview]}
+        - {kind: cloud, provider: gcp, label: Google Cloud comparison, tier: comparisons, nodes: [uc-on-aws-knowledge]}
+        - {kind: cloud, provider: fabric, label: Fabric comparison, tier: comparisons, nodes: [uc-on-aws-onelake]}

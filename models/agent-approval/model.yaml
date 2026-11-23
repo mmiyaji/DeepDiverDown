@@ -210,6 +210,8 @@ implementations:
           - 12
           - 3
     nodes:
+      ex-host: {label: 利用者の LangGraph 実行ホスト, kind: host, tier: flow, x: 3, y: 2, description: グラフ実行と更新ツールを実行する。, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§4}]}
+      ex-state-host: {label: チェックポイント保存基盤, kind: host, tier: ops, x: 2, y: 2, description: 利用者が永続ストアを管理する。製品と配置先は未選定。, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§4}]}
       ex-request:
         label: 利用者画面
         kind: actor
@@ -312,3 +314,129 @@ implementations:
         from: ex-key
         to: ex-tool
         label: 再試行時の重複を防ぐ
+
+
+      - {id: ex-run-agent, from: ex-host, to: ex-agent, label: LangGraph を実行, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§4}]}
+      - {id: ex-store-state, from: ex-state-host, to: ex-state, label: チェックポイントを永続化, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 承認と実行, z: 0, origin: [-4, 0], size: [27, 15]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-agent: {tier: diagram, x: 4, y: 1}
+        ex-tool: {tier: diagram, x: 7, y: 1}
+        ex-key: {tier: diagram, x: 1, y: 4}
+        ex-state-host: {tier: diagram, x: 14, y: 1}
+        ex-state: {tier: diagram, x: 17, y: 1}
+        ex-trace: {tier: diagram, x: 20, y: 1}
+        ex-target: {tier: diagram, x: 14, y: 4}
+        ex-request: {tier: diagram, x: -3, y: 1}
+        ex-approve: {tier: diagram, x: -1.2, y: 1}
+        ex-evaluation: {tier: diagram, x: 3, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者のエージェントホスト, tier: [diagram], x0: 0, y0: 0, x1: 11, y1: 13, nodes: [ex-host, ex-agent, ex-tool, ex-key]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤, z: 0, size: [11, 12]}
+        - {id: app, label: 基盤上の処理, z: 1, size: [11, 12]}
+        - {id: other, label: 独立した保存・外部システム, z: 0, origin: [14, 0], size: [10, 8]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 8]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-agent: {tier: app, x: 4, y: 1}
+        ex-tool: {tier: app, x: 7, y: 1}
+        ex-key: {tier: app, x: 1, y: 4}
+        ex-state-host: {tier: other, x: 1, y: 1}
+        ex-state: {tier: other, x: 4, y: 1}
+        ex-trace: {tier: other, x: 7, y: 1}
+        ex-target: {tier: other, x: 1, y: 4}
+        ex-request: {tier: user, x: 1, y: 1}
+        ex-approve: {tier: user, x: 4, y: 1}
+        ex-evaluation: {tier: user, x: 7, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者のエージェントホスト, tier: [host, app], nodes: [ex-host, ex-agent, ex-tool, ex-key]}
+
+  - id: aws-stepfunctions-approval
+    label: "Step Functions・Lambda・Amazon Bedrock"
+    description: "Step Functions Standard ワークフローで変更案を保存し、担当者の承認を待つ。承認された案件だけを専用 Lambda で更新する。"
+    sources:
+      - {title: "Step Functions のタスクトークン待機", url: https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html}
+      - {title: "API Gateway の JWT Authorizer", url: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html}
+      - {title: "Amazon Bedrock Converse", url: https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html}
+      - {title: "DynamoDB トランザクション", url: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html}
+      - {title: "Step Functions と CloudWatch Logs", url: https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-stepfunctions-approval-auth, aws-stepfunctions-approval-gateway, aws-stepfunctions-approval-reviewer, aws-stepfunctions-approval-workflow, aws-stepfunctions-approval-plan, aws-stepfunctions-approval-llm, aws-stepfunctions-approval-tool, aws-stepfunctions-approval-state, aws-stepfunctions-approval-trace, aws-stepfunctions-approval-target]}
+    nodes:
+      aws-stepfunctions-approval-request: {label: "変更依頼者", kind: actor, tier: entry, x: 1, y: 1, realizes: [request], description: "更新する案件と目的を送る。", evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-review: {label: "承認担当者", kind: actor, tier: entry, x: 1, y: 2.4, realizes: [approve], description: "企業の承認画面から案件と変更案を確認する。", evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-eval: {label: "評価担当者", kind: actor, tier: entry, x: 1, y: 3.8, realizes: [evaluation], description: "操作履歴を確認する。", evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-auth: {label: "Cognito ユーザープール", kind: service, tier: runtime, x: 1, y: 0.3, svc: cognito, description: "依頼者や承認担当者のアクセス JWT を発行する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-gateway: {label: "API Gateway 承認 API", kind: gateway, tier: runtime, x: 1, y: 3.4, svc: apigw, description: "ルートごとに JWT と必要なスコープを検証する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-reviewer: {label: "依頼・承認 API の Lambda", kind: service, tier: runtime, x: 5, y: 3.4, svc: lambda, description: "案件へのアクセス権を検証し、承認時は対応するタスクトークンで応答する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-workflow: {label: "Step Functions Standard", kind: workflow, tier: runtime, x: 9, y: 3.4, svc: stepfunctions, realizes: [agent], description: "提案生成、承認待ち、更新を順に進め、拒否や期限切れは終了へ分岐する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-plan: {label: "提案生成 Lambda", kind: worker, tier: runtime, x: 9, y: 0.3, svc: lambda, description: "Bedrock で変更案を作り、許可する項目と値の形式を検査する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-llm: {label: "Amazon Bedrock", kind: service, tier: runtime, x: 15, y: 0.3, svc: bedrock, description: "与えられた情報から変更案を作成する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-tool: {label: "案件更新 Lambda", kind: worker, tier: runtime, x: 15, y: 3.4, svc: lambda, realizes: [tool], description: "承認された提案バージョンを照合し、DB 更新と操作記録をトランザクションで実行する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-state: {label: "DynamoDB の承認状態", kind: db, tier: data, x: 5, y: 1.5, svc: dynamodb, realizes: [state], description: "案件 ID、承認対象の版、承認状態を保持する。処理中のタスクトークンも管理画面から隔離する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-trace: {label: "CloudWatch の実行ログ", kind: monitor, tier: data, x: 10, y: 1.5, svc: cloudwatch, realizes: [trace], description: "相関 ID と状態遷移を記録する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      aws-stepfunctions-approval-target: {label: "DynamoDB の案件テーブル", kind: db, tier: data, x: 15, y: 1.5, svc: dynamodb, realizes: [target], description: "案件データと重複防止用の操作記録を保持する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+    links:
+      - {id: aws-stepfunctions-approval-jwt, from: aws-stepfunctions-approval-gateway, to: aws-stepfunctions-approval-auth, label: "署名検証用の公開鍵を取得", evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-ask-api, from: aws-stepfunctions-approval-request, to: aws-stepfunctions-approval-gateway, label: "認証済みの変更依頼を送る", realizes: [ask], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-ask-lambda, from: aws-stepfunctions-approval-gateway, to: aws-stepfunctions-approval-reviewer, label: "依頼 API を呼び出す", realizes: [ask], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-start, from: aws-stepfunctions-approval-reviewer, to: aws-stepfunctions-approval-workflow, label: "ワークフローを開始", realizes: [ask], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-plan, from: aws-stepfunctions-approval-workflow, to: aws-stepfunctions-approval-plan, label: "案件の変更案を生成", evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-model, from: aws-stepfunctions-approval-plan, to: aws-stepfunctions-approval-llm, label: "最小限の入力で変更案を生成", evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-wait, from: aws-stepfunctions-approval-workflow, to: aws-stepfunctions-approval-reviewer, label: "タスクトークンを渡して承認待ち", realizes: [pause], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-save, from: aws-stepfunctions-approval-reviewer, to: aws-stepfunctions-approval-state, label: "承認待ちの状態を保存", realizes: [pause], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-show, from: aws-stepfunctions-approval-state, to: aws-stepfunctions-approval-reviewer, label: "担当案件の承認待ち情報を取得", realizes: [review], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-present, from: aws-stepfunctions-approval-reviewer, to: aws-stepfunctions-approval-review, label: "承認画面に変更案を表示", realizes: [review], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-decision, from: aws-stepfunctions-approval-review, to: aws-stepfunctions-approval-gateway, label: "承認または拒否を送信", realizes: [resume], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-callback-api, from: aws-stepfunctions-approval-gateway, to: aws-stepfunctions-approval-reviewer, label: "承認トークンと案件権限を検証", realizes: [resume], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+      - {id: aws-stepfunctions-approval-callback, from: aws-stepfunctions-approval-reviewer, to: aws-stepfunctions-approval-workflow, label: "照合済みのタスクトークンで再開", realizes: [resume], replace: true, evidence: [{type: doc, ref: docs/reference-agent-approval.md#§5}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 承認と実行, z: 0, origin: [-4, 0], size: [27, 15]}]
+      nodes:
+        aws-stepfunctions-approval-auth: {tier: diagram, x: 1, y: 1}
+        aws-stepfunctions-approval-gateway: {tier: diagram, x: 4, y: 1}
+        aws-stepfunctions-approval-reviewer: {tier: diagram, x: 7, y: 1}
+        aws-stepfunctions-approval-workflow: {tier: diagram, x: 1, y: 4}
+        aws-stepfunctions-approval-plan: {tier: diagram, x: 4, y: 4}
+        aws-stepfunctions-approval-llm: {tier: diagram, x: 7, y: 4}
+        aws-stepfunctions-approval-tool: {tier: diagram, x: 1, y: 7}
+        aws-stepfunctions-approval-state: {tier: diagram, x: 4, y: 7}
+        aws-stepfunctions-approval-trace: {tier: diagram, x: 7, y: 7}
+        aws-stepfunctions-approval-target: {tier: diagram, x: 1, y: 10}
+        aws-stepfunctions-approval-request: {tier: diagram, x: -3, y: 1}
+        aws-stepfunctions-approval-review: {tier: diagram, x: -1.2, y: 1}
+        aws-stepfunctions-approval-eval: {tier: diagram, x: 3, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [diagram], x0: 0, y0: 0, x1: 11, y1: 13, nodes: [aws-stepfunctions-approval-auth, aws-stepfunctions-approval-gateway, aws-stepfunctions-approval-reviewer, aws-stepfunctions-approval-workflow, aws-stepfunctions-approval-plan, aws-stepfunctions-approval-llm, aws-stepfunctions-approval-tool, aws-stepfunctions-approval-state, aws-stepfunctions-approval-trace, aws-stepfunctions-approval-target]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤, z: 0, size: [11, 12]}
+        - {id: app, label: 基盤上の処理, z: 1, size: [11, 12]}
+        - {id: other, label: 独立した保存・外部システム, z: 0, origin: [14, 0], size: [10, 8]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 8]}
+      nodes:
+        aws-stepfunctions-approval-auth: {tier: host, x: 1, y: 1}
+        aws-stepfunctions-approval-gateway: {tier: host, x: 4, y: 1}
+        aws-stepfunctions-approval-reviewer: {tier: host, x: 7, y: 1}
+        aws-stepfunctions-approval-workflow: {tier: host, x: 1, y: 4}
+        aws-stepfunctions-approval-plan: {tier: host, x: 4, y: 4}
+        aws-stepfunctions-approval-llm: {tier: host, x: 7, y: 4}
+        aws-stepfunctions-approval-tool: {tier: host, x: 1, y: 7}
+        aws-stepfunctions-approval-state: {tier: host, x: 4, y: 7}
+        aws-stepfunctions-approval-trace: {tier: host, x: 7, y: 7}
+        aws-stepfunctions-approval-target: {tier: host, x: 1, y: 10}
+        aws-stepfunctions-approval-request: {tier: user, x: 1, y: 1}
+        aws-stepfunctions-approval-review: {tier: user, x: 4, y: 1}
+        aws-stepfunctions-approval-eval: {tier: user, x: 7, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [host, app], nodes: [aws-stepfunctions-approval-auth, aws-stepfunctions-approval-gateway, aws-stepfunctions-approval-reviewer, aws-stepfunctions-approval-workflow, aws-stepfunctions-approval-plan, aws-stepfunctions-approval-llm, aws-stepfunctions-approval-tool, aws-stepfunctions-approval-state, aws-stepfunctions-approval-trace, aws-stepfunctions-approval-target]}

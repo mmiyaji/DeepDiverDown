@@ -274,6 +274,8 @@ implementations:
     label: OneLake・SQL 分析エンドポイント
     description: OneLake catalog を使い、Fabric の Lakehouse と関連レポートを検索し、クエリ時に細かな権限を適用する例。
     sources:
+      - {title: Fabric licenses and capacity, url: https://learn.microsoft.com/en-us/fabric/enterprise/licenses}
+      - {title: OneLake overview, url: https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview}
       - title: OneLake Catalog Overview
         url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview
       - title: OneLake Catalog Item Details
@@ -284,13 +286,19 @@ implementations:
         url: https://learn.microsoft.com/en-us/fabric/onelake/security/read-secured-data
       - title: OneLake security overview
         url: https://learn.microsoft.com/en-us/fabric/onelake/security/fabric-onelake-security
+      - title: SQL analytics endpoint for a lakehouse
+        url: https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint
+      - title: OneLake Security for SQL analytics endpoints
+        url: https://learn.microsoft.com/en-us/fabric/onelake/security/sql-analytics-endpoint-onelake-security
     nodes:
+      fabric-managed-capacity: {label: Fabric capacity, svc: "fabric:platform", kind: service, tier: fabric, x: 13, y: 5, evidence: [{type: doc, ref: "docs/reference-fabric-onelake-catalog.md#§6"}]}
+      fabric-managed-storage: {label: OneLake managed storage, svc: "fabric:platform", kind: db, tier: fabric, x: 17, y: 5, evidence: [{type: doc, ref: "docs/reference-fabric-onelake-catalog.md#§6"}]}
       fabric-managed-reader:
         label: レポートを探す分析担当者
         kind: actor
-        tier: people
-        x: 3
-        'y': 1
+        tier: fabric
+        x: 0
+        y: 1
         description: 認定、上流、利用条件を確認する。
         realizes:
           - consumer
@@ -300,9 +308,9 @@ implementations:
       fabric-managed-admin:
         label: Fabric ワークスペース管理者
         kind: actor
-        tier: people
-        x: 10
-        'y': 1
+        tier: fabric
+        x: 0
+        y: 5
         description: 資産の認定とユーザーの権限を設定する。
         realizes:
           - admin
@@ -313,9 +321,9 @@ implementations:
         svc: fabric:platform
         label: OneLake catalog（Explore・Govern・Secure）
         kind: catalog
-        tier: catalog
-        x: 7
-        'y': 1
+        tier: fabric
+        x: 5
+        y: 1
         description: 発見、運用状況、ロール管理を統合した入口。
         realizes:
           - explore
@@ -325,25 +333,32 @@ implementations:
           - type: doc
             ref: docs/reference-fabric-onelake-catalog.md#§6
       fabric-managed-items:
-        svc: fabric:platform
-        label: Power BI レポートと Lakehouse
+        label: Power BI レポート
         kind: external
         tier: fabric
-        x: 3
-        'y': 1
-        description: 探す対象のレポートと、基になるテーブルを持つ。
+        x: 9
+        y: 1
+        description: カタログから探す分析アイテム。
         realizes:
           - items
         evidence:
           - type: doc
             ref: docs/reference-fabric-onelake-catalog.md#§6
+      fabric-managed-delta:
+        label: OneLake の Lakehouse Delta テーブル
+        kind: table
+        tier: fabric
+        x: 13
+        y: 1
+        description: Fabric ワークスペースの Lakehouse に属し、OneLake にデータファイルと Delta ログを保持する。
+        realizes: [items]
+        evidence: [{type: doc, ref: "docs/reference-fabric-onelake-catalog.md#§6"}]
       fabric-managed-workspace:
-        svc: fabric:platform
         label: Fabric ドメイン・ワークスペース
         kind: external
         tier: fabric
-        x: 7
-        'y': 1
+        x: 17
+        y: 1
         description: アイテムの整理とワークスペースロールの範囲。
         realizes:
           - workspaces
@@ -351,12 +366,11 @@ implementations:
           - type: doc
             ref: docs/reference-fabric-onelake-catalog.md#§6
       fabric-managed-roles:
-        svc: fabric:platform
         label: OneLake Security
         kind: policy
         tier: fabric
-        x: 11
-        'y': 1
+        x: 5
+        y: 5
         description: テーブルの行・列のアクセスを Entra ID に結び付ける。
         realizes:
           - roles
@@ -368,8 +382,8 @@ implementations:
         label: SQL 分析エンドポイント
         kind: service
         tier: fabric
-        x: 13
-        'y': 2
+        x: 9
+        y: 5
         description: ユーザー ID の実効権限でクエリを実行する。
         realizes:
           - engine
@@ -380,14 +394,17 @@ implementations:
         label: Microsoft Entra ID
         kind: service
         svc: azure:entra
-        tier: people
-        x: 6
-        'y': 2.5
+        tier: fabric
+        x: 23
+        y: 2
         description: 利用者・グループの ID を認証する。
         evidence:
           - type: doc
             ref: docs/reference-fabric-onelake-catalog.md#§6
     links:
+      - {id: fabric-managed-capacity-sql, from: fabric-managed-capacity, to: fabric-managed-sql, label: "Provide SQL compute capacity", evidence: [{type: doc, ref: "docs/reference-fabric-onelake-catalog.md#§6"}]}
+      - {id: fabric-managed-storage-table, from: fabric-managed-delta, to: fabric-managed-storage, label: "Store Delta files", evidence: [{type: doc, ref: "docs/reference-fabric-onelake-catalog.md#§6"}]}
+      - {id: fabric-managed-read-delta, from: fabric-managed-sql, to: fabric-managed-delta, label: "認可された Lakehouse テーブルを読む", evidence: [{type: doc, ref: "docs/reference-fabric-onelake-catalog.md#§6"}]}
       - id: fabric-managed-resolve-user
         from: fabric-managed-identity
         to: fabric-managed-sql
@@ -396,20 +413,42 @@ implementations:
           - type: doc
             ref: docs/reference-fabric-onelake-catalog.md#§6
     groups:
-      - kind: cloud
-        provider: fabric
-        label: OneLake catalog
-        tier: [catalog]
-        nodes: [fabric-managed-catalog]
-      - kind: cloud
-        provider: fabric
-        label: Fabric ワークスペース
-        tier: [fabric]
-        nodes: [fabric-managed-items, fabric-managed-workspace, fabric-managed-roles, fabric-managed-sql]
-      - kind: cloud
-        provider: azure
-        label: Microsoft Entra ID
-        tier:
-          - people
-        nodes:
-          - fabric-managed-identity
+      - {kind: cloud, provider: fabric, label: Fabric tenant and workspace, tier: fabric, nodes: [fabric-managed-catalog, fabric-managed-items, fabric-managed-delta, fabric-managed-workspace, fabric-managed-roles, fabric-managed-sql, fabric-managed-capacity, fabric-managed-storage]}
+      - {kind: cloud, provider: azure, label: Microsoft Entra tenant, tier: fabric, nodes: [fabric-managed-identity]}
+    layout2d:
+      tiers: [{id: diagram, label: Fabric and identity, z: 0, size: [28, 13]}]
+      nodes:
+        fabric-managed-catalog: {tier: diagram, x: 5, y: 1}
+        fabric-managed-items: {tier: diagram, x: 9, y: 1}
+        fabric-managed-delta: {tier: diagram, x: 13, y: 1}
+        fabric-managed-workspace: {tier: diagram, x: 17, y: 1}
+        fabric-managed-roles: {tier: diagram, x: 5, y: 5}
+        fabric-managed-sql: {tier: diagram, x: 9, y: 5}
+        fabric-managed-capacity: {tier: diagram, x: 13, y: 5}
+        fabric-managed-storage: {tier: diagram, x: 17, y: 5}
+        fabric-managed-identity: {tier: diagram, x: 23, y: 2}
+        fabric-managed-reader: {tier: diagram, x: 0, y: 1}
+        fabric-managed-admin: {tier: diagram, x: 0, y: 5}
+      groups:
+        - {kind: cloud, provider: fabric, label: Fabric tenant and workspace, tier: diagram, nodes: [fabric-managed-catalog, fabric-managed-items, fabric-managed-delta, fabric-managed-workspace, fabric-managed-roles, fabric-managed-sql, fabric-managed-capacity, fabric-managed-storage]}
+        - {kind: cloud, provider: azure, label: Microsoft Entra tenant, tier: diagram, nodes: [fabric-managed-identity]}
+    layout3d:
+      tiers:
+        - {id: fabric, label: Fabric tenant and managed services, z: 0, size: [18, 6]}
+        - {id: entra, label: Microsoft Entra tenant, z: 0, origin: [21, 0], size: [4, 3]}
+        - {id: users, label: Users, kind: origin, z: 0, origin: [-4, 0], size: [3, 3]}
+      nodes:
+        fabric-managed-catalog: {tier: fabric, x: 2, y: 1}
+        fabric-managed-items: {tier: fabric, x: 6, y: 1}
+        fabric-managed-delta: {tier: fabric, x: 10, y: 1}
+        fabric-managed-workspace: {tier: fabric, x: 14, y: 1}
+        fabric-managed-roles: {tier: fabric, x: 2, y: 4}
+        fabric-managed-sql: {tier: fabric, x: 6, y: 4}
+        fabric-managed-capacity: {tier: fabric, x: 10, y: 4}
+        fabric-managed-storage: {tier: fabric, x: 14, y: 4}
+        fabric-managed-identity: {tier: entra, x: 1, y: 1.5}
+        fabric-managed-reader: {tier: users, x: 0, y: 1.5}
+        fabric-managed-admin: {tier: users, x: 2, y: 1.5}
+      groups:
+        - {kind: cloud, provider: fabric, label: Fabric tenant and workspace, tier: fabric, nodes: [fabric-managed-catalog, fabric-managed-items, fabric-managed-delta, fabric-managed-workspace, fabric-managed-roles, fabric-managed-sql, fabric-managed-capacity, fabric-managed-storage]}
+        - {kind: cloud, provider: azure, label: Microsoft Entra tenant, tier: entra, nodes: [fabric-managed-identity]}

@@ -33,7 +33,7 @@ fact_order_line の1行は「1注文の1明細」。注文ヘッダ、明細、�
 
 | 機能 | 具体的な担い手 | 設定・成果物 |
 |---|---|---|
-| 受注イベント | landing.order_events | 注文 ID と明細 ID の入力イベントを持つ。 |
+| 受注イベントとマスター入力 | landing の受注・マスター入力表 | `landing.order_events` に注文 ID と明細 ID を保持し、マスターは別の入力表に置く。 |
 | 受注明細ファクト | sales.fact_order_line | 注文日でパーティション化し、注文 ID と明細 ID の組を一意にロードする。 |
 | 日付ディメンション | sales.dim_date | カレンダー属性を日付キーで参照する。 |
 | 顧客ディメンション | sales.dim_customer | 顧客の属性を顧客キーで参照する。 |
@@ -43,4 +43,15 @@ fact_order_line の1行は「1注文の1明細」。注文ヘッダ、明細、�
 
 タグの複数一致で明細を増やさないよう、タグ条件を `EXISTS` などの存在判定に使う。売上は単位と通貨をそろえ、ロード時にキーの一意性を検証する。
 
+同じ Google Cloud プロジェクトとロケーションに Cloud Storage バケットと BigQuery データセットを置く。受注・商品・顧客マスターの CSV を BigQuery のロードジョブで入力表に取り込む。ロード済みのバッチを GoogleSQL のクエリジョブで読み、`sales` のディメンション、販促タグのブリッジ、ファクトを更新する。更新ジョブの定期実行には BigQuery Data Transfer Service のスケジュールされたクエリを使い、入力を読める専用のサービスアカウントで実行する。
+
+BigQuery の主キー・外部キー宣言は整合性を強制しないため、変換時に明細キーを検査し、重複やディメンションの参照漏れを確認する。分析者は BigQuery Studio で `sales.monthly_sales` を問い合わせ、運用者はジョブ履歴でロード・変換の完了を確認する。
+
+- [Cloud Storage からの CSV ロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
+- [BigQuery のスケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)
+- [BigQuery の主キーと外部キー](https://docs.cloud.google.com/bigquery/docs/primary-foreign-keys)
+- [BigQuery の JOBS ビュー](https://docs.cloud.google.com/bigquery/docs/information-schema-jobs)
+
 出典 [Kimball Group の次元モデリング技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[Fact Tables and Dimension Tables](https://www.kimballgroup.com/2003/01/fact-tables-and-dimension-tables/)、[Power BI のスタースキーマ設計](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)、[BigQuery パーティション表](https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)
+
+Google は BigQuery と Cloud Storage のサービス基盤を運用し、利用者はデータ、SQL、スケジュール、サービスアカウントと IAM を設定する。SQL ジョブの内部計算ノードを直接操作するものではない。ファクト・ディメンション・ビューは BigQuery 内の論理データであり、個別サービスではない。公式資料を組み合わせた例で、ロード・更新・検査の SQL と結果は実動作未検証。[BigQuery overview](https://docs.cloud.google.com/bigquery/docs/introduction)

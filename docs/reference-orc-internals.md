@@ -54,7 +54,7 @@ ORC は 1 つの列を、役割ごとの複数の **Stream** に分けて保存�
 - `open-orc`：最後の 1 バイト → Postscript → File Footer の順に開く。
 - `orc-predicate`：Stripe 統計で Stripe を捨て、Row Index で行グループを読み飛ばし、必要な列の Stream だけを取る。
 
-## 7. 実装例：Trino Hive と S3 上の ORC
+## 7. 実装例：EKS の Trino で S3 の ORC を読む
 
 ORC を使う Hive テーブルを Trino で検索する例。ファイルは S3 に置き、対応する述語と利用可能な統計で不要な Stripe や行グループを除外する。
 
@@ -73,3 +73,20 @@ ORC を使う Hive テーブルを Trino で検索する例。ファイルは S3
 - [ORC Indexes](https://orc.apache.org/docs/indexes.html)
 - [Trino object storage file formats](https://trino.io/docs/current/object-storage/file-formats.html)
 - [Trino Hive connector](https://trino.io/docs/current/connector/hive.html)
+
+
+### AWS 上の実行環境
+
+この例では Trino の Helm チャートを EKS に配置し、EC2 ノード上で Coordinator と Worker の Pod を動かす。Hive Connector は AWS Glue Data Catalog をメタストアとして用い、S3 の ORC オブジェクトを読む。カタログ設定は connector.name=hive、hive.metastore=glue、fs.s3.enabled=true を指定する。Pod の IAM 権限、接続経路、Trino の管理と容量は別途構成する。EKS は Trino 本体をマネージドサービスとして提供するものではない。
+
+| 役割 | 実装 |
+| --- | --- |
+| クエリ計画 | Trino Coordinator Pod |
+| ファイルの読み取り | Trino Worker Pod |
+| テーブル情報 | AWS Glue Data Catalog |
+| 実行先 | EKS / EC2 ノードグループ |
+| ファイル | Amazon S3 |
+
+[Trino on Kubernetes](https://trino.io/docs/current/installation/kubernetes.html)、[Trino Hive connector](https://trino.io/docs/current/connector/hive.html)、[EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)。
+
+AWS が EKS 制御プレーンと EC2・Glue・S3 基盤を運用し、利用者が Kubernetes API、ノード、Trino、カタログ、ファイルと権限を管理する。EKS 制御プレーンサーバーは直接操作しない。この構成は公式資料を組み合わせた代表例で、ネットワーク、Trino バージョンごとの索引利用と実際の読み取り量は未検証。

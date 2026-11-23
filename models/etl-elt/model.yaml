@@ -191,7 +191,20 @@ implementations:
         url: https://docs.aws.amazon.com/redshift/latest/dg/t_loading-tables-from-s3.html
       - title: dbt Redshift setup
         url: https://docs.getdbt.com/docs/local/connect-data-platform/redshift-setup
+      - title: Step Functions の Glue ジョブ統合
+        url: https://docs.aws.amazon.com/step-functions/latest/dg/connect-glue.html
+      - title: Step Functions の ECS タスク統合
+        url: https://docs.aws.amazon.com/step-functions/latest/dg/connect-ecs.html
+      - title: Amazon Redshift Data API
+        url: https://docs.aws.amazon.com/redshift/latest/mgmt/data-api.html
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: input, label: 共通入力と結果の利用, z: 1, size: [17, 5]}
+      - {id: compare, label: ETL と ELT の処理経路, z: 0, size: [17, 5]}
+      - {id: control, label: ワークフローとコンテナ配置, z: 2, size: [17, 4]}
     nodes:
+      aws-redshift-warehouse: {label: Amazon Redshift provisioned cluster, svc: redshift, kind: service, tier: compare, x: 13, y: 3, management: {type: shared, scope: "AWS operates service infrastructure; customer manages cluster settings, data and access."}, evidence: [{type: doc, ref: "docs/reference-etl-elt.md#§7"}]}
+      aws-redshift-fargate-host: {label: AWS Fargate task, svc: fargate, kind: host, tier: control, x: 12, y: 3, management: {type: shared, scope: "AWS operates task infrastructure; customer configures task, image and permissions."}, evidence: [{type: doc, ref: "docs/reference-etl-elt.md#§7"}]}
       aws-redshift-source:
         label: Amazon S3 の入力バケット
         kind: db
@@ -202,6 +215,7 @@ implementations:
         svc: s3
         realizes:
           - source
+        management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
@@ -215,6 +229,7 @@ implementations:
         svc: glue
         realizes:
           - etl-job
+        management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
@@ -227,6 +242,7 @@ implementations:
         description: Glue で変換した結果を保持する。
         realizes:
           - curated
+        management: {type: customer, scope: "Customer manages workload, configuration, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
@@ -240,6 +256,7 @@ implementations:
         description: COPY でロードした無変換の入力を保持する。
         realizes:
           - raw
+        management: {type: customer, scope: "Customer manages workload, configuration, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
@@ -254,16 +271,18 @@ implementations:
         description: dbt モデルの SQL を Redshift 内で実行する。
         realizes:
           - dbt
+        management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
       aws-redshift-dbt-client:
-        label: dbt-redshift 実行環境
-        kind: client
-        tier: input
-        x: 8
-        y: 2.5
-        description: dbt モデルをコンパイルし、変換 SQL を Redshift に送る。
+        label: Fargate 上の dbt Core
+        kind: worker
+        tier: control
+        x: 15
+        y: 1.5
+        description: dbt Core と dbt-redshift でモデルをコンパイルし、変換 SQL を Redshift に送る。
+        management: {type: customer, scope: "Customer manages workload, configuration, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
@@ -276,6 +295,7 @@ implementations:
         description: 比較用に経路ごとにスキーマを分離する。
         realizes:
           - mart
+        management: {type: customer, scope: "Customer manages workload, configuration, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
@@ -300,10 +320,21 @@ implementations:
         'y': 2.5
         description: Glue と Redshift の転送時に一時データを置く。
         svc: s3
+        management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
+      aws-redshift-workflow: {label: Step Functions Standard, svc: stepfunctions, kind: workflow, tier: control, x: 2, y: 1.5, description: ETL と ELT を別経路として実行し、ELT では COPY 成功後に dbt を起動する。, management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
+      aws-redshift-ecs: {label: Amazon ECS RunTask, svc: ecs, kind: service, tier: control, x: 7, y: 1.5, description: タスク定義に従って dbt Core を Fargate で起動する。, management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
+      aws-redshift-image: {label: ECR の dbt イメージ, svc: ecr, kind: file, tier: control, x: 11, y: 1.5, description: dbt Core・dbt-redshift と比較用モデルを配布する。, management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
     links:
+      - {id: aws-redshift-execute-sql, from: aws-redshift-warehouse, to: aws-redshift-dbt, label: "Execute SQL", evidence: [{type: doc, ref: "docs/reference-etl-elt.md#§7"}]}
+      - {id: aws-redshift-host-run, from: aws-redshift-fargate-host, to: aws-redshift-dbt-client, label: "Run dbt container", evidence: [{type: doc, ref: "docs/reference-etl-elt.md#§7"}]}
+      - {id: aws-redshift-glue-run, from: aws-redshift-workflow, to: aws-redshift-etl, label: Glue ETL ジョブを実行, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
+      - {id: aws-redshift-raw-run, from: aws-redshift-workflow, to: aws-redshift-raw, label: Data API で COPY を実行し完了を確認, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
+      - {id: aws-redshift-dbt-run, from: aws-redshift-workflow, to: aws-redshift-ecs, label: ロード成功後に dbt タスクを投入, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
+      - {id: aws-redshift-fargate, from: aws-redshift-ecs, to: aws-redshift-dbt-client, label: Fargate タスクを起動, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
+      - {id: aws-redshift-pull, from: aws-redshift-image, to: aws-redshift-dbt-client, label: dbt コンテナを供給, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§7}]}
       - id: aws-redshift-dbt-submit
         from: aws-redshift-dbt-client
         to: aws-redshift-dbt
@@ -330,6 +361,8 @@ implementations:
         kind: cloud
         provider: aws
         nodes:
+          - aws-redshift-fargate-host
+          - aws-redshift-warehouse
           - aws-redshift-source
           - aws-redshift-etl
           - aws-redshift-curated
@@ -337,6 +370,10 @@ implementations:
           - aws-redshift-dbt
           - aws-redshift-marts
           - aws-redshift-stage
+          - aws-redshift-workflow
+          - aws-redshift-ecs
+          - aws-redshift-image
+          - aws-redshift-dbt-client
       - kind: cloud
         provider: aws
         label: AWS サービス
@@ -373,3 +410,47 @@ implementations:
           - compare
         nodes:
           - aws-redshift-marts
+    layout2d:
+      tiers: [{id: diagram, label: AWS implementation, z: 0, size: [32, 15]}]
+      nodes:
+        aws-redshift-bi: {tier: diagram, x: 1, y: 1}
+        aws-redshift-source: {tier: diagram, x: 6, y: 1}
+        aws-redshift-etl: {tier: diagram, x: 11, y: 1}
+        aws-redshift-curated: {tier: diagram, x: 16, y: 1}
+        aws-redshift-raw: {tier: diagram, x: 21, y: 1}
+        aws-redshift-dbt: {tier: diagram, x: 26, y: 1}
+        aws-redshift-dbt-client: {tier: diagram, x: 1, y: 5}
+        aws-redshift-marts: {tier: diagram, x: 6, y: 5}
+        aws-redshift-stage: {tier: diagram, x: 11, y: 5}
+        aws-redshift-workflow: {tier: diagram, x: 16, y: 5}
+        aws-redshift-ecs: {tier: diagram, x: 21, y: 5}
+        aws-redshift-image: {tier: diagram, x: 26, y: 5}
+        aws-redshift-fargate-host: {tier: diagram, x: 1, y: 9}
+        aws-redshift-warehouse: {tier: diagram, x: 6, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-redshift-source, aws-redshift-etl, aws-redshift-curated, aws-redshift-raw, aws-redshift-dbt, aws-redshift-dbt-client, aws-redshift-marts, aws-redshift-stage, aws-redshift-workflow, aws-redshift-ecs, aws-redshift-image, aws-redshift-fargate-host, aws-redshift-warehouse]}
+        - {kind: cluster, label: Fargate task, tier: diagram, nodes: [aws-redshift-fargate-host, aws-redshift-dbt-client]}
+    layout3d:
+      tiers:
+        - {id: task, label: dbt container, z: 1, size: [5, 3]}
+        - {id: host, label: Fargate, z: 0, size: [5, 3]}
+        - {id: services, label: AWS managed services, z: 0, origin: [8, 0], size: [24, 8]}
+        - {id: outside, label: External user, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-redshift-bi: {tier: outside, x: 0, y: 1.5}
+        aws-redshift-source: {tier: services, x: 6, y: 1}
+        aws-redshift-etl: {tier: services, x: 10, y: 1}
+        aws-redshift-curated: {tier: services, x: 14, y: 1}
+        aws-redshift-raw: {tier: services, x: 18, y: 1}
+        aws-redshift-dbt: {tier: services, x: 2, y: 4}
+        aws-redshift-dbt-client: {tier: task, x: 2, y: 1.5}
+        aws-redshift-marts: {tier: services, x: 10, y: 4}
+        aws-redshift-stage: {tier: services, x: 14, y: 4}
+        aws-redshift-workflow: {tier: services, x: 18, y: 4}
+        aws-redshift-ecs: {tier: services, x: 2, y: 7}
+        aws-redshift-image: {tier: services, x: 6, y: 7}
+        aws-redshift-fargate-host: {tier: host, x: 2, y: 1.5}
+        aws-redshift-warehouse: {tier: services, x: 14, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [task, host, services], nodes: [aws-redshift-source, aws-redshift-etl, aws-redshift-curated, aws-redshift-raw, aws-redshift-dbt, aws-redshift-dbt-client, aws-redshift-marts, aws-redshift-stage, aws-redshift-workflow, aws-redshift-ecs, aws-redshift-image, aws-redshift-fargate-host, aws-redshift-warehouse]}
+        - {kind: cluster, label: Fargate task, tier: [task, host], nodes: [aws-redshift-fargate-host, aws-redshift-dbt-client]}

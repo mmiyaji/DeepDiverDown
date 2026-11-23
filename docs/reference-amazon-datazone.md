@@ -45,12 +45,17 @@ Lake Formation 管理下の Glue テーブルや対応する Redshift テーブ�
 | プロジェクトのインベントリ・ビジネスデータカタログ・購読・権限付与処理 | Amazon DataZone（ドメイン・ポータル） | インベントリ、公開カタログ、購読状態を一つのドメインで管理する。 |
 | 承認イベントの配信 | Amazon EventBridge | 非管理対象の承認イベントを配信する。 |
 | ソースのテーブルカタログ | AWS Glue Data Catalog | Lake Formation 管理下の注文テーブルを登録する。 |
+| 注文データの実体 | Amazon S3 | 提供側の注文ファイルを保持し、Glue Data Catalog にテーブルの保存先を登録する。 |
 | OpenLineage 対応ジョブ | AWS Glue Spark ETL | 対応バージョンで OpenLineage のイベントを出す。 |
 | データレイクの権限制御 | AWS Lake Formation | 購読側のデータアクセスを付与する。 |
 | 購読環境・クエリエンジン | Amazon Athena ワークグループ | 購読環境が付与済みテーブルをクエリする。 |
 | 外部処理・非管理対象ソース | 外部の購読処理 | 承認イベントに従ってソース側の権限変更を担当する。 |
 | 実装で追加 | DefaultDataLake ブループリント | Glue 管理アクセスロールとデータレイク環境を構成する。 |
 
+この例では提供・購読の環境を同じ AWS アカウントの同一リージョンに用意する。提供側の Glue Spark ETL が注文ファイルを S3 に書き込み、購読側の Athena ワークグループは Lake Formation で許可されたテーブルについて S3 のファイルを読む。図の S3 は入力テーブルの保存先を示す。
+
 ブループリントで都度構成する Glue 管理アクセスロールには Lake Formation と Glue を操作できる権限が要る。非管理対象の権限処理は EventBridge を受ける外部担当・実装で行う。
 
 [AWS Reference Architecture: Building a Unified Catalog with Amazon DataZone](https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html)、[Grant Access to Unmanaged Assets](https://docs.aws.amazon.com/datazone/latest/userguide/grant-access-to-unmanaged-asset.html)、[Data Lineage in Amazon DataZone](https://docs.aws.amazon.com/datazone/latest/userguide/datazone-data-lineage.html)、[Amazon DataZone built-in blueprints](https://docs.aws.amazon.com/datazone/latest/userguide/working-with-blueprints.html)
+
+プロジェクトは DataZone 内の運用単位であり、個人と区別する。AWS は DataZone、Glue、Athena、EventBridge と Lambda の基盤を運用し、利用者はプロジェクト、ブループリント、IAM ロール、S3 データ、ジョブと権限を設定する。非管理対象の付与処理は EventBridge に反応する顧客実装の Lambda を例示し、ソース権限と状態報告を担当させる。AWS の内部実行基盤を直接操作するものではない。この連携は資料を組み合わせた例で実動作未検証。[AWS shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)、[EventBridge と Lambda](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-run-lambda-schedule.html)

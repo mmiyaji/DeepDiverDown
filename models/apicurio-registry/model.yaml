@@ -182,6 +182,30 @@ implementations:
       - title: Apicurio Registry Docker Deployment
         url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html
     nodes:
+      apicurio-postgres-client-host:
+        label: 自前 Linux クライアントホスト
+        kind: host
+        tier: kafka
+        x: 3
+        y: 0
+        description: Producer と Consumer の Java アプリを実行する。
+        evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§7}]
+      apicurio-postgres-kafka-host:
+        label: 自前 Kafka ブローカーホスト群
+        kind: host
+        tier: kafka
+        x: 8
+        y: 0
+        description: 利用者が Kafka ブローカーとトピックを運用する。
+        evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§7}]
+      apicurio-postgres-registry-host:
+        label: 自前 Docker 実行ホスト
+        kind: host
+        tier: registry
+        x: 6
+        y: 0
+        description: Registry と PostgreSQL コンテナーを運用する。
+        evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§7}]
       apicurio-postgres-writer:
         label: Java Kafka Producer（Avro Serializer）
         kind: actor
@@ -256,6 +280,11 @@ implementations:
           - type: doc
             ref: docs/reference-apicurio-registry.md#§7
     links:
+      - {id: apicurio-postgres-client-writer, from: apicurio-postgres-client-host, to: apicurio-postgres-writer, label: Producer を実行}
+      - {id: apicurio-postgres-client-reader, from: apicurio-postgres-client-host, to: apicurio-postgres-reader, label: Consumer を実行}
+      - {id: apicurio-postgres-host-kafka, from: apicurio-postgres-kafka-host, to: apicurio-postgres-kafka, label: トピックを保持}
+      - {id: apicurio-postgres-host-registry, from: apicurio-postgres-registry-host, to: apicurio-postgres-registry, label: Registry を実行}
+      - {id: apicurio-postgres-host-db, from: apicurio-postgres-registry-host, to: apicurio-postgres-postgres, label: PostgreSQL を実行}
       - id: apicurio-postgres-persist
         from: apicurio-postgres-registry
         to: apicurio-postgres-postgres
@@ -263,6 +292,124 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-apicurio-registry.md#§7
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [31, 17]}
+      nodes:
+        apicurio-postgres-client-host: {tier: diagram, x: 2, y: 2}
+        apicurio-postgres-writer: {tier: diagram, x: 2, y: 5}
+        apicurio-postgres-reader: {tier: diagram, x: 2, y: 8}
+        apicurio-postgres-kafka-host: {tier: diagram, x: 8, y: 2}
+        apicurio-postgres-kafka: {tier: diagram, x: 8, y: 5}
+        apicurio-postgres-registry-host: {tier: diagram, x: 14, y: 2}
+        apicurio-postgres-registry: {tier: diagram, x: 14, y: 5}
+        apicurio-postgres-postgres: {tier: diagram, x: 14, y: 8}
+        apicurio-postgres-publisher: {tier: diagram, x: 20, y: 2}
+      groups:
+        - {kind: nodegroup, label: "Java クライアント", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 12, nodes: [apicurio-postgres-client-host, apicurio-postgres-writer, apicurio-postgres-reader]}
+        - {kind: cluster, label: "Kafka ホスト群", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 9, nodes: [apicurio-postgres-kafka-host, apicurio-postgres-kafka]}
+        - {kind: nodegroup, label: "Registry Docker ホスト", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 12, nodes: [apicurio-postgres-registry-host, apicurio-postgres-registry, apicurio-postgres-postgres]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Java クライアント", z: 0, origin: [0, 0], size: [5, 9]}
+        - {id: zone1, label: "Kafka ホスト群", z: 0, origin: [7, 0], size: [5, 6]}
+        - {id: zone2, label: "Registry Docker ホスト", z: 0, origin: [14, 0], size: [5, 9]}
+        - {id: zone3, label: "スキーマ登録者", z: 0, origin: [21, 0], size: [5, 5]}
+      nodes:
+        apicurio-postgres-client-host: {tier: zone0, x: 2, y: 1}
+        apicurio-postgres-writer: {tier: zone0, x: 2, y: 4}
+        apicurio-postgres-reader: {tier: zone0, x: 2, y: 7}
+        apicurio-postgres-kafka-host: {tier: zone1, x: 2, y: 1}
+        apicurio-postgres-kafka: {tier: zone1, x: 2, y: 4}
+        apicurio-postgres-registry-host: {tier: zone2, x: 2, y: 1}
+        apicurio-postgres-registry: {tier: zone2, x: 2, y: 4}
+        apicurio-postgres-postgres: {tier: zone2, x: 2, y: 7}
+        apicurio-postgres-publisher: {tier: zone3, x: 2, y: 1}
+      groups:
+        - {kind: nodegroup, label: "Java クライアント", tier: [zone0], nodes: [apicurio-postgres-client-host, apicurio-postgres-writer, apicurio-postgres-reader]}
+        - {kind: cluster, label: "Kafka ホスト群", tier: [zone1], nodes: [apicurio-postgres-kafka-host, apicurio-postgres-kafka]}
+        - {kind: nodegroup, label: "Registry Docker ホスト", tier: [zone2], nodes: [apicurio-postgres-registry-host, apicurio-postgres-registry, apicurio-postgres-postgres]}
+
+  - id: aws-eks-apicurio
+    label: "Amazon EKS 上の Apicurio Registry・RDS・MSK"
+    description: "EKS の EC2 ノードで Apicurio Registry Operator と Registry API を運用する。MSK は注文レコード、RDS PostgreSQL はスキーマの履歴を保持する。"
+    sources:
+      - {title: "Apicurio Registry Operator の PostgreSQL 構成", url: https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-deploying-registry-operator.html}
+      - {title: "Apicurio Registry の Java Kafka SerDes", url: https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-configuring-kafka-client-serdes.html}
+      - {title: "Apicurio Registry Operator の認証設定", url: https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-operator-config-reference.html}
+      - {title: "Amazon MSK への接続", url: https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html}
+      - {title: "EKS マネージドノードグループ", url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
+      - {kind: cluster, label: "Amazon EKS クラスター", provider: k8s, tier: [runtime], nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer]}
+      - {kind: namespace, label: "Registry の名前空間", provider: k8s, tier: [runtime], nodes: [aws-eks-apicurio-operator, aws-eks-apicurio-registry]}
+      - {kind: vpc, label: "MSK と RDS の接続先", provider: aws, tier: [data], nodes: [aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
+    nodes:
+      aws-eks-apicurio-author: {label: "スキーマの登録担当者", kind: actor, tier: entry, x: 1, y: 1.3, realizes: [submitter], description: "登録用クライアントから新しいスキーマを提出する。", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-idp: {label: "既存の Keycloak", kind: external, tier: entry, x: 1, y: 3.3, description: "Registry 向けのアクセストークンを発行する。", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-eks: {label: "EKS Kubernetes API", kind: service, tier: runtime, x: 1, y: 0.6, svc: eks, description: "Operator と ApicurioRegistry3 のリソースを受け入れる。", management: {type: shared, scope: "AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-nodes: {label: "EKS の EC2 ノード", kind: host, tier: runtime, x: 1, y: 4.9, svc: ec2, description: "Operator、Registry、Kafka クライアントの Pod を稼働させる。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループと更新を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-operator: {label: "Apicurio Registry Operator", kind: scheduler, tier: runtime, x: 5, y: 0.6, description: "カスタムリソースに従って Registry の Deployment を管理する。", management: {type: customer, scope: "利用者が Operator とカスタムリソースを管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-registry: {label: "Apicurio Registry API", kind: service, tier: runtime, x: 10, y: 0.6, realizes: [policy], description: "登録候補を互換性ルールで検証し、ID に対応するスキーマを提供する。", management: {type: customer, scope: "利用者が Registry と互換性ルール、認証を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-producer: {label: "Java Producer と Avro Serializer", kind: worker, tier: runtime, x: 6, y: 4.9, realizes: [producer, serialize], description: "スキーマ参照を解決し、Avro メッセージを MSK へ送る。", management: {type: customer, scope: "利用者が Producer と認証設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-consumer: {label: "Java Consumer と Avro Deserializer", kind: worker, tier: runtime, x: 13, y: 4.9, realizes: [deserialize, app], description: "記録された ID で writer schema を解決し、reader schema で読む。", management: {type: customer, scope: "利用者が Consumer と認証設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-topic: {label: "MSK の注文トピック", kind: queue, tier: data, x: 7, y: 1.5, svc: msk, realizes: [topic], description: "Avro レコードとスキーマ参照 ID を保持する。", management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      aws-eks-apicurio-versions: {label: "RDS PostgreSQL の Registry DB", kind: db, tier: data, x: 13, y: 1.5, svc: rds, realizes: [versions], description: "スキーマの版、内容、ID、ルールを永続化する。", management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者が DB と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+    links:
+      - {id: aws-eks-apicurio-reader-result, from: aws-eks-apicurio-registry, to: aws-eks-apicurio-consumer, label: writer schema を返す, realizes: [by-id], replace: true}
+      - {id: aws-eks-apicurio-schedule, from: aws-eks-apicurio-eks, to: aws-eks-apicurio-nodes, label: "Pod を EC2 ノードへ配置", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      - {id: aws-eks-apicurio-reconcile, from: aws-eks-apicurio-operator, to: aws-eks-apicurio-registry, label: "Registry API の Deployment を管理", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      - {id: aws-eks-apicurio-auth, from: aws-eks-apicurio-idp, to: aws-eks-apicurio-registry, label: "OIDC トークンの検証情報を提供", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      - {id: aws-eks-apicurio-request-writer, from: aws-eks-apicurio-versions, to: aws-eks-apicurio-registry, label: "writer schema の参照を取得", realizes: [writer-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      - {id: aws-eks-apicurio-schema-for-write, from: aws-eks-apicurio-registry, to: aws-eks-apicurio-producer, label: "writer schema の参照を返す", realizes: [writer-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      - {id: aws-eks-apicurio-request-reader, from: aws-eks-apicurio-consumer, to: aws-eks-apicurio-registry, label: "レコードの ID で writer schema を要求", realizes: [by-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      - {id: aws-eks-apicurio-schema-for-read, from: aws-eks-apicurio-registry, to: aws-eks-apicurio-versions, label: "対応する writer schema を検索", realizes: [by-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [31, 17]}
+      nodes:
+        aws-eks-apicurio-author: {tier: diagram, x: 2, y: 2}
+        aws-eks-apicurio-idp: {tier: diagram, x: 2, y: 5}
+        aws-eks-apicurio-eks: {tier: diagram, x: 8, y: 2}
+        aws-eks-apicurio-nodes: {tier: diagram, x: 14, y: 2}
+        aws-eks-apicurio-operator: {tier: diagram, x: 14, y: 5}
+        aws-eks-apicurio-registry: {tier: diagram, x: 14, y: 8}
+        aws-eks-apicurio-producer: {tier: diagram, x: 14, y: 11}
+        aws-eks-apicurio-consumer: {tier: diagram, x: 14, y: 14}
+        aws-eks-apicurio-topic: {tier: diagram, x: 20, y: 2}
+        aws-eks-apicurio-versions: {tier: diagram, x: 20, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 5, y0: 0, x1: 30, y1: 16, nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [diagram], x0: 12, y0: 0, x1: 22, y1: 16, nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
+        - {kind: cluster, label: "EKS ノード・Registry", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 18, nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "利用者と既存 IdP", z: 0, origin: [0, 0], size: [5, 6]}
+        - {id: zone1, label: "EKS 制御プレーン", z: 0, origin: [7, 0], size: [5, 5]}
+        - {id: zone2, label: "EKS ノード・Registry", z: 0, origin: [14, 0], size: [5, 15]}
+        - {id: zone3, label: "MSK と RDS", z: 0, origin: [21, 0], size: [5, 6]}
+      nodes:
+        aws-eks-apicurio-author: {tier: zone0, x: 2, y: 1}
+        aws-eks-apicurio-idp: {tier: zone0, x: 2, y: 4}
+        aws-eks-apicurio-eks: {tier: zone1, x: 2, y: 1}
+        aws-eks-apicurio-nodes: {tier: zone2, x: 2, y: 1}
+        aws-eks-apicurio-operator: {tier: zone2, x: 2, y: 4}
+        aws-eks-apicurio-registry: {tier: zone2, x: 2, y: 7}
+        aws-eks-apicurio-producer: {tier: zone2, x: 2, y: 10}
+        aws-eks-apicurio-consumer: {tier: zone2, x: 2, y: 13}
+        aws-eks-apicurio-topic: {tier: zone3, x: 2, y: 1}
+        aws-eks-apicurio-versions: {tier: zone3, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [zone1, zone2, zone3], nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [zone2, zone3], nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
+        - {kind: cluster, label: "EKS ノード・Registry", tier: [zone2], nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer]}
+
 gates: {maxDrift: 0, maxHigh: 0}
 blocks:
   - id: decode

@@ -44,6 +44,8 @@
 | 参照クエリ／BI | 分析者用 SQL Warehouse | 許可された表と、マスクされた列の出力を参照する。 |
 | 列リネージ | Unity Catalog リネージと system.access の履歴 | 対応する処理で記録されたテーブル・列の依存を確認する。 |
 
-ワークスペースの束縛とオブジェクト権限を両方確認する。外部ファイルを更新する処理と、管理テーブルのファイルライフサイクルは別に運用する。
+ワークスペースの束縛とオブジェクト権限を両方確認する。外部着地と管理ストレージには別々の S3 プレフィックスを割り当て、Storage Credential の IAM ロールには用途別のアクセスを設定する。外部ファイルを更新する処理には着地領域の権限を与え、管理領域への直接アクセスは付与しない。分析者には SQL Warehouse の使用と、許可したカタログ・スキーマ・表の権限を付与する。
 
 出典 [Unity Catalog のアクセス制御](https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control)、[ワークスペース・バインディング](https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding)、[管理／外部テーブルの指針](https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices)、[オブジェクトストレージのライフサイクル](https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle)、[Unity Catalog のリネージ](https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage)、[Databricks の S3 外部ロケーション](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3)、[Databricks のリネージシステムテーブル](https://docs.databricks.com/aws/en/admin/system-tables/lineage)
+
+この例の SQL Warehouse は Databricks 管理のサーバーレス計算プレーンで動く。利用者はワークスペースのバインディング、テーブル、外部ロケーション、資格情報、マスキングと権限を設定できるが、サーバーレス内部ノードを直接操作しない。管理テーブルと外部表は論理オブジェクトで、実ファイルは顧客 AWS の別々の S3 領域にある。AWS は S3 基盤を管理し、利用者はアクセス権と外部ファイルのライフサイクルを管理する。公式資料を組み合わせた例で、構成の実動作は未検証。[Databricks architecture](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[Managed storage](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)

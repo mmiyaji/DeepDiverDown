@@ -1,71 +1,471 @@
-name: "DWH の Slowly Changing Dimensions：Type 1 と Type 2"
-description: "顧客の移転を題材に、単純上書きと有効期間を持つ履歴管理を同じ注文で比較する。"
-parent: {"model":"dwh-design-patterns","node":"scd"}
+name: DWH の Slowly Changing Dimensions：Type 1 と Type 2
+description: 顧客の移転を題材に、単純上書きと有効期間を持つ履歴管理を同じ注文で比較する。
+parent:
+  model: dwh-design-patterns
+  node: scd
 reference:
   objectives:
-    - "Type 1 と Type 2 を情報の使い方で選ぶ。"
-    - "業務キー・代理キー・有効期間の役割を確認する。"
+    - Type 1 と Type 2 を情報の使い方で選ぶ。
+    - 業務キー・代理キー・有効期間の役割を確認する。
   sources:
-    - {"title":"Kimball Group の Slowly Changing Dimension 技法","url":"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
-    - {"title":"Power BI の SCD ガイダンス","url":"https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
-sources: ["docs/reference-dwh-slowly-changing-dimensions.md"]
-evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§1"}]
+    - title: Kimball Group の Slowly Changing Dimension 技法
+      url: >-
+        https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
+    - title: Power BI の SCD ガイダンス
+      url: https://learn.microsoft.com/en-us/power-bi/guidance/star-schema
+sources:
+  - docs/reference-dwh-slowly-changing-dimensions.md
+evidence:
+  - type: doc
+    ref: docs/reference-dwh-slowly-changing-dimensions.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[15.5,4.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 15.5
+      - 4.5
 nodes:
-  change: {"label":"顧客 C42 の移転","kind":"external","tier":"flow","x":0,"y":0,"description":"1/20 から西地区。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§1"}]}
-  ingest: {"label":"履歴を反映する変換","kind":"worker","tier":"flow","x":3,"y":1,"description":"有効開始と終了を設定。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
-  current: {"label":"Type 1 現在行","kind":"db","tier":"flow","x":7,"y":0,"description":"最新の地区だけを保持。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
-  history: {"label":"Type 2 の有効期間","kind":"db","tier":"flow","x":7,"y":3,"description":"同じ業務キーに別の代理キー。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
-  event: {"label":"遅れて届いた注文明細","kind":"external","tier":"flow","x":0,"y":4,"description":"発生は 1/17。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
-  fact: {"label":"明細ファクト","kind":"db","tier":"flow","x":11,"y":3,"description":"事実発生時点の顧客キー。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
-  analytics: {"label":"地域別売上","kind":"client","tier":"flow","x":15,"y":1,"description":"当時／現在の見方を選ぶ。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
+  change:
+    label: 顧客 C42 の移転
+    kind: external
+    tier: flow
+    x: 0
+    'y': 0
+    description: 1/20 から西地区。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§1
+  ingest:
+    label: 履歴を反映する変換
+    kind: worker
+    tier: flow
+    x: 3
+    'y': 1
+    description: 有効開始と終了を設定。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§3
+  current:
+    label: Type 1 現在行
+    kind: db
+    tier: flow
+    x: 7
+    'y': 0
+    description: 最新の地区だけを保持。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§2
+  history:
+    label: Type 2 の有効期間
+    kind: db
+    tier: flow
+    x: 7
+    'y': 3
+    description: 同じ業務キーに別の代理キー。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§3
+  event:
+    label: 遅れて届いた注文明細
+    kind: external
+    tier: flow
+    x: 0
+    'y': 4
+    description: 発生は 1/17。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§4
+  fact:
+    label: 明細ファクト
+    kind: db
+    tier: flow
+    x: 11
+    'y': 3
+    description: 事実発生時点の顧客キー。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§4
+  analytics:
+    label: 地域別売上
+    kind: client
+    tier: flow
+    x: 15
+    'y': 1
+    description: 当時／現在の見方を選ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§2
 links:
-  - {"id":"record","from":"change","to":"ingest","label":"地区の変更を取得","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§1"}]}
-  - {"id":"replace","from":"ingest","to":"current","label":"既存行を上書き","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
-  - {"id":"expire","from":"ingest","to":"history","label":"旧行を閉じ、新行を追加","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
-  - {"id":"arrive","from":"event","to":"ingest","label":"業務時刻でキーを引く","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
-  - {"id":"key","from":"history","to":"fact","label":"該当期間の代理キーを設定","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
-  - {"id":"current-report","from":"current","to":"analytics","label":"現在地区で過去の売上も分類","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
-  - {"id":"history-report","from":"fact","to":"analytics","label":"注文当時の地区で集計","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
+  - id: record
+    from: change
+    to: ingest
+    label: 地区の変更を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§1
+  - id: replace
+    from: ingest
+    to: current
+    label: 既存行を上書き
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§2
+  - id: expire
+    from: ingest
+    to: history
+    label: 旧行を閉じ、新行を追加
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§3
+  - id: arrive
+    from: event
+    to: ingest
+    label: 業務時刻でキーを引く
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§4
+  - id: key
+    from: history
+    to: fact
+    label: 該当期間の代理キーを設定
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§4
+  - id: current-report
+    from: current
+    to: analytics
+    label: 現在地区で過去の売上も分類
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§2
+  - id: history-report
+    from: fact
+    to: analytics
+    label: 注文当時の地区で集計
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§3
 scenarios:
   - id: update
-    label: "移転日に Type 1 と Type 2 を比較"
+    label: 移転日に Type 1 と Type 2 を比較
     visual: timeline
-    evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§3
     steps:
-      - {"links":["record"],"note":"顧客 C42 が東から西へ移転する。","current":"east"}
-      - {"links":["replace","current-report"],"note":"Type 1 は上書きし、以前の売上も現在の西として見える。"}
-      - {"links":["expire","history-report"],"note":"Type 2 は旧行を閉じ、新しい代理キーを西に割り当てる。","current":"west","travel":"east"}
+      - links:
+          - record
+        note: 顧客 C42 が東から西へ移転する。
+        current: east
+      - links:
+          - replace
+          - current-report
+        note: Type 1 は上書きし、以前の売上も現在の西として見える。
+      - links:
+          - expire
+          - history-report
+        note: Type 2 は旧行を閉じ、新しい代理キーを西に割り当てる。
+        current: west
+        travel: east
   - id: late
-    label: "遅延注文を正しい履歴の行に紐付ける"
+    label: 遅延注文を正しい履歴の行に紐付ける
     visual: timeline
-    evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-slowly-changing-dimensions.md#§4
     steps:
-      - {"links":["arrive"],"note":"1月17日発生の注文が移転後に届く。","current":"west"}
-      - {"links":["key"],"note":"イベント時刻で旧行の代理キーを引く。","travel":"east"}
-      - {"links":["history-report"],"note":"遅延注文は発生当時の東地区の売上に入る。","highlight":["east"]}
-timeline: {"title":"顧客 C42 の Type 2 有効期間","current":"east","note":"代理キーは例示。期間は開始を含み、終了を含まない。永続的な削除を表す図ではない。","commits":[{"id":"east","label":"東地区・SK 101","time":"[1/01, 1/20)","kind":"append","node":"history"},{"id":"west","label":"西地区・SK 102","time":"[1/20, 現在)","kind":"append","node":"history"}]}
-
+      - links:
+          - arrive
+        note: 1月17日発生の注文が移転後に届く。
+        current: west
+      - links:
+          - key
+        note: イベント時刻で旧行の代理キーを引く。
+        travel: east
+      - links:
+          - history-report
+        note: 遅延注文は発生当時の東地区の売上に入る。
+        highlight:
+          - east
+timeline:
+  title: 顧客 C42 の Type 2 有効期間
+  current: east
+  note: 代理キーは例示。期間は開始を含み、終了を含まない。永続的な削除を表す図ではない。
+  commits:
+    - id: east
+      label: 東地区・SK 101
+      time: '[1/01, 1/20)'
+      kind: append
+      node: history
+    - id: west
+      label: 西地区・SK 102
+      time: '[1/20, 現在)'
+      kind: append
+      node: history
 implementations:
   - id: postgres-customer-history
-    label: "PostgreSQL の顧客属性履歴"
-    description: "顧客の現在値と履歴を別テーブルで保持し、遅れて届いた注文を発生日時点の顧客属性に結び付ける実装例。"
+    label: 顧客属性履歴（Amazon RDS for PostgreSQL）
+    description: ECS の Fargate タスクから Amazon RDS for PostgreSQL のローダーを実行し、顧客の現在値と履歴に遅れて届いた注文明細を紐付ける。
     sources:
-      - {title: "Kimball Group の Slowly Changing Dimension 技法", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
-      - {title: "Power BI の SCD ガイダンス", url: "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
-      - {title: "PostgreSQL CREATE TABLE", url: "https://www.postgresql.org/docs/current/sql-createtable.html"}
+      - {title: ECS Secrets Manager injection, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+      - title: Kimball Group の Slowly Changing Dimension 技法
+        url: >-
+          https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
+      - title: Power BI の SCD ガイダンス
+        url: https://learn.microsoft.com/en-us/power-bi/guidance/star-schema
+      - title: PostgreSQL CREATE TABLE
+        url: https://www.postgresql.org/docs/current/sql-createtable.html
+      - title: RDS for PostgreSQL への接続
+        url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ConnectToPostgreSQLInstance.html
+      - title: EventBridge Scheduler で ECS タスクを実行
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/tasks-scheduled-eventbridge-scheduler.html
+      - title: ECS の Fargate タスク定義
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html
+      - title: PostgreSQL 16 の範囲型と排他制約
+        url: https://www.postgresql.org/docs/16/rangetypes.html
+      - title: RDS for PostgreSQL の拡張機能
+        url: https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-extensions.html
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [15.5,4.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 15.5
+          - 4.5
+      - id: implementation-setup
+        label: AWS の実行環境と運用
+        z: 1
+        size:
+          - 26
+          - 3
+    groups:
+      - {kind: cloud, provider: aws, label: AWS account, tier: [flow, implementation-setup], nodes: [aws-schedule, aws-ecs, aws-fargate, aws-job, aws-secret, aws-rds, aws-ecr, example-change, example-ingest, example-current, example-history, example-event, example-fact, example-analytics, example-check]}
+      - {kind: cluster, label: RDS PostgreSQL database, tier: flow, nodes: [example-change, example-ingest, example-current, example-history, example-event, example-fact, example-analytics]}
     nodes:
-      example-change: {label: "landing.customer_changes", kind: "table", tier: "flow", x: 0, y: 0, realizes: ["change"], description: "顧客の業務キーと新しい地区、変更発生時刻を受け取る。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
-      example-ingest: {label: "顧客履歴更新トランザクション", kind: "workflow", tier: "flow", x: 3, y: 1, realizes: ["ingest"], description: "旧履歴の終了と新規履歴の追加を更新処理の同じトランザクションで行う。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
-      example-current: {label: "dim_customer_current", kind: "table", tier: "flow", x: 7, y: 0, realizes: ["current"], description: "顧客業務キーを主キーとし、現在地区だけを上書きする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
-      example-history: {label: "dim_customer_history", kind: "table", tier: "flow", x: 7, y: 3, realizes: ["history"], description: "版ごとの代理キーと半開区間の有効期間を持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
-      example-event: {label: "landing.order_line_updates", kind: "table", tier: "flow", x: 0, y: 4, realizes: ["event"], description: "注文明細の注文日と顧客業務キーを保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
-      example-fact: {label: "fact_order_line", kind: "table", tier: "flow", x: 11, y: 3, realizes: ["fact"], description: "注文発生時刻の有効期間を照合し、該当する顧客の代理キーを外部キーに持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
-      example-analytics: {label: "地域別売上 SQL ビュー", kind: "table", tier: "flow", x: 15, y: 1, realizes: ["analytics"], description: "現在地区の見方と注文時点の地区の見方を別々に用意する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
-      example-check: {label: "有効期間の整合性チェック", kind: "monitor", tier: "implementation-setup", x: 1, y: 1.5, description: "同じ顧客で有効期間が重複しないことを照合する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      aws-ecs: {label: Amazon ECS RunTask, svc: ecs, kind: service, tier: implementation-setup, x: 4, y: 2, management: {type: shared, scope: "AWS operates ECS; customer configures tasks and permissions."}, evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      aws-fargate: {label: AWS Fargate task, svc: fargate, kind: host, tier: implementation-setup, x: 8, y: 2, management: {type: shared, scope: "AWS operates task infrastructure; customer manages image and task settings."}, evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      aws-secret: {label: Secrets Manager database credential, svc: secrets, kind: service, tier: implementation-setup, x: 20, y: 2, management: {type: shared, scope: "AWS operates service; customer manages secret and access."}, evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      aws-source: {label: Upstream customer and order data, kind: external, tier: flow, x: -4, y: 2, evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      aws-schedule:
+        label: Amazon EventBridge Scheduler
+        svc: eventbridge
+        kind: scheduler
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: ECS RunTask により定期的に処理を開始する。
+        management: {type: shared, scope: "AWS operates Scheduler; customer configures schedule and role."}
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      aws-job:
+        label: SQL ローダーコンテナ
+        kind: worker
+        tier: implementation-setup
+        x: 7
+        'y': 1.5
+        description: 顧客変更と注文明細のローダーを呼び出し、終了状態を報告する。
+        management: {type: customer, scope: "Customer manages loader image and SQL."}
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      aws-rds:
+        label: Amazon RDS for PostgreSQL 16
+        svc: rds
+        kind: db
+        tier: implementation-setup
+        x: 13
+        'y': 1.5
+        description: プライベートな RDS インスタンスがテーブルを保存し、ジョブから依頼された SQL を実行する。
+        management: {type: shared, scope: "AWS operates RDS; customer manages database data and access."}
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      aws-ecr:
+        label: Amazon ECR（SQL ジョブのイメージ）
+        svc: ecr
+        kind: db
+        tier: implementation-setup
+        x: 19
+        'y': 1.5
+        description: データベース接続クライアントと SQL 実行スクリプトを含むイメージを保持する。
+        management: {type: shared, scope: "AWS operates ECR; customer manages images and permissions."}
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-change:
+        label: landing.customer_changes
+        kind: table
+        tier: flow
+        x: 0
+        'y': 0
+        realizes:
+          - change
+        description: 顧客の業務キーと新しい地区、変更発生時刻を受け取る。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-ingest:
+        label: 顧客履歴更新トランザクション
+        kind: workflow
+        tier: flow
+        x: 3
+        'y': 1
+        realizes:
+          - ingest
+        description: 旧履歴の終了と新規履歴の追加を更新処理の同じトランザクションで行う。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-current:
+        label: dim_customer_current
+        kind: table
+        tier: flow
+        x: 7
+        'y': 0
+        realizes:
+          - current
+        description: 顧客業務キーを主キーとし、現在地区だけを上書きする。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-history:
+        label: dim_customer_history
+        kind: table
+        tier: flow
+        x: 7
+        'y': 3
+        realizes:
+          - history
+        description: 版ごとの代理キーと半開区間の有効期間を持つ。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-event:
+        label: landing.order_line_updates
+        kind: table
+        tier: flow
+        x: 0
+        'y': 4
+        realizes:
+          - event
+        description: 注文明細の注文日と顧客業務キーを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-fact:
+        label: fact_order_line
+        kind: table
+        tier: flow
+        x: 11
+        'y': 3
+        realizes:
+          - fact
+        description: 注文発生時刻の有効期間を照合し、該当する顧客の代理キーを外部キーに持つ。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-analytics:
+        label: 地域別売上 SQL ビュー
+        kind: table
+        tier: flow
+        x: 15
+        'y': 1
+        realizes:
+          - analytics
+        description: 現在地区の見方と注文時点の地区の見方を別々に用意する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+      example-check:
+        label: 有効期間の整合性チェック
+        kind: monitor
+        tier: implementation-setup
+        x: 23
+        'y': 1.5
+        description: 同じ顧客で有効期間が重複しないことを照合する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
     links:
-      - {id: "example-check-connection", from: "example-check", to: "example-history", label: "同時点での二重割り当てを検査", evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      - {id: aws-ecs-invoke, from: aws-schedule, to: aws-ecs, label: "Call RunTask", evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      - {id: aws-ecs-launch, from: aws-ecs, to: aws-fargate, label: "Start task", evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      - {id: aws-fargate-run, from: aws-fargate, to: aws-job, label: "Run loader container", evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      - {id: aws-secret-inject, from: aws-secret, to: aws-job, label: "Supply database credential", evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      - {id: aws-source-change, from: aws-source, to: example-change, label: "Load customer changes", evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      - {id: aws-source-orders, from: aws-source, to: example-event, label: "Load order updates", evidence: [{type: doc, ref: "docs/reference-dwh-slowly-changing-dimensions.md#§5"}]}
+      - id: aws-invoke
+        from: aws-schedule
+        to: aws-ecs
+        label: ECS タスクを定期起動
+      - id: aws-pull
+        from: aws-job
+        to: aws-ecr
+        label: 起動時にジョブイメージを取得
+      - id: aws-connect
+        from: aws-job
+        to: aws-rds
+        label: 処理用ロールで PostgreSQL に接続
+      - id: aws-transaction
+        from: aws-job
+        to: example-ingest
+        label: 顧客履歴と明細の反映を起動
+      - id: example-check-connection
+        from: example-check
+        to: example-history
+        label: 同時点での二重割り当てを検査
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-slowly-changing-dimensions.md#§5
+    layout2d:
+      tiers: [{id: diagram, label: Customer history on AWS, z: 0, size: [35, 16]}]
+      nodes:
+        aws-source: {tier: diagram, x: 0, y: 2}
+        aws-schedule: {tier: diagram, x: 3, y: 1}
+        aws-ecs: {tier: diagram, x: 7, y: 1}
+        aws-fargate: {tier: diagram, x: 11, y: 1}
+        aws-job: {tier: diagram, x: 15, y: 1}
+        aws-secret: {tier: diagram, x: 19, y: 1}
+        aws-rds: {tier: diagram, x: 23, y: 1}
+        aws-ecr: {tier: diagram, x: 27, y: 1}
+        example-change: {tier: diagram, x: 3, y: 5}
+        example-ingest: {tier: diagram, x: 7, y: 5}
+        example-current: {tier: diagram, x: 11, y: 5}
+        example-history: {tier: diagram, x: 15, y: 5}
+        example-event: {tier: diagram, x: 19, y: 5}
+        example-fact: {tier: diagram, x: 23, y: 5}
+        example-analytics: {tier: diagram, x: 27, y: 5}
+        example-check: {tier: diagram, x: 3, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-schedule, aws-ecs, aws-fargate, aws-job, aws-secret, aws-rds, aws-ecr, example-change, example-ingest, example-current, example-history, example-event, example-fact, example-analytics, example-check]}
+        - {kind: cluster, label: Fargate task, tier: diagram, nodes: [aws-fargate, aws-job]}
+        - {kind: cluster, label: RDS PostgreSQL database, tier: diagram, nodes: [aws-rds, example-change, example-ingest, example-current, example-history, example-event, example-fact, example-analytics]}
+    layout3d:
+      tiers:
+        - {id: task, label: Loader container, z: 1, size: [5, 3]}
+        - {id: fargate, label: Fargate task, z: 0, size: [5, 3]}
+        - {id: services, label: AWS services and database, z: 0, origin: [8, 0], size: [28, 6]}
+        - {id: outside, label: Upstream, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-source: {tier: outside, x: 0, y: 1.5}
+        aws-schedule: {tier: services, x: 6, y: 1}
+        aws-ecs: {tier: services, x: 10, y: 1}
+        aws-fargate: {tier: fargate, x: 2, y: 1.5}
+        aws-job: {tier: task, x: 2, y: 1.5}
+        aws-secret: {tier: services, x: 22, y: 1}
+        aws-rds: {tier: services, x: 26, y: 1}
+        aws-ecr: {tier: services, x: 2, y: 4}
+        example-change: {tier: services, x: 6, y: 4}
+        example-ingest: {tier: services, x: 10, y: 4}
+        example-current: {tier: services, x: 14, y: 4}
+        example-history: {tier: services, x: 18, y: 4}
+        example-event: {tier: services, x: 22, y: 4}
+        example-fact: {tier: services, x: 26, y: 4}
+        example-analytics: {tier: services, x: 2, y: 7}
+        example-check: {tier: services, x: 6, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [task, fargate, services], nodes: [aws-schedule, aws-ecs, aws-fargate, aws-job, aws-secret, aws-rds, aws-ecr, example-change, example-ingest, example-current, example-history, example-event, example-fact, example-analytics, example-check]}
+        - {kind: cluster, label: Fargate task, tier: [task, fargate], nodes: [aws-fargate, aws-job]}
+        - {kind: cluster, label: RDS PostgreSQL database, tier: services, nodes: [aws-rds, example-change, example-ingest, example-current, example-history, example-event, example-fact, example-analytics]}

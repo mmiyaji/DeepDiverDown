@@ -55,3 +55,24 @@ rewrite ジョブは入力を読み、新しいデータファイルをオブジ
 - [Delta Lake Optimizations](https://docs.delta.io/optimizations-oss/)
 - [Delta Transaction Log Protocol](https://github.com/delta-io/delta/blob/master/PROTOCOL.md)
 - [Iceberg Table Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
+
+## 10. 実装例：AWS（Glue テーブルオプティマイザー）
+
+注文を AWS Glue Streaming のマイクロバッチで取り込み、AWS Glue Data Catalog に登録した Iceberg v2 の Parquet テーブルへ追記する。テーブルにコンパクションとスナップショット保持を個別に設定する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| マイクロバッチ書き込み | AWS Glue Streaming ジョブ |
+| 対象選択とデータファイルの再作成 | AWS Glue のコンパクションオプティマイザー |
+| 現在の表の状態と新しいスナップショット | AWS Glue Data Catalog のメタデータ位置と S3 上の Iceberg メタデータ |
+| 現行・過去スナップショットの読み取り | Amazon Athena のエンジン 3 |
+| 期限切れスナップショットとファイルの整理 | AWS Glue のスナップショット保持オプティマイザー |
+
+この例の再作成は binpack を使う。対象はファイル数・サイズなどの設定で決まり、出力の目安を `write.target-file-size-bytes` で設定できる。保持期間と最低保持数はコンパクションとは独立して設定する。保持のオプティマイザーはスナップショットを期限切れにする。`cleanExpiredFiles` を有効にすると、保持中のスナップショットが参照しない関連ファイルも整理する。
+
+- [AWS Glue Streaming](https://docs.aws.amazon.com/glue/latest/dg/streaming-chapter.html)
+- [AWS Glue のコンパクション設定](https://docs.aws.amazon.com/glue/latest/dg/enable-compaction.html)
+- [AWS Glue のスナップショット保持設定](https://docs.aws.amazon.com/glue/latest/dg/enable-snapshot-retention.html)
+- [Athena の Iceberg タイムトラベル](https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-time-travel-and-version-travel-queries.html)
+
+自前例は Linux Spark Standalone と Kafka、HDFS 上の Hadoop カタログを仮定する。AWS 例は MSK を入力とし、Glue Streaming のチェックポイントを S3 の別パスに置く。AWS は Glue・MSK・Athena・S3 の基盤を運用し、利用者はジョブ、最適化と保持ポリシー、IAM・データを管理する。オプティマイザーの内部ホストは直接操作しない。どちらも公式資料を組み合わせた代表例で、ジョブ設定、認証、バージョンと実動作は未検証。

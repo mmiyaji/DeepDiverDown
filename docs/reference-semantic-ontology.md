@@ -20,3 +20,22 @@ Turtle の RDF データと RDFS 語彙を Jena Fuseki に読み込み、明示�
 | 問い合わせ | Fuseki SPARQL エンドポイントとクライアント |
 
 [W3C RDF 1.1](https://www.w3.org/TR/rdf-concepts/)、[OWL 2 Primer](https://www.w3.org/TR/owl2-primer/)、[SKOS](https://www.w3.org/TR/skos-reference/)、[Apache Jena RDFS](https://jena.apache.org/documentation/rdfs/)、[SPARQL](https://www.w3.org/TR/sparql11-query/)。
+
+## 5. 実装例：AWS（Fuseki on EC2・Amazon EBS）
+
+Linux の Amazon EC2 インスタンス1台に Apache Jena Fuseki を導入する。同じ可用性ゾーンの Amazon EBS ボリュームをファイルシステムとしてマウントし、Jena TDB2 の保存パスに指定する。
+
+| 機能 | 担い手 |
+|---|---|
+| 語彙と実体データの準備 | Amazon S3 上の RDFS・データの Turtle |
+| RDF の保存 | EBS を使う Jena TDB2 の基礎グラフ |
+| 推論と問い合わせ | EC2 上の Fuseki。Assembler の `ja:InfModel` に RDFS Rule Reasoner を設定 |
+| 利用 | 接続を許可した SPARQL クライアント |
+
+運用者が Turtle を S3 から取得し、語彙とデータを推論対象の基礎グラフにロードする。Fuseki がそのグラフの推論ビューを問い合わせに提供する。EBS は TDB2 のファイルを永続化し、Fuseki と Jena の更新は運用者が行う。
+
+- [Fuseki の推論構成](https://jena.apache.org/documentation/fuseki2/fuseki-configuration)
+- [Apache Jena TDB2](https://jena.apache.org/documentation/tdb2/index.html)
+- [Amazon EBS ボリュームのアタッチ](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html)
+
+上記は公式機能を組み合わせた構成例であり、実機での接続、認証、セキュリティ設定、障害復旧は未検証。利用者がアプリ、設定、データと権限を管理し、AWS がマネージドサービスの基盤を運用する。内部ホストへの直接操作を前提としない。

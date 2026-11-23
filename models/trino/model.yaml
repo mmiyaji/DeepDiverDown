@@ -166,10 +166,8 @@ scenarios:
         note: Coordinator が最終結果を取得し、クライアントに返す。
 implementations:
   - id: trino-iceberg
-    label: Trino と Glue Catalog・S3 上の Iceberg
-    description: >-
-      Trino の Coordinator と Worker が、Glue Catalog を使う Iceberg カタログに接続し、S3 にある注文テーブルを検索する例。分散読み取りと部分集計は同じ
-      Worker 群で動く。
+    label: EKS 上の Trino・Glue Catalog・S3
+    description: EKS の EC2 ノード上で Trino Coordinator / Worker を実行し、Glue Data Catalog と S3 上の Iceberg を読む構成例。
     sources:
       - title: Trino · Concepts
         url: https://trino.io/docs/current/overview/concepts.html
@@ -177,26 +175,45 @@ implementations:
         url: https://trino.io/docs/current/connector/iceberg.html
       - title: Trino file system support
         url: https://trino.io/docs/current/object-storage/file-system-s3.html
+      - title: Trino on Kubernetes with Helm
+        url: https://trino.io/docs/current/installation/kubernetes.html
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: IAM roles for service accounts
+        url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
     tiers:
-      - id: processing
-        label: データの処理と保存
-        z: 0
+      - id: entry
+        label: 利用者
+        kind: origin
+        z: 2
         size:
-          - 14
-          - 5
-      - id: setup
-        label: 実行に必要な設定・成果物
+          - 18
+          - 3
+      - id: control-plane
+        label: AWS の管理・認証
         z: 1
         size:
-          - 14
+          - 18
+          - 3
+      - id: processing
+        label: EKS の Trino 実行
+        z: 0
+        size:
+          - 18
+          - 3
+      - id: storage
+        label: テーブルの保存
+        z: -1
+        size:
+          - 18
           - 3
     nodes:
       trino-iceberg-client:
         label: Trino CLI
         kind: client
-        tier: processing
+        tier: entry
         x: 1
-        'y': 1.15
+        'y': 1.5
         realizes:
           - client
         description: SQL を送り、結果を取得する。
@@ -204,37 +221,39 @@ implementations:
           - type: doc
             ref: docs/reference-trino.md#§4
       trino-iceberg-coordinator:
-        label: Trino Coordinator と Iceberg Connector
+        label: Trino Coordinator Pod
         kind: service
         tier: processing
-        x: 1
-        'y': 3.65
+        x: 3
+        'y': 1.5
         realizes:
           - control
           - connector
-        description: Iceberg テーブルを解決して分割とステージを計画する。
+        description: Iceberg Connector を備えた Coordinator が Glue に問い合わせ、分散クエリを計画する。
         evidence:
           - type: doc
             ref: docs/reference-trino.md#§4
+        management: {type: customer, scope: "利用者が Trino とカタログ設定、SQL アクセスを管理する。"}
       trino-iceberg-workers:
-        label: Trino Workers の読取と集約タスク
+        label: Trino Worker Pods
         kind: worker
         tier: processing
-        x: 5
-        'y': 1.15
+        x: 9
+        'y': 1.5
         realizes:
           - scan
           - reduce
-        description: S3 上のデータを読み、ステージ間で中間結果を交換する。
+        description: EC2 ノード上の Worker Pod が S3 のファイルを並列に読み、集計する。
         evidence:
           - type: doc
             ref: docs/reference-trino.md#§4
+        management: {type: customer, scope: "利用者が Trino の配置、容量と更新を管理する。"}
       trino-iceberg-data:
-        label: S3 上の Iceberg データとメタデータ
+        label: S3 / Iceberg テーブル
         kind: db
-        tier: processing
-        x: 5
-        'y': 3.65
+        tier: storage
+        x: 9
+        'y': 1.5
         svc: s3
         realizes:
           - data
@@ -242,34 +261,152 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-trino.md#§4
+        management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}
       trino-iceberg-glue:
-        label: AWS Glue Catalog
+        label: AWS Glue Data Catalog
         kind: catalog
-        tier: setup
-        x: 1
+        tier: control-plane
+        x: 3
         'y': 1.5
-        description: カタログに iceberg.catalog.type=glue と fs.s3.enabled=true を設定し、Glue から Iceberg のメタデータ位置を解決する。
+        description: テーブルのメタデータ位置を提供する。
         evidence:
           - type: doc
             ref: docs/reference-trino.md#§4
         svc: glue
+        management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。"}
+      trino-iceberg-eks:
+        label: Amazon EKS / Kubernetes API
+        svc: eks
+        kind: service
+        tier: control-plane
+        x: 9
+        'y': 1.5
+        description: Kubernetes の制御プレーンが Trino の Pod 配置を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+        management: {type: shared, scope: "AWS が制御プレーンを運用し、利用者が Kubernetes API とクラスタ設定を操作する。"}
+      trino-iceberg-ec2:
+        label: EC2 / EKS ノードグループ
+        svc: ec2
+        kind: host
+        tier: processing
+        x: 15
+        'y': 1.5
+        description: マネージドノードグループの EC2 が Coordinator と Worker の Pod を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループと更新を管理する。"}
+      trino-iceberg-iam:
+        label: IAM / Pod 用ロール
+        svc: iam
+        kind: policy
+        tier: control-plane
+        x: 15
+        'y': 1.5
+        description: サービスアカウントに対応する IAM ロールで Glue と S3 へのアクセス権を付与する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+        management: {type: customer, scope: "利用者がサービスアカウントと IAM ロール・ポリシーを設定する。"}
     links:
-      - id: trino-iceberg-glue-connection
-        from: trino-iceberg-glue
+      - {id: trino-metadata, from: trino-iceberg-coordinator, to: trino-iceberg-data, label: Iceberg メタデータを読む}
+      - {id: trino-host-coordinator, from: trino-iceberg-ec2, to: trino-iceberg-coordinator, label: Coordinator Pod を実行}
+      - id: trino-glue
+        from: trino-iceberg-coordinator
+        to: trino-iceberg-glue
+        label: テーブル情報を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      - id: trino-eks-schedule
+        from: trino-iceberg-eks
+        to: trino-iceberg-workers
+        label: Worker Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      - id: trino-ec2-runtime
+        from: trino-iceberg-ec2
+        to: trino-iceberg-workers
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      - id: trino-iam-role
+        from: trino-iceberg-iam
         to: trino-iceberg-coordinator
-        label: テーブル情報を引く
+        label: AWS アクセス権を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      - id: trino-iam-workers
+        from: trino-iceberg-iam
+        to: trino-iceberg-workers
+        label: S3 読み取り権限を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
     groups:
       - kind: cloud
-        label: AWS サービス
+        label: AWS アカウント
         provider: aws
         tier:
-          - setup
+          - control-plane
+          - processing
+          - storage
         nodes:
           - trino-iceberg-glue
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
+          - trino-iceberg-eks
+          - trino-iceberg-iam
+          - trino-iceberg-coordinator
+          - trino-iceberg-workers
+          - trino-iceberg-ec2
+          - trino-iceberg-data
+      - kind: cluster
+        label: EKS クラスタ / Trino
         tier:
           - processing
         nodes:
-          - trino-iceberg-data
+          - trino-iceberg-coordinator
+          - trino-iceberg-workers
+          - trino-iceberg-ec2
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: AWS 上の Trino, z: 0, size: [25, 13]}
+      nodes:
+        trino-iceberg-client: {tier: diagram, x: 1, y: 2}
+        trino-iceberg-eks: {tier: diagram, x: 4.5, y: 2}
+        trino-iceberg-ec2: {tier: diagram, x: 11, y: 2}
+        trino-iceberg-coordinator: {tier: diagram, x: 9, y: 6}
+        trino-iceberg-workers: {tier: diagram, x: 13, y: 6}
+        trino-iceberg-iam: {tier: diagram, x: 7, y: 10}
+        trino-iceberg-glue: {tier: diagram, x: 19, y: 3}
+        trino-iceberg-data: {tier: diagram, x: 19, y: 8}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 2.8, y0: -0.3, x1: 22, y1: 12, nodes: [trino-iceberg-eks, trino-iceberg-ec2, trino-iceberg-coordinator, trino-iceberg-workers, trino-iceberg-iam, trino-iceberg-glue, trino-iceberg-data]}
+        - {kind: vpc, label: EKS ワーカーの利用者 VPC, provider: aws, tier: [diagram], x0: 6.8, y0: 0.7, x1: 15.5, y1: 8.5, nodes: [trino-iceberg-ec2, trino-iceberg-coordinator, trino-iceberg-workers]}
+        - {kind: cluster, label: EKS クラスター（ワーカー側）, provider: k8s, tier: [diagram], x0: 6.8, y0: 0.7, x1: 15.5, y1: 8.5, nodes: [trino-iceberg-ec2, trino-iceberg-coordinator, trino-iceberg-workers]}
+        - {kind: namespace, label: Trino 名前空間, provider: k8s, tier: [diagram], x0: 6.8, y0: 4.2, x1: 15.5, y1: 8.5, nodes: [trino-iceberg-coordinator, trino-iceberg-workers]}
+    layout3d:
+      tiers:
+        - {id: client, label: Trino CLI, kind: origin, z: 0, origin: [-5, 0], size: [3, 5]}
+        - {id: platform, label: EKS 実行ノード, z: 0, size: [10, 5]}
+        - {id: pods, label: Trino Pods, z: 1, size: [10, 5]}
+        - {id: services, label: AWS 管理サービス, z: 0, origin: [14, 0], size: [16, 5]}
+      nodes:
+        trino-iceberg-client: {tier: client, x: 1, y: 2}
+        trino-iceberg-ec2: {tier: platform, x: 5, y: 2}
+        trino-iceberg-coordinator: {tier: pods, x: 2, y: 2}
+        trino-iceberg-workers: {tier: pods, x: 7, y: 2}
+        trino-iceberg-eks: {tier: services, x: 2, y: 2}
+        trino-iceberg-iam: {tier: services, x: 6, y: 2}
+        trino-iceberg-glue: {tier: services, x: 10, y: 2}
+        trino-iceberg-data: {tier: services, x: 14, y: 2}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [platform, pods, services], nodes: [trino-iceberg-eks, trino-iceberg-ec2, trino-iceberg-coordinator, trino-iceberg-workers, trino-iceberg-iam, trino-iceberg-glue, trino-iceberg-data]}
+        - {kind: vpc, label: EKS ワーカーの利用者 VPC, provider: aws, tier: [platform, pods], nodes: [trino-iceberg-ec2, trino-iceberg-coordinator, trino-iceberg-workers]}
+        - {kind: cluster, label: EKS クラスター（ワーカー側）, provider: k8s, tier: [platform, pods], nodes: [trino-iceberg-ec2, trino-iceberg-coordinator, trino-iceberg-workers]}
+        - {kind: namespace, label: Trino 名前空間, provider: k8s, tier: [pods], nodes: [trino-iceberg-coordinator, trino-iceberg-workers]}

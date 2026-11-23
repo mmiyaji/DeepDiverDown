@@ -2,8 +2,8 @@
   "model": "duckdb",
   "name": "DuckDB の Parquet 読み取り：列投影と行グループの除外",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "query": {
@@ -110,6 +110,12 @@
       "type": "unknown",
       "label": "実ファイルの統計の有無、除外した行グループ数、物理計画の表示、実行時間は未確認。"
     },
+    "python-parquet-host": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "自前 Python 実行ホスト",
+      "realizes": []
+    },
     "python-parquet-client": {
       "type": "implementation",
       "impl": "python-parquet",
@@ -144,6 +150,65 @@
       "impl": "python-parquet",
       "label": "parquet_metadata の診断用 SQL",
       "realizes": []
+    },
+    "aws-operator": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "タスク実行者",
+      "realizes": []
+    },
+    "aws-task-role": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "ECS タスク IAM ロール",
+      "realizes": []
+    },
+    "aws-ecs": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "Amazon ECS（スタンドアロンタスク）",
+      "realizes": []
+    },
+    "aws-fargate": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "AWS Fargate（実行環境）",
+      "realizes": []
+    },
+    "aws-python": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "Python スクリプト",
+      "realizes": [
+        "query"
+      ]
+    },
+    "aws-engine": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "DuckDB（Python と同じプロセス）",
+      "realizes": [
+        "optimizer",
+        "scan",
+        "project",
+        "profile"
+      ]
+    },
+    "aws-ecr": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "Amazon ECR（Python と DuckDB のイメージ）",
+      "realizes": []
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "Amazon S3（orders.parquet）",
+      "realizes": [
+        "footer",
+        "groups",
+        "columns"
+      ]
     }
   },
   "byRef": {
@@ -172,10 +237,19 @@
       "inspect-plan",
       "BR-01",
       "BR-02",
+      "python-parquet-host",
       "python-parquet-client",
       "python-parquet-engine",
       "python-parquet-parquet",
-      "python-parquet-metadata"
+      "python-parquet-metadata",
+      "aws-operator",
+      "aws-task-role",
+      "aws-ecs",
+      "aws-fargate",
+      "aws-python",
+      "aws-engine",
+      "aws-ecr",
+      "aws-s3"
     ],
     "docs/reference-duckdb.md#§2": [
       "model",
@@ -213,10 +287,21 @@
       "model"
     ],
     "docs/reference-duckdb.md#§7": [
+      "python-parquet-host",
       "python-parquet-client",
       "python-parquet-engine",
       "python-parquet-parquet",
       "python-parquet-metadata"
+    ],
+    "docs/reference-duckdb.md#§8": [
+      "aws-operator",
+      "aws-task-role",
+      "aws-ecs",
+      "aws-fargate",
+      "aws-python",
+      "aws-engine",
+      "aws-ecr",
+      "aws-s3"
     ]
   },
   "reference": {

@@ -1,0 +1,388 @@
+name: InfluxDB 3 Core：WAL と Parquet
+description: Linux 上の Core プロセスと file オブジェクトストアを利用者が設定し、WAL と Parquet をローカルファイルとして保持する。
+parent:
+  model: time-series-data
+  node: store
+reference:
+  objectives:
+    - 書き込みと検索の経路を追う。
+    - データ構造と保持・復旧の役割を区別する。
+    - 実装の前提と制約を確認する。
+  sources:
+    - title: InfluxDB 3 Core durability
+      url: https://docs.influxdata.com/influxdb3/core/reference/internals/durability/
+    - title: Core object storage
+      url: https://docs.influxdata.com/influxdb3/core/object-storage/
+    - title: Core storage engine
+      url: https://docs.influxdata.com/influxdb3/core/reference/internals/storage-engine/
+sources:
+  - docs/reference-influxdb3-storage-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-influxdb3-storage-internals.md#§1
+  - type: doc
+    ref: docs/reference-influxdb3-storage-internals.md#§2
+  - type: doc
+    ref: docs/reference-influxdb3-storage-internals.md#§3
+  - type: doc
+    ref: docs/reference-influxdb3-storage-internals.md#§5
+tiers:
+  - id: write
+    label: 処理と検索
+    z: 1
+    size:
+      - 21
+      - 4
+  - id: disk
+    label: データと保存
+    z: 0
+    size:
+      - 21
+      - 4
+nodes:
+  write:
+    label: 書き込み要求
+    kind: client
+    tier: write
+    x: 0
+    'y': 1.5
+    description: line protocol などによる書き込み要求。
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§1
+  buffer:
+    label: 検証と書き込みバッファ
+    kind: service
+    tier: write
+    x: 4
+    'y': 1.5
+    description: 入力を検証し、永続化前のデータをバッファする。
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§1
+  wal:
+    label: オブジェクトストアの WAL
+    kind: file
+    tier: disk
+    x: 4
+    'y': 1.5
+    description: 設定したオブジェクトストアに書き込む復旧用ログ。
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  recent:
+    label: クエリ可能なバッファ
+    kind: db
+    tier: write
+    x: 8
+    'y': 1.5
+    description: WAL 永続化後に検索可能な最近のデータ。
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§1
+  parquet:
+    label: Parquet ファイル
+    kind: file
+    tier: disk
+    x: 9
+    'y': 1.5
+    description: 古いデータをオブジェクトストアに保持する列指向ファイル。
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  cache:
+    label: Parquet メモリキャッシュ
+    kind: db
+    tier: write
+    x: 12
+    'y': 1.5
+    description: 最近永続化された Parquet をメモリにキャッシュする。
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§1
+  query:
+    label: SQL / InfluxQL
+    kind: service
+    tier: write
+    x: 16
+    'y': 1.5
+    description: 直近バッファと保存済みデータを問い合わせる。
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§1
+links:
+  - id: a
+    from: write
+    to: buffer
+    label: 検証して受け取る
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  - id: b
+    from: buffer
+    to: wal
+    label: WAL に永続化
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  - id: c
+    from: wal
+    to: recent
+    label: 永続化後に検索可能
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  - id: d
+    from: recent
+    to: parquet
+    label: 古いデータを Parquet 化
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  - id: e
+    from: parquet
+    to: cache
+    label: 最近のファイルをキャッシュ
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  - id: q1
+    from: query
+    to: recent
+    label: 最新データを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  - id: q2
+    from: query
+    to: cache
+    label: キャッシュを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+  - id: q3
+    from: query
+    to: parquet
+    label: 必要なファイルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+scenarios:
+  - id: ingest
+    label: 書き込みと永続化
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+    steps:
+      - links:
+          - a
+        note: 検証して受け取る。
+        highlight:
+          - in1
+      - links:
+          - b
+        note: WAL に永続化。
+        highlight:
+          - in1
+          - w1
+      - links:
+          - c
+        note: 永続化後に検索可能。
+        highlight:
+          - w1
+          - r1
+      - links:
+          - d
+        note: 古いデータを Parquet 化。
+        highlight:
+          - r1
+          - p1
+    visual: detail-map
+  - id: query
+    label: 最新・過去の検索
+    evidence:
+      - type: doc
+        ref: docs/reference-influxdb3-storage-internals.md#§2
+    steps:
+      - links:
+          - q1
+        note: 最新データを読む。
+        highlight:
+          - r1
+      - links:
+          - q2
+        note: キャッシュを読む。
+        highlight:
+          - p2
+      - links:
+          - q3
+        note: 必要なファイルを読む。
+        highlight:
+          - p1
+    visual: detail-map
+implementations:
+  - id: local
+    label: Linux 上の InfluxDB 3 Core とファイルストア
+    description: Linux 上の Core プロセスと file オブジェクトストアを利用者が設定し、WAL と Parquet をローカルファイルとして保持する。
+    sources:
+      - title: InfluxDB 3 Core durability
+        url: https://docs.influxdata.com/influxdb3/core/reference/internals/durability/
+      - title: Core object storage
+        url: https://docs.influxdata.com/influxdb3/core/object-storage/
+      - title: Core storage engine
+        url: https://docs.influxdata.com/influxdb3/core/reference/internals/storage-engine/
+    tiers:
+      - id: write
+        label: 処理と検索
+        z: 1
+        size:
+          - 21
+          - 4
+      - id: disk
+        label: データと保存
+        z: 0
+        size:
+          - 21
+          - 4
+    nodes:
+      ex-write:
+        label: 書き込み要求
+        kind: client
+        tier: write
+        x: 0
+        'y': 1.5
+        description: line protocol などによる書き込み要求。
+        evidence:
+          - type: doc
+            ref: docs/reference-influxdb3-storage-internals.md#§4
+        realizes:
+          - write
+      ex-buffer:
+        label: 検証と書き込みバッファ
+        kind: service
+        tier: write
+        x: 4
+        'y': 1.5
+        description: 入力を検証し、永続化前のデータをバッファする。
+        evidence:
+          - type: doc
+            ref: docs/reference-influxdb3-storage-internals.md#§4
+        realizes:
+          - buffer
+      ex-wal:
+        label: オブジェクトストアの WAL
+        kind: file
+        tier: disk
+        x: 4
+        'y': 1.5
+        description: 設定したオブジェクトストアに書き込む復旧用ログ。
+        evidence:
+          - type: doc
+            ref: docs/reference-influxdb3-storage-internals.md#§4
+        realizes:
+          - wal
+      ex-recent:
+        label: クエリ可能なバッファ
+        kind: db
+        tier: write
+        x: 8
+        'y': 1.5
+        description: WAL 永続化後に検索可能な最近のデータ。
+        evidence:
+          - type: doc
+            ref: docs/reference-influxdb3-storage-internals.md#§4
+        realizes:
+          - recent
+      ex-parquet:
+        label: Parquet ファイル
+        kind: file
+        tier: disk
+        x: 9
+        'y': 1.5
+        description: 古いデータをオブジェクトストアに保持する列指向ファイル。
+        evidence:
+          - type: doc
+            ref: docs/reference-influxdb3-storage-internals.md#§4
+        realizes:
+          - parquet
+      ex-cache:
+        label: Parquet メモリキャッシュ
+        kind: db
+        tier: write
+        x: 12
+        'y': 1.5
+        description: 最近永続化された Parquet をメモリにキャッシュする。
+        evidence:
+          - type: doc
+            ref: docs/reference-influxdb3-storage-internals.md#§4
+        realizes:
+          - cache
+      ex-query:
+        label: SQL / InfluxQL
+        kind: service
+        tier: write
+        x: 16
+        'y': 1.5
+        description: 直近バッファと保存済みデータを問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-influxdb3-storage-internals.md#§4
+        realizes:
+          - query
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - write
+          - disk
+        nodes:
+          - ex-write
+          - ex-buffer
+          - ex-wal
+          - ex-recent
+          - ex-parquet
+          - ex-cache
+          - ex-query
+blocks:
+  - id: detail-map
+    title: 書き込みから Parquet まで
+    note: 同一データの各段階を示す概念例です。永続化・キャッシュの時期は設定と版に依存します。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: buffer
+        label: 書き込みバッファ
+        node: buffer
+      - id: wal
+        label: WAL
+        node: wal
+      - id: recent
+        label: 検索可能バッファ
+        node: recent
+      - id: files
+        label: Parquet とキャッシュ
+        node: parquet
+    items:
+      buffer:
+        - id: in1
+          label: 検証済み点
+          k: 0
+          note: 受け付けた点を一時的に保持する。
+      wal:
+        - id: w1
+          label: WAL
+          k: 1
+          note: 設定されたオブジェクトストアに永続化する。
+      recent:
+        - id: r1
+          label: 直近の点
+          k: 2
+          note: WAL 永続化後に検索可能な最近のデータ。
+      files:
+        - id: p1
+          label: Parquet
+          k: 3
+          note: 古いデータを Parquet として保存する。
+        - id: p2
+          label: キャッシュ
+          k: 4
+          note: 最近のファイルのメモリキャッシュ。

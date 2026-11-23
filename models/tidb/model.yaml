@@ -1,0 +1,261 @@
+name: TiDB の分散 SQL と HTAP
+description: TiDB の SQL、PD、TiKV の Region と任意の TiFlash 列指向レプリカを追う。
+reference:
+  objectives:
+    - 構成要素と書き込み・読み出しの経路を理解する。
+    - 保存形式と運用上の前提を区別する。
+  sources:
+    - title: TiDB architecture
+      url: https://docs.pingcap.com/tidb/stable/tidb-architecture/
+    - title: TiDB computing
+      url: https://docs.pingcap.com/tidb/stable/tidb-computing/
+    - title: TiDB storage
+      url: https://docs.pingcap.com/tidb/stable/tidb-storage/
+    - title: TiKV RocksDB overview
+      url: https://docs.pingcap.com/tidb/stable/rocksdb-overview/
+    - title: TiFlash replicas
+      url: https://docs.pingcap.com/tidb/stable/create-tiflash-replicas/
+    - title: TiUP playground
+      url: https://docs.pingcap.com/tidb/stable/tiup-playground/
+sources:
+  - docs/reference-tidb.md
+evidence:
+  - type: doc
+    ref: docs/reference-tidb.md#§1
+  - type: doc
+    ref: docs/reference-tidb.md#§3
+  - type: doc
+    ref: docs/reference-tidb.md#§5
+tiers:
+  - id: query
+    label: 入力・実行
+    z: 1
+    size:
+      - 20
+      - 4
+  - id: store
+    label: データの保存
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  client:
+    label: SQL クライアント
+    kind: client
+    tier: query
+    x: 0
+    'y': 1.5
+    description: MySQL 互換プロトコルで SQL を発行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  compute:
+    label: SQL の解析・実行
+    kind: service
+    tier: query
+    x: 5
+    'y': 1.5
+    description: SQL の最適化と分散実行を担当する。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  control:
+    label: 配置とタイムスタンプ
+    kind: service
+    tier: query
+    x: 10
+    'y': 1.5
+    description: Region の配置やトランザクション時刻を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  rowstore:
+    label: 分散行ストレージ
+    kind: db
+    tier: store
+    x: 5
+    'y': 1.5
+    description: 行と索引の KV を Region に分け、Raft で複製する。
+    drill: tidb-storage-internals
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  columnstore:
+    label: 列指向レプリカ
+    kind: db
+    tier: store
+    x: 12
+    'y': 1.5
+    description: 必要なテーブルに設定し、分析クエリに利用できる。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+links:
+  - id: request
+    from: client
+    to: compute
+    label: SQL を発行
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  - id: locate
+    from: compute
+    to: control
+    label: 配置と時刻を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  - id: write
+    from: compute
+    to: rowstore
+    label: 行・索引の KV を読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  - id: copy
+    from: rowstore
+    to: columnstore
+    label: 設定した表を列指向に複製
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+  - id: scan
+    from: compute
+    to: columnstore
+    label: 分析用レプリカを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+scenarios:
+  - id: txn
+    label: トランザクション処理
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+    steps:
+      - links:
+          - request
+        note: SQL を発行。
+      - links:
+          - locate
+        note: 配置と時刻を取得。
+      - links:
+          - write
+        note: 行・索引の KV を読み書き。
+  - id: analytics
+    label: 列指向レプリカの分析
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb.md#§2
+    steps:
+      - links:
+          - copy
+        note: 設定した表を列指向に複製。
+      - links:
+          - scan
+        note: 分析用レプリカを読む。
+implementations:
+  - id: local
+    label: TiUP Playground による単一ホスト検証
+    description: Linux の TiUP playground で TiDB、PD、TiKV、TiFlash を起動し、TiFlash の対象表を明示して列指向レプリカを作る学習用構成。
+    sources:
+      - title: TiDB architecture
+        url: https://docs.pingcap.com/tidb/stable/tidb-architecture/
+      - title: TiDB computing
+        url: https://docs.pingcap.com/tidb/stable/tidb-computing/
+      - title: TiDB storage
+        url: https://docs.pingcap.com/tidb/stable/tidb-storage/
+      - title: TiKV RocksDB overview
+        url: https://docs.pingcap.com/tidb/stable/rocksdb-overview/
+      - title: TiFlash replicas
+        url: https://docs.pingcap.com/tidb/stable/create-tiflash-replicas/
+      - title: TiUP playground
+        url: https://docs.pingcap.com/tidb/stable/tiup-playground/
+    tiers:
+      - id: query
+        label: 入力・実行
+        z: 1
+        size:
+          - 20
+          - 4
+      - id: store
+        label: データの保存
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-client:
+        label: SQL クライアント
+        kind: client
+        tier: query
+        x: 0
+        'y': 1.5
+        description: MySQL 互換プロトコルで SQL を発行する。
+        realizes:
+          - client
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb.md#§4
+      impl-compute:
+        label: TiDB SQL サーバー
+        kind: service
+        tier: query
+        x: 5
+        'y': 1.5
+        description: SQL の最適化と分散実行を担当する。
+        realizes:
+          - compute
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb.md#§4
+      impl-control:
+        label: PD サーバー
+        kind: service
+        tier: query
+        x: 10
+        'y': 1.5
+        description: Region の配置やトランザクション時刻を管理する。
+        realizes:
+          - control
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb.md#§4
+      impl-rowstore:
+        label: TiKV / Region
+        kind: db
+        tier: store
+        x: 5
+        'y': 1.5
+        description: 行と索引の KV を Region に分け、Raft で複製する。
+        realizes:
+          - rowstore
+        drill: tidb-storage-internals
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb.md#§4
+      impl-columnstore:
+        label: TiFlash レプリカ
+        kind: db
+        tier: store
+        x: 12
+        'y': 1.5
+        description: 必要なテーブルに設定し、分析クエリに利用できる。
+        realizes:
+          - columnstore
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - query
+          - store
+        nodes:
+          - impl-client
+          - impl-compute
+          - impl-control
+          - impl-rowstore
+          - impl-columnstore

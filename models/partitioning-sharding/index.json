@@ -2,8 +2,8 @@
   "model": "partitioning-sharding",
   "name": "データ配置と並列性：パーティショニングとシャーディング",
   "coverage": {
-    "covered": 9,
-    "total": 9
+    "covered": 10,
+    "total": 10
   },
   "byId": {
     "order-api": {
@@ -93,6 +93,24 @@
       "type": "scenario",
       "label": "ノードを追加してスロットを移す"
     },
+    "clickhouse-cluster-host-coordinator": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "自前 Linux 調整ホスト",
+      "realizes": []
+    },
+    "clickhouse-cluster-host-a": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "自前 Linux シャード A",
+      "realizes": []
+    },
+    "clickhouse-cluster-host-b": {
+      "type": "implementation",
+      "impl": "clickhouse-cluster",
+      "label": "自前 Linux シャード B",
+      "realizes": []
+    },
     "clickhouse-cluster-app": {
       "type": "implementation",
       "impl": "clickhouse-cluster",
@@ -141,6 +159,55 @@
       "impl": "clickhouse-cluster",
       "label": "remote_servers とシャード式の設定",
       "realizes": []
+    },
+    "aws-client": {
+      "type": "implementation",
+      "impl": "aws-ec2-shards",
+      "label": "注文 API の ClickHouse クライアント",
+      "realizes": [
+        "order-api"
+      ]
+    },
+    "aws-coordinator": {
+      "type": "implementation",
+      "impl": "aws-ec2-shards",
+      "label": "EC2（ClickHouse Distributed）",
+      "realizes": [
+        "partition-router",
+        "orders-table"
+      ]
+    },
+    "aws-a": {
+      "type": "implementation",
+      "impl": "aws-ec2-shards",
+      "label": "EC2（ClickHouse シャード A）",
+      "realizes": [
+        "time-partition",
+        "hash-shard-a",
+        "query-worker"
+      ]
+    },
+    "aws-b": {
+      "type": "implementation",
+      "impl": "aws-ec2-shards",
+      "label": "EC2（ClickHouse シャード B）",
+      "realizes": [
+        "time-partition",
+        "hash-shard-b",
+        "query-worker"
+      ]
+    },
+    "aws-disk-a": {
+      "type": "implementation",
+      "impl": "aws-ec2-shards",
+      "label": "Amazon EBS（シャード A のデータ）",
+      "realizes": []
+    },
+    "aws-disk-b": {
+      "type": "implementation",
+      "impl": "aws-ec2-shards",
+      "label": "Amazon EBS（シャード B のデータ）",
+      "realizes": []
     }
   },
   "byRef": {
@@ -168,12 +235,21 @@
       "order-routing",
       "parallel-aggregation",
       "add-node",
+      "clickhouse-cluster-host-coordinator",
+      "clickhouse-cluster-host-a",
+      "clickhouse-cluster-host-b",
       "clickhouse-cluster-app",
       "clickhouse-cluster-dist",
       "clickhouse-cluster-a",
       "clickhouse-cluster-b",
       "clickhouse-cluster-workers",
-      "clickhouse-cluster-config"
+      "clickhouse-cluster-config",
+      "aws-client",
+      "aws-coordinator",
+      "aws-a",
+      "aws-b",
+      "aws-disk-a",
+      "aws-disk-b"
     ],
     "docs/reference-partitioning-sharding.md#§4": [
       "order-api",
@@ -217,12 +293,23 @@
       "add-node"
     ],
     "docs/reference-partitioning-sharding.md#§9": [
+      "clickhouse-cluster-host-coordinator",
+      "clickhouse-cluster-host-a",
+      "clickhouse-cluster-host-b",
       "clickhouse-cluster-app",
       "clickhouse-cluster-dist",
       "clickhouse-cluster-a",
       "clickhouse-cluster-b",
       "clickhouse-cluster-workers",
       "clickhouse-cluster-config"
+    ],
+    "docs/reference-partitioning-sharding.md#§10": [
+      "aws-client",
+      "aws-coordinator",
+      "aws-a",
+      "aws-b",
+      "aws-disk-a",
+      "aws-disk-b"
     ]
   },
   "reference": {

@@ -74,7 +74,7 @@ Iceberg の既定では Row Group は 128 MB、ページは 1 MB が目安（`wr
 - `prune-and-read`：統計とブルームフィルターで Row Group を捨て、ページ索引で必要なページだけ取ってデコードする。
 - `point-lookup`：ID の等値検索で、min/max では捨てられない Row Group をブルームフィルターで捨てる。
 
-## 9. 実装例：S3 上の Parquet を Trino Hive で読む
+## 9. 実装例：EKS の Trino で S3 の Parquet を読む
 
 Trino Hive カタログから S3 の Parquet ファイルを読む例。索引の動作はファイルの書き手、利用できる統計、述語、読取側の設定に依存する。
 
@@ -95,3 +95,20 @@ Trino Hive カタログから S3 の Parquet ファイルを読む例。索引�
 - [Parquet Data Pages](https://parquet.apache.org/docs/file-format/data-pages/)
 - [Trino object storage file formats](https://trino.io/docs/current/object-storage/file-formats.html)
 - [Trino Hive connector](https://trino.io/docs/current/connector/hive.html)
+
+
+### AWS 上の実行環境
+
+この例では Trino の Helm チャートを EKS に配置し、EC2 ノード上で Coordinator と Worker の Pod を動かす。Hive Connector は AWS Glue Data Catalog をメタストアとして用い、S3 の Parquet オブジェクトを読む。カタログ設定は connector.name=hive、hive.metastore=glue、fs.s3.enabled=true を指定する。Pod の IAM 権限、接続経路、Trino の管理と容量は別途構成する。EKS は Trino 本体をマネージドサービスとして提供するものではない。
+
+| 役割 | 実装 |
+| --- | --- |
+| クエリ計画 | Trino Coordinator Pod |
+| ファイルの読み取り | Trino Worker Pod |
+| テーブル情報 | AWS Glue Data Catalog |
+| 実行先 | EKS / EC2 ノードグループ |
+| ファイル | Amazon S3 |
+
+[Trino on Kubernetes](https://trino.io/docs/current/installation/kubernetes.html)、[Trino Hive connector](https://trino.io/docs/current/connector/hive.html)、[EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)。
+
+AWS が EKS 制御プレーンと EC2・Glue・S3 の基盤を運用し、利用者が Kubernetes API、ノード、Trino、カタログ、データと権限を管理する。EKS 制御プレーンサーバーには直接アクセスしない。この構成は公式資料を組み合わせた代表例で、ネットワーク、Trino の各バージョンでの索引対応および実際の除外量は未検証。

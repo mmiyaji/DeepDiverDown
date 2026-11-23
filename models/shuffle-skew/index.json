@@ -2,8 +2,8 @@
   "model": "shuffle-skew",
   "name": "分散実行：シャッフルとデータスキュー",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "orders": {
@@ -93,6 +93,24 @@
       "type": "scenario",
       "label": "ブロードキャスト結合（シャッフルしない）"
     },
+    "spark-aqe-master": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "Spark Standalone Master",
+      "realizes": []
+    },
+    "spark-aqe-host": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "自前 Linux Worker ホスト群",
+      "realizes": []
+    },
+    "spark-aqe-hdfs": {
+      "type": "implementation",
+      "impl": "spark-aqe",
+      "label": "自前 HDFS クラスター",
+      "realizes": []
+    },
     "spark-aqe-orders": {
       "type": "implementation",
       "impl": "spark-aqe",
@@ -147,6 +165,80 @@
       "impl": "spark-aqe",
       "label": "AQE と偏り検出の設定",
       "realizes": []
+    },
+    "aws-driver": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Glue の Spark Driver",
+      "realizes": []
+    },
+    "aws-orders": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Amazon S3（Parquet 受注明細）",
+      "realizes": [
+        "orders"
+      ]
+    },
+    "aws-customers": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Amazon S3（Parquet 顧客マスタ）",
+      "realizes": [
+        "customers"
+      ]
+    },
+    "aws-exchange": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Spark Executor（Exchange）",
+      "realizes": [
+        "shuffle"
+      ]
+    },
+    "aws-regular": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Spark Executor（通常の結合タスク）",
+      "realizes": [
+        "join"
+      ]
+    },
+    "aws-skew": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Spark Executor（偏った分割）",
+      "realizes": [
+        "hot"
+      ]
+    },
+    "aws-result": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Amazon S3（結合結果）",
+      "realizes": [
+        "result"
+      ]
+    },
+    "aws-job": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "AWS Glue（Spark ジョブ）",
+      "realizes": []
+    },
+    "aws-ui": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "AWS Glue（Spark UI）",
+      "realizes": [
+        "metrics"
+      ]
+    },
+    "aws-logs": {
+      "type": "implementation",
+      "impl": "aws-glue-spark",
+      "label": "Amazon S3（Spark イベントログ）",
+      "realizes": []
     }
   },
   "byRef": {
@@ -181,13 +273,26 @@
       "join-orders",
       "split-skew",
       "broadcast-join",
+      "spark-aqe-master",
+      "spark-aqe-host",
+      "spark-aqe-hdfs",
       "spark-aqe-orders",
       "spark-aqe-customers",
       "spark-aqe-shuffle",
       "spark-aqe-join",
       "spark-aqe-metrics",
       "spark-aqe-result",
-      "spark-aqe-config"
+      "spark-aqe-config",
+      "aws-driver",
+      "aws-orders",
+      "aws-customers",
+      "aws-exchange",
+      "aws-regular",
+      "aws-skew",
+      "aws-result",
+      "aws-job",
+      "aws-ui",
+      "aws-logs"
     ],
     "docs/reference-shuffle-skew.md#§2": [
       "shuffle",
@@ -204,6 +309,9 @@
       "broadcast-join"
     ],
     "docs/reference-shuffle-skew.md#§4": [
+      "spark-aqe-master",
+      "spark-aqe-host",
+      "spark-aqe-hdfs",
       "spark-aqe-orders",
       "spark-aqe-customers",
       "spark-aqe-shuffle",
@@ -211,6 +319,18 @@
       "spark-aqe-metrics",
       "spark-aqe-result",
       "spark-aqe-config"
+    ],
+    "docs/reference-shuffle-skew.md#§5": [
+      "aws-driver",
+      "aws-orders",
+      "aws-customers",
+      "aws-exchange",
+      "aws-regular",
+      "aws-skew",
+      "aws-result",
+      "aws-job",
+      "aws-ui",
+      "aws-logs"
     ]
   },
   "reference": {

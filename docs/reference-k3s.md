@@ -37,7 +37,7 @@ Agent ホストが失われると、そのホスト上の注文 API Pod も影�
 |---|---|
 | 構成の投入クライアント | kubectl |
 | クラスタ制御部 | K3s server VM × 3 |
-| クラスタ状態ストア | K3s server VM × 3 |
+| クラスタ状態ストア | 各 K3s server の組み込み etcd とローカル永続ディスク |
 | ノード参加エージェント | K3s agent VM |
 | ノード実行・ネットワーク | K3s agent VM |
 | 注文 API の実行単位 | 注文 API Deployment |
@@ -47,6 +47,13 @@ Agent ホストが失われると、そのホスト上の注文 API Pod も影�
 
 組み込み etcd の投票には過半数が必要。ServiceLB の使用ポートはホスト上で空けておき、API の登録先とアプリ公開の経路は個別に管理する。
 
+組み込み etcd のデータディレクトリは server ごとの永続ディスクに置く。復元に備え、定期スナップショットと server トークンの保管先を運用側で管理する。
+
+この例では利用者が VM、K3s の設定と更新、固定登録用ロードバランサー、データ・スナップショットを運用する。kubectl で Kubernetes API を操作し、server の設定や agent の参加を管理する。ServiceLB は空きポートのあるノードに Pod を配置し、hostPort を使って Service へ転送する。既定 Traefik が使う 80・443 と競合しないよう、公開ポートと対象ノードを設定する。
+
+複数の公式資料を組み合わせた代表構成であり、実在の導入例や動作検証済み構成ではない。ロードバランサー製品、ノード数、ポート、バックアップ先とリストア手順は導入時に確定する。
+
 公式資料
 - [K3s High Availability Embedded etcd](https://docs.k3s.io/datastore/ha-embedded)
 - [K3s Networking Services](https://docs.k3s.io/networking/networking-services)
+- [K3s の etcd スナップショット](https://docs.k3s.io/cli/etcd-snapshot)

@@ -38,4 +38,15 @@
 
 平坦表の定型分析とネスト表の注文分析を別々のクエリから確認する。`MERGE` や対象範囲の置き換えには、更新粒度ごとに一意なソースを作る。
 
+Cloud Storage のヘッダー・明細・訂正 CSV を、同じロケーションの BigQuery ロードジョブで別々の入力表へ取り込む。配列は CSV から読み込まず、BigQuery の GoogleSQL ジョブで対象注文の全明細をまとめ、`ARRAY<STRUCT>` を生成する。スケジュールされたクエリは専用サービスアカウントを使い、ロードが完了したバッチを処理する。
+
+二つの公開テーブルを同じ基準で切り替える必要がある場合は、既存テーブルへの更新を同じ複数ステートメント トランザクションにまとめる。分析者は BigQuery Studio から注文用・明細用のビューを問い、運用者はジョブ履歴と処理済みバッチを照合する。
+
+- [Cloud Storage からの CSV ロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
+- [BigQuery のスケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)
+- [BigQuery の複数ステートメント トランザクション](https://docs.cloud.google.com/bigquery/docs/transactions)
+- [BigQuery の JOBS ビュー](https://docs.cloud.google.com/bigquery/docs/information-schema-jobs)
+
 出典 [BigQuery: Use nested and repeated fields](https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested)、[BigQuery: Work with arrays](https://docs.cloud.google.com/bigquery/docs/arrays)、[BigQuery: Data manipulation language](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)
+
+この構成は公式機能を組み合わせた例で、実環境での SQL、ジョブの順序制御、権限、重複排除、障害復旧は未検証。Google が BigQuery と Cloud Storage のサービス基盤を運用し、利用者はデータ、SQL、スケジュール、サービスアカウントと IAM 権限を設定する。内部の実行サーバーは利用者が直接操作する対象として描いていない。ジョブ間の完了順序はスケジュールだけで保証されないため、前段の成功確認や再実行方針を別途設計する。バケットとデータセットのロケーションの互換性を確認する。

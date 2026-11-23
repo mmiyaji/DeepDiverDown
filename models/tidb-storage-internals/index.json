@@ -1,0 +1,238 @@
+{
+  "model": "tidb-storage-internals",
+  "name": "TiDB / TiKV：KV・Region・Raft・MVCC",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "sql": {
+      "type": "node",
+      "label": "行と索引を KV 化",
+      "status": "claim"
+    },
+    "pd": {
+      "type": "node",
+      "label": "PD と時刻・配置",
+      "status": "claim"
+    },
+    "leader": {
+      "type": "node",
+      "label": "Region leader",
+      "status": "claim"
+    },
+    "replica": {
+      "type": "node",
+      "label": "Raft follower",
+      "status": "claim"
+    },
+    "mvcc": {
+      "type": "node",
+      "label": "MVCC の版とロック",
+      "status": "claim"
+    },
+    "rocks": {
+      "type": "node",
+      "label": "RocksDB のデータ",
+      "status": "claim"
+    },
+    "flash": {
+      "type": "node",
+      "label": "TiFlash learner",
+      "status": "claim"
+    },
+    "encode": {
+      "type": "link",
+      "label": "行と索引を KV 化 → Region leader",
+      "status": "claim"
+    },
+    "lookup": {
+      "type": "link",
+      "label": "行と索引を KV 化 → PD と時刻・配置",
+      "status": "claim"
+    },
+    "replicate": {
+      "type": "link",
+      "label": "Region leader → Raft follower",
+      "status": "claim"
+    },
+    "apply": {
+      "type": "link",
+      "label": "Region leader → MVCC の版とロック",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "MVCC の版とロック → RocksDB のデータ",
+      "status": "claim"
+    },
+    "learner": {
+      "type": "link",
+      "label": "Region leader → TiFlash learner",
+      "status": "claim"
+    },
+    "write": {
+      "type": "scenario",
+      "label": "書き込みと複製"
+    },
+    "analytics": {
+      "type": "scenario",
+      "label": "TiFlash への複製"
+    },
+    "impl-sql": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "TiDB の行・索引 KV",
+      "realizes": [
+        "sql"
+      ]
+    },
+    "impl-pd": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "PD / TSO",
+      "realizes": [
+        "pd"
+      ]
+    },
+    "impl-leader": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "TiKV の Region leader",
+      "realizes": [
+        "leader"
+      ]
+    },
+    "impl-mvcc": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "TiKV MVCC",
+      "realizes": [
+        "mvcc"
+      ]
+    },
+    "impl-rocks": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "TiKV RocksDB",
+      "realizes": [
+        "rocks"
+      ]
+    },
+    "impl-flash": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "TiFlash learner",
+      "realizes": [
+        "flash"
+      ]
+    },
+    "impl-replica": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "別 TiKV プロセスの follower",
+      "realizes": [
+        "replica"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-tidb-storage-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-tidb-storage-internals.md": [
+      "model",
+      "sql",
+      "pd",
+      "leader",
+      "replica",
+      "mvcc",
+      "rocks",
+      "flash",
+      "encode",
+      "lookup",
+      "replicate",
+      "apply",
+      "persist",
+      "learner",
+      "write",
+      "analytics",
+      "impl-sql",
+      "impl-pd",
+      "impl-leader",
+      "impl-mvcc",
+      "impl-rocks",
+      "impl-flash",
+      "impl-replica"
+    ],
+    "docs/reference-tidb-storage-internals.md#§3": [
+      "model"
+    ],
+    "docs/reference-tidb-storage-internals.md#§5": [
+      "model"
+    ],
+    "docs/reference-tidb-storage-internals.md#§2": [
+      "sql",
+      "pd",
+      "leader",
+      "replica",
+      "mvcc",
+      "rocks",
+      "flash",
+      "encode",
+      "lookup",
+      "replicate",
+      "apply",
+      "persist",
+      "learner",
+      "write",
+      "analytics"
+    ],
+    "docs/reference-tidb-storage-internals.md#§4": [
+      "impl-sql",
+      "impl-pd",
+      "impl-leader",
+      "impl-mvcc",
+      "impl-rocks",
+      "impl-flash",
+      "impl-replica"
+    ]
+  },
+  "reference": {
+    "category": "分散データベース",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "tidb",
+    "objectives": [
+      "構成要素と書き込み・読み出しの経路を理解する。",
+      "保存形式と運用上の前提を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "TiDB architecture",
+        "url": "https://docs.pingcap.com/tidb/stable/tidb-architecture/"
+      },
+      {
+        "title": "TiDB computing",
+        "url": "https://docs.pingcap.com/tidb/stable/tidb-computing/"
+      },
+      {
+        "title": "TiDB storage",
+        "url": "https://docs.pingcap.com/tidb/stable/tidb-storage/"
+      },
+      {
+        "title": "TiKV RocksDB overview",
+        "url": "https://docs.pingcap.com/tidb/stable/rocksdb-overview/"
+      },
+      {
+        "title": "TiFlash replicas",
+        "url": "https://docs.pingcap.com/tidb/stable/create-tiflash-replicas/"
+      },
+      {
+        "title": "TiUP playground",
+        "url": "https://docs.pingcap.com/tidb/stable/tiup-playground/"
+      }
+    ]
+  }
+}

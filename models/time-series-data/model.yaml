@@ -1,0 +1,424 @@
+name: 時系列データの保存・分析と階層化
+description: 時刻付きの観測値の取り込み、系列、時間範囲検索、集計、保持と保存階層を比較する。
+reference:
+  objectives:
+    - 観測時刻、系列と高カーディナリティの影響を理解する。
+    - 時間範囲の絞り込み、集計と保持の考え方を追う。
+    - Hot・Warm・Cold の設計と各製品の機能を区別する。
+  sources:
+    - title: Timescale hypertables
+      url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+    - title: Timescale continuous aggregates
+      url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+    - title: InfluxDB 3 Core schema
+      url: https://docs.influxdata.com/influxdb3/core/write-data/best-practices/schema-design/
+    - title: InfluxDB 3 line protocol
+      url: https://docs.influxdata.com/influxdb3/core/reference/line-protocol/
+    - title: Prometheus data model
+      url: https://prometheus.io/docs/concepts/data_model/
+    - title: Prometheus local storage
+      url: https://prometheus.io/docs/prometheus/latest/storage/
+sources:
+  - docs/reference-time-series-data.md
+evidence:
+  - type: doc
+    ref: docs/reference-time-series-data.md#§1
+  - type: doc
+    ref: docs/reference-time-series-data.md#§3
+  - type: doc
+    ref: docs/reference-time-series-data.md#§5
+tiers:
+  - id: flow
+    label: 処理の流れ
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  source:
+    label: 観測元
+    kind: client
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 値と観測時刻、系列を識別する属性を供給する。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+  ingest:
+    label: 取り込み
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: 時刻付きの値を受け取り、検証して書き込む。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+  store:
+    label: 時系列の保持
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: 系列や時間範囲を使って保存・参照する。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+  query:
+    label: 時間範囲と集計
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 条件に合う値を読み、集計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+  consumer:
+    label: 分析・可視化
+    kind: file
+    tier: flow
+    x: 16
+    'y': 1.5
+    description: 分析結果を利用する。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+links:
+  - id: step-1
+    from: source
+    to: ingest
+    label: 観測値を収集
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+  - id: step-2
+    from: ingest
+    to: store
+    label: 時刻付きの値を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+  - id: step-3
+    from: store
+    to: query
+    label: 対象期間を読み出す
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+  - id: step-4
+    from: query
+    to: consumer
+    label: 集計結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+scenarios:
+  - id: flow
+    label: 入力から結果まで
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-data.md#§2
+    steps:
+      - links:
+          - step-1
+        note: 観測値を収集。
+      - links:
+          - step-2
+        note: 時刻付きの値を保存。
+      - links:
+          - step-3
+        note: 対象期間を読み出す。
+      - links:
+          - step-4
+        note: 集計結果を返す。
+implementations:
+  - id: timescaledb
+    label: Linux 上の PostgreSQL と TimescaleDB
+    description: 観測値を TimescaleDB の hypertable に投入し、時間別 chunk と継続集計を SQL で参照する。
+    sources:
+      - title: Timescale hypertables
+        url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+      - title: Timescale continuous aggregates
+        url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+      - title: InfluxDB 3 Core schema
+        url: https://docs.influxdata.com/influxdb3/core/write-data/best-practices/schema-design/
+      - title: InfluxDB 3 line protocol
+        url: https://docs.influxdata.com/influxdb3/core/reference/line-protocol/
+      - title: Prometheus data model
+        url: https://prometheus.io/docs/concepts/data_model/
+      - title: Prometheus local storage
+        url: https://prometheus.io/docs/prometheus/latest/storage/
+    tiers:
+      - id: runtime
+        label: 利用者が管理する実行環境
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-source:
+        label: 観測データと SQL クライアント
+        kind: client
+        tier: runtime
+        x: 0
+        'y': 1.5
+        realizes:
+          - source
+        description: 観測値を TimescaleDB の hypertable に投入し、時間別 chunk と継続集計を SQL で参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-ingest:
+        label: PostgreSQL INSERT
+        kind: service
+        tier: runtime
+        x: 4
+        'y': 1.5
+        realizes:
+          - ingest
+        description: PostgreSQL と TimescaleDB を利用者の Linux 上で運用する。継続集計の更新ポリシーと保持期間は明示的に設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-store:
+        label: hypertable と時間別 chunk
+        kind: db
+        tier: runtime
+        x: 8
+        'y': 1.5
+        realizes:
+          - store
+        description: 観測値を TimescaleDB の hypertable に投入し、時間別 chunk と継続集計を SQL で参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+        drill: timescaledb-storage-internals
+      impl-query:
+        label: SQL / continuous aggregate
+        kind: service
+        tier: runtime
+        x: 12
+        'y': 1.5
+        realizes:
+          - query
+        description: 観測値を TimescaleDB の hypertable に投入し、時間別 chunk と継続集計を SQL で参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-consumer:
+        label: SQL 集計結果
+        kind: file
+        tier: runtime
+        x: 16
+        'y': 1.5
+        realizes:
+          - consumer
+        description: 観測値を TimescaleDB の hypertable に投入し、時間別 chunk と継続集計を SQL で参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者の実行環境（論理範囲）
+        tier:
+          - runtime
+        nodes:
+          - impl-source
+          - impl-ingest
+          - impl-store
+          - impl-query
+          - impl-consumer
+  - id: influxdb3
+    label: Linux 上の InfluxDB 3 Core
+    description: 観測元が line protocol を送信し、InfluxDB 3 Core のテーブルを SQL で問い合わせる。
+    sources:
+      - title: Timescale hypertables
+        url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+      - title: Timescale continuous aggregates
+        url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+      - title: InfluxDB 3 Core schema
+        url: https://docs.influxdata.com/influxdb3/core/write-data/best-practices/schema-design/
+      - title: InfluxDB 3 line protocol
+        url: https://docs.influxdata.com/influxdb3/core/reference/line-protocol/
+      - title: Prometheus data model
+        url: https://prometheus.io/docs/concepts/data_model/
+      - title: Prometheus local storage
+        url: https://prometheus.io/docs/prometheus/latest/storage/
+    tiers:
+      - id: runtime
+        label: 利用者が管理する実行環境
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-source:
+        label: 観測アプリ
+        kind: client
+        tier: runtime
+        x: 0
+        'y': 1.5
+        realizes:
+          - source
+        description: 観測元が line protocol を送信し、InfluxDB 3 Core のテーブルを SQL で問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-ingest:
+        label: Line protocol 書き込み API
+        kind: service
+        tier: runtime
+        x: 4
+        'y': 1.5
+        realizes:
+          - ingest
+        description: InfluxDB 3 Core とクライアントは利用者がホストで実行し、認証・ストレージ・保持とバックアップを構成する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-store:
+        label: InfluxDB 3 Core テーブル
+        kind: db
+        tier: runtime
+        x: 8
+        'y': 1.5
+        realizes:
+          - store
+        description: 観測元が line protocol を送信し、InfluxDB 3 Core のテーブルを SQL で問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+        drill: influxdb3-storage-internals
+      impl-query:
+        label: SQL クエリ
+        kind: service
+        tier: runtime
+        x: 12
+        'y': 1.5
+        realizes:
+          - query
+        description: 観測元が line protocol を送信し、InfluxDB 3 Core のテーブルを SQL で問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-consumer:
+        label: 集計結果
+        kind: file
+        tier: runtime
+        x: 16
+        'y': 1.5
+        realizes:
+          - consumer
+        description: 観測元が line protocol を送信し、InfluxDB 3 Core のテーブルを SQL で問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者の実行環境（論理範囲）
+        tier:
+          - runtime
+        nodes:
+          - impl-source
+          - impl-ingest
+          - impl-store
+          - impl-query
+          - impl-consumer
+  - id: prometheus
+    label: Linux 上の Prometheus ローカル TSDB
+    description: Prometheus が対象のメトリクスを scrape してローカル TSDB に保持し、PromQL で集計する。
+    sources:
+      - title: Timescale hypertables
+        url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+      - title: Timescale continuous aggregates
+        url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+      - title: InfluxDB 3 Core schema
+        url: https://docs.influxdata.com/influxdb3/core/write-data/best-practices/schema-design/
+      - title: InfluxDB 3 line protocol
+        url: https://docs.influxdata.com/influxdb3/core/reference/line-protocol/
+      - title: Prometheus data model
+        url: https://prometheus.io/docs/concepts/data_model/
+      - title: Prometheus local storage
+        url: https://prometheus.io/docs/prometheus/latest/storage/
+    tiers:
+      - id: runtime
+        label: 利用者が管理する実行環境
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-source:
+        label: メトリクス公開対象
+        kind: client
+        tier: runtime
+        x: 0
+        'y': 1.5
+        realizes:
+          - source
+        description: Prometheus が対象のメトリクスを scrape してローカル TSDB に保持し、PromQL で集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-ingest:
+        label: Prometheus scrape
+        kind: service
+        tier: runtime
+        x: 4
+        'y': 1.5
+        realizes:
+          - ingest
+        description: 利用者が Prometheus と対象を運用する。ローカル TSDB は単一ノードであり、長期保持先や冗長化は別途設計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-store:
+        label: ローカル TSDB
+        kind: db
+        tier: runtime
+        x: 8
+        'y': 1.5
+        realizes:
+          - store
+        description: Prometheus が対象のメトリクスを scrape してローカル TSDB に保持し、PromQL で集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+        drill: prometheus-tsdb-internals
+      impl-query:
+        label: PromQL クエリ
+        kind: service
+        tier: runtime
+        x: 12
+        'y': 1.5
+        realizes:
+          - query
+        description: Prometheus が対象のメトリクスを scrape してローカル TSDB に保持し、PromQL で集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+      impl-consumer:
+        label: 可視化・アラート
+        kind: file
+        tier: runtime
+        x: 16
+        'y': 1.5
+        realizes:
+          - consumer
+        description: Prometheus が対象のメトリクスを scrape してローカル TSDB に保持し、PromQL で集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-data.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者の実行環境（論理範囲）
+        tier:
+          - runtime
+        nodes:
+          - impl-source
+          - impl-ingest
+          - impl-store
+          - impl-query
+          - impl-consumer

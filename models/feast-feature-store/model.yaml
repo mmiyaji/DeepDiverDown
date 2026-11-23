@@ -260,6 +260,7 @@ implementations:
           - 10
           - 3
     nodes:
+      ex-host: {label: Feast・学習ジョブ実行基盤（未選定）, kind: host, tier: control, x: 1, y: 2, description: 利用者が Feast と学習ジョブを実行する基盤。実装と配置は未選定。, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§4}]}
       ex-events:
         label: 注文履歴のバッチデータ
         kind: db
@@ -379,7 +380,132 @@ implementations:
           - type: doc
             ref: docs/reference-feast-feature-store.md#§4
     links:
+      - {id: ex-run-materialize, from: ex-host, to: ex-materialize, label: 特徴量反映ジョブを実行, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§4}]}
+      - {id: ex-run-server, from: ex-host, to: ex-feature-server, label: Feature Server を実行, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§4}]}
       - id: ex-serve
         from: ex-feature-server
         to: ex-online
         label: 特徴量を読み出す
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-transform: {tier: diagram, x: 4, y: 1}
+        ex-train: {tier: diagram, x: 7, y: 1}
+        ex-materialize: {tier: diagram, x: 1, y: 4}
+        ex-feature-server: {tier: diagram, x: 4, y: 4}
+        ex-inference: {tier: diagram, x: 7, y: 4}
+        ex-events: {tier: diagram, x: 14, y: 1}
+        ex-offline: {tier: diagram, x: 17, y: 1}
+        ex-registry: {tier: diagram, x: 20, y: 1}
+        ex-online: {tier: diagram, x: 14, y: 4}
+        ex-app: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の実行基盤, tier: [diagram], x0: -1, y0: 0, x1: 10, y1: 12, nodes: [ex-host, ex-transform, ex-train, ex-materialize, ex-feature-server, ex-inference]}
+    layout3d:
+      tiers:
+        - {id: platform, label: 実行基盤・サービス, z: 0, size: [10, 11]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 11]}
+        - {id: storage, label: 独立した保存・データ基盤, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 7]}
+      nodes:
+        ex-host: {tier: platform, x: 1, y: 1}
+        ex-transform: {tier: apps, x: 4, y: 1}
+        ex-train: {tier: apps, x: 7, y: 1}
+        ex-materialize: {tier: apps, x: 1, y: 4}
+        ex-feature-server: {tier: apps, x: 4, y: 4}
+        ex-inference: {tier: apps, x: 7, y: 4}
+        ex-events: {tier: storage, x: 1, y: 1}
+        ex-offline: {tier: storage, x: 4, y: 1}
+        ex-registry: {tier: storage, x: 7, y: 1}
+        ex-online: {tier: storage, x: 1, y: 4}
+        ex-app: {tier: user, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の実行基盤, tier: [platform, apps], nodes: [ex-host, ex-transform, ex-train, ex-materialize, ex-feature-server, ex-inference]}
+
+  - id: aws-feast
+    label: "Feast・Amazon Redshift・DynamoDB・SageMaker AI"
+    description: "Feast の履歴取得とオンライン参照を ECS on Fargate で実行し、Redshift と DynamoDB を使う。SageMaker AI がモデルの学習と推論を担う。"
+    sources:
+      - {title: Fargate security, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-security-considerations.html}
+      - {title: "Feast の AWS プロバイダー", url: https://docs.feast.dev/reference/providers/amazon-web-services}
+      - {title: "Feast Redshift Offline Store", url: https://docs.feast.dev/reference/offline-stores/redshift}
+      - {title: "Feast DynamoDB Online Store", url: https://docs.feast.dev/v0.58-branch/reference/online-stores/dynamodb}
+      - {title: "Feast Registry", url: https://docs.feast.dev/v0.28-branch/getting-started/concepts/registry}
+      - {title: "AWS Glue と Redshift の接続", url: https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-connect-redshift-home.html}
+      - {title: "SageMaker AI の学習データ", url: https://docs.aws.amazon.com/sagemaker/latest/dg/model-access-training-data.html}
+      - {title: "SageMaker AI のリアルタイム推論", url: https://docs.aws.amazon.com/sagemaker/latest/dg/realtime-endpoints-test-endpoints.html}
+      - {title: "ECS スタンドアロンタスク", url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/standalone-tasks.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-feast-ecs, aws-feast-prepare, aws-feast-materialize, aws-feast-api, aws-feast-etl, aws-feast-training, aws-feast-endpoint, aws-feast-events, aws-feast-redshift, aws-feast-registry, aws-feast-artifacts, aws-feast-online]}
+    nodes:
+      aws-feast-app: {label: "注文アプリ", kind: client, tier: entry, x: 1, y: 1.3, realizes: [app], description: "注文 ID を渡して推論を要求する。", evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-ecs: {label: "ECS のタスク管理", kind: service, tier: runtime, x: 1, y: 1.3, svc: ecs, description: "履歴抽出・反映のタスクと推論 API のサービスを管理する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-prepare: {label: "Fargate の Feast 履歴抽出", kind: worker, tier: runtime, x: 5.5, y: 1.3, svc: fargate, description: "Feast SDK で時点結合を実行し、学習用に整形したデータを S3 に出力する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-materialize: {label: "Fargate の Feast materialize", kind: worker, tier: runtime, x: 10, y: 1.3, svc: fargate, realizes: [materialize], description: "履歴から最新値を選んで DynamoDB に書く。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-api: {label: "Fargate の推論 API", kind: service, tier: runtime, x: 15, y: 1.3, svc: fargate, realizes: [inference], description: "Feast SDK で特徴量を取得し、SageMaker AI エンドポイントへ渡す。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-etl: {label: "AWS Glue の特徴量生成", kind: worker, tier: runtime, x: 1, y: 5, svc: glue, realizes: [transform], description: "S3 上の注文から特徴量を作り、Redshift に書く。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-training: {label: "SageMaker AI 学習ジョブ", kind: worker, tier: runtime, x: 6.5, y: 5, svc: sagemaker, realizes: [train], description: "S3 の学習用データを使い、モデルを訓練して成果物を S3 に保存する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-endpoint: {label: "SageMaker AI 推論エンドポイント", kind: service, tier: runtime, x: 13.5, y: 5, svc: sagemaker, description: "学習済みモデルをデプロイし、特徴量から予測を返す。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-events: {label: "S3 の注文履歴", kind: db, tier: data, x: 1, y: 1.4, svc: s3, realizes: [events], description: "注文イベントの履歴を保持する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-redshift: {label: "Redshift の履歴特徴量", kind: db, tier: data, x: 5, y: 1.4, svc: redshift, realizes: [offline], description: "イベント時刻を持つ特徴量テーブルを保持して時点結合を行う。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-registry: {label: "S3 の Feast Registry", kind: db, tier: data, x: 9, y: 1.4, svc: s3, realizes: [registry], description: "特徴量の定義を共有する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-artifacts: {label: "S3 の学習データとモデル", kind: db, tier: data, x: 13, y: 1.4, svc: s3, description: "学習データとモデル成果物を別のプレフィックスで保持する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      aws-feast-online: {label: "DynamoDB の最新値", kind: db, tier: data, x: 16, y: 1.4, svc: dynamodb, realizes: [online], description: "エンティティキーごとに配信する特徴量を保持する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+    links:
+      - {id: aws-feast-launch-prep, from: aws-feast-ecs, to: aws-feast-prepare, label: "学習データ抽出タスクを起動", evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-launch-materialize, from: aws-feast-ecs, to: aws-feast-materialize, label: "反映タスクを起動", evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-serve, from: aws-feast-ecs, to: aws-feast-api, label: "推論 API を稼働させる", evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-read-feature-defs, from: aws-feast-registry, to: aws-feast-prepare, label: "特徴量の定義を読む", realizes: [definition], replace: true, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-history, from: aws-feast-redshift, to: aws-feast-prepare, label: "時点結合で履歴を取得", realizes: [historical], replace: true, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-save-training-input, from: aws-feast-prepare, to: aws-feast-artifacts, label: "学習データを保存", realizes: [historical], replace: true, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-train-input, from: aws-feast-artifacts, to: aws-feast-training, label: "学習データを読み込み", realizes: [historical], replace: true, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-artifact-write, from: aws-feast-training, to: aws-feast-artifacts, label: "学習済みモデルを保存", realizes: [model], replace: true, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-deploy-model, from: aws-feast-artifacts, to: aws-feast-endpoint, label: "学習済みモデルをロード", realizes: [model], replace: true, evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+      - {id: aws-feast-infer, from: aws-feast-api, to: aws-feast-endpoint, label: "特徴量を渡して推論", evidence: [{type: doc, ref: docs/reference-feast-feature-store.md#§5}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        aws-feast-ecs: {tier: diagram, x: 1, y: 1}
+        aws-feast-prepare: {tier: diagram, x: 4, y: 1}
+        aws-feast-materialize: {tier: diagram, x: 7, y: 1}
+        aws-feast-api: {tier: diagram, x: 1, y: 4}
+        aws-feast-etl: {tier: diagram, x: 4, y: 4}
+        aws-feast-training: {tier: diagram, x: 7, y: 4}
+        aws-feast-endpoint: {tier: diagram, x: 1, y: 7}
+        aws-feast-events: {tier: diagram, x: 14, y: 1}
+        aws-feast-redshift: {tier: diagram, x: 17, y: 1}
+        aws-feast-registry: {tier: diagram, x: 20, y: 1}
+        aws-feast-artifacts: {tier: diagram, x: 14, y: 4}
+        aws-feast-online: {tier: diagram, x: 17, y: 4}
+        aws-feast-app: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [diagram], x0: -1, y0: 0, x1: 23, y1: 12, nodes: [aws-feast-ecs, aws-feast-prepare, aws-feast-materialize, aws-feast-api, aws-feast-etl, aws-feast-training, aws-feast-endpoint, aws-feast-events, aws-feast-redshift, aws-feast-registry, aws-feast-artifacts, aws-feast-online]}
+    layout3d:
+      tiers:
+        - {id: platform, label: 実行基盤・サービス, z: 0, size: [10, 11]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 11]}
+        - {id: storage, label: 独立した保存・データ基盤, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 7]}
+      nodes:
+        aws-feast-ecs: {tier: platform, x: 1, y: 1}
+        aws-feast-prepare: {tier: platform, x: 4, y: 1}
+        aws-feast-materialize: {tier: platform, x: 7, y: 1}
+        aws-feast-api: {tier: platform, x: 1, y: 4}
+        aws-feast-etl: {tier: platform, x: 4, y: 4}
+        aws-feast-training: {tier: platform, x: 7, y: 4}
+        aws-feast-endpoint: {tier: platform, x: 1, y: 7}
+        aws-feast-events: {tier: storage, x: 1, y: 1}
+        aws-feast-redshift: {tier: storage, x: 4, y: 1}
+        aws-feast-registry: {tier: storage, x: 7, y: 1}
+        aws-feast-artifacts: {tier: storage, x: 1, y: 4}
+        aws-feast-online: {tier: storage, x: 4, y: 4}
+        aws-feast-app: {tier: user, x: 1, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [platform, apps, storage], nodes: [aws-feast-ecs, aws-feast-prepare, aws-feast-materialize, aws-feast-api, aws-feast-etl, aws-feast-training, aws-feast-endpoint, aws-feast-events, aws-feast-redshift, aws-feast-registry, aws-feast-artifacts, aws-feast-online]}

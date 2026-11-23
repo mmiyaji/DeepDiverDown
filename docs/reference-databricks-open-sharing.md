@@ -33,13 +33,20 @@
 | 機能 | 具体的な担い手 | 設定・成果物 |
 |---|---|---|
 | 提供側管理者 | 提供側 Unity Catalog 管理者 | 集計表と提供相手を決める。 |
-| 注文集計テーブル | sales.orders_summary | 提供側で整備した集計テーブル。 |
+| 注文集計テーブル | sales.orders_summary | 提供側の Databricks が管理する Delta テーブル。実体は提供者の Amazon S3 に置く。 |
 | 公開資産と受領者の定義・失効 | OpenSharing の SHARE・RECIPIENT・権限 | 受領者を経路別に登録して、Share へのアクセスを付与・取り消しする。 |
 | 受領側のデータカタログ | 受領者の Unity Catalog 共有カタログ | Databricks-to-Databricks の提供者と Share を指定して作る。 |
 | 受領側のクエリ実行 | 受領者の Databricks SQL Warehouse | 受領側で共有カタログを読む。 |
 | 外部クライアント向け共有接続口 | オープン共有の Delta Sharing 接続口 | 外部ツール向けの共有プロトコルを提供する。 |
-| 外部分析クライアント | 外部 Delta Sharing 対応クライアント | 許可された接続情報で集計を参照する。 |
+| 外部分析クライアント | Python の Delta Sharing クライアント | 受領者向けの資格情報ファイルを使い、期限付きでファイルを読み取る。 |
 
 Databricks-to-Databricks と外部クライアントで受領者設定を分ける。取り消しの対象は共有を経由する将来の利用で、すでに受領者が書き出した複製は各受領者が管理する。
 
+Databricks 受領側は共有 ID でメタストアを特定し、受領側の権限を与えられた利用者が共有カタログと SQL Warehouse を使う。この例の外部受領者には、有効化リンクから取得する bearer トークン方式を使う。提供元の S3 に恒久的な IAM 権限を与えず、共有側が発行する期限付きのアクセスで対象ファイルを参照させる。
+
+- [Databricks-to-Open の認証とデータ取得](https://docs.databricks.com/aws/en/opensharing/share-data-open)
+- [Bearer トークン方式の受領者](https://docs.databricks.com/aws/en/opensharing/create-recipient-token)
+
 出典 [OpenSharing の概念](https://docs.databricks.com/aws/en/opensharing)、[OpenSharing の SQL リファレンス](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-sharing)、[OpenSharing 受領者の作成](https://docs.databricks.com/aws/en/opensharing/create-recipient)、[OpenSharing Share の作成](https://docs.databricks.com/aws/en/opensharing/create-share)
+
+提供側と受領側の Databricks アカウント、提供者の AWS S3、外部受領者は別の領域とする。受領側の SQL Warehouse はサーバーレスを選択し Databricks 管理の計算プレーンで実行する。提供者は共有対象・受領者・権限を設定し、外部受領者は bearer 資格情報で接続するが、Databricks 内部基盤は直接操作しない。公式資料を組み合わせた例であり、この構成の実動作は未検証。[Databricks architecture](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[Managed storage](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)

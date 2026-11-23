@@ -22,6 +22,7 @@ Iceberg の Spark quickstart にある REST Catalog と S3 互換 MinIO を使�
 | 機能 | 担い手 |
 |---|---|
 | 参照の解決 | Iceberg REST Catalog |
+| カタログの状態 | Quickstart の REST fixture 内の JdbcCatalog と SQLite。コンテナ再作成後も状態を保持するには SQLite ファイルを永続ボリュームに置く設定が必要 |
 | 形式と表の定義 | ストレージ上の table metadata JSON |
 | ファイル群の選択 | snapshot・manifest list・data / delete manifest |
 | 行データ | Parquet データファイルの Variant 列 |
@@ -30,3 +31,28 @@ Iceberg の Spark quickstart にある REST Catalog と S3 互換 MinIO を使�
 | 計画と読み取り | 対応する Iceberg reader / engine |
 
 [Iceberg 仕様](https://iceberg.apache.org/spec/)、[Iceberg Variant 解説](https://iceberg.apache.org/blog/variant-in-apache-iceberg/)、[Spark quickstart](https://iceberg.apache.org/spark-quickstart/)。
+
+[Apache Iceberg — REST fixture の既定の保存先](https://apache.googlesource.com/iceberg/+/refs/heads/main/docker/iceberg-rest-fixture/README.md)
+
+## 6. 実装例：AWS の EMR on EC2・Glue Data Catalog・S3
+
+`emr-spark-8.1.0` の Amazon EMR on EC2 を使う。このリリースは Spark 4.1.1 と Iceberg 1.11.0 の AWS ビルドを含み、Deletion Vector と行の系譜に加えて Variant の shredding に対応する。Iceberg の `format-version=3` を指定し、Amazon S3 を warehouse に持つ GlueCatalog を Spark に設定する。
+
+| 機能配置 | AWS での担い手 |
+|---|---|
+| 表の参照点 | AWS Glue Data Catalog が現行のメタデータ位置を管理 |
+| 表定義・列 ID・Snapshot | S3 上の Iceberg `metadata.json` |
+| Manifest List・Data / Delete Manifest | 同じテーブルの S3 メタデータファイル |
+| データファイル・Variant 値の名前辞書 | Amazon S3 上の Parquet |
+| 削除ベクトル | 同じ S3 テーブルプレフィックスの Puffin ファイル |
+| 行の系譜 | データファイルの行値または Iceberg メタデータから継承した値 |
+| 読み取りと計画 | EMR の EC2/YARN 上で動く Spark Driver・Executor と Iceberg Runtime |
+
+Amazon EMR は EC2 クラスタを管理し、Spark ジョブを投入する。Spark が Glue で表を解決し、S3 上の Manifest を計画に使って、Parquet の読み取り時に該当する DV を適用する。接続する別のエンジンがある場合は、使用する v3 機能ごとに対応を確認する。
+
+- [Amazon EMR Release Guide — AWS runtime for Apache Spark 8.1.0](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark810-release.html)
+- [AWS Prescriptive Guidance — Iceberg table format v3](https://docs.aws.amazon.com/prescriptive-guidance/latest/apache-iceberg-on-aws/table-spec-v3.html)
+- [Amazon EMR Release Guide — Use an Iceberg cluster with Spark](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-iceberg-use-spark-cluster.html)
+- [Apache Iceberg Specification](https://iceberg.apache.org/spec/)
+
+自前例は Linux の Docker ホスト上に REST fixture と MinIO を置く概念例であり、fixture の SQLite は試行用で本番向けの永続構成ではない。v3 の Variant・DV・row lineage を生成・読み取りできる具体的クライアントと組合せは未検証。AWS 公式資料は EMR Spark 8.1.0 に Spark 4.1.1-amzn-0 と Iceberg 1.11.0-amzn-0 を掲載し、Spark の v3 対応を説明するが、この図の全機能の組合せは実行検証していない。AWS が EMR・EC2・Glue・S3 基盤を運用し、利用者がジョブ、クラスタ、データと権限を管理する。Athena の Iceberg v3 対応は公式資料上ないため利用しない。

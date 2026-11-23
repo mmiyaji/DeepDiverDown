@@ -3,6 +3,7 @@ const KEY = 'ddd.settings';
 export const AI_PROVIDERS = { claude: 'Claude Code CLI', codex: 'Codex CLI' };
 export const DEFAULTS = {
   theme: 'auto',        // auto | light | dark
+  viewAccent: 'blue', // orange | blue
   labelScale: 1,        // ラベルの大きさ
   packetSpeed: 1,       // パケットの速さ
   aiProvider: 'claude', // AI を実行する CLI
@@ -25,6 +26,7 @@ export function saveSettings(s) { try { localStorage.setItem(KEY, JSON.stringify
 export function applyAppearance(s) {
   const r = document.documentElement;
   if (s.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = s.theme;
+  r.dataset.viewAccent = s.viewAccent === 'orange' ? 'orange' : 'blue';
   r.style.setProperty('--lbl-scale', s.labelScale);
 }
 

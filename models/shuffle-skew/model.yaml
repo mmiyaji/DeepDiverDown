@@ -62,11 +62,16 @@ implementations:
       - {title: Apache Spark · Shuffle operations, url: https://spark.apache.org/docs/latest/rdd-programming-guide.html#shuffle-operations}
       - {title: Apache Spark · Performance Tuning, url: https://spark.apache.org/docs/latest/sql-performance-tuning.html#optimizing-skew-join}
       - {title: Google Cloud · Query plan and timeline, url: https://cloud.google.com/bigquery/docs/query-plan-explanation}
+      - {title: Spark Standalone Mode, url: https://spark.apache.org/docs/latest/spark-standalone.html}
+      - {title: HDFS Architecture, url: https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html}
       - {title: Spark Web UI, url: https://spark.apache.org/docs/latest/web-ui.html}
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      spark-aqe-master: {label: Spark Standalone Master, kind: service, tier: processing, x: 1, y: 0, description: Worker の資源を割り当てる。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-host: {label: 自前 Linux Worker ホスト群, kind: host, tier: processing, x: 5, y: 0, description: Driver と Executor JVM を実行する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
+      spark-aqe-hdfs: {label: 自前 HDFS クラスター, kind: host, tier: processing, x: 9, y: 0, description: 入力と結果の Parquet を保存する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
       spark-aqe-orders: {label: 日付で分けた Parquet 受注明細, kind: db, tier: processing, x: 1, y: 1.15, realizes: [orders], description: 対象期間の注文を読む。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
       spark-aqe-customers: {label: Parquet の顧客マスタ, kind: file, tier: processing, x: 1, y: 3.65, realizes: [customers], description: 顧客キーと属性を読み込む。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
       spark-aqe-shuffle: {label: Spark SQL の Shuffle Exchange, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [shuffle], description: customer_id で関連する行を同じ分割へ送る。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
@@ -75,4 +80,109 @@ implementations:
       spark-aqe-result: {label: 出力用 Parquet テーブル, kind: table, tier: processing, x: 9, y: 3.65, realizes: [result], description: 顧客属性を付けた注文を保存する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
       spark-aqe-config: {label: AQE と偏り検出の設定, kind: policy, tier: setup, x: 1, y: 1.5, description: spark.sql.adaptive.skewJoin.enabled を使い、分割サイズのしきい値と中央値に対する倍率を確認する。, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§4}]}
     links:
+      - {id: spark-aqe-master-allocate, from: spark-aqe-master, to: spark-aqe-host, label: Worker の資源を割り当て}
+      - {id: spark-aqe-host-exchange, from: spark-aqe-host, to: spark-aqe-shuffle, label: Executor を実行}
+      - {id: spark-aqe-host-join, from: spark-aqe-host, to: spark-aqe-join, label: 結合タスクを実行}
+      - {id: spark-aqe-hdfs-orders, from: spark-aqe-hdfs, to: spark-aqe-orders, label: 受注明細を保存}
+      - {id: spark-aqe-hdfs-customers, from: spark-aqe-hdfs, to: spark-aqe-customers, label: 顧客マスタを保存}
+      - {id: spark-aqe-hdfs-result, from: spark-aqe-hdfs, to: spark-aqe-result, label: 結合結果を保存}
       - {id: spark-aqe-config-connection, from: spark-aqe-config, to: spark-aqe-join, label: 偏りを検出する条件を設定}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        spark-aqe-master: {tier: diagram, x: 2, y: 2}
+        spark-aqe-host: {tier: diagram, x: 2, y: 5}
+        spark-aqe-shuffle: {tier: diagram, x: 2, y: 8}
+        spark-aqe-join: {tier: diagram, x: 2, y: 11}
+        spark-aqe-config: {tier: diagram, x: 2, y: 14}
+        spark-aqe-metrics: {tier: diagram, x: 2, y: 17}
+        spark-aqe-hdfs: {tier: diagram, x: 8, y: 2}
+        spark-aqe-orders: {tier: diagram, x: 8, y: 5}
+        spark-aqe-customers: {tier: diagram, x: 8, y: 8}
+        spark-aqe-result: {tier: diagram, x: 8, y: 11}
+      groups:
+        - {kind: cluster, label: "Spark クラスター", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 21, nodes: [spark-aqe-master, spark-aqe-host, spark-aqe-shuffle, spark-aqe-join, spark-aqe-config, spark-aqe-metrics]}
+        - {kind: cluster, label: "HDFS ファイル", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 15, nodes: [spark-aqe-hdfs, spark-aqe-orders, spark-aqe-customers, spark-aqe-result]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Spark クラスター", z: 0, origin: [0, 0], size: [5, 18]}
+        - {id: zone1, label: "HDFS ファイル", z: 0, origin: [7, 0], size: [5, 12]}
+      nodes:
+        spark-aqe-master: {tier: zone0, x: 2, y: 1}
+        spark-aqe-host: {tier: zone0, x: 2, y: 4}
+        spark-aqe-shuffle: {tier: zone0, x: 2, y: 7}
+        spark-aqe-join: {tier: zone0, x: 2, y: 10}
+        spark-aqe-config: {tier: zone0, x: 2, y: 13}
+        spark-aqe-metrics: {tier: zone0, x: 2, y: 16}
+        spark-aqe-hdfs: {tier: zone1, x: 2, y: 1}
+        spark-aqe-orders: {tier: zone1, x: 2, y: 4}
+        spark-aqe-customers: {tier: zone1, x: 2, y: 7}
+        spark-aqe-result: {tier: zone1, x: 2, y: 10}
+      groups:
+        - {kind: cluster, label: "Spark クラスター", tier: [zone0], nodes: [spark-aqe-master, spark-aqe-host, spark-aqe-shuffle, spark-aqe-join, spark-aqe-config, spark-aqe-metrics]}
+        - {kind: cluster, label: "HDFS ファイル", tier: [zone1], nodes: [spark-aqe-hdfs, spark-aqe-orders, spark-aqe-customers, spark-aqe-result]}
+  - id: aws-glue-spark
+    label: AWS（Glue の Spark ジョブと Spark UI）
+    description: Glue の Spark ジョブで Parquet の結合を実行し、Spark UI でシャッフルによるタスク間の偏りを調べる例。
+    sources:
+      - {title: AWS Glue のシャッフル調整, url: https://docs.aws.amazon.com/prescriptive-guidance/latest/tuning-aws-glue-for-apache-spark/optimize-shuffles.html}
+      - {title: AWS Glue Spark UI, url: https://docs.aws.amazon.com/glue/latest/dg/monitor-spark-ui-jobs.html}
+    tiers:
+      - {id: processing, label: 結合処理とデータ, z: 0, size: [19, 7]}
+      - {id: observe, label: ジョブ管理と観測, z: 1, size: [19, 3]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [processing, observe], nodes: [aws-orders, aws-customers, aws-exchange, aws-regular, aws-skew, aws-result, aws-job, aws-ui, aws-logs, aws-driver]}
+      - {kind: cluster, label: Glue の Spark ジョブラン, tier: processing, nodes: [aws-exchange, aws-regular, aws-skew]}
+    nodes:
+      aws-driver: {label: Glue の Spark Driver, kind: service, tier: observe, x: 7, y: 3, description: SQL と AQE の実行計画を調整し、Executor にタスクを割り当てる。, management: {type: shared, scope: "AWS が実行基盤を運用し、利用者がジョブコードと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-orders: {label: Amazon S3（Parquet 受注明細）, svc: s3, kind: db, tier: processing, x: 1, y: 1.5, realizes: [orders], description: 日付で分けた明細を保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-customers: {label: Amazon S3（Parquet 顧客マスタ）, svc: s3, kind: db, tier: processing, x: 1, y: 5.5, realizes: [customers], description: 顧客 ID と属性を保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-exchange: {label: Spark Executor（Exchange）, kind: worker, tier: processing, x: 6, y: 3.5, realizes: [shuffle], description: 結合キーでシャッフルする。, management: {type: shared, scope: "AWS がワーカー基盤を運用し、利用者がジョブと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-regular: {label: Spark Executor（通常の結合タスク）, kind: worker, tier: processing, x: 11, y: 1.5, realizes: [join], description: 分割されたデータを結合する。, management: {type: shared, scope: "AWS がワーカー基盤を運用し、利用者がジョブと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-skew: {label: Spark Executor（偏った分割）, kind: worker, tier: processing, x: 11, y: 5.5, realizes: [hot], description: AQE が対象の偏りを検出すると必要に応じて再分割して結合する。, management: {type: shared, scope: "AWS がワーカー基盤を運用し、利用者がジョブと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-result: {label: Amazon S3（結合結果）, svc: s3, kind: db, tier: processing, x: 17, y: 3.5, realizes: [result], description: 結合結果の Parquet を保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-job: {label: AWS Glue（Spark ジョブ）, svc: glue, kind: service, tier: observe, x: 4, y: 1.5, description: Spark Driver と Executor を管理する。, management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がジョブと実行ロールを管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-ui: {label: AWS Glue（Spark UI）, svc: glue, kind: monitor, tier: observe, x: 11, y: 1.5, realizes: [metrics], description: イベントログから実行計画とステージ内のタスクごとのシャッフル読取量・時間を表示する。, management: {type: shared, scope: "AWS が監視基盤を運用し、利用者がログと UI を設定する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+      aws-logs: {label: Amazon S3（Spark イベントログ）, svc: s3, kind: db, tier: observe, x: 17, y: 1.5, description: Spark UI に表示するイベントログを保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がログと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-shuffle-skew.md#§5}]}
+    links:
+      - {id: aws-start-driver, from: aws-job, to: aws-driver, label: Driver を起動}
+      - {id: aws-driver-tasks, from: aws-driver, to: aws-exchange, label: タスクを割り当て}
+      - {id: aws-manage, from: aws-job, to: aws-exchange, label: Glue ワーカーでジョブを実行}
+      - {id: aws-log, from: aws-job, to: aws-logs, label: Spark イベントログを保存}
+      - {id: aws-read-log, from: aws-ui, to: aws-logs, label: イベントログを読み出す}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        aws-job: {tier: diagram, x: 2, y: 2}
+        aws-driver: {tier: diagram, x: 2, y: 5}
+        aws-exchange: {tier: diagram, x: 2, y: 8}
+        aws-regular: {tier: diagram, x: 2, y: 11}
+        aws-skew: {tier: diagram, x: 2, y: 14}
+        aws-orders: {tier: diagram, x: 8, y: 2}
+        aws-customers: {tier: diagram, x: 8, y: 5}
+        aws-result: {tier: diagram, x: 8, y: 8}
+        aws-ui: {tier: diagram, x: 14, y: 2}
+        aws-logs: {tier: diagram, x: 14, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-job, aws-driver, aws-exchange, aws-regular, aws-skew, aws-orders, aws-customers, aws-result, aws-ui, aws-logs]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Glue ジョブ", z: 0, origin: [0, 0], size: [5, 15]}
+        - {id: zone1, label: "S3 入力と出力", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "Spark UI とログ", z: 0, origin: [14, 0], size: [5, 6]}
+      nodes:
+        aws-job: {tier: zone0, x: 2, y: 1}
+        aws-driver: {tier: zone0, x: 2, y: 4}
+        aws-exchange: {tier: zone0, x: 2, y: 7}
+        aws-regular: {tier: zone0, x: 2, y: 10}
+        aws-skew: {tier: zone0, x: 2, y: 13}
+        aws-orders: {tier: zone1, x: 2, y: 1}
+        aws-customers: {tier: zone1, x: 2, y: 4}
+        aws-result: {tier: zone1, x: 2, y: 7}
+        aws-ui: {tier: zone2, x: 2, y: 1}
+        aws-logs: {tier: zone2, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2], nodes: [aws-job, aws-driver, aws-exchange, aws-regular, aws-skew, aws-orders, aws-customers, aws-result, aws-ui, aws-logs]}

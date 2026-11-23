@@ -2,8 +2,8 @@
   "model": "agent-approval",
   "name": "AI エージェントの承認・再開と観測",
   "coverage": {
-    "covered": 4,
-    "total": 4
+    "covered": 5,
+    "total": 5
   },
   "byId": {
     "request": {
@@ -90,6 +90,18 @@
       "type": "scenario",
       "label": "外部更新を承認して再開"
     },
+    "ex-host": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "利用者の LangGraph 実行ホスト",
+      "realizes": []
+    },
+    "ex-state-host": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "チェックポイント保存基盤",
+      "realizes": []
+    },
     "ex-request": {
       "type": "implementation",
       "impl": "langgraph",
@@ -159,6 +171,100 @@
       "impl": "langgraph",
       "label": "重複防止キー",
       "realizes": []
+    },
+    "aws-stepfunctions-approval-request": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "変更依頼者",
+      "realizes": [
+        "request"
+      ]
+    },
+    "aws-stepfunctions-approval-review": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "承認担当者",
+      "realizes": [
+        "approve"
+      ]
+    },
+    "aws-stepfunctions-approval-eval": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "評価担当者",
+      "realizes": [
+        "evaluation"
+      ]
+    },
+    "aws-stepfunctions-approval-auth": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "Cognito ユーザープール",
+      "realizes": []
+    },
+    "aws-stepfunctions-approval-gateway": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "API Gateway 承認 API",
+      "realizes": []
+    },
+    "aws-stepfunctions-approval-reviewer": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "依頼・承認 API の Lambda",
+      "realizes": []
+    },
+    "aws-stepfunctions-approval-workflow": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "Step Functions Standard",
+      "realizes": [
+        "agent"
+      ]
+    },
+    "aws-stepfunctions-approval-plan": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "提案生成 Lambda",
+      "realizes": []
+    },
+    "aws-stepfunctions-approval-llm": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "Amazon Bedrock",
+      "realizes": []
+    },
+    "aws-stepfunctions-approval-tool": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "案件更新 Lambda",
+      "realizes": [
+        "tool"
+      ]
+    },
+    "aws-stepfunctions-approval-state": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "DynamoDB の承認状態",
+      "realizes": [
+        "state"
+      ]
+    },
+    "aws-stepfunctions-approval-trace": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "CloudWatch の実行ログ",
+      "realizes": [
+        "trace"
+      ]
+    },
+    "aws-stepfunctions-approval-target": {
+      "type": "implementation",
+      "impl": "aws-stepfunctions-approval",
+      "label": "DynamoDB の案件テーブル",
+      "realizes": [
+        "target"
+      ]
     }
   },
   "byRef": {
@@ -184,6 +290,8 @@
       "record",
       "inspect",
       "approve-update",
+      "ex-host",
+      "ex-state-host",
       "ex-request",
       "ex-agent",
       "ex-approve",
@@ -192,7 +300,20 @@
       "ex-state",
       "ex-trace",
       "ex-evaluation",
-      "ex-key"
+      "ex-key",
+      "aws-stepfunctions-approval-request",
+      "aws-stepfunctions-approval-review",
+      "aws-stepfunctions-approval-eval",
+      "aws-stepfunctions-approval-auth",
+      "aws-stepfunctions-approval-gateway",
+      "aws-stepfunctions-approval-reviewer",
+      "aws-stepfunctions-approval-workflow",
+      "aws-stepfunctions-approval-plan",
+      "aws-stepfunctions-approval-llm",
+      "aws-stepfunctions-approval-tool",
+      "aws-stepfunctions-approval-state",
+      "aws-stepfunctions-approval-trace",
+      "aws-stepfunctions-approval-target"
     ],
     "docs/reference-agent-approval.md#§3": [
       "model"
@@ -217,6 +338,8 @@
       "approve-update"
     ],
     "docs/reference-agent-approval.md#§4": [
+      "ex-host",
+      "ex-state-host",
       "ex-request",
       "ex-agent",
       "ex-approve",
@@ -226,6 +349,21 @@
       "ex-trace",
       "ex-evaluation",
       "ex-key"
+    ],
+    "docs/reference-agent-approval.md#§5": [
+      "aws-stepfunctions-approval-request",
+      "aws-stepfunctions-approval-review",
+      "aws-stepfunctions-approval-eval",
+      "aws-stepfunctions-approval-auth",
+      "aws-stepfunctions-approval-gateway",
+      "aws-stepfunctions-approval-reviewer",
+      "aws-stepfunctions-approval-workflow",
+      "aws-stepfunctions-approval-plan",
+      "aws-stepfunctions-approval-llm",
+      "aws-stepfunctions-approval-tool",
+      "aws-stepfunctions-approval-state",
+      "aws-stepfunctions-approval-trace",
+      "aws-stepfunctions-approval-target"
     ]
   },
   "reference": {

@@ -1,0 +1,383 @@
+name: Redis Cluster：スロット配置と非同期複製
+description: キーから hash slot、primary・replica、リダイレクトと再同期を追う。
+parent:
+  model: redis
+  node: replica
+reference:
+  objectives:
+    - データの格納とアクセスの仕組みを理解する。
+    - 物理構造と運用・障害時の前提を区別する。
+  sources:
+    - title: Redis Cluster specification
+      url: https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/
+    - title: Redis replication
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+    - title: Redis persistence
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+sources:
+  - docs/reference-redis-cluster-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-redis-cluster-internals.md#§1
+  - type: doc
+    ref: docs/reference-redis-cluster-internals.md#§3
+  - type: doc
+    ref: docs/reference-redis-cluster-internals.md#§5
+tiers:
+  - id: access
+    label: 操作と処理
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: data
+    label: データと保存
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  client:
+    label: クラスタ対応クライアント
+    kind: client
+    tier: access
+    x: 0
+    'y': 1.5
+    description: スロット配置を利用してノードにコマンドを送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  slot:
+    label: キーからスロットを算出
+    kind: service
+    tier: access
+    x: 5
+    'y': 1.5
+    description: CRC16 と hash tag の規則でスロットを求める。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  primaryA:
+    label: primary A
+    kind: db
+    tier: data
+    x: 2
+    'y': 1.5
+    description: 担当スロットのキーを保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  primaryB:
+    label: primary B
+    kind: db
+    tier: data
+    x: 7
+    'y': 1.5
+    description: 別のスロット範囲を担当する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  primaryC:
+    label: primary C
+    kind: db
+    tier: data
+    x: 12
+    'y': 1.5
+    description: 別のスロット範囲を担当する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  replica:
+    label: replica A
+    kind: db
+    tier: data
+    x: 17
+    'y': 1.5
+    description: primary A のデータを非同期に複製する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  backlog:
+    label: 複製 backlog
+    kind: file
+    tier: data
+    x: 22
+    'y': 1.5
+    description: 部分再同期に利用する複製ストリームの範囲。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+links:
+  - id: hash
+    from: client
+    to: slot
+    label: キーのスロットを判定
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  - id: a
+    from: slot
+    to: primaryA
+    label: 担当 primary に要求
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  - id: b
+    from: slot
+    to: primaryB
+    label: 別スロットの要求を振り分け
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  - id: c
+    from: slot
+    to: primaryC
+    label: 残りのスロットに要求
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  - id: replicate
+    from: primaryA
+    to: replica
+    label: 更新を非同期に複製
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  - id: backlog
+    from: primaryA
+    to: backlog
+    label: 再同期用の更新を保持
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+  - id: resync
+    from: backlog
+    to: replica
+    label: 条件を満たす場合に差分再同期
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+scenarios:
+  - id: routing
+    label: スロットの振り分け
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+    visual: structure
+    steps:
+      - links:
+          - hash
+        note: キーのスロットを判定。
+        highlight:
+          - a1
+          - b1
+          - c1
+      - links:
+          - a
+        note: 担当 primary に要求。
+        highlight:
+          - a1
+      - links:
+          - b
+        note: 別スロットの要求を振り分け。
+        highlight:
+          - b1
+      - links:
+          - c
+        note: 残りのスロットに要求。
+        highlight:
+          - c1
+  - id: resync
+    label: 複製と再同期
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-cluster-internals.md#§2
+    visual: structure
+    steps:
+      - links:
+          - replicate
+        note: 更新を非同期に複製。
+        highlight:
+          - a1
+          - r1
+      - links:
+          - backlog
+        note: 再同期用の更新を保持。
+        highlight:
+          - log
+      - links:
+          - resync
+        note: 条件を満たす場合に差分再同期。
+        highlight:
+          - log
+          - r1
+implementations:
+  - id: linux
+    label: Linux 上の Redis Cluster 検証環境
+    description: 単一 Linux ホスト上に複数 Redis プロセスを起動して複数 primary と replica のスロット配置を学ぶ。単一ホストのため障害分離はない。
+    sources:
+      - title: Redis Cluster specification
+        url: https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/
+      - title: Redis replication
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+      - title: Redis persistence
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+    tiers:
+      - id: access
+        label: 操作と処理
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: data
+        label: データと保存
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-client:
+        label: クラスタ対応クライアント
+        kind: client
+        tier: access
+        x: 0
+        'y': 1.5
+        description: スロット配置を利用してノードにコマンドを送る。
+        realizes:
+          - client
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-cluster-internals.md#§4
+      ex-slot:
+        label: キーからスロットを算出
+        kind: service
+        tier: access
+        x: 5
+        'y': 1.5
+        description: CRC16 と hash tag の規則でスロットを求める。
+        realizes:
+          - slot
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-cluster-internals.md#§4
+      ex-primaryA:
+        label: primary A
+        kind: db
+        tier: data
+        x: 2
+        'y': 1.5
+        description: 担当スロットのキーを保持する。
+        realizes:
+          - primaryA
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-cluster-internals.md#§4
+      ex-primaryB:
+        label: primary B
+        kind: db
+        tier: data
+        x: 7
+        'y': 1.5
+        description: 別のスロット範囲を担当する。
+        realizes:
+          - primaryB
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-cluster-internals.md#§4
+      ex-primaryC:
+        label: primary C
+        kind: db
+        tier: data
+        x: 12
+        'y': 1.5
+        description: 別のスロット範囲を担当する。
+        realizes:
+          - primaryC
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-cluster-internals.md#§4
+      ex-replica:
+        label: replica A
+        kind: db
+        tier: data
+        x: 17
+        'y': 1.5
+        description: primary A のデータを非同期に複製する。
+        realizes:
+          - replica
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-cluster-internals.md#§4
+      ex-backlog:
+        label: 複製 backlog
+        kind: file
+        tier: data
+        x: 22
+        'y': 1.5
+        description: 部分再同期に利用する複製ストリームの範囲。
+        realizes:
+          - backlog
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-cluster-internals.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者が管理する Linux の実行環境（論理範囲）
+        tier:
+          - access
+          - data
+        nodes:
+          - ex-client
+          - ex-slot
+          - ex-primaryA
+          - ex-primaryB
+          - ex-primaryC
+          - ex-replica
+          - ex-backlog
+blocks:
+  - id: structure
+    title: スロットとレプリカの配置例
+    note: スロット範囲と構成は説明用です。レプリカは primary のデータのコピーであり、スロットを追加するものではありません。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: pa
+        label: primary A
+        node: primaryA
+      - id: pb
+        label: primary B
+        node: primaryB
+      - id: pc
+        label: primary C
+        node: primaryC
+      - id: ra
+        label: replica A
+        node: replica
+      - id: back
+        label: backlog
+        node: backlog
+    items:
+      pa:
+        - id: a1
+          label: slot 0–5460
+          k: 0
+          note: primary A の担当範囲を単純化した例。
+      pb:
+        - id: b1
+          label: slot 5461–10922
+          k: 1
+          note: primary B の担当範囲を単純化した例。
+      pc:
+        - id: c1
+          label: slot 10923–16383
+          k: 4
+          note: primary C の担当範囲を単純化した例。
+      ra:
+        - id: r1
+          label: A の複製
+          k: 2
+          note: 非同期複製で更新される primary A のコピー。
+      back:
+        - id: log
+          label: offset 範囲
+          k: 3
+          note: 部分再同期に利用可能な複製ストリーム。

@@ -41,3 +41,24 @@ Spark SQL で受注明細と顧客マスタを結合する例。Adaptive Query E
 - [Apache Spark · Performance Tuning](https://spark.apache.org/docs/latest/sql-performance-tuning.html#optimizing-skew-join)
 - [Google Cloud · Query plan and timeline](https://cloud.google.com/bigquery/docs/query-plan-explanation)
 - [Spark Web UI](https://spark.apache.org/docs/latest/web-ui.html)
+
+## 5. 実装例：AWS（Glue の Spark ジョブと Spark UI）
+
+Amazon S3 の Parquet 受注明細と顧客マスタを AWS Glue のバッチ Spark ジョブで結合する。Glue がジョブのワーカーを管理する。Spark SQL の AQE で偏り分割の最適化を有効にし、同じ入力で実行計画と各タスクの負荷を確認する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| 受注明細、顧客マスタ、結合結果 | Amazon S3 の Parquet |
+| キーでの再分配と結合 | Glue ワーカー上の Spark Executor |
+| 偏った結合範囲の検出と再分割 | Spark SQL の Adaptive Query Execution |
+| タスクごとの時間と読取量の観測 | Glue の Spark UI と Amazon S3 に保存した Spark イベントログ |
+
+`spark.sql.adaptive.skewJoin.enabled` を有効にすると、対象の結合方式で、分割サイズと中央値に対する倍率の条件を満たす分割が再分割され得る。Spark UI で結合方式とシャッフル後のタスク分布を確認する。ブロードキャスト結合が選ばれる場合は、同じシャッフルを観察できない。
+
+- [AWS Glue のシャッフル調整](https://docs.aws.amazon.com/prescriptive-guidance/latest/tuning-aws-glue-for-apache-spark/optimize-shuffles.html)
+- [AWS Glue Spark UI](https://docs.aws.amazon.com/glue/latest/dg/monitor-spark-ui-jobs.html)
+
+自前例は Linux の Spark Standalone Master と Worker、別の自前 HDFS に入力と結果を置く。AWS 例では AWS が Glue と S3 の基盤を運用し、利用者がジョブ・AQE・実行ロール・データとログを設定する。管理ワーカーの内部ホストは直接操作しない。公式資料を組み合わせた代表例であり、バージョン、実際の偏りと AQE の効果は未検証。
+
+- [Spark Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)
+- [HDFS Architecture](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)

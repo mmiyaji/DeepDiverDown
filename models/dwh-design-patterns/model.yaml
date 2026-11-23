@@ -302,8 +302,9 @@ scenarios:
 implementations:
   - id: bq-lab
     label: BigQuery の DWH 設計比較環境
-    description: 合成の注文 CSV と明細を共通入力にし、試すパターンごとに別データセットへ SQL の成果物を作る比較環境。表の構成は比較候補で、すべてを一つの本番経路として使う想定ではない。
+    description: 同じロケーションの Cloud Storage と BigQuery を使い、合成 CSV をロードして GoogleSQL のジョブで比較候補ごとのデータセットを作る。
     sources:
+      - {title: BigQuery overview, url: https://docs.cloud.google.com/bigquery/docs/introduction}
       - title: Kimball Group の次元モデリング技法
         url: >-
           https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
@@ -322,6 +323,10 @@ implementations:
         url: https://docs.cloud.google.com/bigquery/docs/datasets
       - title: BigQuery 論理ビュー
         url: https://docs.cloud.google.com/bigquery/docs/views-intro
+      - title: Cloud Storage から BigQuery に CSV をロード
+        url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv
+      - title: BigQuery でスケジュールされたクエリ
+        url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -330,19 +335,21 @@ implementations:
           - 20.5
           - 6.5
       - id: implementation-setup
-        label: 実装時の設定・観測
+        label: 共通入力・GoogleSQL の実行
         z: 1
         size:
-          - 8
+          - 19
           - 3
     nodes:
+      example-engine: {label: BigQuery managed compute, svc: "gcp:bigquery", kind: service, tier: implementation-setup, x: 20, y: 3, evidence: [{type: doc, ref: "docs/reference-dwh-design-patterns.md#§5"}]}
+      example-service-account: {label: Scheduled query service account, kind: policy, tier: implementation-setup, x: 24, y: 3, evidence: [{type: doc, ref: "docs/reference-dwh-design-patterns.md#§5"}]}
+      example-analyst: {label: Analyst, kind: actor, tier: flow, x: -3, y: 2, evidence: [{type: doc, ref: "docs/reference-dwh-design-patterns.md#§5"}]}
       example-source:
         label: BigQuery lab_input データセット
         kind: table
         tier: flow
         x: 0
         'y': 4
-        svc: gcp:bigquery
         realizes:
           - source
         description: 比較に使う注文・商品・顧客・返品の表を登録する。
@@ -468,7 +475,7 @@ implementations:
             ref: docs/reference-dwh-design-patterns.md#§5
         svc: gcp:bigquery
       example-bi:
-        label: 比較用の BigQuery SQL 結果
+        label: BigQuery Studio の比較結果
         kind: client
         tier: flow
         x: 20
@@ -480,17 +487,26 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-design-patterns.md#§5
         svc: gcp:bigquery
+      example-files: {label: Cloud Storage（比較用 CSV）, svc: gcp:gcs, kind: file, tier: implementation-setup, x: 1, y: 1.5, description: 合成した注文・商品・顧客・返品の入力ファイルを保持する。, evidence: [{type: doc, ref: docs/reference-dwh-design-patterns.md#§5}]}
+      example-schedule: {label: BigQuery（スケジュールされたクエリ）, svc: gcp:bigquery, kind: scheduler, tier: implementation-setup, x: 7, y: 1.5, description: BigQuery Data Transfer Service を使って比較用の GoogleSQL スクリプトをサービスアカウントで起動する。, evidence: [{type: doc, ref: docs/reference-dwh-design-patterns.md#§5}]}
       example-checks:
-        label: 比較用 SQL スクリプト
+        label: BigQuery の GoogleSQL ジョブ
+        svc: gcp:bigquery
         kind: workflow
         tier: implementation-setup
-        x: 1
+        x: 13
         'y': 1.5
-        description: 粒度の一意性、行数、売上の合計を、選んだ比較先ごとに確認する。
+        description: 候補のテーブルやビューを生成し、粒度の一意性、行数、売上の合計を確認する。
         evidence:
           - type: doc
             ref: docs/reference-dwh-design-patterns.md#§5
     links:
+      - {id: example-compute-job, from: example-engine, to: example-checks, label: "Run GoogleSQL job", evidence: [{type: doc, ref: "docs/reference-dwh-design-patterns.md#§5"}]}
+      - {id: example-job-identity, from: example-service-account, to: example-schedule, label: "Authorize scheduled query", evidence: [{type: doc, ref: "docs/reference-dwh-design-patterns.md#§5"}]}
+      - {id: example-user-studio, from: example-analyst, to: example-bi, label: "Inspect query results", evidence: [{type: doc, ref: "docs/reference-dwh-design-patterns.md#§5"}]}
+      - {id: example-load, from: example-files, to: example-source, label: CSV をネイティブテーブルへロード}
+      - {id: example-run, from: example-schedule, to: example-checks, label: GoogleSQL ジョブを起動}
+      - {id: example-read-common, from: example-checks, to: example-source, label: すべての候補に共通の入力を読む}
       - id: example-checks-connection
         from: example-checks
         to: example-bi
@@ -499,20 +515,50 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-design-patterns.md#§5
     groups:
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - flow
-        nodes:
-          - example-source
-          - example-medallion
-          - example-inmon
-          - example-vault
-          - example-kimball
-          - example-snowflake-schema
-          - example-scd
-          - example-fact-types
-          - example-wide
-          - example-aggregates
-          - example-bi
+      - {kind: cloud, provider: gcp, label: Google Cloud project, tier: [flow, implementation-setup], nodes: [example-source, example-medallion, example-inmon, example-vault, example-kimball, example-snowflake-schema, example-scd, example-fact-types, example-wide, example-aggregates, example-bi, example-files, example-schedule, example-checks, example-engine, example-service-account]}
+    layout2d:
+      tiers: [{id: diagram, label: BigQuery and Cloud Storage, z: 0, size: [34, 17]}]
+      nodes:
+        example-source: {tier: diagram, x: 4, y: 1}
+        example-medallion: {tier: diagram, x: 8, y: 1}
+        example-inmon: {tier: diagram, x: 12, y: 1}
+        example-vault: {tier: diagram, x: 16, y: 1}
+        example-kimball: {tier: diagram, x: 20, y: 1}
+        example-snowflake-schema: {tier: diagram, x: 24, y: 1}
+        example-scd: {tier: diagram, x: 28, y: 1}
+        example-fact-types: {tier: diagram, x: 4, y: 5}
+        example-wide: {tier: diagram, x: 8, y: 5}
+        example-aggregates: {tier: diagram, x: 12, y: 5}
+        example-bi: {tier: diagram, x: 16, y: 5}
+        example-files: {tier: diagram, x: 20, y: 5}
+        example-schedule: {tier: diagram, x: 24, y: 5}
+        example-checks: {tier: diagram, x: 28, y: 5}
+        example-engine: {tier: diagram, x: 4, y: 9}
+        example-service-account: {tier: diagram, x: 8, y: 9}
+        example-analyst: {tier: diagram, x: 0, y: 2}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: diagram, nodes: [example-source, example-medallion, example-inmon, example-vault, example-kimball, example-snowflake-schema, example-scd, example-fact-types, example-wide, example-aggregates, example-bi, example-files, example-schedule, example-checks, example-engine, example-service-account]}
+    layout3d:
+      tiers:
+        - {id: services, label: BigQuery and Cloud Storage, z: 0, size: [28, 9]}
+        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-source: {tier: services, x: 2, y: 1}
+        example-medallion: {tier: services, x: 6, y: 1}
+        example-inmon: {tier: services, x: 10, y: 1}
+        example-vault: {tier: services, x: 14, y: 1}
+        example-kimball: {tier: services, x: 18, y: 1}
+        example-snowflake-schema: {tier: services, x: 22, y: 1}
+        example-scd: {tier: services, x: 26, y: 1}
+        example-fact-types: {tier: services, x: 2, y: 4}
+        example-wide: {tier: services, x: 6, y: 4}
+        example-aggregates: {tier: services, x: 10, y: 4}
+        example-bi: {tier: services, x: 14, y: 4}
+        example-files: {tier: services, x: 18, y: 4}
+        example-schedule: {tier: services, x: 22, y: 4}
+        example-checks: {tier: services, x: 26, y: 4}
+        example-engine: {tier: services, x: 2, y: 7}
+        example-service-account: {tier: services, x: 6, y: 7}
+        example-analyst: {tier: user, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: services, nodes: [example-source, example-medallion, example-inmon, example-vault, example-kimball, example-snowflake-schema, example-scd, example-fact-types, example-wide, example-aggregates, example-bi, example-files, example-schedule, example-checks, example-engine, example-service-account]}

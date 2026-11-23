@@ -1,0 +1,229 @@
+name: H3 地理空間インデックス
+description: 緯度経度を H3 セルに変換し、解像度、近傍、階層と集計を追う。
+reference:
+  objectives:
+    - H3Index とセルの解像度を理解する。
+    - セル単位の結合・集計と正確な地理判定を区別する。
+    - 親子階層の論理的な包含と地理上の近似を区別する。
+  sources:
+    - title: H3 overview
+      url: https://h3geo.org/docs/core-library/overview/
+    - title: H3 indexing
+      url: https://h3geo.org/docs/highlights/indexing/
+    - title: H3 region functions
+      url: https://h3geo.org/docs/api/regions/
+    - title: H3 terminology
+      url: https://h3geo.org/docs/library/terminology/
+    - title: h3-py documentation
+      url: https://uber.github.io/h3-py/
+sources:
+  - docs/reference-geospatial-h3.md
+evidence:
+  - type: doc
+    ref: docs/reference-geospatial-h3.md#§1
+  - type: doc
+    ref: docs/reference-geospatial-h3.md#§3
+  - type: doc
+    ref: docs/reference-geospatial-h3.md#§5
+tiers:
+  - id: flow
+    label: 処理の流れ
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  position:
+    label: 緯度と経度
+    kind: file
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 位置と解像度を入力する。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+  convert:
+    label: セルへの変換
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: 指定解像度のセル ID を求める。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+  cell:
+    label: セル ID と属性
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: セル ID を位置データに付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+    drill: h3-index-internals
+  aggregate:
+    label: セル単位の集計
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 同じ解像度のセルで集計・結合する。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+  result:
+    label: 地図・集計結果
+    kind: file
+    tier: flow
+    x: 16
+    'y': 1.5
+    description: セル別の値を可視化する。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+links:
+  - id: step-1
+    from: position
+    to: convert
+    label: 位置と解像度を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+  - id: step-2
+    from: convert
+    to: cell
+    label: H3 セルを求める
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+  - id: step-3
+    from: cell
+    to: aggregate
+    label: セル ID を使い集計
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+  - id: step-4
+    from: aggregate
+    to: result
+    label: 集計結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+scenarios:
+  - id: flow
+    label: 入力から結果まで
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-h3.md#§2
+    steps:
+      - links:
+          - step-1
+        note: 位置と解像度を渡す。
+      - links:
+          - step-2
+        note: H3 セルを求める。
+      - links:
+          - step-3
+        note: セル ID を使い集計。
+      - links:
+          - step-4
+        note: 集計結果を返す。
+implementations:
+  - id: h3-python
+    label: Linux 上の Python と H3
+    description: Python プロセス内の H3 ライブラリで GPS の点を同一解像度のセルへ変換して集計する。
+    sources:
+      - title: H3 overview
+        url: https://h3geo.org/docs/core-library/overview/
+      - title: H3 indexing
+        url: https://h3geo.org/docs/highlights/indexing/
+      - title: H3 region functions
+        url: https://h3geo.org/docs/api/regions/
+      - title: H3 terminology
+        url: https://h3geo.org/docs/library/terminology/
+      - title: h3-py documentation
+        url: https://uber.github.io/h3-py/
+    tiers:
+      - id: runtime
+        label: 利用者が管理する実行環境
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-position:
+        label: GPS 入力ファイル
+        kind: file
+        tier: runtime
+        x: 0
+        'y': 1.5
+        realizes:
+          - position
+        description: Python プロセス内の H3 ライブラリで GPS の点を同一解像度のセルへ変換して集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-h3.md#§4
+      impl-convert:
+        label: H3 latlng_to_cell
+        kind: service
+        tier: runtime
+        x: 4
+        'y': 1.5
+        realizes:
+          - convert
+        description: Linux 上で Python と H3 ライブラリを利用者が導入し、入力ファイルと集計結果を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-h3.md#§4
+      impl-cell:
+        label: セル ID 付きデータ
+        kind: db
+        tier: runtime
+        x: 8
+        'y': 1.5
+        realizes:
+          - cell
+        description: Python プロセス内の H3 ライブラリで GPS の点を同一解像度のセルへ変換して集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-h3.md#§4
+        drill: h3-index-internals
+      impl-aggregate:
+        label: Python のセル別集計
+        kind: service
+        tier: runtime
+        x: 12
+        'y': 1.5
+        realizes:
+          - aggregate
+        description: Python プロセス内の H3 ライブラリで GPS の点を同一解像度のセルへ変換して集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-h3.md#§4
+      impl-result:
+        label: 集計結果ファイル
+        kind: file
+        tier: runtime
+        x: 16
+        'y': 1.5
+        realizes:
+          - result
+        description: Python プロセス内の H3 ライブラリで GPS の点を同一解像度のセルへ変換して集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-h3.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者の実行環境（論理範囲）
+        tier:
+          - runtime
+        nodes:
+          - impl-position
+          - impl-convert
+          - impl-cell
+          - impl-aggregate
+          - impl-result

@@ -72,12 +72,14 @@ implementations:
     label: kubeadm と stacked etcd
     description: オンプレミスの仮想マシンで、kubeadm の stacked etcd 構成を使って注文 API を動かす例。
     sources:
+      - {title: Cluster Networking, url: https://kubernetes.io/docs/concepts/cluster-administration/networking/}
       - title: Creating Highly Available Clusters with kubeadm
         url: https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/
       - title: Kubernetes Components
         url: https://kubernetes.io/docs/concepts/overview/components/
       - title: Service
         url: https://kubernetes.io/docs/concepts/services-networking/service/
+      - {title: "kubeadm の LocalEtcd 設定", url: https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta4/}
     tiers:
       - id: client
         label: 利用者
@@ -108,9 +110,11 @@ implementations:
           - network
         nodes:
           - kubeadm-apiserver
+          - vm-etcd-disk
           - kubeadm-kubelet
           - kubeadm-order-api
           - kubeadm-service
+          - kubeadm-cni
     nodes:
       kubeadm-kubectl:
         label: kubectl
@@ -131,8 +135,8 @@ implementations:
           - apiserver
           - controller
           - scheduler
-          - etcd
         description: kube-apiserver、kube-controller-manager、kube-scheduler とローカル etcd メンバーを各 VM 上で実行する。
+        management: {type: customer, scope: 利用者が制御 VM、設定、更新と etcd の保護を運用する。}
         evidence:
           - type: doc
             ref: docs/reference-kubernetes.md#§7
@@ -144,6 +148,7 @@ implementations:
         realizes:
           - kubelet
         description: Pod の割り当てを監視し、containerd に実行を依頼する。
+        management: {type: customer, scope: 利用者がworker VM とランタイムの設定・更新を運用する。}
         evidence:
           - type: doc
             ref: docs/reference-kubernetes.md#§7
@@ -155,6 +160,7 @@ implementations:
         realizes:
           - order-api
         description: レプリカを worker VM 上に配置する。
+        management: {type: customer, scope: 利用者がアプリと Deployment を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-kubernetes.md#§7
@@ -166,19 +172,30 @@ implementations:
         realizes:
           - service
         description: ラベルセレクターに合う Pod をクラスタ内に公開する。
+        management: {type: customer, scope: 利用者がService とアクセス制御を設定する。}
         evidence:
           - type: doc
             ref: docs/reference-kubernetes.md#§7
+      kubeadm-cni:
+        label: Pod ネットワーク用 CNI（製品未選定）
+        kind: service
+        tier: network
+        description: クラスタの Pod ネットワークを提供する。導入する実装は未選定。
+        management: {type: customer, scope: 利用者が CNI の選定、導入と更新を担う。}
+        evidence: [{type: doc, ref: docs/reference-kubernetes.md#§7}]
       kubeadm-api-lb:
         label: API 用 TCP ロードバランサー
         kind: lb
         tier: client
         svc: onprem:lb
         description: 同一 DNS 名から各 API サーバーの 6443 番ポートへ接続を振り分ける。
+        management: {type: customer, scope: 利用者がAPI ロードバランサーを運用する。}
         evidence:
           - type: doc
             ref: docs/reference-kubernetes.md#§7
+      vm-etcd-disk: {label: "各制御 VM のローカル etcd（永続ディスク）", kind: db, tier: control, realizes: [etcd], description: "kubeadm が起動する static Pod の etcd が各 VM の /var/lib/etcd を使用する。", evidence: [{type: doc, ref: docs/reference-kubernetes.md#§7}]}
     links:
+      - {id: kubeadm-network, from: kubeadm-kubelet, to: kubeadm-cni, label: Pod ネットワークを構成, evidence: [{type: doc, ref: docs/reference-kubernetes.md#§7}]}
       - id: kubeadm-admin-endpoint
         from: kubeadm-kubectl
         to: kubeadm-api-lb
@@ -197,3 +214,37 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-kubernetes.md#§7
+
+    layout2d:
+      tiers: [{id: diagram, label: 自主管理構成, z: 0, origin: [-4, 0], size: [22, 11]}]
+      nodes:
+        kubeadm-kubectl: {tier: diagram, x: -3, y: 1}
+        kubeadm-api-lb: {tier: diagram, x: 2, y: 1}
+        kubeadm-apiserver: {tier: diagram, x: 6, y: 1}
+        vm-etcd-disk: {tier: diagram, x: 10, y: 1}
+        kubeadm-kubelet: {tier: diagram, x: 6, y: 5}
+        kubeadm-order-api: {tier: diagram, x: 6, y: 8}
+        kubeadm-service: {tier: diagram, x: 10, y: 8}
+        kubeadm-cni: {tier: diagram, x: 10, y: 5}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [diagram], x0: 0, y0: -1, x1: 12, y1: 10, nodes: [kubeadm-api-lb, kubeadm-apiserver, vm-etcd-disk, kubeadm-kubelet, kubeadm-order-api, kubeadm-service, kubeadm-cni]}
+        - {kind: cluster, label: kubeadm クラスタ, tier: [diagram], x0: 4, y0: -0.5, x1: 11.8, y1: 9.5, nodes: [kubeadm-apiserver, vm-etcd-disk, kubeadm-kubelet, kubeadm-order-api, kubeadm-service, kubeadm-cni]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: 実行ノード, z: 0, size: [10, 4]}
+        - {id: apps, label: ノード上の処理・データ, z: 1, size: [10, 4]}
+        - {id: external, label: クラスタ外の設定・サービス, z: 0, origin: [12, 0], size: [4, 5]}
+        - {id: registry, label: レジストリ（提供先未指定）, z: 0, origin: [18, 0], size: [3, 3]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        kubeadm-kubectl: {tier: outside, x: 1, y: 1}
+        kubeadm-apiserver: {tier: nodes, x: 2, y: 2}
+        vm-etcd-disk: {tier: apps, x: 2, y: 2}
+        kubeadm-kubelet: {tier: nodes, x: 6, y: 2}
+        kubeadm-order-api: {tier: apps, x: 6, y: 2}
+        kubeadm-service: {tier: apps, x: 9, y: 2}
+        kubeadm-cni: {tier: apps, x: 6, y: 3.5}
+        kubeadm-api-lb: {tier: external, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [nodes, apps, external], nodes: [kubeadm-api-lb, kubeadm-apiserver, vm-etcd-disk, kubeadm-kubelet, kubeadm-order-api, kubeadm-service, kubeadm-cni]}
+        - {kind: cluster, label: kubeadm クラスタ, tier: [nodes, apps], nodes: [kubeadm-apiserver, vm-etcd-disk, kubeadm-kubelet, kubeadm-order-api, kubeadm-service, kubeadm-cni]}

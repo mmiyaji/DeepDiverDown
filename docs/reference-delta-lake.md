@@ -39,3 +39,29 @@ Delta の `S3DynamoDBLogStore` を構成し、協調する複数の Spark クラ
 全書き込み元を同じ LogStore、DynamoDB テーブル、リージョン設定に揃える。単一クラスターでの通常の S3 読み書きとも区別する。チェックポイントのファイル形式は Delta プロトコルで選択可能な形式に依存する。
 
 [Delta Transaction Log Protocol](https://github.com/delta-io/delta/blob/master/PROTOCOL.md)、[Delta Lake Storage configuration: Amazon S3](https://docs.delta.io/delta-storage/)、[Delta Lake Quick Start](https://docs.delta.io/quick-start/)
+
+利用者が用意したホスト上の Spark Standalone master / worker を使う複数クラスタの構成例。2組の master と worker がそれぞれ書き込みアプリケーションのリソースを割り当て、両 writer が同じ DynamoDB テーブルでコミットを調停する。ホストの設置先は固定しない。Spark とホストは利用者が管理し、S3 と DynamoDB の基盤は AWS が運用し、データと権限は利用者が管理する。公式資料を組み合わせた構成で、実動作は未検証。複数クラスタ書き込みは実験的機能である。
+
+[Apache Spark Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)、[AWS Shared Responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)
+
+## 8. 実装例：AWS の EMR on EC2・Glue Data Catalog・S3
+
+Amazon EMR が EC2 クラスタを管理し、YARN 上の Spark で Delta Lake の書き込みと読み取りを実行する。書き込み元を一つの Spark Driver に限定する例で、複数クラスターからの同時書き込みは §7 の構成で扱う。
+
+| 機能配置 | AWS での担い手 |
+|---|---|
+| データ書き込みとコミット | EMR の Spark と Delta Lake の拡張・LogStore |
+| データファイル | Amazon S3 のテーブルプレフィックスにある Parquet |
+| トランザクションログ・Checkpoint | 同じ S3 プレフィックスの `_delta_log` 内の JSON コミットと Parquet チェックポイント |
+| スナップショット復元・読み取り | EMR の Spark と Delta Lake が対象バージョンの有効ファイルを再構成し、データを読む |
+
+Delta Lake 対応の EMR リリースで `delta.enabled` を有効にし、Spark の Hive metastore に Glue Data Catalog を設定する。Glue に登録するのは、テーブル名で引ける S3 の保存先などのテーブル情報である。Delta のバージョンと有効ファイルは S3 上のトランザクションログで管理する。クラスタの IAM ロールに、必要な S3 と Glue の操作を許可する。
+
+- [Amazon EMR Release Guide — Use a Delta Lake cluster with Spark and AWS Glue](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltacluster-spark-glue.html)
+- [Amazon EMR Release Guide — Use a Delta Lake cluster with Spark](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltausing-cluster-spark.html)
+- [Delta Lake — Storage configuration](https://docs.delta.io/delta-storage/)
+- [Amazon EMR Management Guide — Understanding Amazon EMR clusters](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html)
+
+運用分担は AWS の共有責任モデルに従う。EMR、Glue、S3 のサービス基盤は AWS が運用し、利用者はクラスタやジョブの設定、ゲスト OS、データ、暗号化、権限を管理する。EMR クラスタの EC2 ノード上のソフトウェアには SSH やアプリケーションのインターフェースからアクセスできる。サービス基盤そのものへの直接操作を意味しない。この構成は公式資料を組み合わせた例であり、実環境での動作検証は行っていない。
+
+- [AWS — Shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

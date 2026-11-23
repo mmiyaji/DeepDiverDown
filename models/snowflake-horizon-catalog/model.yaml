@@ -220,6 +220,9 @@ implementations:
         url: https://docs.snowflake.com/en/user-guide/access-history
       - title: Snowflake アクセス制御
         url: https://docs.snowflake.com/en/user-guide/security-access-control-overview
+      - title: Account Usage のデータベースロール
+        url: https://docs.snowflake.com/en/sql-reference/account-usage
+      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -231,12 +234,13 @@ implementations:
         label: 実装時の設定・観測
         z: 1
         size:
-          - 8
+          - 14
           - 3
     nodes:
+      example-admin-user: {label: Authorized user, kind: client, tier: flow, x: -3, y: 1, evidence: [{type: doc, ref: "docs/reference-snowflake-horizon-catalog.md#§5"}]}
       example-owner:
         label: 分類設定用ロール
-        kind: actor
+        kind: policy
         tier: flow
         x: 0
         'y': 0
@@ -260,7 +264,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-horizon-catalog.md#§5
       example-tag:
-        svc: snowflake:platform
         label: 分類タグとマスキングポリシー
         kind: service
         tier: flow
@@ -275,7 +278,7 @@ implementations:
             ref: docs/reference-snowflake-horizon-catalog.md#§5
       example-analyst:
         label: SALES_READER ロール
-        kind: actor
+        kind: policy
         tier: flow
         x: 0
         'y': 4
@@ -286,7 +289,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-horizon-catalog.md#§5
       example-orders:
-        svc: snowflake:platform
         label: ORDERS.CUSTOMER_EMAIL
         kind: db
         tier: flow
@@ -299,7 +301,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-horizon-catalog.md#§5
       example-mart:
-        svc: snowflake:platform
         label: SALES.ORDERS_ANALYSIS
         kind: db
         tier: flow
@@ -312,7 +313,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-horizon-catalog.md#§5
       example-history:
-        svc: snowflake:platform
         label: ACCOUNT_USAGE.ACCESS_HISTORY
         kind: db
         tier: flow
@@ -325,17 +325,23 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-horizon-catalog.md#§5
       example-privacy:
-        svc: snowflake:platform
-        label: 監査用プライバシーロール
-        kind: service
+        label: アクセス監査用ロール
+        kind: policy
         tier: implementation-setup
         x: 1
         'y': 1.5
-        description: 監査担当者には Account Usage の該当ビューへの権限を追加する。
+        description: SNOWFLAKE.GOVERNANCE_VIEWER を付与した監査用アカウントロール。
         evidence:
           - type: doc
             ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-analysis-wh: {label: 分析用 Virtual Warehouse, svc: 'snowflake:warehouse', kind: worker, tier: flow, x: 3, y: 4, description: SALES_READER の SQL を実行し、授権された分析ビューを読む。, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
+      example-audit-wh: {label: 監査用 Virtual Warehouse, svc: 'snowflake:warehouse', kind: worker, tier: implementation-setup, x: 6, y: 1.5, description: 監査担当の SQL で Account Usage を調べる。, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
     links:
+      - {id: example-user-role, from: example-admin-user, to: example-owner, label: "Use authorized role", evidence: [{type: doc, ref: "docs/reference-snowflake-horizon-catalog.md#§5"}]}
+      - {id: example-analyst-query, from: example-analyst, to: example-analysis-wh, label: SALES_READER で SELECT を実行, realizes: [select], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
+      - {id: example-read-view, from: example-analysis-wh, to: example-mart, label: マスクを適用した分析ビューを読む, realizes: [select], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
+      - {id: example-audit-query, from: example-privacy, to: example-audit-wh, label: 監査用ロールで履歴の SQL を実行, realizes: [audit], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
+      - {id: example-read-history, from: example-audit-wh, to: example-history, label: ACCESS_HISTORY を読む, realizes: [audit], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
       - id: example-privacy-connection
         from: example-privacy
         to: example-history
@@ -344,21 +350,38 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-horizon-catalog.md#§5
     groups:
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - flow
-        nodes:
-          - example-classify
-          - example-tag
-          - example-orders
-          - example-mart
-          - example-history
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - implementation-setup
-        nodes:
-          - example-privacy
+      - {kind: cloud, provider: snowflake, label: Snowflake account, tier: [flow, implementation-setup], nodes: [example-owner, example-classify, example-tag, example-analyst, example-orders, example-mart, example-history, example-privacy, example-analysis-wh, example-audit-wh]}
+    layout2d:
+      tiers: [{id: diagram, label: Snowflake account and user, z: 0, size: [27, 12]}]
+      nodes:
+        example-admin-user: {tier: diagram, x: 0, y: 4}
+        example-owner: {tier: diagram, x: 5, y: 1}
+        example-classify: {tier: diagram, x: 9, y: 1}
+        example-tag: {tier: diagram, x: 13, y: 1}
+        example-analyst: {tier: diagram, x: 17, y: 1}
+        example-orders: {tier: diagram, x: 21, y: 1}
+        example-mart: {tier: diagram, x: 5, y: 5}
+        example-history: {tier: diagram, x: 9, y: 5}
+        example-privacy: {tier: diagram, x: 13, y: 5}
+        example-analysis-wh: {tier: diagram, x: 17, y: 5}
+        example-audit-wh: {tier: diagram, x: 21, y: 5}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: diagram, nodes: [example-owner, example-classify, example-tag, example-analyst, example-orders, example-mart, example-history, example-privacy, example-analysis-wh, example-audit-wh]}
+    layout3d:
+      tiers:
+        - {id: account, label: Snowflake account, z: 0, size: [22, 6]}
+        - {id: user, label: User, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-admin-user: {tier: user, x: 0, y: 1.5}
+        example-owner: {tier: account, x: 2, y: 1}
+        example-classify: {tier: account, x: 6, y: 1}
+        example-tag: {tier: account, x: 10, y: 1}
+        example-analyst: {tier: account, x: 14, y: 1}
+        example-orders: {tier: account, x: 18, y: 1}
+        example-mart: {tier: account, x: 2, y: 4}
+        example-history: {tier: account, x: 6, y: 4}
+        example-privacy: {tier: account, x: 10, y: 4}
+        example-analysis-wh: {tier: account, x: 14, y: 4}
+        example-audit-wh: {tier: account, x: 18, y: 4}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: account, nodes: [example-owner, example-classify, example-tag, example-analyst, example-orders, example-mart, example-history, example-privacy, example-analysis-wh, example-audit-wh]}

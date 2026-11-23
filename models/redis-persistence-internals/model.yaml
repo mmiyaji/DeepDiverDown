@@ -1,0 +1,371 @@
+name: Redis：RDB・マルチパート AOF と復旧
+description: fork と copy-on-write、RDB、Redis 7 以降の AOF base・incremental・manifest、再起動時の復旧を追う。
+parent:
+  model: redis
+  node: persist
+reference:
+  objectives:
+    - データの格納とアクセスの仕組みを理解する。
+    - 物理構造と運用・障害時の前提を区別する。
+  sources:
+    - title: Redis persistence
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+    - title: Redis replication
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+    - title: INFO
+      url: https://redis.io/docs/latest/commands/info/
+sources:
+  - docs/reference-redis-persistence-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-redis-persistence-internals.md#§1
+  - type: doc
+    ref: docs/reference-redis-persistence-internals.md#§3
+  - type: doc
+    ref: docs/reference-redis-persistence-internals.md#§5
+tiers:
+  - id: access
+    label: 操作と処理
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: disk
+    label: データと保存
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  client:
+    label: 書き込み
+    kind: client
+    tier: access
+    x: 0
+    'y': 1.5
+    description: クライアントから更新を受ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  parent:
+    label: Redis のデータセット
+    kind: db
+    tier: access
+    x: 5
+    'y': 1.5
+    description: メモリ内の状態を更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  fork:
+    label: バックグラウンド保存
+    kind: service
+    tier: access
+    x: 10
+    'y': 1.5
+    description: 子プロセスを使った RDB 保存・AOF 書き直し。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  rdb:
+    label: RDB スナップショット
+    kind: file
+    tier: disk
+    x: 4
+    'y': 1.5
+    description: ある時点のデータセットを保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  base:
+    label: AOF base
+    kind: file
+    tier: disk
+    x: 9
+    'y': 1.5
+    description: AOF 書き直し時点の基礎データ。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  incr:
+    label: AOF incremental
+    kind: file
+    tier: disk
+    x: 14
+    'y': 1.5
+    description: base 後の書き込みを追記する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  manifest:
+    label: AOF manifest
+    kind: file
+    tier: disk
+    x: 19
+    'y': 1.5
+    description: 有効な base と incremental ファイルを管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+links:
+  - id: write
+    from: client
+    to: parent
+    label: データを更新
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  - id: fork
+    from: parent
+    to: fork
+    label: 子プロセスで保存を開始
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  - id: rdb
+    from: fork
+    to: rdb
+    label: 時点の状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  - id: base
+    from: fork
+    to: base
+    label: base を書き直す
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  - id: incr
+    from: parent
+    to: incr
+    label: 更新を追記
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+  - id: manifest
+    from: base
+    to: manifest
+    label: base と incremental を管理
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+scenarios:
+  - id: rdb
+    label: RDB 保存
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+    visual: structure
+    steps:
+      - links:
+          - write
+        note: データを更新。
+        highlight:
+          - state
+      - links:
+          - fork
+        note: 子プロセスで保存を開始。
+        highlight:
+          - state
+      - links:
+          - rdb
+        note: 時点の状態を保存。
+        highlight:
+          - snap
+  - id: aof
+    label: AOF 書き込みと書き直し
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-persistence-internals.md#§2
+    visual: structure
+    steps:
+      - links:
+          - write
+        note: データを更新。
+        highlight:
+          - state
+      - links:
+          - incr
+        note: 更新を追記。
+        highlight:
+          - increment
+      - links:
+          - fork
+        note: 子プロセスで保存を開始。
+        highlight:
+          - state
+      - links:
+          - base
+        note: base を書き直す。
+        highlight:
+          - base
+      - links:
+          - manifest
+        note: base と incremental を管理。
+        highlight:
+          - base
+          - increment
+          - manifest
+implementations:
+  - id: linux
+    label: Linux 上の Redis とローカルディスク
+    description: 単一 Linux ホストで Redis の RDB と AOF を設定し、データファイルをローカルディスクに保存する学習用例。
+    sources:
+      - title: Redis persistence
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+      - title: Redis replication
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+      - title: INFO
+        url: https://redis.io/docs/latest/commands/info/
+    tiers:
+      - id: access
+        label: 操作と処理
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: disk
+        label: データと保存
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-client:
+        label: 書き込み
+        kind: client
+        tier: access
+        x: 0
+        'y': 1.5
+        description: クライアントから更新を受ける。
+        realizes:
+          - client
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-persistence-internals.md#§4
+      ex-parent:
+        label: Redis のデータセット
+        kind: db
+        tier: access
+        x: 5
+        'y': 1.5
+        description: メモリ内の状態を更新する。
+        realizes:
+          - parent
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-persistence-internals.md#§4
+      ex-fork:
+        label: バックグラウンド保存
+        kind: service
+        tier: access
+        x: 10
+        'y': 1.5
+        description: 子プロセスを使った RDB 保存・AOF 書き直し。
+        realizes:
+          - fork
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-persistence-internals.md#§4
+      ex-rdb:
+        label: RDB スナップショット
+        kind: file
+        tier: disk
+        x: 4
+        'y': 1.5
+        description: ある時点のデータセットを保存する。
+        realizes:
+          - rdb
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-persistence-internals.md#§4
+      ex-base:
+        label: AOF base
+        kind: file
+        tier: disk
+        x: 9
+        'y': 1.5
+        description: AOF 書き直し時点の基礎データ。
+        realizes:
+          - base
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-persistence-internals.md#§4
+      ex-incr:
+        label: AOF incremental
+        kind: file
+        tier: disk
+        x: 14
+        'y': 1.5
+        description: base 後の書き込みを追記する。
+        realizes:
+          - incr
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-persistence-internals.md#§4
+      ex-manifest:
+        label: AOF manifest
+        kind: file
+        tier: disk
+        x: 19
+        'y': 1.5
+        description: 有効な base と incremental ファイルを管理する。
+        realizes:
+          - manifest
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-persistence-internals.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者が管理する Linux の実行環境（論理範囲）
+        tier:
+          - access
+          - disk
+        nodes:
+          - ex-client
+          - ex-parent
+          - ex-fork
+          - ex-rdb
+          - ex-base
+          - ex-incr
+          - ex-manifest
+blocks:
+  - id: structure
+    title: RDB と AOF のファイル構成
+    note: Redis 7 以降のマルチパート AOF の概念例です。実際のファイル数・書き込みタイミングは設定と状態で異なります。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: mem
+        label: メモリ内
+        node: parent
+      - id: rdb
+        label: RDB
+        node: rdb
+      - id: aof
+        label: AOF
+        node: base
+    items:
+      mem:
+        - id: state
+          label: データセット
+          k: 0
+          note: Redis がメモリ上で扱う現在の状態。
+      rdb:
+        - id: snap
+          label: snapshot
+          k: 1
+          note: 保存時点のスナップショット。
+      aof:
+        - id: base
+          label: base
+          k: 2
+          note: 書き直し時点の基礎データ。
+        - id: increment
+          label: incremental
+          k: 3
+          note: base 後の更新を保持するファイル。
+        - id: manifest
+          label: manifest
+          k: 4
+          note: 利用する AOF ファイルの一覧。

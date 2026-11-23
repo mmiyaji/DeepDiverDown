@@ -46,28 +46,93 @@ implementations:
     sources:
       - {title: Working with logical replication（Amazon RDS for PostgreSQL）, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html}
       - {title: MSK Connect, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect.html}
+      - {title: AWS の PostgreSQL CDC 構成例, url: https://aws.amazon.com/blogs/database/implementing-real-time-change-data-capture-with-debezium-for-amazon-aurora-postgresql-and-amazon-rds-for-postgresql/}
+      - {title: MSK Connect のワーカー, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-workers.html}
       - {title: MSK Connect のプラグイン, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html}
       - {title: MSK Connect の認証情報を外部化する, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-config-provider.html}
       - {title: MSK Connect のオフセットストレージ, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-set-offset-storage-topic.html}
       - {title: MSK Connect のログ, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-logging.html}
       - {title: Using Lambda with Amazon MSK, url: https://docs.aws.amazon.com/lambda/latest/dg/with-msk.html}
+      - {title: Lambda の MSK イベントソースのネットワーク, url: https://docs.aws.amazon.com/lambda/latest/dg/with-msk-cluster-network.html}
     tiers:
-      - {id: flow, label: CDC データフロー, z: 0, size: [16, 3]}
+      - {id: flow, label: CDC データフロー, z: 0, size: [22, 3]}
       - {id: control, label: 実行・設定・運用, z: 1, origin: [0, 0], size: [14, 3]}
     groups:
       - {kind: cloud, label: AWS アカウント, provider: aws, tier: [flow, control]}
-      - {kind: vpc, label: VPC, tier: flow, nodes: [aws-rds, aws-connector, aws-msk]}
+      - {kind: vpc, label: VPC（MSK Connect は接続用 ENI）, tier: flow, nodes: [aws-rds, aws-msk, aws-connect-eni, aws-lambda-eni]}
+      - {kind: vpc, label: "Lambda が管理する VPC（マッピング）", provider: aws, tier: flow, nodes: [aws-event-source]}
+      - {kind: vpc, label: "Lambda が管理する VPC（関数）", provider: aws, tier: flow, nodes: [aws-lambda]}
     nodes:
-      aws-rds: {label: RDS for PostgreSQL, svc: rds, kind: db, tier: flow, x: 0, y: 1.5, realizes: [database, logical], description: 注文テーブルを持ち、rds.logical_replication を有効にして論理レプリケーションを公開する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
-      aws-connector: {label: Debezium コネクタ（カスタムプラグイン）, svc: mskconnect, kind: worker, tier: flow, x: 5, y: 1.5, realizes: [connector], description: MSK Connect に登録した Debezium の PostgreSQL コネクタ。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
-      aws-msk: {label: Amazon MSK（CDC トピック・オフセット）, svc: msk, kind: queue, tier: flow, x: 10, y: 1.5, realizes: [topic, offset], description: CDC イベントのトピックと、コネクタのオフセットを保存するトピックを持つ。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
-      aws-lambda: {label: Lambda（MSK イベントソース）, svc: lambda, kind: service, tier: flow, x: 14, y: 1.5, realizes: [consumer], description: MSK のトピックをイベントソースにして変更を処理する。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
-      aws-worker: {label: MSK Connect（ワーカー管理）, svc: mskconnect, kind: service, tier: control, x: 5, y: 1.5, realizes: [worker], description: Kafka Connect のワーカーを AWS が管理し、コネクタのタスクを動かす。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
-      aws-plugin: {label: S3（プラグインの zip）, svc: s3, kind: file, tier: control, x: 1, y: 1.5, description: 実装で加わる部品。Debezium のプラグインを置く。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
-      aws-secrets: {label: Secrets Manager（DB 認証情報）, svc: secrets, kind: service, tier: control, x: 9, y: 0.5, description: 実装で加わる部品。設定プロバイダーで DB の認証情報を渡す。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
-      aws-logs: {label: CloudWatch Logs（ワーカーのログ）, svc: cloudwatch, kind: monitor, tier: control, x: 9, y: 2.5, description: 実装で加わる部品。ワーカーのログの送り先。, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-connect-eni: {label: MSK Connect 接続用 ENI, kind: gateway, tier: flow, x: 3, y: 2.5, description: MSK Connect ワーカーを利用者サブネットに接続する。, management: {type: aws, scope: "AWS が ENI を管理し、利用者がサブネットとセキュリティグループを指定する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-lambda-eni: {label: Lambda Hyperplane ENI, kind: gateway, tier: flow, x: 13, y: 2.5, description: Lambda のイベントソースマッピングが MSK への接続に用いる。, management: {type: aws, scope: "Lambda が作成または再利用し、MSK のサブネットとセキュリティグループの設定を使用する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-rds: {label: RDS for PostgreSQL, svc: rds, kind: db, tier: flow, x: 0, y: 1.5, realizes: [database, logical], description: 注文テーブルを持ち、rds.logical_replication を有効にして論理レプリケーションを公開する。, management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者が DB と論理レプリケーション設定、権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-connector: {label: MSK Connect（Debezium タスク）, svc: mskconnect, kind: worker, tier: flow, x: 5, y: 1.5, realizes: [connector], description: AWS が管理するワーカーで登録済みプラグインを実行し、利用者 VPC の接続用 ENI を介して RDS から pgoutput の変更を読む。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者がコネクター設定とプラグインを指定する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-msk: {label: Amazon MSK（CDC トピック・オフセット）, svc: msk, kind: queue, tier: flow, x: 10, y: 1.5, realizes: [topic, offset], description: CDC イベントのトピックと、コネクタのオフセットを保存するトピックを持つ。, management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-event-source: {label: Lambda（イベントソースマッピング）, svc: lambda, kind: worker, tier: flow, x: 15, y: 1.5, description: Lambda 管理 VPC のマッピングが MSK のプライベートサブネットの Hyperplane ENI を介してトピックをポーリングする。, management: {type: shared, scope: "AWS がポーリング基盤を運用し、利用者がマッピングの設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-lambda: {label: Lambda（変更処理関数）, svc: lambda, kind: service, tier: flow, x: 20, y: 1.5, realizes: [consumer], description: イベントソースマッピングから受け取ったイベントを処理する。, management: {type: shared, scope: "AWS が実行基盤を運用し、利用者が関数コードと実行ロールを管理する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-worker: {label: MSK Connect（ワーカー管理）, svc: mskconnect, kind: service, tier: control, x: 5, y: 1.5, realizes: [worker], description: Kafka Connect のワーカーを AWS が管理し、コネクタのタスクを動かす。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者が容量とコネクター設定を指定する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-plugin: {label: S3（プラグインの zip）, svc: s3, kind: file, tier: control, x: 1, y: 1.5, description: 実装で加わる部品。Debezium のプラグインを置く。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が ZIP とアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-secrets: {label: Secrets Manager（DB 認証情報）, svc: secrets, kind: service, tier: control, x: 9, y: 0.5, description: 実装で加わる部品。設定プロバイダーで DB の認証情報を渡す。, management: {type: shared, scope: "AWS が基盤を運用し、利用者が認証情報とアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
+      aws-logs: {label: CloudWatch Logs（ワーカーのログ）, svc: cloudwatch, kind: monitor, tier: control, x: 9, y: 2.5, description: 実装で加わる部品。ワーカーのログの送り先。, management: {type: shared, scope: "AWS が基盤を運用し、利用者がログ設定と保持期間を管理する。"}, evidence: [{type: doc, ref: docs/reference-debezium.md#§8}]}
     links:
-      - {id: aws-load-plugin, from: aws-plugin, to: aws-worker, label: プラグインを読み込む}
-      - {id: aws-credentials, from: aws-secrets, to: aws-connector, label: DB 認証情報を渡す}
+      - {id: aws-load-plugin, from: aws-plugin, to: aws-worker, label: 登録時にプラグインをコピー}
+      - {id: aws-credentials, from: aws-connector, to: aws-secrets, label: DB 認証情報を取得}
       - {id: aws-log, from: aws-worker, to: aws-logs, label: ログを送る}
+      - {id: aws-snapshot-eni, from: aws-rds, to: aws-connect-eni, label: スナップショットを返す, realizes: [snapshot], replace: true}
+      - {id: aws-snapshot-task, from: aws-connect-eni, to: aws-connector, label: スナップショットを受信, realizes: [snapshot], replace: true}
+      - {id: aws-capture-eni, from: aws-rds, to: aws-connect-eni, label: WAL の変更を返す, realizes: [capture], replace: true}
+      - {id: aws-capture-task, from: aws-connect-eni, to: aws-connector, label: 変更を受信, realizes: [capture], replace: true}
+      - {id: aws-publish-eni, from: aws-connector, to: aws-connect-eni, label: CDC イベントを送る, realizes: [publish], replace: true}
+      - {id: aws-publish-msk, from: aws-connect-eni, to: aws-msk, label: CDC イベントを発行, realizes: [publish], replace: true}
+      - {id: aws-position-eni, from: aws-connector, to: aws-connect-eni, label: ログ位置を送る, realizes: [position], replace: true}
+      - {id: aws-position-msk, from: aws-connect-eni, to: aws-msk, label: ログ位置を保存, realizes: [position], replace: true}
+      - {id: aws-resume-eni, from: aws-msk, to: aws-connect-eni, label: ログ位置を返す, realizes: [resume], replace: true}
+      - {id: aws-resume-task, from: aws-connect-eni, to: aws-connector, label: ログ位置を読み戻す, realizes: [resume], replace: true}
+      - {id: aws-poll-eni, from: aws-msk, to: aws-lambda-eni, label: CDC イベントを返す, realizes: [consume], replace: true}
+      - {id: aws-poll-events, from: aws-lambda-eni, to: aws-event-source, label: CDC イベントを取得, realizes: [consume], replace: true}
+      - {id: aws-invoke-function, from: aws-event-source, to: aws-lambda, label: イベントで関数を呼び出す, realizes: [consume], replace: true}
+    layout2d:
+      tiers:
+        - {id: diagram, label: AWS の CDC 実装, z: 0, size: [28, 14]}
+      nodes:
+        aws-rds: {tier: diagram, x: 2, y: 3}
+        aws-connect-eni: {tier: diagram, x: 7, y: 3}
+        aws-msk: {tier: diagram, x: 12, y: 3}
+        aws-lambda-eni: {tier: diagram, x: 17, y: 3}
+        aws-connector: {tier: diagram, x: 7, y: 7}
+        aws-worker: {tier: diagram, x: 7, y: 10}
+        aws-event-source: {tier: diagram, x: 17, y: 7}
+        aws-lambda: {tier: diagram, x: 23, y: 7}
+        aws-plugin: {tier: diagram, x: 2, y: 12}
+        aws-secrets: {tier: diagram, x: 12, y: 12}
+        aws-logs: {tier: diagram, x: 17, y: 12}
+      groups:
+        - {kind: cloud, label: AWS の論理的所属, provider: aws, tier: [diagram], x0: -1, y0: -0.5, x1: 27.5, y1: 14, nodes: [aws-rds, aws-connect-eni, aws-msk, aws-lambda-eni, aws-connector, aws-worker, aws-event-source, aws-lambda, aws-plugin, aws-secrets, aws-logs]}
+        - {kind: vpc, label: 利用者 VPC, provider: aws, tier: [diagram], x0: -0.4, y0: 0.7, x1: 19.7, y1: 5.3, nodes: [aws-rds, aws-connect-eni, aws-msk, aws-lambda-eni]}
+        - {kind: vpc, label: Lambda 管理 VPC（マッピング）, provider: aws, tier: [diagram], x0: 14.4, y0: 5.7, x1: 19.6, y1: 9.3, nodes: [aws-event-source]}
+        - {kind: vpc, label: Lambda 管理 VPC（関数）, provider: aws, tier: [diagram], x0: 20.4, y0: 5.7, x1: 25.6, y1: 9.3, nodes: [aws-lambda]}
+    layout3d:
+      tiers:
+        - {id: vpc, label: 利用者 VPC, z: 0, size: [20, 4]}
+        - {id: connect, label: MSK Connect, z: 0, origin: [0, 7], size: [9, 4]}
+        - {id: mapping, label: Lambda マッピング, z: 0, origin: [13, 7], size: [4, 4]}
+        - {id: function, label: Lambda 関数, z: 0, origin: [20, 7], size: [4, 4]}
+        - {id: services, label: 保存・設定・ログ, z: 0, origin: [23, 0], size: [13, 4]}
+      nodes:
+        aws-rds: {tier: vpc, x: 2, y: 1.5}
+        aws-connect-eni: {tier: vpc, x: 7, y: 1.5}
+        aws-msk: {tier: vpc, x: 12, y: 1.5}
+        aws-lambda-eni: {tier: vpc, x: 17, y: 1.5}
+        aws-connector: {tier: connect, x: 2, y: 1.5}
+        aws-worker: {tier: connect, x: 7, y: 1.5}
+        aws-event-source: {tier: mapping, x: 2, y: 1.5}
+        aws-lambda: {tier: function, x: 2, y: 1.5}
+        aws-plugin: {tier: services, x: 2, y: 1.5}
+        aws-secrets: {tier: services, x: 6, y: 1.5}
+        aws-logs: {tier: services, x: 11, y: 1.5}
+      groups:
+        - {kind: cloud, label: AWS の論理的所属, provider: aws, tier: [vpc, connect, mapping, function, services], nodes: [aws-rds, aws-connect-eni, aws-msk, aws-lambda-eni, aws-connector, aws-worker, aws-event-source, aws-lambda, aws-plugin, aws-secrets, aws-logs]}
+        - {kind: vpc, label: 利用者 VPC, provider: aws, tier: [vpc], nodes: [aws-rds, aws-connect-eni, aws-msk, aws-lambda-eni]}
+        - {kind: vpc, label: Lambda 管理 VPC（マッピング）, provider: aws, tier: [mapping], nodes: [aws-event-source]}
+        - {kind: vpc, label: Lambda 管理 VPC（関数）, provider: aws, tier: [function], nodes: [aws-lambda]}
 gates: {maxDrift: 0, maxHigh: 0}

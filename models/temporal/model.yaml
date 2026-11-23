@@ -133,6 +133,8 @@ implementations:
           - temporal-workflow-b
           - temporal-activity
     nodes:
+      temporal-host: {label: 自主管理 Kubernetes ノード群, kind: host, tier: worker, description: 注文 API、Temporal Server と Worker Pod を実行する。, evidence: [{type: doc, ref: docs/reference-temporal.md#§6}]}
+      temporal-db-host: {label: 自主管理 PostgreSQL ホスト, kind: host, tier: outside, description: クラスタ外で PostgreSQL を実行し、データを永続化する。, evidence: [{type: doc, ref: docs/reference-temporal.md#§6}]}
       temporal-order:
         label: Temporal SDK を使う注文 API
         kind: client
@@ -218,6 +220,8 @@ implementations:
           - type: doc
             ref: docs/reference-temporal.md#§6
     links:
+      - {id: temporal-run-server, from: temporal-host, to: temporal-service, label: Temporal Server を実行, evidence: [{type: doc, ref: docs/reference-temporal.md#§6}]}
+      - {id: temporal-run-db, from: temporal-db-host, to: temporal-history, label: PostgreSQL を実行, evidence: [{type: doc, ref: docs/reference-temporal.md#§6}]}
       - id: temporal-index-executions
         from: temporal-service
         to: temporal-visibility
@@ -225,3 +229,122 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-temporal.md#§6
+
+    layout2d:
+      tiers: [{id: diagram, label: ワークフローの実行と保存, z: 0, origin: [-4, 0], size: [27, 15]}]
+      nodes:
+        temporal-host: {tier: diagram, x: 1, y: 1}
+        temporal-order: {tier: diagram, x: 4, y: 1}
+        temporal-service: {tier: diagram, x: 7, y: 1}
+        temporal-workflow-a: {tier: diagram, x: 1, y: 4}
+        temporal-workflow-b: {tier: diagram, x: 4, y: 4}
+        temporal-activity: {tier: diagram, x: 7, y: 4}
+        temporal-db-host: {tier: diagram, x: 14, y: 1}
+        temporal-history: {tier: diagram, x: 17, y: 1}
+        temporal-visibility: {tier: diagram, x: 20, y: 1}
+        temporal-payment: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: cluster, label: 自主管理 Kubernetes, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 12, nodes: [temporal-host, temporal-order, temporal-service, temporal-workflow-a, temporal-workflow-b, temporal-activity]}
+        - {kind: datacenter, label: 自主管理 PostgreSQL ホスト, tier: [diagram], x0: 12, y0: 0, x1: 23, y1: 12, nodes: [temporal-db-host, temporal-history, temporal-visibility]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: Kubernetes ノード, z: 0, size: [10, 10]}
+        - {id: pods, label: ノード上の Pod, z: 1, size: [10, 10]}
+        - {id: services, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: db, label: PostgreSQL 上のデータ, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: outside, label: 外部の呼び出し先, z: 0, origin: [-5, 0], size: [4, 7]}
+      nodes:
+        temporal-host: {tier: nodes, x: 1, y: 1}
+        temporal-order: {tier: pods, x: 4, y: 1}
+        temporal-service: {tier: pods, x: 7, y: 1}
+        temporal-workflow-a: {tier: pods, x: 1, y: 4}
+        temporal-workflow-b: {tier: pods, x: 4, y: 4}
+        temporal-activity: {tier: pods, x: 7, y: 4}
+        temporal-db-host: {tier: services, x: 1, y: 1}
+        temporal-history: {tier: db, x: 4, y: 1}
+        temporal-visibility: {tier: db, x: 7, y: 1}
+        temporal-payment: {tier: outside, x: 1, y: 1}
+      groups:
+        - {kind: cluster, label: 自主管理 Kubernetes, tier: [nodes, pods], nodes: [temporal-host, temporal-order, temporal-service, temporal-workflow-a, temporal-workflow-b, temporal-activity]}
+        - {kind: datacenter, label: 自主管理 PostgreSQL ホスト, tier: [services, db], nodes: [temporal-db-host, temporal-history, temporal-visibility]}
+
+  - id: aws-eks-temporal
+    label: "Amazon EKS 上の Temporal と RDS PostgreSQL"
+    description: "Temporal Server と注文用 Worker を Amazon EKS の EC2 ノードで運用する。RDS PostgreSQL に実行履歴と Visibility を分けて永続化する。"
+    sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+      - {title: RDS security, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.html}
+      - {title: "Temporal の自己管理構成", url: https://docs.temporal.io/self-hosted-guide}
+      - {title: "Temporal の公式 Helm チャート", url: https://github.com/temporalio/helm-charts/blob/main/README.md}
+      - {title: "Temporal Visibility の対応データベース", url: https://docs.temporal.io/self-hosted-guide/visibility}
+      - {title: "Temporal の本番構成チェックリスト", url: https://docs.temporal.io/self-hosted-guide/production-checklist}
+      - {title: "EKS マネージドノードグループ", url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS サービス領域（制御プレーンは AWS 管理 VPC）", provider: aws, tier: [runtime, data], nodes: [aws-eks-temporal-eks, aws-eks-temporal-nodes, aws-eks-temporal-server, aws-eks-temporal-matching, aws-eks-temporal-worker-a, aws-eks-temporal-worker-b, aws-eks-temporal-activity, aws-eks-temporal-history, aws-eks-temporal-visibility]}
+      - {kind: cluster, label: "Amazon EKS クラスター", provider: k8s, tier: [runtime], nodes: [aws-eks-temporal-eks, aws-eks-temporal-nodes, aws-eks-temporal-server, aws-eks-temporal-matching, aws-eks-temporal-worker-a, aws-eks-temporal-worker-b, aws-eks-temporal-activity]}
+      - {kind: namespace, label: "Temporal Server 名前空間", provider: k8s, tier: [runtime], nodes: [aws-eks-temporal-server, aws-eks-temporal-matching]}
+      - {kind: namespace, label: "注文アプリ Worker の名前空間", provider: k8s, tier: [runtime], nodes: [aws-eks-temporal-worker-a, aws-eks-temporal-worker-b, aws-eks-temporal-activity]}
+      - {kind: vpc, label: "RDS のプライベート接続先", provider: aws, tier: [data], nodes: [aws-eks-temporal-history, aws-eks-temporal-visibility]}
+    nodes:
+      aws-eks-temporal-order: {label: "注文 API（Temporal SDK）", kind: client, tier: entry, x: 1, y: 1.1, realizes: [order], description: "顧客の注文を Workflow ID を指定して開始する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-payment: {label: "外部決済 API（例示）", kind: external, tier: entry, x: 1, y: 3.1, realizes: [payment], description: "同一の操作キーに既存の決済結果を返すと仮定する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-eks: {label: "EKS Kubernetes API", kind: service, tier: runtime, x: 1, y: 0.4, svc: eks, description: "AWS 管理 VPC 内の Kubernetes API。利用者は API と公開設定を操作するがサーバーに直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-nodes: {label: "EKS の EC2 ノード", kind: host, tier: runtime, x: 1, y: 3.9, svc: ec2, description: "Temporal Server と Worker の Pod を実行する。", management: {type: shared, scope: EKS がノード作成・更新を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-server: {label: "Temporal Frontend・History", kind: workflow, tier: runtime, x: 6.2, y: 0.7, realizes: [service], description: "SDK の gRPC 要求を受け、履歴を管理する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-matching: {label: "Temporal Matching", kind: queue, tier: runtime, x: 12.4, y: 0.7, realizes: [queue], description: "Task Queue の Workflow Task と Activity Task をポーリングする Worker へ配る。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-worker-a: {label: "注文 Worker Pod A", kind: worker, tier: runtime, x: 5, y: 4.9, realizes: [workflow-a], description: "注文 Workflow を最初に処理する実行担当の例。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-worker-b: {label: "注文 Worker Pod B", kind: worker, tier: runtime, x: 9, y: 4.9, realizes: [workflow-b], description: "別の注文 Worker が Task と履歴を受け、決定的に再生する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-activity: {label: "決済 Activity Worker Pod", kind: worker, tier: runtime, x: 14, y: 4.9, realizes: [activity], description: "専用 Task Queue を読み、注文の操作キーで外部決済を呼ぶ。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-history: {label: "RDS PostgreSQL の Persistence", kind: db, tier: data, x: 6, y: 1.5, svc: rds, realizes: [history], description: "Temporal の履歴イベントや実行状態を永続化する。", management: {type: shared, scope: AWS が RDS 基盤を運用し、利用者がデータ、設定と権限を管理する。}, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-visibility: {label: "RDS PostgreSQL の Visibility", kind: db, tier: data, x: 12, y: 1.5, description: "同じ RDS インスタンスの別データベースに検索用情報を保持する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+    links:
+      - {id: aws-eks-temporal-schedule, from: aws-eks-temporal-eks, to: aws-eks-temporal-nodes, label: "Pod を EC2 ノードへ配置", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      - {id: aws-eks-temporal-search, from: aws-eks-temporal-server, to: aws-eks-temporal-visibility, label: "実行一覧の検索情報を保存", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      - {id: aws-eks-temporal-poll, from: aws-eks-temporal-matching, to: aws-eks-temporal-server, label: "ポーリングへの応答を返す", realizes: [run-a, run-b, run-activity], replace: true, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      - {id: aws-eks-temporal-task-a, from: aws-eks-temporal-server, to: aws-eks-temporal-worker-a, label: "Workflow Task を渡す", realizes: [run-a], replace: true, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      - {id: aws-eks-temporal-task-activity, from: aws-eks-temporal-server, to: aws-eks-temporal-activity, label: "Activity Task を渡す", realizes: [run-activity], replace: true, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      - {id: aws-eks-temporal-read-history, from: aws-eks-temporal-history, to: aws-eks-temporal-server, label: "再実行に必要な履歴を取得", realizes: [replay], replace: true, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      - {id: aws-eks-temporal-send-history, from: aws-eks-temporal-server, to: aws-eks-temporal-worker-b, label: "Task と履歴を渡す", realizes: [run-b, replay], replace: true, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ワークフローの実行と保存, z: 0, origin: [-4, 0], size: [29, 15]}]
+      nodes:
+        aws-eks-temporal-eks: {tier: diagram, x: 1, y: 1}
+        aws-eks-temporal-nodes: {tier: diagram, x: 4, y: 1}
+        aws-eks-temporal-server: {tier: diagram, x: 7, y: 1}
+        aws-eks-temporal-matching: {tier: diagram, x: 1, y: 4}
+        aws-eks-temporal-worker-a: {tier: diagram, x: 4, y: 4}
+        aws-eks-temporal-worker-b: {tier: diagram, x: 7, y: 4}
+        aws-eks-temporal-activity: {tier: diagram, x: 1, y: 7}
+        aws-eks-temporal-history: {tier: diagram, x: 14, y: 1}
+        aws-eks-temporal-visibility: {tier: diagram, x: 17, y: 1}
+        aws-eks-temporal-order: {tier: diagram, x: -3, y: 1}
+        aws-eks-temporal-payment: {tier: diagram, x: -1.2, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: 0, y0: 0, x1: 23, y1: 12, nodes: [aws-eks-temporal-eks, aws-eks-temporal-nodes, aws-eks-temporal-server, aws-eks-temporal-matching, aws-eks-temporal-worker-a, aws-eks-temporal-worker-b, aws-eks-temporal-activity, aws-eks-temporal-history, aws-eks-temporal-visibility]}
+        - {kind: cluster, label: EKS 論理クラスタ, tier: [diagram], x0: 0.5, y0: 0.5, x1: 10, y1: 11, nodes: [aws-eks-temporal-eks, aws-eks-temporal-nodes, aws-eks-temporal-server, aws-eks-temporal-matching, aws-eks-temporal-worker-a, aws-eks-temporal-worker-b, aws-eks-temporal-activity]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: Kubernetes ノード, z: 0, size: [10, 10]}
+        - {id: pods, label: ノード上の Pod, z: 1, size: [10, 10]}
+        - {id: services, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: db, label: PostgreSQL 上のデータ, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: outside, label: 外部の呼び出し先, z: 0, origin: [-5, 0], size: [4, 7]}
+      nodes:
+        aws-eks-temporal-eks: {tier: services, x: 1, y: 1}
+        aws-eks-temporal-nodes: {tier: nodes, x: 4, y: 1}
+        aws-eks-temporal-server: {tier: pods, x: 7, y: 1}
+        aws-eks-temporal-matching: {tier: pods, x: 1, y: 4}
+        aws-eks-temporal-worker-a: {tier: pods, x: 4, y: 4}
+        aws-eks-temporal-worker-b: {tier: pods, x: 7, y: 4}
+        aws-eks-temporal-activity: {tier: pods, x: 1, y: 7}
+        aws-eks-temporal-history: {tier: services, x: 1, y: 1}
+        aws-eks-temporal-visibility: {tier: services, x: 4, y: 1}
+        aws-eks-temporal-order: {tier: outside, x: 1, y: 1}
+        aws-eks-temporal-payment: {tier: outside, x: 4, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [nodes, pods, services], nodes: [aws-eks-temporal-eks, aws-eks-temporal-nodes, aws-eks-temporal-server, aws-eks-temporal-matching, aws-eks-temporal-worker-a, aws-eks-temporal-worker-b, aws-eks-temporal-activity, aws-eks-temporal-history, aws-eks-temporal-visibility]}

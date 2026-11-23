@@ -68,6 +68,7 @@ implementations:
         url: https://docs.k3s.io/datastore/ha-embedded
       - title: K3s Networking Services
         url: https://docs.k3s.io/networking/networking-services
+      - {title: "K3s の etcd スナップショット", url: https://docs.k3s.io/cli/etcd-snapshot}
     tiers:
       - id: client
         label: 利用者
@@ -98,6 +99,7 @@ implementations:
           - network
         nodes:
           - ha-server
+          - vm-etcd-disk
           - ha-agent
           - ha-order-api
           - ha-service
@@ -119,8 +121,8 @@ implementations:
         svc: onprem:vm
         realizes:
           - server
-          - datastore
         description: K3s server と組み込み etcd を同じサーバーに配置し、クラスタ状態を複製する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-k3s.md#§6
@@ -133,6 +135,7 @@ implementations:
           - agent
           - runtime
         description: K3s agent、kubelet、containerd、CNI の実行を担う。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-k3s.md#§6
@@ -144,6 +147,7 @@ implementations:
         realizes:
           - order-api
         description: agent ノードで注文 API の Pod を実行する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-k3s.md#§6
@@ -154,7 +158,8 @@ implementations:
         svc: k8s:service
         realizes:
           - service
-        description: 利用可能なノードの公開ポートを ServiceLB が使う。
+        description: ServiceLB がポート利用可能なノードに Pod を配置し、hostPort を通じて Service に転送する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-k3s.md#§6
@@ -164,10 +169,13 @@ implementations:
         tier: network
         svc: onprem:lb
         description: 外部 TCP ロードバランサーを介して server に接続する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-k3s.md#§6
+      vm-etcd-disk: {label: "各 K3s server の組み込み etcd（永続ディスク）", kind: db, tier: server, realizes: [datastore], description: "各 server が自己の永続ディスクに etcd データを保持する。", evidence: [{type: doc, ref: docs/reference-k3s.md#§6}]}
     links:
+      - {id: ha-servicelb-host, from: ha-agent, to: ha-service, label: ServiceLB Pod の hostPort を提供, evidence: [{type: doc, ref: docs/reference-k3s.md#§6}]}
       - {id: ha-kubectl-api, from: ha-kubectl, to: ha-registration, label: 固定 API エンドポイントへ接続, realizes: [apply], replace: true, evidence: [{type: doc, ref: docs/reference-k3s.md#§6}]}
       - id: ha-register
         from: ha-agent
@@ -187,3 +195,34 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-k3s.md#§6
+
+    layout2d:
+      tiers: [{id: diagram, label: 自主管理環境, z: 0, origin: [-4, 0], size: [22, 11]}]
+      nodes:
+        ha-kubectl: {tier: diagram, x: -3, y: 1}
+        ha-registration: {tier: diagram, x: 2, y: 1}
+        ha-server: {tier: diagram, x: 6, y: 1}
+        vm-etcd-disk: {tier: diagram, x: 10, y: 1}
+        ha-agent: {tier: diagram, x: 6, y: 5}
+        ha-order-api: {tier: diagram, x: 6, y: 8}
+        ha-service: {tier: diagram, x: 10, y: 6}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [diagram], x0: 0, y0: -1, x1: 16, y1: 10, nodes: [ha-registration, ha-server, vm-etcd-disk, ha-agent, ha-order-api, ha-service]}
+        - {kind: cluster, provider: k8s, label: K3s クラスタ, tier: [diagram], x0: 4, y0: -0.5, x1: 12, y1: 9.5, nodes: [ha-server, vm-etcd-disk, ha-agent, ha-order-api, ha-service]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: 制御・実行ノード, z: 0, size: [10, 4]}
+        - {id: apps, label: ノード上のアプリ・データ, z: 1, size: [10, 4]}
+        - {id: external, label: クラスタ外のサービス, z: 0, origin: [12, 0], size: [8, 7]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        ha-kubectl: {tier: outside, x: 1, y: 1}
+        ha-server: {tier: nodes, x: 2, y: 2}
+        vm-etcd-disk: {tier: apps, x: 2, y: 2}
+        ha-agent: {tier: nodes, x: 6, y: 2}
+        ha-order-api: {tier: apps, x: 6, y: 2}
+        ha-service: {tier: apps, x: 9, y: 2}
+        ha-registration: {tier: external, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [nodes, apps, external], nodes: [ha-registration, ha-server, vm-etcd-disk, ha-agent, ha-order-api, ha-service]}
+        - {kind: cluster, provider: k8s, label: K3s クラスタ, tier: [nodes, apps], nodes: [ha-server, vm-etcd-disk, ha-agent, ha-order-api, ha-service]}

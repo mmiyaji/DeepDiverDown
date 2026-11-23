@@ -140,167 +140,82 @@ scenarios:
         note: 受領権限がある参加者が集計を受け取る。
 implementations:
   - id: aws-cleanrooms
-    label: AWS Clean Rooms・Glue・S3
-    description: 媒体社と小売社がそれぞれの AWS Glue テーブルを AWS Clean Rooms のコラボレーションに関連付ける例。
+    label: "AWS Clean Rooms・Glue・S3"
+    description: "媒体社と小売社が別々の AWS アカウントから S3 のデータを関連付け、Clean Rooms の SQL で広告効果を集計する。例では小売社のメンバーがクエリを実行し、結果を受け取る。"
     sources:
-      - title: AWS · AWS Clean Rooms
-        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/what-is.html
-      - title: AWS · 集計分析ルール
-        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/analysis-rules-aggregation.html
-      - title: Associating tables to a collaboration
-        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/associate-configured-table.html
-      - title: Running SQL queries
-        url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/use-sql-editor.html
-    nodes:
-      aws-cleanrooms-media:
-        label: 媒体社の Glue テーブル（S3）
-        kind: table
-        tier: flow
-        x: 0
-        'y': 1
-        description: 広告接触ログを指す設定済みテーブル。
-        svc: glue
-        realizes:
-          - media
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-      aws-cleanrooms-retail:
-        label: 小売社の Glue テーブル（S3）
-        kind: table
-        tier: flow
-        x: 0
-        'y': 4
-        description: 注文履歴を指す設定済みテーブル。
-        svc: glue
-        realizes:
-          - sales
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-      aws-cleanrooms-controls:
-        label: AWS Clean Rooms の集計分析ルール
-        kind: policy
-        tier: flow
-        x: 4
-        'y': 0
-        description: 許可する結合や集計と最小集計しきい値を設定する。
-        realizes:
-          - policy
-          - release
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-        svc: cleanrooms
-      aws-cleanrooms-collab:
-        label: AWS Clean Rooms コラボレーション
-        kind: worker
-        tier: flow
-        x: 8
-        'y': 2
-        description: 許可されたメンバーが制約内で共同クエリを実行する。
-        realizes:
-          - room
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-        svc: cleanrooms
-      aws-cleanrooms-member:
-        label: 結果受領が許可されたメンバー
-        kind: client
-        tier: flow
-        x: 16
-        'y': 2
-        description: 自社の Amazon S3 に集計結果を受け取る。
-        realizes:
-          - recipient
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-      aws-cleanrooms-iam:
-        label: テーブル関連付け用 IAM ロール
-        kind: service
-        tier: flow
-        x: 4
-        'y': 2.5
-        description: AWS Clean Rooms が関連付けた入力テーブルへアクセスする権限を与える。
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-        svc: iam
-      aws-cleanrooms-output:
-        label: 結果受領者の Amazon S3
-        kind: service
-        tier: flow
-        x: 12
-        'y': 2.5
-        description: 結果設定で指定された S3 バケットに出力する。
-        svc: s3
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-    links:
-      - id: aws-cleanrooms-assume-role
-        from: aws-cleanrooms-collab
-        to: aws-cleanrooms-iam
-        label: 入力のアクセス権限を使用
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
-      - id: aws-cleanrooms-deliver
-        from: aws-cleanrooms-collab
-        to: aws-cleanrooms-output
-        label: 許可された結果を出力
-        evidence:
-          - type: doc
-            ref: docs/reference-data-clean-room.md#§4
+      - {title: "AWS Clean Rooms の概要", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/what-is.html}
+      - {title: "集計分析ルール", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/analysis-rules-aggregation.html}
+      - {title: "関連付けと入力サービスロール", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/associate-configured-table.html}
+      - {title: "結果設定とクエリの実行", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/use-sql-editor.html}
+      - {title: "Clean Rooms のサービスロール", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/setting-up-roles.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: flow, label: 共同分析の設定と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
     groups:
-      - label: 共同分析の AWS 範囲
-        kind: cloud
-        provider: aws
-        nodes:
-          - aws-cleanrooms-controls
-          - aws-cleanrooms-collab
-          - aws-cleanrooms-iam
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
-        tier:
-          - flow
-        nodes:
-          - aws-cleanrooms-media
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
-        tier:
-          - flow
-        nodes:
-          - aws-cleanrooms-retail
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
-        tier:
-          - flow
-        nodes:
-          - aws-cleanrooms-output
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
-        tier:
-          - flow
-        nodes:
-          - aws-cleanrooms-controls
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
-        tier:
-          - flow
-        nodes:
-          - aws-cleanrooms-collab
-      - kind: cloud
-        label: AWS サービス
-        provider: aws
-        tier:
-          - flow
-        nodes:
-          - aws-cleanrooms-iam
+      - {kind: cloud, label: "共同分析の AWS 範囲", provider: aws, tier: [flow], nodes: [aws-cleanrooms-controls, aws-cleanrooms-collab]}
+      - {kind: cloud, label: "媒体社の AWS アカウント", provider: aws, tier: [data], nodes: [aws-cleanrooms-media, aws-cleanrooms-media-glue, aws-cleanrooms-iam]}
+      - {kind: cloud, label: "小売社の AWS アカウント", provider: aws, tier: [data], nodes: [aws-cleanrooms-retail, aws-cleanrooms-retail-glue, aws-cleanrooms-retail-role, aws-cleanrooms-output, aws-cleanrooms-result-role]}
+    nodes:
+      aws-cleanrooms-result-role: {label: Retail result output IAM role, svc: iam, kind: policy, tier: data, x: 15, y: 4, management: {type: customer, scope: "Retailer manages result write permissions and trust."}, evidence: [{type: doc, ref: "docs/reference-data-clean-room.md#§4"}]}
+      aws-cleanrooms-member: {label: "小売社の分析メンバー", kind: client, tier: entry, x: 1, y: 2.3, realizes: [recipient], description: "コラボレーションで許可されたクエリを実行し、自社 S3 から集計を読む。", evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-media: {label: "媒体社の S3：広告接触ログ", kind: db, tier: data, x: 2, y: 2.2, svc: s3, realizes: [media], description: "集計に使う広告接触記録を保存する。", management: {type: shared, scope: "AWS operates S3; media company manages data and access."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-media-glue: {label: "媒体社の Glue テーブル", kind: catalog, tier: data, x: 2, y: 0.4, svc: glue, description: "広告接触テーブルの定義と S3 上の位置を持つ。", management: {type: shared, scope: "AWS operates Glue; media company manages table definitions and access."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-retail: {label: "小売社の S3：受注履歴", kind: db, tier: data, x: 8.8, y: 2.2, svc: s3, realizes: [sales], description: "同意・利用許諾のある共通識別子を持つ注文を保存する。", management: {type: shared, scope: "AWS operates S3; retailer manages data and access."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-retail-glue: {label: "小売社の Glue テーブル", kind: catalog, tier: data, x: 8.8, y: 0.4, svc: glue, description: "受注テーブルの定義と S3 上の位置を持つ。", management: {type: shared, scope: "AWS operates Glue; retailer manages table definitions and access."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-controls: {label: "Clean Rooms 集計分析ルール", kind: policy, tier: flow, x: 8.8, y: 0.6, realizes: [policy, release], description: "許可する結合列・集計関数・ディメンションと出力のしきい値を設定する。", management: {type: customer, scope: "Members configure permitted analyses and output constraints."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-collab: {label: "AWS Clean Rooms の SQL 実行", kind: worker, tier: flow, x: 8.8, y: 3.9, svc: cleanrooms, realizes: [room], description: "設定済みテーブルを用いて、許可されたクエリを実行する。", management: {type: shared, scope: "AWS operates Clean Rooms; members configure collaboration, tables and access."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-iam: {label: "媒体社の入力用 IAM ロール", kind: policy, tier: data, x: 5, y: 3.8, svc: iam, description: "Clean Rooms に自社の Glue と S3 への限定読み取りを許可する。", management: {type: customer, scope: "Media company manages role permissions and trust."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-retail-role: {label: "小売社の入力用 IAM ロール", kind: policy, tier: data, x: 12, y: 3.8, svc: iam, description: "Clean Rooms に自社の Glue と S3 への限定読み取りを許可する。", management: {type: customer, scope: "Retailer manages role permissions and trust."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      aws-cleanrooms-output: {label: "小売社の S3：分析結果", kind: db, tier: data, x: 15, y: 2.2, svc: s3, description: "結果設定で指定したプレフィックスに集計結果を保持する。", management: {type: shared, scope: "AWS operates S3; retailer manages results and access."}, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+    links:
+      - {id: aws-cleanrooms-output-role, from: aws-cleanrooms-collab, to: aws-cleanrooms-result-role, label: "Use result output role", evidence: [{type: doc, ref: "docs/reference-data-clean-room.md#§4"}]}
+      - {id: aws-cleanrooms-role-output, from: aws-cleanrooms-result-role, to: aws-cleanrooms-output, label: "Authorize result write", evidence: [{type: doc, ref: "docs/reference-data-clean-room.md#§4"}]}
+      - {id: aws-cleanrooms-query, from: aws-cleanrooms-member, to: aws-cleanrooms-collab, label: "許可された集計クエリを実行", evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      - {id: aws-cleanrooms-assume-role, from: aws-cleanrooms-collab, to: aws-cleanrooms-iam, label: "媒体社データの読み取りロールを使用", evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      - {id: aws-cleanrooms-retail-access, from: aws-cleanrooms-collab, to: aws-cleanrooms-retail-role, label: "小売社データの読み取りロールを使用", evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      - {id: aws-cleanrooms-media-schema, from: aws-cleanrooms-collab, to: aws-cleanrooms-media-glue, label: "広告接触テーブルの定義を取得", evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      - {id: aws-cleanrooms-retail-schema, from: aws-cleanrooms-collab, to: aws-cleanrooms-retail-glue, label: "受注テーブルの定義を取得", evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      - {id: aws-cleanrooms-deliver, from: aws-cleanrooms-collab, to: aws-cleanrooms-output, label: "しきい値を満たした結果を出力", realizes: [receive], replace: true, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+      - {id: aws-cleanrooms-read-output, from: aws-cleanrooms-output, to: aws-cleanrooms-member, label: "集計結果を取得", realizes: [receive], replace: true, evidence: [{type: doc, ref: docs/reference-data-clean-room.md#§4}]}
+    layout2d:
+      tiers: [{id: diagram, label: Clean Rooms collaboration, z: 0, size: [35, 12]}]
+      nodes:
+        aws-cleanrooms-media: {tier: diagram, x: 3, y: 1}
+        aws-cleanrooms-media-glue: {tier: diagram, x: 3, y: 5}
+        aws-cleanrooms-iam: {tier: diagram, x: 3, y: 9}
+        aws-cleanrooms-retail: {tier: diagram, x: 24, y: 1}
+        aws-cleanrooms-retail-glue: {tier: diagram, x: 28, y: 1}
+        aws-cleanrooms-retail-role: {tier: diagram, x: 24, y: 5}
+        aws-cleanrooms-output: {tier: diagram, x: 28, y: 5}
+        aws-cleanrooms-result-role: {tier: diagram, x: 24, y: 9}
+        aws-cleanrooms-controls: {tier: diagram, x: 13, y: 2}
+        aws-cleanrooms-collab: {tier: diagram, x: 13, y: 6}
+        aws-cleanrooms-member: {tier: diagram, x: 33, y: 10}
+      groups:
+        - {kind: cloud, provider: aws, label: Media AWS account, tier: diagram, nodes: [aws-cleanrooms-media, aws-cleanrooms-media-glue, aws-cleanrooms-iam]}
+        - {kind: cloud, provider: aws, label: Retail AWS account, tier: diagram, nodes: [aws-cleanrooms-retail, aws-cleanrooms-retail-glue, aws-cleanrooms-retail-role, aws-cleanrooms-output, aws-cleanrooms-result-role]}
+        - {kind: cloud, provider: aws, label: Clean Rooms collaboration, tier: diagram, nodes: [aws-cleanrooms-controls, aws-cleanrooms-collab]}
+    layout3d:
+      tiers:
+        - {id: media, label: Media AWS account, z: 0, size: [12, 3]}
+        - {id: collaboration, label: Clean Rooms service, z: 0, origin: [15, 0], size: [8, 3]}
+        - {id: retail, label: Retail AWS account, z: 0, origin: [26, 0], size: [20, 3]}
+        - {id: user, label: Retail analyst, kind: origin, z: 0, origin: [49, 0], size: [2, 3]}
+      nodes:
+        aws-cleanrooms-media: {tier: media, x: 2, y: 1.5}
+        aws-cleanrooms-media-glue: {tier: media, x: 6, y: 1.5}
+        aws-cleanrooms-iam: {tier: media, x: 10, y: 1.5}
+        aws-cleanrooms-retail: {tier: retail, x: 2, y: 1.5}
+        aws-cleanrooms-retail-glue: {tier: retail, x: 6, y: 1.5}
+        aws-cleanrooms-retail-role: {tier: retail, x: 10, y: 1.5}
+        aws-cleanrooms-output: {tier: retail, x: 14, y: 1.5}
+        aws-cleanrooms-result-role: {tier: retail, x: 18, y: 1.5}
+        aws-cleanrooms-controls: {tier: collaboration, x: 2, y: 1.5}
+        aws-cleanrooms-collab: {tier: collaboration, x: 6, y: 1.5}
+        aws-cleanrooms-member: {tier: user, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: Media AWS account, tier: media, nodes: [aws-cleanrooms-media, aws-cleanrooms-media-glue, aws-cleanrooms-iam]}
+        - {kind: cloud, provider: aws, label: Retail AWS account, tier: retail, nodes: [aws-cleanrooms-retail, aws-cleanrooms-retail-glue, aws-cleanrooms-retail-role, aws-cleanrooms-output, aws-cleanrooms-result-role]}
+        - {kind: cloud, provider: aws, label: Clean Rooms collaboration, tier: collaboration, nodes: [aws-cleanrooms-controls, aws-cleanrooms-collab]}

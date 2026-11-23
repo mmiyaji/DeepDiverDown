@@ -72,12 +72,16 @@ implementations:
       - {title: Amazon DynamoDB Partitions, url: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html}
       - {title: DynamoDB Partition Key Design, url: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html}
       - {title: Trino・Tasks と Splits, url: https://trino.io/docs/current/overview/concepts.html#split}
+      - {title: ClickHouse の Debian・Ubuntu 導入, url: https://clickhouse.com/docs/get-started/setup/self-managed/debian-ubuntu}
       - {title: ClickHouse Distributed table engine, url: https://clickhouse.com/docs/reference/engines/table-engines/special/distributed}
       - {title: ClickHouse MergeTree table engine, url: https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree}
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      clickhouse-cluster-host-coordinator: {label: 自前 Linux 調整ホスト, kind: host, tier: processing, x: 1, y: 0, description: Distributed 表を備えた ClickHouse Server を運用する。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
+      clickhouse-cluster-host-a: {label: 自前 Linux シャード A, kind: host, tier: processing, x: 5, y: 0, description: シャード A の ClickHouse とローカルディスクを運用する。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
+      clickhouse-cluster-host-b: {label: 自前 Linux シャード B, kind: host, tier: processing, x: 9, y: 0, description: シャード B の ClickHouse とローカルディスクを運用する。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
       clickhouse-cluster-app: {label: 注文 API の ClickHouse クライアント, kind: client, tier: processing, x: 1, y: 1.15, realizes: [order-api], description: 顧客 ID と注文日を持つレコードを投入する。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
       clickhouse-cluster-dist: {label: ClickHouse の Distributed 表と調整ノード, kind: service, tier: processing, x: 1, y: 3.65, realizes: [partition-router, orders-table], description: ハッシュを使って行を分配し、検索時はシャードの部分結果を集める。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
       clickhouse-cluster-a: {label: シャード A のローカル MergeTree 表, kind: db, tier: processing, x: 5, y: 1.15, realizes: [time-partition, hash-shard-a], description: 担当顧客の注文を持ち、その中を注文日の月で分ける。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
@@ -85,4 +89,99 @@ implementations:
       clickhouse-cluster-workers: {label: 各シャードでの読取と部分集計, kind: worker, tier: processing, x: 9, y: 1.15, realizes: [query-worker], description: 条件に合うパートを読み、集約の中間状態を送り返す。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
       clickhouse-cluster-config: {label: remote_servers とシャード式の設定, kind: policy, tier: setup, x: 1, y: 1.5, description: シャードの接続先と重み、顧客キーを使う分配式を定義する。選択的読取ではシャード除外が利用可能な述語と設定を確認する。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§9}]}
     links:
+      - {id: clickhouse-cluster-host-router, from: clickhouse-cluster-host-coordinator, to: clickhouse-cluster-dist, label: Distributed 表を実行}
+      - {id: clickhouse-cluster-host-shard-a, from: clickhouse-cluster-host-a, to: clickhouse-cluster-a, label: シャード A を実行・保存}
+      - {id: clickhouse-cluster-host-shard-b, from: clickhouse-cluster-host-b, to: clickhouse-cluster-b, label: シャード B を実行・保存}
       - {id: clickhouse-cluster-config-connection, from: clickhouse-cluster-config, to: clickhouse-cluster-dist, label: 分配先とシャード式を設定}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 自前 ClickHouse クラスター, z: 0, size: [24, 12]}
+      nodes:
+        clickhouse-cluster-app: {tier: diagram, x: 1, y: 2}
+        clickhouse-cluster-host-coordinator: {tier: diagram, x: 7, y: 2}
+        clickhouse-cluster-dist: {tier: diagram, x: 7, y: 6}
+        clickhouse-cluster-config: {tier: diagram, x: 7, y: 10}
+        clickhouse-cluster-host-a: {tier: diagram, x: 13, y: 2}
+        clickhouse-cluster-a: {tier: diagram, x: 13, y: 6}
+        clickhouse-cluster-host-b: {tier: diagram, x: 19, y: 2}
+        clickhouse-cluster-b: {tier: diagram, x: 19, y: 6}
+        clickhouse-cluster-workers: {tier: diagram, x: 16, y: 10}
+      groups:
+        - {kind: cluster, label: 自前 ClickHouse クラスター, tier: [diagram], x0: 4, y0: -0.5, x1: 22.5, y1: 11.6, nodes: [clickhouse-cluster-host-coordinator, clickhouse-cluster-dist, clickhouse-cluster-config, clickhouse-cluster-host-a, clickhouse-cluster-a, clickhouse-cluster-host-b, clickhouse-cluster-b, clickhouse-cluster-workers]}
+    layout3d:
+      tiers:
+        - {id: client, label: 注文 API, kind: origin, z: 0, origin: [-5, 0], size: [3, 5]}
+        - {id: hosts, label: 自前 Linux ホスト, z: 0, size: [16, 5]}
+        - {id: apps, label: ClickHouse とローカル表, z: 1, size: [16, 5]}
+      nodes:
+        clickhouse-cluster-app: {tier: client, x: 1, y: 2}
+        clickhouse-cluster-host-coordinator: {tier: hosts, x: 2, y: 2}
+        clickhouse-cluster-host-a: {tier: hosts, x: 7, y: 2}
+        clickhouse-cluster-host-b: {tier: hosts, x: 12, y: 2}
+        clickhouse-cluster-dist: {tier: apps, x: 2, y: 1}
+        clickhouse-cluster-config: {tier: apps, x: 2, y: 4}
+        clickhouse-cluster-a: {tier: apps, x: 7, y: 2}
+        clickhouse-cluster-b: {tier: apps, x: 12, y: 2}
+        clickhouse-cluster-workers: {tier: apps, x: 9, y: 4}
+      groups:
+        - {kind: cluster, label: 自前 ClickHouse クラスター, tier: [hosts, apps], nodes: [clickhouse-cluster-host-coordinator, clickhouse-cluster-dist, clickhouse-cluster-config, clickhouse-cluster-host-a, clickhouse-cluster-a, clickhouse-cluster-host-b, clickhouse-cluster-b, clickhouse-cluster-workers]}
+  - id: aws-ec2-shards
+    label: AWS（ClickHouse on EC2・Amazon EBS）
+    description: EC2 上の ClickHouse が顧客のハッシュでシャードへ配分し、各シャードの MergeTree が注文月でパーティション化する例。
+    sources:
+      - {title: ClickHouse Distributed, url: https://clickhouse.com/docs/reference/engines/table-engines/special/distributed}
+      - {title: ClickHouse MergeTree, url: https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree}
+      - {title: ClickHouse の Debian・Ubuntu 導入, url: https://clickhouse.com/docs/get-started/setup/self-managed/debian-ubuntu}
+      - {title: Amazon EBS ボリュームのアタッチ, url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html}
+    tiers:
+      - {id: entry, label: 注文 API, kind: origin, z: 1, size: [5, 3]}
+      - {id: compute, label: ClickHouse の調整ノードとシャード, z: 1, size: [20, 7]}
+      - {id: disk, label: シャード固有の永続ストレージ, z: 0, size: [20, 7]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [compute, disk]}
+      - {kind: vpc, label: ClickHouse ノードの VPC, tier: compute, nodes: [aws-coordinator, aws-a, aws-b]}
+    nodes:
+      aws-client: {label: 注文 API の ClickHouse クライアント, kind: client, tier: entry, x: 2, y: 1.5, realizes: [order-api], description: 接続を許可された環境から Distributed 表を利用する。, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§10}]}
+      aws-coordinator: {label: EC2（ClickHouse Distributed）, svc: ec2, kind: host, tier: compute, x: 3, y: 3.5, realizes: [partition-router, orders-table], description: 配分式とシャード設定を持ち、読み取り時は部分結果を集める。, management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS と ClickHouse を管理する。"}, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§10}]}
+      aws-a: {label: EC2（ClickHouse シャード A）, svc: ec2, kind: host, tier: compute, x: 13, y: 1.4, realizes: [time-partition, hash-shard-a, query-worker], description: ローカル MergeTree で注文月を分け、範囲読取と部分集計を行う。, management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS とシャードを管理する。"}, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§10}]}
+      aws-b: {label: EC2（ClickHouse シャード B）, svc: ec2, kind: host, tier: compute, x: 13, y: 5.5, realizes: [time-partition, hash-shard-b, query-worker], description: 別の顧客を担当し、ローカル MergeTree で範囲読取と部分集計を行う。, management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS とシャードを管理する。"}, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§10}]}
+      aws-disk-a: {label: Amazon EBS（シャード A のデータ）, svc: ebs, kind: db, tier: disk, x: 13, y: 1.4, description: A と同じ AZ にある専用のボリューム。月別パートを保存する。, management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がデータとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§10}]}
+      aws-disk-b: {label: Amazon EBS（シャード B のデータ）, svc: ebs, kind: db, tier: disk, x: 13, y: 5.5, description: B と同じ AZ にある専用のボリューム。月別パートを保存する。, management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がデータとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-partitioning-sharding.md#§10}]}
+    links:
+      - {id: aws-route-a, from: aws-coordinator, to: aws-a, label: 顧客キーでシャード A へ配分, realizes: [hash-route-a], replace: true}
+      - {id: aws-route-b, from: aws-coordinator, to: aws-b, label: 顧客キーでシャード B へ配分, realizes: [hash-route-b], replace: true}
+      - {id: aws-write-a, from: aws-a, to: aws-disk-a, label: 月別パートを読み書きする, realizes: [time-route, selective-read, parallel-read], replace: true}
+      - {id: aws-write-b, from: aws-b, to: aws-disk-b, label: 月別パートを読み書きする, realizes: [time-route, parallel-read], replace: true}
+      - {id: aws-merge-a, from: aws-a, to: aws-coordinator, label: シャード A の部分結果を返す, realizes: [merge], replace: true}
+      - {id: aws-merge-b, from: aws-b, to: aws-coordinator, label: シャード B の部分結果を返す, realizes: [merge], replace: true}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: AWS 上の ClickHouse, z: 0, size: [24, 12]}
+      nodes:
+        aws-client: {tier: diagram, x: 1, y: 3}
+        aws-coordinator: {tier: diagram, x: 7, y: 3}
+        aws-a: {tier: diagram, x: 13, y: 2}
+        aws-b: {tier: diagram, x: 13, y: 7}
+        aws-disk-a: {tier: diagram, x: 20, y: 2}
+        aws-disk-b: {tier: diagram, x: 20, y: 7}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 3.7, y0: -0.5, x1: 23.5, y1: 10.5, nodes: [aws-coordinator, aws-a, aws-b, aws-disk-a, aws-disk-b]}
+        - {kind: vpc, label: ClickHouse ノードの利用者 VPC, provider: aws, tier: [diagram], x0: 4.2, y0: 0, x1: 15.8, y1: 9.5, nodes: [aws-coordinator, aws-a, aws-b]}
+        - {kind: cluster, label: ClickHouse クラスター, tier: [diagram], x0: 4.4, y0: 0.3, x1: 15.6, y1: 9.3, nodes: [aws-coordinator, aws-a, aws-b]}
+    layout3d:
+      tiers:
+        - {id: client, label: 注文 API, kind: origin, z: 0, origin: [-5, 0], size: [3, 5]}
+        - {id: hosts, label: EC2 ノード, z: 0, size: [14, 7]}
+        - {id: disks, label: 専用 EBS, z: 0, origin: [18, 0], size: [8, 7]}
+      nodes:
+        aws-client: {tier: client, x: 1, y: 2}
+        aws-coordinator: {tier: hosts, x: 2, y: 3}
+        aws-a: {tier: hosts, x: 8, y: 1}
+        aws-b: {tier: hosts, x: 8, y: 5}
+        aws-disk-a: {tier: disks, x: 2, y: 1}
+        aws-disk-b: {tier: disks, x: 2, y: 5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [hosts, disks], nodes: [aws-coordinator, aws-a, aws-b, aws-disk-a, aws-disk-b]}
+        - {kind: vpc, label: ClickHouse ノードの利用者 VPC, provider: aws, tier: [hosts], nodes: [aws-coordinator, aws-a, aws-b]}
+        - {kind: cluster, label: ClickHouse クラスター, tier: [hosts], nodes: [aws-coordinator, aws-a, aws-b]}

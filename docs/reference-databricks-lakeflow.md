@@ -32,13 +32,13 @@ Jobs はパイプラインや後続作業の順序・スケジュールを管理
 - [Lakeflow パイプラインの運用](https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines)
 - [Apache Spark Declarative Pipelines と Lakeflow](https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines)
 
-## 6. 実装例 Lakeflow Connect での PostgreSQL 取込
+## 6. 実装例：RDS PostgreSQL と Lakeflow Connect
 
-PostgreSQL の変更を Lakeflow Connect で取り込み、ファイル由来データは別の入力表に置いてから注文データを整備する例。
+Amazon RDS for PostgreSQL の変更を Lakeflow Connect で取り込み、ファイル由来データは別の入力表に置いてから注文データを整備する例。
 
 | 機能 | 具体的な担い手 | 設定・成果物 |
 |---|---|---|
-| 注文DB | PostgreSQL の ORDERS | 対象テーブルの初回取込と CDC を提供する。 |
+| 注文DB | Amazon RDS for PostgreSQL の ORDERS | 対象テーブルの初回取込と CDC を提供する。 |
 | データベース変更の収集ゲートウェイ | Lakeflow Connect 取り込みゲートウェイ | データベースの変更を取得する。 |
 | 変更の一時保存領域 | Unity Catalog ステージングボリューム | ゲートウェイが取得した変更を一時保存する。 |
 | 取り込みパイプライン | Lakeflow Connect 取り込みパイプライン | 接続したソースから宛先テーブルを更新する。 |
@@ -52,3 +52,14 @@ PostgreSQL の変更を Lakeflow Connect で取り込み、ファイル由来デ
 ソース別の受入表を分けることで、同じ注文が双方から届いた場合の優先順位を変換処理に明示できる。DB の初回取込と業務バックフィルは別の経路として扱う。
 
 出典 [Lakeflow Connect DB コネクタ](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview)、[Auto Loader](https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/)、[Lakeflow パイプラインの運用](https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines)、[Apache Spark Declarative Pipelines と Lakeflow](https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines)、[Databricks の PostgreSQL ソース設定](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-source-setup)
+
+
+### AWS と Databricks の配置と前提
+
+注文 DB は Amazon RDS for PostgreSQL、到着ファイルは Amazon S3 に置き、Lakeflow Connect のゲートウェイ、取り込みパイプラインと後続の変換は Databricks 側で実行する。RDS のパラメーターグループで rds.logical_replication を有効にし、publication、pgoutput のレプリケーションスロット、専用ユーザーと権限、ゲートウェイからのネットワーク経路を構成する。スロットの WAL 保持と削除後の後片付けは運用側で管理する。
+
+Databricks の参照資料では PostgreSQL コネクターを Public Preview と案内しており、利用には対象ワークスペースでの登録・利用可能性の確認が必要。プレビュー状態や制約は変わりうるため、導入時に確認する。
+
+[Databricks PostgreSQL source setup](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-source-setup)、[PostgreSQL connector FAQs](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-faq)。
+
+PostgreSQL コネクタは公式資料上 Public Preview で、利用には登録が必要。取得ゲートウェイは顧客 AWS アカウントの classic compute で常時動作し、取り込みパイプラインは Databricks 管理のサーバーレス計算で動く。ステージングの Unity Catalog ボリュームと管理テーブルのファイルは、ここでは顧客側の S3 管理ストレージを指定する。利用者は PostgreSQL の publication・専用レプリケーションユーザー、接続認証情報、ゲートウェイ、パイプライン、ストレージ権限を設定する。サーバーレス内部ノードは直接操作しない。資料を組み合わせた例で、バージョン・権限・ネットワークを含む実動作は未検証。[DB connector components](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview)、[PostgreSQL setup](https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-source-setup)、[Databricks architecture](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[Managed storage](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)

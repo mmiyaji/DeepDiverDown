@@ -36,7 +36,7 @@ Dataflow Runner は Beam グラフを Dataflow ジョブとして実行する。
 - [Dataflow monitoring interface](https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf)
 - [Dataflow product overview](https://cloud.google.com/products/dataflow)
 
-## 8. 実装例：Pub/Sub → Beam SDK → BigQuery
+## 8. 実装例：Pub/Sub → Dataflow（Beam）→ BigQuery
 
 Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例。Pub/Sub から読み、BigQuery に出力するパイプラインを専用ワーカーサービスアカウントで実行する。
 
@@ -52,6 +52,11 @@ Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例
 
 - ワーカーサービスアカウント。Pub/Sub の読み取り、対象 BigQuery への書き込み、実行に必要な権限を割り当てる。
 
+開発端末で Java 向け Beam SDK のジョブを Dataflow Runner で送信する。依存 JAR のステージングと一時ファイルには Cloud Storage を使う。Dataflow が管理する Compute Engine ワーカーで `PubsubIO` の入力を窓ごとに集計し、`BigQueryIO` の Storage Write API で BigQuery のテーブルへ書く。ジョブのステージと処理状況は Dataflow の監視画面で確認する。
+
+- [Dataflow のワーカーとステージング](https://docs.cloud.google.com/dataflow/docs/request-quotas)
+- [Dataflow から BigQuery へのストリーミング書き込み](https://docs.cloud.google.com/dataflow/docs/guides/write-to-bigquery)
+
 公式資料
 
 - [Dataflow documentation](https://cloud.google.com/dataflow/docs/overview)
@@ -60,3 +65,7 @@ Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例
 - [Dataflow product overview](https://cloud.google.com/products/dataflow)
 - [Dataflow security and permissions](https://docs.cloud.google.com/dataflow/docs/concepts/security-and-permissions)
 - [Beam Programming Guide](https://beam.apache.org/documentation/programming-guide/)
+
+この例は Streaming Engine を使わない Java Beam ジョブを仮定し、利用者が指定した VPC・サブネットの Dataflow 管理 Compute Engine ワーカーで実行する。Google は Dataflow、Pub/Sub、BigQuery、Cloud Storage の基盤を運用し、利用者はジョブの投入・停止・監視、コード、ネットワーク、ワーカーサービスアカウント、テーブルと権限を設定する。個々の VM の手動管理を運用前提にせず、管理サービスの内部構成は図に追加しない。Streaming Engine を有効にする場合は処理基盤が異なる。バージョン、ネットワーク経路、ウィンドウと配信保証は未指定で、この構成は公式資料を組み合わせた未検証例である。
+
+- [Dataflow Streaming Engine](https://docs.cloud.google.com/dataflow/docs/streaming-engine)

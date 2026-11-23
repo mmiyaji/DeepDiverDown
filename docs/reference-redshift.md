@@ -41,7 +41,7 @@ Amazon Redshift のプロビジョンドクラスターを、クライアント�
 
 | 機能 | 具体的な担い手 | 設定・成果物 |
 |---|---|---|
-| SQL client | VPC 接続済みの SQL クライアント | Redshift クラスターの SQL エンドポイントに接続する。 |
+| SQL client | VPC 接続済みの Amazon Redshift RSQL | Redshift クラスターの SQL エンドポイントに接続する。 |
 | BI user | BI 担当者 | 集計済みの結果を参照する。 |
 | クエリ計画・結果調整ノード | RA3 クラスターの Leader node | 実行計画を作り分散処理を調整する。 |
 | 分散計算ノード・ノード内の並列処理単位 | RA3 コンピュートノードとスライス | 各ノード内の並列処理単位で計画の一部を実行する。 |
@@ -49,4 +49,11 @@ Amazon Redshift のプロビジョンドクラスターを、クライアント�
 
 プライベート接続用のサブネットとセキュリティグループを設定する。S3 への COPY 経路を VPC 側で制御する場合は拡張 VPC ルーティングの到達先も構成する。図の計算ノードとスライスはプロビジョンドクラスターの例を示す。
 
+この例は拡張 VPC ルーティングを有効にする。クラスターサブネットのルートテーブルに対応する S3 ゲートウェイエンドポイントを設け、同じリージョンの着地バケットへの経路とエンドポイントポリシーを設定する。SQL クライアントが `COPY` を送信し、クラスターに関連付けた IAM ロールで対象ファイルを読み取る。取り込んだテーブルは Redshift Managed Storage に保持する。
+
+- [Redshift COPY と S3 VPC エンドポイント](https://docs.aws.amazon.com/redshift/latest/mgmt/enhanced-vpc-working-with-endpoints.html)
+- [Redshift RSQL の接続](https://docs.aws.amazon.com/redshift/latest/mgmt/rsql-query-tool-starting-tool-connection.html)
+
 出典 [Amazon Redshift provisioned clusters overview](https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html)、[Data warehouse system architecture](https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html)、[Architecture components of an Amazon Redshift data warehouse](https://docs.aws.amazon.com/prescriptive-guidance/latest/query-best-practices-redshift/data-warehouse-arch-components.html)、[VPC 内の Redshift リソース](https://docs.aws.amazon.com/redshift/latest/mgmt/managing-clusters-vpc.html)、[Enhanced VPC routing](https://docs.aws.amazon.com/redshift/latest/mgmt/enhanced-vpc-enabling-cluster.html)
+
+この図は独立したリーダーノードを持つ 2 台以上のコンピュートノードを前提とする。AWS が Redshift ノードと管理ストレージの基盤を運用し、利用者は SQL、ノードタイプ・台数、ネットワーク、データ、IAM と DB 権限を設定する。クライアントはリーダーを通じて SQL を実行し、内部ノードに直接ログインする想定ではない。RMS はサービスの管理ストレージであり、利用者の S3 バケットとは別である。公式資料を組み合わせた代表構成であり、実際の接続方式や性能は未検証。

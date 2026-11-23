@@ -25,4 +25,30 @@ retain・recall・reflect を使い、エージェントの記憶を保持し検
 | 記憶を基にした回答 | Hindsight reflect |
 | 抽出・回答用モデル | 設定された LLM |
 
+この例では Hindsight API と PostgreSQL を利用者が管理する別ホストに配置する。利用者がデータ、バックアップ、設定とモデル接続を管理する。モデル提供先は未選定で、資料を組み合わせた未検証の例である。
+
 [Hindsight](https://github.com/vectorize-io/hindsight)、[Recall and reflect](https://hindsight.vectorize.io/blog/2026/07/24/recall-vs-reflect)。
+
+## 5. 実装例：AWS の EKS・Hindsight・RDS for PostgreSQL
+
+Hindsight の OSS Helm チャートを Amazon EKS に適用し、マネージドノードグループの EC2 上で API を稼働させる。チャート内の PostgreSQL を無効にし、外部 DB として pgvector を有効にした RDS for PostgreSQL を指定する。この例は同期 API を使い、専用の Worker Pod は追加しない。
+
+| 機能配置 | 実装での担い手 |
+|---|---|
+| エージェント | Hindsight SDK から API を使う外部アプリ |
+| 取り込み・検索・回答 | Hindsight API の retain・recall・reflect |
+| 記憶と索引の永続化 | RDS for PostgreSQL 15 以降と pgvector 0.5.0 以降 |
+| 抽出と回答のモデル | 外部の OpenAI API |
+| 埋め込みと再ランキング | Hindsight フルイメージに対応する API プロセス内のモデル |
+
+EKS 制御プレーンは AWS 管理 VPC にあり、利用者は Kubernetes API と公開設定を操作できるがサーバーへ直接アクセスしない。AWS は RDS 基盤を運用し、利用者は DB のデータ・アクセス・設定を管理する。OpenAI API は AWS アカウント外である。複数の公式資料を組み合わせた未検証の例で、Hindsight、モデル、RDS 拡張と Helm の対応版、接続と復旧を導入時に検証する。
+
+RDS のエンジン版で対応する `vector` 拡張を確認し、Hindsight 用 DB で有効にする。AWS は Kubernetes と DB 基盤を管理し、Hindsight の設定、モデルへの接続、アプリの更新と復旧手順は運用者が管理する。この構成で使う Hindsight の自己ホスト版は MIT ライセンス。
+
+- [EKS Control Plane](https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html)
+- [Hindsight installation](https://hindsight.vectorize.io/developer/installation)
+- [Hindsight storage requirements](https://github.com/vectorize-io/hindsight/blob/main/hindsight-docs/docs/developer/storage.md)
+- [Hindsight models](https://hindsight.vectorize.io/developer/models)
+- [Hindsight self-hosted licensing](https://hindsight.vectorize.io/cloud-enterprise/overview)
+- [RDS for PostgreSQL extension versions](https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-extensions.html)
+- [EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)

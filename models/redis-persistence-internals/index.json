@@ -1,0 +1,185 @@
+{
+  "model": "redis-persistence-internals",
+  "name": "Redis：RDB・マルチパート AOF と復旧",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "書き込み",
+      "status": "claim"
+    },
+    "parent": {
+      "type": "node",
+      "label": "Redis のデータセット",
+      "status": "claim"
+    },
+    "fork": {
+      "type": "link",
+      "label": "Redis のデータセット → バックグラウンド保存",
+      "status": "claim"
+    },
+    "rdb": {
+      "type": "scenario",
+      "label": "RDB 保存",
+      "status": "claim"
+    },
+    "base": {
+      "type": "link",
+      "label": "バックグラウンド保存 → AOF base",
+      "status": "claim"
+    },
+    "incr": {
+      "type": "link",
+      "label": "Redis のデータセット → AOF incremental",
+      "status": "claim"
+    },
+    "manifest": {
+      "type": "link",
+      "label": "AOF base → AOF manifest",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "書き込み → Redis のデータセット",
+      "status": "claim"
+    },
+    "aof": {
+      "type": "scenario",
+      "label": "AOF 書き込みと書き直し"
+    },
+    "ex-client": {
+      "type": "implementation",
+      "impl": "linux",
+      "label": "書き込み",
+      "realizes": [
+        "client"
+      ]
+    },
+    "ex-parent": {
+      "type": "implementation",
+      "impl": "linux",
+      "label": "Redis のデータセット",
+      "realizes": [
+        "parent"
+      ]
+    },
+    "ex-fork": {
+      "type": "implementation",
+      "impl": "linux",
+      "label": "バックグラウンド保存",
+      "realizes": [
+        "fork"
+      ]
+    },
+    "ex-rdb": {
+      "type": "implementation",
+      "impl": "linux",
+      "label": "RDB スナップショット",
+      "realizes": [
+        "rdb"
+      ]
+    },
+    "ex-base": {
+      "type": "implementation",
+      "impl": "linux",
+      "label": "AOF base",
+      "realizes": [
+        "base"
+      ]
+    },
+    "ex-incr": {
+      "type": "implementation",
+      "impl": "linux",
+      "label": "AOF incremental",
+      "realizes": [
+        "incr"
+      ]
+    },
+    "ex-manifest": {
+      "type": "implementation",
+      "impl": "linux",
+      "label": "AOF manifest",
+      "realizes": [
+        "manifest"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-redis-persistence-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-redis-persistence-internals.md": [
+      "model",
+      "client",
+      "parent",
+      "fork",
+      "rdb",
+      "base",
+      "incr",
+      "manifest",
+      "write",
+      "aof",
+      "ex-client",
+      "ex-parent",
+      "ex-fork",
+      "ex-rdb",
+      "ex-base",
+      "ex-incr",
+      "ex-manifest"
+    ],
+    "docs/reference-redis-persistence-internals.md#§3": [
+      "model"
+    ],
+    "docs/reference-redis-persistence-internals.md#§5": [
+      "model"
+    ],
+    "docs/reference-redis-persistence-internals.md#§2": [
+      "client",
+      "parent",
+      "fork",
+      "rdb",
+      "base",
+      "incr",
+      "manifest",
+      "write",
+      "aof"
+    ],
+    "docs/reference-redis-persistence-internals.md#§4": [
+      "ex-client",
+      "ex-parent",
+      "ex-fork",
+      "ex-rdb",
+      "ex-base",
+      "ex-incr",
+      "ex-manifest"
+    ]
+  },
+  "reference": {
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "category": "インメモリデータベース",
+    "order": 20,
+    "detailOf": "redis",
+    "objectives": [
+      "データの格納とアクセスの仕組みを理解する。",
+      "物理構造と運用・障害時の前提を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Redis persistence",
+        "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/"
+      },
+      {
+        "title": "Redis replication",
+        "url": "https://redis.io/docs/latest/operate/oss_and_stack/management/replication/"
+      },
+      {
+        "title": "INFO",
+        "url": "https://redis.io/docs/latest/commands/info/"
+      }
+    ]
+  }
+}

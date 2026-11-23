@@ -167,7 +167,7 @@ scenarios:
 implementations:
   - id: example
     label: Ontop とリレーショナル DB
-    description: Ontop の仮想グラフを通じて、元 DB へ SQL を発行する例。配置と権限は環境に依存する。
+    description: 利用者管理の Linux ホストで Ontop コンテナを実行し、利用者管理の別ホスト上の PostgreSQL に SQL を発行する例。
     sources:
       - title: W3C R2RML
         url: https://www.w3.org/TR/r2rml/
@@ -187,6 +187,7 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host: {label: "利用者管理の Linux ホスト", kind: host, tier: definition, x: 15, y: 1.5, description: "利用者が OS、Java と Ontop コンテナを導入・運用する。"}
       ex-analyst:
         label: SPARQL クライアント
         kind: actor
@@ -221,7 +222,7 @@ implementations:
         realizes:
           - translate
       ex-db:
-        label: リレーショナル DB
+        label: 利用者管理の PostgreSQL（別ホスト）
         kind: db
         tier: flow
         x: 12
@@ -264,3 +265,101 @@ implementations:
             ref: docs/reference-semantic-virtual-graph.md#§4
         realizes:
           - ontology
+    links:
+      - {id: ex-host-run, from: ex-host, to: ex-endpoint, label: プロセスを実行}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        ex-analyst: {tier: diagram, x: 2, y: 1}
+        ex-designer: {tier: diagram, x: 8, y: 1}
+        ex-mapping: {tier: diagram, x: 2, y: 5}
+        ex-ontology: {tier: diagram, x: 8, y: 5}
+        ex-host: {tier: diagram, x: 14, y: 5}
+        ex-endpoint: {tier: diagram, x: 20, y: 5}
+        ex-translate: {tier: diagram, x: 2, y: 9}
+        ex-db: {tier: diagram, x: 8, y: 9}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理環境, tier: [diagram], nodes: [ex-mapping, ex-ontology, ex-host, ex-endpoint, ex-translate, ex-db]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [ex-host, ex-endpoint, ex-translate]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        ex-analyst: {tier: diagram, x: 2, y: 1}
+        ex-designer: {tier: diagram, x: 8, y: 1}
+        ex-mapping: {tier: diagram, x: 2, y: 5}
+        ex-ontology: {tier: diagram, x: 8, y: 5}
+        ex-host: {tier: diagram, x: 14, y: 5}
+        ex-endpoint: {tier: diagram, x: 20, y: 5}
+        ex-translate: {tier: diagram, x: 2, y: 9}
+        ex-db: {tier: diagram, x: 8, y: 9}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理環境, tier: [diagram], nodes: [ex-mapping, ex-ontology, ex-host, ex-endpoint, ex-translate, ex-db]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [ex-host, ex-endpoint, ex-translate]}
+  - id: aws-ecs-ontop
+    label: AWS（Ontop on ECS・RDS for PostgreSQL）
+    description: Fargate 上の Ontop が SPARQL を SQL に変換し、プライベートな RDS for PostgreSQL を読む例。
+    sources:
+      - {title: Ontop コンテナの構成, url: https://ontop-vkg.org/tutorial/endpoint/endpoint-docker.html}
+      - {title: Ontop の PostgreSQL 接続, url: https://ontop-vkg.org/guide/databases/postgres}
+      - {title: ECS の Fargate タスク定義, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html}
+      - {title: ECS の Fargate ネットワーキング, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html}
+      - {title: RDS for PostgreSQL の接続, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ConnectToPostgreSQLInstance.html}
+    tiers:
+      - {id: people, label: 問い合わせとマッピング設計, z: 0, size: [4, 6]}
+      - {id: exec, label: 仮想グラフと元データ, z: 0, size: [20, 6]}
+      - {id: delivery, label: デプロイ, z: 1, size: [17, 3]}
+    groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [exec, delivery], nodes: [aws-alb, aws-fargate, aws-ontop, aws-rds, aws-ecs, aws-ecr]}
+      - {kind: vpc, label: プライベート VPC, tier: exec, nodes: [aws-alb, aws-fargate, aws-ontop, aws-rds]}
+    nodes:
+      aws-analyst: {label: "SPARQL クライアント", kind: client, tier: people, x: 1, y: 1.5, realizes: [analyst], description: "プライベートネットワークに到達できるクライアントから問い合わせる。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+      aws-designer: {label: "R2RML の設計担当者", kind: actor, tier: people, x: 1, y: 4.5, realizes: [designer], description: "R2RML とオントロジーを管理する。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+      aws-alb: {management: {type: shared, scope: "AWS が ALB 基盤を運用、利用者がリスナーと到達制御を設定。"}, label: "内部 Application Load Balancer", svc: alb, kind: lb, tier: exec, x: 2, y: 1.5, description: "プライベートな SPARQL 接続をタスクの IP アドレスへ転送する。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+      aws-fargate: {management: {type: shared, scope: "AWS がタスク実行基盤を運用、利用者がタスクとネットワークを設定。"}, label: "AWS Fargate（ECS タスク）", svc: fargate, kind: host, tier: exec, x: 9, y: 4.5, description: "Ontop のコンテナを実行する。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+      aws-ontop: {management: {type: customer, scope: "利用者が Ontop とマッピング、イメージ、資格情報を運用。"}, label: "Ontop（SPARQL エンドポイント）", kind: service, tier: exec, x: 9, y: 1.5, realizes: [endpoint, translate], description: "R2RML と OWL 定義を読み、SPARQL を SQL に変換して JDBC で発行する。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+      aws-rds: {management: {type: shared, scope: "AWS が RDS 基盤を運用、利用者が DB データ、権限と設定を管理。"}, label: "Amazon RDS for PostgreSQL", svc: rds, kind: db, tier: exec, x: 16, y: 1.5, realizes: [db], description: "元テーブルを保持し、変換された SQL を実行する。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+      aws-ecs: {management: {type: shared, scope: "AWS が ECS 基盤を運用、利用者がサービスとタスク定義を設定。"}, label: "Amazon ECS（Ontop サービス）", svc: ecs, kind: service, tier: delivery, x: 1, y: 1.5, description: "Fargate タスクを起動・維持する。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+      aws-ecr: {management: {type: shared, scope: "AWS が ECR 基盤を運用、利用者がイメージとアクセス権を管理。"}, label: "Amazon ECR（Ontop イメージ）", svc: ecr, kind: db, tier: delivery, x: 7, y: 1.5, realizes: [mapping, ontology], description: "Ontop、PostgreSQL JDBC ドライバー、R2RML と OWL ファイルをまとめたイメージを保持する。", evidence: [{type: doc, ref: docs/reference-semantic-virtual-graph.md#§5}]}
+    links:
+      - {id: aws-db-query, from: aws-ontop, to: aws-rds, label: JDBC で SQL を発行}
+      - {id: aws-start, from: aws-ecs, to: aws-fargate, label: Ontop タスクを起動}
+      - {id: aws-run, from: aws-fargate, to: aws-ontop, label: Ontop コンテナを実行}
+      - {id: aws-image, from: aws-fargate, to: aws-ecr, label: コンテナイメージを取得}
+      - {id: aws-ask, from: aws-analyst, to: aws-alb, label: SPARQL クエリを送る, realizes: [ask], replace: true}
+      - {id: aws-forward, from: aws-alb, to: aws-ontop, label: クエリを転送, realizes: [ask], replace: true}
+      - {id: aws-ontop-result, from: aws-ontop, to: aws-alb, label: SPARQL の検索結果を返す, realizes: [returned], replace: true}
+      - {id: aws-client-result, from: aws-alb, to: aws-analyst, label: 検索結果を転送, realizes: [returned], replace: true}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [29, 12]}
+      nodes:
+        aws-analyst: {tier: diagram, x: 1, y: 2}
+        aws-designer: {tier: diagram, x: 1, y: 8}
+        aws-alb: {tier: diagram, x: 8, y: 2}
+        aws-fargate: {tier: diagram, x: 14, y: 2}
+        aws-ontop: {tier: diagram, x: 20, y: 2}
+        aws-rds: {tier: diagram, x: 8, y: 8}
+        aws-ecs: {tier: diagram, x: 14, y: 8}
+        aws-ecr: {tier: diagram, x: 20, y: 8}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 5, y0: 0, x1: 25, y1: 11, nodes: [aws-alb, aws-fargate, aws-ontop, aws-rds, aws-ecs, aws-ecr]}
+        - {kind: vpc, label: 顧客 VPC（タスクと RDS のネットワーク）, tier: [diagram], nodes: [aws-alb, aws-fargate, aws-ontop, aws-rds]}
+        - {kind: cluster, label: Fargate タスク, tier: [diagram], nodes: [aws-fargate, aws-ontop]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [29, 12]}
+      nodes:
+        aws-analyst: {tier: diagram, x: 1, y: 2}
+        aws-designer: {tier: diagram, x: 1, y: 8}
+        aws-alb: {tier: diagram, x: 8, y: 2}
+        aws-fargate: {tier: diagram, x: 14, y: 2}
+        aws-ontop: {tier: diagram, x: 20, y: 2}
+        aws-rds: {tier: diagram, x: 8, y: 8}
+        aws-ecs: {tier: diagram, x: 14, y: 8}
+        aws-ecr: {tier: diagram, x: 20, y: 8}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 5, y0: 0, x1: 25, y1: 11, nodes: [aws-alb, aws-fargate, aws-ontop, aws-rds, aws-ecs, aws-ecr]}
+        - {kind: vpc, label: 顧客 VPC（タスクと RDS のネットワーク）, tier: [diagram], nodes: [aws-alb, aws-fargate, aws-ontop, aws-rds]}
+        - {kind: cluster, label: Fargate タスク, tier: [diagram], nodes: [aws-fargate, aws-ontop]}

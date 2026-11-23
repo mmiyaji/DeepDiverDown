@@ -1,0 +1,245 @@
+name: OpenTofu の IaC と状態暗号化
+description: >-
+  事前作成した S3 backend を使い、OpenTofu の state 暗号化を設定した例。暗号化は明示的な設定が必要で、鍵の管理と既存 state の移行を検討する。Terraform
+  との互換性はバージョンや機能ごとに確認する。
+reference:
+  objectives:
+    - 構成要素と実行場所を理解する。
+    - 定義から変更の反映までの流れと状態管理を追う。
+  sources:
+    - title: OpenTofu state encryption
+      url: https://opentofu.org/docs/language/state/encryption/
+    - title: OpenTofu state
+      url: https://opentofu.org/docs/language/state/
+    - title: OpenTofu S3 backend
+      url: https://opentofu.org/docs/language/settings/backends/s3/
+sources:
+  - docs/reference-opentofu.md
+evidence:
+  - type: doc
+    ref: docs/reference-opentofu.md#§1
+  - type: doc
+    ref: docs/reference-opentofu.md#§3
+  - type: doc
+    ref: docs/reference-opentofu.md#§4
+tiers:
+  - id: flow
+    label: 定義・処理・対象
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: storage
+    label: 状態・補助情報
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  n0:
+    label: 構成定義
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 宣言したリソースと依存関係。
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  n1:
+    label: 計画と適用
+    kind: service
+    tier: flow
+    x: 5
+    'y': 1.5
+    description: plan と apply を実行時に処理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  n2:
+    label: 状態と暗号化
+    kind: file
+    tier: storage
+    x: 8
+    'y': 1.5
+    description: 設定により state と plan を暗号化できる。鍵の保管と復旧が必要。
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  n3:
+    label: リソース操作
+    kind: service
+    tier: flow
+    x: 15
+    'y': 1.5
+    description: provider が外部 API を呼ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  n4:
+    label: 管理対象
+    kind: service
+    tier: flow
+    x: 20
+    'y': 1.5
+    description: API により作成・更新される。
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+links:
+  - id: l0
+    from: n0
+    to: n1
+    label: 構成を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  - id: l1
+    from: n2
+    to: n1
+    label: 状態を読み復号
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  - id: l2
+    from: n1
+    to: n3
+    label: 変更を依頼
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  - id: l3
+    from: n3
+    to: n4
+    label: API で作成・更新
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+  - id: l4
+    from: n1
+    to: n2
+    label: 状態を暗号化して保存
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+scenarios:
+  - id: operation
+    label: 定義から反映まで
+    evidence:
+      - type: doc
+        ref: docs/reference-opentofu.md#§2
+    steps:
+      - links:
+          - l0
+        note: 構成を読む。
+      - links:
+          - l1
+        note: 状態を読み復号。
+      - links:
+          - l2
+        note: 変更を依頼。
+      - links:
+          - l3
+        note: API で作成・更新。
+      - links:
+          - l4
+        note: 状態を暗号化して保存。
+implementations:
+  - id: example
+    label: Linux の OpenTofu と AWS
+    description: >-
+      事前作成した S3 backend を使い、OpenTofu の state 暗号化を設定した例。暗号化は明示的な設定が必要で、鍵の管理と既存 state の移行を検討する。Terraform
+      との互換性はバージョンや機能ごとに確認する。
+    sources:
+      - title: OpenTofu state encryption
+        url: https://opentofu.org/docs/language/state/encryption/
+      - title: OpenTofu state
+        url: https://opentofu.org/docs/language/state/
+      - title: OpenTofu S3 backend
+        url: https://opentofu.org/docs/language/settings/backends/s3/
+    tiers:
+      - id: flow
+        label: 定義・処理・対象
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: storage
+        label: 状態・補助情報
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-n0:
+        label: Linux 上の OpenTofu 構成
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 宣言したリソースと依存関係。
+        realizes:
+          - n0
+        evidence:
+          - type: doc
+            ref: docs/reference-opentofu.md#§4
+      ex-n1:
+        label: Linux 上の tofu CLI
+        kind: service
+        tier: flow
+        x: 5
+        'y': 1.5
+        description: plan と apply を実行時に処理する。
+        realizes:
+          - n1
+        evidence:
+          - type: doc
+            ref: docs/reference-opentofu.md#§4
+      ex-n2:
+        label: Amazon S3 の暗号化 state
+        kind: file
+        tier: storage
+        x: 8
+        'y': 1.5
+        description: 設定により state と plan を暗号化できる。鍵の保管と復旧が必要。
+        realizes:
+          - n2
+        evidence:
+          - type: doc
+            ref: docs/reference-opentofu.md#§4
+        svc: aws:s3
+      ex-n3:
+        label: AWS provider プラグイン
+        kind: service
+        tier: flow
+        x: 15
+        'y': 1.5
+        description: provider が外部 API を呼ぶ。
+        realizes:
+          - n3
+        evidence:
+          - type: doc
+            ref: docs/reference-opentofu.md#§4
+      ex-n4:
+        label: AWS の EC2 インスタンス
+        kind: service
+        tier: flow
+        x: 20
+        'y': 1.5
+        description: API により作成・更新される。
+        realizes:
+          - n4
+        evidence:
+          - type: doc
+            ref: docs/reference-opentofu.md#§4
+        svc: aws:ec2
+    groups:
+      - kind: cloud
+        label: AWS アカウントのサービス領域（論理境界）
+        provider: aws
+        tier:
+          - flow
+          - storage
+        nodes:
+          - ex-n2
+          - ex-n4

@@ -73,3 +73,25 @@ Python プロセス内の DuckDB がローカルの orders.parquet を直接読�
 - [DuckDB EXPLAIN](https://duckdb.org/docs/stable/guides/meta/explain)
 - [DuckDB Profiling](https://duckdb.org/docs/current/dev/profiling)
 - [DuckDB Python API](https://duckdb.org/docs/stable/clients/python/overview)
+
+## 8. 実装例：AWS（DuckDB on Fargate・Amazon S3）
+
+Amazon ECS のスタンドアロンタスクを AWS Fargate で起動し、Amazon ECR に登録したイメージから Python スクリプトを実行する。DuckDB の Python パッケージと、同じ DuckDB リリースに対応する `httpfs`・`aws` 拡張をイメージに用意する。
+
+| 機能 | 担い手 |
+|---|---|
+| タスクの起動と実行環境 | Amazon ECS と AWS Fargate |
+| SQL の計画・読み取り・結果の投影 | Python と同一プロセス内の DuckDB |
+| リモートファイルの部分読み取り | DuckDB の `httpfs` と Amazon S3 |
+| 実行計画と診断 | DuckDB の `EXPLAIN ANALYZE` と `parquet_metadata` を呼ぶ Python スクリプト |
+
+タスク IAM ロールに対象オブジェクトの読み取りを許可する。DuckDB は `CREATE SECRET (TYPE s3, PROVIDER credential_chain)` で AWS SDK のデフォルト認証チェーンを使用する。この例ではリージョンを設定し、`read_parquet('s3://…/orders.parquet')` でアクセスする。DuckDB が Parquet のメタデータを読み、必要な範囲を S3 の Range GET で取得する。取得量は述語、各列の統計、ファイル配置に依存する。
+
+- [DuckDB S3 API Support](https://duckdb.org/docs/1.5/core_extensions/httpfs/s3api)
+- [DuckDB AWS extension](https://duckdb.org/docs/extensions/aws)
+- [AWS SDK のコンテナ認証プロバイダー](https://docs.aws.amazon.com/sdkref/latest/guide/feature-container-credentials.html)
+- [ECS の Fargate タスク定義](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html)
+
+自前例は利用者管理のホストで Python と埋め込み DuckDB を同一プロセスで実行し、ローカル Parquet を読む。AWS 例は RunTask で Fargate タスクを起動し、ECR のイメージを使い、タスク IAM ロールを AWS SDK credential chain に渡して S3 を読む。タスク実行ロールはイメージ取得用として別に設定する。AWS は ECS・Fargate・ECR・S3 の基盤を運用し、利用者はタスク定義、SQL、データと権限を管理する。基盤ホストへの直接操作は想定しない。ネットワーク経路・資格情報チェーン・拡張のバージョンの実動作は未検証で、公式資料を組み合わせた例である。
+
+- [ECS タスク IAM ロール](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html)

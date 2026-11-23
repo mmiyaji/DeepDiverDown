@@ -40,7 +40,15 @@
 | 明細ファクト（階層分離） | hierarchy.fact_order_line | スター側と同じ受注明細粒度を持つ。 |
 | カテゴリ別売上（階層分離） | hierarchy.sales_by_category ビュー | 商品からカテゴリ表をたどって集計する。 |
 | 履歴と結合の比較 | 二つの SQL 結果と実行計画 | 同じ期間で売上を集計し、結果と結合経路を比較する。 |
+| 保存と SQL 実行 | Amazon RDS for PostgreSQL、Amazon EC2 | テーブルとビューは RDS に置き、EC2 上の `psql` から接続する。 |
 
 同じデータと条件で `EXPLAIN` の実行計画と金額を確認する。カテゴリ移動が過去の売上にも効くかは、履歴の持ち方と有効時刻の方針で決める。
 
+この比較では、同じ AWS アカウントの VPC に非公開の Amazon RDS for PostgreSQL と Amazon EC2 の検証ホストを置く。RDS の同じデータベースに `star` と `hierarchy` を用意し、EC2 上の `psql` から同じ入力をロードする。ロード後に両方のテーブルの統計情報を更新し、同じ SQL 条件で結果と実行計画を比較する。接続元のセキュリティグループから PostgreSQL ポートだけを許可し、TLS で接続する。
+
+- [RDS for PostgreSQL への接続](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ConnectToPostgreSQLInstance.html)
+- [同じ VPC の EC2 から RDS へ接続](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/tutorial-connect-ec2-instance-to-rds-database.html)
+
 出典 [Snowflaked Dimensions](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/snowflake-dimension/)、[Power BI のスタースキーマ設計](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)、[PostgreSQL CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)、[PostgreSQL EXPLAIN](https://www.postgresql.org/docs/current/sql-explain.html)
+
+AWS は EC2 と RDS の基盤を運用し、利用者は EC2 のゲスト OS と psql、RDS の DB・テーブル・権限を管理する。利用者は SQL と EXPLAIN で比較できるが、RDS の内部ホストを直接操作しない。比較入力と SQL の組み合わせは実動作未検証。[AWS shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

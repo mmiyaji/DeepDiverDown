@@ -289,6 +289,7 @@ implementations:
     label: 既存 Purview・Azure SQL・Data Factory
     description: 稼働中の Purview Data Governance テナントで、Azure SQL Database をスキャンし、Data Factory の入出力を関連付ける例。
     sources:
+      - {title: Managed virtual networks and private endpoints, url: https://learn.microsoft.com/en-us/purview/data-governance-private-endpoints-managed-virtual-network}
       - title: Microsoft Data Governance Strategy Update
         url: >-
           https://learn.microsoft.com/partner-center/announcements/2026-november#update-on-the-microsoft-data-governance-strategy
@@ -298,13 +299,17 @@ implementations:
         url: https://learn.microsoft.com/en-us/purview/unified-catalog-data-product-access-policies
       - title: Azure SQL Database の登録とスキャン
         url: https://learn.microsoft.com/en-us/purview/register-scan-azure-sql-database
+      - title: Microsoft Purview managed virtual networks and private endpoints
+        url: https://learn.microsoft.com/en-us/purview/catalog-managed-vnet
     nodes:
+      azure-purview-identity: {label: Purview system-assigned managed identity, kind: policy, tier: purview, x: 9, y: 5, evidence: [{type: doc, ref: "docs/reference-microsoft-purview.md#§6"}]}
+      azure-purview-private-endpoint: {label: Managed private endpoint, kind: gateway, tier: purview, x: 13, y: 5, evidence: [{type: doc, ref: "docs/reference-microsoft-purview.md#§6"}]}
       azure-purview-owner:
         label: データ製品所有者
         kind: actor
         tier: people
-        x: 4
-        'y': 1
+        x: 0
+        y: 1
         description: Unified Catalog の製品説明と申請条件を整える。
         realizes:
           - steward
@@ -315,8 +320,8 @@ implementations:
         label: 分析担当者
         kind: actor
         tier: people
-        x: 9
-        'y': 1
+        x: 0
+        y: 5
         description: 注文データ製品の閲覧・申請を行う。
         realizes:
           - consumer
@@ -327,8 +332,8 @@ implementations:
         label: データベースの権限付与担当者
         kind: actor
         tier: people
-        x: 13
-        'y': 1
+        x: 0
+        y: 9
         description: 承認内容に従い Azure SQL の権限を付ける。
         realizes:
           - provider
@@ -340,8 +345,8 @@ implementations:
         label: Purview スキャン
         kind: worker
         tier: purview
-        x: 2
-        'y': 1
+        x: 5
+        y: 1
         description: Azure SQL を収集し、Data Map に反映する。
         realizes:
           - scan
@@ -353,8 +358,8 @@ implementations:
         label: Purview Data Map
         kind: catalog
         tier: purview
-        x: 5
-        'y': 1
+        x: 9
+        y: 1
         description: 自動分類と Data Factory の実行関係を集約する。
         realizes:
           - map
@@ -366,8 +371,8 @@ implementations:
         label: Unified Catalog（データ製品・アクセス）
         kind: catalog
         tier: purview
-        x: 9
-        'y': 1
+        x: 13
+        y: 1
         description: 製品の検索画面に申請と承認の履歴を関連付ける。
         realizes:
           - unified
@@ -379,8 +384,8 @@ implementations:
         label: Azure SQL Database
         kind: db
         tier: sources
-        x: 2
-        'y': 1
+        x: 22
+        y: 1
         description: 注文データを保持し、接続時にアクセス権を評価する。
         realizes:
           - source
@@ -392,8 +397,8 @@ implementations:
         label: Azure Data Factory
         kind: external
         tier: sources
-        x: 6
-        'y': 1
+        x: 22
+        y: 5
         description: 対応するアクティビティの入出力を Purview へ送る。
         realizes:
           - factory
@@ -407,8 +412,8 @@ implementations:
         label: Microsoft Fabric OneLake catalog
         kind: external
         tier: sources
-        x: 12
-        'y': 1
+        x: 29
+        y: 1
         description: 既存サービスの移行先への参照。
         realizes:
           - fabric
@@ -417,17 +422,18 @@ implementations:
             ref: docs/reference-microsoft-purview.md#§6
         drill: fabric-onelake-catalog
       azure-purview-runtime:
-        label: Azure Integration Runtime（マネージド VNet）
+        label: Purview マネージド VNet Integration Runtime
         kind: service
-        tier: sources
-        x: 9
-        'y': 1
-        description: 閉域ソースへのスキャン経路を提供する。
-        evidence:
-          - type: doc
-            ref: docs/reference-microsoft-purview.md#§6
-        svc: azure:datafactory
+        tier: purview
+        x: 5
+        y: 5
+        description: Purview が管理する VNet 内で動き、承認済みのマネージド プライベート エンドポイント経由で Azure SQL をスキャンする。
+        evidence: [{type: doc, ref: "docs/reference-microsoft-purview.md#§6"}]
+        svc: purview:platform
     links:
+      - {id: azure-purview-authenticate, from: azure-purview-identity, to: azure-purview-database, label: "Authenticate and read metadata", evidence: [{type: doc, ref: "docs/reference-microsoft-purview.md#§6"}]}
+      - {id: azure-purview-runtime-endpoint, from: azure-purview-runtime, to: azure-purview-private-endpoint, label: "Use private endpoint", evidence: [{type: doc, ref: "docs/reference-microsoft-purview.md#§6"}]}
+      - {id: azure-purview-endpoint-database, from: azure-purview-private-endpoint, to: azure-purview-database, label: "Connect after approval", evidence: [{type: doc, ref: "docs/reference-microsoft-purview.md#§6"}]}
       - id: azure-purview-use-runtime
         from: azure-purview-scanner
         to: azure-purview-runtime
@@ -443,34 +449,48 @@ implementations:
           - type: doc
             ref: docs/reference-microsoft-purview.md#§6
     groups:
-      - kind: cloud
-        provider: purview
-        label: Data Governance テナント
-        tier: [purview]
-        nodes: [azure-purview-scanner, azure-purview-map, azure-purview-portal]
-      - kind: cloud
-        provider: fabric
-        label: OneLake catalog（移行先）
-        tier: [sources]
-        nodes: [azure-purview-fabric]
-      - kind: cloud
-        provider: azure
-        label: Microsoft Azure サービス
-        tier:
-          - sources
-        nodes:
-          - azure-purview-database
-      - kind: cloud
-        provider: azure
-        label: Microsoft Azure サービス
-        tier:
-          - sources
-        nodes:
-          - azure-purview-factory
-      - kind: cloud
-        provider: azure
-        label: Microsoft Azure サービス
-        tier:
-          - sources
-        nodes:
-          - azure-purview-runtime
+      - {kind: cloud, provider: purview, label: Existing Purview tenant, tier: purview, nodes: [azure-purview-scanner, azure-purview-map, azure-purview-portal, azure-purview-runtime, azure-purview-identity, azure-purview-private-endpoint]}
+      - {kind: cloud, provider: azure, label: Customer Azure subscription, tier: sources, nodes: [azure-purview-database, azure-purview-factory]}
+      - {kind: cloud, provider: fabric, label: OneLake catalog reference, tier: sources, nodes: [azure-purview-fabric]}
+    layout2d:
+      tiers: [{id: diagram, label: Purview and Azure SQL, z: 0, size: [33, 14]}]
+      nodes:
+        azure-purview-scanner: {tier: diagram, x: 5, y: 1}
+        azure-purview-map: {tier: diagram, x: 9, y: 1}
+        azure-purview-portal: {tier: diagram, x: 13, y: 1}
+        azure-purview-runtime: {tier: diagram, x: 5, y: 5}
+        azure-purview-identity: {tier: diagram, x: 9, y: 5}
+        azure-purview-private-endpoint: {tier: diagram, x: 13, y: 5}
+        azure-purview-database: {tier: diagram, x: 22, y: 1}
+        azure-purview-factory: {tier: diagram, x: 22, y: 5}
+        azure-purview-fabric: {tier: diagram, x: 29, y: 1}
+        azure-purview-owner: {tier: diagram, x: 0, y: 1}
+        azure-purview-reader: {tier: diagram, x: 0, y: 5}
+        azure-purview-sql-admin: {tier: diagram, x: 0, y: 9}
+      groups:
+        - {kind: cloud, provider: purview, label: Existing Purview tenant, tier: diagram, nodes: [azure-purview-scanner, azure-purview-map, azure-purview-portal, azure-purview-runtime, azure-purview-identity, azure-purview-private-endpoint]}
+        - {kind: cloud, provider: azure, label: Customer Azure subscription, tier: diagram, nodes: [azure-purview-database, azure-purview-factory]}
+        - {kind: cloud, provider: fabric, label: OneLake catalog reference, tier: diagram, nodes: [azure-purview-fabric]}
+    layout3d:
+      tiers:
+        - {id: purview, label: Purview managed service, z: 0, size: [16, 6]}
+        - {id: azure, label: Customer Azure subscription, z: 0, origin: [19, 0], size: [8, 3]}
+        - {id: fabric, label: Fabric reference, z: 0, origin: [30, 0], size: [4, 3]}
+        - {id: users, label: Users, kind: origin, z: 0, origin: [-6, 0], size: [5, 3]}
+      nodes:
+        azure-purview-scanner: {tier: purview, x: 2, y: 1}
+        azure-purview-map: {tier: purview, x: 6, y: 1}
+        azure-purview-portal: {tier: purview, x: 10, y: 1}
+        azure-purview-runtime: {tier: purview, x: 14, y: 1}
+        azure-purview-identity: {tier: purview, x: 2, y: 4}
+        azure-purview-private-endpoint: {tier: purview, x: 6, y: 4}
+        azure-purview-database: {tier: azure, x: 2, y: 1.5}
+        azure-purview-factory: {tier: azure, x: 6, y: 1.5}
+        azure-purview-fabric: {tier: fabric, x: 1, y: 1.5}
+        azure-purview-owner: {tier: users, x: 0, y: 1.5}
+        azure-purview-reader: {tier: users, x: 2, y: 1.5}
+        azure-purview-sql-admin: {tier: users, x: 4, y: 1.5}
+      groups:
+        - {kind: cloud, provider: purview, label: Existing Purview tenant, tier: purview, nodes: [azure-purview-scanner, azure-purview-map, azure-purview-portal, azure-purview-runtime, azure-purview-identity, azure-purview-private-endpoint]}
+        - {kind: cloud, provider: azure, label: Customer Azure subscription, tier: azure, nodes: [azure-purview-database, azure-purview-factory]}
+        - {kind: cloud, provider: fabric, label: OneLake catalog reference, tier: fabric, nodes: [azure-purview-fabric]}

@@ -43,8 +43,10 @@
 | データソース | Azure SQL Database | 注文データを保持し、接続時にアクセス権を評価する。 |
 | 連携するデータ変換基盤 | Azure Data Factory | 対応するアクティビティの入出力を Purview へ送る。 |
 | 後継のガバナンス基盤 | Microsoft Fabric OneLake catalog | 既存サービスの移行先への参照。 |
-| 実装で追加 | Azure Integration Runtime（マネージド VNet） | 閉域ソースへのスキャン経路を提供する。 |
+| 実装で追加 | Purview マネージド VNet Integration Runtime | Purview 管理の VNet に配置し、マネージド プライベート エンドポイント経由で Azure SQL を読み取る。 |
 
-スキャン用 ID に Azure SQL Database の読み取り権限とネットワーク到達性が必要。閉域接続の例ではマネージド仮想ネットワークの Azure Integration Runtime を使う。新規ガバナンスアカウントの作成受付は終了し、サポート終了予定は 2027年11月12日。
+スキャン用 ID に Azure SQL Database の読み取り権限とネットワーク到達性が必要。閉域接続には Purview 内で作成したランタイムと、Azure SQL Database 側で承認されたマネージド プライベート エンドポイントを使う。Azure Data Factory はパイプラインを実行し、対応する処理のリネージを Data Map に送る。[Purview のマネージド VNet とプライベート エンドポイント](https://learn.microsoft.com/en-us/purview/catalog-managed-vnet)。新規ガバナンスアカウントの作成受付は終了し、サポート終了予定は 2027年11月12日。
 
 [Microsoft Data Governance Strategy Update](https://learn.microsoft.com/partner-center/announcements/2026-november#update-on-the-microsoft-data-governance-strategy)、[Microsoft Purview Data Map Scans and Ingestion](https://learn.microsoft.com/en-us/purview/data-map-scan-ingestion)、[Unified Catalog Data Product Access Policies](https://learn.microsoft.com/en-us/purview/unified-catalog-data-product-access-policies)、[Azure SQL Database の登録とスキャン](https://learn.microsoft.com/en-us/purview/register-scan-azure-sql-database)
+
+この例では Purview のシステム割り当てマネージド ID を Azure SQL の Entra ユーザーとして登録し、必要なメタデータと分類の読み取り権限を与える。Purview が管理する VNet とプライベートエンドポイントを設定し、SQL の所有者が接続を承認する。マネージド VNet は Purview 外から直接管理できない。Data Factory と Azure SQL の設定、スキャン、承認とソース権限は利用者が管理し、Fabric は移行先の参照であって接続済みと仮定しない。この組み合わせは実動作未検証。[Azure SQL スキャン](https://learn.microsoft.com/en-us/purview/register-scan-azure-sql-database)、[管理 VNet とプライベートエンドポイント](https://learn.microsoft.com/en-us/purview/data-governance-private-endpoints-managed-virtual-network)

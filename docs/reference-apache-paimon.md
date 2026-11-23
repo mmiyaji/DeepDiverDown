@@ -56,6 +56,32 @@ Flink SQL で `PRIMARY KEY (order_id) NOT ENFORCED` を宣言した Paimon テ�
 | Changelog Producer | Paimon の lookup Changelog | `lookup` を選ぶと旧値を使い更新前後を出す。 |
 | 実装で追加 | Paimon ファイルカタログ設定 | `CREATE CATALOG` で warehouse を指定する。 |
 
-SQL Client で検証用の更新を入力する。`file:` の warehouse は単一マシンの実験用。分散構成では実行タスクが同じ warehouse に到達できる共有ストレージを使う。`none` と `lookup` の出力差を比較するときは同じ入力の別テーブルを用意する。
+単一マシンで Flink の JobManager と TaskManager を起動し、SQL Client からジョブを投入する。TaskManager が Paimon Sink と読み取りを実行する。Flink のバージョンに対応する Paimon コネクタを配置し、同時実行に十分なスロットを用意する。公式 Quick Start は word count であり、図の注文データと lookup 設定はその応用例で動作未検証。SQL Client で検証用の更新を入力する。`file:` の warehouse は単一マシンの実験用。分散構成では実行タスクが同じ warehouse に到達できる共有ストレージを使う。`none` と `lookup` の出力差を比較するときは同じ入力の別テーブルを用意する。
 
 [Paimon 2.1 Primary-Key Table](https://paimon.apache.org/docs/2.1/primary-key-table/)、[Paimon 2.1 Changelog Producer](https://paimon.apache.org/docs/2.1/primary-key-table/changelog-producer/)、[Paimon 2.1 Compaction](https://paimon.apache.org/docs/2.1/primary-key-table/compaction/)、[Flink Quick Start](https://paimon.apache.org/docs/2.1/flink/quick-start/)、[Understand Files](https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/)
+
+## 8. 実装例：AWS の EMR on EC2・Flink・S3
+
+Amazon EMR が管理する EC2 クラスタで Flink の YARN セッションを起動する。JobManager がタスクを調整し、TaskManager 上の Paimon コネクタでテーブルを読み書きする。たとえば、Flink 1.20 を含む EMR 7.14.0 に Paimon 2.1 の Flink 1.20 用コネクタを追加する。
+
+| 機能配置 | AWS での担い手 |
+|---|---|
+| 更新入力・主キー upsert | 試験用の注文更新入力と Flink SQL の Paimon Sink |
+| sorted run | S3 warehouse のテーブルプレフィックス内のバケットファイル |
+| コンパクション | Flink Sink 内の Paimon の処理 |
+| スナップショット | 同じ S3 のテーブルプレフィックス内のコミットメタデータ |
+| 変更ログ | `lookup` を選択したテーブルの S3 上の changelog ファイル |
+| スナップショット・増分読み取り | Flink 上の Paimon Source によるバッチとストリームの読み取り |
+
+Flink の S3 ファイルシステムを用意し、Paimon のファイルカタログの warehouse を `s3://` に指定する。書き込みジョブを一つに限定し、Flink のチェックポイントを有効にする。Flink が復旧に使うジョブチェックポイントは、Paimon がテーブルの読み取りに使うスナップショットと保存先を分ける。クラスタの IAM ロールで warehouse とチェックポイントの両方に必要な操作を許可する。
+
+- [Amazon EMR Release Guide — Apache Flink](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-flink.html)
+- [Amazon EMR Release Guide — Working with Flink jobs](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/flink-jobs.html)
+- [Paimon 2.1 — Flink Installation](https://paimon.apache.org/docs/2.1/flink/installation/)
+- [Paimon 2.1 — Filesystems](https://paimon.apache.org/docs/2.1/maintenance/filesystems/)
+- [Paimon 2.1 — Compaction](https://paimon.apache.org/docs/2.1/primary-key-table/compaction/)
+- [Apache Flink 1.20 — Amazon S3](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/filesystems/s3/)
+
+EMR 7.14.0 には Flink 1.20.0-amzn-8 が含まれ、Paimon 2.1 の資料には Flink 1.20 用のコネクタが記載されている。Paimon は EMR の同梱一覧にないため別途導入する。EMR の AWS 修正版 Flink、コネクタと S3 依存関係の組み合わせは動作検証していない。 AWS は EMR、EC2、ストレージなどのサービス基盤を運用し、利用者はクラスタ、ゲスト OS、ジョブ、データおよび権限を管理する。EC2 上のソフトウェアには SSH やアプリケーションのインターフェースから操作できるが、マネージドサービスの内部基盤に直接アクセスすることを意味しない。
+
+- [AWS — Shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

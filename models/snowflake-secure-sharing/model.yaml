@@ -196,6 +196,7 @@ implementations:
         url: https://docs.snowflake.com/en/user-guide/data-sharing-secure-views
       - title: 'Snowflake: Create and configure shares'
         url: https://docs.snowflake.com/en/user-guide/data-sharing-provider
+      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -210,12 +211,14 @@ implementations:
           - 8
           - 3
     nodes:
+      example-admin: {label: Provider administrator, kind: client, tier: flow, x: -2, y: 1, evidence: [{type: doc, ref: "docs/reference-snowflake-secure-sharing.md#§5"}]}
+      example-reader: {label: Recipient analyst, kind: client, tier: flow, x: 25, y: 5, evidence: [{type: doc, ref: "docs/reference-snowflake-secure-sharing.md#§5"}]}
       example-provider:
         label: 提供者側データ管理ロール
-        kind: actor
+        kind: policy
         tier: flow
-        x: -4
-        'y': 0
+        x: 4
+        y: 1
         realizes:
           - provider
         description: 共有先アカウントを選択する。
@@ -223,12 +226,11 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-secure-sharing.md#§5
       example-orders:
-        svc: snowflake:platform
         label: 提供側 SALES.ORDERS_SUMMARY
         kind: db
         tier: flow
-        x: 0
-        'y': 3
+        x: 4
+        y: 5
         realizes:
           - orders
         description: 社内分析用の集計表。
@@ -236,12 +238,11 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-secure-sharing.md#§5
       example-view:
-        svc: snowflake:platform
         label: SALES.ORDERS_PUBLIC SECURE VIEW
         kind: db
         tier: flow
-        x: 4
-        'y': 3
+        x: 8
+        y: 5
         realizes:
           - view
         description: 提供を許可した行・列だけを公開する。
@@ -250,11 +251,10 @@ implementations:
             ref: docs/reference-snowflake-secure-sharing.md#§5
       example-share:
         label: Snowflake SHARE と受領者割当
-        kind: service
+        kind: policy
         tier: flow
-        svc: snowflake:platform
-        x: 7
-        'y': 1
+        x: 8
+        y: 1
         realizes:
           - share
           - revoke
@@ -267,8 +267,8 @@ implementations:
         label: 受領側 ORDERS_SHARED データベース
         kind: db
         tier: flow
-        x: 10
-        'y': 3
+        x: 16
+        y: 5
         realizes:
           - imported
         description: CREATE DATABASE FROM SHARE で作る読み取り専用の参照口。
@@ -280,8 +280,8 @@ implementations:
         label: 受領側の BI_WH
         kind: worker
         tier: flow
-        x: 14
-        'y': 3
+        x: 20
+        y: 5
         realizes:
           - consumer
         description: 受領側の計算資源で共有データをクエリする。
@@ -289,17 +289,19 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-secure-sharing.md#§5
       example-role:
-        svc: snowflake:platform
         label: 受領側の BI ロール
-        kind: service
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
+        kind: policy
+        tier: flow
+        x: 16
+        y: 1
         description: 受領側で共有データベースへの参照を許可する。
         evidence:
           - type: doc
             ref: docs/reference-snowflake-secure-sharing.md#§5
     links:
+      - {id: example-admin-role, from: example-admin, to: example-provider, label: "Use provider role", evidence: [{type: doc, ref: "docs/reference-snowflake-secure-sharing.md#§5"}]}
+      - {id: example-reader-role, from: example-reader, to: example-role, label: "Use recipient role", evidence: [{type: doc, ref: "docs/reference-snowflake-secure-sharing.md#§5"}]}
+      - {id: example-reader-query, from: example-reader, to: example-consumer, label: "Run query", evidence: [{type: doc, ref: "docs/reference-snowflake-secure-sharing.md#§5"}]}
       - id: example-role-connection
         from: example-role
         to: example-imported
@@ -308,27 +310,38 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-secure-sharing.md#§5
     groups:
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake 提供側アカウント
-        tier:
-          - flow
-        nodes:
-          - example-orders
-          - example-view
-          - example-share
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake 受領側アカウント
-        tier:
-          - flow
-        nodes:
-          - example-imported
-          - example-consumer
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake 受領側アカウント
-        tier:
-          - implementation-setup
-        nodes:
-          - example-role
+      - {kind: cloud, provider: snowflake, label: Provider account, tier: flow, nodes: [example-provider, example-orders, example-view, example-share]}
+      - {kind: cloud, provider: snowflake, label: Recipient account, tier: flow, nodes: [example-imported, example-consumer, example-role]}
+    layout2d:
+      tiers: [{id: diagram, label: Direct Share, z: 0, size: [27, 11]}]
+      nodes:
+        example-provider: {tier: diagram, x: 4, y: 1}
+        example-orders: {tier: diagram, x: 4, y: 5}
+        example-view: {tier: diagram, x: 8, y: 5}
+        example-share: {tier: diagram, x: 8, y: 1}
+        example-imported: {tier: diagram, x: 16, y: 5}
+        example-consumer: {tier: diagram, x: 20, y: 5}
+        example-role: {tier: diagram, x: 16, y: 1}
+        example-admin: {tier: diagram, x: 0, y: 1}
+        example-reader: {tier: diagram, x: 25, y: 5}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Provider account, tier: diagram, nodes: [example-provider, example-orders, example-view, example-share]}
+        - {kind: cloud, provider: snowflake, label: Recipient account, tier: diagram, nodes: [example-imported, example-consumer, example-role]}
+    layout3d:
+      tiers:
+        - {id: provider, label: Provider account, z: 0, size: [13, 6]}
+        - {id: recipient, label: Recipient account, z: 0, origin: [17, 0], size: [13, 6]}
+        - {id: users, label: Users, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-provider: {tier: provider, x: 2, y: 1}
+        example-orders: {tier: provider, x: 6, y: 1}
+        example-view: {tier: provider, x: 10, y: 1}
+        example-share: {tier: provider, x: 2, y: 4}
+        example-imported: {tier: recipient, x: 2, y: 1.5}
+        example-consumer: {tier: recipient, x: 6, y: 1.5}
+        example-role: {tier: recipient, x: 10, y: 1.5}
+        example-admin: {tier: users, x: 0, y: 1.5}
+        example-reader: {tier: users, x: 1, y: 1.5}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Provider account, tier: provider, nodes: [example-provider, example-orders, example-view, example-share]}
+        - {kind: cloud, provider: snowflake, label: Recipient account, tier: recipient, nodes: [example-imported, example-consumer, example-role]}

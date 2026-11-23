@@ -1,0 +1,389 @@
+name: TiDB / TiKV：KV・Region・Raft・MVCC
+description: SQL の行・索引から KV、Region、Raft 複製と RocksDB の MVCC 格納をたどる。
+parent:
+  model: tidb
+  node: rowstore
+reference:
+  objectives:
+    - 構成要素と書き込み・読み出しの経路を理解する。
+    - 保存形式と運用上の前提を区別する。
+  sources:
+    - title: TiDB architecture
+      url: https://docs.pingcap.com/tidb/stable/tidb-architecture/
+    - title: TiDB computing
+      url: https://docs.pingcap.com/tidb/stable/tidb-computing/
+    - title: TiDB storage
+      url: https://docs.pingcap.com/tidb/stable/tidb-storage/
+    - title: TiKV RocksDB overview
+      url: https://docs.pingcap.com/tidb/stable/rocksdb-overview/
+    - title: TiFlash replicas
+      url: https://docs.pingcap.com/tidb/stable/create-tiflash-replicas/
+    - title: TiUP playground
+      url: https://docs.pingcap.com/tidb/stable/tiup-playground/
+sources:
+  - docs/reference-tidb-storage-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-tidb-storage-internals.md#§1
+  - type: doc
+    ref: docs/reference-tidb-storage-internals.md#§3
+  - type: doc
+    ref: docs/reference-tidb-storage-internals.md#§5
+tiers:
+  - id: query
+    label: 入力・実行
+    z: 1
+    size:
+      - 20
+      - 4
+  - id: store
+    label: データの保存
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  sql:
+    label: 行と索引を KV 化
+    kind: service
+    tier: query
+    x: 0
+    'y': 1.5
+    description: 表 ID と行ハンドルや索引値からキーを組み立てる。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  pd:
+    label: PD と時刻・配置
+    kind: service
+    tier: query
+    x: 5
+    'y': 1.5
+    description: タイムスタンプや Region の配置情報を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  leader:
+    label: Region leader
+    kind: service
+    tier: query
+    x: 10
+    'y': 1.5
+    description: キー範囲の Raft グループで要求を受ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  replica:
+    label: Raft follower
+    kind: service
+    tier: query
+    x: 15
+    'y': 1.5
+    description: Raft ログを複製する別の peer。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  mvcc:
+    label: MVCC の版とロック
+    kind: db
+    tier: store
+    x: 5
+    'y': 1.5
+    description: トランザクションの版とロックを扱う。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  rocks:
+    label: RocksDB のデータ
+    kind: db
+    tier: store
+    x: 10
+    'y': 1.5
+    description: KV と MVCC メタデータを column family と SST に格納する。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  flash:
+    label: TiFlash learner
+    kind: db
+    tier: store
+    x: 15
+    'y': 1.5
+    description: 設定した表の Region を列指向に複製する。
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+links:
+  - id: encode
+    from: sql
+    to: leader
+    label: キー範囲の leader に要求
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  - id: lookup
+    from: sql
+    to: pd
+    label: 時刻と配置を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  - id: replicate
+    from: leader
+    to: replica
+    label: Raft ログを複製
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  - id: apply
+    from: leader
+    to: mvcc
+    label: コミットと版を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  - id: persist
+    from: mvcc
+    to: rocks
+    label: KV と MVCC 情報を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+  - id: learner
+    from: leader
+    to: flash
+    label: 設定済み表を learner に複製
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+scenarios:
+  - id: write
+    label: 書き込みと複製
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+    steps:
+      - links:
+          - lookup
+        note: 時刻と配置を取得。
+        highlight:
+          - lead
+      - links:
+          - encode
+        note: キー範囲の leader に要求。
+        highlight:
+          - row
+          - idx
+          - lead
+      - links:
+          - replicate
+        note: Raft ログを複製。
+        highlight:
+          - lead
+          - follow
+      - links:
+          - apply
+        note: コミットと版を適用。
+        highlight:
+          - lock
+          - write
+      - links:
+          - persist
+        note: KV と MVCC 情報を保存。
+        highlight:
+          - write
+          - default
+          - sst
+    visual: physical-map
+  - id: analytics
+    label: TiFlash への複製
+    evidence:
+      - type: doc
+        ref: docs/reference-tidb-storage-internals.md#§2
+    steps:
+      - links:
+          - learner
+        note: 設定済み表を learner に複製。
+        highlight:
+          - lead
+    visual: physical-map
+implementations:
+  - id: local
+    label: TiUP Playground：複数 TiKV の単一ホスト検証
+    description: TiUP playground で複数の TiKV プロセスを単一ホストで起動し、Region の leader と follower を確認する学習用構成。TiFlash は表別に設定する。
+    sources:
+      - title: TiDB architecture
+        url: https://docs.pingcap.com/tidb/stable/tidb-architecture/
+      - title: TiDB computing
+        url: https://docs.pingcap.com/tidb/stable/tidb-computing/
+      - title: TiDB storage
+        url: https://docs.pingcap.com/tidb/stable/tidb-storage/
+      - title: TiKV RocksDB overview
+        url: https://docs.pingcap.com/tidb/stable/rocksdb-overview/
+      - title: TiFlash replicas
+        url: https://docs.pingcap.com/tidb/stable/create-tiflash-replicas/
+      - title: TiUP playground
+        url: https://docs.pingcap.com/tidb/stable/tiup-playground/
+    tiers:
+      - id: query
+        label: 入力・実行
+        z: 1
+        size:
+          - 20
+          - 4
+      - id: store
+        label: データの保存
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-sql:
+        label: TiDB の行・索引 KV
+        kind: service
+        tier: query
+        x: 0
+        'y': 1.5
+        description: 表 ID と行ハンドルや索引値からキーを組み立てる。
+        realizes:
+          - sql
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb-storage-internals.md#§4
+      impl-pd:
+        label: PD / TSO
+        kind: service
+        tier: query
+        x: 5
+        'y': 1.5
+        description: タイムスタンプや Region の配置情報を管理する。
+        realizes:
+          - pd
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb-storage-internals.md#§4
+      impl-leader:
+        label: TiKV の Region leader
+        kind: service
+        tier: query
+        x: 10
+        'y': 1.5
+        description: キー範囲の Raft グループで要求を受ける。
+        realizes:
+          - leader
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb-storage-internals.md#§4
+      impl-mvcc:
+        label: TiKV MVCC
+        kind: db
+        tier: store
+        x: 5
+        'y': 1.5
+        description: トランザクションの版とロックを扱う。
+        realizes:
+          - mvcc
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb-storage-internals.md#§4
+      impl-rocks:
+        label: TiKV RocksDB
+        kind: db
+        tier: store
+        x: 10
+        'y': 1.5
+        description: KV と MVCC メタデータを column family と SST に格納する。
+        realizes:
+          - rocks
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb-storage-internals.md#§4
+      impl-flash:
+        label: TiFlash learner
+        kind: db
+        tier: store
+        x: 15
+        'y': 1.5
+        description: 設定した表の Region を列指向に複製する。
+        realizes:
+          - flash
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb-storage-internals.md#§4
+      impl-replica:
+        label: 別 TiKV プロセスの follower
+        kind: service
+        tier: query
+        x: 15
+        'y': 1.5
+        description: Raft ログを複製する別の peer。
+        evidence:
+          - type: doc
+            ref: docs/reference-tidb-storage-internals.md#§4
+        realizes:
+          - replica
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - query
+          - store
+        nodes:
+          - impl-sql
+          - impl-pd
+          - impl-leader
+          - impl-mvcc
+          - impl-rocks
+          - impl-flash
+          - impl-replica
+blocks:
+  - id: physical-map
+    title: キーから Region・MVCC まで
+    note: 説明用の概念例です。実データの個数、配置、バージョンや設定を表すものではありません。
+    hint: 項目を選ぶと説明を表示します。シナリオの進行に合わせて該当項目を強調します。
+    lanes:
+      - id: keys
+        label: 行と索引の KV
+        node: sql
+      - id: regions
+        label: Region と複製
+        node: leader
+      - id: physical
+        label: 保存・MVCC
+        node: rocks
+    items:
+      keys:
+        - id: row
+          label: 行キー
+          k: 0
+          note: 表 ID と行ハンドルを含む行キーの概念例。
+        - id: idx
+          label: 索引キー
+          k: 1
+          note: 索引 ID と値を含むキーの概念例。
+      regions:
+        - id: lead
+          label: leader
+          k: 2
+          note: キー範囲の Raft leader。
+        - id: follow
+          label: follower
+          k: 3
+          note: 複数 TiKV ノードを使う場合の follower。
+      physical:
+        - id: lock
+          label: lock CF
+          k: 4
+          note: トランザクションのロック。
+        - id: write
+          label: write CF
+          k: 2
+          note: コミットと版に関する情報。
+        - id: default
+          label: default CF
+          k: 0
+          note: 値を保持する CF。短い値などは実装に依存する。
+        - id: sst
+          label: SST
+          k: 3
+          note: RocksDB の永続ファイル。

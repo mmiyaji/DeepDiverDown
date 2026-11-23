@@ -1,0 +1,390 @@
+name: H3：セル ID・階層・集計
+description: 利用者が Linux 上の Python 内で h3-py を使い、座標をセル ID に変換してファイルを集計する。厳密な境界判定は別途実装する。
+parent:
+  model: geospatial-h3
+  node: cell
+reference:
+  objectives:
+    - 書き込みと検索の経路を追う。
+    - データ構造と保持・復旧の役割を区別する。
+    - 実装の前提と制約を確認する。
+  sources:
+    - title: H3 Cell Index
+      url: https://h3geo.org/docs/library/index/cell/
+    - title: H3 overview
+      url: https://h3geo.org/docs/core-library/overview/
+    - title: H3 indexing
+      url: https://h3geo.org/docs/highlights/indexing/
+    - title: h3-py
+      url: https://uber.github.io/h3-py/
+sources:
+  - docs/reference-h3-index-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-h3-index-internals.md#§1
+  - type: doc
+    ref: docs/reference-h3-index-internals.md#§2
+  - type: doc
+    ref: docs/reference-h3-index-internals.md#§3
+  - type: doc
+    ref: docs/reference-h3-index-internals.md#§5
+tiers:
+  - id: write
+    label: 処理と検索
+    z: 1
+    size:
+      - 21
+      - 4
+  - id: disk
+    label: データと保存
+    z: 0
+    size:
+      - 21
+      - 4
+nodes:
+  coord:
+    label: 緯度・経度
+    kind: client
+    tier: write
+    x: 0
+    'y': 1.5
+    description: 緯度と経度、および目的に応じた解像度を入力する。
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§1
+  encode:
+    label: 位置をセルへ変換
+    kind: service
+    tier: write
+    x: 4
+    'y': 1.5
+    description: 位置と解像度から H3 セル ID を求める。
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§1
+  cell:
+    label: H3 セル ID（64 bit）
+    kind: file
+    tier: disk
+    x: 4
+    'y': 1.5
+    description: セルモード、解像度、基底セルと階層の情報を表す 64 ビット ID。
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  parent:
+    label: 親子・近傍の探索
+    kind: service
+    tier: write
+    x: 9
+    'y': 1.5
+    description: 論理的な親子関係や同解像度の近傍セルを求める。
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§1
+  join:
+    label: セル単位の結合・集計
+    kind: service
+    tier: write
+    x: 13
+    'y': 1.5
+    description: セル ID をキーにデータを結合・集計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§1
+  boundary:
+    label: 元の座標・領域
+    kind: db
+    tier: disk
+    x: 10
+    'y': 1.5
+    description: セルに変換する前の座標やポリゴン。
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  exact:
+    label: 必要に応じ厳密な判定
+    kind: service
+    tier: write
+    x: 17
+    'y': 1.5
+    description: 必要に応じ元座標と境界を使って候補を厳密に判定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§1
+links:
+  - id: a
+    from: coord
+    to: encode
+    label: 解像度と位置を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  - id: b
+    from: encode
+    to: cell
+    label: セル ID を生成
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  - id: c
+    from: cell
+    to: parent
+    label: 階層・近傍を求める
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  - id: d
+    from: cell
+    to: join
+    label: セル ID で集計
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  - id: e
+    from: parent
+    to: join
+    label: 対象セルを渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  - id: f
+    from: join
+    to: exact
+    label: 候補を絞る
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+  - id: g
+    from: boundary
+    to: exact
+    label: 元の座標で検証
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+scenarios:
+  - id: index
+    label: 位置の変換と集計
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+    steps:
+      - links:
+          - a
+        note: 解像度と位置を渡す。
+        highlight:
+          - p1
+          - p2
+      - links:
+          - b
+        note: セル ID を生成。
+        highlight:
+          - h1
+          - h2
+      - links:
+          - d
+        note: セル ID で集計。
+        highlight:
+          - h1
+          - h2
+          - count
+    visual: detail-map
+  - id: boundary
+    label: 階層と厳密な判定
+    evidence:
+      - type: doc
+        ref: docs/reference-h3-index-internals.md#§2
+    steps:
+      - links:
+          - c
+        note: 階層・近傍を求める。
+        highlight:
+          - h1
+          - h2
+          - p
+      - links:
+          - e
+        note: 対象セルを渡す。
+        highlight:
+          - p
+          - count
+      - links:
+          - f
+        note: 候補を絞る。
+        highlight:
+          - count
+      - links:
+          - g
+        note: 元の座標で検証。
+        highlight:
+          - p1
+          - p2
+    visual: detail-map
+implementations:
+  - id: local
+    label: Linux 上の Python と h3-py
+    description: 利用者が Linux 上の Python 内で h3-py を使い、座標をセル ID に変換してファイルを集計する。厳密な境界判定は別途実装する。
+    sources:
+      - title: H3 Cell Index
+        url: https://h3geo.org/docs/library/index/cell/
+      - title: H3 overview
+        url: https://h3geo.org/docs/core-library/overview/
+      - title: H3 indexing
+        url: https://h3geo.org/docs/highlights/indexing/
+      - title: h3-py
+        url: https://uber.github.io/h3-py/
+    tiers:
+      - id: write
+        label: 処理と検索
+        z: 1
+        size:
+          - 21
+          - 4
+      - id: disk
+        label: データと保存
+        z: 0
+        size:
+          - 21
+          - 4
+    nodes:
+      ex-coord:
+        label: 緯度・経度
+        kind: client
+        tier: write
+        x: 0
+        'y': 1.5
+        description: 緯度と経度、および目的に応じた解像度を入力する。
+        evidence:
+          - type: doc
+            ref: docs/reference-h3-index-internals.md#§4
+        realizes:
+          - coord
+      ex-encode:
+        label: 位置をセルへ変換
+        kind: service
+        tier: write
+        x: 4
+        'y': 1.5
+        description: 位置と解像度から H3 セル ID を求める。
+        evidence:
+          - type: doc
+            ref: docs/reference-h3-index-internals.md#§4
+        realizes:
+          - encode
+      ex-cell:
+        label: H3 セル ID（64 bit）
+        kind: file
+        tier: disk
+        x: 4
+        'y': 1.5
+        description: セルモード、解像度、基底セルと階層の情報を表す 64 ビット ID。
+        evidence:
+          - type: doc
+            ref: docs/reference-h3-index-internals.md#§4
+        realizes:
+          - cell
+      ex-parent:
+        label: 親子・近傍の探索
+        kind: service
+        tier: write
+        x: 9
+        'y': 1.5
+        description: 論理的な親子関係や同解像度の近傍セルを求める。
+        evidence:
+          - type: doc
+            ref: docs/reference-h3-index-internals.md#§4
+        realizes:
+          - parent
+      ex-join:
+        label: セル単位の結合・集計
+        kind: service
+        tier: write
+        x: 13
+        'y': 1.5
+        description: セル ID をキーにデータを結合・集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-h3-index-internals.md#§4
+        realizes:
+          - join
+      ex-boundary:
+        label: 元の座標・領域
+        kind: db
+        tier: disk
+        x: 10
+        'y': 1.5
+        description: セルに変換する前の座標やポリゴン。
+        evidence:
+          - type: doc
+            ref: docs/reference-h3-index-internals.md#§4
+        realizes:
+          - boundary
+      ex-exact:
+        label: 必要に応じ厳密な判定
+        kind: service
+        tier: write
+        x: 17
+        'y': 1.5
+        description: 必要に応じ元座標と境界を使って候補を厳密に判定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-h3-index-internals.md#§4
+        realizes:
+          - exact
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - write
+          - disk
+        nodes:
+          - ex-coord
+          - ex-encode
+          - ex-cell
+          - ex-parent
+          - ex-join
+          - ex-boundary
+          - ex-exact
+blocks:
+  - id: detail-map
+    title: セル ID と階層・集計
+    note: セル ID は架空の短縮表記です。解像度間の地理的な包含は近似です。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: points
+        label: 入力点
+        node: coord
+      - id: cells
+        label: 同解像度のセル
+        node: cell
+      - id: parents
+        label: 階層・集計
+        node: parent
+    items:
+      points:
+        - id: p1
+          label: 点 A
+          k: 0
+          note: 緯度・経度の例。
+        - id: p2
+          label: 点 B
+          k: 1
+          note: 別の入力点の例。
+      cells:
+        - id: h1
+          label: セル X
+          k: 0
+          note: 点 A を解像度付きのセルに変換した例。
+        - id: h2
+          label: セル Y
+          k: 1
+          note: 点 B を同じ解像度のセルに変換した例。
+      parents:
+        - id: p
+          label: 親セル
+          k: 2
+          note: 親子関係は論理的な階層。地理的包含は近似。
+        - id: count
+          label: 件数
+          k: 3
+          note: 同じ解像度のセルをキーに集計した結果。

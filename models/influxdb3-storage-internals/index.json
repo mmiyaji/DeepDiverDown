@@ -1,0 +1,237 @@
+{
+  "model": "influxdb3-storage-internals",
+  "name": "InfluxDB 3 Core：WAL と Parquet",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "write": {
+      "type": "node",
+      "label": "書き込み要求",
+      "status": "claim"
+    },
+    "buffer": {
+      "type": "node",
+      "label": "検証と書き込みバッファ",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "オブジェクトストアの WAL",
+      "status": "claim"
+    },
+    "recent": {
+      "type": "node",
+      "label": "クエリ可能なバッファ",
+      "status": "claim"
+    },
+    "parquet": {
+      "type": "node",
+      "label": "Parquet ファイル",
+      "status": "claim"
+    },
+    "cache": {
+      "type": "node",
+      "label": "Parquet メモリキャッシュ",
+      "status": "claim"
+    },
+    "query": {
+      "type": "scenario",
+      "label": "最新・過去の検索",
+      "status": "claim"
+    },
+    "a": {
+      "type": "link",
+      "label": "書き込み要求 → 検証と書き込みバッファ",
+      "status": "claim"
+    },
+    "b": {
+      "type": "link",
+      "label": "検証と書き込みバッファ → オブジェクトストアの WAL",
+      "status": "claim"
+    },
+    "c": {
+      "type": "link",
+      "label": "オブジェクトストアの WAL → クエリ可能なバッファ",
+      "status": "claim"
+    },
+    "d": {
+      "type": "link",
+      "label": "クエリ可能なバッファ → Parquet ファイル",
+      "status": "claim"
+    },
+    "e": {
+      "type": "link",
+      "label": "Parquet ファイル → Parquet メモリキャッシュ",
+      "status": "claim"
+    },
+    "q1": {
+      "type": "link",
+      "label": "SQL / InfluxQL → クエリ可能なバッファ",
+      "status": "claim"
+    },
+    "q2": {
+      "type": "link",
+      "label": "SQL / InfluxQL → Parquet メモリキャッシュ",
+      "status": "claim"
+    },
+    "q3": {
+      "type": "link",
+      "label": "SQL / InfluxQL → Parquet ファイル",
+      "status": "claim"
+    },
+    "ingest": {
+      "type": "scenario",
+      "label": "書き込みと永続化"
+    },
+    "ex-write": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "書き込み要求",
+      "realizes": [
+        "write"
+      ]
+    },
+    "ex-buffer": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "検証と書き込みバッファ",
+      "realizes": [
+        "buffer"
+      ]
+    },
+    "ex-wal": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "オブジェクトストアの WAL",
+      "realizes": [
+        "wal"
+      ]
+    },
+    "ex-recent": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "クエリ可能なバッファ",
+      "realizes": [
+        "recent"
+      ]
+    },
+    "ex-parquet": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "Parquet ファイル",
+      "realizes": [
+        "parquet"
+      ]
+    },
+    "ex-cache": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "Parquet メモリキャッシュ",
+      "realizes": [
+        "cache"
+      ]
+    },
+    "ex-query": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "SQL / InfluxQL",
+      "realizes": [
+        "query"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-influxdb3-storage-internals.md#§1": [
+      "model",
+      "write",
+      "buffer",
+      "recent",
+      "cache",
+      "query"
+    ],
+    "docs/reference-influxdb3-storage-internals.md": [
+      "model",
+      "write",
+      "buffer",
+      "wal",
+      "recent",
+      "parquet",
+      "cache",
+      "query",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "q1",
+      "q2",
+      "q3",
+      "ingest",
+      "ex-write",
+      "ex-buffer",
+      "ex-wal",
+      "ex-recent",
+      "ex-parquet",
+      "ex-cache",
+      "ex-query"
+    ],
+    "docs/reference-influxdb3-storage-internals.md#§2": [
+      "model",
+      "wal",
+      "parquet",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "q1",
+      "q2",
+      "q3",
+      "ingest",
+      "query"
+    ],
+    "docs/reference-influxdb3-storage-internals.md#§3": [
+      "model"
+    ],
+    "docs/reference-influxdb3-storage-internals.md#§5": [
+      "model"
+    ],
+    "docs/reference-influxdb3-storage-internals.md#§4": [
+      "ex-write",
+      "ex-buffer",
+      "ex-wal",
+      "ex-recent",
+      "ex-parquet",
+      "ex-cache",
+      "ex-query"
+    ]
+  },
+  "reference": {
+    "category": "時系列データ",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "time-series-data",
+    "objectives": [
+      "書き込みと検索の経路を追う。",
+      "データ構造と保持・復旧の役割を区別する。",
+      "実装の前提と制約を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "InfluxDB 3 Core durability",
+        "url": "https://docs.influxdata.com/influxdb3/core/reference/internals/durability/"
+      },
+      {
+        "title": "Core object storage",
+        "url": "https://docs.influxdata.com/influxdb3/core/object-storage/"
+      },
+      {
+        "title": "Core storage engine",
+        "url": "https://docs.influxdata.com/influxdb3/core/reference/internals/storage-engine/"
+      }
+    ]
+  }
+}

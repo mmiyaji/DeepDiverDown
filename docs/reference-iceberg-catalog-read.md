@@ -69,3 +69,25 @@ Trino の Iceberg REST カタログで委任認証情報を有効化し、Polari
 `iceberg.rest-catalog.vended-credentials-enabled` を有効にし、Coordinator と Worker の両方から分散ストレージへ到達できるよう構成する。対象は Iceberg v2 の位置削除を含む読み取りで、エンジンのフォーマット仕様対応を確認する。
 
 [Iceberg REST Catalog Spec](https://iceberg.apache.org/rest-catalog-spec/)、[Trino Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)、[Trino REST Catalog metastores](https://trino.io/docs/current/object-storage/metastores.html)、[Polaris Configuring S3 Storage](https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/)
+
+## 8. 実装例：EKS の Trino・Polaris と RDS・S3
+
+Trino Coordinator / Worker と Polaris を EKS の EC2 ノードで Pod として実行する例。Polaris は JDBC で RDS for PostgreSQL にカタログ状態を永続化し、テーブルの Iceberg メタデータとファイルは S3 に置く。Trino は REST API でテーブルを解決し、Polaris が AWS STS を使って発行する一時認証情報を使い S3 にアクセスする。
+
+| 機能 | 担い手 |
+| --- | --- |
+| クエリ計画と読み取り | EKS 上の Trino Coordinator / Worker Pods |
+| REST カタログ | EKS 上の Polaris Pod |
+| カタログ状態 | RDS for PostgreSQL |
+| 一時認証情報 | Polaris、AWS STS、IAM ロール |
+| テーブルファイル | Amazon S3 |
+| 実行基盤 | EKS と EC2 マネージドノードグループ |
+
+Polaris と Trino のバージョン互換性、JDBC の初期化と認証、S3・STS へのネットワークと IAM、REST カタログの認証を個別に構成する。EKS は Pod の実行環境であり、Trino や Polaris の運用そのものを AWS に委ねるものではない。
+
+[Trino on Kubernetes](https://trino.io/docs/current/installation/kubernetes.html)、[Polaris Helm persistence](https://polaris.apache.org/releases/1.9.0/helm-chart/persistence/)、[Polaris S3](https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/)、[EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)。
+
+自前例は利用者管理の Linux ホスト群で Trino と Polaris を実行し、Polaris の状態を自前 PostgreSQL に保存する。AWS 例は AWS が EKS 制御プレーン・EC2・RDS・STS・S3 基盤を運用し、利用者が Kubernetes API、ノード、Trino・Polaris、DB、IAM とデータを管理する。制御プレーンサーバーへの直接操作は想定しない。両例は公式資料を組み合わせた代表構成で、Trino と Polaris のバージョン、認証・IAM・ネットワークと削除形式の実動作は未検証。
+
+- [Trino deployment](https://trino.io/docs/current/installation/deployment.html)
+- [Polaris Helm persistence](https://polaris.apache.org/releases/1.9.0/helm-chart/persistence/)

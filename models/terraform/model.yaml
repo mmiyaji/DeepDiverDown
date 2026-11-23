@@ -1,0 +1,241 @@
+name: Terraform の構成計画と適用
+description: S3 バケットは事前作成し、S3 backend の use_lockfile を有効化する例。Terraform はコマンド実行時に処理し、単独では常時照合しない。state は機密情報を含み得るため権限と保護が必要。
+reference:
+  objectives:
+    - 構成要素と実行場所を理解する。
+    - 定義から変更の反映までの流れと状態管理を追う。
+  sources:
+    - title: Terraform plan
+      url: https://developer.hashicorp.com/terraform/cli/commands/plan
+    - title: State
+      url: https://developer.hashicorp.com/terraform/language/state
+    - title: S3 backend
+      url: https://developer.hashicorp.com/terraform/language/backend/s3
+sources:
+  - docs/reference-terraform.md
+evidence:
+  - type: doc
+    ref: docs/reference-terraform.md#§1
+  - type: doc
+    ref: docs/reference-terraform.md#§3
+  - type: doc
+    ref: docs/reference-terraform.md#§4
+tiers:
+  - id: flow
+    label: 定義・処理・対象
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: storage
+    label: 状態・補助情報
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  n0:
+    label: HCL 構成
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 宣言したリソースと依存関係。
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  n1:
+    label: 計画と適用
+    kind: service
+    tier: flow
+    x: 5
+    'y': 1.5
+    description: plan は通常リモートを読み、構成と state を比較し、apply で変更する。
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  n2:
+    label: 状態の保存
+    kind: file
+    tier: storage
+    x: 8
+    'y': 1.5
+    description: リソース対応を保持し、対応 backend でロックできる。
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  n3:
+    label: リソース操作
+    kind: service
+    tier: flow
+    x: 15
+    'y': 1.5
+    description: provider が外部 API を呼ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  n4:
+    label: 管理対象
+    kind: service
+    tier: flow
+    x: 20
+    'y': 1.5
+    description: API により作成・更新される。
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+links:
+  - id: l0
+    from: n0
+    to: n1
+    label: 構成を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  - id: l1
+    from: n2
+    to: n1
+    label: 状態を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  - id: l2
+    from: n1
+    to: n3
+    label: 変更を依頼
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  - id: l3
+    from: n3
+    to: n4
+    label: API で作成・更新
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+  - id: l4
+    from: n1
+    to: n2
+    label: 状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+scenarios:
+  - id: operation
+    label: 定義から反映まで
+    evidence:
+      - type: doc
+        ref: docs/reference-terraform.md#§2
+    steps:
+      - links:
+          - l0
+        note: 構成を読む。
+      - links:
+          - l1
+        note: 状態を読む。
+      - links:
+          - l2
+        note: 変更を依頼。
+      - links:
+          - l3
+        note: API で作成・更新。
+      - links:
+          - l4
+        note: 状態を保存。
+implementations:
+  - id: example
+    label: Linux の Terraform CLI と AWS
+    description: S3 バケットは事前作成し、S3 backend の use_lockfile を有効化する例。Terraform はコマンド実行時に処理し、単独では常時照合しない。state は機密情報を含み得るため権限と保護が必要。
+    sources:
+      - title: Terraform plan
+        url: https://developer.hashicorp.com/terraform/cli/commands/plan
+      - title: State
+        url: https://developer.hashicorp.com/terraform/language/state
+      - title: S3 backend
+        url: https://developer.hashicorp.com/terraform/language/backend/s3
+    tiers:
+      - id: flow
+        label: 定義・処理・対象
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: storage
+        label: 状態・補助情報
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-n0:
+        label: Linux 上の .tf ファイル
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 宣言したリソースと依存関係。
+        realizes:
+          - n0
+        evidence:
+          - type: doc
+            ref: docs/reference-terraform.md#§4
+      ex-n1:
+        label: Linux 上の Terraform CLI
+        kind: service
+        tier: flow
+        x: 5
+        'y': 1.5
+        description: plan は通常リモートを読み、構成と state を比較し、apply で変更する。
+        realizes:
+          - n1
+        evidence:
+          - type: doc
+            ref: docs/reference-terraform.md#§4
+      ex-n2:
+        label: Amazon S3 state とロックファイル
+        kind: file
+        tier: storage
+        x: 8
+        'y': 1.5
+        description: リソース対応を保持し、対応 backend でロックできる。
+        realizes:
+          - n2
+        evidence:
+          - type: doc
+            ref: docs/reference-terraform.md#§4
+        svc: aws:s3
+      ex-n3:
+        label: AWS provider プラグイン
+        kind: service
+        tier: flow
+        x: 15
+        'y': 1.5
+        description: provider が外部 API を呼ぶ。
+        realizes:
+          - n3
+        evidence:
+          - type: doc
+            ref: docs/reference-terraform.md#§4
+      ex-n4:
+        label: AWS の EC2 インスタンス
+        kind: service
+        tier: flow
+        x: 20
+        'y': 1.5
+        description: API により作成・更新される。
+        realizes:
+          - n4
+        evidence:
+          - type: doc
+            ref: docs/reference-terraform.md#§4
+        svc: aws:ec2
+    groups:
+      - kind: cloud
+        label: AWS アカウントのサービス領域（論理境界）
+        provider: aws
+        tier:
+          - flow
+          - storage
+        nodes:
+          - ex-n2
+          - ex-n4

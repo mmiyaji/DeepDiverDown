@@ -1,0 +1,243 @@
+name: Pulumi のプログラムからの IaC
+description: >-
+  Linux 上の Node.js と Pulumi CLI から AWS provider を使用し EC2 を管理する例。state は Pulumi Cloud に保存する選択で、AWS
+  の外側にある。継続的ドリフト検知は別のサービスや設定に依存する。
+reference:
+  objectives:
+    - 構成要素と実行場所を理解する。
+    - 定義から変更の反映までの流れと状態管理を追う。
+  sources:
+    - title: How Pulumi works
+      url: https://www.pulumi.com/docs/iac/guides/basics/how-pulumi-works/
+    - title: Providers
+      url: https://www.pulumi.com/docs/iac/concepts/providers/
+    - title: State and backends
+      url: https://www.pulumi.com/docs/iac/concepts/state-and-backends/
+sources:
+  - docs/reference-pulumi.md
+evidence:
+  - type: doc
+    ref: docs/reference-pulumi.md#§1
+  - type: doc
+    ref: docs/reference-pulumi.md#§3
+  - type: doc
+    ref: docs/reference-pulumi.md#§4
+tiers:
+  - id: flow
+    label: 定義・処理・対象
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: storage
+    label: 状態・補助情報
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  n0:
+    label: 構成プログラム
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 言語 SDK を使ってリソースを登録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  n1:
+    label: 実行と差分計算
+    kind: service
+    tier: flow
+    x: 5
+    'y': 1.5
+    description: language host と engine が宣言された依存と差分を処理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  n2:
+    label: 状態バックエンド
+    kind: file
+    tier: storage
+    x: 8
+    'y': 1.5
+    description: stack ごとの状態を保持し、別の backend も選択可能。
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  n3:
+    label: リソース操作
+    kind: service
+    tier: flow
+    x: 15
+    'y': 1.5
+    description: provider プロセスが外部 API を呼ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  n4:
+    label: 管理対象
+    kind: service
+    tier: flow
+    x: 20
+    'y': 1.5
+    description: プロバイダー経由で管理される。
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+links:
+  - id: l0
+    from: n0
+    to: n1
+    label: リソースを登録
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  - id: l1
+    from: n2
+    to: n1
+    label: stack state を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  - id: l2
+    from: n1
+    to: n3
+    label: 差分の操作を依頼
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  - id: l3
+    from: n3
+    to: n4
+    label: AWS API で作成・更新
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+  - id: l4
+    from: n1
+    to: n2
+    label: stack state を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+scenarios:
+  - id: operation
+    label: 定義から反映まで
+    evidence:
+      - type: doc
+        ref: docs/reference-pulumi.md#§2
+    steps:
+      - links:
+          - l0
+        note: リソースを登録。
+      - links:
+          - l1
+        note: stack state を読む。
+      - links:
+          - l2
+        note: 差分の操作を依頼。
+      - links:
+          - l3
+        note: AWS API で作成・更新。
+      - links:
+          - l4
+        note: stack state を保存。
+implementations:
+  - id: example
+    label: Node.js の Pulumi と AWS
+    description: >-
+      Linux 上の Node.js と Pulumi CLI から AWS provider を使用し EC2 を管理する例。state は Pulumi Cloud に保存する選択で、AWS
+      の外側にある。継続的ドリフト検知は別のサービスや設定に依存する。
+    sources:
+      - title: How Pulumi works
+        url: https://www.pulumi.com/docs/iac/guides/basics/how-pulumi-works/
+      - title: Providers
+        url: https://www.pulumi.com/docs/iac/concepts/providers/
+      - title: State and backends
+        url: https://www.pulumi.com/docs/iac/concepts/state-and-backends/
+    tiers:
+      - id: flow
+        label: 定義・処理・対象
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: storage
+        label: 状態・補助情報
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-n0:
+        label: TypeScript プログラムと Node.js
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 言語 SDK を使ってリソースを登録する。
+        realizes:
+          - n0
+        evidence:
+          - type: doc
+            ref: docs/reference-pulumi.md#§4
+      ex-n1:
+        label: Linux 上の Pulumi CLI と engine
+        kind: service
+        tier: flow
+        x: 5
+        'y': 1.5
+        description: language host と engine が宣言された依存と差分を処理する。
+        realizes:
+          - n1
+        evidence:
+          - type: doc
+            ref: docs/reference-pulumi.md#§4
+      ex-n2:
+        label: Pulumi Cloud の stack state
+        kind: file
+        tier: storage
+        x: 8
+        'y': 1.5
+        description: stack ごとの状態を保持し、別の backend も選択可能。
+        realizes:
+          - n2
+        evidence:
+          - type: doc
+            ref: docs/reference-pulumi.md#§4
+      ex-n3:
+        label: Pulumi AWS provider
+        kind: service
+        tier: flow
+        x: 15
+        'y': 1.5
+        description: provider プロセスが外部 API を呼ぶ。
+        realizes:
+          - n3
+        evidence:
+          - type: doc
+            ref: docs/reference-pulumi.md#§4
+      ex-n4:
+        label: AWS の EC2 インスタンス
+        kind: service
+        tier: flow
+        x: 20
+        'y': 1.5
+        description: プロバイダー経由で管理される。
+        realizes:
+          - n4
+        evidence:
+          - type: doc
+            ref: docs/reference-pulumi.md#§4
+        svc: aws:ec2
+    groups:
+      - kind: cloud
+        label: AWS アカウントのサービス領域（論理境界）
+        provider: aws
+        tier:
+          - flow
+          - storage
+        nodes:
+          - ex-n4

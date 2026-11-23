@@ -235,6 +235,9 @@ implementations:
           - 14
           - 3
     nodes:
+      ex-host: {label: 利用者管理の MCP ホスト, kind: host, tier: access, x: 2, y: 2, description: MCP クライアントを含むエージェントを実行する。, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§3}]}
+      ex-tools-host: {label: 利用者管理の MCP ツール実行基盤, kind: host, tier: data, x: 3, y: 2, description: 指標と文書検索ツールを実行する。具体的な実行基盤は未選定。, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§3}]}
+      ex-model: {label: 外部 LLM API（提供元未選定）, kind: external, tier: ops, x: 12, y: 2, description: この例でエージェントが回答生成に利用する外部モデル。提供元と実装は未選定。, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§3}]}
       ex-question:
         label: 利用者
         kind: actor
@@ -344,7 +347,130 @@ implementations:
           - type: doc
             ref: docs/reference-mcp-data-agent.md#§3
     links:
+      - {id: ex-run-agent, from: ex-host, to: ex-agent, label: MCP クライアントを実行, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§3}]}
+      - {id: ex-run-metrics, from: ex-tools-host, to: ex-metrics, label: 指標ツールを実行, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§3}]}
+      - {id: ex-run-search, from: ex-tools-host, to: ex-search, label: 検索ツールを実行, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§3}]}
+      - {id: ex-model-call, from: ex-agent, to: ex-model, label: 回答生成を要求, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§3}]}
       - id: ex-record-policy
         from: ex-logpolicy
         to: ex-trace
         label: 記録方針を適用
+
+    layout2d:
+      tiers: [{id: diagram, label: エージェントとデータ, z: 0, origin: [-4, 0], size: [30, 15]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-agent: {tier: diagram, x: 4, y: 1}
+        ex-tools-host: {tier: diagram, x: 13, y: 1}
+        ex-metrics: {tier: diagram, x: 16, y: 1}
+        ex-search: {tier: diagram, x: 19, y: 1}
+        ex-identity: {tier: diagram, x: 21, y: 1}
+        ex-warehouse: {tier: diagram, x: 24, y: 1}
+        ex-documents: {tier: diagram, x: 27, y: 1}
+        ex-trace: {tier: diagram, x: 21, y: 4}
+        ex-model: {tier: diagram, x: 24, y: 4}
+        ex-question: {tier: diagram, x: -3, y: 1}
+        ex-review: {tier: diagram, x: -1.2, y: 1}
+        ex-logpolicy: {tier: diagram, x: 3, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の MCP ホスト, tier: [diagram], x0: 0, y0: 0, x1: 12, y1: 13, nodes: [ex-host, ex-agent]}
+        - {kind: datacenter, label: MCP ツール実行基盤, tier: [diagram], x0: 12, y0: 0, x1: 20, y1: 8, nodes: [ex-tools-host, ex-metrics, ex-search]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤・公開サービス, z: 0, size: [12, 12]}
+        - {id: apps, label: ホスト上の処理, z: 1, size: [12, 12]}
+        - {id: other, label: 独立したツール・データ, z: 0, origin: [15, 0], size: [10, 10]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 9]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-agent: {tier: apps, x: 4, y: 1}
+        ex-tools-host: {tier: other, x: 1, y: 1}
+        ex-metrics: {tier: other, x: 4, y: 1}
+        ex-search: {tier: other, x: 7, y: 1}
+        ex-identity: {tier: other, x: 1, y: 1}
+        ex-warehouse: {tier: other, x: 4, y: 1}
+        ex-documents: {tier: other, x: 7, y: 1}
+        ex-trace: {tier: other, x: 1, y: 4}
+        ex-model: {tier: other, x: 4, y: 4}
+        ex-question: {tier: user, x: 1, y: 1}
+        ex-review: {tier: user, x: 4, y: 1}
+        ex-logpolicy: {tier: user, x: 7, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の MCP ホスト, tier: [host, apps], nodes: [ex-host, ex-agent]}
+
+  - id: aws-ecs-mcp
+    label: "ECS on Fargate の MCP クライアントと読取ツール"
+    description: "ECS on Fargate で MCP ホストと2つの読取専用 MCP サーバーを運用する。Bedrock が回答を組み立て、検索と指標の取得はホストが実行する。"
+    sources:
+      - {title: Fargate security, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-security-considerations.html}
+      - {title: "MCP の HTTP 認可仕様", url: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization}
+      - {title: "Cognito のスコープとリソースバインディング", url: https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-define-resource-servers.html}
+      - {title: "Bedrock のクライアント側ツール利用", url: https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use-client-side.html}
+      - {title: "Athena のワークグループ", url: https://docs.aws.amazon.com/athena/latest/ug/workgroups-manage-queries-control-costs.html}
+      - {title: "PostgreSQL の全文検索", url: https://www.postgresql.org/docs/current/functions-textsearch.html}
+      - {title: "Bedrock モデル呼び出しのログ設定", url: https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-ecs-mcp-ecs, aws-ecs-mcp-auth, aws-ecs-mcp-model, aws-ecs-mcp-host, aws-ecs-mcp-metrics, aws-ecs-mcp-search, aws-ecs-mcp-warehouse, aws-ecs-mcp-lake, aws-ecs-mcp-documents, aws-ecs-mcp-logs]}
+      - {kind: vpc, label: "Fargate のタスクと RDS の VPC", provider: aws, tier: [runtime, data], nodes: [aws-ecs-mcp-host, aws-ecs-mcp-metrics, aws-ecs-mcp-search, aws-ecs-mcp-documents]}
+    nodes:
+      aws-ecs-mcp-user: {label: "利用者", kind: actor, tier: entry, x: 1, y: 1.3, realizes: [question], description: "認証済みセッションから指標と関連文書を質問する。", evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-ops: {label: "運用担当者", kind: actor, tier: entry, x: 1, y: 3.3, realizes: [review], description: "実行履歴やエラーの傾向を確認する。", evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-ecs: {label: "Amazon ECS サービス", kind: service, tier: runtime, x: 1, y: 0.6, svc: ecs, description: "ホストとツールの Fargate タスクを稼働・更新する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-auth: {label: "Cognito の OAuth 認可", kind: service, tier: runtime, x: 5, y: 0.6, svc: cognito, realizes: [identity], description: "事前登録したクライアントにリソース別のアクセス JWT を発行する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-model: {label: "Amazon Bedrock Converse", kind: service, tier: runtime, x: 12, y: 0.6, svc: bedrock, description: "対応モデルがツールの呼び出しを提案し、許可された結果から回答を組み立てる。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-host: {label: "Fargate の MCP ホスト", kind: service, tier: runtime, x: 2, y: 4.6, svc: fargate, realizes: [agent], description: "利用者のセッションで認可し、取得したトークンで許可した MCP ツールを呼び出す。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-metrics: {label: "Fargate の指標 MCP サーバー", kind: service, tier: runtime, x: 8, y: 4.6, svc: fargate, realizes: [metrics], description: "このサーバー向けの JWT を検証し、許可した指標の固定 SQL だけを実行する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-search: {label: "Fargate の検索 MCP サーバー", kind: service, tier: runtime, x: 14, y: 4.6, svc: fargate, realizes: [search], description: "要求ごとにスコープとデータ範囲を検査して文書スニペットを返す。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-warehouse: {label: "Athena の指標ワークグループ", kind: db, tier: data, x: 8, y: 1.4, svc: athena, realizes: [warehouse], description: "許可した集計済みテーブルだけにクエリを発行する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-lake: {label: "S3 の分析データ", kind: db, tier: data, x: 4, y: 1.4, svc: s3, description: "Athena が読む集計データと、別の限定領域にクエリ結果を保持する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-documents: {label: "RDS PostgreSQL の文書", kind: db, tier: data, x: 14, y: 1.4, svc: rds, realizes: [documents], description: "文書とアクセス区分を保存し、全文検索を提供する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      aws-ecs-mcp-logs: {label: "CloudWatch Logs", kind: monitor, tier: data, x: 0, y: 1.4, svc: cloudwatch, realizes: [trace], description: "操作 ID、ツール名、判定と結果コードを記録する。", management: {type: shared, scope: AWS がサービス基盤を運用し、利用者が設定・権限・データを管理する。}, evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+    links:
+      - {id: aws-ecs-mcp-run-host, from: aws-ecs-mcp-ecs, to: aws-ecs-mcp-host, label: "MCP ホストを起動", evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      - {id: aws-ecs-mcp-run-metrics, from: aws-ecs-mcp-ecs, to: aws-ecs-mcp-metrics, label: "指標サーバーを起動", evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      - {id: aws-ecs-mcp-run-search, from: aws-ecs-mcp-ecs, to: aws-ecs-mcp-search, label: "検索サーバーを起動", evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      - {id: aws-ecs-mcp-converse, from: aws-ecs-mcp-host, to: aws-ecs-mcp-model, label: "許可したデータでモデルを呼び出す", evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+      - {id: aws-ecs-mcp-scan, from: aws-ecs-mcp-warehouse, to: aws-ecs-mcp-lake, label: "集計用データを読み結果を保存", evidence: [{type: doc, ref: docs/reference-mcp-data-agent.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: エージェントとデータ, z: 0, origin: [-4, 0], size: [30, 15]}]
+      nodes:
+        aws-ecs-mcp-ecs: {tier: diagram, x: 1, y: 1}
+        aws-ecs-mcp-auth: {tier: diagram, x: 4, y: 1}
+        aws-ecs-mcp-model: {tier: diagram, x: 7, y: 1}
+        aws-ecs-mcp-host: {tier: diagram, x: 1, y: 4}
+        aws-ecs-mcp-metrics: {tier: diagram, x: 4, y: 4}
+        aws-ecs-mcp-search: {tier: diagram, x: 7, y: 4}
+        aws-ecs-mcp-warehouse: {tier: diagram, x: 13, y: 1}
+        aws-ecs-mcp-lake: {tier: diagram, x: 16, y: 1}
+        aws-ecs-mcp-documents: {tier: diagram, x: 19, y: 1}
+        aws-ecs-mcp-logs: {tier: diagram, x: 13, y: 4}
+        aws-ecs-mcp-user: {tier: diagram, x: -3, y: 1}
+        aws-ecs-mcp-ops: {tier: diagram, x: -1.2, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [diagram], x0: 0, y0: 0, x1: 22, y1: 13, nodes: [aws-ecs-mcp-ecs, aws-ecs-mcp-auth, aws-ecs-mcp-model, aws-ecs-mcp-host, aws-ecs-mcp-metrics, aws-ecs-mcp-search, aws-ecs-mcp-warehouse, aws-ecs-mcp-lake, aws-ecs-mcp-documents, aws-ecs-mcp-logs]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤・公開サービス, z: 0, size: [12, 12]}
+        - {id: apps, label: ホスト上の処理, z: 1, size: [12, 12]}
+        - {id: other, label: 独立したツール・データ, z: 0, origin: [15, 0], size: [10, 10]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 9]}
+      nodes:
+        aws-ecs-mcp-ecs: {tier: host, x: 1, y: 1}
+        aws-ecs-mcp-auth: {tier: host, x: 4, y: 1}
+        aws-ecs-mcp-model: {tier: host, x: 7, y: 1}
+        aws-ecs-mcp-host: {tier: host, x: 1, y: 4}
+        aws-ecs-mcp-metrics: {tier: host, x: 4, y: 4}
+        aws-ecs-mcp-search: {tier: host, x: 7, y: 4}
+        aws-ecs-mcp-warehouse: {tier: other, x: 1, y: 1}
+        aws-ecs-mcp-lake: {tier: other, x: 4, y: 1}
+        aws-ecs-mcp-documents: {tier: other, x: 7, y: 1}
+        aws-ecs-mcp-logs: {tier: other, x: 1, y: 4}
+        aws-ecs-mcp-user: {tier: user, x: 1, y: 1}
+        aws-ecs-mcp-ops: {tier: user, x: 4, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [host, apps, other], nodes: [aws-ecs-mcp-ecs, aws-ecs-mcp-auth, aws-ecs-mcp-model, aws-ecs-mcp-host, aws-ecs-mcp-metrics, aws-ecs-mcp-search, aws-ecs-mcp-warehouse, aws-ecs-mcp-lake, aws-ecs-mcp-documents, aws-ecs-mcp-logs]}

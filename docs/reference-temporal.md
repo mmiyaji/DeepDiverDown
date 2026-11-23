@@ -46,9 +46,37 @@ Kubernetes の Temporal Service と PostgreSQL を使い、注文処理の Worke
 
 - **PostgreSQL の Visibility スキーマ**。Web UI / CLI で実行一覧を絞り込むための参照データを保持する。
 
+この例では利用者が Kubernetes ノード上の Temporal Server・注文 API・Worker と、クラスタ外の PostgreSQL ホストを運用する。利用者がデータ、バックアップ、アクセスとワークロードの設定を管理する。複数の公式資料を組み合わせた未検証の代表例で、ノード、DB 製品版、ストレージと接続条件は導入時に確認する。
+
 注文 Worker は同じ Deployment の Pod の例で、B への割り当ては固定されない。Persistence と Visibility のスキーマを用意し、外部決済の冪等性は決済先との契約で確保する。
 
 公式資料
 - [Self-hosted Temporal Service](https://docs.temporal.io/self-hosted-guide)
 - [Temporal Visibility setup](https://docs.temporal.io/self-hosted-guide/visibility)
 - [Temporal Task Queues](https://docs.temporal.io/task-queue)
+
+
+## 7. 実装例：Amazon EKS 上の Temporal と RDS PostgreSQL
+
+Temporal Server と注文用 Worker を Amazon EKS の EC2 ノードで運用する。RDS PostgreSQL に実行履歴と Visibility を分けて永続化する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| タスクの制御 | EKS 上の Temporal Frontend、History、Matching。注文用と決済用の Worker Deployment が Frontend をポーリングする。 |
+| 実行履歴 | RDS for PostgreSQL の Persistence データベース。 |
+| 実行検索 | 同じ RDS インスタンスの別の Visibility データベース。 |
+| 決済 | クラスター外の決済 API。Activity から同じ注文操作キーを送る。 |
+
+EKS の制御プレーンは AWS 管理 VPC 内にあり、利用者は API と公開設定を操作できるが、そのサーバーへ直接アクセスしない。AWS は RDS の基盤を運用し、利用者はデータ、接続、認証とバックアップ設定を管理する。RDS は EKS クラスタ外の独立サービスである。複数の公式資料を組み合わせた未検証の代表例であり、バージョン互換性、権限、ネットワーク、バックアップと復元を導入時に検証する。
+
+公式 Helm チャートで外部 PostgreSQL を指定し、Temporal Server に対応する Persistence と Visibility のスキーマを適用する。Kubernetes と Temporal Server の運用は利用者が担当し、Temporal Cloud のサービス境界はこの構成に含まれない。Worker から Frontend の gRPC 接続を TLS とクライアント認証で保護し、RDS では専用ユーザー、TLS と接続元制限を使う。Worker B は再配置の例であり、割り当て先は固定しない。決済側の操作キー契約がない場合、Temporal の Activity 再試行だけで二重請求を防げるという前提は置かない。
+
+公式資料
+
+- [EKS Control Plane](https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html)
+- [RDS security](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.html)
+- [Temporal の自己管理構成](https://docs.temporal.io/self-hosted-guide)
+- [Temporal の公式 Helm チャート](https://github.com/temporalio/helm-charts/blob/main/README.md)
+- [Temporal Visibility の対応データベース](https://docs.temporal.io/self-hosted-guide/visibility)
+- [Temporal の本番構成チェックリスト](https://docs.temporal.io/self-hosted-guide/production-checklist)
+- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)

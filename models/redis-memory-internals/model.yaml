@@ -1,0 +1,365 @@
+name: Redis：データ型とメモリ内の構造
+description: キー空間、型と内部エンコーディング、TTL とメモリ圧迫時の挙動を追う。
+parent:
+  model: redis
+  node: memory
+reference:
+  objectives:
+    - データの格納とアクセスの仕組みを理解する。
+    - 物理構造と運用・障害時の前提を区別する。
+  sources:
+    - title: メモリ最適化
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/memory-optimization/
+    - title: OBJECT ENCODING
+      url: https://redis.io/docs/latest/commands/object-encoding/
+    - title: Key eviction
+      url: https://redis.io/docs/latest/develop/reference/eviction/
+    - title: INFO
+      url: https://redis.io/docs/latest/commands/info/
+    - title: Redis 7.2 Hash の実装
+      url: https://github.com/redis/redis/blob/7.2/src/t_hash.c
+sources:
+  - docs/reference-redis-memory-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-redis-memory-internals.md#§1
+  - type: doc
+    ref: docs/reference-redis-memory-internals.md#§3
+  - type: doc
+    ref: docs/reference-redis-memory-internals.md#§5
+tiers:
+  - id: access
+    label: 操作と処理
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: data
+    label: データと保存
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  request:
+    label: コマンドとキー
+    kind: client
+    tier: access
+    x: 0
+    'y': 1.5
+    description: キーを指定し、型に応じた操作を要求する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  keyspace:
+    label: キー空間の検索
+    kind: service
+    tier: access
+    x: 5
+    'y': 1.5
+    description: キーから対象の値を参照する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  value:
+    label: 型と内部エンコーディング
+    kind: db
+    tier: data
+    x: 5
+    'y': 1.5
+    description: 型とエンコーディングに従って値を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  compact:
+    label: コンパクトな表現
+    kind: db
+    tier: data
+    x: 10
+    'y': 1.5
+    description: Redis 7.2 の Hash では listpack に field と value を交互に保持する。型と設定により intset 等も用いられる。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  expanded:
+    label: 要素数に応じた表現
+    kind: db
+    tier: data
+    x: 15
+    'y': 1.5
+    description: Redis 7.2 の Hash は要素数や値の長さ等の条件に応じ listpack からハッシュテーブルへ変換する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  expiry:
+    label: TTL と eviction
+    kind: service
+    tier: access
+    x: 10
+    'y': 1.5
+    description: 期限切れとメモリ上限時のポリシーを管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  result:
+    label: 読み取り結果
+    kind: client
+    tier: access
+    x: 15
+    'y': 1.5
+    description: クライアントに結果を返す。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+links:
+  - id: a
+    from: request
+    to: keyspace
+    label: キーを指定
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  - id: b
+    from: keyspace
+    to: value
+    label: 値と型を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  - id: c
+    from: value
+    to: compact
+    label: 小さい値をコンパクトに保持
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  - id: d
+    from: value
+    to: expanded
+    label: 条件に応じ別の表現を使う
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  - id: e
+    from: expiry
+    to: keyspace
+    label: 期限・メモリ上限を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+  - id: f
+    from: keyspace
+    to: result
+    label: 結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+scenarios:
+  - id: read
+    label: キーの検索と内部表現
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+    visual: structure
+    steps:
+      - links:
+          - a
+        note: キーを指定。
+        highlight:
+          - k1
+          - k2
+      - links:
+          - b
+        note: 値と型を参照。
+        highlight:
+          - k1
+          - listpack
+      - links:
+          - c
+        note: 小さい値をコンパクトに保持。
+        highlight:
+          - listpack
+          - intset
+      - links:
+          - f
+        note: 結果を返す。
+        highlight:
+          - k1
+  - id: memory
+    label: 期限とメモリ上限
+    evidence:
+      - type: doc
+        ref: docs/reference-redis-memory-internals.md#§2
+    visual: structure
+    steps:
+      - links:
+          - e
+        note: 期限・メモリ上限を適用。
+        highlight:
+          - k1
+          - k2
+      - links:
+          - d
+        note: 条件に応じ別の表現を使う。
+        highlight:
+          - table
+implementations:
+  - id: linux
+    label: Linux 上の単一 Redis プロセス
+    description: Linux 上に Redis を構成し、キーの読み書きと OBJECT ENCODING、INFO memory で内部表現と使用量を確認する例。
+    sources:
+      - title: メモリ最適化
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/memory-optimization/
+      - title: OBJECT ENCODING
+        url: https://redis.io/docs/latest/commands/object-encoding/
+      - title: Key eviction
+        url: https://redis.io/docs/latest/develop/reference/eviction/
+      - title: INFO
+        url: https://redis.io/docs/latest/commands/info/
+    tiers:
+      - id: access
+        label: 操作と処理
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: data
+        label: データと保存
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-request:
+        label: コマンドとキー
+        kind: client
+        tier: access
+        x: 0
+        'y': 1.5
+        description: キーを指定し、型に応じた操作を要求する。
+        realizes:
+          - request
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-memory-internals.md#§4
+      ex-keyspace:
+        label: キー空間の検索
+        kind: service
+        tier: access
+        x: 5
+        'y': 1.5
+        description: キーから対象の値を参照する。
+        realizes:
+          - keyspace
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-memory-internals.md#§4
+      ex-value:
+        label: 型と内部エンコーディング
+        kind: db
+        tier: data
+        x: 5
+        'y': 1.5
+        description: 型とエンコーディングに従って値を保持する。
+        realizes:
+          - value
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-memory-internals.md#§4
+      ex-compact:
+        label: コンパクトな表現
+        kind: db
+        tier: data
+        x: 10
+        'y': 1.5
+        description: 小さい集合等に listpack や intset 等を使用する場合がある。
+        realizes:
+          - compact
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-memory-internals.md#§4
+      ex-expanded:
+        label: 要素数に応じた表現
+        kind: db
+        tier: data
+        x: 15
+        'y': 1.5
+        description: 型とサイズに応じたハッシュテーブル等の表現を使用する。
+        realizes:
+          - expanded
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-memory-internals.md#§4
+      ex-expiry:
+        label: TTL と eviction
+        kind: service
+        tier: access
+        x: 10
+        'y': 1.5
+        description: 期限切れとメモリ上限時のポリシーを管理する。
+        realizes:
+          - expiry
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-memory-internals.md#§4
+      ex-result:
+        label: 読み取り結果
+        kind: client
+        tier: access
+        x: 15
+        'y': 1.5
+        description: クライアントに結果を返す。
+        realizes:
+          - result
+        evidence:
+          - type: doc
+            ref: docs/reference-redis-memory-internals.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者が管理する Linux の実行環境（論理範囲）
+        tier:
+          - access
+          - data
+        nodes:
+          - ex-request
+          - ex-keyspace
+          - ex-value
+          - ex-compact
+          - ex-expanded
+          - ex-expiry
+          - ex-result
+blocks:
+  - id: structure
+    title: キーと内部表現の例
+    note: 表現は概念例であり、Redis の版、設定、要素数・値により変わります。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: keys
+        label: キー空間
+        node: keyspace
+      - id: enc
+        label: 値の内部表現
+        node: value
+    items:
+      keys:
+        - id: k1
+          label: user:1
+          k: 0
+          note: キーは値への参照を持つ。
+        - id: k2
+          label: scores
+          k: 1
+          note: 別の値を識別するキーの例。
+      enc:
+        - id: listpack
+          label: listpack
+          k: 2
+          note: 小さい集合型のコンパクト表現の例。
+        - id: intset
+          label: intset
+          k: 3
+          note: 整数のみの小さい Set などで使われる表現。
+        - id: table
+          label: 別の表現
+          k: 4
+          note: 閾値、型、版により別の表現を使う。

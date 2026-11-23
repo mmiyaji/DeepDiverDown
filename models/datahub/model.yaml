@@ -272,6 +272,8 @@ implementations:
       - title: DataHub Docker Container Architecture
         url: https://archive.docs.datahub.com/docs/1.2.0/architecture/docker-containers
     nodes:
+      datahub-compose-consumer: {label: Metadata change consumer, kind: worker, tier: datahub, x: 14, y: 3, evidence: [{type: doc, ref: "docs/reference-datahub.md#§7"}]}
+      datahub-compose-host: {label: Docker Compose host, kind: host, tier: datahub, x: 14, y: 1, evidence: [{type: doc, ref: "docs/reference-datahub.md#§7"}]}
       datahub-compose-warehouse:
         label: Snowflake のデータセット
         kind: external
@@ -390,6 +392,7 @@ implementations:
           - type: doc
             ref: docs/reference-datahub.md#§7
     links:
+      - {id: datahub-compose-consumer-index, from: datahub-compose-consumer, to: datahub-compose-search, label: "Update search index", evidence: [{type: doc, ref: "docs/reference-datahub.md#§7"}]}
       - id: datahub-compose-dbt-ingest
         from: datahub-compose-dbt
         to: datahub-compose-cli
@@ -406,8 +409,8 @@ implementations:
             ref: docs/reference-datahub.md#§7
       - id: datahub-compose-index-change
         from: datahub-compose-kafka
-        to: datahub-compose-search
-        label: 変更を受けて索引に反映
+        to: datahub-compose-consumer
+        label: 変更イベントを受信
         evidence:
           - type: doc
             ref: docs/reference-datahub.md#§7
@@ -417,3 +420,129 @@ implementations:
         label: Snowflake
         tier: [people]
         nodes: [datahub-compose-warehouse]
+
+
+    layout2d:
+      tiers: [{id: diagram, label: Local containers and sources, z: 0, size: [31, 14]}]
+      nodes:
+        datahub-compose-host: {tier: diagram, x: 3, y: 2}
+        datahub-compose-cli: {tier: diagram, x: 7, y: 2}
+        datahub-compose-gms: {tier: diagram, x: 11, y: 2}
+        datahub-compose-ui: {tier: diagram, x: 15, y: 2}
+        datahub-compose-mysql: {tier: diagram, x: 3, y: 6}
+        datahub-compose-search: {tier: diagram, x: 7, y: 6}
+        datahub-compose-kafka: {tier: diagram, x: 11, y: 6}
+        datahub-compose-consumer: {tier: diagram, x: 15, y: 6}
+        datahub-compose-warehouse: {tier: diagram, x: 22, y: 1}
+        datahub-compose-dbt: {tier: diagram, x: 26, y: 1}
+        datahub-compose-assertions: {tier: diagram, x: 22, y: 4}
+        datahub-compose-user: {tier: diagram, x: 26, y: 4}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: diagram, nodes: [datahub-compose-host, datahub-compose-cli, datahub-compose-gms, datahub-compose-ui, datahub-compose-mysql, datahub-compose-search, datahub-compose-kafka, datahub-compose-consumer]}
+        - {kind: cloud, provider: snowflake, label: External data platform, tier: diagram, nodes: [datahub-compose-warehouse]}
+    layout3d:
+      tiers:
+        - {id: containers, label: Containers, z: 1, size: [16, 6]}
+        - {id: host, label: Docker host, z: 0, size: [16, 6]}
+        - {id: outside, label: Sources and users, kind: origin, z: 0, origin: [20, 0], size: [16, 6]}
+      nodes:
+        datahub-compose-host: {tier: host, x: 2, y: 1}
+        datahub-compose-cli: {tier: containers, x: 6, y: 1}
+        datahub-compose-gms: {tier: containers, x: 10, y: 1}
+        datahub-compose-ui: {tier: containers, x: 14, y: 1}
+        datahub-compose-mysql: {tier: containers, x: 2, y: 4}
+        datahub-compose-search: {tier: containers, x: 6, y: 4}
+        datahub-compose-kafka: {tier: containers, x: 10, y: 4}
+        datahub-compose-consumer: {tier: containers, x: 14, y: 4}
+        datahub-compose-warehouse: {tier: outside, x: 2, y: 1}
+        datahub-compose-dbt: {tier: outside, x: 6, y: 1}
+        datahub-compose-assertions: {tier: outside, x: 10, y: 1}
+        datahub-compose-user: {tier: outside, x: 14, y: 1}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: [containers, host], nodes: [datahub-compose-host, datahub-compose-cli, datahub-compose-gms, datahub-compose-ui, datahub-compose-mysql, datahub-compose-search, datahub-compose-kafka, datahub-compose-consumer]}
+        - {kind: cloud, provider: snowflake, label: External data platform, tier: outside, nodes: [datahub-compose-warehouse]}
+
+  - id: aws-eks-datahub
+    label: "Amazon EKS 上の DataHub・RDS・MSK・OpenSearch"
+    description: "DataHub を Helm で EKS の EC2 ノード上に展開する。RDS に Aspect を保持し、MSK の変更イベントを処理して OpenSearch の索引を更新する。"
+    sources:
+      - {title: "DataHub の AWS デプロイ", url: https://docs.datahub.com/docs/deploy/aws}
+      - {title: "DataHub の Kubernetes デプロイ", url: https://docs.datahub.com/docs/deploy/kubernetes}
+      - {title: "DataHub dbt コネクター", url: https://docs.datahub.com/docs/generated/ingestion/sources/dbt}
+      - {title: "EKS マネージドノードグループ", url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+      - {title: EKS managed node groups, url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-eks-datahub-eks, aws-eks-datahub-nodes, aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-indexer, aws-eks-datahub-registry, aws-eks-datahub-db, aws-eks-datahub-msk, aws-eks-datahub-index]}
+      - {kind: cluster, label: "Amazon EKS クラスター", provider: k8s, tier: [runtime], nodes: [aws-eks-datahub-eks, aws-eks-datahub-nodes, aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-indexer, aws-eks-datahub-registry]}
+      - {kind: namespace, label: "DataHub 名前空間", provider: k8s, tier: [runtime], nodes: [aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-indexer, aws-eks-datahub-registry]}
+      - {kind: vpc, label: "保存先サービスの接続先", provider: aws, tier: [data], nodes: [aws-eks-datahub-db, aws-eks-datahub-msk, aws-eks-datahub-index]}
+    nodes:
+      aws-eks-datahub-source: {label: "既存のウェアハウス", kind: external, tier: entry, x: 1, y: 0.6, realizes: [source], description: "テーブルとスキーマのメタデータを供給する。", evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-test: {label: "外部 dbt Core 実行基盤", kind: external, tier: entry, x: 1, y: 2.1, realizes: [test], description: "契約を含むビルド結果のアーティファクトを出力する。", evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-user: {label: "利用者・データ所有者", kind: actor, tier: entry, x: 1, y: 3.5, realizes: [user], description: "検索、影響確認、所有者の更新を行う。", evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-eks: {label: "EKS Kubernetes API", kind: service, tier: runtime, x: 1, y: 0.5, svc: eks, description: "Helm のリソースを適用する。", management: {type: shared, scope: "AWS operates EKS control plane; customer manages Kubernetes API configuration and workloads."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-nodes: {label: "EKS の EC2 ノード", kind: host, tier: runtime, x: 1, y: 3.1, svc: ec2, description: "DataHub の Pod と取り込み Job を稼働させる。", management: {type: shared, scope: "AWS operates service infrastructure; customer configures resources, data and permissions."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-ingest: {label: "DataHub 取り込み CronJob", kind: worker, tier: runtime, x: 5.5, y: 1.3, realizes: [ingest], description: "DataHub CLI のコネクターを定期実行する。", management: {type: customer, scope: "Customer manages deployment, code and access."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-frontend: {label: "DataHub Frontend", kind: service, tier: runtime, x: 5.5, y: 4.9, realizes: [portal], description: "認証した利用者に検索と資産編集の UI を提供する。", management: {type: customer, scope: "Customer manages deployment, code and access."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-gms: {label: "DataHub GMS", kind: service, tier: runtime, x: 10.3, y: 1.3, realizes: [gms], description: "Aspect、アセット、リネージをアプリケーション API で受け付ける。", management: {type: customer, scope: "Customer manages deployment, code and access."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-registry: {label: "Kafka 用 Schema Registry", kind: service, tier: runtime, x: 14.5, y: 1.3, description: "DataHub の Kafka イベント用スキーマを提供する。", management: {type: customer, scope: "Customer manages deployment, code and access."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-indexer: {label: "DataHub の変更コンシューマー", kind: worker, tier: runtime, x: 14.5, y: 4.9, description: "Metadata Change Log を処理して検索用の索引に反映する。", management: {type: customer, scope: "Customer manages deployment, code and access."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-db: {label: "RDS for MySQL", kind: db, tier: data, x: 5, y: 1.5, svc: rds, realizes: [meta-store], description: "Aspect を保持する。", management: {type: shared, scope: "AWS operates service infrastructure; customer configures resources, data and permissions."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-msk: {label: "Amazon MSK の変更トピック", kind: queue, tier: data, x: 10, y: 1.5, svc: msk, description: "変更イベントを Kafka トピックに保持する。", management: {type: shared, scope: "AWS operates service infrastructure; customer configures resources, data and permissions."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      aws-eks-datahub-index: {label: "Amazon OpenSearch Service", kind: db, tier: data, x: 15, y: 1.5, svc: opensearch, realizes: [index], description: "検索インデックスと関係の索引を保持する。", management: {type: shared, scope: "AWS operates service infrastructure; customer configures resources, data and permissions."}, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+    links:
+      - {id: aws-eks-datahub-schedule, from: aws-eks-datahub-eks, to: aws-eks-datahub-nodes, label: "DataHub Pod を配置", evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      - {id: aws-eks-datahub-publish, from: aws-eks-datahub-gms, to: aws-eks-datahub-msk, label: "変更ログを発行", realizes: [index-update], replace: true, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      - {id: aws-eks-datahub-poll, from: aws-eks-datahub-msk, to: aws-eks-datahub-indexer, label: "変更ログを取り込む", realizes: [index-update], replace: true, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      - {id: aws-eks-datahub-index, from: aws-eks-datahub-indexer, to: aws-eks-datahub-index, label: "索引を更新", realizes: [index-update], replace: true, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      - {id: aws-eks-datahub-schema, from: aws-eks-datahub-indexer, to: aws-eks-datahub-registry, label: "イベントの Avro スキーマを取得", evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      - {id: aws-eks-datahub-dbt-artifacts, from: aws-eks-datahub-test, to: aws-eks-datahub-ingest, label: "dbt の契約と実行結果を取り込む", realizes: [report], replace: true, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+      - {id: aws-eks-datahub-dbt-results, from: aws-eks-datahub-ingest, to: aws-eks-datahub-gms, label: "外部の検証結果を登録", realizes: [report], replace: true, evidence: [{type: doc, ref: docs/reference-datahub.md#§8}]}
+    layout2d:
+      tiers: [{id: diagram, label: EKS and managed services, z: 0, size: [34, 16]}]
+      nodes:
+        aws-eks-datahub-source: {tier: diagram, x: 0, y: 2}
+        aws-eks-datahub-test: {tier: diagram, x: 0, y: 6}
+        aws-eks-datahub-user: {tier: diagram, x: 0, y: 10}
+        aws-eks-datahub-eks: {tier: diagram, x: 24, y: 1}
+        aws-eks-datahub-nodes: {tier: diagram, x: 8, y: 2}
+        aws-eks-datahub-ingest: {tier: diagram, x: 3, y: 5}
+        aws-eks-datahub-frontend: {tier: diagram, x: 7, y: 5}
+        aws-eks-datahub-gms: {tier: diagram, x: 11, y: 5}
+        aws-eks-datahub-registry: {tier: diagram, x: 15, y: 5}
+        aws-eks-datahub-indexer: {tier: diagram, x: 3, y: 9}
+        aws-eks-datahub-db: {tier: diagram, x: 23, y: 5}
+        aws-eks-datahub-msk: {tier: diagram, x: 27, y: 5}
+        aws-eks-datahub-index: {tier: diagram, x: 23, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-eks-datahub-eks, aws-eks-datahub-nodes, aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-registry, aws-eks-datahub-indexer, aws-eks-datahub-db, aws-eks-datahub-msk, aws-eks-datahub-index]}
+        - {kind: cluster, label: EKS cluster, tier: diagram, nodes: [aws-eks-datahub-nodes, aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-registry, aws-eks-datahub-indexer]}
+        - {kind: namespace, label: DataHub namespace, tier: diagram, nodes: [aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-registry, aws-eks-datahub-indexer]}
+    layout3d:
+      tiers:
+        - {id: apps, label: Kubernetes workloads, z: 1, size: [20, 3]}
+        - {id: nodes, label: EC2 worker nodes, z: 0, size: [20, 3]}
+        - {id: services, label: Managed AWS services, z: 0, origin: [23, 0], size: [20, 3]}
+        - {id: outside, label: Sources and users, kind: origin, z: 0, origin: [-7, 0], size: [5, 3]}
+      nodes:
+        aws-eks-datahub-source: {tier: outside, x: 0, y: 1.5}
+        aws-eks-datahub-test: {tier: outside, x: 2, y: 1.5}
+        aws-eks-datahub-user: {tier: outside, x: 4, y: 1.5}
+        aws-eks-datahub-eks: {tier: services, x: 2, y: 1.5}
+        aws-eks-datahub-nodes: {tier: nodes, x: 8, y: 1.5}
+        aws-eks-datahub-ingest: {tier: apps, x: 2, y: 1.5}
+        aws-eks-datahub-frontend: {tier: apps, x: 6, y: 1.5}
+        aws-eks-datahub-gms: {tier: apps, x: 10, y: 1.5}
+        aws-eks-datahub-registry: {tier: apps, x: 14, y: 1.5}
+        aws-eks-datahub-indexer: {tier: apps, x: 18, y: 1.5}
+        aws-eks-datahub-db: {tier: services, x: 6, y: 1.5}
+        aws-eks-datahub-msk: {tier: services, x: 10, y: 1.5}
+        aws-eks-datahub-index: {tier: services, x: 14, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [apps, nodes, services], nodes: [aws-eks-datahub-eks, aws-eks-datahub-nodes, aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-registry, aws-eks-datahub-indexer, aws-eks-datahub-db, aws-eks-datahub-msk, aws-eks-datahub-index]}
+        - {kind: cluster, label: EKS cluster, tier: [apps, nodes], nodes: [aws-eks-datahub-nodes, aws-eks-datahub-ingest, aws-eks-datahub-frontend, aws-eks-datahub-gms, aws-eks-datahub-registry, aws-eks-datahub-indexer]}

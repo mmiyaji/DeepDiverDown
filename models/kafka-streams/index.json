@@ -2,8 +2,8 @@
   "model": "kafka-streams",
   "name": "Apache Kafka Streams の基本アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "topic": {
@@ -70,6 +70,18 @@
       "type": "scenario",
       "label": "Topic から集計・状態復元"
     },
+    "java-rocksdb-host": {
+      "type": "implementation",
+      "impl": "java-rocksdb",
+      "label": "自前 Linux アプリホスト群",
+      "realizes": []
+    },
+    "java-rocksdb-brokers": {
+      "type": "implementation",
+      "impl": "java-rocksdb",
+      "label": "自前 Kafka ブローカーホスト群",
+      "realizes": []
+    },
     "java-rocksdb-input": {
       "type": "implementation",
       "impl": "java-rocksdb",
@@ -109,6 +121,59 @@
       "impl": "java-rocksdb",
       "label": "application.id と state.dir",
       "realizes": []
+    },
+    "aws-ecs-msk-cli": {
+      "type": "implementation",
+      "impl": "aws-ecs-msk",
+      "label": "デプロイ担当",
+      "realizes": []
+    },
+    "aws-ecs-msk-ecs": {
+      "type": "implementation",
+      "impl": "aws-ecs-msk",
+      "label": "ECS サービス",
+      "realizes": []
+    },
+    "aws-ecs-msk-app": {
+      "type": "implementation",
+      "impl": "aws-ecs-msk",
+      "label": "Fargate 上の Kafka Streams アプリ",
+      "realizes": [
+        "task",
+        "topology"
+      ]
+    },
+    "aws-ecs-msk-state": {
+      "type": "implementation",
+      "impl": "aws-ecs-msk",
+      "label": "タスク内の RocksDB",
+      "realizes": [
+        "state"
+      ]
+    },
+    "aws-ecs-msk-source": {
+      "type": "implementation",
+      "impl": "aws-ecs-msk",
+      "label": "MSK 入力トピック",
+      "realizes": [
+        "topic"
+      ]
+    },
+    "aws-ecs-msk-sink": {
+      "type": "implementation",
+      "impl": "aws-ecs-msk",
+      "label": "MSK 出力トピック",
+      "realizes": [
+        "output"
+      ]
+    },
+    "aws-ecs-msk-changelog": {
+      "type": "implementation",
+      "impl": "aws-ecs-msk",
+      "label": "MSK changelog",
+      "realizes": [
+        "changelog"
+      ]
     }
   },
   "byRef": {
@@ -131,11 +196,20 @@
       "log",
       "restore",
       "kafka-streams-state-recovery",
+      "java-rocksdb-host",
+      "java-rocksdb-brokers",
       "java-rocksdb-input",
       "java-rocksdb-java",
       "java-rocksdb-kv",
       "java-rocksdb-topics",
-      "java-rocksdb-config"
+      "java-rocksdb-config",
+      "aws-ecs-msk-cli",
+      "aws-ecs-msk-ecs",
+      "aws-ecs-msk-app",
+      "aws-ecs-msk-state",
+      "aws-ecs-msk-source",
+      "aws-ecs-msk-sink",
+      "aws-ecs-msk-changelog"
     ],
     "docs/reference-kafka-streams.md#§2": [
       "topic",
@@ -164,11 +238,22 @@
       "kafka-streams-state-recovery"
     ],
     "docs/reference-kafka-streams.md#§8": [
+      "java-rocksdb-host",
+      "java-rocksdb-brokers",
       "java-rocksdb-input",
       "java-rocksdb-java",
       "java-rocksdb-kv",
       "java-rocksdb-topics",
       "java-rocksdb-config"
+    ],
+    "docs/reference-kafka-streams.md#§9": [
+      "aws-ecs-msk-cli",
+      "aws-ecs-msk-ecs",
+      "aws-ecs-msk-app",
+      "aws-ecs-msk-state",
+      "aws-ecs-msk-source",
+      "aws-ecs-msk-sink",
+      "aws-ecs-msk-changelog"
     ]
   },
   "reference": {

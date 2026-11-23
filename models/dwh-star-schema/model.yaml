@@ -196,8 +196,9 @@ requirements:
 implementations:
   - id: bq-order-star
     label: BigQuery の受注明細スタースキーマ
-    description: 注文明細を日付でパーティション化し、同じ商品に付いた販促タグでファクトを絞り込む例。
+    description: Cloud Storage の受注・マスター CSV を BigQuery にロードし、GoogleSQL ジョブでスタースキーマを更新する例。
     sources:
+      - {title: BigQuery overview, url: https://docs.cloud.google.com/bigquery/docs/introduction}
       - title: Kimball Group の次元モデリング技法
         url: >-
           https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
@@ -209,6 +210,10 @@ implementations:
         url: https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables
       - title: BigQuery 論理ビュー
         url: https://docs.cloud.google.com/bigquery/docs/views-intro
+      - {title: "Cloud Storage からの CSV ロード", url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv}
+      - {title: "BigQuery のスケジュールされたクエリ", url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries}
+      - {title: "BigQuery の主キーと外部キー", url: https://docs.cloud.google.com/bigquery/docs/primary-foreign-keys}
+      - {title: "BigQuery の JOBS ビュー", url: https://docs.cloud.google.com/bigquery/docs/information-schema-jobs}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -217,21 +222,29 @@ implementations:
           - 12.5
           - 4.5
       - id: implementation-setup
-        label: 実装時の設定・観測
+        label: Cloud Storage と BigQuery ジョブ
         z: 1
         size:
-          - 8
-          - 3
+          - 26
+          - 6
     nodes:
+      example-engine: {label: BigQuery managed compute, svc: "gcp:bigquery", kind: service, tier: implementation-setup, x: 20, y: 3, evidence: [{type: doc, ref: "docs/reference-dwh-star-schema.md#§5"}]}
+      example-service-account: {label: Scheduled query service account, kind: policy, tier: implementation-setup, x: 24, y: 3, evidence: [{type: doc, ref: "docs/reference-dwh-star-schema.md#§5"}]}
+      example-analyst: {label: Analyst, kind: actor, tier: flow, x: -3, y: 2, evidence: [{type: doc, ref: "docs/reference-dwh-star-schema.md#§5"}]}
+      example-files: {label: "Cloud Storage（受注と商品・顧客マスターの CSV）", svc: gcp:gcs, kind: file, tier: implementation-setup, x: 1, y: 1.5, description: "業務システムまたは検証用のバッチ CSV を保持する。", evidence: [{type: doc, ref: docs/reference-dwh-star-schema.md#§5}]}
+      example-load-job: {label: "BigQuery（CSV ロードジョブ）", svc: gcp:bigquery, kind: worker, tier: implementation-setup, x: 6, y: 1.5, description: "同じロケーションの Cloud Storage から BigQuery の入力表へロードする。", evidence: [{type: doc, ref: docs/reference-dwh-star-schema.md#§5}]}
+      example-scheduler: {label: "BigQuery（スケジュールされたクエリ）", svc: gcp:bigquery, kind: scheduler, tier: implementation-setup, x: 11, y: 1.5, description: "Data Transfer Service でサービスアカウントの GoogleSQL ジョブを起動する。", evidence: [{type: doc, ref: docs/reference-dwh-star-schema.md#§5}]}
+      example-transform: {label: "BigQuery（スタースキーマ更新ジョブ）", svc: gcp:bigquery, kind: workflow, tier: implementation-setup, x: 16, y: 1.5, description: "受注とマスターの入力からディメンションと明細ファクトを更新する。", evidence: [{type: doc, ref: docs/reference-dwh-star-schema.md#§5}]}
+      example-studio: {label: "BigQuery Studio（SQL 問い合わせ）", svc: gcp:bigquery, kind: client, tier: implementation-setup, x: 22, y: 1.5, description: "受注明細と販促タグの売上を確認する。", evidence: [{type: doc, ref: docs/reference-dwh-star-schema.md#§5}]}
       example-source:
-        label: landing.order_events
+        label: landing の受注・マスター入力表
         kind: table
         tier: flow
         x: 0
         'y': 2
         realizes:
           - source
-        description: 注文 ID と明細 ID の入力イベントを持つ。
+        description: 受注イベント、商品・顧客のマスター、商品と販促タグの対応を入力表として保持する。
         evidence:
           - type: doc
             ref: docs/reference-dwh-star-schema.md#§5
@@ -319,12 +332,25 @@ implementations:
         kind: monitor
         tier: implementation-setup
         x: 1
-        'y': 1.5
+        'y': 4.3
         description: 重複する明細キーを検出して、集計前にロード結果を確かめる。
         evidence:
           - type: doc
             ref: docs/reference-dwh-star-schema.md#§5
     links:
+      - {id: example-compute-job, from: example-engine, to: example-transform, label: "Run GoogleSQL job", evidence: [{type: doc, ref: "docs/reference-dwh-star-schema.md#§5"}]}
+      - {id: example-job-identity, from: example-service-account, to: example-scheduler, label: "Authorize scheduled query", evidence: [{type: doc, ref: "docs/reference-dwh-star-schema.md#§5"}]}
+      - {id: example-user-studio, from: example-analyst, to: example-studio, label: "Inspect query results", evidence: [{type: doc, ref: "docs/reference-dwh-star-schema.md#§5"}]}
+      - {id: example-bq-files, from: example-files, to: example-load-job, label: CSV ファイルを読み込む}
+      - {id: example-bq-load, from: example-load-job, to: example-source, label: BigQuery の入力表に書き込む}
+      - {id: example-bq-run, from: example-scheduler, to: example-transform, label: スケジュールから GoogleSQL ジョブを起動}
+      - {id: example-bq-query, from: example-studio, to: example-bi, label: 公開ビューをクエリする}
+      - {id: example-bq-read, from: example-transform, to: example-source, label: ロード済み受注とマスターを読む}
+      - {id: example-bq-write, from: example-transform, to: example-fact, label: 重複を除き明細ファクトを更新}
+      - {id: example-bq-date, from: example-transform, to: example-date, label: 日付ディメンションを整備}
+      - {id: example-bq-customer, from: example-transform, to: example-customer, label: 顧客ディメンションを更新}
+      - {id: example-bq-product, from: example-transform, to: example-product, label: 商品ディメンションを更新}
+      - {id: example-bq-tags, from: example-transform, to: example-tag, label: 商品と販促タグの対応を更新}
       - id: example-validation-connection
         from: example-validation
         to: example-fact
@@ -333,16 +359,48 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-star-schema.md#§5
     groups:
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - flow
-        nodes:
-          - example-source
-          - example-fact
-          - example-date
-          - example-customer
-          - example-product
-          - example-tag
-          - example-bi
+      - {kind: cloud, provider: gcp, label: Google Cloud project, tier: [flow, implementation-setup], nodes: [example-source, example-fact, example-date, example-customer, example-product, example-tag, example-bi, example-files, example-load-job, example-scheduler, example-transform, example-studio, example-validation, example-engine, example-service-account]}
+    layout2d:
+      tiers: [{id: diagram, label: BigQuery and Cloud Storage, z: 0, size: [34, 17]}]
+      nodes:
+        example-source: {tier: diagram, x: 4, y: 1}
+        example-fact: {tier: diagram, x: 8, y: 1}
+        example-date: {tier: diagram, x: 12, y: 1}
+        example-customer: {tier: diagram, x: 16, y: 1}
+        example-product: {tier: diagram, x: 20, y: 1}
+        example-tag: {tier: diagram, x: 24, y: 1}
+        example-bi: {tier: diagram, x: 28, y: 1}
+        example-files: {tier: diagram, x: 4, y: 5}
+        example-load-job: {tier: diagram, x: 8, y: 5}
+        example-scheduler: {tier: diagram, x: 12, y: 5}
+        example-transform: {tier: diagram, x: 16, y: 5}
+        example-studio: {tier: diagram, x: 20, y: 5}
+        example-validation: {tier: diagram, x: 24, y: 5}
+        example-engine: {tier: diagram, x: 28, y: 5}
+        example-service-account: {tier: diagram, x: 4, y: 9}
+        example-analyst: {tier: diagram, x: 0, y: 2}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: diagram, nodes: [example-source, example-fact, example-date, example-customer, example-product, example-tag, example-bi, example-files, example-load-job, example-scheduler, example-transform, example-studio, example-validation, example-engine, example-service-account]}
+    layout3d:
+      tiers:
+        - {id: services, label: BigQuery and Cloud Storage, z: 0, size: [28, 9]}
+        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-source: {tier: services, x: 2, y: 1}
+        example-fact: {tier: services, x: 6, y: 1}
+        example-date: {tier: services, x: 10, y: 1}
+        example-customer: {tier: services, x: 14, y: 1}
+        example-product: {tier: services, x: 18, y: 1}
+        example-tag: {tier: services, x: 22, y: 1}
+        example-bi: {tier: services, x: 26, y: 1}
+        example-files: {tier: services, x: 2, y: 4}
+        example-load-job: {tier: services, x: 6, y: 4}
+        example-scheduler: {tier: services, x: 10, y: 4}
+        example-transform: {tier: services, x: 14, y: 4}
+        example-studio: {tier: services, x: 18, y: 4}
+        example-validation: {tier: services, x: 22, y: 4}
+        example-engine: {tier: services, x: 26, y: 4}
+        example-service-account: {tier: services, x: 2, y: 7}
+        example-analyst: {tier: user, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: services, nodes: [example-source, example-fact, example-date, example-customer, example-product, example-tag, example-bi, example-files, example-load-job, example-scheduler, example-transform, example-studio, example-validation, example-engine, example-service-account]}

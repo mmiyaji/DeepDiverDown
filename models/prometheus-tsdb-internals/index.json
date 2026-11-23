@@ -1,0 +1,233 @@
+{
+  "model": "prometheus-tsdb-internals",
+  "name": "Prometheus TSDB：WAL・Head・ブロック",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "scrape": {
+      "type": "node",
+      "label": "監視対象のメトリクス",
+      "status": "claim"
+    },
+    "head": {
+      "type": "node",
+      "label": "Head：最新サンプル",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "WAL：復旧用ログ",
+      "status": "claim"
+    },
+    "blocks": {
+      "type": "node",
+      "label": "時間別ブロック",
+      "status": "claim"
+    },
+    "index": {
+      "type": "node",
+      "label": "ブロック内の索引",
+      "status": "claim"
+    },
+    "compact": {
+      "type": "node",
+      "label": "Compaction・保持",
+      "status": "claim"
+    },
+    "query": {
+      "type": "scenario",
+      "label": "最新と過去の検索",
+      "status": "claim"
+    },
+    "s": {
+      "type": "link",
+      "label": "監視対象のメトリクス → Head：最新サンプル",
+      "status": "claim"
+    },
+    "w": {
+      "type": "link",
+      "label": "Head：最新サンプル → WAL：復旧用ログ",
+      "status": "claim"
+    },
+    "b": {
+      "type": "link",
+      "label": "Head：最新サンプル → 時間別ブロック",
+      "status": "claim"
+    },
+    "i": {
+      "type": "link",
+      "label": "時間別ブロック → ブロック内の索引",
+      "status": "claim"
+    },
+    "c": {
+      "type": "link",
+      "label": "時間別ブロック → Compaction・保持",
+      "status": "claim"
+    },
+    "q1": {
+      "type": "link",
+      "label": "PromQL 検索 → Head：最新サンプル",
+      "status": "claim"
+    },
+    "q2": {
+      "type": "link",
+      "label": "PromQL 検索 → ブロック内の索引",
+      "status": "claim"
+    },
+    "q3": {
+      "type": "link",
+      "label": "ブロック内の索引 → 時間別ブロック",
+      "status": "claim"
+    },
+    "write": {
+      "type": "scenario",
+      "label": "収集と永続化"
+    },
+    "ex-scrape": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "監視対象のメトリクス",
+      "realizes": [
+        "scrape"
+      ]
+    },
+    "ex-head": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "Head：最新サンプル",
+      "realizes": [
+        "head"
+      ]
+    },
+    "ex-wal": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "WAL：復旧用ログ",
+      "realizes": [
+        "wal"
+      ]
+    },
+    "ex-blocks": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "時間別ブロック",
+      "realizes": [
+        "blocks"
+      ]
+    },
+    "ex-index": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "ブロック内の索引",
+      "realizes": [
+        "index"
+      ]
+    },
+    "ex-compact": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "Compaction・保持",
+      "realizes": [
+        "compact"
+      ]
+    },
+    "ex-query": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "PromQL 検索",
+      "realizes": [
+        "query"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-prometheus-tsdb-internals.md#§1": [
+      "model",
+      "scrape",
+      "head",
+      "compact",
+      "query"
+    ],
+    "docs/reference-prometheus-tsdb-internals.md": [
+      "model",
+      "scrape",
+      "head",
+      "wal",
+      "blocks",
+      "index",
+      "compact",
+      "query",
+      "s",
+      "w",
+      "b",
+      "i",
+      "c",
+      "q1",
+      "q2",
+      "q3",
+      "write",
+      "ex-scrape",
+      "ex-head",
+      "ex-wal",
+      "ex-blocks",
+      "ex-index",
+      "ex-compact",
+      "ex-query"
+    ],
+    "docs/reference-prometheus-tsdb-internals.md#§2": [
+      "model",
+      "wal",
+      "blocks",
+      "index",
+      "s",
+      "w",
+      "b",
+      "i",
+      "c",
+      "q1",
+      "q2",
+      "q3",
+      "write",
+      "query"
+    ],
+    "docs/reference-prometheus-tsdb-internals.md#§3": [
+      "model"
+    ],
+    "docs/reference-prometheus-tsdb-internals.md#§5": [
+      "model"
+    ],
+    "docs/reference-prometheus-tsdb-internals.md#§4": [
+      "ex-scrape",
+      "ex-head",
+      "ex-wal",
+      "ex-blocks",
+      "ex-index",
+      "ex-compact",
+      "ex-query"
+    ]
+  },
+  "reference": {
+    "category": "時系列データ",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "time-series-data",
+    "objectives": [
+      "書き込みと検索の経路を追う。",
+      "データ構造と保持・復旧の役割を区別する。",
+      "実装の前提と制約を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "Prometheus Storage",
+        "url": "https://prometheus.io/docs/prometheus/latest/storage/"
+      },
+      {
+        "title": "Prometheus data model",
+        "url": "https://prometheus.io/docs/concepts/data_model/"
+      }
+    ]
+  }
+}

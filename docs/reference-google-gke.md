@@ -59,8 +59,17 @@ GKE Standard で基盤用とアプリ用のノードプールを置き、Artifac
 
 基盤用とアプリ用のプール分割はこの例の配置方針。ゾーン分散、LB の種類、ノードのリポジトリへのアクセス権を用途に合わせて設定する。
 
+外部パススルー Network Load Balancer のバックエンドはノード VM。ノード側の Service ルールが注文 API の Pod へ転送する。この例では `externalTrafficPolicy: Local` を使い、正常なローカル Pod があるノードで外部トラフィックを受ける。リージョン制御プレーンの配置と各ノードプールのゾーン指定は個別に確認する。
+
+GKE が制御プレーンのライフサイクルを管理し、制御プレーンは GKE 管理プロジェクトで動く。利用者は Kubernetes API と公開されたクラスタ設定を権限に応じて操作し、Standard のノードプールを設定・管理する。外枠は Google Cloud のサービス領域、クラスタ枠は論理的な所属であり、単一の顧客プロジェクトや VPC を意味しない。ロードバランサーと Artifact Registry は独立サービスである。
+
+この構成は複数の公式資料を組み合わせた例であり、実在の導入例や動作検証済み構成ではない。具体的な権限、ネットワークとバージョンは導入時に確認する。
+
 公式資料
+- [GKE cluster architecture](https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-architecture)
+- [GKE network isolation](https://cloud.google.com/kubernetes-engine/docs/concepts/network-isolation)
 - [GKE cluster modes](https://cloud.google.com/kubernetes-engine/docs/concepts/choose-cluster-mode)
 - [GKE node pools](https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools)
 - [GKE LoadBalancer Services](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/service-load-balancer)
 - [Artifact Registry integration with GKE](https://cloud.google.com/artifact-registry/docs/integrate-gke)
+- [GKE のリージョンクラスタとノードロケーション](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/regional-clusters)

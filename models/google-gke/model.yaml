@@ -56,6 +56,8 @@ implementations:
     label: GKE Standard のリージョンクラスタ
     description: GKE Standard で基盤用とアプリ用のノードプールを置き、Artifact Registry の注文 API を外部 L4 ロードバランサーで公開する例。
     sources:
+      - {title: GKE cluster architecture, url: https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-architecture}
+      - {title: GKE network isolation, url: https://cloud.google.com/kubernetes-engine/docs/concepts/network-isolation}
       - title: GKE cluster modes
         url: https://cloud.google.com/kubernetes-engine/docs/concepts/choose-cluster-mode
       - title: GKE node pools
@@ -64,6 +66,7 @@ implementations:
         url: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/service-load-balancer
       - title: Artifact Registry integration with GKE
         url: https://cloud.google.com/artifact-registry/docs/integrate-gke
+      - {title: "GKE のリージョンクラスタとノードロケーション", url: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/regional-clusters}
     tiers:
       - id: interface
         label: 利用・管理
@@ -91,7 +94,7 @@ implementations:
           - 8
     groups:
       - kind: cloud
-        label: Google Cloud プロジェクト
+        label: Google Cloud サービス領域（制御プレーンは管理プロジェクト）
         provider: gcp
         tier:
           - control
@@ -136,7 +139,7 @@ implementations:
         svc: gcp:gke
         realizes:
           - api
-        description: リージョンクラスタの Kubernetes API を提供する。
+        description: Google 管理プロジェクトの制御プレーンを GKE が運用する。利用者は Kubernetes API と公開されたクラスタ設定を権限に応じて操作する。
         evidence:
           - type: doc
             ref: docs/reference-google-gke.md#§9
@@ -147,7 +150,7 @@ implementations:
         svc: gcp:gce
         realizes:
           - system
-        description: 基盤ワークロードを配置するために例で分けたプール。
+        description: 利用者が設定・管理する Standard ノードプール。基盤ワークロード用の分離はこの例の選択。
         evidence:
           - type: doc
             ref: docs/reference-google-gke.md#§9
@@ -158,7 +161,7 @@ implementations:
         svc: gcp:gce
         realizes:
           - user
-        description: 注文 API の Pod を配置する。
+        description: 利用者が設定・管理する Standard ノードプールに注文 API の Pod を配置する。
         evidence:
           - type: doc
             ref: docs/reference-google-gke.md#§9
@@ -205,6 +208,8 @@ implementations:
           - type: doc
             ref: docs/reference-google-gke.md#§9
     links:
+      - {id: gcp-lb-backend, from: gcp-lb, to: gcp-user, label: 正常なノードへ L4 パケットを転送, realizes: [expose], replace: true}
+      - {id: gcp-node-forward, from: gcp-user, to: gcp-workload, label: Service のルールで Pod へ転送, realizes: [expose], replace: true}
       - id: gcp-selector
         from: gcp-workload
         to: gcp-svc
@@ -219,3 +224,36 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-google-gke.md#§9
+
+    layout2d:
+      tiers: [{id: diagram, label: GKE 実装構成, z: 0, origin: [-4, 0], size: [21, 12]}]
+      nodes:
+        gcp-operator: {tier: diagram, x: -3, y: 1}
+        gcp-api: {tier: diagram, x: 3, y: 1}
+        gcp-system: {tier: diagram, x: 3, y: 5}
+        gcp-user: {tier: diagram, x: 7, y: 5}
+        gcp-workload: {tier: diagram, x: 7, y: 8}
+        gcp-svc: {tier: diagram, x: 11, y: 8}
+        gcp-lb: {tier: diagram, x: 14.5, y: 6}
+        gcp-registry: {tier: diagram, x: 14.5, y: 2}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud サービス領域, tier: [diagram], x0: 0, y0: -1, x1: 17, y1: 11, nodes: [gcp-api, gcp-system, gcp-user, gcp-workload, gcp-svc, gcp-lb, gcp-registry]}
+        - {kind: cluster, provider: gcp, label: GKE Standard（論理クラスタ・制御プレーンは管理プロジェクト）, tier: [diagram], x0: 1, y0: 0, x1: 12.5, y1: 10, nodes: [gcp-api, gcp-system, gcp-user, gcp-workload, gcp-svc]}
+        - {kind: vpc, provider: gcp, label: 顧客 VPC のノード, tier: [diagram], x0: 1.5, y0: 3, x1: 9, y1: 9.5, nodes: [gcp-system, gcp-user, gcp-workload]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: Standard ノード, z: 0, size: [10, 4]}
+        - {id: apps, label: Kubernetes ワークロード, z: 1, size: [10, 4]}
+        - {id: services, label: 制御プレーンと独立サービス, z: 0, origin: [12, 0], size: [10, 7]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        gcp-operator: {tier: outside, x: 1, y: 1}
+        gcp-system: {tier: nodes, x: 2, y: 2}
+        gcp-user: {tier: nodes, x: 6, y: 2}
+        gcp-workload: {tier: apps, x: 6, y: 2}
+        gcp-svc: {tier: apps, x: 9, y: 2}
+        gcp-api: {tier: services, x: 1, y: 1}
+        gcp-lb: {tier: services, x: 5, y: 1}
+        gcp-registry: {tier: services, x: 1, y: 5}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud サービス領域, tier: [nodes, apps, services], nodes: [gcp-api, gcp-system, gcp-user, gcp-workload, gcp-svc, gcp-lb, gcp-registry]}

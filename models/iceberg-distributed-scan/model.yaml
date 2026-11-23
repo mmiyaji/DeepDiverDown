@@ -590,6 +590,8 @@ implementations:
         url: https://iceberg.apache.org/docs/latest/performance/
       - title: Iceberg Configuration
         url: https://iceberg.apache.org/docs/latest/configuration/
+      - title: Trino deployment
+        url: https://trino.io/docs/current/installation/deployment.html
       - title: Trino Iceberg connector
         url: https://trino.io/docs/current/connector/iceberg.html
       - title: Apache Parquet File Format
@@ -614,6 +616,22 @@ implementations:
           - 14
           - 3
     nodes:
+      trino-rest-s3-host:
+        label: 自前 Linux Trino ホスト群
+        kind: host
+        tier: processing
+        x: 2
+        y: 0
+        description: 利用者が Coordinator と Worker を別ホストで運用する。
+        evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§13}]
+      trino-rest-s3-catalog-host:
+        label: 自前 REST カタログホスト
+        kind: host
+        tier: setup
+        x: 4
+        y: 0
+        description: 利用者が REST API と永続バックエンドを運用する。製品とバックエンドは未指定。
+        evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§13}]
       trino-rest-s3-client:
         label: Trino CLI の SQL クライアント
         kind: client
@@ -680,6 +698,9 @@ implementations:
           - type: doc
             ref: docs/reference-iceberg-distributed-scan.md#§13
     links:
+      - {id: trino-rest-s3-host-coord, from: trino-rest-s3-host, to: trino-rest-s3-coord, label: Coordinator を実行}
+      - {id: trino-rest-s3-host-workers, from: trino-rest-s3-host, to: trino-rest-s3-workers, label: Worker を実行}
+      - {id: trino-rest-s3-host-catalog, from: trino-rest-s3-catalog-host, to: trino-rest-s3-rest, label: REST カタログを実行}
       - id: trino-rest-s3-rest-connection
         from: trino-rest-s3-rest
         to: trino-rest-s3-coord
@@ -692,3 +713,100 @@ implementations:
           - processing
         nodes:
           - trino-rest-s3-storage
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [33, 20]}
+      nodes:
+        trino-rest-s3-client: {tier: diagram, x: 2, y: 2}
+        trino-rest-s3-host: {tier: diagram, x: 8, y: 2}
+        trino-rest-s3-coord: {tier: diagram, x: 8, y: 5}
+        trino-rest-s3-workers: {tier: diagram, x: 8, y: 8}
+        trino-rest-s3-catalog-host: {tier: diagram, x: 14, y: 2}
+        trino-rest-s3-rest: {tier: diagram, x: 14, y: 5}
+        trino-rest-s3-storage: {tier: diagram, x: 20, y: 2}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [trino-rest-s3-storage]}
+        - {kind: cluster, label: "自前 Trino", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 12, nodes: [trino-rest-s3-host, trino-rest-s3-coord, trino-rest-s3-workers]}
+        - {kind: nodegroup, label: "自前 REST カタログ", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 9, nodes: [trino-rest-s3-catalog-host, trino-rest-s3-rest]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "SQL クライアント", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "自前 Trino", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "自前 REST カタログ", z: 0, origin: [14, 0], size: [5, 6]}
+        - {id: zone3, label: "AWS S3", z: 0, origin: [21, 0], size: [5, 5]}
+      nodes:
+        trino-rest-s3-client: {tier: zone0, x: 2, y: 1}
+        trino-rest-s3-host: {tier: zone1, x: 2, y: 1}
+        trino-rest-s3-coord: {tier: zone1, x: 2, y: 4}
+        trino-rest-s3-workers: {tier: zone1, x: 2, y: 7}
+        trino-rest-s3-catalog-host: {tier: zone2, x: 2, y: 1}
+        trino-rest-s3-rest: {tier: zone2, x: 2, y: 4}
+        trino-rest-s3-storage: {tier: zone3, x: 2, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [trino-rest-s3-storage]}
+        - {kind: cluster, label: "自前 Trino", tier: [zone1], nodes: [trino-rest-s3-host, trino-rest-s3-coord, trino-rest-s3-workers]}
+        - {kind: nodegroup, label: "自前 REST カタログ", tier: [zone2], nodes: [trino-rest-s3-catalog-host, trino-rest-s3-rest]}
+  - id: aws-eks-trino
+    label: AWS（Trino on EKS・Glue・S3）
+    description: EKS 上の Trino が Glue Data Catalog で Iceberg テーブルを解決し、Amazon S3 上の Iceberg ファイルを分散して読む例。
+    sources:
+      - {title: Trino on Kubernetes with Helm, url: https://trino.io/docs/current/installation/kubernetes.html}
+      - {title: Trino Iceberg connector, url: https://trino.io/docs/current/connector/iceberg.html}
+      - {title: Trino native S3 file system, url: https://trino.io/docs/current/object-storage/file-system-s3.html}
+      - {title: EKS マネージドノードグループ, url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+    tiers:
+      - {id: entry, label: SQL クライアント, z: 0, size: [4, 3]}
+      - {id: query, label: クエリの実行, z: 1, size: [16, 4]}
+      - {id: files, label: カタログとオブジェクト, z: 0, size: [16, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [entry, query, files], nodes: [aws-eks, aws-ec2, aws-coordinator, aws-workers, aws-glue, aws-s3]}
+      - {kind: cluster, label: 顧客管理の Trino を配備する EKS クラスタ, tier: query, nodes: [aws-ec2, aws-coordinator, aws-workers]}
+    nodes:
+      aws-client: {label: Trino CLI, kind: client, tier: entry, x: 1, y: 1.5, realizes: [analyst], description: 利用者の CLI から SQL を送る。, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§14}]}
+      aws-eks: {label: Amazon EKS（コントロールプレーン）, svc: eks, kind: service, tier: query, x: 2, y: 1.5, description: Kubernetes を管理し、マネージドノードグループで EC2 ノードを維持する。, management: {type: shared, scope: "AWS が制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§14}]}
+      aws-ec2: {label: Amazon EC2（EKS マネージドノード）, svc: ec2, kind: host, tier: query, x: 6, y: 1.5, description: Trino Coordinator と Worker の Pod を実行する。, management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードを管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§14}]}
+      aws-coordinator: {label: Trino Coordinator Pod, kind: service, tier: query, x: 10, y: 1.5, realizes: [planner, splits], description: Iceberg Connector で述語を適用し、必要なファイル・範囲と削除情報を Split にまとめる。, management: {type: customer, scope: "利用者が Trino とカタログ設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§14}]}
+      aws-workers: {label: Trino Worker Pods, kind: worker, tier: query, x: 14, y: 1.5, realizes: [worker, reader], description: Split の Parquet データを読み、対応する削除ファイルを適用する。, management: {type: customer, scope: "利用者が Trino Worker と設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§14}]}
+      aws-glue: {label: AWS Glue Data Catalog, svc: glue, kind: catalog, tier: files, x: 6, y: 1.5, description: テーブルを解決し、現行の Iceberg メタデータの位置を返す。, management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§14}]}
+      aws-s3: {label: Amazon S3（Iceberg メタデータ・データ）, svc: s3, kind: db, tier: files, x: 13, y: 1.5, realizes: [metajson, mlist, manifest, data, deletes], description: メタデータ、マニフェスト、データと削除ファイルを保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-iceberg-distributed-scan.md#§14}]}
+    links:
+      - {id: aws-provision, from: aws-eks, to: aws-ec2, label: ノードグループを管理}
+      - {id: aws-host-coordinator, from: aws-ec2, to: aws-coordinator, label: Coordinator Pod を実行}
+      - {id: aws-host-workers, from: aws-ec2, to: aws-workers, label: Worker Pod を実行}
+      - {id: aws-catalog, from: aws-coordinator, to: aws-glue, label: 現在のメタデータ位置を取得, realizes: [resolve], replace: true}
+      - {id: aws-metadata, from: aws-coordinator, to: aws-s3, label: メタデータを読みファイルを絞る, realizes: [resolve, prune-mlist, prune-manifest, attach-deletes], replace: true}
+      - {id: aws-range-read, from: aws-workers, to: aws-s3, label: Parquet の必要範囲と削除ファイルを読む, realizes: [footer, chunks, apply-deletes], replace: true}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [33, 20]}
+      nodes:
+        aws-client: {tier: diagram, x: 2, y: 2}
+        aws-eks: {tier: diagram, x: 8, y: 2}
+        aws-ec2: {tier: diagram, x: 14, y: 2}
+        aws-coordinator: {tier: diagram, x: 14, y: 5}
+        aws-workers: {tier: diagram, x: 14, y: 8}
+        aws-glue: {tier: diagram, x: 20, y: 2}
+        aws-s3: {tier: diagram, x: 20, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-eks, aws-ec2, aws-coordinator, aws-workers, aws-glue, aws-s3]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [diagram], nodes: [aws-ec2, aws-coordinator, aws-workers]}
+        - {kind: cluster, label: "EKS ワーカー", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 12, nodes: [aws-ec2, aws-coordinator, aws-workers]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "SQL クライアント", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "EKS 制御プレーン", z: 0, origin: [7, 0], size: [5, 5]}
+        - {id: zone2, label: "EKS ワーカー", z: 0, origin: [14, 0], size: [5, 9]}
+        - {id: zone3, label: "Glue と S3", z: 0, origin: [21, 0], size: [5, 6]}
+      nodes:
+        aws-client: {tier: zone0, x: 2, y: 1}
+        aws-eks: {tier: zone1, x: 2, y: 1}
+        aws-ec2: {tier: zone2, x: 2, y: 1}
+        aws-coordinator: {tier: zone2, x: 2, y: 4}
+        aws-workers: {tier: zone2, x: 2, y: 7}
+        aws-glue: {tier: zone3, x: 2, y: 1}
+        aws-s3: {tier: zone3, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [aws-eks, aws-ec2, aws-coordinator, aws-workers, aws-glue, aws-s3]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [zone0, zone1, zone2, zone3], nodes: [aws-ec2, aws-coordinator, aws-workers]}
+        - {kind: cluster, label: "EKS ワーカー", tier: [zone2], nodes: [aws-ec2, aws-coordinator, aws-workers]}

@@ -37,4 +37,10 @@ DROP した対応オブジェクトの復元には保持期間内の UNDROP を�
 
 検証用クローンで差分と対象キーを確認してから、本番の影響行を修復する。Fail-safe は利用者が SQL で照会できる履歴とは別に、適用条件を満たすデータの回復を Snowflake が支援する仕組み。
 
+検証ロールに元表の参照、復旧用スキーマでのクローン作成、検証用 Warehouse の使用を許可する。本番表への書き込みは修復担当のロールに限定する。この例では独立した復旧用スキーマにクローンを作り、そのスキーマの将来の権限付与も確認する。
+
+- [CREATE CLONE のアクセス制御](https://docs.snowflake.com/en/sql-reference/sql/create-clone)
+
 出典 [Time Travel](https://docs.snowflake.com/en/user-guide/data-time-travel)、[Fail-safe](https://docs.snowflake.com/en/user-guide/data-failsafe)、[クローンの考慮点](https://docs.snowflake.com/en/user-guide/object-clone)、[Snowflake パラメーター](https://docs.snowflake.com/en/sql-reference/parameters#data-retention-time-in-days)、[QUERY_HISTORY ビュー](https://docs.snowflake.com/en/sql-reference/account-usage/query_history)
+
+Snowflake が計算・保存基盤と履歴の保持を運用する。利用者は権限に応じて保持期間、クローン、Warehouse と修復 SQL を操作できるが、Fail-safe のデータを直接照会・復旧できず、条件に応じて Snowflake に回復を依頼する。ロールはアカウント内の権限設定で、担当者とは区別する。7 日の保持と修復手順は例であり、この構成の実動作は未検証。[Snowflake architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)

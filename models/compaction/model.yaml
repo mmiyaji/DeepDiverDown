@@ -65,6 +65,8 @@ implementations:
     label: "Spark プロシージャで Iceberg の小ファイルを整理"
     description: "注文の Iceberg テーブルへ継続書き込みし、Spark の保守ジョブで小さなファイルをまとめる例。読み手のスナップショットと古いファイルの保持期間を管理する。"
     sources:
+      - {title: Iceberg Spark Configuration, url: https://iceberg.apache.org/docs/latest/spark-configuration/}
+      - {title: Spark Standalone Mode, url: https://spark.apache.org/docs/latest/spark-standalone.html}
       - {title: Apache Iceberg Maintenance, url: https://iceberg.apache.org/docs/nightly/maintenance/}
       - {title: Apache Iceberg Spark Procedures, url: https://iceberg.apache.org/docs/latest/spark-procedures/}
       - {title: Delta Lake Optimizations, url: https://docs.delta.io/optimizations-oss/}
@@ -74,6 +76,9 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      iceberg-spark-host: {label: 自前 Linux Spark クラスター, kind: host, tier: processing, x: 3, y: 0, description: Standalone Master と Worker を運用し Driver と Executor を実行する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+      iceberg-spark-source: {label: 自前 Kafka 注文トピック, kind: queue, tier: processing, x: 8, y: 0, description: ストリーミング入力の注文イベントを保持する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
+      iceberg-spark-hdfs: {label: 自前 HDFS と Hadoop カタログ, kind: db, tier: processing, x: 12, y: 0, description: Iceberg ファイルと Hadoop カタログのテーブルを保存する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
       iceberg-spark-write: {label: Spark のマイクロバッチ書き込み, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [stream_writer], description: Iceberg へ小さな Parquet ファイルを継続して追加する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
       iceberg-spark-action: {label: Spark の rewrite_data_files, kind: workflow, tier: processing, x: 1, y: 3.65, realizes: [planner, rewrite], description: テーブルのファイル群を調べ、binpack 戦略で対象を選んで書き直す。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
       iceberg-spark-iceberg: {label: Iceberg のテーブル・メタデータ・スナップショット, kind: catalog, tier: processing, x: 5, y: 1.15, realizes: [metadata, orders, snapshot], description: 注文データのファイル集合をスナップショットで管理し、再作成をコミットする。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
@@ -81,4 +86,104 @@ implementations:
       iceberg-spark-expire: {label: Spark の expire_snapshots, kind: worker, tier: processing, x: 9, y: 1.15, realizes: [cleanup], description: 保護対象のスナップショットを保持し、期限切れのものと参照されなくなったファイルを整理する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
       iceberg-spark-policy: {label: コンパクションと保持の設定, kind: policy, tier: setup, x: 1, y: 1.5, description: 対象ファイルの基準、出力サイズの目安、履歴を保持する期間を決めてから実行する。, evidence: [{type: doc, ref: docs/reference-compaction.md#§9}]}
     links:
+      - {id: iceberg-spark-host-write, from: iceberg-spark-host, to: iceberg-spark-write, label: Streaming ジョブを実行}
+      - {id: iceberg-spark-host-maintain, from: iceberg-spark-host, to: iceberg-spark-action, label: 保守ジョブを実行}
+      - {id: iceberg-spark-input, from: iceberg-spark-source, to: iceberg-spark-write, label: 注文を取得}
+      - {id: iceberg-spark-storage, from: iceberg-spark-iceberg, to: iceberg-spark-hdfs, label: メタデータとデータを保存}
       - {id: iceberg-spark-policy-connection, from: iceberg-spark-policy, to: iceberg-spark-action, label: 対象と出力サイズを設定}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        iceberg-spark-source: {tier: diagram, x: 2, y: 2}
+        iceberg-spark-host: {tier: diagram, x: 8, y: 2}
+        iceberg-spark-write: {tier: diagram, x: 8, y: 5}
+        iceberg-spark-action: {tier: diagram, x: 8, y: 8}
+        iceberg-spark-query: {tier: diagram, x: 8, y: 11}
+        iceberg-spark-expire: {tier: diagram, x: 8, y: 14}
+        iceberg-spark-policy: {tier: diagram, x: 8, y: 17}
+        iceberg-spark-hdfs: {tier: diagram, x: 14, y: 2}
+        iceberg-spark-iceberg: {tier: diagram, x: 14, y: 5}
+      groups:
+        - {kind: cluster, label: "Spark クラスター", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 21, nodes: [iceberg-spark-host, iceberg-spark-write, iceberg-spark-action, iceberg-spark-query, iceberg-spark-expire, iceberg-spark-policy]}
+        - {kind: cluster, label: "自前 HDFS", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 9, nodes: [iceberg-spark-hdfs, iceberg-spark-iceberg]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "自前 Kafka", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "Spark クラスター", z: 0, origin: [7, 0], size: [5, 18]}
+        - {id: zone2, label: "自前 HDFS", z: 0, origin: [14, 0], size: [5, 6]}
+      nodes:
+        iceberg-spark-source: {tier: zone0, x: 2, y: 1}
+        iceberg-spark-host: {tier: zone1, x: 2, y: 1}
+        iceberg-spark-write: {tier: zone1, x: 2, y: 4}
+        iceberg-spark-action: {tier: zone1, x: 2, y: 7}
+        iceberg-spark-query: {tier: zone1, x: 2, y: 10}
+        iceberg-spark-expire: {tier: zone1, x: 2, y: 13}
+        iceberg-spark-policy: {tier: zone1, x: 2, y: 16}
+        iceberg-spark-hdfs: {tier: zone2, x: 2, y: 1}
+        iceberg-spark-iceberg: {tier: zone2, x: 2, y: 4}
+      groups:
+        - {kind: cluster, label: "Spark クラスター", tier: [zone1], nodes: [iceberg-spark-host, iceberg-spark-write, iceberg-spark-action, iceberg-spark-query, iceberg-spark-expire, iceberg-spark-policy]}
+        - {kind: cluster, label: "自前 HDFS", tier: [zone2], nodes: [iceberg-spark-hdfs, iceberg-spark-iceberg]}
+  - id: aws-glue
+    label: AWS（Glue テーブルオプティマイザー）
+    description: Glue Streaming が追加する Iceberg の小ファイルを Glue のコンパクションでまとめ、Athena がスナップショットを読む例。
+    sources:
+      - {title: AWS Glue Streaming, url: https://docs.aws.amazon.com/glue/latest/dg/streaming-chapter.html}
+      - {title: AWS Glue のコンパクション設定, url: https://docs.aws.amazon.com/glue/latest/dg/enable-compaction.html}
+      - {title: AWS Glue のスナップショット保持設定, url: https://docs.aws.amazon.com/glue/latest/dg/enable-snapshot-retention.html}
+      - {title: Athena の Iceberg タイムトラベル, url: https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-time-travel-and-version-travel-queries.html}
+    tiers:
+      - {id: compute, label: 書き込み・保守・クエリ, z: 1, size: [22, 4]}
+      - {id: storage, label: カタログとファイル, z: 0, size: [22, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [compute, storage], nodes: [aws-writer, aws-compact, aws-retention, aws-query, aws-catalog, aws-s3, aws-input, aws-checkpoint]}
+    nodes:
+      aws-input: {label: Amazon MSK（注文トピック）, svc: msk, kind: queue, tier: storage, x: 2, y: 3, description: Glue Streaming が購読する注文イベントを保持する。, management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+      aws-checkpoint: {label: S3 Streaming チェックポイント, svc: s3, kind: db, tier: storage, x: 11, y: 3, description: ジョブの復旧に使うチェックポイントをテーブルとは別のパスに保存する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が復旧データと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+      aws-writer: {label: AWS Glue Streaming ジョブ, svc: glue, kind: worker, tier: compute, x: 2, y: 1.5, realizes: [stream_writer], description: Spark Structured Streaming のマイクロバッチで v2 Iceberg テーブルに追記する。, management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がジョブと権限を設定する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+      aws-compact: {label: AWS Glue（コンパクション）, svc: glue, kind: worker, tier: compute, x: 8, y: 1.5, realizes: [planner, rewrite], description: ファイル数などの条件を監視し、対象を binpack で書き直してコミットする。, management: {type: shared, scope: "AWS が最適化を実行し、利用者が有効化と IAM ロールを設定する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+      aws-retention: {label: AWS Glue（スナップショット保持）, svc: glue, kind: worker, tier: compute, x: 14, y: 1.5, realizes: [cleanup], description: 保持ポリシーを満たしたスナップショットを期限切れにし、削除設定が有効なら関連ファイルを整理する。, management: {type: shared, scope: "AWS が保持処理を実行し、利用者が保持と削除を設定する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+      aws-query: {label: Amazon Athena（エンジン 3）, svc: athena, kind: service, tier: compute, x: 20, y: 1.5, realizes: [reader], description: 現行または選択したスナップショットをクエリする。, management: {type: shared, scope: "AWS が Athena 基盤を運用し、利用者が SQL と権限を設定する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+      aws-catalog: {label: AWS Glue Data Catalog, svc: glue, kind: catalog, tier: storage, x: 7, y: 1.5, realizes: [metadata], description: Iceberg テーブルの現行メタデータファイルの位置を管理する。, management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がテーブルと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+      aws-s3: {label: Amazon S3（Iceberg のデータとスナップショット）, svc: s3, kind: db, tier: storage, x: 15, y: 1.5, realizes: [orders, snapshot], description: メタデータ、スナップショットの参照、Parquet データを保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-compaction.md#§10}]}
+    links:
+      - {id: aws-read-stream, from: aws-input, to: aws-writer, label: 注文イベントを取得}
+      - {id: aws-save-checkpoint, from: aws-writer, to: aws-checkpoint, label: 処理進捗を保存}
+      - {id: aws-resume-checkpoint, from: aws-checkpoint, to: aws-writer, label: 進捗を読み戻す}
+      - {id: aws-writer-catalog, from: aws-writer, to: aws-catalog, label: 追記時にメタデータの位置を更新}
+      - {id: aws-expire-files, from: aws-retention, to: aws-s3, label: 期限切れで参照不要のファイルを削除}
+      - {id: aws-query-catalog, from: aws-query, to: aws-catalog, label: Iceberg テーブルを解決, realizes: [read], replace: true}
+      - {id: aws-query-files, from: aws-query, to: aws-s3, label: 選択したスナップショットのファイルを読む, realizes: [read], replace: true}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        aws-input: {tier: diagram, x: 2, y: 2}
+        aws-writer: {tier: diagram, x: 8, y: 2}
+        aws-compact: {tier: diagram, x: 8, y: 5}
+        aws-retention: {tier: diagram, x: 8, y: 8}
+        aws-query: {tier: diagram, x: 8, y: 11}
+        aws-catalog: {tier: diagram, x: 14, y: 2}
+        aws-s3: {tier: diagram, x: 20, y: 2}
+        aws-checkpoint: {tier: diagram, x: 20, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-input, aws-writer, aws-compact, aws-retention, aws-query, aws-catalog, aws-s3, aws-checkpoint]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "MSK 入力", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "Glue と Athena", z: 0, origin: [7, 0], size: [5, 12]}
+        - {id: zone2, label: "Glue カタログ", z: 0, origin: [14, 0], size: [5, 5]}
+        - {id: zone3, label: "S3 データと復旧", z: 0, origin: [21, 0], size: [5, 6]}
+      nodes:
+        aws-input: {tier: zone0, x: 2, y: 1}
+        aws-writer: {tier: zone1, x: 2, y: 1}
+        aws-compact: {tier: zone1, x: 2, y: 4}
+        aws-retention: {tier: zone1, x: 2, y: 7}
+        aws-query: {tier: zone1, x: 2, y: 10}
+        aws-catalog: {tier: zone2, x: 2, y: 1}
+        aws-s3: {tier: zone3, x: 2, y: 1}
+        aws-checkpoint: {tier: zone3, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [aws-input, aws-writer, aws-compact, aws-retention, aws-query, aws-catalog, aws-s3, aws-checkpoint]}

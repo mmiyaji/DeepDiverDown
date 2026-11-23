@@ -1,0 +1,400 @@
+name: TimescaleDB：chunk・列バッチと絞り込み
+description: 時刻別 chunk、列化したバッチの segmentby / orderby、読み取り・継続集計を追う。
+parent:
+  model: timescaledb-storage-internals
+  node: column
+reference:
+  objectives:
+    - 構成要素と書き込み・読み出しの経路を理解する。
+    - 保存形式と運用上の前提を区別する。
+  sources:
+    - title: Hypertables
+      url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+    - title: Hypercore
+      url: https://www.tigerdata.com/docs/learn/columnar-storage/understand-hypercore
+    - title: Columnstore policy
+      url: https://www.tigerdata.com/docs/reference/timescaledb/hypercore/add_columnstore_policy
+    - title: Continuous aggregates
+      url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+    - title: PostgreSQL WAL
+      url: https://www.postgresql.org/docs/current/wal-intro.html
+sources:
+  - docs/reference-timescaledb-columnstore-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-timescaledb-columnstore-internals.md#§1
+  - type: doc
+    ref: docs/reference-timescaledb-columnstore-internals.md#§3
+  - type: doc
+    ref: docs/reference-timescaledb-columnstore-internals.md#§5
+tiers:
+  - id: query
+    label: 入力・実行
+    z: 1
+    size:
+      - 20
+      - 4
+  - id: store
+    label: データの保存
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  write:
+    label: 時刻付きの行
+    kind: client
+    tier: query
+    x: 0
+    'y': 1.5
+    description: 観測時刻・系列属性・値の行。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  route:
+    label: hypertable の振り分け
+    kind: service
+    tier: query
+    x: 4
+    'y': 1.5
+    description: 時刻に応じた chunk に書き込む。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  row:
+    label: rowstore chunk
+    kind: db
+    tier: store
+    x: 4
+    'y': 1.5
+    description: 最新の行を時間範囲別に格納する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  batch:
+    label: columnstore の列バッチ
+    kind: db
+    tier: store
+    x: 9
+    'y': 1.5
+    description: segmentby のキーと orderby の順序でバッチ化したデータ。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  wal:
+    label: PostgreSQL WAL
+    kind: file
+    tier: store
+    x: 0
+    'y': 1.5
+    description: PostgreSQL の変更を復旧用に記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  rollup:
+    label: continuous aggregate
+    kind: db
+    tier: store
+    x: 14
+    'y': 1.5
+    description: 時間幅の集計を保存し、更新ポリシーで更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  scan:
+    label: SQL の期間・系列検索
+    kind: service
+    tier: query
+    x: 14
+    'y': 1.5
+    description: 対象 chunk を絞り、行と列バッチや集計を読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+links:
+  - id: a
+    from: write
+    to: route
+    label: 観測行を投入
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  - id: b
+    from: route
+    to: row
+    label: 時間別 chunk に保存
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  - id: w
+    from: route
+    to: wal
+    label: 変更を WAL に記録
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  - id: c
+    from: row
+    to: batch
+    label: 設定したポリシーで列化
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  - id: d
+    from: row
+    to: rollup
+    label: 対象期間を集計
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  - id: q
+    from: scan
+    to: row
+    label: 対象の rowstore を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  - id: r
+    from: scan
+    to: batch
+    label: 対象の columnstore を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+  - id: s
+    from: scan
+    to: rollup
+    label: 時間別集計を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+scenarios:
+  - id: store
+    label: 投入と列化
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+    steps:
+      - links:
+          - a
+        note: 観測行を投入。
+        highlight:
+          - today
+      - links:
+          - b
+        note: 時間別 chunk に保存。
+        highlight:
+          - today
+          - yesterday
+      - links:
+          - w
+        note: 変更を WAL に記録。
+        highlight:
+          - wal
+      - links:
+          - c
+        note: 設定したポリシーで列化。
+        highlight:
+          - yesterday
+          - segment
+          - order
+    visual: physical-map
+  - id: read
+    label: 期間を絞って読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-columnstore-internals.md#§2
+    steps:
+      - links:
+          - q
+        note: 対象の rowstore を読む。
+        highlight:
+          - today
+      - links:
+          - r
+        note: 対象の columnstore を読む。
+        highlight:
+          - segment
+          - order
+      - links:
+          - d
+        note: 対象期間を集計。
+        highlight:
+          - today
+          - agg
+      - links:
+          - s
+        note: 時間別集計を読む。
+        highlight:
+          - agg
+    visual: physical-map
+implementations:
+  - id: local
+    label: Linux 上の PostgreSQL と TimescaleDB
+    description: 単一 Linux ホストの PostgreSQL / TimescaleDB で WAL、hypertable、columnstore と集計を管理する。
+    sources:
+      - title: Hypertables
+        url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+      - title: Hypercore
+        url: https://www.tigerdata.com/docs/learn/columnar-storage/understand-hypercore
+      - title: Columnstore policy
+        url: https://www.tigerdata.com/docs/reference/timescaledb/hypercore/add_columnstore_policy
+      - title: Continuous aggregates
+        url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+      - title: PostgreSQL WAL
+        url: https://www.postgresql.org/docs/current/wal-intro.html
+    tiers:
+      - id: query
+        label: 入力・実行
+        z: 1
+        size:
+          - 20
+          - 4
+      - id: store
+        label: データの保存
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-write:
+        label: 時刻付きの行
+        kind: client
+        tier: query
+        x: 0
+        'y': 1.5
+        description: 観測時刻・系列属性・値の行。
+        realizes:
+          - write
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-columnstore-internals.md#§4
+      impl-route:
+        label: hypertable の振り分け
+        kind: service
+        tier: query
+        x: 4
+        'y': 1.5
+        description: 時刻に応じた chunk に書き込む。
+        realizes:
+          - route
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-columnstore-internals.md#§4
+      impl-row:
+        label: rowstore chunk
+        kind: db
+        tier: store
+        x: 4
+        'y': 1.5
+        description: 最新の行を時間範囲別に格納する。
+        realizes:
+          - row
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-columnstore-internals.md#§4
+      impl-batch:
+        label: columnstore の列バッチ
+        kind: db
+        tier: store
+        x: 9
+        'y': 1.5
+        description: segmentby のキーと orderby の順序でバッチ化したデータ。
+        realizes:
+          - batch
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-columnstore-internals.md#§4
+      impl-wal:
+        label: PostgreSQL WAL
+        kind: file
+        tier: store
+        x: 0
+        'y': 1.5
+        description: PostgreSQL の変更を復旧用に記録する。
+        realizes:
+          - wal
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-columnstore-internals.md#§4
+      impl-rollup:
+        label: continuous aggregate
+        kind: db
+        tier: store
+        x: 14
+        'y': 1.5
+        description: 時間幅の集計を保存し、更新ポリシーで更新する。
+        realizes:
+          - rollup
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-columnstore-internals.md#§4
+      impl-scan:
+        label: SQL の期間・系列検索
+        kind: service
+        tier: query
+        x: 14
+        'y': 1.5
+        description: 対象 chunk を絞り、行と列バッチや集計を読む。
+        realizes:
+          - scan
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-columnstore-internals.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - query
+          - store
+        nodes:
+          - impl-write
+          - impl-route
+          - impl-row
+          - impl-batch
+          - impl-wal
+          - impl-rollup
+          - impl-scan
+blocks:
+  - id: physical-map
+    title: chunk と列バッチの構造
+    note: 説明用の概念例です。実データの個数、配置、バージョンや設定を表すものではありません。
+    hint: 項目を選ぶと説明を表示します。シナリオの進行に合わせて該当項目を強調します。
+    lanes:
+      - id: rowlane
+        label: 時間別 rowstore
+        node: row
+      - id: columnlane
+        label: 列バッチ
+        node: batch
+      - id: agglane
+        label: 継続集計・WAL
+        node: rollup
+    items:
+      rowlane:
+        - id: today
+          label: 今日
+          k: 0
+          note: 最近の時間範囲の chunk の例。
+        - id: yesterday
+          label: 昨日
+          k: 1
+          note: 別の時間範囲の chunk の例。
+      columnlane:
+        - id: segment
+          label: segmentby
+          k: 2
+          note: 同じキーで値をまとめる例。
+        - id: order
+          label: orderby
+          k: 3
+          note: 列バッチ内の並び順を決める列。
+      agglane:
+        - id: agg
+          label: 時間別集計
+          k: 4
+          note: 更新された時間幅の集計値。
+        - id: wal
+          label: WAL
+          k: 1
+          note: PostgreSQL の変更記録。

@@ -68,10 +68,17 @@ implementations:
       - {title: RDD Programming Guide, url: https://spark.apache.org/docs/latest/rdd-programming-guide.html}
       - {title: Job Scheduling, url: https://spark.apache.org/docs/latest/job-scheduling.html}
       - {title: Spark Standalone Mode, url: https://spark.apache.org/docs/latest/spark-standalone.html}
+      - {title: HDFS Architecture, url: https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html}
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    groups:
+      - {kind: cluster, label: 自前運用の Spark Standalone クラスター, tier: [processing], nodes: [standalone-master, standalone-driver, standalone-host-a, standalone-host-b]}
     nodes:
+      standalone-master-host: {label: Master 用 Linux ホスト, kind: host, tier: processing, x: 1, y: 0, description: 利用者が OS と Spark Master を運用する。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
+      standalone-worker-host-a: {label: Worker A の Linux ホスト, kind: host, tier: processing, x: 5, y: 0, description: Worker と Driver・Executor の JVM を実行する。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
+      standalone-worker-host-b: {label: Worker B の Linux ホスト, kind: host, tier: processing, x: 9, y: 0, description: Worker と Executor JVM を実行する。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
+      standalone-hdfs-host: {label: 自前 HDFS クラスター, kind: host, tier: processing, x: 13, y: 0, description: 利用者が NameNode と複数 DataNode を運用する。個々のノードの配置は省略。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
       standalone-submit: {label: spark-submit, kind: actor, tier: processing, x: 1, y: 1.15, realizes: [submitter], description: アプリケーション JAR を cluster モードで投入する。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
       standalone-master: {label: Standalone Master, kind: service, tier: processing, x: 1, y: 3.65, realizes: [manager], description: Worker 登録と Executor の資源割当を担う。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
       standalone-driver: {label: Worker 上の Driver JVM, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [driver], description: ジョブをステージに分けてタスクを割り当てる。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
@@ -80,4 +87,121 @@ implementations:
       standalone-files: {label: HDFS 上の入力・出力パス, kind: db, tier: processing, x: 9, y: 3.65, realizes: [input, output], description: 入力と集計結果を異なる HDFS パスで保持する。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
       standalone-jar: {label: アプリケーション JAR, kind: file, tier: setup, x: 1, y: 1.5, description: 注文集計のコードをパッケージ化し、投入時に指定する。, evidence: [{type: doc, ref: docs/reference-spark.md#§8}]}
     links:
+      - {id: standalone-master-runtime, from: standalone-master-host, to: standalone-master, label: Master を実行}
+      - {id: standalone-worker-a-driver, from: standalone-worker-host-a, to: standalone-driver, label: Driver を実行}
+      - {id: standalone-worker-a-executor, from: standalone-worker-host-a, to: standalone-host-a, label: Executor を実行}
+      - {id: standalone-worker-b-executor, from: standalone-worker-host-b, to: standalone-host-b, label: Executor を実行}
+      - {id: standalone-hdfs-runtime, from: standalone-hdfs-host, to: standalone-files, label: 入出力パスを提供}
       - {id: standalone-jar-connection, from: standalone-jar, to: standalone-submit, label: 配布する JAR を指定}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 自前運用の実装構成, z: 0, size: [23, 12]}
+      nodes:
+        standalone-submit: {tier: diagram, x: 1, y: 1}
+        standalone-jar: {tier: diagram, x: 1, y: 5}
+        standalone-master-host: {tier: diagram, x: 6, y: 3}
+        standalone-master: {tier: diagram, x: 6, y: 6}
+        standalone-worker-host-a: {tier: diagram, x: 11, y: 2}
+        standalone-driver: {tier: diagram, x: 11, y: 5}
+        standalone-host-a: {tier: diagram, x: 11, y: 8}
+        standalone-worker-host-b: {tier: diagram, x: 16, y: 3}
+        standalone-host-b: {tier: diagram, x: 16, y: 6}
+        standalone-hdfs-host: {tier: diagram, x: 21, y: 3}
+        standalone-files: {tier: diagram, x: 21, y: 6}
+      groups:
+        - {kind: cluster, label: Spark Standalone クラスター, tier: [diagram], x0: 4, y0: 0, x1: 18, y1: 10, nodes: [standalone-master-host, standalone-master, standalone-worker-host-a, standalone-driver, standalone-host-a, standalone-worker-host-b, standalone-host-b]}
+        - {kind: cluster, label: HDFS クラスター, tier: [diagram], x0: 19, y0: 1, x1: 23, y1: 8, nodes: [standalone-hdfs-host, standalone-files]}
+    layout3d:
+      tiers:
+        - {id: input, label: ジョブ投入, kind: origin, z: 0, origin: [-5, 0], size: [3, 5]}
+        - {id: hosts, label: 自前 Linux ホスト, z: 0, size: [14, 5]}
+        - {id: processes, label: Spark プロセス, z: 1, size: [14, 5]}
+        - {id: hdfs, label: HDFS, z: 0, origin: [17, 0], size: [7, 5]}
+      nodes:
+        standalone-submit: {tier: input, x: 1, y: 1}
+        standalone-jar: {tier: input, x: 1, y: 4}
+        standalone-master-host: {tier: hosts, x: 1, y: 2}
+        standalone-worker-host-a: {tier: hosts, x: 6, y: 2}
+        standalone-worker-host-b: {tier: hosts, x: 11, y: 2}
+        standalone-master: {tier: processes, x: 1, y: 2}
+        standalone-driver: {tier: processes, x: 6, y: 1}
+        standalone-host-a: {tier: processes, x: 6, y: 4}
+        standalone-host-b: {tier: processes, x: 11, y: 2}
+        standalone-hdfs-host: {tier: hdfs, x: 1, y: 2}
+        standalone-files: {tier: hdfs, x: 5, y: 2}
+      groups:
+        - {kind: cluster, label: Spark Standalone クラスター, tier: [hosts, processes], nodes: [standalone-master-host, standalone-master, standalone-worker-host-a, standalone-driver, standalone-host-a, standalone-worker-host-b, standalone-host-b]}
+        - {kind: cluster, label: HDFS クラスター, tier: [hdfs], nodes: [standalone-hdfs-host, standalone-files]}
+
+  - id: aws-emr-eks
+    label: "Amazon EMR on EKS と S3"
+    description: "Amazon EMR の StartJobRun で EKS 上の Spark バッチ処理を動かし、S3 の注文データを集計する例。"
+    sources:
+      - {title: "EMR on EKS のジョブ投入", url: https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/getting-started.html}
+      - {title: "仮想クラスターと Pod のスケジューリング", url: https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/emr-eks-how.html}
+      - {title: "ジョブ投入用 Pod", url: https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/emr-eks-job-submitter.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-emr-eks-emr, aws-emr-eks-scheduler, aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b, aws-emr-eks-capacity, aws-emr-eks-source, aws-emr-eks-target]}
+      - {kind: cluster, label: "Amazon EKS クラスター", provider: k8s, tier: [runtime], nodes: [aws-emr-eks-scheduler, aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b, aws-emr-eks-capacity]}
+      - {kind: namespace, label: "EMR に登録した名前空間", provider: k8s, tier: [runtime], nodes: [aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b]}
+    nodes:
+      aws-emr-eks-cli: {label: "AWS CLI", kind: client, tier: entry, x: 1, y: 1.5, realizes: [submitter], description: "仮想クラスター ID、実行ロール、アプリケーションの場所を指定する。", evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-emr: {label: "EMR ジョブ API", kind: service, tier: runtime, x: 1, y: 1.5, svc: emr, description: "StartJobRun を受け、登録済みの名前空間へ投入用 Pod を配置する。", management: {type: aws, scope: "AWS がジョブ API の基盤を運用し、利用者がジョブと仮想クラスターを指定する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-submitter: {label: "ジョブ投入用 Pod", kind: worker, tier: runtime, x: 5, y: 2.6, description: "Spark Driver Pod を起動する。", management: {type: shared, scope: "EMR が投入用 Pod を作成し、利用者がジョブ実行ロールと設定を指定する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-scheduler: {label: "EKS のスケジューラー", kind: scheduler, tier: runtime, x: 10, y: 0.5, svc: eks, realizes: [manager], description: "Pod を EKS のノードへ割り当てる。", management: {type: shared, scope: "AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-driver: {label: "Spark Driver Pod", kind: service, tier: runtime, x: 5, y: 4.5, realizes: [driver], description: "実行計画を作り、Executor Pod とタスクを手配する。", management: {type: customer, scope: "利用者がジョブコードと実行設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-worker-a: {label: "Executor Pod A", kind: worker, tier: runtime, x: 10, y: 4.5, realizes: [executor-a], slots: 4, description: "入力分割を担当し、中間データを再分配する。", management: {type: customer, scope: "利用者がジョブコードと実行設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-worker-b: {label: "Executor Pod B", kind: worker, tier: runtime, x: 14, y: 4.5, realizes: [executor-b], slots: 4, description: "再分配されたデータを処理する。", management: {type: customer, scope: "利用者がジョブコードと実行設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-capacity: {label: "EKS の EC2 ノード", kind: host, svc: ec2, tier: runtime, x: 14, y: 0.5, description: "ジョブ投入用 Pod、Driver Pod、Executor Pod を稼働させる。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-source: {label: "S3 入力データ", kind: db, tier: data, x: 8, y: 1.5, svc: s3, realizes: [input], description: "受注データを入力用プレフィックスに保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      aws-emr-eks-target: {label: "S3 集計結果", kind: db, tier: data, x: 14, y: 1.5, svc: s3, realizes: [output], description: "集計結果を出力用プレフィックスに保存する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+    links:
+      - {id: aws-emr-eks-request, from: aws-emr-eks-cli, to: aws-emr-eks-emr, label: "StartJobRun を呼び出す", realizes: [submit], replace: true, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      - {id: aws-emr-eks-submit-pod, from: aws-emr-eks-emr, to: aws-emr-eks-submitter, label: "ジョブ投入用 Pod を配置", realizes: [submit], replace: true, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      - {id: aws-emr-eks-start-driver, from: aws-emr-eks-submitter, to: aws-emr-eks-driver, label: "Driver Pod を起動", realizes: [submit], replace: true, evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+      - {id: aws-emr-eks-bind, from: aws-emr-eks-scheduler, to: aws-emr-eks-capacity, label: "EC2 ノードに Pod を割り当て", evidence: [{type: doc, ref: docs/reference-spark.md#§9}]}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: EMR on EKS の構成, z: 0, size: [27, 13]}
+      nodes:
+        aws-emr-eks-cli: {tier: diagram, x: 1, y: 2}
+        aws-emr-eks-emr: {tier: diagram, x: 6, y: 2}
+        aws-emr-eks-scheduler: {tier: diagram, x: 11, y: 2}
+        aws-emr-eks-capacity: {tier: diagram, x: 11, y: 4.7}
+        aws-emr-eks-submitter: {tier: diagram, x: 11, y: 8}
+        aws-emr-eks-driver: {tier: diagram, x: 16, y: 8}
+        aws-emr-eks-worker-a: {tier: diagram, x: 21, y: 7}
+        aws-emr-eks-worker-b: {tier: diagram, x: 21, y: 10}
+        aws-emr-eks-source: {tier: diagram, x: 26, y: 4}
+        aws-emr-eks-target: {tier: diagram, x: 26, y: 9}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 4, y0: 0, x1: 28, y1: 12, nodes: [aws-emr-eks-emr, aws-emr-eks-scheduler, aws-emr-eks-capacity, aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b, aws-emr-eks-source, aws-emr-eks-target]}
+        - {kind: cluster, label: EKS クラスター, provider: k8s, tier: [diagram], x0: 8.3, y0: -0.3, x1: 23.7, y1: 12, nodes: [aws-emr-eks-scheduler, aws-emr-eks-capacity, aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b]}
+        - {kind: namespace, label: EMR に登録した名前空間, provider: k8s, tier: [diagram], x0: 8.5, y0: 5.8, x1: 23.5, y1: 11.8, nodes: [aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b]}
+    layout3d:
+      tiers:
+        - {id: entry, label: ジョブ投入, kind: origin, z: 0, origin: [-5, 0], size: [3, 4]}
+        - {id: platform, label: EKS 実行基盤, z: 0, size: [16, 5]}
+        - {id: pods, label: ジョブ Pod, z: 1, size: [16, 5]}
+        - {id: services, label: AWS 管理サービス, z: 0, origin: [20, 0], size: [13, 5]}
+      nodes:
+        aws-emr-eks-cli: {tier: entry, x: 1, y: 2}
+        aws-emr-eks-scheduler: {tier: platform, x: 2, y: 1.5}
+        aws-emr-eks-capacity: {tier: platform, x: 9, y: 2.5}
+        aws-emr-eks-submitter: {tier: pods, x: 2, y: 2.5}
+        aws-emr-eks-driver: {tier: pods, x: 6, y: 2.5}
+        aws-emr-eks-worker-a: {tier: pods, x: 10, y: 2.5}
+        aws-emr-eks-worker-b: {tier: pods, x: 14, y: 2.5}
+        aws-emr-eks-emr: {tier: services, x: 1, y: 2.5}
+        aws-emr-eks-source: {tier: services, x: 6, y: 2.5}
+        aws-emr-eks-target: {tier: services, x: 11, y: 2.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [platform, pods, services], nodes: [aws-emr-eks-emr, aws-emr-eks-scheduler, aws-emr-eks-capacity, aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b, aws-emr-eks-source, aws-emr-eks-target]}
+        - {kind: cluster, label: EKS クラスター, provider: k8s, tier: [platform, pods], nodes: [aws-emr-eks-scheduler, aws-emr-eks-capacity, aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b]}
+        - {kind: namespace, label: EMR に登録した名前空間, provider: k8s, tier: [pods], nodes: [aws-emr-eks-submitter, aws-emr-eks-driver, aws-emr-eks-worker-a, aws-emr-eks-worker-b]}

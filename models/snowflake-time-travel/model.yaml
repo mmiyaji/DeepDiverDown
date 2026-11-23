@@ -199,6 +199,7 @@ implementations:
         url: https://docs.snowflake.com/en/sql-reference/parameters#data-retention-time-in-days
       - title: QUERY_HISTORY ビュー
         url: https://docs.snowflake.com/en/sql-reference/account-usage/query_history
+      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -213,9 +214,10 @@ implementations:
           - 8
           - 3
     nodes:
+      example-recovery-user: {label: Authorized user, kind: client, tier: flow, x: -3, y: 1, evidence: [{type: doc, ref: "docs/reference-snowflake-time-travel.md#§4"}]}
       example-operator:
         label: データ復旧担当ロール
-        kind: actor
+        kind: policy
         tier: flow
         x: 0
         'y': 2
@@ -226,7 +228,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-time-travel.md#§4
       example-current:
-        svc: snowflake:platform
         label: Snowflake 永続テーブル ORDERS と Time Travel
         kind: db
         tier: flow
@@ -240,7 +241,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-time-travel.md#§4
       example-clone:
-        svc: snowflake:platform
         label: ORDERS_RECOVERY クローン
         kind: db
         tier: flow
@@ -282,7 +282,6 @@ implementations:
         label: Snowflake クエリ履歴
         kind: service
         tier: implementation-setup
-        svc: snowflake:platform
         x: 1
         'y': 1.5
         description: 誤更新のクエリ ID を復旧担当が確認する。
@@ -290,6 +289,7 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-time-travel.md#§4
     links:
+      - {id: example-user-role, from: example-recovery-user, to: example-operator, label: "Use authorized role", evidence: [{type: doc, ref: "docs/reference-snowflake-time-travel.md#§4"}]}
       - id: example-querylog-connection
         from: example-querylog
         to: example-operator
@@ -298,20 +298,30 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-time-travel.md#§4
     groups:
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - flow
-        nodes:
-          - example-current
-          - example-clone
-          - example-repair
-          - example-failsafe
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - implementation-setup
-        nodes:
-          - example-querylog
+      - {kind: cloud, provider: snowflake, label: Snowflake account, tier: [flow, implementation-setup], nodes: [example-operator, example-current, example-clone, example-repair, example-failsafe, example-querylog]}
+    layout2d:
+      tiers: [{id: diagram, label: Snowflake account and user, z: 0, size: [27, 12]}]
+      nodes:
+        example-recovery-user: {tier: diagram, x: 0, y: 4}
+        example-operator: {tier: diagram, x: 5, y: 1}
+        example-current: {tier: diagram, x: 9, y: 1}
+        example-clone: {tier: diagram, x: 13, y: 1}
+        example-repair: {tier: diagram, x: 17, y: 1}
+        example-failsafe: {tier: diagram, x: 21, y: 1}
+        example-querylog: {tier: diagram, x: 5, y: 5}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: diagram, nodes: [example-operator, example-current, example-clone, example-repair, example-failsafe, example-querylog]}
+    layout3d:
+      tiers:
+        - {id: account, label: Snowflake account, z: 0, size: [22, 6]}
+        - {id: user, label: User, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-recovery-user: {tier: user, x: 0, y: 1.5}
+        example-operator: {tier: account, x: 2, y: 1}
+        example-current: {tier: account, x: 6, y: 1}
+        example-clone: {tier: account, x: 10, y: 1}
+        example-repair: {tier: account, x: 14, y: 1}
+        example-failsafe: {tier: account, x: 18, y: 1}
+        example-querylog: {tier: account, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: account, nodes: [example-operator, example-current, example-clone, example-repair, example-failsafe, example-querylog]}

@@ -92,8 +92,8 @@ blocks:
   items: {a: [], b: [], c: []}
 implementations:
   - id: etcd
-    label: 3 台の VM で運用する etcd
-    description: 受付上限のキーを 3 台の etcd メンバーに保持し、書き込み後の状態を etcdctl で確認する例。
+    label: AWS（3 AZ の EC2 で運用する etcd）
+    description: 各 AZ に EC2 上の etcd メンバーと専用 EBS を1組ずつ置き、状態を etcdctl で確認する例。
     sources:
       - title: etcd Clustering Guide
         url: https://etcd.io/docs/v3.6/op-guide/clustering/
@@ -101,18 +101,21 @@ implementations:
         url: https://etcd.io/docs/v3.6/tasks/operator/how-to-check-cluster-status/
       - title: etcd API guarantees
         url: https://etcd.io/docs/v3.6/learning/api_guarantees/
+      - {title: etcd のハードウェア要件, url: https://etcd.io/docs/v3.6/op-guide/hardware/}
+      - {title: Amazon EBS ボリュームのアタッチ, url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html}
     tiers:
       - id: client
         label: 設定の更新
-        z: 1
+        z: 2
         kind: origin
       - id: cluster
         label: etcd クラスタ
-        z: 0
+        z: 1
+      - {id: disk, label: メンバーごとのローカル永続化, z: 0, size: [14, 4]}
     groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [cluster, disk]}
       - kind: cluster
-        label: etcd の 3 投票メンバー
-        provider: onprem
+        label: 同一リージョン・VPC の 3 投票メンバー
         tier:
           - cluster
         nodes:
@@ -142,42 +145,53 @@ implementations:
           - type: doc
             ref: docs/reference-etcd-raft.md#§6
       etcd-member-a:
-        label: etcd member A の VM
+        label: EC2（etcd メンバー A・AZ A）
         kind: db
         tier: cluster
-        svc: onprem:vm
+        svc: ec2
+        x: 2
+        y: 1.5
         realizes:
           - member-a
         description: 初期リーダーの例。Raft ログとローカルデータを保持する。
         evidence:
           - type: doc
             ref: docs/reference-etcd-raft.md#§6
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS・etcd・バックアップを管理する。"}
       etcd-member-b:
-        label: etcd member B の VM
+        label: EC2（etcd メンバー B・AZ B）
         kind: db
         tier: cluster
-        svc: onprem:vm
+        svc: ec2
+        x: 6
+        y: 1.5
         realizes:
           - member-b
         description: A 停止後にリーダーとなる候補。
         evidence:
           - type: doc
             ref: docs/reference-etcd-raft.md#§6
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS・etcd・バックアップを管理する。"}
       etcd-member-c:
-        label: etcd member C の VM
+        label: EC2（etcd メンバー C・AZ C）
         kind: db
         tier: cluster
-        svc: onprem:vm
+        svc: ec2
+        x: 10
+        y: 1.5
         realizes:
           - member-c
         description: 同じ Raft グループに参加する。
         evidence:
           - type: doc
             ref: docs/reference-etcd-raft.md#§6
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS・etcd・バックアップを管理する。"}
       etcd-setting:
         label: etcd MVCC の受付上限キー
         kind: table
         tier: cluster
+        x: 6
+        y: 5
         realizes:
           - setting
         description: 各メンバーの適用済み状態に存在する同じキーを表す。別ストレージへの複製を示す箱ではない。
@@ -192,7 +206,13 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-etcd-raft.md#§6
+      etcd-ebs-a: {label: Amazon EBS（A のデータ）, svc: ebs, kind: db, tier: disk, x: 2, y: 1.5, description: 同じ AZ のメンバー A 専用で etcd の WAL とバックエンドを保存する。, management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がボリューム・データ・バックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-etcd-raft.md#§6}]}
+      etcd-ebs-b: {label: Amazon EBS（B のデータ）, svc: ebs, kind: db, tier: disk, x: 6, y: 1.5, description: 同じ AZ のメンバー B 専用で etcd の WAL とバックエンドを保存する。, management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がボリューム・データ・バックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-etcd-raft.md#§6}]}
+      etcd-ebs-c: {label: Amazon EBS（C のデータ）, svc: ebs, kind: db, tier: disk, x: 10, y: 1.5, description: 同じ AZ のメンバー C 専用で etcd の WAL とバックエンドを保存する。, management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がボリューム・データ・バックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-etcd-raft.md#§6}]}
     links:
+      - {id: etcd-local-a, from: etcd-member-a, to: etcd-ebs-a, label: A の WAL と状態を永続化}
+      - {id: etcd-local-b, from: etcd-member-b, to: etcd-ebs-b, label: B の WAL と状態を永続化}
+      - {id: etcd-local-c, from: etcd-member-c, to: etcd-ebs-c, label: C の WAL と状態を永続化}
       - id: etcd-observe-a
         from: etcd-health
         to: etcd-member-a
@@ -214,3 +234,42 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-etcd-raft.md#§6
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [31, 17]}
+      nodes:
+        etcd-operator: {tier: diagram, x: 2, y: 2}
+        etcd-client: {tier: diagram, x: 2, y: 5}
+        etcd-health: {tier: diagram, x: 2, y: 8}
+        etcd-member-a: {tier: diagram, x: 8, y: 2}
+        etcd-ebs-a: {tier: diagram, x: 8, y: 10}
+        etcd-member-b: {tier: diagram, x: 14, y: 2}
+        etcd-ebs-b: {tier: diagram, x: 14, y: 10}
+        etcd-member-c: {tier: diagram, x: 20, y: 2}
+        etcd-ebs-c: {tier: diagram, x: 20, y: 10}
+        etcd-setting: {tier: diagram, x: 26, y: 2}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 5, y0: 0, x1: 30, y1: 16, nodes: [etcd-member-a, etcd-ebs-a, etcd-member-b, etcd-ebs-b, etcd-member-c, etcd-ebs-c, etcd-setting]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [diagram], x0: 6, y0: 0, x1: 22, y1: 4, nodes: [etcd-member-a, etcd-member-b, etcd-member-c]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "運用者", z: 0, origin: [0, 0], size: [5, 9]}
+        - {id: zone1, label: "AZ A", z: 0, origin: [7, 0], size: [5, 6]}
+        - {id: zone2, label: "AZ B", z: 0, origin: [14, 0], size: [5, 6]}
+        - {id: zone3, label: "AZ C", z: 0, origin: [21, 0], size: [5, 6]}
+        - {id: zone4, label: "論理的な共有状態", z: 0, origin: [28, 0], size: [5, 5]}
+      nodes:
+        etcd-operator: {tier: zone0, x: 2, y: 1}
+        etcd-client: {tier: zone0, x: 2, y: 4}
+        etcd-health: {tier: zone0, x: 2, y: 7}
+        etcd-member-a: {tier: zone1, x: 2, y: 1}
+        etcd-ebs-a: {tier: zone1, x: 2, y: 4}
+        etcd-member-b: {tier: zone2, x: 2, y: 1}
+        etcd-ebs-b: {tier: zone2, x: 2, y: 4}
+        etcd-member-c: {tier: zone3, x: 2, y: 1}
+        etcd-ebs-c: {tier: zone3, x: 2, y: 4}
+        etcd-setting: {tier: zone4, x: 2, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [zone1, zone2, zone3, zone4], nodes: [etcd-member-a, etcd-ebs-a, etcd-member-b, etcd-ebs-b, etcd-member-c, etcd-ebs-c, etcd-setting]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [zone1, zone2, zone3], nodes: [etcd-member-a, etcd-member-b, etcd-member-c]}

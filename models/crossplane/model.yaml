@@ -1,0 +1,244 @@
+name: Crossplane の Kubernetes API による基盤管理
+description: >-
+  利用者が管理する Kubernetes に Crossplane と AWS provider を導入し、認証設定を用いて AWS の S3 バケットを管理する概念例。provider
+  のバージョン、API、権限および削除ポリシーは採用環境で確認する。
+reference:
+  objectives:
+    - 構成要素と実行場所を理解する。
+    - 定義から変更の反映までの流れと状態管理を追う。
+  sources:
+    - title: Crossplane providers
+      url: https://docs.crossplane.io/latest/packages/providers/
+    - title: Managed resources
+      url: https://docs.crossplane.io/latest/managed-resources/managed-resources/
+    - title: Compositions
+      url: https://docs.crossplane.io/latest/composition/compositions/
+sources:
+  - docs/reference-crossplane.md
+evidence:
+  - type: doc
+    ref: docs/reference-crossplane.md#§1
+  - type: doc
+    ref: docs/reference-crossplane.md#§3
+  - type: doc
+    ref: docs/reference-crossplane.md#§4
+tiers:
+  - id: flow
+    label: 定義・処理・対象
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: storage
+    label: 状態・補助情報
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  n0:
+    label: 要求の宣言
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 管理対象とする外部資源の目標状態を宣言する。
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+  n1:
+    label: Kubernetes API
+    kind: service
+    tier: flow
+    x: 5
+    'y': 1.5
+    description: CRD により資源定義を Kubernetes API に登録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+  n2:
+    label: 外部資源の照合
+    kind: file
+    tier: storage
+    x: 8
+    'y': 1.5
+    description: provider が目標状態と外部資源を照合する。
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+  n3:
+    label: 認証と設定
+    kind: service
+    tier: flow
+    x: 15
+    'y': 1.5
+    description: provider は設定された認証情報を使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+  n4:
+    label: 管理対象の資源
+    kind: service
+    tier: flow
+    x: 20
+    'y': 1.5
+    description: 外部 API によって管理される。
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+links:
+  - id: l0
+    from: n0
+    to: n1
+    label: 目標状態を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+  - id: l1
+    from: n1
+    to: n2
+    label: managed resource を監視
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+  - id: l2
+    from: n3
+    to: n2
+    label: 認証設定を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+  - id: l3
+    from: n2
+    to: n4
+    label: AWS API で照合・変更
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+scenarios:
+  - id: operation
+    label: 定義から反映まで
+    evidence:
+      - type: doc
+        ref: docs/reference-crossplane.md#§2
+    steps:
+      - links:
+          - l0
+        note: 目標状態を登録。
+      - links:
+          - l1
+        note: managed resource を監視。
+      - links:
+          - l2
+        note: 認証設定を参照。
+      - links:
+          - l3
+        note: AWS API で照合・変更。
+implementations:
+  - id: example
+    label: Kubernetes の Crossplane と AWS provider
+    description: >-
+      利用者が管理する Kubernetes に Crossplane と AWS provider を導入し、認証設定を用いて AWS の S3 バケットを管理する概念例。provider
+      のバージョン、API、権限および削除ポリシーは採用環境で確認する。
+    sources:
+      - title: Crossplane providers
+        url: https://docs.crossplane.io/latest/packages/providers/
+      - title: Managed resources
+        url: https://docs.crossplane.io/latest/managed-resources/managed-resources/
+      - title: Compositions
+        url: https://docs.crossplane.io/latest/composition/compositions/
+    tiers:
+      - id: flow
+        label: 定義・処理・対象
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: storage
+        label: 状態・補助情報
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-n0:
+        label: S3 Bucket managed resource
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 管理対象とする外部資源の目標状態を宣言する。
+        realizes:
+          - n0
+        evidence:
+          - type: doc
+            ref: docs/reference-crossplane.md#§4
+      ex-n1:
+        label: Kubernetes API と CRD
+        kind: service
+        tier: flow
+        x: 5
+        'y': 1.5
+        description: CRD により資源定義を Kubernetes API に登録する。
+        realizes:
+          - n1
+        evidence:
+          - type: doc
+            ref: docs/reference-crossplane.md#§4
+      ex-n2:
+        label: AWS provider controller
+        kind: file
+        tier: storage
+        x: 8
+        'y': 1.5
+        description: provider が目標状態と外部資源を照合する。
+        realizes:
+          - n2
+        evidence:
+          - type: doc
+            ref: docs/reference-crossplane.md#§4
+      ex-n3:
+        label: AWS ProviderConfig と認証情報
+        kind: service
+        tier: flow
+        x: 15
+        'y': 1.5
+        description: provider は設定された認証情報を使う。
+        realizes:
+          - n3
+        evidence:
+          - type: doc
+            ref: docs/reference-crossplane.md#§4
+      ex-n4:
+        label: Amazon S3 バケット
+        kind: service
+        tier: flow
+        x: 20
+        'y': 1.5
+        description: 外部 API によって管理される。
+        realizes:
+          - n4
+        evidence:
+          - type: doc
+            ref: docs/reference-crossplane.md#§4
+        svc: aws:s3
+    groups:
+      - kind: cloud
+        label: AWS アカウントのサービス領域（論理境界）
+        provider: aws
+        tier:
+          - flow
+          - storage
+        nodes:
+          - ex-n4
+      - kind: cluster
+        label: 利用者管理の Kubernetes クラスタ
+        provider: k8s
+        tier:
+          - flow
+          - storage
+        nodes:
+          - ex-n0
+          - ex-n1
+          - ex-n2
+          - ex-n3

@@ -62,14 +62,17 @@ timeline:
 blocks: [{"id":"evolution","title":"パーティションの進化：月 → 日","legend":{"0":"旧仕様（month）のファイル","2":"新仕様（day）のファイル"},"note":"仕様の変更はメタデータだけで、既存ファイルは動かない。数値は説明用。","lanes":[{"id":"m09","label":"month=2026-09","node":"data"},{"id":"m10","label":"month=2026-10","node":"data"},{"id":"d01","label":"day=11-01","node":"data","optional":true},{"id":"d02","label":"day=11-02","node":"data","optional":true},{"id":"d03","label":"day=11-03","node":"data","optional":true}],"items":{"m09":[{"id":"s1","label":"09-a","k":0},{"id":"s2","label":"09-b","k":0},{"id":"s3","label":"09-c","k":0}],"m10":[{"id":"o1","label":"10-a","k":0},{"id":"o2","label":"10-b","k":0},{"id":"o3","label":"10-c","k":0}]}},{"id":"files","title":"スナップショットの失効と孤立ファイルの削除","legend":{"0":"現在の版も参照","2":"新しいファイル","4":"古い版だけが参照","6":"孤立ファイル"},"note":"数値は説明用。","lanes":[{"id":"live","label":"現在の版が参照","node":"data"},{"id":"old","label":"古い版だけが参照","node":"data"},{"id":"orphan","label":"どこからも参照されない","node":"data"}],"items":{"live":[{"id":"c1","label":"f-101","k":0},{"id":"c2","label":"f-102","k":0},{"id":"c3","label":"f-103","k":0},{"id":"c4","label":"f-110","k":2},{"id":"c5","label":"f-111","k":2}],"old":[{"id":"x1","label":"f-090","k":4,"note":"上書き前の古いファイル。8805 以前の版だけが参照する。"},{"id":"x2","label":"f-091","k":4},{"id":"x3","label":"f-092","k":4},{"id":"x4","label":"f-093","k":4}],"orphan":[{"id":"z1","label":"tmp-7f3","k":6,"note":"書き込みに失敗したジョブが残したファイル。どのメタデータも参照しない。"}]}}]
 implementations:
   - id: spark-minio
-    label: Spark・Iceberg REST・MinIO
-    description: Apache Iceberg の Spark Quickstart に沿って、Spark と REST カタログを起動し、MinIO へテーブルファイルを置く例。
+    label: Spark・Iceberg REST・RustFS
+    description: Apache Iceberg の Spark Quickstart に沿って、Spark と REST カタログを起動し、RustFS へテーブルファイルを置く例。
     sources:
       - title: Apache Iceberg Specification
         url: https://iceberg.apache.org/spec/
       - title: Spark and Iceberg Quickstart
         url: https://iceberg.apache.org/spark-quickstart/
     nodes:
+      spark-minio-init: {label: create-bucket container, kind: worker, tier: query, x: 16, y: 1.5, description: "Creates the warehouse bucket through the S3-compatible API after RustFS is ready.", evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§9"}]}
+      spark-minio-host: {label: Docker Compose host, kind: host, tier: query, x: 8, y: 1.5, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§9"}]}
+      spark-minio-store: {label: RustFS container, kind: service, tier: query, x: 12, y: 1.5, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§9"}]}
       spark-minio-spark:
         label: Spark SQL・Iceberg Runtime
         kind: service
@@ -83,7 +86,7 @@ implementations:
           - type: doc
             ref: docs/reference-apache-iceberg.md#§9
       spark-minio-meta:
-        label: MinIO の metadata.json と Snapshot
+        label: RustFS の metadata.json と Snapshot
         kind: file
         tier: storage
         x: 3
@@ -97,7 +100,7 @@ implementations:
             ref: docs/reference-apache-iceberg.md#§9
         drill: iceberg-catalog-read
       spark-minio-list:
-        label: MinIO の Manifest List
+        label: RustFS の Manifest List
         kind: file
         tier: storage
         x: 9
@@ -109,7 +112,7 @@ implementations:
           - type: doc
             ref: docs/reference-apache-iceberg.md#§9
       spark-minio-manifests:
-        label: MinIO の Manifest
+        label: RustFS の Manifest
         kind: file
         tier: storage
         x: 12
@@ -121,7 +124,7 @@ implementations:
           - type: doc
             ref: docs/reference-apache-iceberg.md#§9
       spark-minio-parquet:
-        label: MinIO の Parquet
+        label: RustFS の Parquet
         kind: file
         tier: storage
         x: 15
@@ -144,6 +147,8 @@ implementations:
           - type: doc
             ref: docs/reference-apache-iceberg.md#§9
     links:
+      - {id: spark-minio-init-bucket, from: spark-minio-init, to: spark-minio-store, label: Create warehouse bucket, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§9"}]}
+      - {id: spark-minio-storage, from: spark-minio-spark, to: spark-minio-store, label: S3 API, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§9"}]}
       - id: spark-minio-resolve
         from: spark-minio-spark
         to: spark-minio-rest
@@ -158,3 +163,99 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-apache-iceberg.md#§9
+    layout2d:
+      tiers: [{id: local, label: Docker Compose, z: 0, size: [20, 10]}]
+      nodes:
+        spark-minio-init: {tier: local, x: 15, y: 4}
+        spark-minio-host: {tier: local, x: 2, y: 1}
+        spark-minio-spark: {tier: local, x: 2, y: 4}
+        spark-minio-rest: {tier: local, x: 6, y: 4}
+        spark-minio-store: {tier: local, x: 10, y: 4}
+        spark-minio-meta: {tier: local, x: 2, y: 8}
+        spark-minio-list: {tier: local, x: 6, y: 8}
+        spark-minio-manifests: {tier: local, x: 10, y: 8}
+        spark-minio-parquet: {tier: local, x: 14, y: 8}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: local, nodes: [spark-minio-host, spark-minio-init, spark-minio-spark, spark-minio-rest, spark-minio-store, spark-minio-meta, spark-minio-list, spark-minio-manifests, spark-minio-parquet]}
+    layout3d:
+      tiers:
+        - {id: containers, label: Containers, z: 1, size: [16, 3]}
+        - {id: host, label: Host and files, z: 0, size: [16, 3]}
+      nodes:
+        spark-minio-init: {tier: containers, x: 14, y: 1.5}
+        spark-minio-host: {tier: host, x: 2, y: 1.5}
+        spark-minio-spark: {tier: containers, x: 2, y: 1.5}
+        spark-minio-rest: {tier: containers, x: 6, y: 1.5}
+        spark-minio-store: {tier: containers, x: 10, y: 1.5}
+        spark-minio-meta: {tier: host, x: 4, y: 1.5}
+        spark-minio-list: {tier: host, x: 8, y: 1.5}
+        spark-minio-manifests: {tier: host, x: 12, y: 1.5}
+        spark-minio-parquet: {tier: host, x: 15, y: 1.5}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: [containers, host], nodes: [spark-minio-host, spark-minio-init, spark-minio-spark, spark-minio-rest, spark-minio-store, spark-minio-meta, spark-minio-list, spark-minio-manifests, spark-minio-parquet]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Spark・Iceberg"
+    description: "EMR on EC2 の Spark SQL で Glue Data Catalog から Iceberg テーブルを解決し、S3 上のメタデータと Parquet を読む例。"
+    sources:
+      - {title: "Use an Iceberg cluster with Spark", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-iceberg-use-spark-cluster.html}
+      - {title: "Amazon EMR クラスタの構成", url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html}
+      - {title: "Apache Iceberg Specification", url: https://iceberg.apache.org/spec/}
+      - {title: "AWS shared responsibility", url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理とテーブル登録, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルの永続ストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-emr-control, aws-emr-host, aws-emr-glue, aws-emr-spark, aws-emr-executors, aws-emr-meta, aws-emr-list, aws-emr-manifest, aws-emr-s3]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-emr-host, aws-emr-spark, aws-emr-executors]}
+    nodes:
+      aws-emr-control: {label: "Amazon EMR", svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: "EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。", management: {type: shared, scope: "AWS は EMR サービスを運用し、利用者はクラスタ構成とステップを指定する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-host: {label: "Amazon EC2 / YARN", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "EMR の EC2 ノードで YARN がアプリケーションの実行リソースを割り当てる。", management: {type: shared, scope: "AWS は EC2 基盤を運用し、利用者はクラスタの構成、ゲスト OS とソフトウェアを管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-glue: {label: "AWS Glue Data Catalog", svc: glue, kind: catalog, tier: management, x: 10, y: 1.5, description: "テーブル名から現行の Iceberg メタデータファイルの S3 位置を解決する。", management: {type: shared, scope: "AWS はカタログサービス基盤を運用し、利用者はカタログの内容とアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-spark: {label: "Spark Driver / Iceberg SparkCatalog", kind: worker, tier: compute, x: 5, y: 1.5, realizes: [engine], description: "Glue でテーブルを解決し、Iceberg のスナップショットを選択してスキャンを計画する。", management: {type: customer, scope: "利用者が Spark ジョブと Iceberg の設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-executors: {label: "Spark Executors", kind: worker, tier: compute, x: 13, y: 1.5, description: "計画に含まれる Parquet ファイルを S3 から読み取る。", management: {type: customer, scope: "利用者が Spark ジョブと実行設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-meta: {label: "metadata.json / Snapshot", kind: file, tier: storage, x: 3, y: 1.5, realizes: [metadata, snapshot], drill: iceberg-catalog-read, description: "S3 上のテーブルメタデータ。スキーマ、現行スナップショット ID、スナップショット一覧を記録する。", management: {type: customer, scope: "利用者がテーブルメタデータとアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-list: {label: "Manifest List", kind: file, tier: storage, x: 7, y: 1.5, realizes: [list], description: "S3 上の Manifest List。選択したスナップショットに属する Manifest の位置を保持する。", management: {type: customer, scope: "利用者がテーブルのメタデータと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-manifest: {label: "Manifest", kind: file, tier: storage, x: 11, y: 1.5, realizes: [manifest], description: "S3 上の Manifest。データファイルの位置、パーティション値と統計を保持する。", management: {type: customer, scope: "利用者がテーブルのメタデータと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      aws-emr-s3: {label: "Amazon S3 / Parquet", svc: s3, kind: db, tier: storage, x: 16, y: 1.5, realizes: [data], drill: parquet-internals, description: "メタデータとデータを保持するテーブルの S3 バケット。クエリの対象は絞り込んだ Parquet ファイル。", management: {type: shared, scope: "AWS は S3 基盤を運用し、利用者はデータ、暗号化とアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+    links:
+      - {id: aws-emr-provision, from: aws-emr-control, to: aws-emr-host, label: "クラスタを作成・管理", evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      - {id: aws-emr-submit, from: aws-emr-control, to: aws-emr-spark, label: "Spark step を実行", evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      - {id: aws-emr-resolve, from: aws-emr-spark, to: aws-emr-glue, label: "テーブルのメタデータ位置を取得", realizes: [choose], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      - {id: aws-emr-metadata, from: aws-emr-spark, to: aws-emr-meta, label: "現行の metadata.json を読む", realizes: [choose], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      - {id: aws-emr-plan, from: aws-emr-spark, to: aws-emr-executors, label: "対象ファイルのスキャンを割り当てる", realizes: [scan], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+      - {id: aws-emr-scan, from: aws-emr-executors, to: aws-emr-s3, label: "Parquet をスキャン", realizes: [scan], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-iceberg.md#§10"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: Spark ジョブ, z: 1, size: [8, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [8, 3]}
+        - {id: services, label: AWS 管理サービスとテーブル, z: 0, origin: [11, 0], size: [20, 3]}
+      nodes:
+        aws-emr-control: {tier: services, x: 2, y: 0.5}
+        aws-emr-host: {tier: cluster, x: 4, y: 1.5}
+        aws-emr-glue: {tier: services, x: 6, y: 0.5}
+        aws-emr-spark: {tier: apps, x: 2, y: 1.5}
+        aws-emr-executors: {tier: apps, x: 6, y: 1.5}
+        aws-emr-meta: {tier: services, x: 2, y: 2}
+        aws-emr-list: {tier: services, x: 6, y: 2}
+        aws-emr-manifest: {tier: services, x: 10, y: 2}
+        aws-emr-s3: {tier: services, x: 14, y: 2}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, cluster, services], nodes: [aws-emr-control, aws-emr-host, aws-emr-glue, aws-emr-spark, aws-emr-executors, aws-emr-meta, aws-emr-list, aws-emr-manifest, aws-emr-s3]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-emr-host, aws-emr-spark, aws-emr-executors]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: AWS の実装構成, z: 0, size: [22, 13]}
+      nodes:
+        aws-emr-control: {tier: diagram, x: 12, y: 1}
+        aws-emr-host: {tier: diagram, x: 4, y: 4}
+        aws-emr-glue: {tier: diagram, x: 12, y: 4}
+        aws-emr-spark: {tier: diagram, x: 2, y: 7}
+        aws-emr-executors: {tier: diagram, x: 6, y: 7}
+        aws-emr-meta: {tier: diagram, x: 12, y: 7}
+        aws-emr-list: {tier: diagram, x: 16, y: 7}
+        aws-emr-manifest: {tier: diagram, x: 12, y: 10}
+        aws-emr-s3: {tier: diagram, x: 16, y: 10}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: -1, y0: -1, x1: 21, y1: 12, nodes: [aws-emr-control, aws-emr-host, aws-emr-glue, aws-emr-spark, aws-emr-executors, aws-emr-meta, aws-emr-list, aws-emr-manifest, aws-emr-s3]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 0, y0: 3, x1: 8, y1: 9, nodes: [aws-emr-host, aws-emr-spark, aws-emr-executors]}

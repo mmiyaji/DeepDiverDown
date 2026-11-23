@@ -274,11 +274,8 @@ implementations:
       - id: compute
         label: 計算ワークロード
         z: 1
-        origin:
-          - 4
-          - 0
         size:
-          - 12
+          - 13
           - 3
       - id: implementation-setup
         label: 実装時の設定・観測
@@ -287,6 +284,7 @@ implementations:
           - 8
           - 3
     nodes:
+      example-partner-wh: {label: Recipient virtual warehouse, svc: "snowflake:warehouse", kind: worker, tier: compute, x: 12, y: 2.5, description: "Recipient runs read-only queries with its own warehouse.", evidence: [{type: doc, ref: "docs/reference-snowflake.md#§8"}]}
       example-source:
         label: Amazon S3 注文ファイル
         kind: db
@@ -305,7 +303,7 @@ implementations:
         kind: service
         tier: compute
         svc: snowflake:platform
-        x: 3
+        x: 0
         'y': 1.5
         realizes:
           - services
@@ -319,7 +317,7 @@ implementations:
         label: LOAD_WH
         kind: worker
         tier: compute
-        x: 6
+        x: 3
         'y': 1.5
         realizes:
           - load
@@ -328,7 +326,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake.md#§8
       example-storage:
-        svc: snowflake:platform
         label: Snowflake ORDERS テーブル
         kind: db
         tier: platform
@@ -345,7 +342,7 @@ implementations:
         label: BI_WH
         kind: worker
         tier: compute
-        x: 12
+        x: 9
         'y': 1.5
         realizes:
           - biwh
@@ -401,14 +398,29 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-snowflake.md#§8
-    links:
-      - id: example-s3-stage
-        from: example-source
-        to: example-stage
-        label: S3 の着地パスを参照
+      example-iam:
+        label: AWS IAM / S3 アクセスロール
+        svc: iam
+        kind: policy
+        tier: implementation-setup
+        x: 6
+        'y': 1.5
+        description: Snowflake が引き受けるロールに対象 S3 パスへの権限と信頼関係を設定する。
         evidence:
           - type: doc
             ref: docs/reference-snowflake.md#§8
+    links:
+      - {id: example-partner-query, from: example-partner, to: example-partner-wh, label: "Query shared data", evidence: [{type: doc, ref: "docs/reference-snowflake.md#§8"}]}
+      - id: example-s3-stage
+        from: example-source
+        to: example-stage
+        label: S3 のファイルを参照
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake.md#§8
+        realizes:
+          - ingest
+        replace: true
       - id: example-stage-connection
         from: example-stage
         to: example-load
@@ -416,35 +428,57 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-snowflake.md#§8
+        realizes:
+          - ingest
+        replace: true
+      - id: example-storage-role
+        from: example-stage
+        to: example-iam
+        label: ストレージ統合でロールを利用
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake.md#§8
     groups:
-      - kind: cloud
-        label: AWS・Amazon S3
-        provider: aws
-        tier:
-          - platform
-        nodes:
-          - example-source
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - compute
-        nodes:
-          - example-services
-          - example-load
-          - example-biwh
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - platform
-        nodes:
-          - example-storage
-          - example-sharing
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - implementation-setup
-        nodes:
-          - example-stage
+      - {kind: cloud, provider: snowflake, label: Provider Snowflake account, tier: [platform, compute, implementation-setup], nodes: [example-services, example-load, example-storage, example-biwh, example-sharing, example-stage]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: [platform, implementation-setup], nodes: [example-source, example-iam]}
+      - {kind: cloud, provider: snowflake, label: Recipient Snowflake account, tier: [platform, compute], nodes: [example-partner, example-partner-wh]}
+    layout2d:
+      tiers: [{id: diagram, label: Snowflake and AWS, z: 0, size: [33, 14]}]
+      nodes:
+        example-services: {tier: diagram, x: 2, y: 2}
+        example-load: {tier: diagram, x: 6, y: 2}
+        example-storage: {tier: diagram, x: 10, y: 2}
+        example-biwh: {tier: diagram, x: 2, y: 6}
+        example-sharing: {tier: diagram, x: 6, y: 6}
+        example-stage: {tier: diagram, x: 10, y: 6}
+        example-source: {tier: diagram, x: 17, y: 2}
+        example-iam: {tier: diagram, x: 17, y: 6}
+        example-partner: {tier: diagram, x: 25, y: 2}
+        example-partner-wh: {tier: diagram, x: 25, y: 6}
+        example-bi: {tier: diagram, x: 25, y: 11}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Provider Snowflake account, tier: diagram, nodes: [example-services, example-load, example-storage, example-biwh, example-sharing, example-stage]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-source, example-iam]}
+        - {kind: cloud, provider: snowflake, label: Recipient Snowflake account, tier: diagram, nodes: [example-partner, example-partner-wh]}
+    layout3d:
+      tiers:
+        - {id: provider, label: Snowflake account services, z: 0, size: [16, 6]}
+        - {id: customer, label: Customer AWS account, z: 0, origin: [19, 0], size: [6, 3]}
+        - {id: recipient, label: Recipient Snowflake account, z: 0, origin: [28, 0], size: [6, 3]}
+        - {id: users, label: BI user, kind: origin, z: 0, origin: [37, 0], size: [2, 3]}
+      nodes:
+        example-services: {tier: provider, x: 2, y: 1}
+        example-load: {tier: provider, x: 6, y: 1}
+        example-storage: {tier: provider, x: 10, y: 1}
+        example-biwh: {tier: provider, x: 2, y: 4}
+        example-sharing: {tier: provider, x: 6, y: 4}
+        example-stage: {tier: provider, x: 10, y: 4}
+        example-source: {tier: customer, x: 2, y: 1.5}
+        example-iam: {tier: customer, x: 5, y: 1.5}
+        example-partner: {tier: recipient, x: 2, y: 1.5}
+        example-partner-wh: {tier: recipient, x: 5, y: 1.5}
+        example-bi: {tier: users, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Provider Snowflake account, tier: provider, nodes: [example-services, example-load, example-storage, example-biwh, example-sharing, example-stage]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: customer, nodes: [example-source, example-iam]}
+        - {kind: cloud, provider: snowflake, label: Recipient Snowflake account, tier: recipient, nodes: [example-partner, example-partner-wh]}

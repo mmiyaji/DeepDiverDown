@@ -85,6 +85,8 @@ BigQuery の orders テーブルを注文日の月でパーティション化し
 
 - クエリジョブの処理量。パーティションによる見積りと、実行後の処理バイトなどを参照する。クラスタリングの除外量は実行まで確定しない。
 
+入力の注文 CSV は同じ Google Cloud プロジェクトとロケーションの Cloud Storage に置き、BigQuery のロードジョブで、月パーティションとクラスタ列を定義したネイティブテーブルに取り込む。分析者が BigQuery Studio から GoogleSQL を送ると、BigQuery のクエリジョブがプルーニングと読み取りを実行する。運用者はジョブ履歴またはリージョンを指定した `INFORMATION_SCHEMA.JOBS` で実行後の処理バイトを確認する。BigQuery は既存のクラスタ化テーブルにデータが追加されると、バックグラウンドで各パーティション内のクラスタリングを維持する。
+
 公式資料
 
 - [Query partitioned tables](https://cloud.google.com/bigquery/docs/querying-partitioned-tables)
@@ -92,3 +94,8 @@ BigQuery の orders テーブルを注文日の月でパーティション化し
 - [Query clustered tables](https://cloud.google.com/bigquery/docs/querying-clustered-tables)
 - [Apache Iceberg Specification - Sorting](https://iceberg.apache.org/spec/#sorting)
 - [Create partitioned tables](https://cloud.google.com/bigquery/docs/creating-partitioned-tables)
+- [Cloud Storage からの CSV ロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
+- [BigQuery のクエリジョブ](https://docs.cloud.google.com/bigquery/docs/running-queries)
+- [BigQuery の JOBS ビュー](https://docs.cloud.google.com/bigquery/docs/information-schema-jobs)
+
+この例は同一 Google Cloud プロジェクトの Storage と BigQuery を使う代表構成であり、実データでの動作検証や削減量の実測ではない。Google はロード・クエリ・管理ストレージの基盤を運用し、利用者は SQL、テーブルのパーティションとクラスタ列、データ、権限を管理する。内部ホストや個々の物理ブロックを直接操作しない。結果と除外量はデータ分布、述語と実行時の状況に依存する。

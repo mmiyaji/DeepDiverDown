@@ -253,6 +253,15 @@ implementations:
         url: https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide
       - title: Snowpipe の S3 自動取込
         url: https://docs.snowflake.com/en/user-guide/data-load-snowpipe-auto-s3
+      - title: Snowpipe Streaming SDK の接続と認証
+        url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-configurations
+      - title: Dynamic Table 更新用 Warehouse
+        url: https://docs.snowflake.com/en/user-guide/dynamic-tables-warehouses
+      - title: Amazon ECS サービス
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html
+      - {title: Snowflake S3 storage integration, url: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration}
+      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -264,9 +273,12 @@ implementations:
         label: 実装時の設定・観測
         z: 1
         size:
-          - 8
-          - 3
+          - 18
+          - 5
     nodes:
+      example-origin: {label: Upstream order events, kind: external, tier: flow, x: -3, y: 4, evidence: [{type: doc, ref: "docs/reference-snowflake-ingestion-cdc.md#§6"}]}
+      example-fargate: {label: Fargate task, svc: fargate, kind: host, tier: implementation-setup, x: 5, y: 4, management: {type: shared, scope: "AWS operates task infrastructure; customer manages app and task configuration."}, evidence: [{type: doc, ref: "docs/reference-snowflake-ingestion-cdc.md#§6"}]}
+      example-iam: {label: IAM storage role, svc: iam, kind: policy, tier: implementation-setup, x: 9, y: 4, management: {type: customer, scope: "Customer manages S3 access and role trust."}, evidence: [{type: doc, ref: "docs/reference-snowflake-ingestion-cdc.md#§6"}]}
       example-files:
         label: Amazon S3 注文ファイル
         kind: db
@@ -294,14 +306,14 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
       example-client:
-        label: 注文イベント送信アプリ
-        kind: external
+        label: Fargate の注文イベント送信
+        kind: worker
         tier: flow
         x: 0
         'y': 4
         realizes:
           - client
-        description: Snowpipe Streaming SDK でイベントを送る。
+        description: ECS が配置した Java SDK アプリが Snowflake の専用ユーザーで認証してイベントを送る。
         evidence:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
@@ -319,7 +331,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
       example-raw:
-        svc: snowflake:platform
         label: RAW_ORDERS と Stream
         kind: db
         tier: flow
@@ -346,7 +357,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
       example-orders:
-        svc: snowflake:platform
         label: ORDERS_CURRENT
         kind: db
         tier: flow
@@ -384,13 +394,13 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
       example-notif:
-        label: S3 イベント通知
-        kind: service
+        label: Snowflake 管理の SQS
+        kind: queue
         tier: implementation-setup
-        svc: aws:s3
+        svc: sqs
         x: 1
         'y': 1.5
-        description: 新しい注文オブジェクトのキーを Snowpipe に伝える。
+        description: S3 のファイル作成通知を受けて Snowpipe に伝える。
         evidence:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
@@ -401,11 +411,23 @@ implementations:
         svc: snowflake:platform
         x: 5
         y: 1.5
-        description: S3 のバケットを参照する Snowflake 側のステージを定義する。
+        description: ストレージ統合の IAM ロールで S3 入力プレフィックスを参照する。
         evidence:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-ecs: {label: Amazon ECS サービス, svc: ecs, kind: service, tier: implementation-setup, x: 1, y: 4, description: SDK を組み込んだ送信アプリを Fargate 上で稼働させる。, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
+      example-transform-wh: {label: 変換・更新用 Virtual Warehouse, svc: 'snowflake:warehouse', kind: worker, tier: implementation-setup, x: 10, y: 1.5, description: Task の MERGE と Dynamic Table の更新で使う SQL 計算資源。, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
+      example-bi-wh: {label: BI 用 Virtual Warehouse, svc: 'snowflake:warehouse', kind: worker, tier: implementation-setup, x: 15, y: 1.5, description: BI クライアントの SQL を実行し日別集計を参照する。, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
     links:
+      - {id: example-event-source, from: example-origin, to: example-client, label: "Supply order events", evidence: [{type: doc, ref: "docs/reference-snowflake-ingestion-cdc.md#§6"}]}
+      - {id: example-execute-sdk, from: example-fargate, to: example-client, label: "Run SDK app", evidence: [{type: doc, ref: "docs/reference-snowflake-ingestion-cdc.md#§6"}]}
+      - {id: example-stage-role, from: example-stage, to: example-iam, label: "Assume storage role", evidence: [{type: doc, ref: "docs/reference-snowflake-ingestion-cdc.md#§6"}]}
+      - {id: example-s3-notify, from: example-files, to: example-notif, label: オブジェクト作成通知を送る, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
+      - {id: example-run-sdk, from: example-ecs, to: example-client, label: 送信アプリを稼働させる, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
+      - {id: example-run-merge, from: example-task, to: example-transform-wh, label: MERGE の SQL を実行, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
+      - {id: example-refresh-compute, from: example-dynamic, to: example-transform-wh, label: 指定 Warehouse で更新を実行, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
+      - {id: example-bi-query, from: example-dynamic, to: example-bi-wh, label: 日別集計を読み取る, realizes: [serve], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
+      - {id: example-bi-result, from: example-bi-wh, to: example-bi, label: BI に集計結果を返す, realizes: [serve], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-ingestion-cdc.md#§6}]}
       - id: example-stage-bucket
         from: example-stage
         to: example-files
@@ -428,32 +450,61 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-ingestion-cdc.md#§6
     groups:
-      - kind: cloud
-        label: AWS・Amazon S3
-        provider: aws
-        tier: [implementation-setup]
-        nodes: [example-notif]
-      - kind: cloud
-        label: Snowflake
-        provider: snowflake
-        tier: [implementation-setup]
-        nodes: [example-stage]
-      - kind: cloud
-        label: AWS・Amazon S3
-        provider: aws
-        tier:
-          - flow
-        nodes:
-          - example-files
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - flow
-        nodes:
-          - example-pipe
-          - example-streaming
-          - example-raw
-          - example-task
-          - example-orders
-          - example-dynamic
+      - {kind: cloud, provider: snowflake, label: Snowflake account, tier: [flow, implementation-setup], nodes: [example-pipe, example-streaming, example-raw, example-task, example-orders, example-dynamic, example-stage, example-transform-wh, example-bi-wh]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: [flow, implementation-setup], nodes: [example-files, example-ecs, example-fargate, example-client, example-iam]}
+      - {kind: cloud, provider: aws, label: Snowflake-managed AWS notification queue, tier: implementation-setup, nodes: [example-notif]}
+    layout2d:
+      tiers: [{id: diagram, label: Snowflake and AWS, z: 0, size: [35, 16]}]
+      nodes:
+        example-pipe: {tier: diagram, x: 13, y: 1}
+        example-streaming: {tier: diagram, x: 17, y: 1}
+        example-raw: {tier: diagram, x: 21, y: 1}
+        example-task: {tier: diagram, x: 13, y: 5}
+        example-orders: {tier: diagram, x: 17, y: 5}
+        example-dynamic: {tier: diagram, x: 21, y: 5}
+        example-stage: {tier: diagram, x: 13, y: 9}
+        example-transform-wh: {tier: diagram, x: 17, y: 9}
+        example-bi-wh: {tier: diagram, x: 21, y: 9}
+        example-files: {tier: diagram, x: 2, y: 1}
+        example-ecs: {tier: diagram, x: 6, y: 1}
+        example-fargate: {tier: diagram, x: 2, y: 5}
+        example-client: {tier: diagram, x: 6, y: 5}
+        example-iam: {tier: diagram, x: 2, y: 9}
+        example-notif: {tier: diagram, x: 10, y: 13}
+        example-origin: {tier: diagram, x: 0, y: 13}
+        example-bi: {tier: diagram, x: 30, y: 13}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: diagram, nodes: [example-pipe, example-streaming, example-raw, example-task, example-orders, example-dynamic, example-stage, example-transform-wh, example-bi-wh]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-files, example-ecs, example-fargate, example-client, example-iam]}
+        - {kind: cloud, provider: aws, label: Snowflake-managed AWS queue, tier: diagram, nodes: [example-notif]}
+        - {kind: cluster, label: Fargate task, tier: diagram, nodes: [example-fargate, example-client]}
+    layout3d:
+      tiers:
+        - {id: customer, label: Customer AWS account, z: 0, size: [16, 3]}
+        - {id: app, label: SDK application, z: 1, size: [16, 3]}
+        - {id: snowflake, label: Snowflake account, z: 0, origin: [19, 0], size: [20, 6]}
+        - {id: queue, label: Snowflake-managed AWS queue, z: 0, origin: [42, 0], size: [3, 3]}
+        - {id: outside, label: External, kind: origin, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        example-pipe: {tier: snowflake, x: 2, y: 1}
+        example-streaming: {tier: snowflake, x: 6, y: 1}
+        example-raw: {tier: snowflake, x: 10, y: 1}
+        example-task: {tier: snowflake, x: 14, y: 1}
+        example-orders: {tier: snowflake, x: 18, y: 1}
+        example-dynamic: {tier: snowflake, x: 2, y: 4}
+        example-stage: {tier: snowflake, x: 6, y: 4}
+        example-transform-wh: {tier: snowflake, x: 10, y: 4}
+        example-bi-wh: {tier: snowflake, x: 14, y: 4}
+        example-files: {tier: customer, x: 2, y: 1.5}
+        example-ecs: {tier: customer, x: 5, y: 1.5}
+        example-fargate: {tier: customer, x: 8, y: 1.5}
+        example-client: {tier: app, x: 8, y: 1.5}
+        example-iam: {tier: customer, x: 14, y: 1.5}
+        example-notif: {tier: queue, x: 1, y: 1.5}
+        example-origin: {tier: outside, x: 0, y: 1.5}
+        example-bi: {tier: outside, x: 2, y: 1.5}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: snowflake, nodes: [example-pipe, example-streaming, example-raw, example-task, example-orders, example-dynamic, example-stage, example-transform-wh, example-bi-wh]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: [customer, app], nodes: [example-files, example-ecs, example-fargate, example-client, example-iam]}
+        - {kind: cloud, provider: aws, label: Snowflake-managed AWS queue, tier: queue, nodes: [example-notif]}
+        - {kind: cluster, label: Fargate task, tier: [customer, app], nodes: [example-fargate, example-client]}

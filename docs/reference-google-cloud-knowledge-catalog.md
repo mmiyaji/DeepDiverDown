@@ -45,10 +45,12 @@ BigQuery の注文テーブルと承認付きアクセスグループを結び�
 | Entry Group・Entry・Aspect Type・Aspect | Knowledge Catalog（Entry・Aspect） | BigQuery テーブルの自動 Entry とカスタム Aspect を管理する。 |
 | リネージ | Google Cloud Data Lineage API | 対応する BigQuery ジョブの入出力を記録する。 |
 | データ製品・アクセス申請 | Knowledge Catalog データ製品 | 関連資産とアクセス要求を管理する。 |
-| 分析基盤の資産 | BigQuery テーブル | スキーマを公開し、クエリ時に資産の IAM を評価する。 |
+| 分析基盤の資産 | BigQuery テーブル | 提供側の BigQuery 管理ストレージに注文データを保持し、資産 IAM で読み取りを制御する。 |
 | グループと資産の利用権限 | Google グループと IAM ロール | アクセスグループから利用者と資産権限を対応付ける。 |
-| 実装で追加 | BigQuery ジョブ実行プロジェクト | BigQuery Job User などクエリを実行するための権限を持つ。 |
+| クエリ実行 | BigQuery クエリジョブ | 利用側プロジェクトで実行し、提供側の資産を参照する。 |
 
-対応する関連リソースの権限をグループに設定する。コンソール承認後もメンバーシップの伝播には時間がかかる場合がある。REST API 承認ではグループ反映は別途行う。利用者はクエリを実行するプロジェクトでジョブを作成できる権限も要る。
+対応する関連リソースの権限をグループに設定する。コンソール承認後もメンバーシップの伝播には時間がかかる場合がある。REST API 承認ではグループ反映は別途行う。この例では提供側の Google Cloud プロジェクトにカタログ製品とデータを置き、利用側のプロジェクトから実行する。利用者には利用側での `bigquery.jobs.create` と、提供側のテーブルへのデータ読み取り権限の両方が必要。[BigQuery のクエリ実行](https://docs.cloud.google.com/bigquery/docs/running-queries)。
 
 [About Metadata in Knowledge Catalog](https://docs.cloud.google.com/knowledge-catalog/docs/metadata-overview)、[About Data Lineage](https://docs.cloud.google.com/knowledge-catalog/docs/about-data-lineage)、[Manage Data Products](https://docs.cloud.google.com/knowledge-catalog/docs/manage-data-products)、[Use data products](https://docs.cloud.google.com/knowledge-catalog/docs/use-data-products)
+
+Knowledge Catalog と BigQuery の内部基盤は Google Cloud が運用する。提供者は製品、Entry、Aspect、データと IAM を管理し、利用者は利用側プロジェクトの権限で BigQuery ジョブを実行する。Google グループはプロジェクト内の計算サービスではなく、メンバーシップと IAM の主体を表す。REST 承認では別途グループ反映が必要である。この資料を組み合わせた構成と具体的な権限の実動作は未検証。[BigQuery query jobs](https://docs.cloud.google.com/bigquery/docs/running-queries)、[Data products](https://docs.cloud.google.com/knowledge-catalog/docs/manage-data-products)

@@ -1,0 +1,248 @@
+{
+  "model": "timescaledb-columnstore-internals",
+  "name": "TimescaleDB：chunk・列バッチと絞り込み",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "write": {
+      "type": "node",
+      "label": "時刻付きの行",
+      "status": "claim"
+    },
+    "route": {
+      "type": "node",
+      "label": "hypertable の振り分け",
+      "status": "claim"
+    },
+    "row": {
+      "type": "node",
+      "label": "rowstore chunk",
+      "status": "claim"
+    },
+    "batch": {
+      "type": "node",
+      "label": "columnstore の列バッチ",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "PostgreSQL WAL",
+      "status": "claim"
+    },
+    "rollup": {
+      "type": "node",
+      "label": "continuous aggregate",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "SQL の期間・系列検索",
+      "status": "claim"
+    },
+    "a": {
+      "type": "link",
+      "label": "時刻付きの行 → hypertable の振り分け",
+      "status": "claim"
+    },
+    "b": {
+      "type": "link",
+      "label": "hypertable の振り分け → rowstore chunk",
+      "status": "claim"
+    },
+    "w": {
+      "type": "link",
+      "label": "hypertable の振り分け → PostgreSQL WAL",
+      "status": "claim"
+    },
+    "c": {
+      "type": "link",
+      "label": "rowstore chunk → columnstore の列バッチ",
+      "status": "claim"
+    },
+    "d": {
+      "type": "link",
+      "label": "rowstore chunk → continuous aggregate",
+      "status": "claim"
+    },
+    "q": {
+      "type": "link",
+      "label": "SQL の期間・系列検索 → rowstore chunk",
+      "status": "claim"
+    },
+    "r": {
+      "type": "link",
+      "label": "SQL の期間・系列検索 → columnstore の列バッチ",
+      "status": "claim"
+    },
+    "s": {
+      "type": "link",
+      "label": "SQL の期間・系列検索 → continuous aggregate",
+      "status": "claim"
+    },
+    "store": {
+      "type": "scenario",
+      "label": "投入と列化"
+    },
+    "read": {
+      "type": "scenario",
+      "label": "期間を絞って読む"
+    },
+    "impl-write": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "時刻付きの行",
+      "realizes": [
+        "write"
+      ]
+    },
+    "impl-route": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "hypertable の振り分け",
+      "realizes": [
+        "route"
+      ]
+    },
+    "impl-row": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "rowstore chunk",
+      "realizes": [
+        "row"
+      ]
+    },
+    "impl-batch": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "columnstore の列バッチ",
+      "realizes": [
+        "batch"
+      ]
+    },
+    "impl-wal": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "PostgreSQL WAL",
+      "realizes": [
+        "wal"
+      ]
+    },
+    "impl-rollup": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "continuous aggregate",
+      "realizes": [
+        "rollup"
+      ]
+    },
+    "impl-scan": {
+      "type": "implementation",
+      "impl": "local",
+      "label": "SQL の期間・系列検索",
+      "realizes": [
+        "scan"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-timescaledb-columnstore-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-timescaledb-columnstore-internals.md": [
+      "model",
+      "write",
+      "route",
+      "row",
+      "batch",
+      "wal",
+      "rollup",
+      "scan",
+      "a",
+      "b",
+      "w",
+      "c",
+      "d",
+      "q",
+      "r",
+      "s",
+      "store",
+      "read",
+      "impl-write",
+      "impl-route",
+      "impl-row",
+      "impl-batch",
+      "impl-wal",
+      "impl-rollup",
+      "impl-scan"
+    ],
+    "docs/reference-timescaledb-columnstore-internals.md#§3": [
+      "model"
+    ],
+    "docs/reference-timescaledb-columnstore-internals.md#§5": [
+      "model"
+    ],
+    "docs/reference-timescaledb-columnstore-internals.md#§2": [
+      "write",
+      "route",
+      "row",
+      "batch",
+      "wal",
+      "rollup",
+      "scan",
+      "a",
+      "b",
+      "w",
+      "c",
+      "d",
+      "q",
+      "r",
+      "s",
+      "store",
+      "read"
+    ],
+    "docs/reference-timescaledb-columnstore-internals.md#§4": [
+      "impl-write",
+      "impl-route",
+      "impl-row",
+      "impl-batch",
+      "impl-wal",
+      "impl-rollup",
+      "impl-scan"
+    ]
+  },
+  "reference": {
+    "category": "時系列データ",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "timescaledb-storage-internals",
+    "objectives": [
+      "構成要素と書き込み・読み出しの経路を理解する。",
+      "保存形式と運用上の前提を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Hypertables",
+        "url": "https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables"
+      },
+      {
+        "title": "Hypercore",
+        "url": "https://www.tigerdata.com/docs/learn/columnar-storage/understand-hypercore"
+      },
+      {
+        "title": "Columnstore policy",
+        "url": "https://www.tigerdata.com/docs/reference/timescaledb/hypercore/add_columnstore_policy"
+      },
+      {
+        "title": "Continuous aggregates",
+        "url": "https://www.tigerdata.com/docs/learn/continuous-aggregates"
+      },
+      {
+        "title": "PostgreSQL WAL",
+        "url": "https://www.postgresql.org/docs/current/wal-intro.html"
+      }
+    ]
+  }
+}

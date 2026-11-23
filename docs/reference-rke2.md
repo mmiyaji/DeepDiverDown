@@ -27,7 +27,7 @@ Deployment が注文 API の Pod を用意し、スケジューラーが配置�
 | デプロイ担当 | kubectl を使う運用端末 |
 | 固定登録アドレス | 外部 L4 ロードバランサー |
 | クラスタ制御部・API | rke2-server VM × 3 |
-| クラスタ状態ストア | rke2-server VM × 3 |
+| クラスタ状態ストア | 各 rke2-server の組み込み etcd とローカル永続ディスク |
 | ノード参加・実行エージェント | rke2-agent VM |
 | 注文 API の実行単位 | 注文 API Deployment / Pod |
 
@@ -35,6 +35,13 @@ Deployment が注文 API の Pod を用意し、スケジューラーが配置�
 
 TLS の SAN に固定アドレスを含める。トークンは秘密情報として扱う。RKE2 の構成自体は Rancher Manager なしでも成立する。
 
+各 server のデータディレクトリを永続ディスクに置く。障害復旧に備え、クラスタ状態の etcd スナップショットと復元に必要な server トークンを保管する。
+
+利用者は VM と RKE2 server・agent、外部ロードバランサー、トークン、バックアップを運用する。kubectl で Kubernetes API のリソースを操作し、RKE2 の設定と更新を管理する。agent は固定アドレスで登録し、kubelet の API 接続は agent のクライアント側ロードバランサーを経由する。
+
+この例は複数の公式資料を組み合わせた代表構成であり、実在の導入例や動作検証済み構成ではない。VM の容量、agent 数、ロードバランサー製品、バックアップ先や復元手順は導入時に確定する。
+
 公式資料
 - [RKE2 High Availability](https://docs.rke2.io/install/ha)
 - [RKE2 Architecture](https://docs.rke2.io/architecture)
+- [RKE2 のバックアップと復元](https://docs.rke2.io/datastore/backup_restore)

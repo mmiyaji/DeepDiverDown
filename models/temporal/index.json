@@ -2,8 +2,8 @@
   "model": "temporal",
   "name": "Temporal のワーカー障害とリプレイ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "order": {
@@ -109,6 +109,18 @@
       "type": "scenario",
       "label": "完了報告を失った決済 Activity を再試行"
     },
+    "temporal-host": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "自主管理 Kubernetes ノード群",
+      "realizes": []
+    },
+    "temporal-db-host": {
+      "type": "implementation",
+      "impl": "temporal",
+      "label": "自主管理 PostgreSQL ホスト",
+      "realizes": []
+    },
     "temporal-order": {
       "type": "implementation",
       "impl": "temporal",
@@ -171,6 +183,88 @@
       "impl": "temporal",
       "label": "PostgreSQL の Visibility スキーマ",
       "realizes": []
+    },
+    "aws-eks-temporal-order": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "注文 API（Temporal SDK）",
+      "realizes": [
+        "order"
+      ]
+    },
+    "aws-eks-temporal-payment": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "外部決済 API（例示）",
+      "realizes": [
+        "payment"
+      ]
+    },
+    "aws-eks-temporal-eks": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "EKS Kubernetes API",
+      "realizes": []
+    },
+    "aws-eks-temporal-nodes": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "EKS の EC2 ノード",
+      "realizes": []
+    },
+    "aws-eks-temporal-server": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "Temporal Frontend・History",
+      "realizes": [
+        "service"
+      ]
+    },
+    "aws-eks-temporal-matching": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "Temporal Matching",
+      "realizes": [
+        "queue"
+      ]
+    },
+    "aws-eks-temporal-worker-a": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "注文 Worker Pod A",
+      "realizes": [
+        "workflow-a"
+      ]
+    },
+    "aws-eks-temporal-worker-b": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "注文 Worker Pod B",
+      "realizes": [
+        "workflow-b"
+      ]
+    },
+    "aws-eks-temporal-activity": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "決済 Activity Worker Pod",
+      "realizes": [
+        "activity"
+      ]
+    },
+    "aws-eks-temporal-history": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "RDS PostgreSQL の Persistence",
+      "realizes": [
+        "history"
+      ]
+    },
+    "aws-eks-temporal-visibility": {
+      "type": "implementation",
+      "impl": "aws-eks-temporal",
+      "label": "RDS PostgreSQL の Visibility",
+      "realizes": []
     }
   },
   "byRef": {
@@ -202,6 +296,8 @@
       "complete",
       "worker-replay",
       "activity-retry",
+      "temporal-host",
+      "temporal-db-host",
       "temporal-order",
       "temporal-service",
       "temporal-history",
@@ -209,7 +305,18 @@
       "temporal-workflow-b",
       "temporal-activity",
       "temporal-payment",
-      "temporal-visibility"
+      "temporal-visibility",
+      "aws-eks-temporal-order",
+      "aws-eks-temporal-payment",
+      "aws-eks-temporal-eks",
+      "aws-eks-temporal-nodes",
+      "aws-eks-temporal-server",
+      "aws-eks-temporal-matching",
+      "aws-eks-temporal-worker-a",
+      "aws-eks-temporal-worker-b",
+      "aws-eks-temporal-activity",
+      "aws-eks-temporal-history",
+      "aws-eks-temporal-visibility"
     ],
     "docs/reference-temporal.md#§2": [
       "service",
@@ -243,6 +350,8 @@
       "activity-retry"
     ],
     "docs/reference-temporal.md#§6": [
+      "temporal-host",
+      "temporal-db-host",
       "temporal-order",
       "temporal-service",
       "temporal-history",
@@ -251,6 +360,19 @@
       "temporal-activity",
       "temporal-payment",
       "temporal-visibility"
+    ],
+    "docs/reference-temporal.md#§7": [
+      "aws-eks-temporal-order",
+      "aws-eks-temporal-payment",
+      "aws-eks-temporal-eks",
+      "aws-eks-temporal-nodes",
+      "aws-eks-temporal-server",
+      "aws-eks-temporal-matching",
+      "aws-eks-temporal-worker-a",
+      "aws-eks-temporal-worker-b",
+      "aws-eks-temporal-activity",
+      "aws-eks-temporal-history",
+      "aws-eks-temporal-visibility"
     ]
   },
   "reference": {

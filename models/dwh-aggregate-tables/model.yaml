@@ -164,7 +164,7 @@ scenarios:
 implementations:
   - id: bq-aggregate
     label: BigQuery の日次集約と再計算
-    description: 日付パーティションを持つ明細と集約表を BigQuery に置き、影響日だけをスケジュール SQL で再計算する例。
+    description: Cloud Storage の補正入力を BigQuery にロードし、明細の反映後、影響日だけをスケジュールされた GoogleSQL ジョブで再計算する例。
     sources:
       - title: Kimball Group の集約ファクトと加法性
         url: >-
@@ -177,6 +177,9 @@ implementations:
         url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries
       - title: BigQuery 論理ビュー
         url: https://docs.cloud.google.com/bigquery/docs/views-intro
+      - {title: "Cloud Storage からの CSV ロード", url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv}
+      - {title: "BigQuery の複数ステートメント トランザクション", url: https://docs.cloud.google.com/bigquery/docs/transactions}
+      - {title: "BigQuery の JOBS ビュー", url: https://docs.cloud.google.com/bigquery/docs/information-schema-jobs}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -185,12 +188,17 @@ implementations:
           - 16.5
           - 4.5
       - id: implementation-setup
-        label: 実装時の設定・観測
+        label: Cloud Storage と BigQuery ジョブ
         z: 1
         size:
-          - 8
-          - 3
+          - 26
+          - 6
     nodes:
+      example-files: {label: "Cloud Storage（後着明細・訂正の CSV）", svc: gcp:gcs, kind: file, tier: implementation-setup, x: 1, y: 1.5, description: "業務システムまたは検証用のバッチ CSV を保持する。", evidence: [{type: doc, ref: docs/reference-dwh-aggregate-tables.md#§4}]}
+      example-load-job: {label: "BigQuery（CSV ロードジョブ）", svc: gcp:bigquery, kind: worker, tier: implementation-setup, x: 6, y: 1.5, description: "同じロケーションの Cloud Storage から BigQuery の入力表へロードする。", evidence: [{type: doc, ref: docs/reference-dwh-aggregate-tables.md#§4}]}
+      example-scheduler: {label: "BigQuery（スケジュールされたクエリ）", svc: gcp:bigquery, kind: scheduler, tier: implementation-setup, x: 11, y: 1.5, description: "Data Transfer Service でサービスアカウントの GoogleSQL ジョブを起動する。", evidence: [{type: doc, ref: docs/reference-dwh-aggregate-tables.md#§4}]}
+      example-correction: {label: "landing.order_corrections", svc: gcp:bigquery, kind: table, tier: implementation-setup, x: 16, y: 1.5, description: "後着明細の更新と対象注文日をバッチ ID 付きで受け取る。", evidence: [{type: doc, ref: docs/reference-dwh-aggregate-tables.md#§4}]}
+      example-apply: {label: "BigQuery（明細補正ジョブ）", svc: gcp:bigquery, kind: workflow, tier: implementation-setup, x: 21, y: 1.5, description: "変更をファクトに反映し、影響日を同じトランザクションで記録する。", evidence: [{type: doc, ref: docs/reference-dwh-aggregate-tables.md#§4}]}
       example-late:
         label: 補正対象日の記録
         kind: table
@@ -218,7 +226,7 @@ implementations:
             ref: docs/reference-dwh-aggregate-tables.md#§4
         svc: gcp:bigquery
       example-refresh:
-        label: BigQuery のスケジュール SQL
+        label: BigQuery（対象日の集約更新ジョブ）
         kind: workflow
         tier: flow
         x: 7
@@ -257,7 +265,8 @@ implementations:
             ref: docs/reference-dwh-aggregate-tables.md#§4
         svc: gcp:bigquery
       example-bi:
-        label: 日次売上と購入者レポート
+        label: BigQuery Studio の日次売上・購入者レポート
+        svc: gcp:bigquery
         kind: client
         tier: flow
         x: 16
@@ -270,15 +279,22 @@ implementations:
             ref: docs/reference-dwh-aggregate-tables.md#§4
       example-audit:
         label: 更新履歴テーブル
+        svc: gcp:bigquery
         kind: monitor
         tier: implementation-setup
         x: 1
-        'y': 1.5
+        'y': 4.3
         description: 対象日、明細の読み取り時点、再計算の完了時刻を保存して鮮度表示に使う。
         evidence:
           - type: doc
             ref: docs/reference-dwh-aggregate-tables.md#§4
     links:
+      - {id: example-bq-files, from: example-files, to: example-load-job, label: CSV ファイルを読み込む}
+      - {id: example-bq-load, from: example-load-job, to: example-correction, label: BigQuery の入力表に書き込む}
+      - {id: example-bq-run, from: example-scheduler, to: example-refresh, label: スケジュールから GoogleSQL ジョブを起動}
+      - {id: example-bq-correct, from: example-correction, to: example-apply, label: 対象バッチの後着明細を読む}
+      - {id: example-bq-apply, from: example-apply, to: example-fact, label: 対象明細を追加・訂正}
+      - {id: example-bq-queue, from: example-apply, to: example-late, label: 補正対象日を記録}
       - id: example-audit-connection
         from: example-refresh
         to: example-audit
@@ -286,15 +302,42 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-dwh-aggregate-tables.md#§4
+      - {id: example-bq-apply-run, from: example-scheduler, to: example-apply, label: 明細補正 SQL をスケジュール}
     groups:
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - flow
-        nodes:
-          - example-late
-          - example-fact
-          - example-refresh
-          - example-aggregate
-          - example-metrics
+      - {kind: cloud, provider: gcp, label: Google Cloud プロジェクト, tier: [flow, implementation-setup]}
+    layout2d:
+      tiers:
+        - {id: platform, label: Google Cloud プロジェクト, z: 0, size: [26, 13]}
+      nodes:
+        example-files: {tier: platform, x: 2, y: 2}
+        example-load-job: {tier: platform, x: 8, y: 2}
+        example-correction: {tier: platform, x: 14, y: 2}
+        example-scheduler: {tier: platform, x: 20, y: 2}
+        example-apply: {tier: platform, x: 2, y: 6}
+        example-late: {tier: platform, x: 8, y: 6}
+        example-fact: {tier: platform, x: 14, y: 6}
+        example-refresh: {tier: platform, x: 20, y: 6}
+        example-aggregate: {tier: platform, x: 2, y: 10}
+        example-metrics: {tier: platform, x: 8, y: 10}
+        example-bi: {tier: platform, x: 14, y: 10}
+        example-audit: {tier: platform, x: 20, y: 10}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud プロジェクト（サービスの論理的所属）, tier: [platform], nodes: [example-files, example-load-job, example-correction, example-scheduler, example-apply, example-late, example-fact, example-refresh, example-aggregate, example-metrics, example-bi, example-audit]}
+    layout3d:
+      tiers:
+        - {id: platform, label: Google Cloud のサービスとデータ, z: 0, size: [26, 13]}
+      nodes:
+        example-files: {tier: platform, x: 2, y: 2}
+        example-load-job: {tier: platform, x: 8, y: 2}
+        example-correction: {tier: platform, x: 14, y: 2}
+        example-scheduler: {tier: platform, x: 20, y: 2}
+        example-apply: {tier: platform, x: 2, y: 6}
+        example-late: {tier: platform, x: 8, y: 6}
+        example-fact: {tier: platform, x: 14, y: 6}
+        example-refresh: {tier: platform, x: 20, y: 6}
+        example-aggregate: {tier: platform, x: 2, y: 10}
+        example-metrics: {tier: platform, x: 8, y: 10}
+        example-bi: {tier: platform, x: 14, y: 10}
+        example-audit: {tier: platform, x: 20, y: 10}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud プロジェクト（サービスの論理的所属）, tier: [platform], nodes: [example-files, example-load-job, example-correction, example-scheduler, example-apply, example-late, example-fact, example-refresh, example-aggregate, example-metrics, example-bi, example-audit]}

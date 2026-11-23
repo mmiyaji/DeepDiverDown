@@ -61,6 +61,10 @@ implementations:
         url: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
       - title: GitHub protected branches
         url: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
+      - title: GitHub-hosted runners
+        url: https://docs.github.com/en/actions/how-tos/manage-runners/github-hosted-runners
+      - title: GitHub の CODEOWNERS
+        url: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
     tiers:
       - id: source
         label: 変更とポリシー
@@ -115,17 +119,17 @@ implementations:
           - type: doc
             ref: docs/reference-opa-conftest.md#§5
       github-runner:
-        label: GitHub Actions runner の policy-ci ジョブ
+        label: GitHub-hosted Linux runner
         kind: worker
         tier: ci
         svc: github
         realizes:
           - runner
-          - conftest
-        description: pull_request イベントで、Conftest CLI をインストールして評価を実行する。
+        description: GitHub が用意する一時的な Ubuntu VM で policy-ci ジョブと固定版の Conftest CLI を実行する。
         evidence:
           - type: doc
             ref: docs/reference-opa-conftest.md#§5
+      github-conftest: {label: Conftest CLI / OPA, kind: worker, tier: ci, realizes: [conftest], description: Runner 上で Rego とマニフェストを評価する固定版 CLI。, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§5}]}
       github-check:
         label: policy-ci の必須チェック
         kind: monitor
@@ -155,7 +159,10 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-opa-conftest.md#§5
+      github-policy-review: {label: CODEOWNERS の承認, kind: policy, tier: merge, x: 1, y: 3.6, description: ワークフローや Rego ポリシーの変更には指定担当者の承認を必須にする。, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§5}]}
     links:
+      - {id: github-run-cli, from: github-runner, to: github-conftest, label: Conftest CLI を実行, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§5}]}
+      - {id: github-review-rules, from: github-policy-review, to: github-branch, label: 検査定義の変更をコードオーナーが承認, evidence: [{type: doc, ref: docs/reference-opa-conftest.md#§5}]}
       - id: github-configure-workflow
         from: github-workflow
         to: github-runner
@@ -163,3 +170,39 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-opa-conftest.md#§5
+
+    layout2d:
+      tiers: [{id: diagram, label: GitHub と CI, z: 0, origin: [-4, 0], size: [24, 12]}]
+      nodes:
+        github-author: {tier: diagram, x: -2, y: 2}
+        github-pull-request: {tier: diagram, x: 2, y: 1}
+        github-manifest: {tier: diagram, x: 2, y: 4}
+        github-policy: {tier: diagram, x: 5, y: 4}
+        github-workflow: {tier: diagram, x: 5, y: 1}
+        github-runner: {tier: diagram, x: 10, y: 2}
+        github-conftest: {tier: diagram, x: 10, y: 5}
+        github-check: {tier: diagram, x: 15, y: 2}
+        github-branch: {tier: diagram, x: 15, y: 5}
+        github-policy-review: {tier: diagram, x: 15, y: 8}
+      groups:
+        - {kind: cloud, label: GitHub サービス領域, tier: [diagram], x0: 0, y0: 0, x1: 18, y1: 10, nodes: [github-pull-request, github-manifest, github-policy, github-workflow, github-runner, github-conftest, github-check, github-branch, github-policy-review]}
+        - {kind: datacenter, label: GitHub-hosted runner VM, tier: [diagram], x0: 8, y0: 1, x1: 12, y1: 7, nodes: [github-runner, github-conftest]}
+    layout3d:
+      tiers:
+        - {id: runner, label: GitHub-hosted VM, z: 0, size: [5, 4]}
+        - {id: cli, label: VM 上の検査, z: 1, size: [5, 4]}
+        - {id: service, label: GitHub リポジトリ・設定, z: 0, origin: [8, 0], size: [12, 8]}
+        - {id: user, label: 開発者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        github-author: {tier: user, x: 1, y: 1}
+        github-runner: {tier: runner, x: 2, y: 2}
+        github-conftest: {tier: cli, x: 2, y: 2}
+        github-pull-request: {tier: service, x: 1, y: 1}
+        github-manifest: {tier: service, x: 4, y: 1}
+        github-policy: {tier: service, x: 7, y: 1}
+        github-workflow: {tier: service, x: 1, y: 4}
+        github-check: {tier: service, x: 4, y: 4}
+        github-branch: {tier: service, x: 7, y: 4}
+        github-policy-review: {tier: service, x: 10, y: 4}
+      groups:
+        - {kind: cloud, label: GitHub サービス領域, tier: [runner, cli, service], nodes: [github-pull-request, github-manifest, github-policy, github-workflow, github-runner, github-conftest, github-check, github-branch, github-policy-review]}

@@ -47,17 +47,27 @@ scenarios:
 
 implementations:
   - id: postgres-schema-comparison
-    label: "PostgreSQL の商品階層比較"
-    description: "同じ受注明細から平坦な商品ディメンションとカテゴリを分けたディメンションを別スキーマに作り、同じ問いで比較する例。"
+    label: "商品階層比較（Amazon RDS for PostgreSQL）"
+    description: "Amazon RDS for PostgreSQL の二つのスキーマに同じ受注明細をロードし、EC2 の psql から商品階層と結合経路を比較する。"
     sources:
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
       - {title: "Snowflaked Dimensions", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/snowflake-dimension/"}
       - {title: "Power BI のスタースキーマ設計", url: "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
       - {title: "PostgreSQL CREATE TABLE", url: "https://www.postgresql.org/docs/current/sql-createtable.html"}
       - {title: "PostgreSQL EXPLAIN", url: "https://www.postgresql.org/docs/current/sql-explain.html"}
+      - {title: "RDS for PostgreSQL への接続", url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ConnectToPostgreSQLInstance.html}
+      - {title: "同じ VPC の EC2 から RDS へ接続", url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/tutorial-connect-ec2-instance-to-rds-database.html}
     tiers:
       - {id: "flow", label: "構成と処理の流れ", z: 0, size: [15.5,4.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - {id: "implementation-setup", label: "AWS の実行環境と運用", z: 1, size: [17,3]}
+    groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [flow, implementation-setup]}
+      - {kind: cluster, label: RDS for PostgreSQL の同一データベース, tier: [flow], nodes: [example-fixtures, example-star-category, example-star-fact, example-star-report, example-norm-category, example-norm-product, example-norm-fact, example-norm-report]}
     nodes:
+      aws-operator: {label: Data analyst, kind: actor, tier: implementation-setup, x: 0, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-snowflake-schema.md#§5"}]}
+      aws-psql: {label: PostgreSQL psql client, kind: client, tier: implementation-setup, x: 3, y: 1, management: {type: customer, scope: "Customer manages client software and credentials."}, evidence: [{type: doc, ref: "docs/reference-dwh-snowflake-schema.md#§5"}]}
+      aws-client: {label: "Amazon EC2（psql 検証ホスト）", svc: ec2, kind: host, tier: implementation-setup, x: 6, y: 1.5, description: "同じ VPC から入力をロードし、双方のビューの結果と実行計画を比較する。", management: {type: shared, scope: "AWS operates EC2 infrastructure; customer manages guest OS and client."}, evidence: [{type: doc, ref: docs/reference-dwh-snowflake-schema.md#§5}]}
+      aws-rds: {label: "Amazon RDS for PostgreSQL", svc: rds, kind: db, tier: implementation-setup, x: 13, y: 1.5, description: "同一データベース内の star と hierarchy のテーブルおよびビューを保存し、SQL を実行する。", management: {type: shared, scope: "AWS operates RDS; customer manages database, data and access."}, evidence: [{type: doc, ref: docs/reference-dwh-snowflake-schema.md#§5}]}
       example-star-category: {label: "star.dim_product", kind: "table", tier: "flow", x: 3, y: 0, realizes: ["star-category"], description: "商品キーとカテゴリ名・属性を同じ行に保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
       example-star-fact: {label: "star.fact_order_line", kind: "table", tier: "flow", x: 7, y: 0, realizes: ["star-fact"], description: "明細の粒度を固定して商品キーを参照する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
       example-star-report: {label: "star.sales_by_category ビュー", kind: "table", tier: "flow", x: 12, y: 0, realizes: ["star-report"], description: "ファクトから商品表に結合して集計する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
@@ -66,6 +76,53 @@ implementations:
       example-norm-fact: {label: "hierarchy.fact_order_line", kind: "table", tier: "flow", x: 7, y: 4, realizes: ["norm-fact"], description: "スター側と同じ受注明細粒度を持つ。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
       example-norm-report: {label: "hierarchy.sales_by_category ビュー", kind: "table", tier: "flow", x: 12, y: 4, realizes: ["norm-report"], description: "商品からカテゴリ表をたどって集計する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
       example-review: {label: "二つの SQL 結果と実行計画", kind: "monitor", tier: "flow", x: 15, y: 2, realizes: ["review"], description: "同じ期間で売上を集計し、結果と結合経路を比較する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
-      example-fixtures: {label: "比較共通の明細・商品入力表", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "両方式に同じデータをロードする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+      example-fixtures: {label: "比較共通の明細・商品入力表", kind: "table", tier: "flow", x: 0, y: 0, description: "両方式に同じデータをロードする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
     links:
+      - {id: aws-use-psql, from: aws-operator, to: aws-psql, label: "Run comparison SQL", evidence: [{type: doc, ref: "docs/reference-dwh-snowflake-schema.md#§5"}]}
+      - {id: aws-run-psql, from: aws-client, to: aws-psql, label: "Run psql client", evidence: [{type: doc, ref: "docs/reference-dwh-snowflake-schema.md#§5"}]}
+      - {id: aws-psql-connect, from: aws-psql, to: aws-rds, label: "Connect with TLS", evidence: [{type: doc, ref: "docs/reference-dwh-snowflake-schema.md#§5"}]}
+      - {id: aws-exec, from: aws-client, to: aws-rds, label: 比較用 SQL と EXPLAIN を実行}
+      - {id: aws-fixtures-snow, from: example-fixtures, to: example-norm-fact, label: 同じ粒度の比較用データをロード}
       - {id: "example-fixtures-connection", from: "example-fixtures", to: "example-star-fact", label: "同じ粒度の比較用データを供給", evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§5"}]}
+    layout2d:
+      tiers: [{id: diagram, label: PostgreSQL comparison, z: 0, size: [32, 15]}]
+      nodes:
+        aws-operator: {tier: diagram, x: 0, y: 2}
+        aws-client: {tier: diagram, x: 4, y: 1}
+        aws-psql: {tier: diagram, x: 8, y: 1}
+        aws-rds: {tier: diagram, x: 12, y: 1}
+        example-fixtures: {tier: diagram, x: 4, y: 5}
+        example-star-category: {tier: diagram, x: 8, y: 5}
+        example-star-fact: {tier: diagram, x: 12, y: 5}
+        example-star-report: {tier: diagram, x: 16, y: 5}
+        example-norm-category: {tier: diagram, x: 20, y: 5}
+        example-norm-product: {tier: diagram, x: 24, y: 5}
+        example-norm-fact: {tier: diagram, x: 4, y: 9}
+        example-norm-report: {tier: diagram, x: 8, y: 9}
+        example-review: {tier: diagram, x: 12, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-client, aws-psql, aws-rds, example-fixtures, example-star-category, example-star-fact, example-star-report, example-norm-category, example-norm-product, example-norm-fact, example-norm-report, example-review]}
+        - {kind: cluster, label: RDS PostgreSQL database, tier: diagram, nodes: [aws-rds, example-fixtures, example-star-category, example-star-fact, example-star-report, example-norm-category, example-norm-product, example-norm-fact, example-norm-report]}
+    layout3d:
+      tiers:
+        - {id: client, label: psql client, z: 1, size: [5, 3]}
+        - {id: host, label: EC2 host, z: 0, size: [5, 3]}
+        - {id: database, label: RDS PostgreSQL database, z: 0, origin: [8, 0], size: [28, 6]}
+        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-operator: {tier: user, x: 0, y: 1.5}
+        aws-client: {tier: host, x: 2, y: 1.5}
+        aws-psql: {tier: client, x: 2, y: 1.5}
+        aws-rds: {tier: database, x: 2, y: 1}
+        example-fixtures: {tier: database, x: 6, y: 1}
+        example-star-category: {tier: database, x: 10, y: 1}
+        example-star-fact: {tier: database, x: 14, y: 1}
+        example-star-report: {tier: database, x: 18, y: 1}
+        example-norm-category: {tier: database, x: 22, y: 1}
+        example-norm-product: {tier: database, x: 26, y: 1}
+        example-norm-fact: {tier: database, x: 2, y: 4}
+        example-norm-report: {tier: database, x: 6, y: 4}
+        example-review: {tier: database, x: 10, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [client, host, database], nodes: [aws-client, aws-psql, aws-rds, example-fixtures, example-star-category, example-star-fact, example-star-report, example-norm-category, example-norm-product, example-norm-fact, example-norm-report, example-review]}
+        - {kind: cluster, label: RDS PostgreSQL database, tier: database, nodes: [aws-rds, example-fixtures, example-star-category, example-star-fact, example-star-report, example-norm-category, example-norm-product, example-norm-fact, example-norm-report]}

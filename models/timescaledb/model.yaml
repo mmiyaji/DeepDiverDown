@@ -1,0 +1,290 @@
+name: TimescaleDB の時系列アーキテクチャ
+description: PostgreSQL と TimescaleDB による取り込み、時間別 chunk、列化、継続集計と SQL 読み出し。
+reference:
+  objectives:
+    - 構成要素と書き込み・読み出しの経路を理解する。
+    - 保存形式と運用上の前提を区別する。
+  sources:
+    - title: Hypertables
+      url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+    - title: Hypercore
+      url: https://www.tigerdata.com/docs/learn/columnar-storage/understand-hypercore
+    - title: Columnstore policy
+      url: https://www.tigerdata.com/docs/reference/timescaledb/hypercore/add_columnstore_policy
+    - title: Continuous aggregates
+      url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+    - title: PostgreSQL WAL
+      url: https://www.postgresql.org/docs/current/wal-intro.html
+sources:
+  - docs/reference-timescaledb.md
+evidence:
+  - type: doc
+    ref: docs/reference-timescaledb.md#§1
+  - type: doc
+    ref: docs/reference-timescaledb.md#§3
+  - type: doc
+    ref: docs/reference-timescaledb.md#§5
+tiers:
+  - id: query
+    label: 入力・実行
+    z: 1
+    size:
+      - 20
+      - 4
+  - id: store
+    label: データの保存
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  writer:
+    label: 観測データの投入
+    kind: client
+    tier: query
+    x: 0
+    'y': 1.5
+    description: 観測時刻と系列属性、値を SQL で渡す。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  sql:
+    label: SQL と時刻の振り分け
+    kind: service
+    tier: query
+    x: 4
+    'y': 1.5
+    description: SQL で行を受け、対象の時間別領域に配置する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  chunks:
+    label: 時刻別のデータ保持
+    kind: db
+    tier: store
+    x: 4
+    'y': 1.5
+    description: 時間範囲に基づいて chunk に格納し、必要な範囲を読み出す。
+    drill: timescaledb-storage-internals
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  column:
+    label: 列指向への変換
+    kind: service
+    tier: store
+    x: 9
+    'y': 1.5
+    description: 設定とポリシーに応じて chunk を列指向に変換する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  aggregate:
+    label: 時間幅別の継続集計
+    kind: db
+    tier: store
+    x: 14
+    'y': 1.5
+    description: 時間幅ごとの集計を保持し、設定した範囲を更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  query:
+    label: SQL 分析
+    kind: service
+    tier: query
+    x: 14
+    'y': 1.5
+    description: 時間や属性で絞り、元データまたは集計を問い合わせる。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+links:
+  - id: ingest
+    from: writer
+    to: sql
+    label: 観測値を投入
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  - id: insert
+    from: sql
+    to: chunks
+    label: 時刻に対応する chunk に保存
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  - id: convert
+    from: chunks
+    to: column
+    label: 対象 chunk を列化
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  - id: agg
+    from: chunks
+    to: aggregate
+    label: 時間幅ごとに集計
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  - id: raw
+    from: query
+    to: chunks
+    label: 必要な時間範囲を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+  - id: rollup
+    from: query
+    to: aggregate
+    label: 集計済みの値を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+scenarios:
+  - id: ingest
+    label: 書き込みと列化
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+    steps:
+      - links:
+          - ingest
+        note: 観測値を投入。
+      - links:
+          - insert
+        note: 時刻に対応する chunk に保存。
+      - links:
+          - convert
+        note: 対象 chunk を列化。
+  - id: query
+    label: 期間検索と集計
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb.md#§2
+    steps:
+      - links:
+          - raw
+        note: 必要な時間範囲を読む。
+      - links:
+          - agg
+        note: 時間幅ごとに集計。
+      - links:
+          - rollup
+        note: 集計済みの値を読む。
+implementations:
+  - id: local
+    label: Linux 上の PostgreSQL / TimescaleDB
+    description: 利用者が Linux ホストで PostgreSQL と TimescaleDB 拡張を運用し、ローカルディスクに chunk と集計結果を保存する。
+    sources:
+      - title: Hypertables
+        url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+      - title: Hypercore
+        url: https://www.tigerdata.com/docs/learn/columnar-storage/understand-hypercore
+      - title: Columnstore policy
+        url: https://www.tigerdata.com/docs/reference/timescaledb/hypercore/add_columnstore_policy
+      - title: Continuous aggregates
+        url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+      - title: PostgreSQL WAL
+        url: https://www.postgresql.org/docs/current/wal-intro.html
+    tiers:
+      - id: query
+        label: 入力・実行
+        z: 1
+        size:
+          - 20
+          - 4
+      - id: store
+        label: データの保存
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-writer:
+        label: 観測データの投入
+        kind: client
+        tier: query
+        x: 0
+        'y': 1.5
+        description: 観測時刻と系列属性、値を SQL で渡す。
+        realizes:
+          - writer
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb.md#§4
+      impl-sql:
+        label: SQL と時刻の振り分け
+        kind: service
+        tier: query
+        x: 4
+        'y': 1.5
+        description: SQL で行を受け、対象の時間別領域に配置する。
+        realizes:
+          - sql
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb.md#§4
+      impl-chunks:
+        label: 時刻別のデータ保持
+        kind: db
+        tier: store
+        x: 4
+        'y': 1.5
+        description: 時間範囲に基づいて chunk に格納し、必要な範囲を読み出す。
+        realizes:
+          - chunks
+        drill: timescaledb-storage-internals
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb.md#§4
+      impl-column:
+        label: 列指向への変換
+        kind: service
+        tier: store
+        x: 9
+        'y': 1.5
+        description: 設定とポリシーに応じて chunk を列指向に変換する。
+        realizes:
+          - column
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb.md#§4
+      impl-aggregate:
+        label: 時間幅別の継続集計
+        kind: db
+        tier: store
+        x: 14
+        'y': 1.5
+        description: 時間幅ごとの集計を保持し、設定した範囲を更新する。
+        realizes:
+          - aggregate
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb.md#§4
+      impl-query:
+        label: SQL 分析
+        kind: service
+        tier: query
+        x: 14
+        'y': 1.5
+        description: 時間や属性で絞り、元データまたは集計を問い合わせる。
+        realizes:
+          - query
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - query
+          - store
+        nodes:
+          - impl-writer
+          - impl-sql
+          - impl-chunks
+          - impl-column
+          - impl-aggregate
+          - impl-query

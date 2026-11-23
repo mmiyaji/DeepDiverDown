@@ -166,6 +166,8 @@ implementations:
           - 16
           - 3
     nodes:
+      ex-host: {label: Toolbox 実行ホスト, kind: host, tier: support, x: 3, y: 2, description: 利用者が Toolbox を実行するホスト。, evidence: [{type: doc, ref: docs/reference-mcp-toolbox.md#§4}]}
+      ex-db-host: {label: PostgreSQL 実行ホスト, kind: host, tier: support, x: 9, y: 2, description: 利用者が PostgreSQL とデータを管理するホスト。, evidence: [{type: doc, ref: docs/reference-mcp-toolbox.md#§4}]}
       ex-client:
         label: エージェント / MCP クライアント
         kind: actor
@@ -232,3 +234,102 @@ implementations:
             ref: docs/reference-mcp-toolbox.md#§4
         realizes:
           - operator
+    links:
+      - {id: ex-run-toolbox, from: ex-host, to: ex-server, label: Toolbox を実行, evidence: [{type: doc, ref: docs/reference-mcp-toolbox.md#§4}]}
+      - {id: ex-run-db, from: ex-db-host, to: ex-database, label: PostgreSQL を実行・保存, evidence: [{type: doc, ref: docs/reference-mcp-toolbox.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と外部接続, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-server: {tier: diagram, x: 4, y: 1}
+        ex-config: {tier: diagram, x: 7, y: 1}
+        ex-db-host: {tier: diagram, x: 14, y: 1}
+        ex-database: {tier: diagram, x: 17, y: 1}
+        ex-client: {tier: diagram, x: -3, y: 1}
+        ex-result: {tier: diagram, x: 0, y: 1}
+        ex-operator: {tier: diagram, x: 3, y: 1}
+      groups:
+        - {kind: datacenter, label: Toolbox ホスト, tier: [diagram], x0: 0.5, y0: 0.5, x1: 10, y1: 11, nodes: [ex-host, ex-server, ex-config]}
+        - {kind: datacenter, label: PostgreSQL ホスト, tier: [diagram], x0: 13, y0: 0, x1: 22, y1: 7, nodes: [ex-db-host, ex-database]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤, z: 0, size: [10, 10]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 10]}
+        - {id: services, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: db, label: DB ホスト上のデータ, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: outside, label: 外部の利用者・アプリ, z: 0, origin: [-5, 0], size: [4, 8]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-server: {tier: apps, x: 4, y: 1}
+        ex-config: {tier: apps, x: 7, y: 1}
+        ex-db-host: {tier: services, x: 1, y: 1}
+        ex-database: {tier: db, x: 4, y: 1}
+        ex-client: {tier: outside, x: 1, y: 1}
+        ex-result: {tier: outside, x: 4, y: 1}
+        ex-operator: {tier: outside, x: 7, y: 1}
+      groups:
+        - {kind: datacenter, label: Toolbox ホスト, tier: [host, apps], nodes: [ex-host, ex-server, ex-config]}
+        - {kind: datacenter, label: PostgreSQL ホスト, tier: [services, db], nodes: [ex-db-host, ex-database]}
+
+  - id: gcp-cloud-run
+    label: "Google Cloud：Cloud Run・Cloud SQL"
+    description: "Toolbox を Cloud Run で運用し、Secret Manager の定義に従って Cloud SQL のパラメータ化した読み取りツールを公開する例。"
+    sources:
+      - {title: "MCP Toolbox v1.16 — Cloud Run", url: https://mcp-toolbox.dev/v1.16.0/documentation/deploy-to/cloud-run/}
+      - {title: "MCP Toolbox v1.16 — Cloud SQL for PostgreSQL Source", url: https://mcp-toolbox.dev/v1.16.0/integrations/cloud-sql-pg/source/}
+      - {title: "Cloud SQL connections from Cloud Run", url: https://cloud.google.com/sql/docs/postgres/connect-run}
+      - {title: "Cloud Run secrets", url: https://cloud.google.com/run/docs/configuring/services/secrets}
+      - {title: "MCP Toolbox license", url: https://github.com/googleapis/mcp-toolbox/blob/main/LICENSE}
+    tiers:
+      - {id: client, label: "運用と外部クライアント", z: 2, size: [20, 4]}
+      - {id: compute, label: "Google Cloud 上の実行", z: 1, size: [20, 4]}
+      - {id: data, label: "構成と業務データ", z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: "Google Cloud プロジェクト", provider: gcp, tier: [compute, data], nodes: [gcp-toolbox-run, gcp-toolbox-server, gcp-toolbox-sql, gcp-toolbox-secret]}
+    nodes:
+      gcp-toolbox-operator: {label: "ツール管理者", kind: actor, tier: client, x: 3, y: 1.5, realizes: [operator], description: "カスタムツールを定義して Secret Manager に更新を登録する。", evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      gcp-toolbox-client: {label: "MCP クライアント", kind: client, tier: client, x: 10, y: 1.5, realizes: [client], description: "Cloud Run の呼び出し権限を持ち、認証付き HTTPS で Toolbox に接続する。", evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      gcp-toolbox-result: {label: "クライアントの問い合わせ結果", kind: external, tier: client, x: 16, y: 1.5, realizes: [result], description: "MCP の応答としてツールが返した行を受け取る。", evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      gcp-toolbox-run: {label: "Cloud Run / HTTPS サービス", svc: gcp:cloudrun, kind: host, tier: compute, x: 5, y: 1.5, description: "Google 管理の実行基盤がリクエストを認証し、Toolbox コンテナに転送する。利用者はサービス・リビジョンを設定する。", evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      gcp-toolbox-server: {label: "MCP Toolbox コンテナ", kind: service, tier: compute, x: 12, y: 1.5, realizes: [server], description: "定義されたツールを公開し、実行サービスアカウントで Cloud SQL Go Connector を使用する。", evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      gcp-toolbox-secret: {label: "Secret Manager / tools.yaml", svc: gcp:secretmanager, kind: file, tier: data, x: 5, y: 1.5, realizes: [config], description: "バージョン管理されたデータソースとカスタム SQL ツールの定義。Cloud Run がファイルとしてマウントする。", evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      gcp-toolbox-sql: {label: "Cloud SQL for PostgreSQL", svc: gcp:cloudsql, kind: db, tier: data, x: 13, y: 1.5, realizes: [database], description: "業務データを永続化し、読み取り専用の DB ユーザーで SQL を実行する。", evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+    links:
+      - {id: gcp-toolbox-invoke, from: gcp-toolbox-client, to: gcp-toolbox-run, label: "認証付き HTTPS でツールを呼ぶ", realizes: [invoke], replace: true, evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      - {id: gcp-toolbox-forward, from: gcp-toolbox-run, to: gcp-toolbox-server, label: "MCP リクエストを転送", realizes: [invoke], replace: true, evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      - {id: gcp-toolbox-response, from: gcp-toolbox-server, to: gcp-toolbox-run, label: "MCP の結果を返す", realizes: [return], replace: true, evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      - {id: gcp-toolbox-deliver, from: gcp-toolbox-run, to: gcp-toolbox-result, label: "呼び出し元に結果を配信", realizes: [return], replace: true, evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      - {id: gcp-toolbox-config, from: gcp-toolbox-secret, to: gcp-toolbox-run, label: "指定したバージョンをファイルとして取得", realizes: [load], replace: true, evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+      - {id: gcp-toolbox-mount, from: gcp-toolbox-run, to: gcp-toolbox-server, label: "マウントした設定ファイルを読み込む", realizes: [load], replace: true, evidence: [{type: doc, ref: "docs/reference-mcp-toolbox.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と外部接続, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        gcp-toolbox-run: {tier: diagram, x: 1, y: 1}
+        gcp-toolbox-server: {tier: diagram, x: 4, y: 1}
+        gcp-toolbox-sql: {tier: diagram, x: 14, y: 1}
+        gcp-toolbox-secret: {tier: diagram, x: 17, y: 1}
+        gcp-toolbox-operator: {tier: diagram, x: -3, y: 1}
+        gcp-toolbox-client: {tier: diagram, x: -1.2, y: 1}
+        gcp-toolbox-result: {tier: diagram, x: 3, y: 1}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud プロジェクト, tier: [diagram], x0: 0, y0: 0, x1: 23, y1: 12, nodes: [gcp-toolbox-run, gcp-toolbox-server, gcp-toolbox-sql, gcp-toolbox-secret]}
+        - {kind: datacenter, label: Cloud Run サービス, tier: [diagram], x0: 0.5, y0: 0.5, x1: 10, y1: 11, nodes: [gcp-toolbox-run, gcp-toolbox-server]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤, z: 0, size: [10, 10]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 10]}
+        - {id: services, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: db, label: DB ホスト上のデータ, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: outside, label: 外部の利用者・アプリ, z: 0, origin: [-5, 0], size: [4, 8]}
+      nodes:
+        gcp-toolbox-run: {tier: host, x: 1, y: 1}
+        gcp-toolbox-server: {tier: apps, x: 4, y: 1}
+        gcp-toolbox-sql: {tier: services, x: 1, y: 1}
+        gcp-toolbox-secret: {tier: services, x: 4, y: 1}
+        gcp-toolbox-operator: {tier: outside, x: 1, y: 1}
+        gcp-toolbox-client: {tier: outside, x: 4, y: 1}
+        gcp-toolbox-result: {tier: outside, x: 7, y: 1}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud プロジェクト, tier: [host, apps, services], nodes: [gcp-toolbox-run, gcp-toolbox-server, gcp-toolbox-sql, gcp-toolbox-secret]}

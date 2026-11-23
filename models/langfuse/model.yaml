@@ -214,6 +214,7 @@ implementations:
           - 16
           - 3
     nodes:
+      ex-host: {label: 利用者管理の Langfuse ホスト群, kind: host, tier: support, x: 1, y: 2, description: Web、Worker と自己運用の DB・キューを実行する。, evidence: [{type: doc, ref: docs/reference-langfuse.md#§4}]}
       ex-app:
         label: 計装した AI アプリ
         kind: service
@@ -302,3 +303,133 @@ implementations:
             ref: docs/reference-langfuse.md#§4
         realizes:
           - blob
+    links:
+      - {id: ex-run-web, from: ex-host, to: ex-web, label: Langfuse Web を実行, evidence: [{type: doc, ref: docs/reference-langfuse.md#§4}]}
+      - {id: ex-run-worker, from: ex-host, to: ex-worker, label: Langfuse Worker を実行, evidence: [{type: doc, ref: docs/reference-langfuse.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と外部接続, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-web: {tier: diagram, x: 4, y: 1}
+        ex-worker: {tier: diagram, x: 7, y: 1}
+        ex-observations: {tier: diagram, x: 1, y: 4}
+        ex-queue: {tier: diagram, x: 4, y: 4}
+        ex-settings: {tier: diagram, x: 7, y: 4}
+        ex-blob: {tier: diagram, x: 14, y: 1}
+        ex-app: {tier: diagram, x: -3, y: 1}
+        ex-operator: {tier: diagram, x: 0, y: 1}
+      groups:
+        - {kind: datacenter, label: 自己管理 Langfuse ホスト群, tier: [diagram], x0: 0.5, y0: 0.5, x1: 10, y1: 11, nodes: [ex-host, ex-web, ex-worker, ex-observations, ex-queue, ex-settings]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤, z: 0, size: [10, 10]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 10]}
+        - {id: services, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: db, label: DB ホスト上のデータ, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: outside, label: 外部の利用者・アプリ, z: 0, origin: [-5, 0], size: [4, 8]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-web: {tier: apps, x: 4, y: 1}
+        ex-worker: {tier: apps, x: 7, y: 1}
+        ex-observations: {tier: apps, x: 1, y: 4}
+        ex-queue: {tier: apps, x: 4, y: 4}
+        ex-settings: {tier: apps, x: 7, y: 4}
+        ex-blob: {tier: services, x: 1, y: 1}
+        ex-app: {tier: outside, x: 1, y: 1}
+        ex-operator: {tier: outside, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: 自己管理 Langfuse ホスト群, tier: [host, apps], nodes: [ex-host, ex-web, ex-worker, ex-observations, ex-queue, ex-settings]}
+
+  - id: aws-eks-fargate
+    label: "AWS：EKS / Fargate・Langfuse v4"
+    description: "公式 AWS Terraform の Helm chart v2 構成に沿って、Langfuse v4 と ClickHouse を EKS/Fargate に置き、Aurora・ElastiCache・S3・EFS を接続する例。"
+    sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+      - {title: "Langfuse AWS Terraform v4", url: https://langfuse.com/self-hosting/deployment/aws}
+      - {title: "Langfuse platform architecture", url: https://langfuse.com/handbook/product-engineering/architecture}
+      - {title: "ClickHouse requirements for Langfuse v4", url: https://langfuse.com/self-hosting/deployment/infrastructure/clickhouse}
+      - {title: "Langfuse self-hosting license", url: https://langfuse.com/resources/engineering/clarifications}
+    tiers:
+      - {id: access, label: "利用者と HTTPS 入口", z: 3, size: [20, 4]}
+      - {id: control, label: "Kubernetes 実行基盤", z: 2, size: [20, 4]}
+      - {id: compute, label: "Langfuse と分析 DB", z: 1, size: [20, 4]}
+      - {id: data, label: "マネージドのデータ基盤", z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: "AWS サービス領域（EKS 制御プレーンは AWS 管理 VPC）", provider: aws, tier: [access, control, compute, data], nodes: [aws-langfuse-alb, aws-langfuse-eks, aws-langfuse-fargate, aws-langfuse-web, aws-langfuse-worker, aws-langfuse-ch, aws-langfuse-operator, aws-langfuse-keeper, aws-langfuse-aurora, aws-langfuse-queue, aws-langfuse-s3, aws-langfuse-efs]}
+      - {kind: cluster, label: "EKS クラスタ", tier: [compute], nodes: [aws-langfuse-web, aws-langfuse-worker, aws-langfuse-ch, aws-langfuse-operator, aws-langfuse-keeper]}
+    nodes:
+      aws-langfuse-app: {label: "計装した AI アプリ", kind: external, tier: access, x: 4, y: 1.5, realizes: [app], description: "SDK や OpenTelemetry で生成した記録を Langfuse の API に送る。", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-alb: {label: "Application Load Balancer", svc: alb, kind: lb, tier: access, x: 10, y: 1.5, description: "外部からの HTTPS を Langfuse Web に転送する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-user: {label: "運用・評価担当者", kind: actor, tier: access, x: 16, y: 1.5, realizes: [operator], description: "Web UI から観測データを調査する。", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-eks: {label: "Amazon EKS", svc: eks, kind: service, tier: control, x: 5, y: 1.5, description: "AWS 管理 VPC の制御プレーン。利用者は API と公開設定を操作するがサーバーへ直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-fargate: {label: "AWS Fargate", svc: fargate, kind: host, tier: control, x: 14, y: 1.5, description: "対象名前空間の Kubernetes Pod を実行する基盤。利用者は Fargate の基盤ホストに接続しない。", management: {type: shared, scope: AWS が実行基盤を運用し、利用者が Pod と設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-web: {label: "Langfuse Web", kind: service, tier: compute, x: 3, y: 1.2, realizes: [web], description: "UI と取り込み API を提供し、受けたイベントを S3 に保存して Redis に参照を登録する。", management: {type: customer, scope: 利用者がソフトウェアと設定・更新を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-worker: {label: "Langfuse Worker", kind: worker, tier: compute, x: 8, y: 1.2, realizes: [worker], description: "キューを消費し、S3 からイベントを読み込んで ClickHouse へ書く。", management: {type: customer, scope: 利用者がソフトウェアと設定・更新を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-ch: {label: "ClickHouse", kind: db, tier: compute, x: 13, y: 1.2, realizes: [observations], description: "トレース・観測・スコアの列指向分析用 DB。", management: {type: customer, scope: 利用者がソフトウェアと設定・更新を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-keeper: {label: "ClickHouse Keeper", kind: service, tier: compute, x: 17, y: 1.2, description: "ClickHouse レプリカを調整する。", management: {type: customer, scope: 利用者がソフトウェアと設定・更新を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-operator: {label: "ClickHouse Operator / cert-manager", kind: scheduler, tier: compute, x: 13, y: 3.2, description: "Operator が ClickHouse と Keeper を管理する。cert-manager が Operator の webhook 用証明書を発行する。", management: {type: customer, scope: 利用者がソフトウェアと設定・更新を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-aurora: {label: "Aurora PostgreSQL Serverless v2", svc: aurora, kind: db, tier: data, x: 3, y: 1.5, realizes: [settings], description: "プロジェクトや設定などのトランザクションデータを保持する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-s3: {label: "Amazon S3 / イベント・添付", svc: s3, kind: db, tier: data, x: 7.5, y: 1.5, realizes: [blob], description: "取り込みイベントと添付の実体を保存する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-queue: {label: "ElastiCache / Redis", svc: elasticache, kind: queue, tier: data, x: 12, y: 1.5, realizes: [queue], description: "イベント本体の S3 参照を持つ処理待ちのジョブを保持する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      aws-langfuse-efs: {label: "Amazon EFS / 分析 DB の PV", svc: efs, kind: db, tier: data, x: 17, y: 1.5, description: "EFS CSI を経由して ClickHouse と Keeper の各 Pod の永続領域を提供する。", management: {type: shared, scope: AWS が基盤を運用し、利用者が設定・データ・権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+    links:
+      - {id: aws-langfuse-sdk-edge, from: aws-langfuse-app, to: aws-langfuse-alb, label: "HTTPS で実行記録を送る", realizes: [send], replace: true, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-sdk-web, from: aws-langfuse-alb, to: aws-langfuse-web, label: "取り込み API に転送", realizes: [send], replace: true, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-ui-edge, from: aws-langfuse-user, to: aws-langfuse-alb, label: "HTTPS で調査画面を開く", realizes: [inspect], replace: true, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-ui-web, from: aws-langfuse-alb, to: aws-langfuse-web, label: "Web UI に転送", realizes: [inspect], replace: true, evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-schedule, from: aws-langfuse-eks, to: aws-langfuse-fargate, label: "対象 Pod の実行環境を割り当て", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-run-web, from: aws-langfuse-fargate, to: aws-langfuse-web, label: "Web Pod を実行", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-run-worker, from: aws-langfuse-fargate, to: aws-langfuse-worker, label: "Worker Pod を実行", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-run-operator, from: aws-langfuse-fargate, to: aws-langfuse-operator, label: "Operator と cert-manager を実行", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-read-event, from: aws-langfuse-worker, to: aws-langfuse-s3, label: "ジョブが参照するイベントを取得", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-manage-ch, from: aws-langfuse-operator, to: aws-langfuse-ch, label: "ClickHouseCluster を調整", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-manage-keeper, from: aws-langfuse-operator, to: aws-langfuse-keeper, label: "KeeperCluster を調整", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-coordination, from: aws-langfuse-ch, to: aws-langfuse-keeper, label: "レプリカの状態を調整", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-ch-storage, from: aws-langfuse-ch, to: aws-langfuse-efs, label: "ClickHouse の DB ファイルを保存", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+      - {id: aws-langfuse-keeper-storage, from: aws-langfuse-keeper, to: aws-langfuse-efs, label: "Keeper の状態を保存", evidence: [{type: doc, ref: "docs/reference-langfuse.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と外部接続, z: 0, origin: [-4, 0], size: [28, 15]}]
+      nodes:
+        aws-langfuse-eks: {tier: diagram, x: 1.8, y: 1}
+        aws-langfuse-fargate: {tier: diagram, x: 4, y: 1}
+        aws-langfuse-web: {tier: diagram, x: 7, y: 1}
+        aws-langfuse-worker: {tier: diagram, x: 1.8, y: 4}
+        aws-langfuse-ch: {tier: diagram, x: 4, y: 4}
+        aws-langfuse-keeper: {tier: diagram, x: 7, y: 4}
+        aws-langfuse-operator: {tier: diagram, x: 1.8, y: 7}
+        aws-langfuse-alb: {tier: diagram, x: 14, y: 1}
+        aws-langfuse-aurora: {tier: diagram, x: 17, y: 1}
+        aws-langfuse-queue: {tier: diagram, x: 20, y: 1}
+        aws-langfuse-s3: {tier: diagram, x: 14, y: 4}
+        aws-langfuse-efs: {tier: diagram, x: 17, y: 4}
+        aws-langfuse-app: {tier: diagram, x: -3, y: 1}
+        aws-langfuse-user: {tier: diagram, x: -1.2, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: 0, y0: 0, x1: 23, y1: 12, nodes: [aws-langfuse-eks, aws-langfuse-fargate, aws-langfuse-web, aws-langfuse-worker, aws-langfuse-ch, aws-langfuse-keeper, aws-langfuse-operator, aws-langfuse-alb, aws-langfuse-aurora, aws-langfuse-queue, aws-langfuse-s3, aws-langfuse-efs]}
+        - {kind: cluster, label: EKS 論理クラスタ, tier: [diagram], x0: 0.5, y0: 0.5, x1: 10, y1: 11, nodes: [aws-langfuse-eks, aws-langfuse-fargate, aws-langfuse-web, aws-langfuse-worker, aws-langfuse-ch, aws-langfuse-keeper, aws-langfuse-operator]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤, z: 0, size: [10, 10]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 10]}
+        - {id: services, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: db, label: DB ホスト上のデータ, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: outside, label: 外部の利用者・アプリ, z: 0, origin: [-5, 0], size: [4, 8]}
+      nodes:
+        aws-langfuse-eks: {tier: services, x: 1, y: 1}
+        aws-langfuse-fargate: {tier: host, x: 4, y: 1}
+        aws-langfuse-web: {tier: apps, x: 7, y: 1}
+        aws-langfuse-worker: {tier: apps, x: 1, y: 4}
+        aws-langfuse-ch: {tier: apps, x: 4, y: 4}
+        aws-langfuse-keeper: {tier: apps, x: 7, y: 4}
+        aws-langfuse-operator: {tier: apps, x: 1, y: 7}
+        aws-langfuse-alb: {tier: services, x: 1, y: 1}
+        aws-langfuse-aurora: {tier: services, x: 4, y: 1}
+        aws-langfuse-queue: {tier: services, x: 7, y: 1}
+        aws-langfuse-s3: {tier: services, x: 1, y: 4}
+        aws-langfuse-efs: {tier: services, x: 4, y: 4}
+        aws-langfuse-app: {tier: outside, x: 1, y: 1}
+        aws-langfuse-user: {tier: outside, x: 4, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [host, apps, services], nodes: [aws-langfuse-eks, aws-langfuse-fargate, aws-langfuse-web, aws-langfuse-worker, aws-langfuse-ch, aws-langfuse-keeper, aws-langfuse-operator, aws-langfuse-alb, aws-langfuse-aurora, aws-langfuse-queue, aws-langfuse-s3, aws-langfuse-efs]}

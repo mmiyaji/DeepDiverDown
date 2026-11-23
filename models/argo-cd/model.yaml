@@ -50,14 +50,19 @@ scenarios:
 implementations:
   - id: argocd
     label: Argo CD と Helm の宣言同期
-    description: 運用クラスタに Argo CD をインストールし、Git 内の Helm chart を注文 API のクラスタへ同期する例。
+    description: 2つの Amazon EKS クラスタを用意し、運用側で動く Argo CD が注文 API 用のクラスタへ Helm の生成結果を同期する例。
     sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
       - title: Argo CD Architecture
         url: https://argo-cd.readthedocs.io/en/stable/operator-manual/architecture/
       - title: Argo CD Helm guide
         url: https://argo-cd.readthedocs.io/en/stable/user-guide/helm/
       - title: Argo CD High Availability
         url: https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/
+      - title: Argo CD の EKS 認証
+        url: https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#eks
+      - title: Argo CD のプライベートリポジトリ
+        url: https://argo-cd.readthedocs.io/en/stable/user-guide/private-repositories/
     tiers:
       - id: inputs
         label: 変更の入力
@@ -70,6 +75,7 @@ implementations:
         label: Kubernetes
         z: 0
     groups:
+      - {kind: cloud, label: AWS サービス領域（制御プレーンは AWS 管理 VPC）, provider: aws, tier: [gitops, cluster], nodes: [argocd-management-api, argocd-management-nodes, argocd-application, argocd-repo-server, argocd-controller, argocd-redis, argocd-api, argocd-target-nodes, argocd-deployment]}
       - kind: cluster
         label: Argo CD 運用クラスタ
         provider: k8s
@@ -80,6 +86,8 @@ implementations:
           - argocd-repo-server
           - argocd-controller
           - argocd-redis
+          - argocd-management-api
+          - argocd-management-nodes
       - kind: cluster
         label: 注文 API の対象クラスタ
         provider: k8s
@@ -88,10 +96,12 @@ implementations:
         nodes:
           - argocd-api
           - argocd-deployment
+          - argocd-target-nodes
     nodes:
       argocd-git:
-        label: Git 内の注文 API Helm chart
+        label: GitHub の注文 API Helm chart
         kind: file
+        svc: github
         tier: inputs
         realizes:
           - git
@@ -127,6 +137,7 @@ implementations:
         realizes:
           - repo-server
         description: Git の Helm chart から目的状態のマニフェストを生成する。
+        management: {type: customer, scope: 利用者が Argo CD とリポジトリ資格情報を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-argo-cd.md#§5
@@ -138,16 +149,19 @@ implementations:
         realizes:
           - controller
         description: 目的状態と対象クラスタの状態を比較して同期する。
+        management: {type: customer, scope: 利用者が Argo CD と同期権限を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-argo-cd.md#§5
       argocd-api:
-        label: 対象 Kubernetes API
+        label: 対象 EKS Kubernetes API
+        svc: eks
         kind: service
         tier: cluster
         realizes:
           - api
         description: Argo CD が権限を持つ名前空間の API を監視・更新する。
+        management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}
         evidence:
           - type: doc
             ref: docs/reference-argo-cd.md#§5
@@ -159,6 +173,7 @@ implementations:
         realizes:
           - deployment
         description: Helm で生成したマニフェストが API 経由で適用される。
+        management: {type: customer, scope: 利用者が注文 API と配備を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-argo-cd.md#§5
@@ -170,7 +185,12 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-argo-cd.md#§5
+      argocd-management-api: {label: 運用 EKS Kubernetes API, svc: eks, kind: service, tier: gitops, x: 1, y: 3.8, description: Argo CD の運用リソースと Application CR を管理する。, management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§5}]}
+      argocd-management-nodes: {label: Argo CD 用 EC2 ノード, svc: ec2, kind: host, tier: gitops, x: 6, y: 3.8, description: 利用者が配置した Argo CD と Redis の Pod を実行する。, management: {type: shared, scope: EKS がノード管理を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§5}]}
+      argocd-target-nodes: {label: 注文 API 用 EC2 ノード, svc: ec2, kind: host, tier: cluster, x: 11, y: 3.8, description: 同期対象の注文 API Pod を実行する。, management: {type: shared, scope: EKS がノード管理を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§5}]}
     links:
+      - {id: argocd-schedule-management, from: argocd-management-api, to: argocd-management-nodes, label: Argo CD Pod を配置, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§5}]}
+      - {id: argocd-schedule-target, from: argocd-api, to: argocd-target-nodes, label: 注文 API Pod を配置, evidence: [{type: doc, ref: docs/reference-argo-cd.md#§5}]}
       - id: argocd-cache-manifests
         from: argocd-repo-server
         to: argocd-redis
@@ -185,3 +205,46 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-argo-cd.md#§5
+
+    layout2d:
+      tiers: [{id: diagram, label: クラスタと外部の接続, z: 0, origin: [-4, 0], size: [27, 15]}]
+      nodes:
+        argocd-operator: {tier: diagram, x: -3, y: 1}
+        argocd-git: {tier: diagram, x: 22, y: 2}
+        argocd-management-api: {tier: diagram, x: 2, y: 1}
+        argocd-management-nodes: {tier: diagram, x: 2, y: 4}
+        argocd-application: {tier: diagram, x: 5, y: 1.5}
+        argocd-repo-server: {tier: diagram, x: 5, y: 4}
+        argocd-controller: {tier: diagram, x: 5, y: 7}
+        argocd-redis: {tier: diagram, x: 5, y: 10}
+        argocd-api: {tier: diagram, x: 13, y: 1}
+        argocd-target-nodes: {tier: diagram, x: 13, y: 4}
+        argocd-deployment: {tier: diagram, x: 13, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: 0, y0: -1, x1: 19, y1: 12, nodes: [argocd-management-api, argocd-management-nodes, argocd-application, argocd-repo-server, argocd-controller, argocd-redis, argocd-api, argocd-target-nodes, argocd-deployment]}
+        - {kind: cluster, label: 運用 EKS（論理）, tier: [diagram], x0: 0.5, y0: 0, x1: 9.5, y1: 12, nodes: [argocd-management-api, argocd-management-nodes, argocd-application, argocd-repo-server, argocd-controller, argocd-redis]}
+        - {kind: cluster, label: 対象 EKS（論理）, tier: [diagram], x0: 11, y0: 0, x1: 18, y1: 12, nodes: [argocd-api, argocd-target-nodes, argocd-deployment]}
+        - {kind: vpc, provider: aws, label: 運用側ノードの顧客 VPC, tier: [diagram], x0: 0.6, y0: 3, x1: 8, y1: 12, nodes: [argocd-management-nodes, argocd-repo-server, argocd-controller, argocd-redis]}
+        - {kind: vpc, provider: aws, label: 対象側ノードの顧客 VPC, tier: [diagram], x0: 11.6, y0: 3, x1: 17, y1: 12, nodes: [argocd-target-nodes, argocd-deployment]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: 顧客 EC2 ノード, z: 0, size: [11, 10]}
+        - {id: pods, label: ノード上の Pod・設定, z: 1, size: [11, 10]}
+        - {id: targetnodes, label: 対象 EC2 ノード, z: 0, origin: [13, 0], size: [8, 8]}
+        - {id: targetpods, label: 対象ノード上の Pod, z: 1, origin: [13, 0], size: [8, 8]}
+        - {id: control, label: AWS 管理制御プレーン, z: 0, origin: [24, 0], size: [8, 4]}
+        - {id: outside, label: 外部の利用者・サービス, z: 0, origin: [35, 0], size: [8, 4]}
+      nodes:
+        argocd-management-api: {tier: control, x: 1, y: 1}
+        argocd-management-nodes: {tier: nodes, x: 1, y: 2}
+        argocd-application: {tier: pods, x: 1, y: 1}
+        argocd-repo-server: {tier: pods, x: 4, y: 1}
+        argocd-controller: {tier: pods, x: 7, y: 1}
+        argocd-redis: {tier: pods, x: 1, y: 4}
+        argocd-api: {tier: control, x: 4, y: 1}
+        argocd-target-nodes: {tier: targetnodes, x: 2, y: 2}
+        argocd-deployment: {tier: targetpods, x: 2, y: 2}
+        argocd-operator: {tier: outside, x: 1, y: 1}
+        argocd-git: {tier: outside, x: 4, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [nodes, pods, targetnodes, targetpods, control], nodes: [argocd-management-api, argocd-management-nodes, argocd-application, argocd-repo-server, argocd-controller, argocd-redis, argocd-api, argocd-target-nodes, argocd-deployment]}

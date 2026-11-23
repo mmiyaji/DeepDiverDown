@@ -50,14 +50,21 @@ scenarios:
 implementations:
   - id: otel
     label: Kubernetes の分配・サンプリング Gateway
-    description: OpenTelemetry Collector を Kubernetes に 2 段で配置し、注文処理のトレースを Jaeger へ送る例。
+    description: EKS の EC2 ノードで OpenTelemetry Collector を 2 段運用し、Jaeger で取り込んだトレースを OpenSearch Service に保存する例。
     sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
       - title: OpenTelemetry Collector gateway pattern
         url: https://opentelemetry.io/docs/collector/deploy/gateway/
       - title: Tail Sampling Processor
         url: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor
       - title: Jaeger APIs
         url: https://www.jaegertracing.io/docs/latest/apis/
+      - title: Jaeger のストレージ
+        url: https://www.jaegertracing.io/docs/2.23/storage/
+      - title: Amazon OpenSearch Service のアクセス制御
+        url: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html
+      - title: EKS のマネージドノードグループ
+        url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html
     tiers:
       - id: app
         label: アプリケーション
@@ -66,19 +73,25 @@ implementations:
       - id: collect
         label: テレメトリー収集
         z: 0
+      - {id: aws-runtime, label: AWS のクラスタ管理とトレース保存, z: 2, size: [15, 4]}
     groups:
+      - {kind: cloud, label: AWS サービス領域（EKS 制御プレーンは AWS 管理 VPC）, provider: aws, tier: [app, collect, aws-runtime], nodes: [otel-order, otel-inventory, otel-receiver, otel-sampling, otel-routing, otel-backend, otel-eks, otel-ec2, otel-storage]}
       - kind: cluster
         label: 計装アプリと Collector の Kubernetes クラスタ
         provider: k8s
         tier:
           - app
           - collect
+          - aws-runtime
         nodes:
           - otel-order
           - otel-inventory
           - otel-receiver
           - otel-sampling
           - otel-routing
+          - otel-backend
+          - otel-eks
+          - otel-ec2
     nodes:
       otel-caller:
         label: テスト用 HTTP クライアント
@@ -98,6 +111,7 @@ implementations:
         realizes:
           - order
         description: 在庫 API 呼び出しを計装し、トレースの Span を OTLP で送信する。
+        management: {type: customer, scope: 利用者が Pod と設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-opentelemetry.md#§6
@@ -109,6 +123,7 @@ implementations:
         realizes:
           - inventory
         description: 受け取った Trace Context を使い、同じ Trace に Span を送る。
+        management: {type: customer, scope: 利用者が Pod と設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-opentelemetry.md#§6
@@ -120,6 +135,7 @@ implementations:
         realizes:
           - receiver
         description: OTLP Receiver と loadbalancing exporter を置き、Trace ID で次の段へ分配する。
+        management: {type: customer, scope: 利用者が Pod と設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-opentelemetry.md#§6
@@ -132,16 +148,19 @@ implementations:
           - sampling
           - exporter
         description: Trace ID ごとに受けた Span を tail_sampling で選別し、OTLP exporter で送る。
+        management: {type: customer, scope: 利用者が Pod と設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-opentelemetry.md#§6
       otel-backend:
-        label: Jaeger Collector / Query
+        label: Jaeger の取り込み・検索 Deployment
         kind: monitor
         tier: collect
+        svc: k8s:deployment
         realizes:
           - backend
-        description: OTLP で受けたトレースを保存し検索できるようにする。
+        description: OTLP で受けたトレースを OpenSearch に保存し、検索 UI と API を提供する。
+        management: {type: customer, scope: 利用者が Pod と設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-opentelemetry.md#§6
@@ -151,10 +170,16 @@ implementations:
         tier: collect
         svc: k8s:service
         description: サンプリング側レプリカの集合を入口側が解決する。
+        management: {type: customer, scope: 利用者が Pod と設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-opentelemetry.md#§6
+      otel-eks: {label: EKS Kubernetes API, kind: service, svc: eks, tier: aws-runtime, x: 1, y: 1.5, description: AWS 管理 VPC の制御プレーン。利用者は API と公開設定を操作するがサーバーに直接アクセスしない。, management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と設定を操作する。}, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§6}]}
+      otel-ec2: {label: EKS ノードグループの EC2, kind: host, svc: ec2, tier: aws-runtime, x: 6, y: 1.5, description: 利用者が配置する SDK 計装アプリ・Collector・Jaeger の Pod を実行する。, management: {type: shared, scope: EKS がノードの作成・更新を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§6}]}
+      otel-storage: {label: OpenSearch Service のトレース索引, kind: db, svc: opensearch, tier: aws-runtime, x: 13, y: 1.5, description: Jaeger が作るトレース索引を VPC のプライベートドメインで保持する。, management: {type: shared, scope: AWS が基盤を運用し、利用者がドメイン設定、データとアクセスを管理する。}, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§6}]}
     links:
+      - {id: otel-schedule, from: otel-eks, to: otel-ec2, label: Pod を EC2 ノードへ配置, evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§6}]}
+      - {id: otel-persist, from: otel-backend, to: otel-storage, label: トレースを保存・検索, realizes: [export], evidence: [{type: doc, ref: docs/reference-opentelemetry.md#§6}]}
       - id: otel-resolve
         from: otel-receiver
         to: otel-routing
@@ -169,3 +194,40 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-opentelemetry.md#§6
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行基盤と監視サービス, z: 0, origin: [-3, 0], size: [27, 15]}]
+      nodes:
+        otel-eks: {tier: diagram, x: 1, y: 1}
+        otel-ec2: {tier: diagram, x: 4, y: 1}
+        otel-order: {tier: diagram, x: 7, y: 1}
+        otel-inventory: {tier: diagram, x: 1, y: 4}
+        otel-receiver: {tier: diagram, x: 4, y: 4}
+        otel-sampling: {tier: diagram, x: 7, y: 4}
+        otel-routing: {tier: diagram, x: 1, y: 7}
+        otel-backend: {tier: diagram, x: 4, y: 7}
+        otel-storage: {tier: diagram, x: 14, y: 1}
+        otel-caller: {tier: diagram, x: -4, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: -1.5, y0: 0, x1: 24, y1: 12, nodes: [otel-eks, otel-ec2, otel-order, otel-inventory, otel-receiver, otel-sampling, otel-routing, otel-backend, otel-storage]}
+        - {kind: cluster, label: EKS 論理クラスタ（制御プレーンは AWS 管理 VPC）, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 12, nodes: [otel-eks, otel-ec2, otel-order, otel-inventory, otel-receiver, otel-sampling, otel-routing, otel-backend]}
+    layout3d:
+      tiers:
+        - {id: hosts, label: 実行基盤, z: 0, size: [10, 10]}
+        - {id: apps, label: ノード上の処理, z: 1, size: [10, 10]}
+        - {id: services, label: 独立サービス・監視ホスト, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: serviceapps, label: 監視ホスト上の処理, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [4, 4]}
+      nodes:
+        otel-eks: {tier: services, x: 7, y: 6}
+        otel-ec2: {tier: hosts, x: 4, y: 1}
+        otel-order: {tier: apps, x: 7, y: 1}
+        otel-inventory: {tier: apps, x: 1, y: 4}
+        otel-receiver: {tier: apps, x: 4, y: 4}
+        otel-sampling: {tier: apps, x: 7, y: 4}
+        otel-routing: {tier: apps, x: 1, y: 7}
+        otel-backend: {tier: apps, x: 4, y: 7}
+        otel-storage: {tier: services, x: 1, y: 1}
+        otel-caller: {tier: outside, x: 1, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [hosts, apps, services], nodes: [otel-eks, otel-ec2, otel-order, otel-inventory, otel-receiver, otel-sampling, otel-routing, otel-backend, otel-storage]}

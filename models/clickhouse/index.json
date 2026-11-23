@@ -2,8 +2,8 @@
   "model": "clickhouse",
   "name": "ClickHouse の MergeTree：疎インデックスとパートのマージ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "insert": {
@@ -110,6 +110,12 @@
       "type": "unknown",
       "label": "実環境のパート数、グラニュール境界、索引による除外数、マージの時期は未確認。"
     },
+    "mergetree-host": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "自前 Linux サーバー",
+      "realizes": []
+    },
     "mergetree-insert": {
       "type": "implementation",
       "impl": "mergetree",
@@ -158,6 +164,54 @@
       "impl": "mergetree",
       "label": "system.parts",
       "realizes": []
+    },
+    "aws-client": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "clickhouse-client（投入と結果表示）",
+      "realizes": [
+        "insert",
+        "result"
+      ]
+    },
+    "aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "Amazon EC2（Linux）",
+      "realizes": []
+    },
+    "aws-server": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "ClickHouse Server（SQL・MergeTree 読取）",
+      "realizes": [
+        "planner",
+        "scan"
+      ]
+    },
+    "aws-merge": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "MergeTree バックグラウンドマージ",
+      "realizes": [
+        "merger"
+      ]
+    },
+    "aws-ebs": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "Amazon EBS（データボリューム）",
+      "realizes": []
+    },
+    "aws-parts": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "EBS 上の MergeTree のデータパート",
+      "realizes": [
+        "partition",
+        "parts",
+        "granules"
+      ]
     }
   },
   "byRef": {
@@ -187,12 +241,19 @@
       "merge-parts",
       "BR-01",
       "BR-02",
+      "mergetree-host",
       "mergetree-insert",
       "mergetree-server",
       "mergetree-data",
       "mergetree-merge",
       "mergetree-result",
-      "mergetree-system"
+      "mergetree-system",
+      "aws-client",
+      "aws-ec2",
+      "aws-server",
+      "aws-merge",
+      "aws-ebs",
+      "aws-parts"
     ],
     "docs/reference-clickhouse.md#§2": [
       "model",
@@ -230,12 +291,21 @@
       "model"
     ],
     "docs/reference-clickhouse.md#§7": [
+      "mergetree-host",
       "mergetree-insert",
       "mergetree-server",
       "mergetree-data",
       "mergetree-merge",
       "mergetree-result",
       "mergetree-system"
+    ],
+    "docs/reference-clickhouse.md#§8": [
+      "aws-client",
+      "aws-ec2",
+      "aws-server",
+      "aws-merge",
+      "aws-ebs",
+      "aws-parts"
     ]
   },
   "reference": {

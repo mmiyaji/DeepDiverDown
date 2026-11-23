@@ -195,8 +195,8 @@ implementations:
           - type: doc
             ref: docs/reference-autosar-classic.md#§4
       ex-hardware:
-        label: 車載マイクロコントローラー
-        kind: external
+        label: Classic ECU / マイクロコントローラー
+        kind: host
         tier: support
         x: 8
         'y': 1.5
@@ -206,3 +206,105 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-autosar-classic.md#§4
+
+    layout2d:
+      tiers: [{id: diagram, label: ECU と接続, z: 0, size: [25, 14]}]
+      nodes:
+        ex-hardware: {tier: diagram, x: 1, y: 1}
+        ex-abstraction: {tier: diagram, x: 4, y: 1}
+        ex-services: {tier: diagram, x: 7, y: 1}
+        ex-runtime: {tier: diagram, x: 1, y: 4}
+        ex-app: {tier: diagram, x: 4, y: 4}
+      groups:
+        - {kind: datacenter, label: Classic ECU, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 11, nodes: [ex-hardware, ex-abstraction, ex-services, ex-runtime, ex-app]}
+    layout3d:
+      tiers:
+        - {id: hw, label: ECU ハードウェア, z: 0, size: [10, 9]}
+        - {id: runtime, label: OS・基盤ソフトウェア, z: 1, size: [10, 9]}
+        - {id: app, label: アプリケーション, z: 2, size: [10, 9]}
+        - {id: peer, label: 対向 ECU・開発ホスト, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: peerapp, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: network, label: 通信・配備設定, z: 0, origin: [25, 0], size: [8, 4]}
+      nodes:
+        ex-hardware: {tier: hw, x: 1, y: 1}
+        ex-abstraction: {tier: runtime, x: 4, y: 1}
+        ex-services: {tier: runtime, x: 7, y: 1}
+        ex-runtime: {tier: runtime, x: 1, y: 4}
+        ex-app: {tier: app, x: 4, y: 4}
+      groups:
+        - {kind: datacenter, label: Classic ECU, tier: [hw, runtime, app], nodes: [ex-hardware, ex-abstraction, ex-services, ex-runtime, ex-app]}
+
+  - id: classic-can-workflow
+    label: "AUTOSAR Workflow Example：CAN ベンチの 2 ECU"
+    description: "AUTOSAR のツール非依存 Workflow Example に基づき、ECU Extract から CAN 対応 MCU に配備する構成例。"
+    sources:
+      - {title: "AUTOSAR Classic Platform Workflow Example", url: https://www.autosar.org/standards/classic-platform}
+      - {title: "AUTOSAR R24-11 Classic Layered Software Architecture", url: https://www.autosar.org/fileadmin/standards/R24-11/CP/AUTOSAR_CP_EXP_LayeredSoftwareArchitecture.pdf}
+      - {title: "AUTOSAR R24-11 releases", url: https://www.autosar.org/standards/r24-11}
+    tiers:
+      - {id: build, label: "開発ホストの成果物と生成", z: 2, size: [20, 4]}
+      - {id: runtime, label: "Classic ECU で動くソフトウェア", z: 1, size: [20, 4]}
+      - {id: bench, label: "ベンチの物理接続", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "開発ホスト", provider: onprem, tier: [build], nodes: [classic-can-devhost, classic-can-arxml, classic-can-tool, classic-can-hex]}
+      - {kind: datacenter, label: "Classic ECU A", provider: onprem, tier: [runtime, bench], nodes: [classic-can-swc, classic-can-rte, classic-can-bsw, classic-can-can, classic-can-mcu]}
+    nodes:
+      classic-can-devhost: {label: 開発ホスト（ツール未選定）, kind: host, tier: build, x: 1, y: 3, description: 生成とビルドを実行する利用者管理ホスト。, evidence: [{type: doc, ref: docs/reference-autosar-classic.md#§5}]}
+      classic-can-arxml: {label: "システム記述・ECU Extract / ARXML", kind: file, tier: build, x: 3, y: 1.5, description: "車両システム記述から ECU に配備する部品と通信の設定を抽出する。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-tool: {label: "RTE・BSW 生成とビルド", kind: worker, tier: build, x: 9, y: 1.5, description: "対象 MCU と BSW 実装に合う生成器・コンパイラーで C ソースをビルドする。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-hex: {label: "ECU 用 HEX", kind: file, tier: build, x: 16, y: 1.5, description: "対象 MCU に書き込むファームウェアの成果物。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-swc: {label: "Classic Application SWC", kind: worker, tier: runtime, x: 3, y: 1.5, realizes: [app], description: "アプリケーション C コード。RTE のインターフェースを利用する。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-rte: {label: "生成された RTE", kind: service, tier: runtime, x: 8, y: 1.5, realizes: [runtime], description: "SWC と ECU 固有の BSW を接続する。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-bsw: {label: "Classic BSW / OS・通信サービス", kind: service, tier: runtime, x: 13, y: 1.5, realizes: [services], description: "OS と COM・PduR 等の通信スタックを配置する。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-can: {label: "CAN Interface と CAN Driver / MCAL", kind: service, tier: runtime, x: 18, y: 1.5, realizes: [abstraction], description: "CAN コントローラーに送受信要求を渡す。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-mcu: {label: "CAN 対応 MCU / ECU A", kind: host, tier: bench, x: 5, y: 1.5, realizes: [hardware], description: "ECU 用 HEX を書き込むベンチの物理 MCU。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-bus: {label: "ベンチ CAN バス", kind: service, tier: bench, x: 11, y: 1.5, description: "デモの 2 台を結ぶ CAN 通信。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      classic-can-peer: {label: "Classic ECU B", kind: external, tier: bench, x: 17, y: 1.5, description: "CAN バスの対向 ECU。", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+    links:
+      - {id: classic-can-run-tool, from: classic-can-devhost, to: classic-can-tool, label: 生成・ビルドを実行, evidence: [{type: doc, ref: docs/reference-autosar-classic.md#§5}]}
+      - {id: classic-can-import, from: classic-can-arxml, to: classic-can-tool, label: "ECU の配置と通信設定を取り込む", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      - {id: classic-can-build, from: classic-can-tool, to: classic-can-hex, label: "対象 MCU 用にビルド", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      - {id: classic-can-flash, from: classic-can-hex, to: classic-can-mcu, label: "対象 MCU へ書き込む", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      - {id: classic-can-send, from: classic-can-mcu, to: classic-can-bus, label: "CAN フレームを送信", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+      - {id: classic-can-receive, from: classic-can-bus, to: classic-can-peer, label: "対向 ECU がフレームを受け取る", evidence: [{type: doc, ref: "docs/reference-autosar-classic.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ECU と接続, z: 0, size: [27, 15]}]
+      nodes:
+        classic-can-mcu: {tier: diagram, x: 1, y: 1}
+        classic-can-can: {tier: diagram, x: 4, y: 1}
+        classic-can-bsw: {tier: diagram, x: 7, y: 1}
+        classic-can-rte: {tier: diagram, x: 1, y: 4}
+        classic-can-swc: {tier: diagram, x: 4, y: 4}
+        classic-can-devhost: {tier: diagram, x: 14, y: 1}
+        classic-can-arxml: {tier: diagram, x: 17, y: 1}
+        classic-can-tool: {tier: diagram, x: 20, y: 1}
+        classic-can-hex: {tier: diagram, x: 14, y: 4}
+        classic-can-bus: {tier: diagram, x: 10.5, y: 1}
+        classic-can-peer: {tier: diagram, x: 10.5, y: 9}
+      groups:
+        - {kind: datacenter, label: Classic ECU A, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 12, nodes: [classic-can-mcu, classic-can-can, classic-can-bsw, classic-can-rte, classic-can-swc]}
+        - {kind: datacenter, label: 開発ホスト, tier: [diagram], x0: 12, y0: 0, x1: 23, y1: 12, nodes: [classic-can-devhost, classic-can-arxml, classic-can-tool, classic-can-hex]}
+    layout3d:
+      tiers:
+        - {id: hw, label: ECU ハードウェア, z: 0, size: [10, 9]}
+        - {id: runtime, label: OS・基盤ソフトウェア, z: 1, size: [10, 9]}
+        - {id: app, label: アプリケーション, z: 2, size: [10, 9]}
+        - {id: peer, label: 対向 ECU・開発ホスト, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: peerapp, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: network, label: 通信・配備設定, z: 0, origin: [25, 0], size: [8, 4]}
+      nodes:
+        classic-can-mcu: {tier: hw, x: 1, y: 1}
+        classic-can-can: {tier: runtime, x: 4, y: 1}
+        classic-can-bsw: {tier: runtime, x: 7, y: 1}
+        classic-can-rte: {tier: runtime, x: 1, y: 4}
+        classic-can-swc: {tier: app, x: 4, y: 4}
+        classic-can-devhost: {tier: peer, x: 1, y: 1}
+        classic-can-arxml: {tier: peerapp, x: 4, y: 1}
+        classic-can-tool: {tier: peerapp, x: 7, y: 1}
+        classic-can-hex: {tier: peerapp, x: 1, y: 4}
+        classic-can-bus: {tier: network, x: 1, y: 1}
+        classic-can-peer: {tier: network, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: Classic ECU A, tier: [hw, runtime, app], nodes: [classic-can-mcu, classic-can-can, classic-can-bsw, classic-can-rte, classic-can-swc]}
+        - {kind: datacenter, label: 開発ホスト, tier: [peer, peerapp], nodes: [classic-can-devhost, classic-can-arxml, classic-can-tool, classic-can-hex]}

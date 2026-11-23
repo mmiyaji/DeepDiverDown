@@ -264,13 +264,16 @@ implementations:
         url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime
       - title: Monitor Azure Data Factory
         url: https://learn.microsoft.com/en-us/azure/data-factory/monitor-data-factory
+      - {title: Mapping Data Flow の概要, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-overview}
+      - {title: Copy Activity の実行, url: https://learn.microsoft.com/en-us/azure/data-factory/copy-activity-overview}
+      - {title: Azure Monitor に ADF のログを送る, url: https://learn.microsoft.com/en-us/azure/data-factory/monitor-configure-diagnostics}
     tiers:
       - id: processing
         label: データの処理と保存
         z: 0
         size:
-          - 14
-          - 5
+          - 22
+          - 6
       - id: setup
         label: 実行に必要な設定・成果物
         z: 1
@@ -299,35 +302,35 @@ implementations:
           - type: doc
             ref: docs/reference-azure-data-factory.md#§8
       azure-pipeline:
-        label: ADF のスケジュール Trigger・Pipeline・Copy Activity
+        label: ADF（スケジュールとパイプライン）
         kind: workflow
+        svc: azure:datafactory
         tier: processing
         x: 1
         'y': 3.65
         realizes:
           - trigger
           - pipeline
-          - copy
         description: 定期的にコピーを始め、成功後に変換を依存実行する。
         evidence:
           - type: doc
             ref: docs/reference-azure-data-factory.md#§8
       azure-ir:
-        label: Azure Integration Runtime と Mapping Data Flow
+        label: ADF（Copy Activity・Azure IR）
         kind: worker
         tier: processing
         x: 5
         'y': 1.15
         realizes:
           - ir
-          - flow
-        description: コピーのデータ移動と、管理 Spark 上のマッピング変換を担う。
+          - copy
+        description: Microsoft が実行基盤を運用し、利用者は IR と接続・認証を設定する。Blob の入力を ADLS Gen2 の raw パスにコピーする。
         evidence:
           - type: doc
             ref: docs/reference-azure-data-factory.md#§8
         svc: azure:datafactory
       azure-lake:
-        label: ADLS Gen2 の raw と curated
+        label: ADLS Gen2（raw）
         kind: db
         tier: processing
         x: 5
@@ -335,20 +338,19 @@ implementations:
         svc: azure:storage
         realizes:
           - landing
-          - lake
-        description: 変換前の中間結果と整形データを別のパスに保存する。
+        description: コピーした変換前の注文ファイルを保持する。
         evidence:
           - type: doc
             ref: docs/reference-azure-data-factory.md#§8
       azure-monitor:
-        label: Azure Monitor / ADF の監視画面
+        label: Azure Monitor Logs（Log Analytics）
         kind: monitor
         tier: processing
-        x: 9
-        'y': 1.15
+        x: 15
+        'y': 4.8
         realizes:
           - monitor
-        description: パイプラインやアクティビティの実行状態を確認する。
+        description: 診断設定で送信した ADF パイプラインとアクティビティの実行ログを確認する。
         evidence:
           - type: doc
             ref: docs/reference-azure-data-factory.md#§8
@@ -363,8 +365,44 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-azure-data-factory.md#§8
+      azure-spark: {label: ADF（Mapping Data Flow・管理 Spark）, svc: azure:datafactory, kind: worker, tier: processing, x: 11, y: 3.65, realizes: [flow], description: Microsoft 管理の Spark 上で raw を変換する。利用者は Data Flow と計算設定を指定し、内部ホストは直接操作しない。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
+      azure-curated: {label: ADLS Gen2（curated）, svc: azure:storage, kind: db, tier: processing, x: 17, y: 2, realizes: [lake], description: 分析用に整形したデータを保持する。, evidence: [{type: doc, ref: docs/reference-azure-data-factory.md#§8}]}
     links:
+      - {id: azure-after-copy, from: azure-pipeline, to: azure-spark, label: コピー成功後に変換アクティビティを起動, realizes: [ir-flow], replace: true}
       - id: azure-linked-connection
         from: azure-linked
         to: azure-pipeline
         label: 接続・パスの定義を読む
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: Azure の実装構成, z: 0, size: [23, 12]}
+      nodes:
+        azure-source: {tier: diagram, x: 2, y: 3}
+        azure-ir: {tier: diagram, x: 7, y: 3}
+        azure-pipeline: {tier: diagram, x: 7, y: 7}
+        azure-linked: {tier: diagram, x: 7, y: 10}
+        azure-lake: {tier: diagram, x: 12, y: 3}
+        azure-spark: {tier: diagram, x: 17, y: 3}
+        azure-curated: {tier: diagram, x: 22, y: 3}
+        azure-monitor: {tier: diagram, x: 17, y: 8}
+      groups:
+        - {kind: cloud, label: Azure サブスクリプション（管理サービスの論理的所属）, provider: azure, tier: [diagram], x0: 0, y0: 0, x1: 24, y1: 12, nodes: [azure-source, azure-ir, azure-pipeline, azure-linked, azure-lake, azure-spark, azure-curated, azure-monitor]}
+        - {kind: cluster, label: Data Factory と Azure IR, provider: azure, tier: [diagram], x0: 4.5, y0: 0.7, x1: 9.5, y1: 11.5, nodes: [azure-ir, azure-pipeline, azure-linked]}
+    layout3d:
+      tiers:
+        - {id: adf, label: Data Factory と Azure IR, z: 0, size: [9, 8]}
+        - {id: spark, label: 管理 Spark, z: 0, origin: [12, 0], size: [4, 8]}
+        - {id: storage, label: Azure Storage, z: 0, origin: [19, 0], size: [5, 11]}
+        - {id: logs, label: Azure Monitor, z: 0, origin: [27, 0], size: [4, 5]}
+      nodes:
+        azure-pipeline: {tier: adf, x: 2, y: 1}
+        azure-ir: {tier: adf, x: 6, y: 1}
+        azure-linked: {tier: adf, x: 2, y: 5}
+        azure-spark: {tier: spark, x: 2, y: 2}
+        azure-source: {tier: storage, x: 2, y: 1}
+        azure-lake: {tier: storage, x: 2, y: 5}
+        azure-curated: {tier: storage, x: 2, y: 9}
+        azure-monitor: {tier: logs, x: 2, y: 2}
+      groups:
+        - {kind: cloud, label: Azure サブスクリプション（管理サービスの論理的所属）, provider: azure, tier: [adf, spark, storage, logs], nodes: [azure-source, azure-ir, azure-pipeline, azure-linked, azure-lake, azure-spark, azure-curated, azure-monitor]}

@@ -94,3 +94,10 @@ Spark と Kafka 連携ライブラリーを含むイメージ、Kubernetes の�
 AWS のマネージド範囲を 3D 図に表示する。「AWS管理」は表示したサービス基盤に AWS の運用範囲があることを示し、設定・データ・権限を含むすべてを AWS が担う意味ではない。「共同管理」はマネージドノードグループなど役割が分かれる場合、「利用者管理」は Spark アプリなど利用者が主に運用する部品を示す。詳しい分担は各部品を選択して確認する。
 
 [AWS 共有責任モデル](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)、[EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)、[EMR のセキュリティ](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-security.html)。
+
+自前例は Linux ホスト群で Spark Standalone の Master と Worker を運用し、cluster モードの Driver と Executor を Worker に配置する。HDFS は別の自前クラスターとし、NameNode・DataNode の具体的な配置や冗長化は未指定である。AWS 例はいずれも公式資料を組み合わせた代表構成であり、実際の導入事例や動作検証済み構成ではない。EKS の制御プレーンは AWS が運用し、利用者は Kubernetes API とクラスタ設定を操作できるが、制御プレーンサーバーには直接アクセスしない。EMR・Spark・Kafka ライブラリーの個別バージョン互換性やチェックポイントの S3 利用を含めた実際の動作は未検証である。
+
+- [Spark Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)
+- [HDFS Architecture](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)
+
+AWS の2例は実行ノードと MSK を同じ利用者 VPC に置く選択例とし、S3 および AWS 管理の EKS 制御プレーンとは区別する。サブネット、セキュリティグループ、S3 経路と認証の具体的設定は未指定である。

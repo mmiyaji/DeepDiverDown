@@ -196,6 +196,8 @@ implementations:
           - 16
           - 3
     nodes:
+      ex-host: {label: Hindsight API 実行ホスト, kind: host, tier: support, x: 1, y: 2, description: 利用者が Hindsight API を実行するホスト。, evidence: [{type: doc, ref: docs/reference-hindsight.md#§4}]}
+      ex-db-host: {label: 外部 PostgreSQL ホスト, kind: host, tier: support, x: 9, y: 2, description: 利用者が記憶データを永続化する DB ホスト。, evidence: [{type: doc, ref: docs/reference-hindsight.md#§4}]}
       ex-agent:
         label: 利用するエージェント
         kind: actor
@@ -262,3 +264,100 @@ implementations:
             ref: docs/reference-hindsight.md#§4
         realizes:
           - model
+    links:
+      - {id: ex-run-api, from: ex-host, to: ex-retain, label: Hindsight API を実行, evidence: [{type: doc, ref: docs/reference-hindsight.md#§4}]}
+      - {id: ex-run-db, from: ex-db-host, to: ex-store, label: PostgreSQL を実行・保存, evidence: [{type: doc, ref: docs/reference-hindsight.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行・保存と外部接続, z: 0, origin: [-4, 0], size: [30, 13]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-retain: {tier: diagram, x: 4, y: 1}
+        ex-recall: {tier: diagram, x: 7, y: 1}
+        ex-reflect: {tier: diagram, x: 1, y: 4}
+        ex-db-host: {tier: diagram, x: 13, y: 1}
+        ex-store: {tier: diagram, x: 16, y: 1}
+        ex-agent: {tier: diagram, x: 22, y: 1}
+        ex-model: {tier: diagram, x: 25, y: 1}
+      groups:
+        - {kind: datacenter, label: Hindsight API ホスト, tier: [diagram], x0: -1, y0: 0.5, x1: 9.5, y1: 9.5, nodes: [ex-host, ex-retain, ex-recall, ex-reflect]}
+        - {kind: datacenter, label: PostgreSQL ホスト, tier: [diagram], x0: 11, y0: 0, x1: 20, y1: 7, nodes: [ex-db-host, ex-store]}
+    layout3d:
+      tiers:
+        - {id: host, label: 顧客実行基盤, z: 0, size: [10, 8]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 8]}
+        - {id: dbhost, label: 独立サービス・DB, z: 0, origin: [13, 0], size: [10, 7]}
+        - {id: db, label: DB データ, z: 1, origin: [13, 0], size: [10, 7]}
+        - {id: external, label: 外部モデル・利用者, z: 0, origin: [26, 0], size: [8, 5]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-retain: {tier: apps, x: 4, y: 1}
+        ex-recall: {tier: apps, x: 7, y: 1}
+        ex-reflect: {tier: apps, x: 1, y: 4}
+        ex-db-host: {tier: dbhost, x: 1, y: 1}
+        ex-store: {tier: db, x: 4, y: 1}
+        ex-agent: {tier: external, x: 1, y: 1}
+        ex-model: {tier: external, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: Hindsight API ホスト, tier: [host, apps], nodes: [ex-host, ex-retain, ex-recall, ex-reflect]}
+        - {kind: datacenter, label: PostgreSQL ホスト, tier: [dbhost, db], nodes: [ex-db-host, ex-store]}
+
+  - id: aws-eks-rds
+    label: "AWS：EKS・Hindsight・RDS for PostgreSQL"
+    description: "OSS の Hindsight Helm チャートを EKS に配置し、pgvector を有効にした RDS に記憶を永続化する例。"
+    sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+      - {title: "Hindsight installation", url: https://hindsight.vectorize.io/developer/installation}
+      - {title: "Hindsight storage requirements", url: https://github.com/vectorize-io/hindsight/blob/main/hindsight-docs/docs/developer/storage.md}
+      - {title: "Hindsight models", url: https://hindsight.vectorize.io/developer/models}
+      - {title: "Hindsight self-hosted licensing", url: https://hindsight.vectorize.io/cloud-enterprise/overview}
+      - {title: "RDS for PostgreSQL extension versions", url: https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-extensions.html}
+      - {title: "EKS managed node groups", url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+    tiers:
+      - {id: access, label: "外部の利用者と推論", z: 2, size: [20, 4]}
+      - {id: compute, label: "Kubernetes 上の記憶 API", z: 1, size: [20, 4]}
+      - {id: storage, label: "永続ストレージ", z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: "AWS サービス領域（EKS 制御プレーンは AWS 管理 VPC）", provider: aws, tier: [compute, storage], nodes: [aws-hindsight-eks, aws-hindsight-host, aws-hindsight-api, aws-hindsight-rds]}
+      - {kind: cluster, label: "EKS クラスタ", tier: [compute], nodes: [aws-hindsight-host, aws-hindsight-api]}
+    nodes:
+      aws-hindsight-agent: {label: "エージェント / Hindsight SDK", kind: client, tier: access, x: 3, y: 1.5, realizes: [agent], description: "Hindsight API に記憶の保存・検索・回答を要求する。", evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      aws-hindsight-llm: {label: "OpenAI API / LLM", kind: external, tier: access, x: 14, y: 1.5, realizes: [model], description: "抽出や reflect の回答に使う外部推論 API。", evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      aws-hindsight-eks: {label: "Amazon EKS", svc: eks, kind: service, tier: compute, x: 3, y: 1.5, description: "AWS 管理 VPC の制御プレーン。利用者は Kubernetes API と公開設定を操作するが、サーバーに直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      aws-hindsight-api: {label: "Hindsight API Pod", kind: service, tier: compute, x: 10, y: 1.5, realizes: [retain, recall, reflect], description: "フルイメージで retain・recall・reflect を実行する。埋め込みと再ランキングはプロセス内で行う。", evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      aws-hindsight-host: {label: "Amazon EC2 / ノードグループ", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "Hindsight API Pod を実行する Kubernetes ノード。", management: {type: shared, scope: EKS がノードの作成・更新を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      aws-hindsight-rds: {label: "Amazon RDS for PostgreSQL / pgvector", svc: rds, kind: db, tier: storage, x: 10, y: 1.5, realizes: [store], description: "記憶のテキスト、関係、埋め込みと検索用索引を保持する。", management: {type: shared, scope: AWS が DB 基盤を運用し、利用者がデータと設定・権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+    links:
+      - {id: aws-hindsight-node-group, from: aws-hindsight-eks, to: aws-hindsight-host, label: "EC2 ノードを管理", evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      - {id: aws-hindsight-deploy, from: aws-hindsight-eks, to: aws-hindsight-api, label: "Helm の API ワークロードを配置", evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      - {id: aws-hindsight-llm, from: aws-hindsight-api, to: aws-hindsight-llm, label: "抽出と回答生成を要求", realizes: [extract, think], replace: true, evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+      - {id: aws-hindsight-query, from: aws-hindsight-api, to: aws-hindsight-rds, label: "記憶とベクトル索引を検索", realizes: [recall], replace: true, evidence: [{type: doc, ref: "docs/reference-hindsight.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行・保存と外部接続, z: 0, origin: [-4, 0], size: [30, 13]}]
+      nodes:
+        aws-hindsight-eks: {tier: diagram, x: 1, y: 1}
+        aws-hindsight-host: {tier: diagram, x: 4, y: 1}
+        aws-hindsight-api: {tier: diagram, x: 7, y: 1}
+        aws-hindsight-rds: {tier: diagram, x: 13, y: 1}
+        aws-hindsight-agent: {tier: diagram, x: 22, y: 1}
+        aws-hindsight-llm: {tier: diagram, x: 25, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: -1.5, y0: 0, x1: 20, y1: 10, nodes: [aws-hindsight-eks, aws-hindsight-host, aws-hindsight-api, aws-hindsight-rds]}
+        - {kind: cluster, label: EKS 論理クラスタ, tier: [diagram], x0: -1, y0: 0.5, x1: 9.5, y1: 9.5, nodes: [aws-hindsight-eks, aws-hindsight-host, aws-hindsight-api]}
+    layout3d:
+      tiers:
+        - {id: host, label: 顧客実行基盤, z: 0, size: [10, 8]}
+        - {id: apps, label: 実行基盤上の処理, z: 1, size: [10, 8]}
+        - {id: dbhost, label: 独立サービス・DB, z: 0, origin: [13, 0], size: [10, 7]}
+        - {id: db, label: DB データ, z: 1, origin: [13, 0], size: [10, 7]}
+        - {id: external, label: 外部モデル・利用者, z: 0, origin: [26, 0], size: [8, 5]}
+      nodes:
+        aws-hindsight-eks: {tier: dbhost, x: 1, y: 1}
+        aws-hindsight-host: {tier: host, x: 4, y: 1}
+        aws-hindsight-api: {tier: apps, x: 7, y: 1}
+        aws-hindsight-rds: {tier: dbhost, x: 1, y: 1}
+        aws-hindsight-agent: {tier: external, x: 1, y: 1}
+        aws-hindsight-llm: {tier: external, x: 4, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [host, apps, dbhost], nodes: [aws-hindsight-eks, aws-hindsight-host, aws-hindsight-api, aws-hindsight-rds]}

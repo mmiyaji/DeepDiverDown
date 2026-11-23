@@ -295,6 +295,8 @@ implementations:
         url: https://docs.cloud.google.com/bigquery/docs/reservations-intro
       - title: Cloud Storage の CSV をロード
         url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv
+      - {title: BigQuery の予約割り当て, url: https://docs.cloud.google.com/bigquery/docs/reservations-assignments}
+      - {title: BigQuery のバッチロードと容量, url: https://docs.cloud.google.com/bigquery/docs/batch-loading-data}
     tiers:
       - id: interface
         label: 利用と管理
@@ -321,7 +323,7 @@ implementations:
         label: 実装時の設定・観測
         z: 3
         size:
-          - 8
+          - 17
           - 3
     groups:
       - kind: cloud
@@ -332,16 +334,17 @@ implementations:
           - data
           - compute
           - implementation-setup
+        nodes: [example-api, example-dataset, example-engine, example-gcs, example-loader, example-reservation]
     nodes:
       example-client:
-        label: bq CLI とロードジョブ
+        label: bq CLI を使う投入端末
         kind: external
         tier: interface
         x: 0
         'y': 1.5
         realizes:
           - client
-        description: 受注ファイルの URI と出力テーブル名を指定する。
+        description: 受注ファイルの URI と出力テーブルを指定してロードジョブを送信する。
         evidence:
           - type: doc
             ref: docs/reference-bigquery.md#§9
@@ -359,7 +362,7 @@ implementations:
             ref: docs/reference-bigquery.md#§9
         svc: gcp:bigquery
       example-bi:
-        label: BI 利用者
+        label: BigQuery Studio を使う分析者
         kind: actor
         tier: interface
         x: 8
@@ -385,7 +388,7 @@ implementations:
           - type: doc
             ref: docs/reference-bigquery.md#§9
       example-engine:
-        label: BigQuery の分析用予約と実行
+        label: BigQuery のクエリステージと実行スロット
         kind: worker
         tier: compute
         x: 2
@@ -409,11 +412,47 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-bigquery.md#§9
+      example-loader: {label: BigQuery（CSV ロードジョブ）, svc: gcp:bigquery, kind: worker, tier: implementation-setup, x: 6, y: 1.5, description: Google 管理のロード処理が Cloud Storage から CSV を読み管理表へ保存する。利用者は API からジョブと権限を指定する。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§9}]}
+      example-reservation: {label: BigQuery（QUERY 予約割当）, svc: gcp:bigquery, kind: policy, tier: implementation-setup, x: 12, y: 1.5, description: 利用者が同一ロケーションの QUERY 予約を分析プロジェクトに割り当てる。ロードは既定の共有プールを利用する。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§9}]}
     links:
       - id: example-gcs-connection
         from: example-gcs
-        to: example-client
-        label: ロードするファイルを指定
+        to: example-loader
+        label: Cloud Storage から CSV を読み取る
         evidence:
           - type: doc
             ref: docs/reference-bigquery.md#§9
+      - {id: example-submit-load, from: example-client, to: example-loader, label: ファイル URI を指定してロード, realizes: [submit], replace: true}
+      - {id: example-load-table, from: example-loader, to: example-dataset, label: BigQuery 管理テーブルに保存, realizes: [organize, persist], replace: true}
+      - {id: example-use-reservation, from: example-reservation, to: example-engine, label: クエリジョブに予約スロットを割り当てる}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: BigQuery 受注分析, z: 0, size: [23, 12]}
+      nodes:
+        example-client: {tier: diagram, x: 1, y: 2}
+        example-bi: {tier: diagram, x: 1, y: 8}
+        example-gcs: {tier: diagram, x: 7, y: 2}
+        example-loader: {tier: diagram, x: 12, y: 2}
+        example-dataset: {tier: diagram, x: 18, y: 2}
+        example-api: {tier: diagram, x: 7, y: 8}
+        example-engine: {tier: diagram, x: 12, y: 8}
+        example-reservation: {tier: diagram, x: 18, y: 8}
+      groups:
+        - {kind: cloud, label: Google Cloud 分析プロジェクト（サービスの論理的所属）, provider: gcp, tier: [diagram], x0: 4.3, y0: -0.5, x1: 21.5, y1: 11.5, nodes: [example-gcs, example-loader, example-dataset, example-api, example-engine, example-reservation]}
+    layout3d:
+      tiers:
+        - {id: clients, label: 利用者, kind: origin, z: 0, origin: [-5, 0], size: [3, 7]}
+        - {id: input, label: Cloud Storage, z: 0, size: [4, 7]}
+        - {id: bigquery, label: BigQuery ジョブと管理データ, z: 0, origin: [8, 0], size: [17, 7]}
+      nodes:
+        example-client: {tier: clients, x: 1, y: 1}
+        example-bi: {tier: clients, x: 1, y: 5}
+        example-gcs: {tier: input, x: 2, y: 3}
+        example-loader: {tier: bigquery, x: 2, y: 1}
+        example-dataset: {tier: bigquery, x: 7, y: 1}
+        example-api: {tier: bigquery, x: 2, y: 5}
+        example-engine: {tier: bigquery, x: 7, y: 5}
+        example-reservation: {tier: bigquery, x: 13, y: 5}
+      groups:
+        - {kind: cloud, label: Google Cloud 分析プロジェクト（サービスの論理的所属）, provider: gcp, tier: [input, bigquery], nodes: [example-gcs, example-loader, example-dataset, example-api, example-engine, example-reservation]}

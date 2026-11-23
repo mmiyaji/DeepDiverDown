@@ -337,7 +337,7 @@ export class BlockMap {
     this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || 'データの移動')}</span>${legend ? `<div class="bm-legend">${legend}</div>` : ''}</div>
       <div class="bm" style="--lanes:${lanes.length}">${html}</div>
       ${L.note ? `<div class="fm-note">${esc(L.note)}</div>` : ''}
-      ${infoBox(sel && { label: sel.label ?? sel.id, description: sel.note }, '塊を選ぶと説明を表示します。シナリオを再生すると、データの塊が箱の間を移動・結合・分割・複製します。')}`;
+      ${infoBox(sel && { label: sel.label ?? sel.id, description: sel.note }, L.hint || '塊を選ぶと説明を表示します。シナリオを再生すると、データの塊が箱の間を移動・結合・分割・複製します。')}`;
     this.items = all;
     if (before.size && !matchMedia('(prefers-reduced-motion: reduce)').matches) this.animate(before, prevItems, all);
   }

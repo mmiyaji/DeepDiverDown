@@ -17,23 +17,25 @@ Worker は Connector を介して対象ファイルを読み、部分集計を�
 - [Trino · Concepts](https://trino.io/docs/current/overview/concepts.html)
 - [Trino · Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)
 
-## 4. 実装例：Trino と Glue Catalog・S3 上の Iceberg
+## 4. 実装例：EKS 上の Trino・Glue Catalog・S3
 
-Trino の Coordinator と Worker が、Glue Catalog を使う Iceberg カタログに接続し、S3 にある注文テーブルを検索する例。分散読み取りと部分集計は同じ Worker 群で動く。
+EKS の EC2 マネージドノードグループに Trino Helm チャートを配置し、Coordinator と Worker を別 Pod で実行する例。Iceberg Connector は Glue Data Catalog でテーブルのメタデータ位置を解決し、Coordinator と Worker は必要なメタデータやデータファイルを Amazon S3 から読み取る。クライアントは Kubernetes Service など、別途設定した接続経路を通じて Coordinator に SQL を送る。
 
-| 機能 | 実装での担い手 | 配置・設定 |
-| --- | --- | --- |
-| SQL クライアント | Trino CLI | SQL を送り、結果を取得する。 |
-| SQL の計画と調整、外部テーブルのメタデータ解決 | Trino Coordinator と Iceberg Connector | Iceberg テーブルを解決して分割とステージを計画する。 |
-| 分割データの読取タスク、集約タスク | Trino Workers の読取と集約タスク | S3 上のデータを読み、ステージ間で中間結果を交換する。 |
-| Iceberg テーブルのデータファイル | S3 上の Iceberg データとメタデータ | スナップショットが参照する物理ファイルを保持する。 |
+| 機能 | 担い手 |
+| --- | --- |
+| SQL クライアント | 外部の Trino CLI |
+| SQL の計画とメタデータ解決 | Trino Coordinator Pod、Iceberg Connector、AWS Glue Data Catalog |
+| 読み取りと集約 | Trino Worker Pods |
+| データとメタデータ | Amazon S3 上の Iceberg テーブル |
+| 実行基盤 | EKS の Kubernetes 制御プレーンと EC2 ノードグループ |
+| AWS アクセス | Pod の Kubernetes Service Account に対応する IAM ロール |
 
-実装で加わる部品を以下に示す。
+Trino のカタログ設定で `iceberg.catalog.type=glue` と `fs.s3.enabled=true` を指定する。Coordinator と Worker の両方に必要な S3 アクセスを、Glue に問い合わせる処理に必要な権限をそれぞれ与える。図は IAM roles for service accounts を使う例であり、ロールやポリシーが自動的に作られることを意味しない。クライアントへの公開方法、ネットワーク、認証、ノード容量は個別に構成する。EKS が Trino 自体をマネージドサービスとして運用するわけではない。
 
-- AWS Glue Catalog。カタログに iceberg.catalog.type=glue と fs.s3.enabled=true を設定し、Glue から Iceberg のメタデータ位置を解決する。
+- [Trino on Kubernetes with Helm](https://trino.io/docs/current/installation/kubernetes.html)
+- [Trino Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)
+- [Trino S3 file system](https://trino.io/docs/current/object-storage/file-system-s3.html)
+- [EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
+- [IAM roles for service accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
 
-公式資料
-
-- [Trino · Concepts](https://trino.io/docs/current/overview/concepts.html)
-- [Trino · Iceberg connector](https://trino.io/docs/current/connector/iceberg.html)
-- [Trino file system support](https://trino.io/docs/current/object-storage/file-system-s3.html)
+AWS が EKS 制御プレーンと EC2・Glue・S3 の基盤を運用する。利用者は Kubernetes API、ノードグループ、Trino の配置・設定・更新、カタログ・S3 データと IAM 権限を管理する。制御プレーンのサーバーは直接操作しない。図は公式資料を組み合わせた代表例であり実動作は未検証。クライアント公開方式、Glue と S3 のネットワーク経路、Trino と Iceberg のバージョン互換性は未指定。

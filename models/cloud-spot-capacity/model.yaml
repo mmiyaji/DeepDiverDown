@@ -205,6 +205,8 @@ implementations:
         url: https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/preemptible.htm
       - title: EC2 Auto Scaling Capacity Rebalancing
         url: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-capacity-rebalancing.html
+      - {title: EC2 Auto Scaling の混合インスタンスポリシー, url: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html}
+      - {title: EC2 Spot の進捗保存, url: https://docs.aws.amazon.com/pdfs/whitepapers/latest/cost-optimization-leveraging-ec2-spot-instances/cost-optimization-leveraging-ec2-spot-instances.pdf}
     tiers:
       - id: compute
         label: ワークロードと容量
@@ -220,11 +222,13 @@ implementations:
           - 3
     nodes:
       ex-work:
-        label: 実行アプリ
+        label: EC2 上の処理アプリ
         kind: service
         tier: compute
         x: 0
         'y': 1.5
+        description: 起動テンプレートの EC2 上で実行し、S3 に定期的に進捗を保存する。
+        management: {type: customer, scope: "利用者がアプリ、起動時の配備とチェックポイント処理を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-cloud-spot-capacity.md#§4
@@ -237,6 +241,7 @@ implementations:
         x: 4
         'y': 1.5
         svc: ec2
+        management: {type: shared, scope: "AWS が物理基盤と Spot 容量の割り当て・回収を担い、利用者がインスタンス設定とゲスト OS を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-cloud-spot-capacity.md#§4
@@ -249,6 +254,7 @@ implementations:
         x: 8
         'y': 1.5
         svc: ec2
+        management: {type: shared, scope: "AWS が物理基盤を運用し、利用者がインスタンス設定とゲスト OS を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-cloud-spot-capacity.md#§4
@@ -261,30 +267,35 @@ implementations:
         x: 12
         'y': 1.5
         svc: s3
+        management: {type: shared, scope: "AWS が S3 サービスを運用し、利用者がバケット設定、権限と進捗データを管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-cloud-spot-capacity.md#§4
         realizes:
           - checkpoint
       ex-manager:
-        label: EC2 Auto Scaling
+        label: EC2 Auto Scaling（混合インスタンスグループ）
         kind: service
         tier: control
         x: 0
         'y': 1.5
         svc: autoscaling
+        description: 複数 AZ と機種から混合グループを起動し、容量リバランスを有効にする。
+        management: {type: shared, scope: "AWS が Auto Scaling サービスを運用し、利用者が API でグループ、起動テンプレート、混合ポリシーとリバランスを設定する。AWS の内部サービスには直接アクセスしない。"}
         evidence:
           - type: doc
             ref: docs/reference-cloud-spot-capacity.md#§4
         realizes:
           - manager
       ex-notice:
-        label: EventBridge 中断イベント
+        label: EC2 IMDSv2（Spot 中断通知）
         kind: service
         tier: control
         x: 4
         'y': 1.5
-        svc: eventbridge
+        svc: ec2
+        description: Spot インスタンス上の処理が IMDSv2 の instance-action をポーリングする。
+        management: {type: shared, scope: "AWS がインスタンスメタデータを提供し、利用者が IMDSv2 の利用設定とポーリング処理を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-cloud-spot-capacity.md#§4
@@ -296,11 +307,16 @@ implementations:
         tier: control
         x: 8
         'y': 1.5
+        description: Spot 側では停止処理を実行し、代替 EC2 のアプリ起動時に S3 の進捗を読み戻す。
+        management: {type: customer, scope: "利用者が停止処理、保存済み進捗の読み戻しと再実行を実装・運用する。"}
         evidence:
           - type: doc
             ref: docs/reference-cloud-spot-capacity.md#§4
         realizes:
           - recovery
+      ex-role: {label: "IAM（EC2 インスタンスロール）", svc: iam, kind: policy, tier: control, x: 14, y: 1.5, description: "アプリが対象の S3 進捗オブジェクトを読み書きできるようにする。", management: {type: shared, scope: "AWS が IAM を提供し、利用者がロールの信頼関係と権限を設定する。"}, evidence: [{type: doc, ref: docs/reference-cloud-spot-capacity.md#§4}]}
+    links:
+      - {id: ex-checkpoint-role, from: ex-role, to: ex-work, label: S3 の進捗を読み書きする権限を付与}
     groups:
       - kind: cloud
         provider: aws
@@ -321,3 +337,36 @@ implementations:
           - ex-manager
           - ex-notice
           - ex-recovery
+          - ex-role
+      - {kind: vpc, label: EC2 を実行する VPC, tier: [compute, control], nodes: [ex-work, ex-spot, ex-standard, ex-notice, ex-recovery]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: AWS の実装構成, z: 0, size: [19, 11]}
+      nodes:
+        ex-manager: {tier: diagram, x: 3, y: 1}
+        ex-role: {tier: diagram, x: 9, y: 1}
+        ex-work: {tier: diagram, x: 3, y: 4}
+        ex-recovery: {tier: diagram, x: 7, y: 4}
+        ex-notice: {tier: diagram, x: 3, y: 7}
+        ex-spot: {tier: diagram, x: 3, y: 10}
+        ex-standard: {tier: diagram, x: 7, y: 10}
+        ex-checkpoint: {tier: diagram, x: 14, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], nodes: [ex-manager, ex-role, ex-work, ex-recovery, ex-notice, ex-spot, ex-standard, ex-checkpoint]}
+        - {kind: vpc, label: EC2 を実行する VPC, tier: [diagram], nodes: [ex-work, ex-recovery, ex-notice, ex-spot, ex-standard]}
+    layout3d:
+      tiers:
+        - {id: infrastructure, label: EC2 と独立した AWS サービス, z: 0, size: [19, 8]}
+        - {id: application, label: EC2 のゲスト上の処理, z: 1, size: [19, 8]}
+      nodes:
+        ex-manager: {tier: infrastructure, x: 2, y: 1}
+        ex-role: {tier: infrastructure, x: 8, y: 1}
+        ex-spot: {tier: infrastructure, x: 3, y: 5}
+        ex-standard: {tier: infrastructure, x: 7, y: 5}
+        ex-checkpoint: {tier: infrastructure, x: 14, y: 5}
+        ex-work: {tier: application, x: 3, y: 5}
+        ex-notice: {tier: infrastructure, x: 5, y: 5}
+        ex-recovery: {tier: application, x: 7, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [infrastructure, application], nodes: [ex-manager, ex-role, ex-work, ex-recovery, ex-notice, ex-spot, ex-standard, ex-checkpoint]}
+        - {kind: vpc, label: EC2 を実行する VPC, tier: [infrastructure, application], nodes: [ex-work, ex-recovery, ex-notice, ex-spot, ex-standard]}

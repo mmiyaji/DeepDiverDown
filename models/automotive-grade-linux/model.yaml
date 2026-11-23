@@ -196,7 +196,7 @@ implementations:
             ref: docs/reference-automotive-grade-linux.md#§4
       ex-hardware:
         label: 車載ボード
-        kind: external
+        kind: host
         tier: support
         x: 8
         'y': 1.5
@@ -206,3 +206,94 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-automotive-grade-linux.md#§4
+
+    layout2d:
+      tiers: [{id: diagram, label: ホストと実行環境, z: 0, size: [20, 14]}]
+      nodes:
+        ex-hardware: {tier: diagram, x: 2, y: 1}
+        ex-os: {tier: diagram, x: 10, y: 2}
+        ex-framework: {tier: diagram, x: 13, y: 2}
+        ex-services: {tier: diagram, x: 16, y: 2}
+        ex-ui: {tier: diagram, x: 10, y: 5}
+      groups:
+        - {kind: datacenter, label: 車載ボード, tier: [diagram], x0: 0, y0: 0, x1: 19, y1: 12, nodes: [ex-hardware, ex-os, ex-framework, ex-services, ex-ui]}
+        - {kind: cluster, label: 車載ボード, tier: [diagram], x0: 8, y0: 1, x1: 19, y1: 11, nodes: [ex-os, ex-framework, ex-services, ex-ui]}
+    layout3d:
+      tiers:
+        - {id: host, label: 物理ホストとホスト側処理, z: 0, size: [13, 9]}
+        - {id: os, label: OS・実行基盤, z: 1, size: [13, 9]}
+        - {id: apps, label: アプリ, z: 2, size: [13, 9]}
+      nodes:
+        ex-hardware: {tier: host, x: 1, y: 1}
+        ex-os: {tier: os, x: 1, y: 1}
+        ex-framework: {tier: os, x: 4, y: 1}
+        ex-services: {tier: os, x: 7, y: 1}
+        ex-ui: {tier: apps, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の実行ホスト, tier: [host, os, apps], nodes: [ex-hardware, ex-os, ex-framework, ex-services, ex-ui]}
+        - {kind: cluster, label: 車載ボード, tier: [os, apps], nodes: [ex-os, ex-framework, ex-services, ex-ui]}
+
+  - id: unagi-qt-qemu
+    label: "Linux x86-64：AGL Unagi 21.0.0・Qt IVI / QEMU"
+    description: "AGL Unagi 21.0.0 の公式 Qt IVI イメージを Linux x86-64 の QEMU/KVM で起動する開発例。"
+    sources:
+      - {title: "AGL Unagi quickstart", url: https://docs.automotivelinux.org/en/unagi/01_Getting_Started/01_Quickstart/01_Using_Ready_Made_Images/}
+      - {title: "AGL Unagi 21.0.0 Qt IVI image manifest", url: https://download.automotivelinux.org/AGL/release/unagi/21.0.0/qemux86-64/deploy/images/qemux86-64/agl-ivi-demo-qt-qemux86-64.manifest}
+      - {title: "AGL Unagi compositor", url: https://docs.automotivelinux.org/en/unagi/06_Component_Documentation/01_Graphics_Service/01_agl_compositor/}
+      - {title: "AGL application launcher", url: https://docs.automotivelinux.org/en/salmon/06_Component_Documentation/Application_Framework/02_Application_Startup/}
+    tiers:
+      - {id: guest, label: "AGL Unagi Qt IVI ゲスト", z: 1, size: [20, 4]}
+      - {id: host, label: "Linux x86-64 開発ホスト", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "QEMU の AGL ゲスト", provider: onprem, tier: [guest], nodes: [agl-unagi-ui, agl-unagi-framework, agl-unagi-services, agl-unagi-os, agl-unagi-device]}
+      - {kind: datacenter, label: "Linux ホスト / KVM", provider: onprem, tier: [host], nodes: [agl-unagi-host, agl-unagi-qemu, agl-unagi-image, agl-unagi-viewer]}
+    nodes:
+      agl-unagi-host: {label: Linux x86-64 開発ホスト, kind: host, tier: host, x: 2, y: 3, description: QEMU と VNC を実行する利用者管理ホスト。, evidence: [{type: doc, ref: docs/reference-automotive-grade-linux.md#§5}]}
+      agl-unagi-ui: {label: "Qt Homescreen・IVI アプリ", kind: client, tier: guest, x: 2, y: 1.5, realizes: [ui], description: "Qt IVI イメージに含まれる Homescreen とアプリ。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      agl-unagi-framework: {label: "applaunchd・systemd", kind: scheduler, tier: guest, x: 6.5, y: 1.5, realizes: [framework], description: "gRPC でアプリを列挙し、systemd unit としてアプリを起動する。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      agl-unagi-services: {label: "agl-compositor / Wayland", kind: service, tier: guest, x: 11, y: 1.5, realizes: [services], description: "ゲスト内で Qt アプリの画面を合成する。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      agl-unagi-os: {label: "AGL Linux kernel・ドライバー", kind: service, tier: guest, x: 15, y: 1.5, realizes: [os], description: "virtio 等のゲストドライバーを使う。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      agl-unagi-device: {label: "QEMU 仮想ディスク・表示装置", kind: external, tier: guest, x: 19, y: 1.5, realizes: [hardware], description: "ゲストに提供する virtio ディスクと仮想表示装置。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      agl-unagi-qemu: {label: "QEMU / KVM", kind: host, tier: host, x: 6, y: 1.5, description: "Linux 上で x86-64 のゲストと仮想デバイスを実行する。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      agl-unagi-image: {label: "Qt IVI の ext4 イメージ・bzImage", kind: file, tier: host, x: 11, y: 1.5, description: "同じ Unagi 21.0.0 配布先から選ぶルート FS とカーネル。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      agl-unagi-viewer: {label: "VNC ビューアー", kind: client, tier: host, x: 16, y: 1.5, description: "ホストからゲストの IVI 画面を確認する。", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+    links:
+      - {id: agl-unagi-host-qemu, from: agl-unagi-host, to: agl-unagi-qemu, label: QEMU を実行, evidence: [{type: doc, ref: docs/reference-automotive-grade-linux.md#§5}]}
+      - {id: agl-unagi-graphics, from: agl-unagi-ui, to: agl-unagi-services, label: "Wayland でアプリ画面を渡す", realizes: [use], replace: true, evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      - {id: agl-unagi-boot, from: agl-unagi-image, to: agl-unagi-qemu, label: "ルート FS とカーネルを指定", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      - {id: agl-unagi-emulate, from: agl-unagi-qemu, to: agl-unagi-device, label: "ゲストに仮想デバイスを提示", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+      - {id: agl-unagi-view, from: agl-unagi-viewer, to: agl-unagi-qemu, label: "ホスト側の VNC で画面を表示", evidence: [{type: doc, ref: "docs/reference-automotive-grade-linux.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ホストと実行環境, z: 0, size: [20, 14]}]
+      nodes:
+        agl-unagi-host: {tier: diagram, x: 2, y: 1}
+        agl-unagi-qemu: {tier: diagram, x: 5, y: 1}
+        agl-unagi-image: {tier: diagram, x: 8, y: 1}
+        agl-unagi-viewer: {tier: diagram, x: 2, y: 4}
+        agl-unagi-device: {tier: diagram, x: 10, y: 2}
+        agl-unagi-os: {tier: diagram, x: 13, y: 2}
+        agl-unagi-framework: {tier: diagram, x: 16, y: 2}
+        agl-unagi-services: {tier: diagram, x: 10, y: 5}
+        agl-unagi-ui: {tier: diagram, x: 13, y: 5}
+      groups:
+        - {kind: datacenter, label: 利用者の実行ホスト, tier: [diagram], x0: 0, y0: 0, x1: 19, y1: 12, nodes: [agl-unagi-host, agl-unagi-qemu, agl-unagi-image, agl-unagi-viewer, agl-unagi-device, agl-unagi-os, agl-unagi-framework, agl-unagi-services, agl-unagi-ui]}
+        - {kind: cluster, label: QEMU AGL ゲスト, tier: [diagram], x0: 9, y0: 1, x1: 19, y1: 11, nodes: [agl-unagi-device, agl-unagi-os, agl-unagi-framework, agl-unagi-services, agl-unagi-ui]}
+    layout3d:
+      tiers:
+        - {id: host, label: 物理ホストとホスト側処理, z: 0, size: [13, 9]}
+        - {id: os, label: OS・実行基盤, z: 1, size: [13, 9]}
+        - {id: apps, label: アプリ, z: 2, size: [13, 9]}
+      nodes:
+        agl-unagi-host: {tier: host, x: 1, y: 1}
+        agl-unagi-qemu: {tier: host, x: 4, y: 1}
+        agl-unagi-image: {tier: host, x: 7, y: 1}
+        agl-unagi-viewer: {tier: host, x: 10, y: 1}
+        agl-unagi-device: {tier: os, x: 1, y: 1}
+        agl-unagi-os: {tier: os, x: 4, y: 1}
+        agl-unagi-framework: {tier: os, x: 7, y: 1}
+        agl-unagi-services: {tier: os, x: 10, y: 1}
+        agl-unagi-ui: {tier: apps, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の実行ホスト, tier: [host, os, apps], nodes: [agl-unagi-host, agl-unagi-qemu, agl-unagi-image, agl-unagi-viewer, agl-unagi-device, agl-unagi-os, agl-unagi-framework, agl-unagi-services, agl-unagi-ui]}
+        - {kind: cluster, label: QEMU AGL ゲスト, tier: [os, apps], nodes: [agl-unagi-device, agl-unagi-os, agl-unagi-framework, agl-unagi-services, agl-unagi-ui]}

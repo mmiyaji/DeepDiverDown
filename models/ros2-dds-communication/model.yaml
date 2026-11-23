@@ -49,7 +49,7 @@ nodes:
     tier: flow
     x: 4
     'y': 1.5
-    description: 発行者と購読者が同じトピックを利用する。
+    description: 発行者と購読者が使う論理的な通信名。中央ブローカーを意味しない。
     evidence:
       - type: doc
         ref: docs/reference-ros2-dds-communication.md#§2
@@ -170,6 +170,9 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-pub-host: {label: 送信側ホスト, kind: host, tier: support, x: 1, y: 2, description: Publisher と DDS 実装を実行するホスト。, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§4}]}
+      ex-sub-host: {label: 受信側ホスト, kind: host, tier: support, x: 12, y: 2, description: Subscriber と DDS 実装を実行するホスト。, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§4}]}
+      ex-sub-rmw: {label: 受信側 RMW / DDS, kind: service, tier: support, x: 12, y: 1, description: 受信プロセス側にロードされるミドルウェア。, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§4}]}
       ex-publisher:
         label: ROS 2 Publisher
         kind: service
@@ -242,3 +245,109 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-ros2-dds-communication.md#§4
+    links:
+      - {id: ex-host-pub, from: ex-pub-host, to: ex-publisher, label: Publisher を実行, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§4}]}
+      - {id: ex-host-sub, from: ex-sub-host, to: ex-subscriber, label: Subscriber を実行, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§4}]}
+      - {id: ex-sub-middleware, from: ex-subscriber, to: ex-sub-rmw, label: 受信 RMW を利用, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実装構成, z: 0, size: [25, 16]}]
+      nodes:
+        ex-pub-host: {tier: diagram, x: 1, y: 1}
+        ex-publisher: {tier: diagram, x: 4, y: 1}
+        ex-rmw: {tier: diagram, x: 7, y: 1}
+        ex-dds: {tier: diagram, x: 1, y: 4}
+        ex-sub-host: {tier: diagram, x: 13, y: 1}
+        ex-subscriber: {tier: diagram, x: 16, y: 1}
+        ex-sub-rmw: {tier: diagram, x: 19, y: 1}
+        ex-topic: {tier: diagram, x: 20, y: 1}
+        ex-qos: {tier: diagram, x: 23, y: 1}
+      groups:
+        - {kind: datacenter, label: 送信側ホスト, tier: [diagram], x0: 0, y0: 0, x1: 10, y1: 14, nodes: [ex-pub-host, ex-publisher, ex-rmw, ex-dds]}
+        - {kind: datacenter, label: 受信側ホスト, tier: [diagram], x0: 12, y0: 0, x1: 22, y1: 8, nodes: [ex-sub-host, ex-subscriber, ex-sub-rmw]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 12]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 12]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホスト上の処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: network, label: 論理通信・設定, z: 0, origin: [26, 0], size: [8, 4]}
+      nodes:
+        ex-pub-host: {tier: hosta, x: 1, y: 1}
+        ex-publisher: {tier: appsa, x: 4, y: 1}
+        ex-rmw: {tier: appsa, x: 7, y: 1}
+        ex-dds: {tier: appsa, x: 1, y: 4}
+        ex-sub-host: {tier: hostb, x: 1, y: 1}
+        ex-subscriber: {tier: appsb, x: 4, y: 1}
+        ex-sub-rmw: {tier: appsb, x: 7, y: 1}
+        ex-topic: {tier: network, x: 1, y: 1}
+        ex-qos: {tier: network, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: 送信側ホスト, tier: [hosta, appsa], nodes: [ex-pub-host, ex-publisher, ex-rmw, ex-dds]}
+        - {kind: datacenter, label: 受信側ホスト, tier: [hostb, appsb], nodes: [ex-sub-host, ex-subscriber, ex-sub-rmw]}
+
+  - id: jazzy-fastdds-lan
+    label: "Ubuntu 24.04：ROS 2 Jazzy・Fast DDS / LAN"
+    description: "同一の有線 LAN に接続した 2 台の Ubuntu ホストで、ROS 2 Jazzy の talker と listener が Fast DDS で通信する例。"
+    sources:
+      - {title: "ROS 2 Jazzy RMW selection", url: https://github.com/ros2/ros2_documentation/blob/jazzy/source/How-To-Guides/Working-with-multiple-RMW-implementations.rst}
+      - {title: "ROS 2 Jazzy discovery range", url: https://github.com/ros2/ros2_documentation/blob/jazzy/source/Tutorials/Advanced/Improved-Dynamic-Discovery.rst}
+      - {title: "ROS 2 Jazzy talker", url: https://github.com/ros2/demos/blob/jazzy/demo_nodes_cpp/src/topics/talker.cpp}
+      - {title: "ROS 2 Jazzy listener", url: https://github.com/ros2/demos/blob/jazzy/demo_nodes_cpp/src/topics/listener.cpp}
+      - {title: "Fast DDS SIMPLE discovery", url: https://fast-dds.docs.eprosima.com/en/latest/fastdds/discovery/simple.html}
+    tiers:
+      - {id: host, label: "Ubuntu ホスト上のプロセス", z: 1, size: [20, 4]}
+      - {id: network, label: "同一有線 LAN と共通設定", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "Ubuntu 24.04 / 送信側", provider: onprem, tier: [host], nodes: [jazzy-pub-host, jazzy-fastdds-talker, jazzy-fastdds-pub-rmw]}
+      - {kind: datacenter, label: "Ubuntu 24.04 / 受信側", provider: onprem, tier: [host], nodes: [jazzy-sub-host, jazzy-fastdds-listener, jazzy-fastdds-sub-rmw]}
+    nodes:
+      jazzy-pub-host: {label: 送信側 Ubuntu ホスト, kind: host, tier: host, x: 1, y: 3, description: talker と送信 RMW を実行する。, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§5}]}
+      jazzy-sub-host: {label: 受信側 Ubuntu ホスト, kind: host, tier: host, x: 17, y: 3, description: listener と受信 RMW を実行する。, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§5}]}
+      jazzy-fastdds-talker: {label: "ROS 2 Jazzy / talker", kind: worker, tier: host, x: 2, y: 1.5, realizes: [publisher], description: "C++ の demo_nodes_cpp プロセスが /chatter に文字列を発行する。", evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      jazzy-fastdds-pub-rmw: {label: "送信側 rmw_fastrtps_cpp", kind: service, tier: host, x: 6.5, y: 1.5, realizes: [rmw], description: "talker プロセスがロードする Fast DDS 向け ROS middleware 実装。", evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      jazzy-fastdds-sub-rmw: {label: "受信側 rmw_fastrtps_cpp", kind: service, tier: host, x: 12.5, y: 1.5, description: "listener プロセスがロードする Fast DDS 向け ROS middleware 実装。", evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      jazzy-fastdds-listener: {label: "ROS 2 Jazzy / listener", kind: worker, tier: host, x: 17, y: 1.5, realizes: [subscriber], description: "C++ の demo_nodes_cpp プロセスが /chatter を購読する。", evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      jazzy-fastdds-udp: {label: "Fast DDS / RTPS と /chatter", kind: service, tier: network, x: 10, y: 1.5, realizes: [topic, dds], description: "LAN を通る RTPS 通信と対象トピック。DDS の実体は各プロセス内にある。", evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      jazzy-fastdds-qos: {label: "共通の Domain ID・QoS", kind: policy, tier: network, x: 4, y: 1.5, realizes: [qos], description: "同じ ROS_DOMAIN_ID を選び、送受信の QoS の互換性を保つ。", evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+    links:
+      - {id: jazzy-host-pub, from: jazzy-pub-host, to: jazzy-fastdds-talker, label: talker を実行, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§5}]}
+      - {id: jazzy-host-sub, from: jazzy-sub-host, to: jazzy-fastdds-listener, label: listener を実行, evidence: [{type: doc, ref: docs/reference-ros2-dds-communication.md#§5}]}
+      - {id: jazzy-fastdds-write, from: jazzy-fastdds-talker, to: jazzy-fastdds-pub-rmw, label: "文字列の発行を RMW に渡す", realizes: [publish, middleware], replace: true, evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      - {id: jazzy-fastdds-send, from: jazzy-fastdds-pub-rmw, to: jazzy-fastdds-udp, label: "LAN へ RTPS データを送る", realizes: [publish, implementation], replace: true, evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      - {id: jazzy-fastdds-match, from: jazzy-fastdds-udp, to: jazzy-fastdds-sub-rmw, label: "発見した購読側へ配信", realizes: [receive], replace: true, evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+      - {id: jazzy-fastdds-deliver, from: jazzy-fastdds-sub-rmw, to: jazzy-fastdds-listener, label: "購読コールバックに文字列を渡す", realizes: [receive], replace: true, evidence: [{type: doc, ref: "docs/reference-ros2-dds-communication.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実装構成, z: 0, size: [25, 16]}]
+      nodes:
+        jazzy-pub-host: {tier: diagram, x: 1, y: 1}
+        jazzy-fastdds-talker: {tier: diagram, x: 4, y: 1}
+        jazzy-fastdds-pub-rmw: {tier: diagram, x: 7, y: 1}
+        jazzy-sub-host: {tier: diagram, x: 13, y: 1}
+        jazzy-fastdds-listener: {tier: diagram, x: 16, y: 1}
+        jazzy-fastdds-sub-rmw: {tier: diagram, x: 19, y: 1}
+        jazzy-fastdds-udp: {tier: diagram, x: 20, y: 1}
+        jazzy-fastdds-qos: {tier: diagram, x: 23, y: 1}
+      groups:
+        - {kind: datacenter, label: 送信側 Ubuntu, tier: [diagram], x0: 0, y0: 0, x1: 10, y1: 14, nodes: [jazzy-pub-host, jazzy-fastdds-talker, jazzy-fastdds-pub-rmw]}
+        - {kind: datacenter, label: 受信側 Ubuntu, tier: [diagram], x0: 12, y0: 0, x1: 22, y1: 8, nodes: [jazzy-sub-host, jazzy-fastdds-listener, jazzy-fastdds-sub-rmw]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 12]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 12]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホスト上の処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: network, label: 論理通信・設定, z: 0, origin: [26, 0], size: [8, 4]}
+      nodes:
+        jazzy-pub-host: {tier: hosta, x: 1, y: 1}
+        jazzy-fastdds-talker: {tier: appsa, x: 4, y: 1}
+        jazzy-fastdds-pub-rmw: {tier: appsa, x: 7, y: 1}
+        jazzy-sub-host: {tier: hostb, x: 1, y: 1}
+        jazzy-fastdds-listener: {tier: appsb, x: 4, y: 1}
+        jazzy-fastdds-sub-rmw: {tier: appsb, x: 7, y: 1}
+        jazzy-fastdds-udp: {tier: network, x: 1, y: 1}
+        jazzy-fastdds-qos: {tier: network, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: 送信側 Ubuntu, tier: [hosta, appsa], nodes: [jazzy-pub-host, jazzy-fastdds-talker, jazzy-fastdds-pub-rmw]}
+        - {kind: datacenter, label: 受信側 Ubuntu, tier: [hostb, appsb], nodes: [jazzy-sub-host, jazzy-fastdds-listener, jazzy-fastdds-sub-rmw]}

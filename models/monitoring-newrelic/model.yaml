@@ -151,16 +151,28 @@ scenarios:
         note: 設定した条件に応じて担当者に通知する。
 implementations:
   - id: example
-    label: New Relic Agents と SaaS
-    description: アプリ内 APM Agent とホストの Infrastructure Agent、New Relic SaaS を使う例。
+    label: EC2 の New Relic Agent と SaaS
+    description: Amazon EC2 の Linux ホストとアプリに New Relic の Agent を配置し、SaaS に送る例。
     sources:
+      - {title: Security in Amazon EC2, url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security.html}
+      - {title: Infrastructure agent behavior, url: https://docs.newrelic.com/docs/infrastructure/infrastructure-agent/manage-your-agent/agent-behavior/}
       - title: New Relic infrastructure monitoring
         url: https://docs.newrelic.com/docs/infrastructure/introduction-infra-monitoring/
       - title: New Relic NRDB
         url: https://docs.newrelic.com/docs/data-apis/get-started/nrdb-horsepower-under-hood/
       - title: New Relic data limits
         url: https://docs.newrelic.com/docs/data-apis/manage-data/view-system-limits/
+      - title: New Relic Linux agent
+        url: https://docs.newrelic.com/docs/infrastructure/infrastructure-agent/linux-installation/package-manager-install/
+      - title: Amazon EC2 instances
+        url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Instances.html
     tiers:
+      - id: host
+        label: AWS 実行環境
+        z: 2
+        size:
+          - 16
+          - 3
       - id: flow
         label: 収集と分析
         z: 1
@@ -175,11 +187,12 @@ implementations:
           - 3
     nodes:
       ex-app:
-        label: アプリ内 APM Agent とホスト
+        label: APM Agent を組み込んだアプリ
         kind: service
         tier: flow
         x: 0
         'y': 1.5
+        management: {type: customer, scope: 利用者がアプリと計装を設定・運用する。}
         evidence:
           - type: doc
             ref: docs/reference-monitoring-newrelic.md#§4
@@ -191,6 +204,7 @@ implementations:
         tier: flow
         x: 4
         'y': 1.5
+        management: {type: customer, scope: 利用者が Agent、認証情報、収集対象と送信先を設定・更新する。}
         evidence:
           - type: doc
             ref: docs/reference-monitoring-newrelic.md#§4
@@ -243,6 +257,18 @@ implementations:
             ref: docs/reference-monitoring-newrelic.md#§4
         realizes:
           - alert
+      ex-ec2:
+        label: Amazon EC2 / Linux
+        kind: host
+        svc: ec2
+        tier: host
+        x: 2
+        'y': 1.5
+        description: 計装アプリと New Relic のホスト Agent を稼働させる。
+        management: {type: customer, scope: 利用者がゲスト OS、ネットワーク、アプリと Agent を管理する。}
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
     groups:
       - kind: cloud
         label: New Relic SaaS
@@ -259,6 +285,23 @@ implementations:
           - ops
         nodes:
           - ex-alert
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - host
+          - flow
+        nodes:
+          - ex-ec2
+          - ex-app
+          - ex-collector
+      - kind: cluster
+        label: EC2 ホスト
+        tier:
+          - flow
+        nodes:
+          - ex-app
+          - ex-collector
     links:
       - id: ex-apm-send
         from: ex-app
@@ -267,3 +310,59 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-monitoring-newrelic.md#§4
+      - id: ec2-run-app
+        from: ex-ec2
+        to: ex-app
+        label: アプリを実行
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+      - id: ec2-run-agent
+        from: ex-ec2
+        to: ex-collector
+        label: ホスト Agent を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+      - id: ec2-infra-host
+        from: ex-collector
+        to: ex-ec2
+        label: ホストのインフラ情報を収集
+        realizes:
+          - capture
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+
+    layout2d:
+      tiers: [{id: diagram, label: 監視対象と SaaS, z: 0, origin: [-3, 0], size: [23, 12]}]
+      nodes:
+        ex-operator: {tier: diagram, x: -2, y: 1}
+        ex-ec2: {tier: diagram, x: 2, y: 2}
+        ex-app: {tier: diagram, x: 2, y: 5}
+        ex-collector: {tier: diagram, x: 5, y: 5}
+        ex-store: {tier: diagram, x: 11, y: 3}
+        ex-dashboard: {tier: diagram, x: 15, y: 3}
+        ex-alert: {tier: diagram, x: 13, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [diagram], x0: 0, y0: 0, x1: 7, y1: 8, nodes: [ex-ec2, ex-app, ex-collector]}
+        - {kind: cluster, label: 顧客 EC2 / Linux, tier: [diagram], x0: 0.5, y0: 1, x1: 6.5, y1: 7.5, nodes: [ex-ec2, ex-app, ex-collector]}
+        - {kind: cloud, provider: newrelic, label: New Relic SaaS, tier: [diagram], x0: 9, y0: 0, x1: 18, y1: 9, nodes: [ex-store, ex-dashboard, ex-alert]}
+    layout3d:
+      tiers:
+        - {id: host, label: 顧客 EC2, z: 0, size: [8, 5]}
+        - {id: apps, label: アプリと Agent, z: 1, size: [8, 5]}
+        - {id: saas, label: SaaS の公開機能, z: 0, origin: [11, 0], size: [10, 7]}
+        - {id: outside, label: 運用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        ex-ec2: {tier: host, x: 2, y: 2}
+        ex-app: {tier: apps, x: 2, y: 2}
+        ex-collector: {tier: apps, x: 5, y: 2}
+        ex-store: {tier: saas, x: 1, y: 1}
+        ex-dashboard: {tier: saas, x: 5, y: 1}
+        ex-alert: {tier: saas, x: 3, y: 5}
+        ex-operator: {tier: outside, x: 1, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [host, apps], nodes: [ex-ec2, ex-app, ex-collector]}
+        - {kind: cloud, provider: newrelic, label: New Relic SaaS, tier: [saas], nodes: [ex-store, ex-dashboard, ex-alert]}

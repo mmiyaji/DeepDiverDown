@@ -1,0 +1,257 @@
+name: Redis のデータ処理と保存
+description: Redis のキーと値、メモリ上の処理、永続化、レプリカとクラスタを俯瞰する。
+reference:
+  objectives:
+    - データの格納とアクセスの仕組みを理解する。
+    - 物理構造と運用・障害時の前提を区別する。
+  sources:
+    - title: メモリ最適化
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/memory-optimization/
+    - title: Redis persistence
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+    - title: Redis replication
+      url: https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+    - title: Redis Cluster specification
+      url: https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/
+    - title: Key eviction
+      url: https://redis.io/docs/latest/develop/reference/eviction/
+sources:
+  - docs/reference-redis.md
+evidence:
+  - type: doc
+    ref: docs/reference-redis.md#§1
+  - type: doc
+    ref: docs/reference-redis.md#§3
+  - type: doc
+    ref: docs/reference-redis.md#§5
+tiers:
+  - id: access
+    label: 操作と処理
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: data
+    label: データと保存
+    z: 0
+    size:
+      - 24
+      - 4
+nodes:
+  client:
+    label: クライアント
+    kind: client
+    tier: access
+    x: 0
+    'y': 1.5
+    description: Redis プロトコルでコマンドを発行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+  server:
+    label: コマンド処理
+    kind: service
+    tier: access
+    x: 5
+    'y': 1.5
+    description: キーを対象にデータ型に応じたコマンドを実行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+  memory:
+    label: キーと値のメモリ
+    kind: db
+    tier: data
+    x: 4
+    'y': 1.5
+    description: キー、型、値の内部エンコーディングを保持する。
+    drill: redis-memory-internals
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+  persist:
+    label: RDB / AOF の保存
+    kind: file
+    tier: data
+    x: 10
+    'y': 1.5
+    description: 設定した永続化方式でデータや更新を保存する。
+    drill: redis-persistence-internals
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+  replica:
+    label: レプリカ
+    kind: db
+    tier: data
+    x: 16
+    'y': 1.5
+    description: プライマリの更新を非同期に受け取る。
+    drill: redis-cluster-internals
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+links:
+  - id: command
+    from: client
+    to: server
+    label: コマンドを送る
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+  - id: read
+    from: server
+    to: memory
+    label: キーを読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+  - id: save
+    from: memory
+    to: persist
+    label: 設定に応じて永続化
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+  - id: replicate
+    from: server
+    to: replica
+    label: 更新を非同期に複製
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+scenarios:
+  - id: write
+    label: 読み書きと永続化
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+    steps:
+      - links:
+          - command
+        note: コマンドを送る。
+      - links:
+          - read
+        note: キーを読み書き。
+      - links:
+          - save
+        note: 設定に応じて永続化。
+  - id: replication
+    label: 更新の複製
+    evidence:
+      - type: doc
+        ref: docs/reference-redis.md#§2
+    steps:
+      - links:
+          - command
+        note: コマンドを送る。
+      - links:
+          - read
+        note: キーを読み書き。
+      - links:
+          - replicate
+        note: 更新を非同期に複製。
+implementations:
+  - id: linux
+    label: Linux 上の Redis とレプリカ
+    description: Linux ホスト上の Redis primary と別プロセスの replica を設定し、primary の RDB / AOF をローカルディスクに保存する学習用構成。単一ホストではホスト障害を分離できない。
+    sources:
+      - title: メモリ最適化
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/memory-optimization/
+      - title: Redis persistence
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/
+      - title: Redis replication
+        url: https://redis.io/docs/latest/operate/oss_and_stack/management/replication/
+      - title: Redis Cluster specification
+        url: https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/
+      - title: Key eviction
+        url: https://redis.io/docs/latest/develop/reference/eviction/
+    tiers:
+      - id: access
+        label: 操作と処理
+        z: 1
+        size:
+          - 24
+          - 4
+      - id: data
+        label: データと保存
+        z: 0
+        size:
+          - 24
+          - 4
+    nodes:
+      ex-client:
+        label: Redis クライアント
+        kind: client
+        tier: access
+        x: 0
+        'y': 1.5
+        description: Redis プロトコルでコマンドを発行する。
+        realizes:
+          - client
+        evidence:
+          - type: doc
+            ref: docs/reference-redis.md#§4
+      ex-server:
+        label: Redis primary
+        kind: service
+        tier: access
+        x: 5
+        'y': 1.5
+        description: キーを対象にデータ型に応じたコマンドを実行する。
+        realizes:
+          - server
+        evidence:
+          - type: doc
+            ref: docs/reference-redis.md#§4
+      ex-memory:
+        label: primary のデータセット
+        kind: db
+        tier: data
+        x: 4
+        'y': 1.5
+        description: キー、型、値の内部エンコーディングを保持する。
+        realizes:
+          - memory
+        drill: redis-memory-internals
+        evidence:
+          - type: doc
+            ref: docs/reference-redis.md#§4
+      ex-persist:
+        label: primary の RDB / AOF
+        kind: file
+        tier: data
+        x: 10
+        'y': 1.5
+        description: 設定した永続化方式でデータや更新を保存する。
+        realizes:
+          - persist
+        drill: redis-persistence-internals
+        evidence:
+          - type: doc
+            ref: docs/reference-redis.md#§4
+      ex-replica:
+        label: Redis replica
+        kind: db
+        tier: data
+        x: 16
+        'y': 1.5
+        description: プライマリの更新を非同期に受け取る。
+        realizes:
+          - replica
+        drill: redis-cluster-internals
+        evidence:
+          - type: doc
+            ref: docs/reference-redis.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者が管理する Linux の実行環境（論理範囲）
+        tier:
+          - access
+          - data
+        nodes:
+          - ex-client
+          - ex-server
+          - ex-memory
+          - ex-persist
+          - ex-replica

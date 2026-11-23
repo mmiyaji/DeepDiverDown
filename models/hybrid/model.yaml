@@ -1,5 +1,6 @@
 name: ハイブリッド受注基盤
 sources: [docs/sample-hybrid.md]
+description: 架空の複数クラウド構成を使ったデモ。サービス間の線は論理的な利用関係を表し、ネットワーク経路の詳細は未指定。
 evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§1" }]
 tiers:
   - { id: internet, label: インターネット, z: 2, origin: [-3, 0], size: [1, 3], kind: origin }
@@ -44,15 +45,16 @@ links:
   - { id: aks-to-sql, from: aks, to: sql, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
   - { id: aks-to-bus, from: aks, to: bus, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
   - { id: aks-to-vault, from: aks, to: vault, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§3" }] }
-  - { id: aks-to-adb, from: aks, to: adb, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
-  - { id: fastconnect-to-adb, from: fastconnect, to: adb, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
+  - { id: aks-to-adb, label: 基幹 DB を同期利用（経路は概略）, from: aks, to: adb, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
+  - { id: fastconnect-to-adb, label: OCI 側の接続（経路詳細未指定）, from: fastconnect, to: adb, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§4" }] }
   - { id: bus-to-vpn, from: bus, to: vpn, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
   - { id: vpn-to-fw, from: vpn, to: fw, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
   - { id: fw-to-erp, from: fw, to: erp, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
   - { id: erp-to-local-db, from: erp, to: local-db, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
   - { id: ops-to-vpn, from: ops, to: vpn, sync: true, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§5" }] }
-  - { id: sql-to-bigquery, from: sql, to: bigquery, sync: false, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§6" }] }
+  - { id: sql-to-bigquery, label: 注文データを非同期でエクスポート（方式未指定）, from: sql, to: bigquery, sync: false, evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§6" }] }
 requirements:
   - { id: NFR-01, kind: nfr, title: 分析障害時の受注継続, text: 分析先に障害が起きても受注処理を継続する。, links: [sql-to-bigquery], evidence: [{ type: doc, ref: "docs/sample-hybrid.md#§7" }] }
 unknowns:
   - { id: UNK-01, text: 受注アプリから基幹 DB へのタイムアウト値は未確認。, refs: [aks-to-adb] }
+  - { id: UNK-02, text: Azure から OCI FastConnect への接続経路と分析先への転送方式は未指定。, refs: [aks-to-adb, fastconnect-to-adb, sql-to-bigquery] }

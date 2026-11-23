@@ -120,3 +120,29 @@ Arrow は**メモリ上の列指向形式**の標準で、ファイル形式（A
 - [Spark Avro Data Source Guide](https://spark.apache.org/docs/latest/sql-data-sources-avro.html)
 - [Apache Arrow in PySpark](https://spark.apache.org/docs/latest/api/python/tutorial/sql/arrow_pandas.html)
 - [Apache Arrow streaming, serialization, and IPC](https://arrow.apache.org/docs/python/ipc.html)
+
+## 12. 実装例：AWS の EMR on EC2・Spark・S3
+
+同一 AWS アカウントの Amazon EMR が管理する EC2 クラスタで、YARN 上の Spark を使って注文データをファイル間で変換する。`DataFrame.toArrow()` を使うため、この例では Spark 4.1.1 を含む `emr-spark-8.1.0` を選ぶ。
+
+| 機能配置 | AWS での担い手 |
+|---|---|
+| 元の業務イベント | 外部の注文アプリ |
+| CSV・JSON Lines・Avro | Amazon S3 の着地プレフィックス |
+| 取り込み・形式変換 | EMR の Spark データソースで読み、Parquet へ書き出すジョブ |
+| Parquet・ORC の照会 | Amazon S3 の分析用プレフィックスを読む Spark SQL |
+| Python の列データ利用 | 小さい結果を `toArrow()` で集める PySpark Driver と PyArrow |
+| Arrow IPC | Driver の PyArrow が必要に応じて書き出す受け渡しファイル |
+
+CSV や Avro などのうち必要な入力だけを選び、分析用の Parquet に変換する。ORC は別途用意した比較用のサンプルを読む。Spark の照会結果を Arrow に集める処理は Driver のメモリーに収まる範囲で使う。Avro の対応モジュールと PyArrow を実行環境に用意し、クラスタの IAM ロールに着地・出力プレフィックスへの必要なアクセスを許可する。
+
+- [Amazon EMR Release Guide — AWS runtime for Apache Spark 8.1.0](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark810-release.html)
+- [AWS Prescriptive Guidance — Using columnar formats](https://docs.aws.amazon.com/prescriptive-guidance/latest/spark-tuning-glue-emr/using-columnar-formats.html)
+- [Apache Spark 4.1.1 — Avro Data Source](https://spark.apache.org/docs/4.1.1/sql-data-sources-avro.html)
+- [PySpark 4.1.1 — DataFrame.toArrow](https://spark.apache.org/docs/4.1.1/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toArrow.html)
+- [PyArrow — Streaming, serialization and IPC](https://arrow.apache.org/docs/python/ipc.html)
+
+自前例は Linux 上の Spark Standalone Master と Worker を使い、共有 HDFS の入力・分析ファイルを読む。PyArrow と IPC は Driver 側で利用する。AWS 例では AWS が EMR・EC2・S3 の基盤を運用し、利用者がジョブ、クラスタ、データと権限を管理する。公式資料を組み合わせた代表例であり、ネットワーク、依存ライブラリーと各形式の実動作は未検証。
+
+- [Spark Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)
+- [HDFS Architecture](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)

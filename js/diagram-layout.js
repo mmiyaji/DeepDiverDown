@@ -1,5 +1,11 @@
 /* Display coordinates belong to a projection, never to the source model.
    Groups, plates and nodes all use the same per-floor transform. */
+export function overviewScale(viewportWidth, viewportHeight, contentWidth, contentHeight) {
+  if (viewportWidth <= 2 || viewportHeight <= 2 || contentWidth <= 0 || contentHeight <= 0) return 1;
+  const scale = Math.min(1, (viewportWidth - 2) / contentWidth, (viewportHeight - 2) / contentHeight);
+  return Math.max(0.001, Math.floor(scale * 1000) / 1000);
+}
+
 export function buildDiagramLayout(view, { flat, expanded = false, compact = false, comparison = false, cardWidthPx = 128, width = 1000, height = 650, labelScale = 1 }) {
   const sx = flat ? 1.65 : 1.12, sz = flat ? 1.3 : 1;
   const autoLevels = view.tiers.filter(t => t.z == null).map(t => t.id).reverse();

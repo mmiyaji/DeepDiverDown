@@ -314,10 +314,38 @@ implementations:
         url: https://trino.io/docs/current/connector/iceberg.html
       - title: Trino REST Catalog metastores
         url: https://trino.io/docs/current/object-storage/metastores.html
+      - title: Polaris Helm persistence
+        url: https://polaris.apache.org/releases/1.9.0/helm-chart/persistence/
+      - title: Trino deployment
+        url: https://trino.io/docs/current/installation/deployment.html
       - title: Polaris Configuring S3 Storage
         url: >-
           https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
     nodes:
+      trino-rest-engine-host:
+        label: 自前 Linux Trino ホスト群
+        kind: host
+        tier: engine
+        x: 6
+        y: 0
+        description: Coordinator と Worker を別ホストで運用する。
+        evidence: [{type: doc, ref: docs/reference-iceberg-catalog-read.md#§7}]
+      trino-rest-polaris-host:
+        label: 自前 Polaris ホスト
+        kind: host
+        tier: catalog
+        x: 3
+        y: 0
+        description: Polaris REST API を利用者が運用する。
+        evidence: [{type: doc, ref: docs/reference-iceberg-catalog-read.md#§7}]
+      trino-rest-postgres:
+        label: 自前 PostgreSQL（Polaris JDBC）
+        kind: db
+        tier: catalog
+        x: 6
+        y: 0
+        description: Polaris カタログ状態を永続化する。
+        evidence: [{type: doc, ref: docs/reference-iceberg-catalog-read.md#§7}]
       trino-rest-coord:
         label: Trino Coordinator
         kind: service
@@ -372,7 +400,7 @@ implementations:
         tier: catalog
         svc: aws:sts
         x: 13
-        y: 1.5
+        'y': 1.5
         description: IAM ロールの短期セッションを発行する。
         evidence:
           - type: doc
@@ -454,6 +482,10 @@ implementations:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
     links:
+      - {id: trino-rest-host-coord, from: trino-rest-engine-host, to: trino-rest-coord, label: Coordinator を実行}
+      - {id: trino-rest-host-worker, from: trino-rest-engine-host, to: trino-rest-workers, label: Worker を実行}
+      - {id: trino-rest-host-polaris, from: trino-rest-polaris-host, to: trino-rest-rest, label: Polaris を実行}
+      - {id: trino-rest-local-persistence, from: trino-rest-rest, to: trino-rest-postgres, label: カタログ状態を保存}
       - id: trino-rest-assume-role
         from: trino-rest-rest
         to: trino-rest-aws-sts
@@ -479,8 +511,10 @@ implementations:
       - kind: cloud
         provider: aws
         label: AWS STS
-        tier: [catalog]
-        nodes: [trino-rest-aws-sts]
+        tier:
+          - catalog
+        nodes:
+          - trino-rest-aws-sts
       - label: Amazon S3 のテーブル
         kind: cloud
         provider: aws
@@ -501,6 +535,297 @@ implementations:
           - trino-rest-manifest
           - trino-rest-parquet
           - trino-rest-delete
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [33, 20]}
+      nodes:
+        trino-rest-engine-host: {tier: diagram, x: 2, y: 2}
+        trino-rest-coord: {tier: diagram, x: 2, y: 5}
+        trino-rest-workers: {tier: diagram, x: 2, y: 8}
+        trino-rest-config: {tier: diagram, x: 2, y: 11}
+        trino-rest-polaris-host: {tier: diagram, x: 8, y: 2}
+        trino-rest-rest: {tier: diagram, x: 8, y: 5}
+        trino-rest-postgres: {tier: diagram, x: 8, y: 8}
+        trino-rest-sts: {tier: diagram, x: 8, y: 11}
+        trino-rest-aws-sts: {tier: diagram, x: 14, y: 2}
+        trino-rest-meta: {tier: diagram, x: 20, y: 2}
+        trino-rest-list: {tier: diagram, x: 20, y: 5}
+        trino-rest-manifest: {tier: diagram, x: 20, y: 8}
+        trino-rest-parquet: {tier: diagram, x: 20, y: 11}
+        trino-rest-delete: {tier: diagram, x: 20, y: 14}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [trino-rest-aws-sts, trino-rest-meta, trino-rest-list, trino-rest-manifest, trino-rest-parquet, trino-rest-delete]}
+        - {kind: cluster, label: "自前 Trino", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 15, nodes: [trino-rest-engine-host, trino-rest-coord, trino-rest-workers, trino-rest-config]}
+        - {kind: nodegroup, label: "自前 Polaris と PostgreSQL", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 15, nodes: [trino-rest-polaris-host, trino-rest-rest, trino-rest-postgres, trino-rest-sts]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "自前 Trino", z: 0, origin: [0, 0], size: [5, 12]}
+        - {id: zone1, label: "自前 Polaris と PostgreSQL", z: 0, origin: [7, 0], size: [5, 12]}
+        - {id: zone2, label: "AWS STS", z: 0, origin: [14, 0], size: [5, 5]}
+        - {id: zone3, label: "AWS S3", z: 0, origin: [21, 0], size: [5, 15]}
+      nodes:
+        trino-rest-engine-host: {tier: zone0, x: 2, y: 1}
+        trino-rest-coord: {tier: zone0, x: 2, y: 4}
+        trino-rest-workers: {tier: zone0, x: 2, y: 7}
+        trino-rest-config: {tier: zone0, x: 2, y: 10}
+        trino-rest-polaris-host: {tier: zone1, x: 2, y: 1}
+        trino-rest-rest: {tier: zone1, x: 2, y: 4}
+        trino-rest-postgres: {tier: zone1, x: 2, y: 7}
+        trino-rest-sts: {tier: zone1, x: 2, y: 10}
+        trino-rest-aws-sts: {tier: zone2, x: 2, y: 1}
+        trino-rest-meta: {tier: zone3, x: 2, y: 1}
+        trino-rest-list: {tier: zone3, x: 2, y: 4}
+        trino-rest-manifest: {tier: zone3, x: 2, y: 7}
+        trino-rest-parquet: {tier: zone3, x: 2, y: 10}
+        trino-rest-delete: {tier: zone3, x: 2, y: 13}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [trino-rest-aws-sts, trino-rest-meta, trino-rest-list, trino-rest-manifest, trino-rest-parquet, trino-rest-delete]}
+        - {kind: cluster, label: "自前 Trino", tier: [zone0], nodes: [trino-rest-engine-host, trino-rest-coord, trino-rest-workers, trino-rest-config]}
+        - {kind: nodegroup, label: "自前 Polaris と PostgreSQL", tier: [zone1], nodes: [trino-rest-polaris-host, trino-rest-rest, trino-rest-postgres, trino-rest-sts]}
+  - id: eks-polaris-s3
+    label: AWS：EKS の Trino・Polaris と RDS・S3
+    description: Trino と Polaris を EKS の別 Pod に配置し、Polaris のメタストアを RDS、Iceberg ファイルを S3 に置く例。
+    sources:
+      - title: Iceberg REST Catalog Spec
+        url: https://iceberg.apache.org/rest-catalog-spec/
+      - title: Trino Iceberg connector
+        url: https://trino.io/docs/current/connector/iceberg.html
+      - title: Trino REST Catalog metastores
+        url: https://trino.io/docs/current/object-storage/metastores.html
+      - title: Polaris Configuring S3 Storage
+        url: >-
+          https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
+      - title: Trino on Kubernetes
+        url: https://trino.io/docs/current/installation/kubernetes.html
+      - title: Polaris Helm persistence
+        url: https://polaris.apache.org/releases/1.9.0/helm-chart/persistence/
+      - title: EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+    nodes:
+      trino-rest-coord:
+        label: Trino Coordinator Pod
+        kind: service
+        tier: engine
+        x: 2
+        'y': 1.5
+        description: カタログ解決、メタデータ読み取りとタスク計画を調停する。
+        realizes:
+          - coordinator
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        management: {type: customer, scope: "利用者が Trino とカタログ設定を管理する。"}
+      trino-rest-workers:
+        label: Trino Worker Pods
+        kind: worker
+        tier: engine
+        x: 6
+        'y': 1.5
+        description: 割り当てられたファイルの読み取りとフィルタを実行する。
+        realizes:
+          - worker
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        management: {type: customer, scope: "利用者が Trino Worker を管理する。"}
+      trino-rest-rest:
+        label: Polaris REST API Pod
+        kind: catalog
+        tier: catalog
+        x: 4
+        'y': 1.5
+        description: Polaris がカタログ API と認証情報の発行を担う。
+        realizes:
+          - rest
+          - creds
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        management: {type: customer, scope: "利用者が Polaris と認証・カタログ設定を管理する。"}
+      trino-rest-aws-sts:
+        label: AWS STS
+        kind: service
+        tier: catalog
+        svc: aws:sts
+        x: 8
+        'y': 1.5
+        description: IAM ロールの短期セッションを発行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        management: {type: shared, scope: "AWS が STS 基盤を運用し、利用者が IAM ロールと権限を管理する。"}
+      trino-rest-meta:
+        label: S3 / Iceberg テーブルファイル
+        kind: file
+        tier: storage
+        x: 6
+        'y': 1.5
+        description: metadata.json、Manifest、Parquet と削除ファイルを同じ S3 テーブル領域に格納する。
+        realizes:
+          - metajson
+          - mlist
+          - manifest
+          - data
+          - deletes
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        svc: s3
+        management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がファイルと権限を管理する。"}
+      trino-rest-eks:
+        label: Amazon EKS
+        kind: service
+        svc: eks
+        tier: catalog
+        x: 0
+        'y': 1.5
+        description: Trino と Polaris の Pod を配置する Kubernetes 制御プレーン。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        management: {type: shared, scope: "AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}
+      trino-rest-ec2:
+        label: EC2 / EKS ノード
+        kind: host
+        svc: ec2
+        tier: engine
+        x: 10
+        'y': 1.5
+        description: マネージドノードグループの EC2 で Pod を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループを管理する。"}
+      trino-rest-rds:
+        label: RDS for PostgreSQL
+        kind: db
+        svc: rds
+        tier: catalog
+        x: 12
+        'y': 1.5
+        description: Polaris カタログの JDBC 永続化先。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+        management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者が DB と権限を管理する。"}
+    links:
+      - id: trino-rest-assume-role
+        from: trino-rest-rest
+        to: trino-rest-aws-sts
+        label: IAM ロールの一時認証情報を要求
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      - id: eks-polaris-schedule
+        from: trino-rest-eks
+        to: trino-rest-rest
+        label: Polaris Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+      - id: eks-polaris-host
+        from: trino-rest-ec2
+        to: trino-rest-rest
+        label: Polaris Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+      - id: eks-polaris-db
+        from: trino-rest-rest
+        to: trino-rest-rds
+        label: カタログ状態を保存
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+      - id: eks-polaris-session
+        from: trino-rest-aws-sts
+        to: trino-rest-rest
+        label: 一時認証情報を発行
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§8
+    groups:
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - engine
+          - catalog
+          - storage
+        nodes:
+          - trino-rest-coord
+          - trino-rest-workers
+          - trino-rest-rest
+          - trino-rest-aws-sts
+          - trino-rest-meta
+          - trino-rest-eks
+          - trino-rest-ec2
+          - trino-rest-rds
+      - kind: cluster
+        label: EKS クラスタ
+        tier:
+          - engine
+          - catalog
+        nodes:
+          - trino-rest-coord
+          - trino-rest-workers
+          - trino-rest-rest
+          - trino-rest-ec2
+    tiers:
+      - id: engine
+        label: EKS の Trino
+        z: 2
+        size:
+          - 15
+          - 3
+      - id: catalog
+        label: Polaris と AWS 管理
+        z: 1
+        size:
+          - 15
+          - 3
+      - id: storage
+        label: S3 の Iceberg ファイル
+        z: 0
+        size:
+          - 15
+          - 3
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [33, 20]}
+      nodes:
+        trino-rest-eks: {tier: diagram, x: 2, y: 2}
+        trino-rest-ec2: {tier: diagram, x: 8, y: 2}
+        trino-rest-coord: {tier: diagram, x: 8, y: 5}
+        trino-rest-workers: {tier: diagram, x: 8, y: 8}
+        trino-rest-rest: {tier: diagram, x: 8, y: 11}
+        trino-rest-rds: {tier: diagram, x: 14, y: 2}
+        trino-rest-aws-sts: {tier: diagram, x: 20, y: 2}
+        trino-rest-meta: {tier: diagram, x: 20, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [trino-rest-eks, trino-rest-ec2, trino-rest-coord, trino-rest-workers, trino-rest-rest, trino-rest-rds, trino-rest-aws-sts, trino-rest-meta]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [diagram], nodes: [trino-rest-ec2, trino-rest-coord, trino-rest-workers, trino-rest-rest, trino-rest-rds]}
+        - {kind: cluster, label: "EKS の Trino と Polaris", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 15, nodes: [trino-rest-ec2, trino-rest-coord, trino-rest-workers, trino-rest-rest]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "EKS 制御プレーン", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "EKS の Trino と Polaris", z: 0, origin: [7, 0], size: [5, 12]}
+        - {id: zone2, label: "RDS PostgreSQL", z: 0, origin: [14, 0], size: [5, 5]}
+        - {id: zone3, label: "AWS STS と S3", z: 0, origin: [21, 0], size: [5, 6]}
+      nodes:
+        trino-rest-eks: {tier: zone0, x: 2, y: 1}
+        trino-rest-ec2: {tier: zone1, x: 2, y: 1}
+        trino-rest-coord: {tier: zone1, x: 2, y: 4}
+        trino-rest-workers: {tier: zone1, x: 2, y: 7}
+        trino-rest-rest: {tier: zone1, x: 2, y: 10}
+        trino-rest-rds: {tier: zone2, x: 2, y: 1}
+        trino-rest-aws-sts: {tier: zone3, x: 2, y: 1}
+        trino-rest-meta: {tier: zone3, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [trino-rest-eks, trino-rest-ec2, trino-rest-coord, trino-rest-workers, trino-rest-rest, trino-rest-rds, trino-rest-aws-sts, trino-rest-meta]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [zone0, zone1, zone2, zone3], nodes: [trino-rest-ec2, trino-rest-coord, trino-rest-workers, trino-rest-rest, trino-rest-rds]}
+        - {kind: cluster, label: "EKS の Trino と Polaris", tier: [zone1], nodes: [trino-rest-ec2, trino-rest-coord, trino-rest-workers, trino-rest-rest]}
+
 gates:
   maxDrift: 0
   maxHigh: 0

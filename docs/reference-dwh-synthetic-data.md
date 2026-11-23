@@ -14,9 +14,9 @@
 
 [NIST SP 800-226](https://csrc.nist.gov/pubs/sp/800/226/final)、[NIST の差分プライバシーを用いた合成データ](https://www.nist.gov/blogs/cybersecurity-insights/differentially-private-synthetic-data)、[NIST SP 800-188](https://csrc.nist.gov/pubs/sp/800/188/final)。
 
-## 4. 実装例：BigQuery と SDV
+## 4. 実装例：BigQuery と Cloud Run Jobs 上の SDV
 
-Google Cloud の BigQuery に元テーブルと公開用テーブルを分け、権限を持つ Python 実行環境で SDV Community の `GaussianCopulaSynthesizer` を学習・サンプリングする例。生成器は BigQuery 自体の機能ではなく外部の Python プロセスである。SDMetrics などで品質・プライバシー指標を確認し、人が公開を承認する。具体的な認証、アクセス制御、評価基準、ネットワークは環境ごとに設計する。この生成方式に差分プライバシー保証は仮定しない。
+Google Cloud の BigQuery に元テーブルと公開用テーブルを分け、権限を持つ Cloud Run Jobs の Python コンテナーで SDV Community の `GaussianCopulaSynthesizer` を学習・サンプリングする例。生成器は BigQuery 自体の機能ではなく外部の Python プロセスである。SDMetrics などで品質・プライバシー指標を確認し、人が公開を承認する。具体的な認証、アクセス制御、評価基準、ネットワークは環境ごとに設計する。この生成方式に差分プライバシー保証は仮定しない。
 
 | 機能 | 担い手 |
 |---|---|
@@ -26,3 +26,16 @@ Google Cloud の BigQuery に元テーブルと公開用テーブルを分け、
 | 提供と利用 | 承認後の BigQuery 合成テーブルと開発者 |
 
 [SDV Community](https://docs.sdv.dev/sdv/explore/sdv-community)、[SDMetrics](https://docs.sdv.dev/sdmetrics)、[SDMetrics Privacy](https://docs.sdv.dev/sdmetrics/data-metrics/privacy)、[BigQuery のアクセス制御](https://docs.cloud.google.com/bigquery/docs/access-control)。
+
+
+### 実行環境と権限
+
+Cloud Run Jobs で SDV と SDMetrics を含む Python コンテナーをバッチ実行する構成例。元テーブルと候補は公開用とは別の BigQuery データセットに置き、ジョブのサービスアカウントに元データの読み取り、候補データセットへの書き込みなど必要最小限の権限を付ける。公開用データセットへのコピーは審査後に別途実施する。コンテナーの作成、BigQuery クライアント、ジョブ起動、評価の閾値と公開操作は利用者が実装・管理する。Cloud Run は SDV や匿名化を自動提供しない。
+
+| 追加する役割 | 担い手 |
+| --- | --- |
+| 生成・評価のバッチ実行 | Cloud Run Jobs 上の Python コンテナー |
+| 非公開の生成候補 | アクセスを制限した BigQuery データセット |
+| API 利用時の認証 | Cloud Run Job のサービスアカウント |
+
+[Cloud Run Jobs](https://docs.cloud.google.com/run/docs/create-jobs)、[Cloud Run jobs のサービス ID](https://docs.cloud.google.com/run/docs/configuring/jobs/service-identity)、[BigQuery 認証](https://docs.cloud.google.com/bigquery/docs/authentication)。

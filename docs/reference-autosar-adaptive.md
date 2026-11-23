@@ -26,4 +26,25 @@ ARA の機能クラスタと Classic ECU への接続を示す標準構成例。
 | 基盤 OS | POSIX OS |
 | 従来 ECU との接続 | Classic ECU / 信号変換 |
 
+Adaptive ECU 上で POSIX 対応 OS とアプリ・機能クラスタを実行し、Classic ECU は別の実行対象として示す。利用者が ECU、OS と AUTOSAR 実装、通信設定を選定・管理する。接続方式と変換の配置は未確定であり、公式仕様に基づく未検証の例である。
+
 [AUTOSAR Adaptive Platform](https://www.autosar.org/standards/adaptive-platform/)、[AUTOSAR Classic Platform](https://www.autosar.org/standards/classic-platform)。
+
+## 5. 実装例：R24-11 仕様に基づく Adaptive / Classic ECU の連携
+
+AUTOSAR R24-11 が示す信号・サービス変換を、別々の ECU の境界が見えるように配置した仕様例。Adaptive Application は POSIX 対応のマシン上のプロセスとして起動し、Classic ECU とのサービス通信には Ethernet 上の SOME/IP を選ぶ。
+
+| 機能配置 | この仕様ベースの例での担い手 |
+|---|---|
+| アプリと実行環境 | Adaptive Application プロセス、ARA、POSIX 対応 OS |
+| 起動・停止と配備 | Execution Management と Execution / Machine Manifest |
+| サービス通信 | Communication Management と SOME/IP の Service Instance Manifest |
+| Classic ECU への変換 | Classic 側の Translation SWC。SOME/IP のサービスイベントと Sender/Receiver 信号を変換する |
+| 永続データ | Persistency API。保存媒体は採用する実装で選ぶ |
+
+Adaptive ECU と Classic ECU を別のハードウェアとして示し、Ethernet と配備設定を外に分ける。利用者が両 ECU の実装、マニフェスト、通信と更新を管理する。複数の公開仕様から構成した代表例であり、通信スタックの具体製品と変換方式の互換性は未確認で、動作検証していない。公開仕様は機能とインターフェースを定義する。特定の OS 製品・ボード、配備可能な ECU イメージや実車認証はこの例の範囲外である。AUTOSAR の Release Overview が説明する内部 Demonstrator は、仕様の部分的な検証に用いられる。
+
+- [AUTOSAR Adaptive R24-11 Platform Design](https://www.autosar.org/fileadmin/standards/R24-11/AP/AUTOSAR_AP_EXP_PlatformDesign.pdf)
+- [AUTOSAR Adaptive R24-11 Software Architecture](https://www.autosar.org/fileadmin/standards/R24-11/AP/AUTOSAR_AP_EXP_SWArchitecture.pdf)
+- [AUTOSAR Classic R24-11 Layered Software Architecture](https://www.autosar.org/fileadmin/standards/R24-11/CP/AUTOSAR_CP_EXP_LayeredSoftwareArchitecture.pdf)
+- [AUTOSAR Adaptive R24-11 Release Overview](https://www.autosar.org/fileadmin/standards/R24-11/AP/AUTOSAR_AP_TR_ReleaseOverview.pdf)

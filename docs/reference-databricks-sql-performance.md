@@ -43,4 +43,12 @@ Liquid clustering はテーブルのデータ配置を条件列に合わせて�
 
 スキャンの対象範囲と並行負荷を個別に比較する。テーブルに適用できる保守機能と履歴の利用範囲は、Unity Catalog の管理形態や権限に従う。
 
+この例の計算資源は Databricks 管理のサーバーレス環境で動く。注文表の実体は利用者の S3 に設定した Unity Catalog 管理ストレージに置く。分析者は SQL Warehouse の `CAN USE` と Unity Catalog のテーブル参照権限を持つ。Query Profile を確認するのはクエリの所有者、または Warehouse の `CAN MONITOR` 以上を持つ担当者とする。Predictive Optimization を有効にした場合、保守処理は Databricks のサーバーレス Jobs 計算資源で実行される。
+
+- [Serverless SQL Warehouse の設定](https://docs.databricks.com/aws/en/admin/sql/serverless)
+- [SQL Warehouse の権限](https://docs.databricks.com/aws/en/compute/sql-warehouse/create)
+- [Unity Catalog 管理ストレージ](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)
+
 出典 [SQL Warehouse の種類](https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types)、[Photon](https://docs.databricks.com/aws/en/compute/photon)、[クエリプロファイル](https://docs.databricks.com/aws/en/sql/user/queries/query-profile)、[Liquid clustering](https://docs.databricks.com/aws/en/tables/clustering)、[Predictive optimization](https://docs.databricks.com/aws/en/optimizations/predictive-optimization)、[Query history system table](https://docs.databricks.com/aws/en/admin/system-tables/query-history)
+
+Serverless SQL Warehouse は Databricks 管理のサーバーレス計算プレーンで SQL を実行し、管理テーブルの実ファイルはこの例では顧客 AWS アカウントの S3 管理ストレージに置く。利用者は権限に応じて Warehouse、SQL、クラスタリング設定とテーブル保守を指定し、Query Profile・履歴を確認できる。サーバーレス内部ノードを直接操作するものではない。性能と改善幅は例示であり実環境で未検証。[Databricks architecture](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[Managed storage](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)

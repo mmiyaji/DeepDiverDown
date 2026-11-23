@@ -48,7 +48,14 @@ Kubernetes に Cilium と Hubble Relay を配置し、注文 API への許可・
 
 port-forward は確認用の接続例。Hubble の verdict は通信の可否を説明するために使い、アプリケーションの正常性は別のテストで測る。
 
+この例では Amazon EKS の EC2 ノードで AWS VPC CNI を先に動かし、利用者が Helm で Cilium をチェイン方式に設定する。Pod の IP 管理と基本接続は AWS VPC CNI、対象 Pod のポリシー適用とフロー観測は Cilium が担う。既存ネットワークに後からチェインを追加するときは、対象 Pod が設定後の CNI によって作られたことを確認する。別のエージェントによる NetworkPolicy 適用も有効にする場合は、どちらが評価を担うかを明示してから検証する。運用者は EKS API で認証し、Kubernetes RBAC で許可された Relay の port-forward を使う。長期保存先を別途構成しないこの例では、フローの確認は Hubble の参照可能な範囲に限られる。
+
+EKS の制御プレーンは AWS 管理 VPC にあり、利用者は Kubernetes API と公開設定を操作できるが、制御プレーンのサーバーには直接アクセスしない。利用者が顧客 VPC のノード、CNI 設定、Cilium、Hubble、ポリシーと認証を管理する。AWS VPC CNI が IP 管理と仮想デバイスを設定し、Cilium がそのデバイスに eBPF を接続する。 これは複数の公式資料を組み合わせた代表構成であり、実在の導入例や動作検証済みの構成ではない。対応バージョン、ネットワーク、認証と権限は導入時に検証する。
+
 公式資料
+- [EKS Control Plane](https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html)
 - [Hubble Observability Setup](https://docs.cilium.io/en/stable/observability/hubble/setup/index.html)
 - [Hubble Architecture](https://docs.cilium.io/en/stable/observability/hubble/)
 - [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [Cilium と AWS VPC CNI のチェイン](https://docs.cilium.io/en/stable/installation/cni-chaining-aws-cni/)
+- [EKS のマネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)
