@@ -428,9 +428,8 @@ function modelLink(entry) {
   const detail = selected && !entry.reference
     ? `<span class="tag ${GATES.pass ? 'ok' : 'high'}">${GATES.pass ? '合格' : '不合格'}</span> 網羅 ${coverage}%` : '';
   const tags = entry.tags || [], sub = entry.reference?.detailOf;
-  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''} ${sub ? 'mdetail' : ''}" data-tags="${esc(tags.join('|'))}" ${selected ? 'aria-current="page"' : ''}>
-    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}</span>
-    ${tags.length ? `<span class="mtags">${tags.map(t => `<span class="mtag ${TAG_KIND(t)}">${esc(t)}</span>`).join('')}</span>` : ''}
+  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''} ${sub ? 'mdetail' : ''}" data-tags="${esc(tags.join('|'))}" title="${esc([entry.name, tags.join('・')].filter(Boolean).join('\n'))}" ${selected ? 'aria-current="page"' : ''}>
+    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}${tags.length ? (t => ` <span class="mtag mini ${TAG_KIND(t)}">${esc(t)}</span>`)(tags.find(t => DELIVERY.includes(t)) || tags[0]) : ''}</span>
     ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
 }
 
@@ -438,8 +437,10 @@ function modelLink(entry) {
 const LIB_OPEN = new Set((() => { try { return JSON.parse(localStorage.getItem('ddd.libOpen') || '[]'); } catch { return []; } })());
 function renderLibrary() {
   const aside = $('library').closest('aside'), top = aside?.scrollTop;
-  $('mlist').innerHTML = REGISTRY.filter(entry => !entry.reference).map(modelLink).join('') +
-    '<button class="b small" data-act="open">＋ YAML を開く</button>';
+  const mine = REGISTRY.filter(entry => !entry.reference);
+  $('mlist').innerHTML = mine.map(modelLink).join('') + '<button class="b small" data-act="open">＋ YAML を開く</button>';
+  $('my-count').textContent = mine.length;
+  if (!ENTRY.reference) $('my-models').open = true;
 
   const refs = REGISTRY.filter(r => r.reference);
   $('reference-section').hidden = !refs.length;
@@ -503,10 +504,16 @@ function renderTagFilter() {
   for (const e of REGISTRY) for (const t of e.tags || []) count.set(t, (count.get(t) || 0) + 1);
   const chip = t => `<button type="button" class="mtag ${TAG_KIND(t)} ${LIB_TAGS.has(t) ? 'on' : ''}" data-tag="${esc(t)}" aria-pressed="${LIB_TAGS.has(t)}">${esc(t)} <small>${count.get(t)}</small></button>`;
   const delivery = DELIVERY.filter(t => count.has(t)), orgs = [...count.keys()].filter(t => !DELIVERY.includes(t)).sort((a, b) => count.get(b) - count.get(a) || a.localeCompare(b));
-  $('tag-filter').innerHTML = `<div class="tf-row"><span class="tf-h">提供形態</span>${delivery.map(chip).join('')}</div>
-    <div class="tf-row"><span class="tf-h">提供元・団体</span>${orgs.map(chip).join('')}</div>
-    ${LIB_TAGS.size ? '<button type="button" class="b small" data-tag-clear>ラベルを解除</button>' : ''}<span id="tag-count" class="tf-count"></span>`;
+  const main = ['OSS', '商用サービス', 'クラウドマネージド', '概念', 'パターン'].filter(t => count.has(t));
+  const more = [...delivery.filter(t => !main.includes(t)), ...orgs];
+  const moreOpen = more.some(t => LIB_TAGS.has(t)) || TF_MORE.open;
+  $('tag-filter').innerHTML = `<div class="tf-row">${main.map(chip).join('')}</div>
+    <details class="tf-more" ${moreOpen ? 'open' : ''}><summary>その他の提供形態・提供元で絞り込む <small>${more.length}</small></summary><div class="tf-row">${more.map(chip).join('')}</div></details>`;
+  $('tag-filter').querySelector('.tf-more').addEventListener('toggle', e => { TF_MORE.open = e.target.open; });
+  $('tag-filter').insertAdjacentHTML('beforeend', `
+    ${LIB_TAGS.size ? '<button type="button" class="b small" data-tag-clear>ラベルを解除</button>' : ''}<span id="tag-count" class="tf-count"></span>`);
 }
+const TF_MORE = { open: false };
 function toggleTag(t, only = false) {
   if (only) { LIB_TAGS.clear(); LIB_TAGS.add(t); } else LIB_TAGS.has(t) ? LIB_TAGS.delete(t) : LIB_TAGS.add(t);
   renderTagFilter(); filterLibrary();
