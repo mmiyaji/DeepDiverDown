@@ -1,0 +1,224 @@
+name: HydraDB のオブジェクトストレージ型グラフ
+description: グラフの問い合わせと非同期インデックスを分け、状態をオブジェクトストレージに保持する。
+reference:
+  objectives:
+    - グラフの問い合わせと非同期インデックスを分け、状態をオブジェクトストレージに保持する。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: HydraDB architecture
+      url: https://github.com/hydra-db/hydradb/blob/main/architecture.md
+    - title: HydraDB
+      url: https://github.com/hydra-db/hydradb
+sources:
+  - docs/reference-hydradb.md
+evidence:
+  - type: doc
+    ref: docs/reference-hydradb.md#§1
+  - type: doc
+    ref: docs/reference-hydradb.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  client:
+    label: グラフ利用者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  query:
+    label: 問い合わせと更新
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  storage:
+    label: 永続データとログ
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  index:
+    label: インデックス構築
+    kind: service
+    tier: support
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  indices:
+    label: 探索用インデックス
+    kind: file
+    tier: support
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+links:
+  - id: ask
+    from: client
+    to: query
+    label: グラフを問い合わせ
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  - id: write
+    from: query
+    to: storage
+    label: グラフとログを読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  - id: read
+    from: storage
+    to: index
+    label: 保存データを読み取り
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  - id: build
+    from: index
+    to: indices
+    label: 索引を生成
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  - id: publish
+    from: indices
+    to: storage
+    label: 索引を公開
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+  - id: use
+    from: storage
+    to: query
+    label: 索引とデータを参照
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-hydradb.md#§2
+    steps:
+      - links:
+          - ask
+        note: グラフを問い合わせ。
+      - links:
+          - write
+        note: グラフとログを読み書き。
+      - links:
+          - read
+        note: 保存データを読み取り。
+      - links:
+          - build
+        note: 索引を生成。
+      - links:
+          - publish
+        note: 索引を公開。
+      - links:
+          - use
+        note: 索引とデータを参照。
+implementations:
+  - id: example
+    label: HydraDB のオブジェクトストレージ型グラフの構成例
+    description: HydraDB の graph-node と graph-indexer が S3 互換オブジェクトストレージを共有する自己運用の例。具体的なストレージ製品と配置先は固定しない。
+    sources:
+      - title: HydraDB architecture
+        url: https://github.com/hydra-db/hydradb/blob/main/architecture.md
+      - title: HydraDB
+        url: https://github.com/hydra-db/hydradb
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-client:
+        label: Bolt / HTTPS クライアント
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hydradb.md#§4
+        realizes:
+          - client
+      ex-query:
+        label: HydraDB graph-node
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hydradb.md#§4
+        realizes:
+          - query
+      ex-storage:
+        label: S3 互換オブジェクトストレージ
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hydradb.md#§4
+        realizes:
+          - storage
+      ex-index:
+        label: HydraDB graph-indexer
+        kind: service
+        tier: support
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hydradb.md#§4
+        realizes:
+          - index
+      ex-indices:
+        label: 保存されたグラフ索引
+        kind: file
+        tier: support
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hydradb.md#§4
+        realizes:
+          - indices

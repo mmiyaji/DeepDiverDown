@@ -1,0 +1,208 @@
+{
+  "model": "file-compression",
+  "name": "ファイル圧縮と分析データの読み書き",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "入力データ",
+      "status": "claim"
+    },
+    "encode": {
+      "type": "link",
+      "label": "入力データ → データの符号化",
+      "status": "claim"
+    },
+    "compress": {
+      "type": "link",
+      "label": "データの符号化 → 圧縮コーデック",
+      "status": "claim"
+    },
+    "stored": {
+      "type": "node",
+      "label": "圧縮データと形式情報",
+      "status": "claim"
+    },
+    "decompress": {
+      "type": "node",
+      "label": "コーデックで伸長",
+      "status": "claim"
+    },
+    "decode": {
+      "type": "link",
+      "label": "コーデックで伸長 → データの復号・解析",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "読み取り結果",
+      "status": "claim"
+    },
+    "save": {
+      "type": "link",
+      "label": "圧縮コーデック → 圧縮データと形式情報",
+      "status": "claim"
+    },
+    "load": {
+      "type": "link",
+      "label": "圧縮データと形式情報 → コーデックで伸長",
+      "status": "claim"
+    },
+    "return": {
+      "type": "link",
+      "label": "データの復号・解析 → 読み取り結果",
+      "status": "claim"
+    },
+    "roundtrip": {
+      "type": "scenario",
+      "label": "書き込みと読み戻し"
+    },
+    "ex-source": {
+      "type": "implementation",
+      "impl": "csv-gzip",
+      "label": "表データ",
+      "realizes": [
+        "source"
+      ]
+    },
+    "ex-encode": {
+      "type": "implementation",
+      "impl": "csv-gzip",
+      "label": "CSV 文字列へ変換",
+      "realizes": [
+        "encode"
+      ]
+    },
+    "ex-compress": {
+      "type": "implementation",
+      "impl": "csv-gzip",
+      "label": "gzip / DEFLATE 圧縮",
+      "realizes": [
+        "compress"
+      ]
+    },
+    "ex-stored": {
+      "type": "implementation",
+      "impl": "csv-gzip",
+      "label": ".csv.gz ファイル",
+      "realizes": [
+        "stored"
+      ]
+    },
+    "ex-decompress": {
+      "type": "implementation",
+      "impl": "csv-gzip",
+      "label": "gzip ストリームの伸長",
+      "realizes": [
+        "decompress"
+      ]
+    },
+    "ex-decode": {
+      "type": "implementation",
+      "impl": "csv-gzip",
+      "label": "CSV を解析",
+      "realizes": [
+        "decode"
+      ]
+    },
+    "ex-consumer": {
+      "type": "implementation",
+      "impl": "csv-gzip",
+      "label": "読み取り結果",
+      "realizes": [
+        "consumer"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-file-compression.md#§1": [
+      "model"
+    ],
+    "docs/reference-file-compression.md": [
+      "model",
+      "source",
+      "encode",
+      "compress",
+      "stored",
+      "decompress",
+      "decode",
+      "consumer",
+      "save",
+      "load",
+      "return",
+      "roundtrip",
+      "ex-source",
+      "ex-encode",
+      "ex-compress",
+      "ex-stored",
+      "ex-decompress",
+      "ex-decode",
+      "ex-consumer"
+    ],
+    "docs/reference-file-compression.md#§3": [
+      "model"
+    ],
+    "docs/reference-file-compression.md#§2": [
+      "source",
+      "encode",
+      "compress",
+      "stored",
+      "decompress",
+      "decode",
+      "consumer",
+      "save",
+      "load",
+      "return",
+      "roundtrip"
+    ],
+    "docs/reference-file-compression.md#§4": [
+      "ex-source",
+      "ex-encode",
+      "ex-compress",
+      "ex-stored",
+      "ex-decompress",
+      "ex-decode",
+      "ex-consumer"
+    ]
+  },
+  "reference": {
+    "category": "ファイル形式と圧縮",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
+    "objectives": [
+      "gzip・Zstd・Snappy などの特徴と選択基準を理解する。",
+      "Parquet のページ圧縮とストリーム全体の圧縮を区別する。",
+      "互換性、速度、容量、分割読み込みを考慮する。"
+    ],
+    "sources": [
+      {
+        "title": "Parquet compression",
+        "url": "https://parquet.apache.org/docs/file-format/data-pages/compression/"
+      },
+      {
+        "title": "PyArrow Parquet writer",
+        "url": "https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html"
+      },
+      {
+        "title": "Snappy",
+        "url": "https://github.com/google/snappy/blob/main/README.md"
+      },
+      {
+        "title": "Zstd manual",
+        "url": "https://github.com/facebook/zstd/blob/dev/doc/zstd_manual.html"
+      },
+      {
+        "title": "GZIP RFC 1952",
+        "url": "https://www.rfc-editor.org/rfc/rfc1952"
+      },
+      {
+        "title": "GNU gzip",
+        "url": "https://www.gnu.org/s/gzip/manual/html_node/Advanced-usage.html"
+      }
+    ]
+  }
+}

@@ -1,0 +1,239 @@
+name: SHACL による RDF データ検証
+description: RDF のデータと形状制約を照合し、違反レポートから修正と再検証を行う。
+reference:
+  objectives:
+    - SHACL の形状と検証対象データを区別する。
+    - 制約違反を報告し修正する流れを追う。
+    - 推論とデータ検証の役割の違いを理解する。
+  sources:
+    - title: W3C SHACL
+      url: https://www.w3.org/TR/shacl/
+    - title: Apache Jena SHACL
+      url: https://jena.apache.org/documentation/shacl/
+sources:
+  - docs/reference-semantic-shacl.md
+evidence:
+  - type: doc
+    ref: docs/reference-semantic-shacl.md#§1
+  - type: doc
+    ref: docs/reference-semantic-shacl.md#§3
+tiers:
+  - id: flow
+    label: 問い合わせと利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: definition
+    label: 定義とデータ
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  data:
+    label: 検証対象の RDF
+    kind: file
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  validator:
+    label: 形状に対する検証
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  report:
+    label: 適合・違反の報告
+    kind: file
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  steward:
+    label: データ管理担当者
+    kind: actor
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  designer:
+    label: 制約の設計者
+    kind: actor
+    tier: definition
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  shapes:
+    label: SHACL 形状と制約
+    kind: file
+    tier: definition
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+links:
+  - id: data
+    from: data
+    to: validator
+    label: データを渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  - id: shapes
+    from: shapes
+    to: validator
+    label: 形状と制約を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  - id: report
+    from: validator
+    to: report
+    label: 検証結果を出力
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  - id: review
+    from: report
+    to: steward
+    label: 違反を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  - id: fix
+    from: steward
+    to: data
+    label: データを修正
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+  - id: define
+    from: designer
+    to: shapes
+    label: 形状を定義
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-shacl.md#§2
+    steps:
+      - links:
+          - define
+          - shapes
+          - data
+        note: 形状と検証対象のグラフを検証器に渡す。
+      - links:
+          - report
+          - review
+        note: 適合状況と違反箇所を確認する。
+      - links:
+          - fix
+          - data
+        note: 必要に応じて修正して再検証する。
+implementations:
+  - id: example
+    label: Apache Jena SHACL コマンド
+    description: Turtle の形状とデータを Jena SHACL コマンドで検証する例。
+    sources:
+      - title: W3C SHACL
+        url: https://www.w3.org/TR/shacl/
+      - title: Apache Jena SHACL
+        url: https://jena.apache.org/documentation/shacl/
+    tiers:
+      - id: flow
+        label: 問い合わせと利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: definition
+        label: 定義とデータ
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-data:
+        label: RDF データ TTL
+        kind: file
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-shacl.md#§4
+        realizes:
+          - data
+      ex-validator:
+        label: Jena SHACL validate
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-shacl.md#§4
+        realizes:
+          - validator
+      ex-report:
+        label: SHACL 検証レポート
+        kind: file
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-shacl.md#§4
+        realizes:
+          - report
+      ex-steward:
+        label: データ管理担当者
+        kind: actor
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-shacl.md#§4
+        realizes:
+          - steward
+      ex-designer:
+        label: 制約の設計者
+        kind: actor
+        tier: definition
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-shacl.md#§4
+        realizes:
+          - designer
+      ex-shapes:
+        label: SHACL shapes TTL
+        kind: file
+        tier: definition
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-shacl.md#§4
+        realizes:
+          - shapes

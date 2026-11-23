@@ -1,57 +1,275 @@
-name: "Trino の分散クエリアーキテクチャ"
-description: "SQL クライアントの受注集計を Trino が計画し、Iceberg テーブルを並列に読んで結果を返します。"
+name: Trino の分散クエリアーキテクチャ
+description: SQL クライアントの受注集計を Trino が計画し、Iceberg テーブルを並列に読んで結果を返します。
 reference:
-  objectives: ["Stage、Task、Split の関係を区別する。", "Connector で読み出したデータが Exchange を経て返る流れを追う。"]
+  objectives:
+    - Stage、Task、Split の関係を区別する。
+    - Connector で読み出したデータが Exchange を経て返る流れを追う。
   sources:
-    - {"title": "Trino · Concepts", "url": "https://trino.io/docs/current/overview/concepts.html"}
-    - {"title": "Trino · Iceberg connector", "url": "https://trino.io/docs/current/connector/iceberg.html"}
-sources: [docs/reference-trino.md]
-evidence: [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]
+    - title: Trino · Concepts
+      url: https://trino.io/docs/current/overview/concepts.html
+    - title: Trino · Iceberg connector
+      url: https://trino.io/docs/current/connector/iceberg.html
+sources:
+  - docs/reference-trino.md
+evidence:
+  - type: doc
+    ref: docs/reference-trino.md#§1
 tiers:
-  - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+  - id: flow
+    label: データと処理
+    z: 0
+    size:
+      - 16
+      - 5
 groups:
-  - {kind: parallel, label: Split ごとに Worker が並列実行, tier: flow, nodes: [scan, reduce]}
+  - kind: parallel
+    label: Split ごとに Worker が並列実行
+    tier: flow
+    nodes:
+      - scan
+      - reduce
 nodes:
-  client: {"label": "SQL クライアント", "kind": "client", "tier": "flow", "x": 0, "y": 1, "description": "受注明細を日別に集計する SQL を送る。", "evidence": [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]}
-  control: {label: SQL の計画と調整, kind: service, tier: flow, x: 4, 'y': 1, description: 分散計画と Task の実行を調整する。, evidence: [{type: doc, ref: docs/reference-trino.md#§1}]}
-  connector: {label: 外部テーブルのメタデータ解決, kind: service, tier: flow, x: 9, 'y': 0, description: カタログとテーブルメタデータから Split を列挙する。, evidence: [{type: doc, ref: docs/reference-trino.md#§2}]}
-  scan: {parallel: 'N', label: 分割データの読取タスク, kind: worker, tier: flow, x: 8, 'y': 4, description: 担当 Split を読み、部分集計する。, evidence: [{type: doc, ref: docs/reference-trino.md#§3}]}
-  data: {partitions: 6, label: Iceberg テーブルのデータファイル, kind: db, tier: flow, x: 13, 'y': 4, description: 受注明細のファイルを保持する。, evidence: [{type: doc, ref: docs/reference-trino.md#§2}]}
-  reduce: {parallel: 'N', label: 集約タスク, kind: worker, tier: flow, x: 4, 'y': 4, description: Exchange で受け取った部分集計を統合する。, evidence: [{type: doc, ref: docs/reference-trino.md#§3}]}
+  client:
+    label: SQL クライアント
+    kind: client
+    tier: flow
+    x: 0
+    'y': 1
+    description: 受注明細を日別に集計する SQL を送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§1
+  control:
+    label: SQL の計画と調整
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1
+    description: 分散計画と Task の実行を調整する。
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§1
+  connector:
+    label: 外部テーブルのメタデータ解決
+    kind: service
+    tier: flow
+    x: 9
+    'y': 0
+    description: カタログとテーブルメタデータから Split を列挙する。
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§2
+  scan:
+    parallel: 'N'
+    label: 分割データの読取タスク
+    kind: worker
+    tier: flow
+    x: 8
+    'y': 4
+    description: 担当 Split を読み、部分集計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§3
+  data:
+    partitions: 6
+    label: Iceberg テーブルのデータファイル
+    kind: db
+    tier: flow
+    x: 13
+    'y': 4
+    description: 受注明細のファイルを保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§2
+  reduce:
+    parallel: 'N'
+    label: 集約タスク
+    kind: worker
+    tier: flow
+    x: 4
+    'y': 4
+    description: Exchange で受け取った部分集計を統合する。
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§3
 links:
-  - {id: submit, from: client, to: control, label: SQL を送る, evidence: [{type: doc, ref: docs/reference-trino.md#§1}]}
-  - {id: resolve, from: control, to: connector, label: テーブルを解決して分割候補を列挙, evidence: [{type: doc, ref: docs/reference-trino.md#§2}]}
-  - {id: assign, from: control, to: scan, label: 読取単位とタスクを割り当てる, evidence: [{type: doc, ref: docs/reference-trino.md#§1}]}
-  - {id: read, from: data, to: scan, label: 対象のデータ範囲を読む, evidence: [{type: doc, ref: docs/reference-trino.md#§3}]}
-  - {id: exchange, from: scan, to: reduce, label: 中間の集約結果を送る, evidence: [{type: doc, ref: docs/reference-trino.md#§3}]}
-  - {id: collect, from: reduce, to: control, label: 集計結果を返す, evidence: [{type: doc, ref: docs/reference-trino.md#§3}]}
-  - {id: return, from: control, to: client, label: 結果を取得, evidence: [{type: doc, ref: docs/reference-trino.md#§3}]}
+  - id: submit
+    from: client
+    to: control
+    label: SQL を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§1
+  - id: resolve
+    from: control
+    to: connector
+    label: テーブルを解決して分割候補を列挙
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§2
+  - id: assign
+    from: control
+    to: scan
+    label: 読取単位とタスクを割り当てる
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§1
+  - id: read
+    from: data
+    to: scan
+    label: 対象のデータ範囲を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§3
+  - id: exchange
+    from: scan
+    to: reduce
+    label: 中間の集約結果を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§3
+  - id: collect
+    from: reduce
+    to: control
+    label: 集計結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§3
+  - id: return
+    from: control
+    to: client
+    label: 結果を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§3
 scenarios:
   - id: orders-by-date
-    label: "Iceberg の受注明細を日別集計"
-    evidence: [{"type": "doc", "ref": "docs/reference-trino.md#§1"}]
+    label: Iceberg の受注明細を日別集計
+    evidence:
+      - type: doc
+        ref: docs/reference-trino.md#§1
     steps:
-      - {"links": ["submit", "resolve"], "note": "Coordinator が SQL を解析し、Iceberg テーブルと読み取り対象の Split を解決する。"}
-      - {"links": ["assign", "read"], "note": "Worker が担当 Split を読み、並列に部分集計する。"}
-      - {"links": ["exchange"], "note": "別 Stage の Task が Exchange 経由で部分集計を受け取り、日別にまとめる。"}
-      - {"links": ["collect", "return"], "note": "Coordinator が最終結果を取得し、クライアントに返す。"}
-
+      - links:
+          - submit
+          - resolve
+        note: Coordinator が SQL を解析し、Iceberg テーブルと読み取り対象の Split を解決する。
+      - links:
+          - assign
+          - read
+        note: Worker が担当 Split を読み、並列に部分集計する。
+      - links:
+          - exchange
+        note: 別 Stage の Task が Exchange 経由で部分集計を受け取り、日別にまとめる。
+      - links:
+          - collect
+          - return
+        note: Coordinator が最終結果を取得し、クライアントに返す。
 implementations:
   - id: trino-iceberg
-    label: "Trino と Glue Catalog・S3 上の Iceberg"
-    description: "Trino の Coordinator と Worker が、Glue Catalog を使う Iceberg カタログに接続し、S3 にある注文テーブルを検索する例。分散読み取りと部分集計は同じ Worker 群で動く。"
+    label: Trino と Glue Catalog・S3 上の Iceberg
+    description: >-
+      Trino の Coordinator と Worker が、Glue Catalog を使う Iceberg カタログに接続し、S3 にある注文テーブルを検索する例。分散読み取りと部分集計は同じ
+      Worker 群で動く。
     sources:
-      - {title: Trino · Concepts, url: https://trino.io/docs/current/overview/concepts.html}
-      - {title: Trino · Iceberg connector, url: https://trino.io/docs/current/connector/iceberg.html}
-      - {title: Trino file system support, url: https://trino.io/docs/current/object-storage/file-system-s3.html}
+      - title: Trino · Concepts
+        url: https://trino.io/docs/current/overview/concepts.html
+      - title: Trino · Iceberg connector
+        url: https://trino.io/docs/current/connector/iceberg.html
+      - title: Trino file system support
+        url: https://trino.io/docs/current/object-storage/file-system-s3.html
     tiers:
-      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
-      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+      - id: processing
+        label: データの処理と保存
+        z: 0
+        size:
+          - 14
+          - 5
+      - id: setup
+        label: 実行に必要な設定・成果物
+        z: 1
+        size:
+          - 14
+          - 3
     nodes:
-      trino-iceberg-client: {label: Trino CLI, kind: client, tier: processing, x: 1, y: 1.15, realizes: [client], description: SQL を送り、結果を取得する。, evidence: [{type: doc, ref: docs/reference-trino.md#§4}]}
-      trino-iceberg-coordinator: {label: Trino Coordinator と Iceberg Connector, kind: service, tier: processing, x: 1, y: 3.65, realizes: [control, connector], description: Iceberg テーブルを解決して分割とステージを計画する。, evidence: [{type: doc, ref: docs/reference-trino.md#§4}]}
-      trino-iceberg-workers: {label: Trino Workers の読取と集約タスク, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [scan, reduce], description: S3 上のデータを読み、ステージ間で中間結果を交換する。, evidence: [{type: doc, ref: docs/reference-trino.md#§4}]}
-      trino-iceberg-data: {label: S3 上の Iceberg データとメタデータ, kind: db, tier: processing, x: 5, y: 3.65, svc: s3, realizes: [data], description: スナップショットが参照する物理ファイルを保持する。, evidence: [{type: doc, ref: docs/reference-trino.md#§4}]}
-      trino-iceberg-glue: {label: AWS Glue Catalog, kind: catalog, tier: setup, x: 1, y: 1.5, description: カタログに iceberg.catalog.type=glue と fs.s3.enabled=true を設定し、Glue から Iceberg のメタデータ位置を解決する。, evidence: [{type: doc, ref: docs/reference-trino.md#§4}]}
+      trino-iceberg-client:
+        label: Trino CLI
+        kind: client
+        tier: processing
+        x: 1
+        'y': 1.15
+        realizes:
+          - client
+        description: SQL を送り、結果を取得する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      trino-iceberg-coordinator:
+        label: Trino Coordinator と Iceberg Connector
+        kind: service
+        tier: processing
+        x: 1
+        'y': 3.65
+        realizes:
+          - control
+          - connector
+        description: Iceberg テーブルを解決して分割とステージを計画する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      trino-iceberg-workers:
+        label: Trino Workers の読取と集約タスク
+        kind: worker
+        tier: processing
+        x: 5
+        'y': 1.15
+        realizes:
+          - scan
+          - reduce
+        description: S3 上のデータを読み、ステージ間で中間結果を交換する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      trino-iceberg-data:
+        label: S3 上の Iceberg データとメタデータ
+        kind: db
+        tier: processing
+        x: 5
+        'y': 3.65
+        svc: s3
+        realizes:
+          - data
+        description: スナップショットが参照する物理ファイルを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+      trino-iceberg-glue:
+        label: AWS Glue Catalog
+        kind: catalog
+        tier: setup
+        x: 1
+        'y': 1.5
+        description: カタログに iceberg.catalog.type=glue と fs.s3.enabled=true を設定し、Glue から Iceberg のメタデータ位置を解決する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino.md#§4
+        svc: glue
     links:
-      - {id: trino-iceberg-glue-connection, from: trino-iceberg-glue, to: trino-iceberg-coordinator, label: テーブル情報を引く}
+      - id: trino-iceberg-glue-connection
+        from: trino-iceberg-glue
+        to: trino-iceberg-coordinator
+        label: テーブル情報を引く
+    groups:
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - setup
+        nodes:
+          - trino-iceberg-glue
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - processing
+        nodes:
+          - trino-iceberg-data

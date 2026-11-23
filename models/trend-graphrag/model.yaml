@@ -1,0 +1,272 @@
+name: GraphRAG による文書の検索と回答
+description: 文書から実体と関係を抽出し、グラフと関連文書を使って回答する。
+reference:
+  objectives:
+    - 文書からグラフと索引を作る流れを追う。
+    - グラフ検索と回答生成を区別する。
+    - 出典・権限・回答の正確性を評価する。
+  sources:
+    - title: Gartner 2026 Data & Analytics trends
+      url: >-
+        https://www.gartner.com/en/newsroom/press-releases/2026-06-16-gartner-identifies-the-top-trends-for-data-and-analytics
+    - title: Microsoft GraphRAG
+      url: https://microsoft.github.io/graphrag/
+    - title: GraphRAG indexing
+      url: https://microsoft.github.io/graphrag/index/overview/
+sources:
+  - docs/reference-trend-graphrag.md
+evidence:
+  - type: doc
+    ref: docs/reference-trend-graphrag.md#§1
+  - type: doc
+    ref: docs/reference-trend-graphrag.md#§3
+tiers:
+  - id: flow
+    label: 問い合わせと利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: definition
+    label: 定義とデータ
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  user:
+    label: 質問者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  search:
+    label: グラフと文書の検索
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  answer:
+    label: 文脈を基に回答生成
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  documents:
+    label: 元文書
+    kind: file
+    tier: definition
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  indexer:
+    label: 実体・関係の抽出
+    kind: service
+    tier: definition
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  index:
+    label: グラフ・要約と索引
+    kind: db
+    tier: definition
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  model:
+    label: 生成モデル
+    kind: service
+    tier: definition
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+links:
+  - id: build
+    from: documents
+    to: indexer
+    label: 文書を取り込む
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  - id: index
+    from: indexer
+    to: index
+    label: 実体と関係を索引化
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  - id: ask
+    from: user
+    to: search
+    label: 質問を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  - id: lookup
+    from: index
+    to: search
+    label: 関連情報を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  - id: context
+    from: search
+    to: answer
+    label: 検索文脈を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  - id: generate
+    from: model
+    to: answer
+    label: 回答を生成
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+  - id: reply
+    from: answer
+    to: user
+    label: 出典と回答を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-graphrag.md#§2
+    steps:
+      - links:
+          - build
+          - index
+        note: 文書からグラフと検索索引を構築する。
+      - links:
+          - ask
+          - lookup
+          - context
+        note: 質問に関係する情報を索引から集める。
+      - links:
+          - generate
+          - reply
+        note: 取得した文脈を基に回答を生成する。
+implementations:
+  - id: example
+    label: Microsoft GraphRAG Local Search
+    description: Microsoft GraphRAG の索引処理と Local Search を用いる。モデル提供者と実行環境は別途設定する。
+    sources:
+      - title: Gartner 2026 Data & Analytics trends
+        url: >-
+          https://www.gartner.com/en/newsroom/press-releases/2026-06-16-gartner-identifies-the-top-trends-for-data-and-analytics
+      - title: Microsoft GraphRAG
+        url: https://microsoft.github.io/graphrag/
+      - title: GraphRAG indexing
+        url: https://microsoft.github.io/graphrag/index/overview/
+    tiers:
+      - id: flow
+        label: 問い合わせと利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: definition
+        label: 定義とデータ
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-user:
+        label: 質問者
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§4
+        realizes:
+          - user
+      ex-search:
+        label: GraphRAG Local Search
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§4
+        realizes:
+          - search
+      ex-answer:
+        label: 回答の生成
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§4
+        realizes:
+          - answer
+      ex-documents:
+        label: 元文書
+        kind: file
+        tier: definition
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§4
+        realizes:
+          - documents
+      ex-indexer:
+        label: GraphRAG 索引処理
+        kind: service
+        tier: definition
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§4
+        realizes:
+          - indexer
+      ex-index:
+        label: Parquet とベクトル索引
+        kind: db
+        tier: definition
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§4
+        realizes:
+          - index
+      ex-model:
+        label: 設定した生成モデル
+        kind: service
+        tier: definition
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§4
+        realizes:
+          - model

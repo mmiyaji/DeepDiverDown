@@ -1,0 +1,237 @@
+name: Eclipse Kuksa と VSS の車両データ
+description: 車両信号を VSS に対応付け、Databroker を通して車載アプリに渡す。
+reference:
+  objectives:
+    - CAN の生信号と VSS の意味を区別する。
+    - プロバイダー、Databroker、アプリの役割を追う。
+  sources:
+    - title: Eclipse SDV blueprint architecture
+      url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/architecture/
+    - title: Signal mapping
+      url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/signal-mapping/
+sources:
+  - docs/reference-kuksa-vss.md
+evidence:
+  - type: doc
+    ref: docs/reference-kuksa-vss.md#§1
+  - type: doc
+    ref: docs/reference-kuksa-vss.md#§3
+tiers:
+  - id: flow
+    label: 信号の取得と共有
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 信号定義
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  bus:
+    label: 車両ネットワーク
+    kind: external
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 車両信号を送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  provider:
+    label: 信号変換
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: 生信号を定義に対応付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  broker:
+    label: 車両データ共有
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: VSS 信号の取得と更新を仲介する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  app:
+    label: 車載アプリ
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 共有された信号を取得する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  mapping:
+    label: 信号の対応付け
+    kind: file
+    tier: support
+    x: 4
+    'y': 1.5
+    description: DBC と VSS の関係を定義する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  vss:
+    label: 車両信号の定義
+    kind: file
+    tier: support
+    x: 8
+    'y': 1.5
+    description: 信号の名前や型を定義する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+links:
+  - id: receive
+    from: bus
+    to: provider
+    label: CAN 信号を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  - id: map
+    from: mapping
+    to: provider
+    label: 信号変換を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  - id: publish
+    from: provider
+    to: broker
+    label: VSS 信号を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  - id: schema
+    from: vss
+    to: broker
+    label: 信号の定義を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+  - id: read
+    from: broker
+    to: app
+    label: API で信号を提供
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+scenarios:
+  - id: signals
+    label: 車両信号の読み取り
+    evidence:
+      - type: doc
+        ref: docs/reference-kuksa-vss.md#§2
+    steps:
+      - links:
+          - map
+          - schema
+          - receive
+          - publish
+          - read
+        note: 生信号を VSS に対応付けてアプリへ提供する。
+implementations:
+  - id: example
+    label: Eclipse SDV ブループリントの信号共有
+    description: CAN Provider と Kuksa Databroker による読み取り例。信号の実際の種類と対応付けは車両による。
+    sources:
+      - title: Eclipse SDV blueprint architecture
+        url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/architecture/
+      - title: Signal mapping
+        url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/signal-mapping/
+    tiers:
+      - id: flow
+        label: 信号の取得と共有
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 信号定義
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-bus:
+        label: CAN バス
+        kind: external
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 車両信号を送る。
+        realizes:
+          - bus
+        evidence:
+          - type: doc
+            ref: docs/reference-kuksa-vss.md#§4
+      ex-provider:
+        label: CAN Provider
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: 生信号を定義に対応付ける。
+        realizes:
+          - provider
+        evidence:
+          - type: doc
+            ref: docs/reference-kuksa-vss.md#§4
+      ex-broker:
+        label: Kuksa Databroker
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: VSS 信号の取得と更新を仲介する。
+        realizes:
+          - broker
+        evidence:
+          - type: doc
+            ref: docs/reference-kuksa-vss.md#§4
+      ex-app:
+        label: 車載アプリ
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        description: 共有された信号を取得する。
+        realizes:
+          - app
+        evidence:
+          - type: doc
+            ref: docs/reference-kuksa-vss.md#§4
+      ex-mapping:
+        label: DBC / VSS mapping
+        kind: file
+        tier: support
+        x: 4
+        'y': 1.5
+        description: DBC と VSS の関係を定義する。
+        realizes:
+          - mapping
+        evidence:
+          - type: doc
+            ref: docs/reference-kuksa-vss.md#§4
+      ex-vss:
+        label: Vehicle Signal Specification
+        kind: file
+        tier: support
+        x: 8
+        'y': 1.5
+        description: 信号の名前や型を定義する。
+        realizes:
+          - vss
+        evidence:
+          - type: doc
+            ref: docs/reference-kuksa-vss.md#§4

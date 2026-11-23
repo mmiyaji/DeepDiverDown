@@ -1,74 +1,364 @@
-name: "Snowflake Horizon Catalog の分類・保護・監査"
-description: "分類した機微列へマスキングを適用し、誰がその列を参照したかと下流への影響を確認する。"
-parent: {"model":"snowflake","node":"metadata"}
+name: Snowflake Horizon Catalog の分類・保護・監査
+description: 分類した機微列へマスキングを適用し、誰がその列を参照したかと下流への影響を確認する。
+parent:
+  model: snowflake
+  node: metadata
 reference:
   objectives:
-    - "ロールによる利用権限と、タグを使った実行時の保護を区別する。"
-    - "分類、利用の記録、リネージで確認できる情報を区別する。"
+    - ロールによる利用権限と、タグを使った実行時の保護を区別する。
+    - 分類、利用の記録、リネージで確認できる情報を区別する。
   sources:
-    - {"title":"Snowflake Horizon Catalog","url":"https://docs.snowflake.com/en/user-guide/snowflake-horizon"}
-    - {"title":"データガバナンス","url":"https://docs.snowflake.com/en/guides-overview-govern"}
-    - {"title":"タグベースのマスキング","url":"https://docs.snowflake.com/en/user-guide/tag-based-masking-policies"}
-    - {"title":"アクセス履歴","url":"https://docs.snowflake.com/en/user-guide/access-history"}
-sources: ["docs/reference-snowflake-horizon-catalog.md"]
-evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§1"}]
+    - title: Snowflake Horizon Catalog
+      url: https://docs.snowflake.com/en/user-guide/snowflake-horizon
+    - title: データガバナンス
+      url: https://docs.snowflake.com/en/guides-overview-govern
+    - title: タグベースのマスキング
+      url: https://docs.snowflake.com/en/user-guide/tag-based-masking-policies
+    - title: アクセス履歴
+      url: https://docs.snowflake.com/en/user-guide/access-history
+sources:
+  - docs/reference-snowflake-horizon-catalog.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[13.5,4.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 13.5
+      - 4.5
 nodes:
-  owner: {"label":"データ管理者","kind":"actor","tier":"flow","x":0,"y":0,"description":"分類結果とタグの付け方を確認。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§2"}]}
-  classify: {"label":"機微データ分類","kind":"service","tier":"flow","x":3,"y":0,"description":"機微情報の候補を分類。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§2"}]}
-  tag: {"label":"列の分類ラベル","kind":"service","tier":"flow","x":6,"y":0,"description":"列に付与する分類メタデータ。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§2"}]}
-  policy: {"label":"列の値を保護するポリシー","kind":"service","tier":"flow","x":9,"y":0,"description":"実行時にロールに従って変換。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§3"}]}
-  analyst: {"label":"分析担当ロール","kind":"actor","tier":"flow","x":0,"y":4,"description":"利用権限のある列をクエリ。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§3"}]}
-  orders: {"label":"注文のメールアドレス列","kind":"db","tier":"flow","x":6,"y":4,"description":"保護対象の列。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§1"}]}
-  mart: {"label":"注文分析ビュー","kind":"db","tier":"flow","x":9,"y":4,"description":"下流の影響調査先。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§4"}]}
-  history: {"label":"列アクセスの監査履歴","kind":"db","tier":"flow","x":13,"y":4,"description":"アクセスしたオブジェクト・列を追う。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§4"}]}
+  owner:
+    label: データ管理者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 0
+    description: 分類結果とタグの付け方を確認。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§2
+  classify:
+    label: 機微データ分類
+    kind: service
+    tier: flow
+    x: 3
+    'y': 0
+    description: 機微情報の候補を分類。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§2
+  tag:
+    label: 列の分類ラベル
+    kind: service
+    tier: flow
+    x: 6
+    'y': 0
+    description: 列に付与する分類メタデータ。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§2
+  policy:
+    label: 列の値を保護するポリシー
+    kind: service
+    tier: flow
+    x: 9
+    'y': 0
+    description: 実行時にロールに従って変換。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§3
+  analyst:
+    label: 分析担当ロール
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 4
+    description: 利用権限のある列をクエリ。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§3
+  orders:
+    label: 注文のメールアドレス列
+    kind: db
+    tier: flow
+    x: 6
+    'y': 4
+    description: 保護対象の列。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§1
+  mart:
+    label: 注文分析ビュー
+    kind: db
+    tier: flow
+    x: 9
+    'y': 4
+    description: 下流の影響調査先。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§4
+  history:
+    label: 列アクセスの監査履歴
+    kind: db
+    tier: flow
+    x: 13
+    'y': 4
+    description: アクセスしたオブジェクト・列を追う。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§4
 links:
-  - {"id":"classify","from":"owner","to":"classify","label":"分類を設定・確認","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§2"}]}
-  - {"id":"inspect","from":"classify","to":"orders","label":"列の機微情報を分類","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§2"}]}
-  - {"id":"assign","from":"tag","to":"orders","label":"列にタグを付与","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§2"}]}
-  - {"id":"bind","from":"tag","to":"policy","label":"型が合うマスキングを関連付け","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§3"}]}
-  - {"id":"select","from":"analyst","to":"orders","label":"許可されたロールで参照","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§3"}]}
-  - {"id":"mask","from":"policy","to":"orders","label":"許可条件に応じた表示値","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§3"}]}
-  - {"id":"derive","from":"orders","to":"mart","label":"注文分析で利用","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§4"}]}
-  - {"id":"track","from":"mart","to":"history","label":"使用列の情報を照合","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§4"}]}
-  - {"id":"audit","from":"owner","to":"history","label":"利用履歴を確認","evidence":[{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§4"}]}
+  - id: classify
+    from: owner
+    to: classify
+    label: 分類を設定・確認
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§2
+  - id: inspect
+    from: classify
+    to: orders
+    label: 列の機微情報を分類
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§2
+  - id: assign
+    from: tag
+    to: orders
+    label: 列にタグを付与
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§2
+  - id: bind
+    from: tag
+    to: policy
+    label: 型が合うマスキングを関連付け
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§3
+  - id: select
+    from: analyst
+    to: orders
+    label: 許可されたロールで参照
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§3
+  - id: mask
+    from: policy
+    to: orders
+    label: 許可条件に応じた表示値
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§3
+  - id: derive
+    from: orders
+    to: mart
+    label: 注文分析で利用
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§4
+  - id: track
+    from: mart
+    to: history
+    label: 使用列の情報を照合
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§4
+  - id: audit
+    from: owner
+    to: history
+    label: 利用履歴を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§4
 scenarios:
   - id: protect
-    label: "メールアドレスの分類とマスキング"
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§3"}]
+    label: メールアドレスの分類とマスキング
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§3
     steps:
-      - {"links":["classify","inspect"],"note":"対象列の分類結果を確認する。"}
-      - {"links":["assign","bind"],"note":"保護対象のタグとポリシーを関連付ける。"}
-      - {"links":["select","mask"],"note":"SELECT 権限のある分析担当にも、設定によりマスク済みの値を返す。"}
+      - links:
+          - classify
+          - inspect
+        note: 対象列の分類結果を確認する。
+      - links:
+          - assign
+          - bind
+        note: 保護対象のタグとポリシーを関連付ける。
+      - links:
+          - select
+          - mask
+        note: SELECT 権限のある分析担当にも、設定によりマスク済みの値を返す。
   - id: investigate
-    label: "機微列の変更影響を調べる"
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§4"}]
+    label: 機微列の変更影響を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§4
     steps:
-      - {"links":["derive"],"note":"機微列を使用する下流ビューを確認する。"}
-      - {"links":["track","audit"],"note":"アクセス履歴で実際の利用者と参照された列を照合する。"}
-
+      - links:
+          - derive
+        note: 機微列を使用する下流ビューを確認する。
+      - links:
+          - track
+          - audit
+        note: アクセス履歴で実際の利用者と参照された列を照合する。
 implementations:
   - id: snowflake-policy
-    label: "Snowflake での列分類とタグマスク"
-    description: "受注メール列に分類タグとマスキングポリシーを適用し、分析権限と監査権限を分離する例。"
+    label: Snowflake での列分類とタグマスク
+    description: 受注メール列に分類タグとマスキングポリシーを適用し、分析権限と監査権限を分離する例。
     sources:
-      - {title: "Snowflake Horizon Catalog", url: "https://docs.snowflake.com/en/user-guide/snowflake-horizon"}
-      - {title: "データガバナンス", url: "https://docs.snowflake.com/en/guides-overview-govern"}
-      - {title: "タグベースのマスキング", url: "https://docs.snowflake.com/en/user-guide/tag-based-masking-policies"}
-      - {title: "アクセス履歴", url: "https://docs.snowflake.com/en/user-guide/access-history"}
-      - {title: "Snowflake アクセス制御", url: "https://docs.snowflake.com/en/user-guide/security-access-control-overview"}
+      - title: Snowflake Horizon Catalog
+        url: https://docs.snowflake.com/en/user-guide/snowflake-horizon
+      - title: データガバナンス
+        url: https://docs.snowflake.com/en/guides-overview-govern
+      - title: タグベースのマスキング
+        url: https://docs.snowflake.com/en/user-guide/tag-based-masking-policies
+      - title: アクセス履歴
+        url: https://docs.snowflake.com/en/user-guide/access-history
+      - title: Snowflake アクセス制御
+        url: https://docs.snowflake.com/en/user-guide/security-access-control-overview
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [13.5,4.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 13.5
+          - 4.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-owner: {label: "分類設定用ロール", kind: "actor", tier: "flow", x: 0, y: 0, realizes: ["owner"], description: "分類プロファイルと結果を管理する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      example-classify: {label: "Sensitive Data Classification", kind: "service", tier: "flow", x: 3, y: 0, realizes: ["classify"], description: "機微情報候補の分類結果を確認する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      example-tag: {label: "分類タグとマスキングポリシー", kind: "service", tier: "flow", x: 6, y: 0, realizes: ["tag","policy"], description: "文字列用ポリシーをタグに関連付ける。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      example-analyst: {label: "SALES_READER ロール", kind: "actor", tier: "flow", x: 0, y: 4, realizes: ["analyst"], description: "許可された分析ビューだけを参照する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      example-orders: {label: "ORDERS.CUSTOMER_EMAIL", kind: "db", tier: "flow", x: 6, y: 4, realizes: ["orders"], description: "メール列に分類タグを設定する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      example-mart: {label: "SALES.ORDERS_ANALYSIS", kind: "db", tier: "flow", x: 9, y: 4, realizes: ["mart"], description: "注文分析に必要な列を公開する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      example-history: {label: "ACCOUNT_USAGE.ACCESS_HISTORY", kind: "db", tier: "flow", x: 13, y: 4, realizes: ["history"], description: "アクセスした資産と列を、対応するクエリで確認する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      example-privacy: {label: "監査用プライバシーロール", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "監査担当者には Account Usage の該当ビューへの権限を追加する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
+      example-owner:
+        label: 分類設定用ロール
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 0
+        realizes:
+          - owner
+        description: 分類プロファイルと結果を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-classify:
+        svc: snowflake:horizon
+        label: Sensitive Data Classification
+        kind: service
+        tier: flow
+        x: 3
+        'y': 0
+        realizes:
+          - classify
+        description: 機微情報候補の分類結果を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-tag:
+        svc: snowflake:platform
+        label: 分類タグとマスキングポリシー
+        kind: service
+        tier: flow
+        x: 6
+        'y': 0
+        realizes:
+          - tag
+          - policy
+        description: 文字列用ポリシーをタグに関連付ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-analyst:
+        label: SALES_READER ロール
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 4
+        realizes:
+          - analyst
+        description: 許可された分析ビューだけを参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-orders:
+        svc: snowflake:platform
+        label: ORDERS.CUSTOMER_EMAIL
+        kind: db
+        tier: flow
+        x: 6
+        'y': 4
+        realizes:
+          - orders
+        description: メール列に分類タグを設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-mart:
+        svc: snowflake:platform
+        label: SALES.ORDERS_ANALYSIS
+        kind: db
+        tier: flow
+        x: 9
+        'y': 4
+        realizes:
+          - mart
+        description: 注文分析に必要な列を公開する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-history:
+        svc: snowflake:platform
+        label: ACCOUNT_USAGE.ACCESS_HISTORY
+        kind: db
+        tier: flow
+        x: 13
+        'y': 4
+        realizes:
+          - history
+        description: アクセスした資産と列を、対応するクエリで確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+      example-privacy:
+        svc: snowflake:platform
+        label: 監査用プライバシーロール
+        kind: service
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 監査担当者には Account Usage の該当ビューへの権限を追加する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
     links:
-      - {id: "example-privacy-connection", from: "example-privacy", to: "example-history", label: "監査履歴の閲覧を許可", evidence: [{"type":"doc","ref":"docs/reference-snowflake-horizon-catalog.md#§5"}]}
+      - id: example-privacy-connection
+        from: example-privacy
+        to: example-history
+        label: 監査履歴の閲覧を許可
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-horizon-catalog.md#§5
+    groups:
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake
+        tier:
+          - flow
+        nodes:
+          - example-classify
+          - example-tag
+          - example-orders
+          - example-mart
+          - example-history
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake
+        tier:
+          - implementation-setup
+        nodes:
+          - example-privacy

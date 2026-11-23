@@ -1,0 +1,243 @@
+{
+  "model": "cloud-spot-capacity",
+  "name": "スポット容量と中断への対応",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "work": {
+      "type": "node",
+      "label": "中断可能なワークロード",
+      "status": "claim"
+    },
+    "spot": {
+      "type": "node",
+      "label": "中断可能な計算容量",
+      "status": "claim"
+    },
+    "standard": {
+      "type": "node",
+      "label": "通常の計算容量",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "node",
+      "label": "永続的な処理進捗",
+      "status": "claim"
+    },
+    "manager": {
+      "type": "node",
+      "label": "容量の選択と補充",
+      "status": "claim"
+    },
+    "notice": {
+      "type": "link",
+      "label": "中断可能な計算容量 → 中断の通知",
+      "status": "claim"
+    },
+    "recovery": {
+      "type": "node",
+      "label": "停止・再開の制御",
+      "status": "claim"
+    },
+    "run": {
+      "type": "link",
+      "label": "中断可能なワークロード → 中断可能な計算容量",
+      "status": "claim"
+    },
+    "alternate": {
+      "type": "link",
+      "label": "中断可能なワークロード → 通常の計算容量",
+      "status": "claim"
+    },
+    "save": {
+      "type": "link",
+      "label": "中断可能なワークロード → 永続的な処理進捗",
+      "status": "claim"
+    },
+    "handle": {
+      "type": "link",
+      "label": "中断の通知 → 停止・再開の制御",
+      "status": "claim"
+    },
+    "restore": {
+      "type": "link",
+      "label": "永続的な処理進捗 → 停止・再開の制御",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "link",
+      "label": "停止・再開の制御 → 中断可能なワークロード",
+      "status": "claim"
+    },
+    "supply": {
+      "type": "link",
+      "label": "容量の選択と補充 → 中断可能な計算容量",
+      "status": "claim"
+    },
+    "supply-standard": {
+      "type": "link",
+      "label": "容量の選択と補充 → 通常の計算容量",
+      "status": "claim"
+    },
+    "main": {
+      "type": "scenario",
+      "label": "容量管理と復旧"
+    },
+    "ex-work": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "実行アプリ",
+      "realizes": [
+        "work"
+      ]
+    },
+    "ex-spot": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "EC2 Spot",
+      "realizes": [
+        "spot"
+      ]
+    },
+    "ex-standard": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "EC2 On-Demand",
+      "realizes": [
+        "standard"
+      ]
+    },
+    "ex-checkpoint": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "S3 進捗オブジェクト",
+      "realizes": [
+        "checkpoint"
+      ]
+    },
+    "ex-manager": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "EC2 Auto Scaling",
+      "realizes": [
+        "manager"
+      ]
+    },
+    "ex-notice": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "EventBridge 中断イベント",
+      "realizes": [
+        "notice"
+      ]
+    },
+    "ex-recovery": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "アプリの停止・再開処理",
+      "realizes": [
+        "recovery"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-cloud-spot-capacity.md#§1": [
+      "model"
+    ],
+    "docs/reference-cloud-spot-capacity.md": [
+      "model",
+      "work",
+      "spot",
+      "standard",
+      "checkpoint",
+      "manager",
+      "notice",
+      "recovery",
+      "run",
+      "alternate",
+      "save",
+      "handle",
+      "restore",
+      "resume",
+      "supply",
+      "supply-standard",
+      "main",
+      "ex-work",
+      "ex-spot",
+      "ex-standard",
+      "ex-checkpoint",
+      "ex-manager",
+      "ex-notice",
+      "ex-recovery"
+    ],
+    "docs/reference-cloud-spot-capacity.md#§3": [
+      "model"
+    ],
+    "docs/reference-cloud-spot-capacity.md#§2": [
+      "work",
+      "spot",
+      "standard",
+      "checkpoint",
+      "manager",
+      "notice",
+      "recovery",
+      "run",
+      "alternate",
+      "save",
+      "handle",
+      "restore",
+      "resume",
+      "supply",
+      "supply-standard",
+      "main"
+    ],
+    "docs/reference-cloud-spot-capacity.md#§4": [
+      "ex-work",
+      "ex-spot",
+      "ex-standard",
+      "ex-checkpoint",
+      "ex-manager",
+      "ex-notice",
+      "ex-recovery"
+    ]
+  },
+  "reference": {
+    "category": "クラウドの容量とコスト",
+    "order": 10,
+    "domain": "運用基盤",
+    "kind": "設計パターン・ユースケース",
+    "objectives": [
+      "余剰容量と通常容量の違いを理解する。",
+      "中断通知と進捗の保存・再開を追う。",
+      "各クラウドの事前通知と容量の制約を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "AWS Spot interruption notice",
+        "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html"
+      },
+      {
+        "title": "AWS EC2 rebalance recommendations",
+        "url": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/rebalance-recommendations.html"
+      },
+      {
+        "title": "Azure Spot eviction",
+        "url": "https://learn.microsoft.com/en-us/azure/architecture/guide/spot/spot-eviction"
+      },
+      {
+        "title": "Google Cloud Spot VMs",
+        "url": "https://docs.cloud.google.com/compute/docs/instances/spot"
+      },
+      {
+        "title": "OCI preemptible instances",
+        "url": "https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/preemptible.htm"
+      },
+      {
+        "title": "EC2 Auto Scaling Capacity Rebalancing",
+        "url": "https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-capacity-rebalancing.html"
+      }
+    ]
+  }
+}

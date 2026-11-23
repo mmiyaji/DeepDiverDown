@@ -1,0 +1,204 @@
+name: RisingWave のストリーミング SQL
+description: イベントを継続的に取り込み、SQL の結果と状態を更新して提供する。
+reference:
+  objectives:
+    - イベントを継続的に取り込み、SQL の結果と状態を更新して提供する。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: RisingWave
+      url: https://github.com/risingwavelabs/risingwave
+    - title: RisingWave documentation
+      url: https://docs.risingwave.com/
+sources:
+  - docs/reference-risingwave.md
+evidence:
+  - type: doc
+    ref: docs/reference-risingwave.md#§1
+  - type: doc
+    ref: docs/reference-risingwave.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  source:
+    label: イベントの入力
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+  engine:
+    label: 継続的な SQL 処理
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+  view:
+    label: 更新されるビュー
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+  consumer:
+    label: 分析クライアント
+    kind: actor
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+  state:
+    label: 処理状態の保存
+    kind: db
+    tier: support
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+links:
+  - id: consume
+    from: source
+    to: engine
+    label: イベントを取り込む
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+  - id: update
+    from: engine
+    to: view
+    label: ビューを更新
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+  - id: query
+    from: consumer
+    to: view
+    label: SQL で問い合わせ
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+  - id: state
+    from: engine
+    to: state
+    label: 処理状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave.md#§2
+    steps:
+      - links:
+          - consume
+        note: イベントを取り込む。
+      - links:
+          - update
+        note: ビューを更新。
+      - links:
+          - query
+        note: SQL で問い合わせ。
+      - links:
+          - state
+        note: 処理状態を保存。
+implementations:
+  - id: example
+    label: RisingWave のストリーミング SQLの構成例
+    description: Kafka のストリームから RisingWave が実体化ビューを更新し、SQL クライアントが問い合わせる自己運用例。オブジェクトストレージは S3 互換であり提供元は指定しない。
+    sources:
+      - title: RisingWave
+        url: https://github.com/risingwavelabs/risingwave
+      - title: RisingWave documentation
+        url: https://docs.risingwave.com/
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-source:
+        label: Kafka トピック
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave.md#§4
+        realizes:
+          - source
+      ex-engine:
+        label: RisingWave ストリーム処理
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave.md#§4
+        realizes:
+          - engine
+      ex-view:
+        label: RisingWave 実体化ビュー
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave.md#§4
+        realizes:
+          - view
+      ex-consumer:
+        label: SQL クライアント
+        kind: actor
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave.md#§4
+        realizes:
+          - consumer
+      ex-state:
+        label: S3 互換オブジェクトストレージ
+        kind: db
+        tier: support
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave.md#§4
+        realizes:
+          - state

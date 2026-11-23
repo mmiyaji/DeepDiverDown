@@ -1,0 +1,272 @@
+name: データプロダクトの公開と利用
+description: 用途ごとのデータ資産、説明、契約と権限申請をまとめて利用者へ提供する。
+reference:
+  objectives:
+    - データ資産とカタログの登録を区別する。
+    - 利用契約の確認とアクセス申請を追う。
+    - 契約の記述と実際の監視・権限を区別する。
+  sources:
+    - title: Gartner 2025 Data & Analytics trends
+      url: >-
+        https://www.gartner.com/en/newsroom/press-releases/2025-03-05-gartner-identifies-top-trends-in-data-and-analytics-for-2025
+    - title: Google Cloud data products
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/data-products-overview
+    - title: Use data products
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/use-data-products
+sources:
+  - docs/reference-trend-data-product.md
+evidence:
+  - type: doc
+    ref: docs/reference-trend-data-product.md#§1
+  - type: doc
+    ref: docs/reference-trend-data-product.md#§3
+tiers:
+  - id: flow
+    label: 問い合わせと利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: definition
+    label: 定義とデータ
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  user:
+    label: データ利用者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  catalog:
+    label: データプロダクト
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  access:
+    label: アクセス申請と承認
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  asset:
+    label: 提供するデータ資産
+    kind: db
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  owner:
+    label: プロダクト所有者
+    kind: actor
+    tier: definition
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  contract:
+    label: 説明とデータ契約
+    kind: file
+    tier: definition
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+links:
+  - id: find
+    from: user
+    to: catalog
+    label: 発見して内容を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  - id: request
+    from: catalog
+    to: access
+    label: アクセスを申請
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  - id: read
+    from: user
+    to: asset
+    label: 承認後にデータを利用
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  - id: grant
+    from: access
+    to: asset
+    label: 資産への権限を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  - id: publish
+    from: owner
+    to: catalog
+    label: 資産を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  - id: define
+    from: owner
+    to: contract
+    label: 契約を定義
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+  - id: describe
+    from: contract
+    to: catalog
+    label: 条件と説明を公開
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-data-product.md#§2
+    steps:
+      - links:
+          - publish
+          - define
+          - describe
+        note: 所有者が資産と契約を登録する。
+      - links:
+          - find
+          - request
+          - grant
+        note: 利用者が内容を確認しアクセスを申請する。
+      - links:
+          - read
+        note: 承認後に権限を使って資産を利用する。
+implementations:
+  - id: example
+    label: Knowledge Catalog と BigQuery
+    description: Knowledge Catalog で BigQuery の資産と契約をまとめ、利用者がアクセスを申請する。
+    sources:
+      - title: Gartner 2025 Data & Analytics trends
+        url: >-
+          https://www.gartner.com/en/newsroom/press-releases/2025-03-05-gartner-identifies-top-trends-in-data-and-analytics-for-2025
+      - title: Google Cloud data products
+        url: https://docs.cloud.google.com/knowledge-catalog/docs/data-products-overview
+      - title: Use data products
+        url: https://docs.cloud.google.com/knowledge-catalog/docs/use-data-products
+    tiers:
+      - id: flow
+        label: 問い合わせと利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: definition
+        label: 定義とデータ
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-user:
+        label: データ利用者
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+        realizes:
+          - user
+      ex-catalog:
+        label: Knowledge Catalog データプロダクト
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        svc: gcp:knowledgecatalog
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+        realizes:
+          - catalog
+      ex-access:
+        label: Knowledge Catalog アクセス申請
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        svc: gcp:knowledgecatalog
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+        realizes:
+          - access
+      ex-asset:
+        label: BigQuery テーブル・ビュー
+        kind: db
+        tier: flow
+        x: 12
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+        realizes:
+          - asset
+      ex-owner:
+        label: プロダクト所有者
+        kind: actor
+        tier: definition
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+        realizes:
+          - owner
+      ex-contract:
+        label: 契約と説明
+        kind: file
+        tier: definition
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+        realizes:
+          - contract
+    groups:
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud
+        tier:
+          - flow
+        nodes:
+          - ex-catalog
+          - ex-access
+          - ex-asset
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud
+        tier:
+          - definition
+        nodes:
+          - ex-contract

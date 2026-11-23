@@ -13,10 +13,52 @@
     cloudflare: { label: 'Cloudflare', color: '#F38020' },
     onprem: { label: 'オンプレミス', color: '#6d6a63' },
     k8s: { label: 'Kubernetes', color: '#326CE5' },
+    databricks: { label: 'Databricks', color: '#FF3621' },
+    snowflake: { label: 'Snowflake', color: '#29B5E8' },
+    fabric: { label: 'Microsoft Fabric', color: '#16847A' },
+    purview: { label: 'Microsoft Purview', color: '#6B4DB5' },
+    datadog: { label: 'Datadog', color: '#632CA6' },
+    newrelic: { label: 'New Relic', color: '#008C86' },
+    spotnetapp: { label: 'Spot by NetApp', color: '#1474B8' },
+    slack: { label: 'Slack', color: '#BD68BA' },
   };
   const S = (abbr, name, cat, more = {}) => ({ abbr, name, cat, ...more });
   const I = true; // infra
   const SERVICES = {
+    datadog: { platform: S('DD', 'Datadog SaaS', 'mgmt') },
+    newrelic: { platform: S('NR', 'New Relic SaaS', 'mgmt') },
+    fabric: {
+      platform: S('Fabric', 'Microsoft Fabric', 'compute', { icon: ['fabric_48_color'] }),
+      pipeline: S('Pipeline', 'Fabric Data Pipeline', 'int', { icon: ['pipeline_48_item'] }),
+      lakehouse: S('Lakehouse', 'Fabric Lakehouse', 'storage', { icon: ['lakehouse_48_item'] }),
+      notebook: S('Notebook', 'Fabric Notebook', 'compute', { icon: ['notebook_48_item'] }),
+      report: S('Report', 'Power BI Report', 'compute', { icon: ['report_48_item'] }),
+      semantic: S('Model', 'Power BI Semantic Model', 'db', { icon: ['semantic_model_48_item'] }),
+    },
+    purview: {
+      platform: S('Purview', 'Microsoft Purview', 'mgmt', { icon: ['purview_48_color'] }),
+    },
+    databricks: {
+      platform: S('DB', 'Databricks', 'compute', { icon: ['Databricks-Logo-Icon'] }),
+      unity: S('UC', 'Unity Catalog', 'mgmt', { icon: ['icon-unity-catalog'] }),
+      sql: S('SQL', 'Databricks SQL', 'compute', { icon: ['icon-databricks-sql'] }),
+      lakeflow: S('Lakeflow', 'Lakeflow', 'int', { icon: ['icon-lakeflow'] }),
+      delta: S('Delta', 'Delta Table', 'storage', { shape: 'cyl', icon: ['icon-orange-Delta-Table'] }),
+      aisearch: S('Search', 'Databricks AI Search', 'compute', { icon: ['SearchDataIcon'] }),
+      modelserving: S('Serving', 'Databricks Model Serving', 'compute', { icon: ['CloudModelIcon'] }),
+    },
+    snowflake: {
+      platform: S('SF', 'Snowflake', 'compute', { icon: ['bug-sno-blue'] }),
+      warehouse: S('WH', 'Snowflake Virtual Warehouse', 'compute', { icon: ['Snowflake-Virtual-Warehouse'], fallback: 'platform' }),
+      task: S('Task', 'Snowflake Task', 'compute', { icon: ['Snowflake-Task'], fallback: 'platform' }),
+      pipe: S('Pipe', 'Snowpipe', 'int', { icon: ['Snowflake-Pipe'], fallback: 'platform' }),
+      stream: S('Stream', 'Snowflake Stream', 'int', { icon: ['Snowflake-Stream'], fallback: 'platform' }),
+      database: S('DB', 'Snowflake Database', 'db', { icon: ['Snowflake-Database'], fallback: 'platform' }),
+      dynamic: S('Dynamic', 'Snowflake Dynamic Tables', 'db', { icon: ['Snowflake-Dynamic-Tables'], fallback: 'platform' }),
+      horizon: S('Horizon', 'Snowflake Horizon Catalog', 'mgmt', { icon: ['Snowflake-Horizon'], fallback: 'platform' }),
+      cortex: S('Cortex', 'Snowflake Cortex AI', 'compute', { icon: ['Snowflake-Cortex'], fallback: 'platform' }),
+      intelligence: S('Intelligence', 'Snowflake Intelligence', 'compute', { icon: ['Snowflake-Intelligence'], fallback: 'platform' }),
+    },
     aws: {
       route53: S('R53', 'Route 53', 'net', { infra: I, icon: ['Route-53'] }),
       cloudfront: S('CF', 'CloudFront', 'net', { infra: I, icon: ['CloudFront'] }),
@@ -24,9 +66,11 @@
       alb: S('ALB', 'Application LB', 'net', { infra: I, icon: ['Elastic-Load-Balancing', 'Application-Load-Balancer'] }),
       nat: S('NAT', 'NAT Gateway', 'net', { infra: I, icon: ['NAT-Gateway'] }),
       apigw: S('APIGW', 'API Gateway', 'int', { infra: I, icon: ['API-Gateway'] }),
-      ecs: S('ECS', 'ECS Fargate', 'compute', { icon: ['Elastic-Container-Service', 'Fargate'] }),
+      ecs: S('ECS', 'Amazon ECS', 'compute', { icon: ['Elastic-Container-Service'] }),
+      fargate: S('Fargate', 'AWS Fargate', 'compute', { icon: ['Arch_AWS-Fargate_'] }),
       eks: S('EKS', 'EKS', 'compute', { icon: ['Elastic-Kubernetes-Service'] }),
       ec2: S('EC2', 'EC2', 'compute', { icon: ['Arch_Amazon-EC2_'] }),
+      autoscaling: S('ASG', 'EC2 Auto Scaling', 'compute', { icon: ['Arch_Amazon-EC2-Auto-Scaling_'] }),
       lambda: S('λ', 'Lambda', 'compute', { icon: ['Arch_AWS-Lambda_'] }),
       aurora: S('Aurora', 'Aurora', 'db', { shape: 'cyl', icon: ['Aurora'] }),
       rds: S('RDS', 'RDS', 'db', { shape: 'cyl', icon: ['Arch_Amazon-RDS_'] }),
@@ -34,12 +78,20 @@
       elasticache: S('Redis', 'ElastiCache', 'db', { shape: 'cyl', icon: ['ElastiCache'] }),
       s3: S('S3', 'S3', 'storage', { shape: 'cyl', icon: ['Simple-Storage-Service'] }),
       glue: S('Glue', 'AWS Glue', 'int', { icon: ['Arch_AWS-Glue_'] }),
+      redshift: S('Redshift', 'Amazon Redshift', 'db', { icon: ['Arch_Amazon-Redshift_'] }),
+      iam: S('IAM', 'AWS Identity and Access Management', 'sec', { icon: ['Arch_AWS-Identity-and-Access-Management_'] }),
+      sts: S('STS', 'AWS Security Token Service', 'sec', { icon: ['Res_AWS-Identity-Access-Management_AWS-STS_48'] }),
+      datazone: S('DataZone', 'Amazon DataZone', 'mgmt', { icon: ['Arch_Amazon-DataZone_'] }),
+      lakeformation: S('Lake Formation', 'AWS Lake Formation', 'sec', { icon: ['Arch_AWS-Lake-Formation_'] }),
+      cleanrooms: S('Clean Rooms', 'AWS Clean Rooms', 'sec', { icon: ['Arch_AWS-Clean-Rooms_'] }),
       athena: S('Athena', 'Amazon Athena', 'db', { icon: ['Arch_Amazon-Athena_'] }),
       sqs: S('SQS', 'SQS', 'int', { shape: 'queue', icon: ['Simple-Queue-Service'] }),
       msk: S('MSK', 'Amazon MSK', 'int', { shape: 'queue', icon: ['Managed-Streaming-for-Apache-Kafka'] }),
       mskconnect: S('MSKC', 'MSK Connect', 'int', { icon: ['Managed-Streaming-for-Apache-Kafka'] }),
       sns: S('SNS', 'SNS', 'int', { icon: ['Simple-Notification-Service'] }),
       eventbridge: S('EB', 'EventBridge', 'int', { icon: ['EventBridge'] }),
+      iotcore: S('IoT Core', 'AWS IoT Core', 'int', { icon: ['Arch_AWS-IoT-Core_'] }),
+      greengrass: S('Greengrass', 'AWS IoT Greengrass', 'int', { icon: ['Arch_AWS-IoT-Greengrass_'] }),
       stepfunctions: S('SFN', 'Step Functions', 'int', { icon: ['Step-Functions'] }),
       cognito: S('Cog', 'Cognito', 'sec', { icon: ['Cognito'] }),
       secrets: S('SM', 'Secrets Manager', 'sec', { infra: I, icon: ['Secrets-Manager'] }),
@@ -69,12 +121,17 @@
       gcs: S('GCS', 'Cloud Storage', 'storage', { shape: 'cyl', icon: ['cloud_storage'] }),
       pubsub: S('Pub/Sub', 'Pub/Sub', 'int', { shape: 'queue', icon: ['pubsub'] }),
       bigquery: S('BQ', 'BigQuery', 'db', { shape: 'cyl', icon: ['bigquery'] }),
+      // Knowledge Catalog was renamed from Dataplex Universal Catalog. Google
+      // still distributes the Dataplex mark in its legacy icon collection.
+      knowledgecatalog: S('KC', 'Knowledge Catalog（旧 Dataplex）', 'mgmt', { icon: ['dataplex'] }),
       secretmanager: S('SM', 'Secret Manager', 'sec', { infra: I, icon: ['secret_manager'] }),
       artifact: S('AR', 'Artifact Registry', 'devtools', { shape: 'cyl', icon: ['artifact_registry'] }),
       cloudbuild: S('CB', 'Cloud Build', 'devtools', { icon: ['cloud_build'] }),
       interconnect: S('IC', 'Cloud Interconnect', 'net', { infra: I, icon: ['cloud_interconnect'] }),
     },
     azure: {
+      datafactory: S('ADF', 'Azure Data Factory', 'int', { icon: ['Data-Factories'] }),
+      monitor: S('Monitor', 'Azure Monitor', 'mgmt', { icon: ['Monitor'] }),
       frontdoor: S('AFD', 'Front Door', 'net', { infra: I, icon: ['Front-Door'] }),
       appgw: S('AppGW', 'Application Gateway', 'net', { infra: I, icon: ['Application-Gateway'] }),
       lb: S('LB', 'Load Balancer', 'net', { infra: I, icon: ['Load-Balancers'] }),
@@ -149,7 +206,7 @@
     const [p, k] = svc.includes(':') ? svc.split(':') : ['aws', svc];
     const s = SERVICES[p]?.[k];
     if (!s) return null;
-    return { ...s, provider: p, key: k, id: `${p}:${k}`, providerLabel: PROVIDERS[p].label, providerColor: PROVIDERS[p].color, color: CAT[s.cat], iconUrl: ICONS[`${p}:${k}`] || null };
+    return { ...s, provider: p, key: k, id: `${p}:${k}`, providerLabel: PROVIDERS[p].label, providerColor: PROVIDERS[p].color, color: CAT[s.cat], iconUrl: ICONS[`${p}:${k}`] || (s.fallback && ICONS[`${p}:${s.fallback}`]) || null };
   }
   const providerOf = n => lookup(n?.svc)?.provider || n?.provider || null;
 

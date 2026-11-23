@@ -1,0 +1,314 @@
+name: AI エージェントの承認・再開と観測
+description: 外部更新の前に人が内容を確認し、保存した実行状態から再開して結果を観測する。
+reference:
+  objectives:
+    - 承認待ちと実行状態の保存を区別する。
+    - 外部操作の再試行と重複防止を追う。
+    - トレースで実行を確認する。
+  sources:
+    - title: LangGraph interrupts
+      url: https://docs.langchain.com/oss/python/langgraph/interrupts
+    - title: LangGraph durable execution
+      url: https://docs.langchain.com/oss/python/langgraph/durable-execution
+    - title: OpenTelemetry GenAI observability
+      url: https://opentelemetry.io/blog/2026/genai-observability/
+sources:
+  - docs/reference-agent-approval.md
+evidence:
+  - type: doc
+    ref: docs/reference-agent-approval.md#§1
+  - type: doc
+    ref: docs/reference-agent-approval.md#§3
+tiers:
+  - id: flow
+    label: 承認と実行
+    z: 1
+    size:
+      - 16
+      - 3
+  - id: ops
+    label: 保存と観測
+    z: 0
+    size:
+      - 12
+      - 3
+nodes:
+  request:
+    label: 依頼者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  agent:
+    label: エージェント実行
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  approve:
+    label: 承認者
+    kind: actor
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  tool:
+    label: 外部更新ツール
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  target:
+    label: 更新先システム
+    kind: db
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  state:
+    label: 実行状態の保存
+    kind: db
+    tier: ops
+    x: 2
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  trace:
+    label: 実行トレース
+    kind: service
+    tier: ops
+    x: 6
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  evaluation:
+    label: 評価担当者
+    kind: actor
+    tier: ops
+    x: 10
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+links:
+  - id: ask
+    from: request
+    to: agent
+    label: 更新を依頼
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  - id: pause
+    from: agent
+    to: state
+    label: 実行状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  - id: review
+    from: agent
+    to: approve
+    label: 更新内容を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  - id: resume
+    from: approve
+    to: agent
+    label: 承認結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  - id: execute
+    from: agent
+    to: tool
+    label: 承認済みの操作を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  - id: update
+    from: tool
+    to: target
+    label: 対象を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  - id: record
+    from: agent
+    to: trace
+    label: 実行を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+  - id: inspect
+    from: evaluation
+    to: trace
+    label: 実行結果を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+scenarios:
+  - id: approve-update
+    label: 外部更新を承認して再開
+    evidence:
+      - type: doc
+        ref: docs/reference-agent-approval.md#§2
+    steps:
+      - links:
+          - ask
+          - pause
+        note: 依頼を受けて承認待ちの状態を保存する。
+      - links:
+          - review
+          - resume
+        note: 更新内容を確認し承認結果を返す。
+      - links:
+          - execute
+          - update
+        note: 権限と対象を再確認して更新する。
+      - links:
+          - record
+          - inspect
+        note: トレースで操作と結果を確認する。
+implementations:
+  - id: langgraph
+    label: LangGraph と OpenTelemetry
+    description: チェックポインター、承認画面、更新ツール、観測基盤を組み合わせる例。
+    sources:
+      - title: LangGraph interrupts
+        url: https://docs.langchain.com/oss/python/langgraph/interrupts
+      - title: LangGraph durable execution
+        url: https://docs.langchain.com/oss/python/langgraph/durable-execution
+      - title: OpenTelemetry GenAI observability
+        url: https://opentelemetry.io/blog/2026/genai-observability/
+    tiers:
+      - id: flow
+        label: 承認と実行
+        z: 1
+        size:
+          - 16
+          - 3
+      - id: ops
+        label: 保存と観測
+        z: 0
+        size:
+          - 12
+          - 3
+    nodes:
+      ex-request:
+        label: 利用者画面
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - request
+      ex-agent:
+        label: LangGraph のグラフ実行
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - agent
+      ex-approve:
+        label: 承認画面と担当者
+        kind: actor
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - approve
+      ex-tool:
+        label: 認可された更新ツール
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - tool
+      ex-target:
+        label: 業務システム
+        kind: db
+        tier: flow
+        x: 16
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - target
+      ex-state:
+        label: チェックポインターと永続ストア
+        kind: db
+        tier: ops
+        x: 2
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - state
+      ex-trace:
+        label: OpenTelemetry のトレース基盤
+        kind: service
+        tier: ops
+        x: 6
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - trace
+      ex-evaluation:
+        label: 評価担当者
+        kind: actor
+        tier: ops
+        x: 10
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+        realizes:
+          - evaluation
+      ex-key:
+        label: 重複防止キー
+        kind: file
+        tier: ops
+        x: 14
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-agent-approval.md#§4
+    links:
+      - id: ex-idempotence
+        from: ex-key
+        to: ex-tool
+        label: 再試行時の重複を防ぐ

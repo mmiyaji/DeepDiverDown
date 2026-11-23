@@ -6,29 +6,163 @@ reference:
     - MVCC と atomic commit が一貫したスナップショットを作る流れを追う。
     - Checkpoint と JSON ログから表の状態を復元する方法を理解する。
   sources:
-    - {title: Delta Transaction Log Protocol, url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md}
-sources: [docs/reference-delta-lake.md]
-evidence: [{type: doc, ref: docs/reference-delta-lake.md#§1}]
+    - title: Delta Transaction Log Protocol
+      url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md
+sources:
+  - docs/reference-delta-lake.md
+evidence:
+  - type: doc
+    ref: docs/reference-delta-lake.md#§1
 tiers:
-  - {id: write, label: 書き込み, z: 1, size: [16,3]}
-  - {id: table, label: Delta Table, z: 0, origin: [1,0], size: [16,3]}
+  - id: write
+    label: 書き込み
+    z: 1
+    size:
+      - 16
+      - 3
+  - id: table
+    label: Delta Table
+    z: 0
+    origin:
+      - 1
+      - 0
+    size:
+      - 16
+      - 3
 nodes:
-  writer: {label: Writer / Engine, kind: service, tier: write, x: 0, y: 1.5, description: データファイルを書き、コミットを作る。, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§2}]}
-  data: {label: Data Files, kind: db, shape3D: crate, tier: table, x: 3, y: 1.5, description: 表の行を格納するファイル。, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§1}]}
-  log: {label: Delta JSON Log, kind: queue, tier: table, x: 6, y: 1.5, description: add/remove 等の原子的な変更をバージョン順に記録する。, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§2}]}
-  checkpoint: {label: Checkpoint, kind: db, tier: table, x: 9, y: 1.5, description: あるバージョンまでの状態を短縮復元する。, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§4}]}
-  snapshot: {label: Consistent Snapshot, kind: db, tier: table, x: 12, y: 1.5, description: ログから選ばれた一貫した表の状態。, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§3}]}
-  reader: {label: Reader / Query Engine, kind: service, tier: write, x: 15, y: 1.5, description: スナップショットを使ってデータを読む。, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§3},{type: doc, ref: docs/reference-delta-lake.md#§5}]}
+  writer:
+    label: Writer / Engine
+    kind: service
+    tier: write
+    x: 0
+    'y': 1.5
+    description: データファイルを書き、コミットを作る。
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§2
+  data:
+    label: Data Files
+    kind: db
+    shape3D: crate
+    tier: table
+    x: 3
+    'y': 1.5
+    description: 表の行を格納するファイル。
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§1
+  log:
+    label: Delta JSON Log
+    kind: queue
+    tier: table
+    x: 6
+    'y': 1.5
+    description: add/remove 等の原子的な変更をバージョン順に記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§2
+  checkpoint:
+    label: Checkpoint
+    kind: db
+    tier: table
+    x: 9
+    'y': 1.5
+    description: あるバージョンまでの状態を短縮復元する。
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§4
+  snapshot:
+    label: Consistent Snapshot
+    kind: db
+    tier: table
+    x: 12
+    'y': 1.5
+    description: ログから選ばれた一貫した表の状態。
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§3
+  reader:
+    label: Reader / Query Engine
+    kind: service
+    tier: write
+    x: 15
+    'y': 1.5
+    description: スナップショットを使ってデータを読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§3
+      - type: doc
+        ref: docs/reference-delta-lake.md#§5
 links:
-  - {id: write-data, from: writer, to: data, label: データファイルを書き込む, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§2}]}
-  - {id: commit, from: writer, to: log, label: add/remove をコミット, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§2}]}
-  - {id: checkpointing, from: log, to: checkpoint, label: 状態を Checkpoint 化, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§4}]}
-  - {id: replay, from: checkpoint, to: snapshot, label: 後続ログを適用, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§4}]}
-  - {id: assemble, from: log, to: snapshot, label: MVCC の状態を復元, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§3}]}
-  - {id: read, from: snapshot, to: reader, label: 一貫した状態を読む, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§3}]}
-  - {id: files, from: data, to: reader, label: 対象ファイルをスキャン, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§1}]}
+  - id: write-data
+    from: writer
+    to: data
+    label: データファイルを書き込む
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§2
+  - id: commit
+    from: writer
+    to: log
+    label: add/remove をコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§2
+  - id: checkpointing
+    from: log
+    to: checkpoint
+    label: 状態を Checkpoint 化
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§4
+  - id: replay
+    from: checkpoint
+    to: snapshot
+    label: 後続ログを適用
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§4
+  - id: assemble
+    from: log
+    to: snapshot
+    label: MVCC の状態を復元
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§3
+  - id: read
+    from: snapshot
+    to: reader
+    label: 一貫した状態を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§3
+  - id: files
+    from: data
+    to: reader
+    label: 対象ファイルをスキャン
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§1
 scenarios:
-  - {id: commit-read, label: 注文をコミットして読む, evidence: [{type: doc, ref: docs/reference-delta-lake.md#§6}], steps: [{links: [write-data, commit], note: 新しいデータファイルを書き、JSON ログへ原子的にコミットする。}, {links: [checkpointing, replay, assemble], note: Checkpoint と後続ログから表のスナップショットを復元する。}, {links: [read, files], note: 読み手が同じバージョンのファイルを読む。}]}
+  - id: commit-read
+    label: 注文をコミットして読む
+    evidence:
+      - type: doc
+        ref: docs/reference-delta-lake.md#§6
+    steps:
+      - links:
+          - write-data
+          - commit
+        note: 新しいデータファイルを書き、JSON ログへ原子的にコミットする。
+      - links:
+          - checkpointing
+          - replay
+          - assemble
+        note: Checkpoint と後続ログから表のスナップショットを復元する。
+      - links:
+          - read
+          - files
+        note: 読み手が同じバージョンのファイルを読む。
 implementations:
   - id: spark-s3
     label: Spark・Delta Lake・Amazon S3
@@ -46,7 +180,7 @@ implementations:
         kind: service
         tier: write
         x: 0
-        y: 1.5
+        'y': 1.5
         description: データファイルを生成し、LogStore でコミットを公開する。
         realizes:
           - writer
@@ -58,19 +192,20 @@ implementations:
         kind: file
         tier: table
         x: 3
-        y: 1.5
+        'y': 1.5
         description: Parquet のデータ本体を保持する。
         realizes:
           - data
         evidence:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
+        svc: s3
       spark-s3-log:
         label: S3 の `_delta_log`（コミット・チェックポイント）
         kind: file
         tier: table
         x: 5
-        y: 1.5
+        'y': 1.5
         description: テーブルの履歴と、復元を短縮するチェックポイントを保持する。
         realizes:
           - log
@@ -78,12 +213,13 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
+        svc: s3
       spark-s3-reader:
         label: Apache Spark（ログ再生と読み取り）
         kind: db
         tier: write
         x: 9
-        y: 1.5
+        'y': 1.5
         description: 有効ファイル集合を復元し、対象のデータを読む。
         realizes:
           - snapshot
@@ -96,7 +232,7 @@ implementations:
         kind: service
         tier: table
         x: 9
-        y: 2.5
+        'y': 2.5
         description: 複数クラスター間で新規ログファイル作成を調停する。
         svc: dynamodb
         evidence:
@@ -118,3 +254,18 @@ implementations:
           - spark-s3-ddb
           - spark-s3-log
           - spark-s3-data
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - table
+        nodes:
+          - spark-s3-data
+          - spark-s3-log
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - table
+        nodes:
+          - spark-s3-ddb

@@ -1,0 +1,348 @@
+name: Autoware の自動運転処理
+description: センサー、自己位置推定、周辺認識、計画、制御と車両インターフェースを追う。
+reference:
+  objectives:
+    - 観測・位置推定・認識・計画・制御の役割を区別する。
+    - 地図と車両インターフェースの接続を追う。
+    - 実車ごとの安全検証の必要性を理解する。
+  sources:
+    - title: Autoware module overview
+      url: https://autowarefoundation.github.io/AWSIM-Labs/main/Introduction/Autoware/
+    - title: Autoware Core
+      url: https://autowarefoundation.github.io/autoware_core/main/
+sources:
+  - docs/reference-autoware-autonomous-driving.md
+evidence:
+  - type: doc
+    ref: docs/reference-autoware-autonomous-driving.md#§1
+  - type: doc
+    ref: docs/reference-autoware-autonomous-driving.md#§3
+tiers:
+  - id: flow
+    label: 認識から制御
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: センサー・地図と車両
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  sense:
+    label: センサーデータ取得
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: LiDAR、カメラ、GNSS 等を前処理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  perception:
+    label: 周辺の認識
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: 物体や信号を認識する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  planning:
+    label: 走行軌道の計画
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: 位置、認識、地図から軌道を計画する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  control:
+    label: 軌道追従の制御
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 軌道に従う指令を求める。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  interface:
+    label: 車両インターフェース
+    kind: service
+    tier: flow
+    x: 16
+    'y': 1.5
+    description: 車両固有の制御・状態に接続する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  sensors:
+    label: センサー
+    kind: external
+    tier: support
+    x: 0
+    'y': 1.5
+    description: センサーは実車またはシミュレーターから入力される。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  localization:
+    label: 自己位置推定
+    kind: service
+    tier: support
+    x: 4
+    'y': 1.5
+    description: センサーや地図から位置と姿勢を推定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  map:
+    label: 地図
+    kind: file
+    tier: support
+    x: 8
+    'y': 1.5
+    description: 地図は位置推定と計画の参照情報。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  vehicle:
+    label: 車両・アクチュエーター
+    kind: external
+    tier: support
+    x: 16
+    'y': 1.5
+    description: 実車への具体的接続は車両ごとに設計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+links:
+  - id: observe
+    from: sensors
+    to: sense
+    label: センサー値を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: perceive
+    from: sense
+    to: perception
+    label: 前処理結果を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: localize
+    from: sense
+    to: localization
+    label: 位置推定に観測を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: maploc
+    from: map
+    to: localization
+    label: 地図を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: mapplan
+    from: map
+    to: planning
+    label: 交通規則・地図を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: positions
+    from: localization
+    to: planning
+    label: 自車位置を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: objects
+    from: perception
+    to: planning
+    label: 周辺認識を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: trajectory
+    from: planning
+    to: control
+    label: 軌道を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: command
+    from: control
+    to: interface
+    label: 制御指令を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+  - id: actuate
+    from: interface
+    to: vehicle
+    label: 車両に指令
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+scenarios:
+  - id: drive
+    label: 観測から制御まで
+    evidence:
+      - type: doc
+        ref: docs/reference-autoware-autonomous-driving.md#§2
+    steps:
+      - links:
+          - observe
+          - perceive
+          - localize
+          - maploc
+        note: 観測を認識と自己位置推定に用いる。
+      - links:
+          - objects
+          - positions
+          - mapplan
+          - trajectory
+        note: 認識・位置・地図から軌道を計画する。
+      - links:
+          - command
+          - actuate
+        note: 車両インターフェース経由で制御指令を送る。
+implementations:
+  - id: example
+    label: Autoware のモジュール構成例
+    description: Autoware の説明に基づく機能例。実際のセンサー、車両固有インターフェースとアルゴリズムは環境ごとに異なる。
+    sources:
+      - title: Autoware module overview
+        url: https://autowarefoundation.github.io/AWSIM-Labs/main/Introduction/Autoware/
+      - title: Autoware Core
+        url: https://autowarefoundation.github.io/autoware_core/main/
+    tiers:
+      - id: flow
+        label: 認識から制御
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: センサー・地図と車両
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-sense:
+        label: Autoware Sensing
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: LiDAR、カメラ、GNSS 等を前処理する。
+        realizes:
+          - sense
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-perception:
+        label: Autoware Perception
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: 物体や信号を認識する。
+        realizes:
+          - perception
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-planning:
+        label: Autoware Planning
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: 位置、認識、地図から軌道を計画する。
+        realizes:
+          - planning
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-control:
+        label: Autoware Control
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        description: 軌道に従う指令を求める。
+        realizes:
+          - control
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-interface:
+        label: Autoware Vehicle Interface
+        kind: service
+        tier: flow
+        x: 16
+        'y': 1.5
+        description: 車両固有の制御・状態に接続する。
+        realizes:
+          - interface
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-sensors:
+        label: LiDAR・カメラ・GNSS / IMU
+        kind: external
+        tier: support
+        x: 0
+        'y': 1.5
+        description: センサーは実車またはシミュレーターから入力される。
+        realizes:
+          - sensors
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-localization:
+        label: Autoware Localization
+        kind: service
+        tier: support
+        x: 4
+        'y': 1.5
+        description: センサーや地図から位置と姿勢を推定する。
+        realizes:
+          - localization
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-map:
+        label: Autoware 地図
+        kind: file
+        tier: support
+        x: 8
+        'y': 1.5
+        description: 地図は位置推定と計画の参照情報。
+        realizes:
+          - map
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4
+      ex-vehicle:
+        label: 車両の制御対象
+        kind: external
+        tier: support
+        x: 16
+        'y': 1.5
+        description: 実車への具体的接続は車両ごとに設計する。
+        realizes:
+          - vehicle
+        evidence:
+          - type: doc
+            ref: docs/reference-autoware-autonomous-driving.md#§4

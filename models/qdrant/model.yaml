@@ -1,0 +1,244 @@
+name: Qdrant のベクトル検索
+description: ベクトルと付随属性をコレクションに保存し、条件付き類似検索を行う。
+reference:
+  objectives:
+    - ベクトルと付随属性をコレクションに保存し、条件付き類似検索を行う。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: Qdrant architecture
+      url: https://qdrant.tech/documentation/overview/
+    - title: Qdrant
+      url: https://github.com/qdrant/qdrant
+sources:
+  - docs/reference-qdrant.md
+evidence:
+  - type: doc
+    ref: docs/reference-qdrant.md#§1
+  - type: doc
+    ref: docs/reference-qdrant.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  app:
+    label: 検索アプリ
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  embed:
+    label: ベクトルの生成
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  collection:
+    label: ベクトルと属性の保存
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  search:
+    label: 近傍・条件付き検索
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  result:
+    label: 検索結果の利用
+    kind: actor
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  segment:
+    label: 索引とデータの単位
+    kind: file
+    tier: support
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+links:
+  - id: vector
+    from: app
+    to: embed
+    label: 入力をベクトル化
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  - id: insert
+    from: embed
+    to: collection
+    label: ベクトルと属性を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  - id: index
+    from: collection
+    to: segment
+    label: セグメントと索引を構成
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  - id: query
+    from: collection
+    to: search
+    label: ベクトルと属性を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  - id: result
+    from: search
+    to: result
+    label: 候補を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+  - id: search-request
+    from: app
+    to: search
+    label: 類似検索を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-qdrant.md#§2
+    steps:
+      - links:
+          - vector
+        note: 入力をベクトル化。
+      - links:
+          - insert
+        note: ベクトルと属性を登録。
+      - links:
+          - index
+        note: セグメントと索引を構成。
+      - links:
+          - query
+        note: ベクトルと属性を検索。
+      - links:
+          - result
+        note: 候補を返す。
+      - links:
+          - search-request
+        note: 類似検索を要求。
+implementations:
+  - id: example
+    label: Qdrant のベクトル検索の構成例
+    description: 外部の埋め込みモデルで生成したベクトルを自己運用の Qdrant コレクションに登録し、検索する例。モデル提供者は固定しない。
+    sources:
+      - title: Qdrant architecture
+        url: https://qdrant.tech/documentation/overview/
+      - title: Qdrant
+        url: https://github.com/qdrant/qdrant
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-app:
+        label: 検索アプリ
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-qdrant.md#§4
+        realizes:
+          - app
+      ex-embed:
+        label: 設定された埋め込みモデル
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-qdrant.md#§4
+        realizes:
+          - embed
+      ex-collection:
+        label: Qdrant コレクション
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-qdrant.md#§4
+        realizes:
+          - collection
+      ex-search:
+        label: Qdrant 検索 API
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-qdrant.md#§4
+        realizes:
+          - search
+      ex-result:
+        label: 検索結果の利用者
+        kind: actor
+        tier: flow
+        x: 16
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-qdrant.md#§4
+        realizes:
+          - result
+      ex-segment:
+        label: Qdrant セグメント
+        kind: file
+        tier: support
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-qdrant.md#§4
+        realizes:
+          - segment

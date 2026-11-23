@@ -1,6 +1,8 @@
-name: "DWH のファクトテーブル：トランザクション・定期・累積スナップショット"
-description: "受注から出荷までの一つの明細を、イベントの追記、倉庫別の日次集計、明細の進捗更新で記録し、問いに合う粒度を選ぶ。"
-parent: {"model":"dwh-design-patterns","node":"fact-types"}
+name: DWH のファクトテーブル：トランザクション・定期・累積スナップショット
+description: 受注から出荷までの一つの明細を、イベントの追記、倉庫別の日次集計、明細の進捗更新で記録し、問いに合う粒度を選ぶ。
+parent:
+  model: dwh-design-patterns
+  node: fact-types
 reference:
   objectives:
     - 測定したい業務プロセスから、1 行が何を表すかを決める。
@@ -22,37 +24,187 @@ reference:
     - title: Kimball Group Additive, Semi-Additive, and Non-Additive Facts
       url: >-
         https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/
-sources: ["docs/reference-dwh-fact-table-types.md"]
+sources:
+  - docs/reference-dwh-fact-table-types.md
 evidence:
-  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§1"}
-  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}
-  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}
-  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§4"}
-  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}
-  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§6"}
-  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§7"}
+  - type: doc
+    ref: docs/reference-dwh-fact-table-types.md#§1
+  - type: doc
+    ref: docs/reference-dwh-fact-table-types.md#§2
+  - type: doc
+    ref: docs/reference-dwh-fact-table-types.md#§3
+  - type: doc
+    ref: docs/reference-dwh-fact-table-types.md#§4
+  - type: doc
+    ref: docs/reference-dwh-fact-table-types.md#§5
+  - type: doc
+    ref: docs/reference-dwh-fact-table-types.md#§6
+  - type: doc
+    ref: docs/reference-dwh-fact-table-types.md#§7
 tiers:
-  - {"id":"input","label":"出荷業務と日次締め","z":1,"origin":[0,0],"size":[16,3]}
-  - {"id":"warehouse","label":"粒度が異なるファクト","z":0,"origin":[0,0],"size":[16,3]}
+  - id: input
+    label: 出荷業務と日次締め
+    z: 1
+    origin:
+      - 0
+      - 0
+    size:
+      - 16
+      - 3
+  - id: warehouse
+    label: 粒度が異なるファクト
+    z: 0
+    origin:
+      - 0
+      - 0
+    size:
+      - 16
+      - 3
 nodes:
-  events: {"label":"出荷工程のイベント","kind":"queue","tier":"input","x":0.5,"y":1.5,"description":"倉庫 W1 で受注受付・梱包完了・出荷を記録する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§1"}]}
-  load: {"label":"イベント取り込み","kind":"worker","tier":"input","x":4.4,"y":1.5,"description":"イベント ID で明細の工程を識別し、追記と進捗更新に使う。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
-  day-close: {"label":"倉庫別の日次締め","kind":"worker","tier":"input","x":8.6,"y":1.5,"description":"日中の出荷と日末の未出荷を、営業日と倉庫で集計する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
-  analyst: {"label":"分析者","kind":"actor","tier":"input","x":13.4,"y":1.5,"description":"個々の工程、日別の残、受注から出荷までの時間を分析する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
-  transactions: {"label":"トランザクションファクト","kind":"db","tier":"warehouse","x":2.2,"y":1.5,"description":"1 行は注文の 1 明細・1 工程イベント。発生に応じて行を追加する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
-  periodic: {"label":"定期スナップショット","kind":"db","tier":"warehouse","x":6.2,"y":1.5,"description":"1 行は倉庫・営業日。出荷のない日にも締めの行を持つ。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
-  accumulating: {"label":"累積スナップショット","kind":"db","tier":"warehouse","x":10.4,"y":1.5,"description":"1 行は注文の 1 明細。工程が進むたびにその行の日時列を更新する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§4"}]}
-  factless: {"label":"数値尺度のないファクト","kind":"db","tier":"warehouse","x":14.4,"y":1.5,"description":"発生の有無などをディメンションの組み合わせで記録する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§6"}]}
+  events:
+    label: 出荷工程のイベント
+    kind: queue
+    tier: input
+    x: 0.5
+    'y': 1.5
+    description: 倉庫 W1 で受注受付・梱包完了・出荷を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§1
+  load:
+    label: イベント取り込み
+    kind: worker
+    tier: input
+    x: 4.4
+    'y': 1.5
+    description: イベント ID で明細の工程を識別し、追記と進捗更新に使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§2
+  day-close:
+    label: 倉庫別の日次締め
+    kind: worker
+    tier: input
+    x: 8.6
+    'y': 1.5
+    description: 日中の出荷と日末の未出荷を、営業日と倉庫で集計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§3
+  analyst:
+    label: 分析者
+    kind: actor
+    tier: input
+    x: 13.4
+    'y': 1.5
+    description: 個々の工程、日別の残、受注から出荷までの時間を分析する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§5
+  transactions:
+    label: トランザクションファクト
+    kind: db
+    tier: warehouse
+    x: 2.2
+    'y': 1.5
+    description: 1 行は注文の 1 明細・1 工程イベント。発生に応じて行を追加する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§2
+  periodic:
+    label: 定期スナップショット
+    kind: db
+    tier: warehouse
+    x: 6.2
+    'y': 1.5
+    description: 1 行は倉庫・営業日。出荷のない日にも締めの行を持つ。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§3
+  accumulating:
+    label: 累積スナップショット
+    kind: db
+    tier: warehouse
+    x: 10.4
+    'y': 1.5
+    description: 1 行は注文の 1 明細。工程が進むたびにその行の日時列を更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§4
+  factless:
+    label: 数値尺度のないファクト
+    kind: db
+    tier: warehouse
+    x: 14.4
+    'y': 1.5
+    description: 発生の有無などをディメンションの組み合わせで記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§6
 links:
-  - {"id":"collect","from":"events","to":"load","label":"発生した工程を取り込む","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
-  - {"id":"append","from":"load","to":"transactions","label":"イベントごとに 1 行を追加","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
-  - {"id":"maintain","from":"load","to":"accumulating","label":"同じ明細行の工程日時を更新","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§4"}]}
-  - {"id":"summarize","from":"transactions","to":"day-close","label":"営業日・倉庫で締める","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
-  - {"id":"snapshot-row","from":"day-close","to":"periodic","label":"活動のない日も 1 行を保存","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
-  - {"id":"drill-event","from":"transactions","to":"analyst","label":"個々の工程を調べる","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
-  - {"id":"read-daily","from":"periodic","to":"analyst","label":"日次の出荷数と残を読む","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
-  - {"id":"lead-time","from":"accumulating","to":"analyst","label":"受注から出荷までの時間を読む","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
-  - {"id":"record-relation","from":"load","to":"factless","label":"計測値のない実施イベントを記録","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§6"}]}
+  - id: collect
+    from: events
+    to: load
+    label: 発生した工程を取り込む
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§2
+  - id: append
+    from: load
+    to: transactions
+    label: イベントごとに 1 行を追加
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§2
+  - id: maintain
+    from: load
+    to: accumulating
+    label: 同じ明細行の工程日時を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§4
+  - id: summarize
+    from: transactions
+    to: day-close
+    label: 営業日・倉庫で締める
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§3
+  - id: snapshot-row
+    from: day-close
+    to: periodic
+    label: 活動のない日も 1 行を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§3
+  - id: drill-event
+    from: transactions
+    to: analyst
+    label: 個々の工程を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§5
+  - id: read-daily
+    from: periodic
+    to: analyst
+    label: 日次の出荷数と残を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§5
+  - id: lead-time
+    from: accumulating
+    to: analyst
+    label: 受注から出荷までの時間を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§5
+  - id: record-relation
+    from: load
+    to: factless
+    label: 計測値のない実施イベントを記録
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§6
 scenarios:
   - id: one-line
     label: 明細 42-1 の 3 工程を記録する
@@ -162,19 +314,45 @@ scenarios:
         highlight:
           - day20-row
 requirements:
-  - {"id":"BR-01","kind":"rule","title":"1 行が表す業務上の粒度を固定する","text":"明細のイベント、倉庫の営業日、明細の進捗をそれぞれの粒度で記録する。","links":["append","snapshot-row","maintain"],"evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
-  - {"id":"BR-02","kind":"usecase","title":"出荷実績と期末残高を計算する","text":"期間内の出荷件数と、期間末時点の未出荷明細数を取得する。","links":["snapshot-row","read-daily"],"evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
+  - id: BR-01
+    kind: rule
+    title: 1 行が表す業務上の粒度を固定する
+    text: 明細のイベント、倉庫の営業日、明細の進捗をそれぞれの粒度で記録する。
+    links:
+      - append
+      - snapshot-row
+      - maintain
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§5
+  - id: BR-02
+    kind: usecase
+    title: 出荷実績と期末残高を計算する
+    text: 期間内の出荷件数と、期間末時点の未出荷明細数を取得する。
+    links:
+      - snapshot-row
+      - read-daily
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§3
 unknowns:
-  - {"id":"UNK-01","text":"実際の締め時刻、倉庫間移動、分割出荷、取消、遅着イベントの扱いは未確認。","refs":["events","day-close","accumulating"]}
-gates: {maxDrift: 0, maxHigh: 0}
+  - id: UNK-01
+    text: 実際の締め時刻、倉庫間移動、分割出荷、取消、遅着イベントの扱いは未確認。
+    refs:
+      - events
+      - day-close
+      - accumulating
+gates:
+  maxDrift: 0
+  maxHigh: 0
 blocks:
   id: daily-rows
   title: 倉庫 W1 の日次ファクト
   note: 各行の出荷は日中の出荷明細数、未出荷は締め時点の未出荷明細数。時点をまたいで未出荷を合計すると、同じ明細を重複して数える。
   legend:
-    "0": 工程イベントあり
-    "1": 工程イベントなし
-    "2": 倉庫・営業日ごとのファクト行
+    '0': 工程イベントあり
+    '1': 工程イベントなし
+    '2': 倉庫・営業日ごとのファクト行
   lanes:
     - id: days
       label: 締め前の営業日
@@ -220,33 +398,206 @@ timeline:
       node: accumulating
       description: 同じ明細行に出荷日時と経過時間を記録する。
       sample: order_line=42-1, ordered=11/18 09:00, packed=11/18 14:30, shipped=11/20 10:00, elapsed_hours=49
-
 implementations:
   - id: bq-shipping-facts
-    label: "BigQuery の出荷工程ファクト"
-    description: "出荷の工程イベントから、異なる粒度でトランザクション・日次・進捗・発生有無の表を作る実装例。"
+    label: BigQuery の出荷工程ファクト
+    description: 出荷の工程イベントから、異なる粒度でトランザクション・日次・進捗・発生有無の表を作る実装例。
     sources:
-      - {title: "Kimball Group Transaction Fact Tables", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/transaction-fact-table/"}
-      - {title: "Kimball Group Periodic Snapshot Fact Tables", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/periodic-snapshot-fact-table/"}
-      - {title: "Kimball Group Accumulating Snapshot Fact Tables", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/accumulating-snapshot-fact-table/"}
-      - {title: "Kimball Group Factless Fact Tables", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/factless-fact-table/"}
-      - {title: "Kimball Group Additive, Semi-Additive, and Non-Additive Facts", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/"}
-      - {title: "BigQuery パーティション表", url: "https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables"}
-      - {title: "BigQuery スケジュールされたクエリ", url: "https://docs.cloud.google.com/bigquery/docs/scheduling-queries"}
-      - {title: "BigQuery DML", url: "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax"}
+      - title: Kimball Group Transaction Fact Tables
+        url: >-
+          https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/transaction-fact-table/
+      - title: Kimball Group Periodic Snapshot Fact Tables
+        url: >-
+          https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/periodic-snapshot-fact-table/
+      - title: Kimball Group Accumulating Snapshot Fact Tables
+        url: >-
+          https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/accumulating-snapshot-fact-table/
+      - title: Kimball Group Factless Fact Tables
+        url: >-
+          https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/factless-fact-table/
+      - title: Kimball Group Additive, Semi-Additive, and Non-Additive Facts
+        url: >-
+          https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/
+      - title: BigQuery パーティション表
+        url: https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables
+      - title: BigQuery スケジュールされたクエリ
+        url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries
+      - title: BigQuery DML
+        url: https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax
     tiers:
-      - {id: "input", label: "出荷業務と日次締め", z: 1, origin: [0,0], size: [16,3]}
-      - {id: "warehouse", label: "粒度が異なるファクト", z: 0, origin: [0,0], size: [16,3]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 2, size: [8,3]}
+      - id: input
+        label: 出荷業務と日次締め
+        z: 1
+        origin:
+          - 0
+          - 0
+        size:
+          - 16
+          - 3
+      - id: warehouse
+        label: 粒度が異なるファクト
+        z: 0
+        origin:
+          - 0
+          - 0
+        size:
+          - 16
+          - 3
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 2
+        size:
+          - 8
+          - 3
     nodes:
-      example-events: {label: "landing.shipping_events", kind: "table", tier: "input", x: 0.5, y: 1.5, realizes: ["events"], description: "発生時刻と一意なイベント識別子を保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-load: {label: "BigQuery の増分ロード SQL", kind: "workflow", tier: "input", x: 4.4, y: 1.5, realizes: ["load"], description: "一意なイベントを追記し、工程が進んだ注文を特定する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-day-close: {label: "スケジュールされた日次締め SQL", kind: "workflow", tier: "input", x: 8.6, y: 1.5, realizes: ["day-close"], description: "倉庫と営業日の組ごとに出荷数と残数を計算する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-analyst: {label: "集計・工程分析用 SQL ビュー", kind: "table", tier: "input", x: 13.4, y: 1.5, realizes: ["analyst"], description: "指標に対応する粒度の表をクエリする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-transactions: {label: "warehouse.fact_shipping_event", kind: "table", tier: "warehouse", x: 2.2, y: 1.5, realizes: ["transactions"], description: "発生日で区切る 1 工程イベントごとの表。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-periodic: {label: "warehouse.fact_warehouse_day", kind: "table", tier: "warehouse", x: 6.2, y: 1.5, realizes: ["periodic"], description: "1 倉庫・営業日ごとに出荷数と残数を保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-accumulating: {label: "warehouse.fact_order_line_progress", kind: "table", tier: "warehouse", x: 10.4, y: 1.5, realizes: ["accumulating"], description: "1 受注明細の工程時刻を MERGE 相当の DML で更新する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-factless: {label: "warehouse.fact_coverage", kind: "table", tier: "warehouse", x: 14.4, y: 1.5, realizes: ["factless"], description: "実施した明細と工程のキーの組み合わせを保持する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
-      example-calendar: {label: "倉庫と営業日を列挙するカレンダー", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "出荷がない営業日にも日次行を用意する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
+      example-events:
+        label: landing.shipping_events
+        kind: table
+        tier: input
+        x: 0.5
+        'y': 1.5
+        realizes:
+          - events
+        description: 発生時刻と一意なイベント識別子を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
+      example-load:
+        label: BigQuery の増分ロード SQL
+        kind: workflow
+        tier: input
+        x: 4.4
+        'y': 1.5
+        realizes:
+          - load
+        description: 一意なイベントを追記し、工程が進んだ注文を特定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
+      example-day-close:
+        label: スケジュールされた日次締め SQL
+        kind: workflow
+        tier: input
+        svc: gcp:bigquery
+        x: 8.6
+        'y': 1.5
+        realizes:
+          - day-close
+        description: 倉庫と営業日の組ごとに出荷数と残数を計算する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+      example-analyst:
+        label: 集計・工程分析用 SQL ビュー
+        kind: table
+        tier: input
+        x: 13.4
+        'y': 1.5
+        realizes:
+          - analyst
+        description: 指標に対応する粒度の表をクエリする。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
+      example-transactions:
+        label: warehouse.fact_shipping_event
+        kind: table
+        tier: warehouse
+        x: 2.2
+        'y': 1.5
+        realizes:
+          - transactions
+        description: 発生日で区切る 1 工程イベントごとの表。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
+      example-periodic:
+        label: warehouse.fact_warehouse_day
+        kind: table
+        tier: warehouse
+        x: 6.2
+        'y': 1.5
+        realizes:
+          - periodic
+        description: 1 倉庫・営業日ごとに出荷数と残数を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
+      example-accumulating:
+        label: warehouse.fact_order_line_progress
+        kind: table
+        tier: warehouse
+        x: 10.4
+        'y': 1.5
+        realizes:
+          - accumulating
+        description: 1 受注明細の工程時刻を MERGE 相当の DML で更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
+      example-factless:
+        label: warehouse.fact_coverage
+        kind: table
+        tier: warehouse
+        x: 14.4
+        'y': 1.5
+        realizes:
+          - factless
+        description: 実施した明細と工程のキーの組み合わせを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
+      example-calendar:
+        label: 倉庫と営業日を列挙するカレンダー
+        kind: table
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 出荷がない営業日にも日次行を用意する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+        svc: gcp:bigquery
     links:
-      - {id: "example-calendar-connection", from: "example-calendar", to: "example-day-close", label: "ゼロ件の日を日次締めに含める", evidence: [{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§8"}]}
+      - id: example-calendar-connection
+        from: example-calendar
+        to: example-day-close
+        label: ゼロ件の日を日次締めに含める
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-fact-table-types.md#§8
+    groups:
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - input
+        nodes:
+          - example-events
+          - example-load
+          - example-day-close
+          - example-analyst
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - warehouse
+        nodes:
+          - example-transactions
+          - example-periodic
+          - example-accumulating
+          - example-factless
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - implementation-setup
+        nodes:
+          - example-calendar

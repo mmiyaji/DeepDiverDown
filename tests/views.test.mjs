@@ -13,6 +13,20 @@ test('available：AZ やサブネットの情報があるモデルだけネッ�
   assert.ok(!V.available(M['ec-shop']).includes('network'));
 });
 
+test('実装例のアカウント境界は対象フロアに表示し、重複するサービス枠をまとめる', () => {
+  const m = M['etl-elt'];
+  const v = V.project(base(m), m, 'impl:aws-redshift');
+  const account = v.groups.find(g => g.label === 'AWS 分析環境');
+  assert.ok(account.tier.includes('input'));
+  assert.ok(account.tier.includes('compare'));
+  assert.ok(account.nodes.includes('aws-redshift-source'));
+  assert.ok(!v.groups.some(g => g.label === 'AWS サービス' && g.nodes?.includes('aws-redshift-source')));
+  const clean = M['data-clean-room'];
+  const other = V.project(base(clean), clean, 'impl:aws-cleanrooms');
+  assert.ok(other.groups.some(g => g.label === '共同分析の AWS 範囲' && g.tier.includes('flow')));
+  assert.ok(other.groups.some(g => g.nodes?.includes('aws-cleanrooms-media')));
+});
+
 test('logical（自動）：基盤部品を隠し、通り抜けた接続を機能どうしの接続にする', () => {
   const v = V.project(base(M['ec-shop']), M['ec-shop'], 'logical');
   assert.ok(!v.nodes.cdn && !v.nodes.alb, 'CDN・ALB は隠す');

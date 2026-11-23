@@ -57,7 +57,8 @@ Databricks on AWS で Iceberg テーブル用の REST 入口と、資産検索�
 | --- | --- | --- |
 | データ提供パイプライン・データ契約の検証 | Lakeflow Jobs | 検証タスクから公開タスクへ進む。検証ロジックは SQL などで実装する。 |
 | データ利用者 | Databricks ワークスペース利用者 | Catalog Explorer で資産を探し、必要な権限を申請する。 |
-| 処理エンジン | Databricks Runtime・外部 Iceberg クライアント | 対象テーブルを読み書きし、対応する処理のリネージを登録する。 |
+| 処理エンジン | Databricks Runtime | 対象テーブルを読み書きし、対応する処理のリネージを登録する。 |
+| 実装で追加 | 外部 Iceberg クライアント | Unity Catalog の Iceberg REST 入口を介して対象テーブルにアクセスする。 |
 | Iceberg REST Catalog・メタデータ・イベント収集・検索・リネージ・所有者・ポリシー・利用申請 | Databricks Unity Catalog | REST インターフェース、ワークスペース内のリネージ、検索、権限申請を提供する。 |
 | データ・メタデータファイル | Amazon S3（管理ストレージ） | 管理 Iceberg テーブルのファイルを保持する。 |
 | 実装で追加 | 契約検証結果の表 | 契約版、対象資産、検証時刻、成否を SQL で確認できるようにする。 |

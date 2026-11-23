@@ -55,7 +55,7 @@ nodes:
     kind: external
     tier: external
     x: 1
-    y: 1
+    'y': 1
     description: スキーマ、クエリ、ダッシュボードの取り込み元。
     evidence:
       - type: doc
@@ -67,7 +67,7 @@ nodes:
     kind: actor
     tier: external
     x: 6
-    y: 1
+    'y': 1
     description: タグ・所有者・契約をキュレーションする。
     evidence:
       - type: doc
@@ -81,7 +81,7 @@ nodes:
     kind: actor
     tier: external
     x: 10
-    y: 1
+    'y': 1
     description: 資産を探して下流の影響を確認する。
     evidence:
       - type: doc
@@ -91,7 +91,7 @@ nodes:
     kind: worker
     tier: service
     x: 1
-    y: 1
+    'y': 1
     description: 外部ソースから必要な情報を抽出する。
     evidence:
       - type: doc
@@ -103,7 +103,7 @@ nodes:
     kind: service
     tier: service
     x: 5
-    y: 1
+    'y': 1
     description: メタデータ API と操作の認可を提供する。
     evidence:
       - type: doc
@@ -115,7 +115,7 @@ nodes:
     kind: worker
     tier: service
     x: 8
-    y: 2.5
+    'y': 2.5
     description: スキーマなどの契約条件を管理し、検証結果を記録する。
     evidence:
       - type: doc
@@ -125,7 +125,7 @@ nodes:
     kind: service
     tier: service
     x: 11
-    y: 1
+    'y': 1
     description: 資産、所有者、分類タグや関連列を表示する。
     evidence:
       - type: doc
@@ -137,7 +137,7 @@ nodes:
     kind: db
     tier: stores
     x: 5
-    y: 1
+    'y': 1
     description: カタログの資産・関係を保存する。
     evidence:
       - type: doc
@@ -147,7 +147,7 @@ nodes:
     kind: db
     tier: stores
     x: 10
-    y: 1
+    'y': 1
     description: メタデータを検索可能にする索引。
     evidence:
       - type: doc
@@ -300,7 +300,7 @@ implementations:
         kind: external
         tier: external
         x: 1
-        y: 1
+        'y': 1
         description: テーブルとリネージ用のクエリログを提供する。
         svc: gcp:bigquery
         realizes:
@@ -313,7 +313,7 @@ implementations:
         kind: actor
         tier: external
         x: 6
-        y: 1
+        'y': 1
         description: 分類や契約を担当する。
         realizes:
           - steward
@@ -325,9 +325,10 @@ implementations:
         kind: external
         tier: external
         x: 3.8
-        y: 1
+        'y': 1
         description: Looker コネクタがダッシュボード・チャートを API から取得する。
-        realizes: [source]
+        realizes:
+          - source
         evidence:
           - type: doc
             ref: docs/reference-openmetadata.md#§7
@@ -336,7 +337,7 @@ implementations:
         kind: file
         tier: external
         x: 3.8
-        y: 2.7
+        'y': 2.7
         description: 対応する LookML View と、その参照先テーブルのリネージを収集するために使用する。
         evidence:
           - type: doc
@@ -346,7 +347,7 @@ implementations:
         kind: actor
         tier: external
         x: 10
-        y: 1
+        'y': 1
         description: 資産と依存関係を検索する。
         realizes:
           - consumer
@@ -358,7 +359,7 @@ implementations:
         kind: worker
         tier: service
         x: 1
-        y: 1
+        'y': 1
         description: BigQuery のスキーマ・クエリログと Looker のメタデータを、別のコネクタで収集する。
         realizes:
           - ingest
@@ -370,7 +371,7 @@ implementations:
         kind: catalog
         tier: service
         x: 7
-        y: 1
+        'y': 1
         description: API と検索画面、契約の取得・検証を提供する。
         realizes:
           - api
@@ -384,7 +385,7 @@ implementations:
         kind: db
         tier: stores
         x: 5
-        y: 1
+        'y': 1
         description: カタログのエンティティと関係を保持する。
         realizes:
           - db
@@ -396,7 +397,7 @@ implementations:
         kind: db
         tier: stores
         x: 10
-        y: 1
+        'y': 1
         description: カタログを索引化する。
         realizes:
           - index
@@ -408,7 +409,7 @@ implementations:
         kind: workflow
         tier: service
         x: 3.8
-        y: 2.6
+        'y': 2.6
         description: 収集ワークフローを起動する。
         evidence:
           - type: doc
@@ -418,7 +419,8 @@ implementations:
         from: openmetadata-compose-looker
         to: openmetadata-compose-ingestion
         label: ダッシュボードのメタデータを収集
-        realizes: [extract]
+        realizes:
+          - extract
         evidence:
           - type: doc
             ref: docs/reference-openmetadata.md#§7
@@ -426,7 +428,8 @@ implementations:
         from: openmetadata-compose-lookml
         to: openmetadata-compose-ingestion
         label: View と参照先テーブルの情報を収集
-        realizes: [extract]
+        realizes:
+          - extract
         evidence:
           - type: doc
             ref: docs/reference-openmetadata.md#§7
@@ -444,3 +447,11 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-openmetadata.md#§7
+    groups:
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud サービス
+        tier:
+          - external
+        nodes:
+          - openmetadata-compose-bigquery

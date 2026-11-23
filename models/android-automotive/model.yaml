@@ -1,0 +1,207 @@
+name: Android Automotive OS と VHAL
+description: 車載アプリから Car Service、VHAL と車両プロパティへ接続する。
+reference:
+  objectives:
+    - Car API、Car Service と VHAL を区別する。
+    - 模擬ハードウェアと実車実装を区別する。
+  sources:
+    - title: Vehicle HAL overview
+      url: https://source.android.com/docs/automotive/vhal
+    - title: VHAL reference implementation
+      url: https://source.android.com/docs/automotive/vhal/reference-implementation
+sources:
+  - docs/reference-android-automotive.md
+evidence:
+  - type: doc
+    ref: docs/reference-android-automotive.md#§1
+  - type: doc
+    ref: docs/reference-android-automotive.md#§3
+tiers:
+  - id: flow
+    label: 車載 API と HAL
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 車両プロパティ
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  app:
+    label: 車載アプリ
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 車載 API を呼び出す。
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+  service:
+    label: 車載サービス
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: Car API の呼び出しを処理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+  hal:
+    label: 車両抽象化 API
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: 車両プロパティを抽象化する。
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+  hardware:
+    label: 模擬車両実装
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 参照実装で模擬値を扱う。
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+  properties:
+    label: 模擬プロパティ
+    kind: db
+    tier: support
+    x: 12
+    'y': 1.5
+    description: 実車ではないメモリ内の模擬値。
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+links:
+  - id: call
+    from: app
+    to: service
+    label: Car API を呼ぶ
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+  - id: access
+    from: service
+    to: hal
+    label: 車両プロパティを要求
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+  - id: delegate
+    from: hal
+    to: hardware
+    label: 処理を委譲
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+  - id: read
+    from: hardware
+    to: properties
+    label: 模擬値を読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+scenarios:
+  - id: property
+    label: 模擬プロパティへのアクセス
+    evidence:
+      - type: doc
+        ref: docs/reference-android-automotive.md#§2
+    steps:
+      - links:
+          - call
+          - access
+          - delegate
+          - read
+        note: アプリが車両プロパティにアクセスする。
+implementations:
+  - id: example
+    label: AOSP VHAL 参照実装
+    description: FakeVehicleHardware を用いる参照実装の例。実車のハードウェア接続は OEM の実装による。
+    sources:
+      - title: Vehicle HAL overview
+        url: https://source.android.com/docs/automotive/vhal
+      - title: VHAL reference implementation
+        url: https://source.android.com/docs/automotive/vhal/reference-implementation
+    tiers:
+      - id: flow
+        label: 車載 API と HAL
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 車両プロパティ
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-app:
+        label: 車載 Android アプリ
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 車載 API を呼び出す。
+        realizes:
+          - app
+        evidence:
+          - type: doc
+            ref: docs/reference-android-automotive.md#§4
+      ex-service:
+        label: Android Car Service
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: Car API の呼び出しを処理する。
+        realizes:
+          - service
+        evidence:
+          - type: doc
+            ref: docs/reference-android-automotive.md#§4
+      ex-hal:
+        label: AIDL Vehicle HAL
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: 車両プロパティを抽象化する。
+        realizes:
+          - hal
+        evidence:
+          - type: doc
+            ref: docs/reference-android-automotive.md#§4
+      ex-hardware:
+        label: FakeVehicleHardware
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        description: 参照実装で模擬値を扱う。
+        realizes:
+          - hardware
+        evidence:
+          - type: doc
+            ref: docs/reference-android-automotive.md#§4
+      ex-properties:
+        label: 模擬車両プロパティ
+        kind: db
+        tier: support
+        x: 12
+        'y': 1.5
+        description: 実車ではないメモリ内の模擬値。
+        realizes:
+          - properties
+        evidence:
+          - type: doc
+            ref: docs/reference-android-automotive.md#§4

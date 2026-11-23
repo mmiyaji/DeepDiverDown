@@ -1,0 +1,255 @@
+{
+  "model": "agent-approval",
+  "name": "AI エージェントの承認・再開と観測",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "request": {
+      "type": "node",
+      "label": "依頼者",
+      "status": "claim"
+    },
+    "agent": {
+      "type": "node",
+      "label": "エージェント実行",
+      "status": "claim"
+    },
+    "approve": {
+      "type": "node",
+      "label": "承認者",
+      "status": "claim"
+    },
+    "tool": {
+      "type": "node",
+      "label": "外部更新ツール",
+      "status": "claim"
+    },
+    "target": {
+      "type": "node",
+      "label": "更新先システム",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "実行状態の保存",
+      "status": "claim"
+    },
+    "trace": {
+      "type": "node",
+      "label": "実行トレース",
+      "status": "claim"
+    },
+    "evaluation": {
+      "type": "node",
+      "label": "評価担当者",
+      "status": "claim"
+    },
+    "ask": {
+      "type": "link",
+      "label": "依頼者 → エージェント実行",
+      "status": "claim"
+    },
+    "pause": {
+      "type": "link",
+      "label": "エージェント実行 → 実行状態の保存",
+      "status": "claim"
+    },
+    "review": {
+      "type": "link",
+      "label": "エージェント実行 → 承認者",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "link",
+      "label": "承認者 → エージェント実行",
+      "status": "claim"
+    },
+    "execute": {
+      "type": "link",
+      "label": "エージェント実行 → 外部更新ツール",
+      "status": "claim"
+    },
+    "update": {
+      "type": "link",
+      "label": "外部更新ツール → 更新先システム",
+      "status": "claim"
+    },
+    "record": {
+      "type": "link",
+      "label": "エージェント実行 → 実行トレース",
+      "status": "claim"
+    },
+    "inspect": {
+      "type": "link",
+      "label": "評価担当者 → 実行トレース",
+      "status": "claim"
+    },
+    "approve-update": {
+      "type": "scenario",
+      "label": "外部更新を承認して再開"
+    },
+    "ex-request": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "利用者画面",
+      "realizes": [
+        "request"
+      ]
+    },
+    "ex-agent": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "LangGraph のグラフ実行",
+      "realizes": [
+        "agent"
+      ]
+    },
+    "ex-approve": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "承認画面と担当者",
+      "realizes": [
+        "approve"
+      ]
+    },
+    "ex-tool": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "認可された更新ツール",
+      "realizes": [
+        "tool"
+      ]
+    },
+    "ex-target": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "業務システム",
+      "realizes": [
+        "target"
+      ]
+    },
+    "ex-state": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "チェックポインターと永続ストア",
+      "realizes": [
+        "state"
+      ]
+    },
+    "ex-trace": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "OpenTelemetry のトレース基盤",
+      "realizes": [
+        "trace"
+      ]
+    },
+    "ex-evaluation": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "評価担当者",
+      "realizes": [
+        "evaluation"
+      ]
+    },
+    "ex-key": {
+      "type": "implementation",
+      "impl": "langgraph",
+      "label": "重複防止キー",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-agent-approval.md#§1": [
+      "model"
+    ],
+    "docs/reference-agent-approval.md": [
+      "model",
+      "request",
+      "agent",
+      "approve",
+      "tool",
+      "target",
+      "state",
+      "trace",
+      "evaluation",
+      "ask",
+      "pause",
+      "review",
+      "resume",
+      "execute",
+      "update",
+      "record",
+      "inspect",
+      "approve-update",
+      "ex-request",
+      "ex-agent",
+      "ex-approve",
+      "ex-tool",
+      "ex-target",
+      "ex-state",
+      "ex-trace",
+      "ex-evaluation",
+      "ex-key"
+    ],
+    "docs/reference-agent-approval.md#§3": [
+      "model"
+    ],
+    "docs/reference-agent-approval.md#§2": [
+      "request",
+      "agent",
+      "approve",
+      "tool",
+      "target",
+      "state",
+      "trace",
+      "evaluation",
+      "ask",
+      "pause",
+      "review",
+      "resume",
+      "execute",
+      "update",
+      "record",
+      "inspect",
+      "approve-update"
+    ],
+    "docs/reference-agent-approval.md#§4": [
+      "ex-request",
+      "ex-agent",
+      "ex-approve",
+      "ex-tool",
+      "ex-target",
+      "ex-state",
+      "ex-trace",
+      "ex-evaluation",
+      "ex-key"
+    ]
+  },
+  "reference": {
+    "category": "AI エージェントと分析",
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
+    "objectives": [
+      "承認待ちと実行状態の保存を区別する。",
+      "外部操作の再試行と重複防止を追う。",
+      "トレースで実行を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "LangGraph interrupts",
+        "url": "https://docs.langchain.com/oss/python/langgraph/interrupts"
+      },
+      {
+        "title": "LangGraph durable execution",
+        "url": "https://docs.langchain.com/oss/python/langgraph/durable-execution"
+      },
+      {
+        "title": "OpenTelemetry GenAI observability",
+        "url": "https://opentelemetry.io/blog/2026/genai-observability/"
+      }
+    ]
+  }
+}

@@ -1,0 +1,270 @@
+name: AUTOSAR Adaptive Platform のサービス
+description: Adaptive Application、ARA、通信・実行・永続化サービスと OS を分ける。
+reference:
+  objectives:
+    - Adaptive Application と ARA の関係を理解する。
+    - 通信、実行管理、永続化と OS を区別する。
+    - Classic 側との連携を追う。
+  sources:
+    - title: AUTOSAR Adaptive Platform
+      url: https://www.autosar.org/standards/adaptive-platform/
+    - title: AUTOSAR Classic Platform
+      url: https://www.autosar.org/standards/classic-platform
+sources:
+  - docs/reference-autosar-adaptive.md
+evidence:
+  - type: doc
+    ref: docs/reference-autosar-adaptive.md#§1
+  - type: doc
+    ref: docs/reference-autosar-adaptive.md#§3
+tiers:
+  - id: flow
+    label: アプリと標準 API
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 基盤と連携
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  app:
+    label: 車載アプリ
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 高性能 ECU 上のアプリ。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  runtime:
+    label: 標準ランタイム API
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: アプリが使う機能クラスタの標準インターフェース。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  communication:
+    label: サービス間通信
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: アプリや他 ECU の通信を扱う。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  execution:
+    label: 実行と状態の管理
+    kind: service
+    tier: support
+    x: 0
+    'y': 1.5
+    description: アプリの実行に関する管理を担う。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  storage:
+    label: 永続データ
+    kind: db
+    tier: support
+    x: 4
+    'y': 1.5
+    description: 再起動をまたぐデータのアクセスを扱う。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  os:
+    label: 基盤 OS
+    kind: service
+    tier: support
+    x: 8
+    'y': 1.5
+    description: 実装の基盤となる OS。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  classic:
+    label: 従来 ECU との接続
+    kind: service
+    tier: support
+    x: 12
+    'y': 1.5
+    description: 信号とサービス間の変換が必要な場合がある。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+links:
+  - id: invoke
+    from: app
+    to: runtime
+    label: 標準 API を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  - id: communicate
+    from: runtime
+    to: communication
+    label: サービス通信を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  - id: execute
+    from: runtime
+    to: execution
+    label: アプリの実行を管理
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  - id: persist
+    from: runtime
+    to: storage
+    label: 状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  - id: os
+    from: execution
+    to: os
+    label: OS 上で実行
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+  - id: translate
+    from: communication
+    to: classic
+    label: 信号とサービスを連携
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+scenarios:
+  - id: service
+    label: サービスと ECU の連携
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-adaptive.md#§2
+    steps:
+      - links:
+          - invoke
+          - communicate
+          - translate
+        note: Adaptive Application が通信機能を利用して Classic 側と連携する。
+      - links:
+          - execute
+          - persist
+          - os
+        note: 実行管理と永続化を OS 上で利用する。
+implementations:
+  - id: example
+    label: Adaptive Platform の標準構成例
+    description: ARA の機能クラスタと Classic ECU への接続を示す標準構成例。具体的な OS や信号変換の配置は実装による。
+    sources:
+      - title: AUTOSAR Adaptive Platform
+        url: https://www.autosar.org/standards/adaptive-platform/
+      - title: AUTOSAR Classic Platform
+        url: https://www.autosar.org/standards/classic-platform
+    tiers:
+      - id: flow
+        label: アプリと標準 API
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 基盤と連携
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-app:
+        label: Adaptive Application
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 高性能 ECU 上のアプリ。
+        realizes:
+          - app
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-adaptive.md#§4
+      ex-runtime:
+        label: AUTOSAR ARA
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: アプリが使う機能クラスタの標準インターフェース。
+        realizes:
+          - runtime
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-adaptive.md#§4
+      ex-communication:
+        label: Communication Management
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: アプリや他 ECU の通信を扱う。
+        realizes:
+          - communication
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-adaptive.md#§4
+      ex-execution:
+        label: Execution Management
+        kind: service
+        tier: support
+        x: 0
+        'y': 1.5
+        description: アプリの実行に関する管理を担う。
+        realizes:
+          - execution
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-adaptive.md#§4
+      ex-storage:
+        label: Persistency
+        kind: db
+        tier: support
+        x: 4
+        'y': 1.5
+        description: 再起動をまたぐデータのアクセスを扱う。
+        realizes:
+          - storage
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-adaptive.md#§4
+      ex-os:
+        label: POSIX OS
+        kind: service
+        tier: support
+        x: 8
+        'y': 1.5
+        description: 実装の基盤となる OS。
+        realizes:
+          - os
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-adaptive.md#§4
+      ex-classic:
+        label: Classic ECU / 信号変換
+        kind: service
+        tier: support
+        x: 12
+        'y': 1.5
+        description: 信号とサービス間の変換が必要な場合がある。
+        realizes:
+          - classic
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-adaptive.md#§4

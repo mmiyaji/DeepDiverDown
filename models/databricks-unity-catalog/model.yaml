@@ -1,82 +1,446 @@
-name: "Databricks Unity Catalog の権限・ストレージ・リネージ"
-description: "名前空間とロール、ワークスペース制限、クラウドデータの管理責任、列リネージをつなげる。"
-parent: {"model":"databricks","node":"catalog"}
+name: Databricks Unity Catalog の権限・ストレージ・リネージ
+description: 名前空間とロール、ワークスペース制限、クラウドデータの管理責任、列リネージをつなげる。
+parent:
+  model: databricks
+  node: catalog
 reference:
   objectives:
-    - "カタログ権限とワークスペース・バインディングを区別する。"
-    - "管理テーブル、外部テーブル、外部ロケーションの責務を確認する。"
-    - "クエリで観測した列リネージの影響を確認する。"
+    - カタログ権限とワークスペース・バインディングを区別する。
+    - 管理テーブル、外部テーブル、外部ロケーションの責務を確認する。
+    - クエリで観測した列リネージの影響を確認する。
   sources:
-    - {"title":"Unity Catalog のアクセス制御","url":"https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control"}
-    - {"title":"ワークスペース・バインディング","url":"https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding"}
-    - {"title":"管理／外部テーブルの指針","url":"https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices"}
-    - {"title":"オブジェクトストレージのライフサイクル","url":"https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle"}
-    - {"title":"Unity Catalog のリネージ","url":"https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage"}
-sources: ["docs/reference-databricks-unity-catalog.md"]
-evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§1"}]
+    - title: Unity Catalog のアクセス制御
+      url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control
+    - title: ワークスペース・バインディング
+      url: >-
+        https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding
+    - title: 管理／外部テーブルの指針
+      url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices
+    - title: オブジェクトストレージのライフサイクル
+      url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle
+    - title: Unity Catalog のリネージ
+      url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage
+sources:
+  - docs/reference-databricks-unity-catalog.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-unity-catalog.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[19.5,5.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 19.5
+      - 5.5
 nodes:
-  workspace: {"label":"分析ワークスペース","kind":"client","tier":"flow","x":0,"y":2,"description":"本番と開発を区別。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§2"}]}
-  metastore: {"label":"統制メタストア","kind":"service","tier":"flow","x":4,"y":2,"description":"カタログとオブジェクトを管理。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§1"}]}
-  catalog: {"label":"本番カタログと業務スキーマ","kind":"service","tier":"flow","x":8,"y":2,"description":"本番カタログと sales スキーマ。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§2"}]}
-  managed: {"label":"管理ストレージ上の注文表","kind":"db","tier":"flow","x":12,"y":0,"description":"ファイルもサービスで管理。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  external: {"label":"外部ファイルを登録した注文表","kind":"db","tier":"flow","x":12,"y":4,"description":"外部ファイルを指す。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  location: {"label":"保存パスとアクセス資格情報","kind":"service","tier":"flow","x":8,"y":5,"description":"パスと認証方法を対応付ける。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  storage: {"label":"クラウドストレージ","kind":"db","tier":"flow","x":16,"y":4,"description":"基盤ファイルを保持。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  masked: {"label":"参照クエリ／BI","kind":"client","tier":"flow","x":16,"y":0,"description":"制御適用後の値を利用。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§2"}]}
-  lineage: {"label":"列リネージ","kind":"service","tier":"flow","x":19,"y":2,"description":"上流列からクエリと下流を辿る。","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§4"}]}
+  workspace:
+    label: 分析ワークスペース
+    kind: client
+    tier: flow
+    x: 0
+    'y': 2
+    description: 本番と開発を区別。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§2
+  metastore:
+    label: 統制メタストア
+    kind: service
+    tier: flow
+    x: 4
+    'y': 2
+    description: カタログとオブジェクトを管理。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§1
+  catalog:
+    label: 本番カタログと業務スキーマ
+    kind: service
+    tier: flow
+    x: 8
+    'y': 2
+    description: 本番カタログと sales スキーマ。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§2
+  managed:
+    label: 管理ストレージ上の注文表
+    kind: db
+    tier: flow
+    x: 12
+    'y': 0
+    description: ファイルもサービスで管理。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  external:
+    label: 外部ファイルを登録した注文表
+    kind: db
+    tier: flow
+    x: 12
+    'y': 4
+    description: 外部ファイルを指す。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  location:
+    label: 保存パスとアクセス資格情報
+    kind: service
+    tier: flow
+    x: 8
+    'y': 5
+    description: パスと認証方法を対応付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  storage:
+    label: クラウドストレージ
+    kind: db
+    tier: flow
+    x: 16
+    'y': 4
+    description: 基盤ファイルを保持。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  masked:
+    label: 参照クエリ／BI
+    kind: client
+    tier: flow
+    x: 16
+    'y': 0
+    description: 制御適用後の値を利用。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§2
+  lineage:
+    label: 列リネージ
+    kind: service
+    tier: flow
+    x: 19
+    'y': 2
+    description: 上流列からクエリと下流を辿る。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§4
 links:
-  - {"id":"binding","from":"workspace","to":"metastore","label":"ワークスペースからの利用制約を確認","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§2"}]}
-  - {"id":"namespace","from":"metastore","to":"catalog","label":"カタログ・スキーマ解決","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§1"}]}
-  - {"id":"grant","from":"catalog","to":"managed","label":"テーブル利用権限を評価","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§2"}]}
-  - {"id":"policy","from":"managed","to":"masked","label":"行・列の制御を適用","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§2"}]}
-  - {"id":"external","from":"catalog","to":"external","label":"外部テーブルのメタデータ","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  - {"id":"register","from":"location","to":"external","label":"パスと資格情報を対応","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  - {"id":"data","from":"external","to":"storage","label":"登録されたパスのデータを読む","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  - {"id":"files","from":"managed","to":"storage","label":"ファイルのライフサイクルを管理","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]}
-  - {"id":"record","from":"masked","to":"lineage","label":"対応する実行から依存関係を記録","evidence":[{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§4"}]}
+  - id: binding
+    from: workspace
+    to: metastore
+    label: ワークスペースからの利用制約を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§2
+  - id: namespace
+    from: metastore
+    to: catalog
+    label: カタログ・スキーマ解決
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§1
+  - id: grant
+    from: catalog
+    to: managed
+    label: テーブル利用権限を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§2
+  - id: policy
+    from: managed
+    to: masked
+    label: 行・列の制御を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§2
+  - id: external
+    from: catalog
+    to: external
+    label: 外部テーブルのメタデータ
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  - id: register
+    from: location
+    to: external
+    label: パスと資格情報を対応
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  - id: data
+    from: external
+    to: storage
+    label: 登録されたパスのデータを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  - id: files
+    from: managed
+    to: storage
+    label: ファイルのライフサイクルを管理
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
+  - id: record
+    from: masked
+    to: lineage
+    label: 対応する実行から依存関係を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§4
 scenarios:
   - id: access
-    label: "本番ワークスペースで受注テーブルを参照"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§2"}]
+    label: 本番ワークスペースで受注テーブルを参照
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§2
     steps:
-      - {"links":["binding","namespace"],"note":"本番カタログを許可されたワークスペースで解決する。"}
-      - {"links":["grant","policy"],"note":"必要権限を満たす利用者に制御を適用した結果を返す。"}
-      - {"links":["record"],"note":"捕捉対象のクエリから金額列の下流を調べる。"}
+      - links:
+          - binding
+          - namespace
+        note: 本番カタログを許可されたワークスペースで解決する。
+      - links:
+          - grant
+          - policy
+        note: 必要権限を満たす利用者に制御を適用した結果を返す。
+      - links:
+          - record
+        note: 捕捉対象のクエリから金額列の下流を調べる。
   - id: ownership
-    label: "管理テーブルと外部テーブルの削除範囲を比較"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§3"}]
+    label: 管理テーブルと外部テーブルの削除範囲を比較
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-catalog.md#§3
     steps:
-      - {"links":["external","register","data"],"note":"外部ロケーション経由で既存ファイルへの参照を登録する。"}
-      - {"links":["files"],"note":"管理テーブルの削除時はファイルも回復期間を経るライフサイクルの対象となる。"}
-      - {"links":["external","data"],"note":"外部テーブルを削除しても基盤ファイルの削除は外部で管理する。"}
-treeLayout: {"title":"メタストアから資産へ","unit":"資産","levels":["メタストア","カタログ","スキーマ","資産"],"note":"エントリーの名前空間の例。利用権限やバインディングは別に確認する。","root":{"id":"root","label":"Unity Catalog メタストア","node":"metastore","children":[{"id":"prod","label":"prod","node":"catalog","children":[{"id":"sales","label":"sales","children":[{"id":"orders","label":"orders","node":"managed"},{"id":"landing","label":"orders_landing","node":"external"}]}]},{"id":"sandbox","label":"sandbox","children":[{"id":"lab","label":"lab","children":[{"id":"sample","label":"sample_orders"}]}]}]}}
-
+      - links:
+          - external
+          - register
+          - data
+        note: 外部ロケーション経由で既存ファイルへの参照を登録する。
+      - links:
+          - files
+        note: 管理テーブルの削除時はファイルも回復期間を経るライフサイクルの対象となる。
+      - links:
+          - external
+          - data
+        note: 外部テーブルを削除しても基盤ファイルの削除は外部で管理する。
+treeLayout:
+  title: メタストアから資産へ
+  unit: 資産
+  levels:
+    - メタストア
+    - カタログ
+    - スキーマ
+    - 資産
+  note: エントリーの名前空間の例。利用権限やバインディングは別に確認する。
+  root:
+    id: root
+    label: Unity Catalog メタストア
+    node: metastore
+    children:
+      - id: prod
+        label: prod
+        node: catalog
+        children:
+          - id: sales
+            label: sales
+            children:
+              - id: orders
+                label: orders
+                node: managed
+              - id: landing
+                label: orders_landing
+                node: external
+      - id: sandbox
+        label: sandbox
+        children:
+          - id: lab
+            label: lab
+            children:
+              - id: sample
+                label: sample_orders
 implementations:
   - id: databricks-governance-aws
-    label: "Unity Catalog と AWS S3 の本番管理"
-    description: "本番カタログを本番ワークスペースに束縛し、管理テーブルと外部着地表の保存責任を分ける例。"
+    label: Unity Catalog と AWS S3 の本番管理
+    description: 本番カタログを本番ワークスペースに束縛し、管理テーブルと外部着地表の保存責任を分ける例。
     sources:
-      - {title: "Unity Catalog のアクセス制御", url: "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control"}
-      - {title: "ワークスペース・バインディング", url: "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding"}
-      - {title: "管理／外部テーブルの指針", url: "https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices"}
-      - {title: "オブジェクトストレージのライフサイクル", url: "https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle"}
-      - {title: "Unity Catalog のリネージ", url: "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage"}
-      - {title: "Databricks の S3 外部ロケーション", url: "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3"}
-      - {title: "Databricks のリネージシステムテーブル", url: "https://docs.databricks.com/aws/en/admin/system-tables/lineage"}
+      - title: Unity Catalog のアクセス制御
+        url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control
+      - title: ワークスペース・バインディング
+        url: >-
+          https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/workspace-catalog-binding
+      - title: 管理／外部テーブルの指針
+        url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/best-practices
+      - title: オブジェクトストレージのライフサイクル
+        url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle
+      - title: Unity Catalog のリネージ
+        url: https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage
+      - title: Databricks の S3 外部ロケーション
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3
+      - title: Databricks のリネージシステムテーブル
+        url: https://docs.databricks.com/aws/en/admin/system-tables/lineage
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [19.5,5.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 19.5
+          - 5.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-workspace: {label: "Databricks 本番ワークスペース", kind: "client", tier: "flow", x: 0, y: 2, realizes: ["workspace"], description: "本番カタログを利用するワークスペースを制限する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-metastore: {label: "Unity Catalog のメタストアと prod.sales", kind: "service", tier: "flow", x: 4, y: 2, realizes: ["metastore","catalog"], description: "カタログ、スキーマ、権限を管理する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-managed: {label: "prod.sales.orders 管理 Delta テーブル", kind: "db", tier: "flow", x: 12, y: 0, realizes: ["managed"], description: "サービスがデータライフサイクルを管理する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-external: {label: "prod.sales.orders_landing 外部表", kind: "db", tier: "flow", x: 12, y: 4, realizes: ["external"], description: "外部ロケーションのファイルを表として登録する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-location: {label: "Unity Catalog 外部ロケーションと Storage Credential", kind: "service", tier: "flow", x: 8, y: 5, realizes: ["location"], description: "アクセスを許可する S3 パスと認証主体を関連付ける。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-storage: {label: "Amazon S3 の着地・管理領域", kind: "db", tier: "flow", x: 16, y: 4, svc: "s3", realizes: ["storage"], description: "外部ファイルと管理テーブル用の保存先を分ける。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-masked: {label: "分析者用 SQL Warehouse", kind: "client", tier: "flow", x: 16, y: 0, realizes: ["masked"], description: "許可された表と、マスクされた列の出力を参照する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-lineage: {label: "Unity Catalog リネージと system.access の履歴", kind: "service", tier: "flow", x: 19, y: 2, realizes: ["lineage"], description: "対応する処理で記録されたテーブル・列の依存を確認する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
-      example-iam: {label: "AWS IAM ロール", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "外部着地パスの S3 アクセスを Storage Credential の主体に許可する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
+      example-workspace:
+        label: Databricks 本番ワークスペース
+        kind: client
+        tier: flow
+        svc: databricks:platform
+        x: 0
+        'y': 2
+        realizes:
+          - workspace
+        description: 本番カタログを利用するワークスペースを制限する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+      example-metastore:
+        label: Unity Catalog のメタストアと prod.sales
+        kind: service
+        tier: flow
+        x: 4
+        'y': 2
+        realizes:
+          - metastore
+          - catalog
+        description: カタログ、スキーマ、権限を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+        svc: databricks:unity
+      example-managed:
+        label: prod.sales.orders 管理 Delta テーブル
+        kind: db
+        tier: flow
+        x: 12
+        'y': 0
+        realizes:
+          - managed
+        description: サービスがデータライフサイクルを管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+        svc: databricks:delta
+      example-external:
+        label: prod.sales.orders_landing 外部表
+        kind: db
+        tier: flow
+        x: 12
+        'y': 4
+        realizes:
+          - external
+        description: 外部ロケーションのファイルを表として登録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+        svc: databricks:delta
+      example-location:
+        label: Unity Catalog 外部ロケーションと Storage Credential
+        kind: service
+        tier: flow
+        x: 8
+        'y': 5
+        realizes:
+          - location
+        description: アクセスを許可する S3 パスと認証主体を関連付ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+        svc: databricks:unity
+      example-storage:
+        label: Amazon S3 の着地・管理領域
+        kind: db
+        tier: flow
+        x: 23
+        'y': 4
+        svc: s3
+        realizes:
+          - storage
+        description: 外部ファイルと管理テーブル用の保存先を分ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+      example-masked:
+        label: 分析者用 SQL Warehouse
+        kind: client
+        tier: flow
+        x: 16
+        'y': 0
+        realizes:
+          - masked
+        description: 許可された表と、マスクされた列の出力を参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+        svc: databricks:sql
+      example-lineage:
+        label: Unity Catalog リネージと system.access の履歴
+        kind: service
+        tier: flow
+        x: 19
+        'y': 2
+        realizes:
+          - lineage
+        description: 対応する処理で記録されたテーブル・列の依存を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+        svc: databricks:unity
+      example-iam:
+        label: AWS IAM ロール
+        kind: service
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 外部着地パスの S3 アクセスを Storage Credential の主体に許可する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+        svc: iam
     links:
-      - {id: "example-iam-connection", from: "example-iam", to: "example-location", label: "S3 の権限を資格情報に関連付ける", evidence: [{"type":"doc","ref":"docs/reference-databricks-unity-catalog.md#§5"}]}
+      - id: example-iam-connection
+        from: example-iam
+        to: example-location
+        label: S3 の権限を資格情報に関連付ける
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-catalog.md#§5
+    groups:
+      - kind: cloud
+        label: AWS・Amazon S3
+        provider: aws
+        tier:
+          - flow
+        nodes:
+          - example-storage
+      - kind: cloud
+        provider: databricks
+        label: Databricks
+        tier:
+          - flow
+        nodes:
+          - example-workspace
+          - example-metastore
+          - example-managed
+          - example-external
+          - example-location
+          - example-masked
+          - example-lineage
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - implementation-setup
+        nodes:
+          - example-iam

@@ -1,0 +1,217 @@
+name: KubeEdge のクラウド・エッジ連携
+description: Kubernetes 管理側の CloudCore と端末側の EdgeCore を分ける。
+reference:
+  objectives:
+    - CloudCore と EdgeCore の配置を区別する。
+    - Kubernetes からエッジへの配置経路を追う。
+  sources:
+    - title: CloudHub
+      url: https://release-1-17.docs.kubeedge.io/docs/architecture/cloud/cloudhub/
+    - title: EdgeHub
+      url: https://release-1-18.docs.kubeedge.io/docs/architecture/edge/edgehub/
+sources:
+  - docs/reference-kubeedge.md
+evidence:
+  - type: doc
+    ref: docs/reference-kubeedge.md#§1
+  - type: doc
+    ref: docs/reference-kubeedge.md#§3
+tiers:
+  - id: flow
+    label: 管理とエッジ実行
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 現場の対象
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  api:
+    label: クラスタ管理 API
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 管理側の Kubernetes API。
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  cloudcore:
+    label: 管理側ゲートウェイ
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: CloudHub を含む管理側の連携。
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  edgecore:
+    label: エッジ実行基盤
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: EdgeHub と edged を含む端末側基盤。
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  workload:
+    label: 現場の処理
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: エッジで動くアプリ。
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  device:
+    label: 現場デバイス
+    kind: external
+    tier: support
+    x: 12
+    'y': 1.5
+    description: エッジ処理が扱う現場の対象。
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+links:
+  - id: watch
+    from: api
+    to: cloudcore
+    label: 管理情報を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  - id: sync
+    from: cloudcore
+    to: edgecore
+    label: 構成を同期
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  - id: run
+    from: edgecore
+    to: workload
+    label: ワークロードを実行
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  - id: observe
+    from: device
+    to: workload
+    label: 現場データを入力
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+  - id: status
+    from: edgecore
+    to: cloudcore
+    label: 状態を報告
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+scenarios:
+  - id: deployment
+    label: エッジへの配置と状態報告
+    evidence:
+      - type: doc
+        ref: docs/reference-kubeedge.md#§2
+    steps:
+      - links:
+          - watch
+          - sync
+          - run
+        note: 管理側の構成をエッジへ伝える。
+      - links:
+          - observe
+          - status
+        note: 現場処理と状態報告を行う。
+implementations:
+  - id: example
+    label: CloudCore と EdgeCore の配置
+    description: 管理側 Kubernetes と現場端末を接続する例。クラウド事業者は固定しない。
+    sources:
+      - title: CloudHub
+        url: https://release-1-17.docs.kubeedge.io/docs/architecture/cloud/cloudhub/
+      - title: EdgeHub
+        url: https://release-1-18.docs.kubeedge.io/docs/architecture/edge/edgehub/
+    tiers:
+      - id: flow
+        label: 管理とエッジ実行
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 現場の対象
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-api:
+        label: Kubernetes API
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 管理側の Kubernetes API。
+        realizes:
+          - api
+        evidence:
+          - type: doc
+            ref: docs/reference-kubeedge.md#§4
+      ex-cloudcore:
+        label: KubeEdge CloudCore / CloudHub
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: CloudHub を含む管理側の連携。
+        realizes:
+          - cloudcore
+        evidence:
+          - type: doc
+            ref: docs/reference-kubeedge.md#§4
+      ex-edgecore:
+        label: KubeEdge EdgeCore / EdgeHub
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: EdgeHub と edged を含む端末側基盤。
+        realizes:
+          - edgecore
+        evidence:
+          - type: doc
+            ref: docs/reference-kubeedge.md#§4
+      ex-workload:
+        label: エッジワークロード
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        description: エッジで動くアプリ。
+        realizes:
+          - workload
+        evidence:
+          - type: doc
+            ref: docs/reference-kubeedge.md#§4
+      ex-device:
+        label: 現場デバイス
+        kind: external
+        tier: support
+        x: 12
+        'y': 1.5
+        description: エッジ処理が扱う現場の対象。
+        realizes:
+          - device
+        evidence:
+          - type: doc
+            ref: docs/reference-kubeedge.md#§4

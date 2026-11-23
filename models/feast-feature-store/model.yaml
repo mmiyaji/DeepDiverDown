@@ -1,0 +1,385 @@
+name: Feast の特徴量ストアとオンライン推論
+description: 注文履歴から特徴量を生成し、学習時と注文時の推論で利用する構成例。
+reference:
+  objectives:
+    - 学習用の履歴とオンライン特徴量の責務を区別する。
+    - 特徴量の反映と予測の流れを追う。
+    - 特徴量の鮮度と時点の整合性を確認する。
+  sources:
+    - title: Feast components overview
+      url: https://docs.feast.dev/master/getting-started/components/overview
+    - title: Feast feature serving and inference
+      url: https://docs.feast.dev/getting-started/architecture/model-inference
+sources:
+  - docs/reference-feast-feature-store.md
+evidence:
+  - type: doc
+    ref: docs/reference-feast-feature-store.md#§1
+  - type: doc
+    ref: docs/reference-feast-feature-store.md#§3
+tiers:
+  - id: data
+    label: 履歴と特徴量生成
+    z: 2
+    size:
+      - 10
+      - 3
+  - id: control
+    label: 学習と反映
+    z: 1
+    size:
+      - 10
+      - 3
+  - id: serve
+    label: オンライン推論
+    z: 0
+    size:
+      - 10
+      - 3
+nodes:
+  events:
+    label: 注文履歴
+    kind: db
+    tier: data
+    x: 0
+    'y': 1
+    description: 注文履歴を保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  transform:
+    label: 特徴量の生成
+    kind: worker
+    tier: data
+    x: 4
+    'y': 1
+    description: 履歴から特徴量を作る。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  offline:
+    label: 履歴の特徴量
+    kind: db
+    tier: data
+    x: 8
+    'y': 1
+    description: 過去の特徴量を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  registry:
+    label: 特徴量の定義
+    kind: service
+    tier: control
+    x: 0
+    'y': 1
+    description: 利用する特徴量を定義する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  train:
+    label: 学習データとモデルの学習
+    kind: worker
+    tier: control
+    x: 4
+    'y': 1
+    description: 過去の時点に対応する特徴量で学習する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  materialize:
+    label: オンラインへの反映
+    kind: worker
+    tier: control
+    x: 8
+    'y': 1
+    description: 特徴量をオンライン側へ反映する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  online:
+    label: オンライン特徴量
+    kind: db
+    tier: serve
+    x: 0
+    'y': 1
+    description: エンティティごとの最新値を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  inference:
+    label: 推論サービス
+    kind: service
+    tier: serve
+    x: 4
+    'y': 1
+    description: 特徴量と登録済みモデルで予測する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  app:
+    label: 注文アプリ
+    kind: service
+    tier: serve
+    x: 8
+    'y': 1
+    description: 注文時に予測を要求する。
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+links:
+  - id: create
+    from: events
+    to: transform
+    label: 履歴から生成
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: write
+    from: transform
+    to: offline
+    label: 特徴量を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: definition
+    from: registry
+    to: train
+    label: 定義を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: historical
+    from: offline
+    to: train
+    label: 時点に対応した履歴を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: publish
+    from: offline
+    to: materialize
+    label: 特徴量を読み出す
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: load
+    from: materialize
+    to: online
+    label: 最新値を反映
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: request
+    from: app
+    to: inference
+    label: 予測を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: features
+    from: inference
+    to: online
+    label: 特徴量を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: model
+    from: train
+    to: inference
+    label: 学習済みモデルを配置
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+  - id: result
+    from: inference
+    to: app
+    label: 予測を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+scenarios:
+  - id: training
+    label: 履歴から学習する
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+    steps:
+      - links:
+          - create
+          - write
+        note: 注文履歴から特徴量を生成する。
+      - links:
+          - definition
+          - historical
+        note: 特徴量定義と過去時点の履歴を使って学習する。
+  - id: serving
+    label: 注文時に予測する
+    evidence:
+      - type: doc
+        ref: docs/reference-feast-feature-store.md#§2
+    steps:
+      - links:
+          - publish
+          - load
+        note: オンラインストアに特徴量を反映する。
+      - links:
+          - request
+          - features
+          - model
+        note: 注文時に特徴量とモデルを使って推論する。
+      - links:
+          - result
+        note: 予測を返す。
+implementations:
+  - id: feast
+    label: Feast とモデルサーバー
+    description: Feast と外部のモデルサーバーを組み合わせた配置例。
+    sources:
+      - title: Feast components overview
+        url: https://docs.feast.dev/master/getting-started/components/overview
+      - title: Feast feature serving and inference
+        url: https://docs.feast.dev/getting-started/architecture/model-inference
+    tiers:
+      - id: data
+        label: 履歴と特徴量生成
+        z: 2
+        size:
+          - 10
+          - 3
+      - id: control
+        label: 学習と反映
+        z: 1
+        size:
+          - 10
+          - 3
+      - id: serve
+        label: オンライン推論
+        z: 0
+        size:
+          - 10
+          - 3
+    nodes:
+      ex-events:
+        label: 注文履歴のバッチデータ
+        kind: db
+        tier: data
+        x: 0
+        'y': 1
+        description: 注文履歴を保存する。
+        realizes:
+          - events
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-transform:
+        label: Spark / SQL 特徴量生成
+        kind: worker
+        tier: data
+        x: 4
+        'y': 1
+        description: 履歴から特徴量を作る。
+        realizes:
+          - transform
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-offline:
+        label: Feast オフラインストア
+        kind: db
+        tier: data
+        x: 8
+        'y': 1
+        description: 過去の特徴量を保持する。
+        realizes:
+          - offline
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-registry:
+        label: Feast レジストリ
+        kind: service
+        tier: control
+        x: 0
+        'y': 1
+        description: 利用する特徴量を定義する。
+        realizes:
+          - registry
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-train:
+        label: 学習パイプラインとモデル登録
+        kind: worker
+        tier: control
+        x: 4
+        'y': 1
+        description: 過去の時点に対応する特徴量で学習する。
+        realizes:
+          - train
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-materialize:
+        label: Feast materialize ジョブ
+        kind: worker
+        tier: control
+        x: 8
+        'y': 1
+        description: 特徴量をオンライン側へ反映する。
+        realizes:
+          - materialize
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-online:
+        label: Feast オンラインストア
+        kind: db
+        tier: serve
+        x: 0
+        'y': 1
+        description: エンティティごとの最新値を保持する。
+        realizes:
+          - online
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-inference:
+        label: 特徴量取得とモデルサーバー
+        kind: service
+        tier: serve
+        x: 4
+        'y': 1
+        description: 特徴量と登録済みモデルで予測する。
+        realizes:
+          - inference
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-app:
+        label: 注文アプリ
+        kind: service
+        tier: serve
+        x: 8
+        'y': 1
+        description: 注文時に予測を要求する。
+        realizes:
+          - app
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+      ex-feature-server:
+        label: Feast Feature Server
+        kind: service
+        tier: serve
+        x: 12
+        'y': 1
+        description: エンティティキーでオンライン特徴量を取得する API。
+        evidence:
+          - type: doc
+            ref: docs/reference-feast-feature-store.md#§4
+    links:
+      - id: ex-serve
+        from: ex-feature-server
+        to: ex-online
+        label: 特徴量を読み出す

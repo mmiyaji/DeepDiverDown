@@ -6,32 +6,178 @@ reference:
     - ETL の curated 出力と ELT の raw 保持・後段モデル化を比較する。
     - AWS Glue Job と dbt SQL モデルを例として役割を区別する。
   sources:
-    - {title: AWS Glue concepts, url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html}
-    - {title: AWS Glue overview, url: https://docs.aws.amazon.com/glue/latest/dg/}
-    - {title: What is dbt?, url: https://docs.getdbt.com/docs/introduction}
-sources: [docs/reference-etl-elt.md]
-evidence: [{type: doc, ref: docs/reference-etl-elt.md#§1}]
+    - title: AWS Glue concepts
+      url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html
+    - title: AWS Glue overview
+      url: https://docs.aws.amazon.com/glue/latest/dg/
+    - title: What is dbt?
+      url: https://docs.getdbt.com/docs/introduction
+sources:
+  - docs/reference-etl-elt.md
+evidence:
+  - type: doc
+    ref: docs/reference-etl-elt.md#§1
 tiers:
-  - {id: input, label: 共通入力, z: 1, size: [18,3]}
-  - {id: compare, label: 変換経路の比較, z: 0, origin: [1,0], size: [16,5]}
+  - id: input
+    label: 共通入力
+    z: 1
+    size:
+      - 18
+      - 3
+  - id: compare
+    label: 変換経路の比較
+    z: 0
+    origin:
+      - 1
+      - 0
+    size:
+      - 16
+      - 5
 nodes:
-  source: {label: 注文データソース, kind: external, tier: input, x: 0, y: 2.5, description: ETL と ELT が共有する入力。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§1},{type: doc, ref: docs/reference-etl-elt.md#§5}]}
-  etl-job: {label: ロード前の変換処理, kind: worker, tier: compare, x: 4, y: 1, description: ロード前に抽出・変換する。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
-  curated: {label: Curated Table, kind: db, shape3D: crate, tier: compare, x: 8, y: 1, description: 変換済みデータを保持する ETL 出力。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
-  raw: {label: Raw Landing, kind: db, shape3D: crate, tier: compare, x: 4, y: 4, description: 変換前のデータを先に保持する ELT 入力層。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
-  dbt: {label: ロード後の SQL 変換, kind: worker, tier: compare, x: 8, y: 4, description: 分析基盤上で raw データを変換する。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
-  mart: {label: Analytics Mart, kind: db, tier: compare, x: 12, y: 2.5, description: ETL または ELT の分析用出力。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§4}]}
-  bi: {label: BI / Consumer, kind: external, tier: input, x: 16, y: 2.5, description: 集計結果を利用する下流。, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§6}]}
+  source:
+    label: 注文データソース
+    kind: external
+    tier: input
+    x: 0
+    'y': 2.5
+    description: ETL と ELT が共有する入力。
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§1
+      - type: doc
+        ref: docs/reference-etl-elt.md#§5
+  etl-job:
+    label: ロード前の変換処理
+    kind: worker
+    tier: compare
+    x: 4
+    'y': 1
+    description: ロード前に抽出・変換する。
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§2
+  curated:
+    label: Curated Table
+    kind: db
+    shape3D: crate
+    tier: compare
+    x: 8
+    'y': 1
+    description: 変換済みデータを保持する ETL 出力。
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§2
+  raw:
+    label: Raw Landing
+    kind: db
+    shape3D: crate
+    tier: compare
+    x: 4
+    'y': 4
+    description: 変換前のデータを先に保持する ELT 入力層。
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§3
+  dbt:
+    label: ロード後の SQL 変換
+    kind: worker
+    tier: compare
+    x: 8
+    'y': 4
+    description: 分析基盤上で raw データを変換する。
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§3
+  mart:
+    label: Analytics Mart
+    kind: db
+    tier: compare
+    x: 12
+    'y': 2.5
+    description: ETL または ELT の分析用出力。
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§4
+  bi:
+    label: BI / Consumer
+    kind: external
+    tier: input
+    x: 16
+    'y': 2.5
+    description: 集計結果を利用する下流。
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§6
 links:
-  - {id: etl-extract, from: source, to: etl-job, label: Extract・Transform, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
-  - {id: etl-load, from: etl-job, to: curated, label: 変換済みを Load, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§2}]}
-  - {id: etl-mart, from: curated, to: mart, label: 分析用に提供, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§4}]}
-  - {id: elt-load, from: source, to: raw, label: 先に Load, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
-  - {id: elt-transform, from: raw, to: dbt, label: 後段で Transform, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
-  - {id: elt-mart, from: dbt, to: mart, label: モデル化した結果, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§3}]}
-  - {id: consume, from: mart, to: bi, label: 集計を利用, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§6}]}
+  - id: etl-extract
+    from: source
+    to: etl-job
+    label: Extract・Transform
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§2
+  - id: etl-load
+    from: etl-job
+    to: curated
+    label: 変換済みを Load
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§2
+  - id: etl-mart
+    from: curated
+    to: mart
+    label: 分析用に提供
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§4
+  - id: elt-load
+    from: source
+    to: raw
+    label: 先に Load
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§3
+  - id: elt-transform
+    from: raw
+    to: dbt
+    label: 後段で Transform
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§3
+  - id: elt-mart
+    from: dbt
+    to: mart
+    label: モデル化した結果
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§3
+  - id: consume
+    from: mart
+    to: bi
+    label: 集計を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§6
 scenarios:
-  - {id: compare-etl-elt, label: 注文データの ETL / ELT 比較, evidence: [{type: doc, ref: docs/reference-etl-elt.md#§6}], steps: [{links: [etl-extract, etl-load], note: ETL はロード前に変換し、Curated Table へ書く。}, {links: [elt-load, elt-transform], note: ELT は Raw Landing へ先にロードし、基盤上の SQL モデルで変換する。}, {links: [etl-mart, elt-mart, consume], note: 両経路の分析用 Mart を BI が利用する。}]}
+  - id: compare-etl-elt
+    label: 注文データの ETL / ELT 比較
+    evidence:
+      - type: doc
+        ref: docs/reference-etl-elt.md#§6
+    steps:
+      - links:
+          - etl-extract
+          - etl-load
+        note: ETL はロード前に変換し、Curated Table へ書く。
+      - links:
+          - elt-load
+          - elt-transform
+        note: ELT は Raw Landing へ先にロードし、基盤上の SQL モデルで変換する。
+      - links:
+          - etl-mart
+          - elt-mart
+          - consume
+        note: 両経路の分析用 Mart を BI が利用する。
 implementations:
   - id: aws-redshift
     label: AWS Glue・Amazon Redshift・dbt
@@ -51,7 +197,7 @@ implementations:
         kind: db
         tier: input
         x: 0
-        y: 2.5
+        'y': 2.5
         description: 取り込み元のスキーマと元の入力値を保持する。
         svc: s3
         realizes:
@@ -64,7 +210,7 @@ implementations:
         kind: worker
         tier: compare
         x: 4
-        y: 1
+        'y': 1
         description: 抽出と変換を行い、Redshift へロードする。
         svc: glue
         realizes:
@@ -77,34 +223,47 @@ implementations:
         kind: table
         tier: compare
         x: 8
-        y: 1
+        'y': 1
         description: Glue で変換した結果を保持する。
         realizes:
           - curated
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
+        svc: redshift
       aws-redshift-raw:
         label: Redshift の raw スキーマ
         kind: table
         tier: compare
         x: 4
-        y: 4
+        'y': 4
         description: COPY でロードした無変換の入力を保持する。
         realizes:
           - raw
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
+        svc: redshift
       aws-redshift-dbt:
-        label: dbt-redshift と Redshift SQL
+        label: Redshift 内の SQL 変換
         kind: worker
         tier: compare
+        svc: aws:redshift
         x: 8
-        y: 4
+        'y': 4
         description: dbt モデルの SQL を Redshift 内で実行する。
         realizes:
           - dbt
+        evidence:
+          - type: doc
+            ref: docs/reference-etl-elt.md#§7
+      aws-redshift-dbt-client:
+        label: dbt-redshift 実行環境
+        kind: client
+        tier: input
+        x: 8
+        y: 2.5
+        description: dbt モデルをコンパイルし、変換 SQL を Redshift に送る。
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
@@ -113,19 +272,20 @@ implementations:
         kind: table
         tier: compare
         x: 12
-        y: 2.5
+        'y': 2.5
         description: 比較用に経路ごとにスキーマを分離する。
         realizes:
           - mart
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
+        svc: redshift
       aws-redshift-bi:
         label: Redshift 対応の BI クライアント
         kind: external
         tier: input
         x: 16
-        y: 2.5
+        'y': 2.5
         description: 注文売上の集計を参照する。
         realizes:
           - bi
@@ -137,13 +297,20 @@ implementations:
         kind: db
         tier: compare
         x: 6
-        y: 2.5
+        'y': 2.5
         description: Glue と Redshift の転送時に一時データを置く。
         svc: s3
         evidence:
           - type: doc
             ref: docs/reference-etl-elt.md#§7
     links:
+      - id: aws-redshift-dbt-submit
+        from: aws-redshift-dbt-client
+        to: aws-redshift-dbt
+        label: 変換 SQL を実行依頼
+        evidence:
+          - type: doc
+            ref: docs/reference-etl-elt.md#§7
       - id: aws-redshift-temp-file
         from: aws-redshift-etl
         to: aws-redshift-stage
@@ -170,3 +337,39 @@ implementations:
           - aws-redshift-dbt
           - aws-redshift-marts
           - aws-redshift-stage
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - input
+        nodes:
+          - aws-redshift-source
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - compare
+        nodes:
+          - aws-redshift-etl
+          - aws-redshift-stage
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - compare
+        nodes:
+          - aws-redshift-curated
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - compare
+        nodes:
+          - aws-redshift-raw
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - compare
+        nodes:
+          - aws-redshift-marts

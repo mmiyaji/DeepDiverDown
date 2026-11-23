@@ -1,83 +1,452 @@
-name: "Databricks Lakeflow の CDC と品質管理"
-description: "DB の CDC または到着ファイルを取り込み、宣言型パイプラインで変更と品質を管理する。"
-parent: {"model":"databricks","node":"ingest"}
+name: Databricks Lakeflow の CDC と品質管理
+description: DB の CDC または到着ファイルを取り込み、宣言型パイプラインで変更と品質を管理する。
+parent:
+  model: databricks
+  node: ingest
 reference:
   objectives:
-    - "Lakeflow Connect、Auto Loader、Lakeflow パイプライン、Jobs の責務を区別する。"
-    - "遅延イベントと不正行を観測し、再処理の起点を選ぶ。"
+    - Lakeflow Connect、Auto Loader、Lakeflow パイプライン、Jobs の責務を区別する。
+    - 遅延イベントと不正行を観測し、再処理の起点を選ぶ。
   sources:
-    - {"title":"Lakeflow Connect DB コネクタ","url":"https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview"}
-    - {"title":"Auto Loader","url":"https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/"}
-    - {"title":"Lakeflow パイプラインの運用","url":"https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines"}
-    - {"title":"Apache Spark Declarative Pipelines と Lakeflow","url":"https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines"}
-sources: ["docs/reference-databricks-lakeflow.md"]
-evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§1"}]
+    - title: Lakeflow Connect DB コネクタ
+      url: https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview
+    - title: Auto Loader
+      url: https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/
+    - title: Lakeflow パイプラインの運用
+      url: https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines
+    - title: Apache Spark Declarative Pipelines と Lakeflow
+      url: https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines
+sources:
+  - docs/reference-databricks-lakeflow.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-lakeflow.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[18.5,4.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 18.5
+      - 4.5
 nodes:
-  db: {"label":"注文DB","kind":"external","tier":"flow","x":0,"y":0,"description":"初期状態と変更ログを提供。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  gateway: {"label":"データベース変更の収集ゲートウェイ","kind":"service","tier":"flow","x":3,"y":0,"description":"ソースに接続して取得。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  stage: {"label":"変更の一時保存領域","kind":"db","tier":"flow","x":6,"y":0,"description":"変更を一時保持。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  connector: {"label":"取り込みパイプライン","kind":"worker","tier":"flow","x":9,"y":0,"description":"宛先の RAW へ反映。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  files: {"label":"到着ファイル","kind":"external","tier":"flow","x":0,"y":4,"description":"バックフィルや外部からのファイル。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
-  auto-loader: {"label":"新着ファイルの増分読み込み","kind":"service","tier":"flow","x":5,"y":4,"description":"ファイルを見つけ増分ロード。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
-  raw: {"label":"注文変更の受入テーブル","kind":"db","tier":"flow","x":10,"y":4,"description":"取り込まれた注文変更。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§1"}]}
-  sdp: {"label":"宣言型の変換・品質処理","kind":"worker","tier":"flow","x":14,"y":4,"description":"順序付け、品質チェック、更新。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
-  clean: {"label":"分析用注文テーブル","kind":"db","tier":"flow","x":18,"y":4,"description":"検証済みの注文状態。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
-  jobs: {"label":"ジョブのスケジューラー","kind":"service","tier":"flow","x":13,"y":0,"description":"実行順とスケジュール。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
-  event-log: {"label":"イベントログ","kind":"db","tier":"flow","x":18,"y":0,"description":"進捗と品質を確認。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
+  db:
+    label: 注文DB
+    kind: external
+    tier: flow
+    x: 0
+    'y': 0
+    description: 初期状態と変更ログを提供。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  gateway:
+    label: データベース変更の収集ゲートウェイ
+    kind: service
+    tier: flow
+    x: 3
+    'y': 0
+    description: ソースに接続して取得。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  stage:
+    label: 変更の一時保存領域
+    kind: db
+    tier: flow
+    x: 6
+    'y': 0
+    description: 変更を一時保持。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  connector:
+    label: 取り込みパイプライン
+    kind: worker
+    tier: flow
+    x: 9
+    'y': 0
+    description: 宛先の RAW へ反映。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  files:
+    label: 到着ファイル
+    kind: external
+    tier: flow
+    x: 0
+    'y': 4
+    description: バックフィルや外部からのファイル。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§3
+  auto-loader:
+    label: 新着ファイルの増分読み込み
+    kind: service
+    tier: flow
+    x: 5
+    'y': 4
+    description: ファイルを見つけ増分ロード。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§3
+  raw:
+    label: 注文変更の受入テーブル
+    kind: db
+    tier: flow
+    x: 10
+    'y': 4
+    description: 取り込まれた注文変更。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§1
+  sdp:
+    label: 宣言型の変換・品質処理
+    kind: worker
+    tier: flow
+    x: 14
+    'y': 4
+    description: 順序付け、品質チェック、更新。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§4
+  clean:
+    label: 分析用注文テーブル
+    kind: db
+    tier: flow
+    x: 18
+    'y': 4
+    description: 検証済みの注文状態。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§4
+  jobs:
+    label: ジョブのスケジューラー
+    kind: service
+    tier: flow
+    x: 13
+    'y': 0
+    description: 実行順とスケジュール。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§5
+  event-log:
+    label: イベントログ
+    kind: db
+    tier: flow
+    x: 18
+    'y': 0
+    description: 進捗と品質を確認。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§5
 links:
-  - {"id":"capture","from":"db","to":"gateway","label":"DB の変更を取得","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  - {"id":"spool","from":"gateway","to":"stage","label":"変更を一時保存","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  - {"id":"consume","from":"stage","to":"connector","label":"ステージを読む","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  - {"id":"ingest","from":"connector","to":"raw","label":"注文変更の受入表へ反映","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
-  - {"id":"discover","from":"files","to":"auto-loader","label":"新着を検出","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
-  - {"id":"load","from":"auto-loader","to":"raw","label":"取り込み進捗を記録しロード","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
-  - {"id":"validate","from":"raw","to":"sdp","label":"キー・順序・期待値で検証","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
-  - {"id":"apply","from":"sdp","to":"clean","label":"整形済みの行を反映","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
-  - {"id":"schedule","from":"jobs","to":"sdp","label":"パイプラインを起動","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
-  - {"id":"observe","from":"sdp","to":"event-log","label":"進捗と違反を記録","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
+  - id: capture
+    from: db
+    to: gateway
+    label: DB の変更を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  - id: spool
+    from: gateway
+    to: stage
+    label: 変更を一時保存
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  - id: consume
+    from: stage
+    to: connector
+    label: ステージを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  - id: ingest
+    from: connector
+    to: raw
+    label: 注文変更の受入表へ反映
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§2
+  - id: discover
+    from: files
+    to: auto-loader
+    label: 新着を検出
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§3
+  - id: load
+    from: auto-loader
+    to: raw
+    label: 取り込み進捗を記録しロード
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§3
+  - id: validate
+    from: raw
+    to: sdp
+    label: キー・順序・期待値で検証
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§4
+  - id: apply
+    from: sdp
+    to: clean
+    label: 整形済みの行を反映
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§4
+  - id: schedule
+    from: jobs
+    to: sdp
+    label: パイプラインを起動
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§5
+  - id: observe
+    from: sdp
+    to: event-log
+    label: 進捗と違反を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§5
 scenarios:
   - id: cdc
-    label: "変更ログから注文の現在状態を整える"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]
+    label: 変更ログから注文の現在状態を整える
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§4
     steps:
-      - {"links":["capture","spool"],"note":"対応コネクタで DB の変更をステージへ送る。"}
-      - {"links":["consume","ingest"],"note":"取り込みパイプラインが RAW 側へ反映する。"}
-      - {"links":["schedule","validate","apply"],"note":"キーと業務上の順序を使って注文の現在状態を更新する。"}
-      - {"links":["observe"],"note":"イベントログで進捗と品質を確認する。"}
+      - links:
+          - capture
+          - spool
+        note: 対応コネクタで DB の変更をステージへ送る。
+      - links:
+          - consume
+          - ingest
+        note: 取り込みパイプラインが RAW 側へ反映する。
+      - links:
+          - schedule
+          - validate
+          - apply
+        note: キーと業務上の順序を使って注文の現在状態を更新する。
+      - links:
+          - observe
+        note: イベントログで進捗と品質を確認する。
   - id: files
-    label: "到着ファイルの増分と品質違反を調べる"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]
+    label: 到着ファイルの増分と品質違反を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-lakeflow.md#§5
     steps:
-      - {"links":["discover","load"],"note":"Auto Loader が新着ファイルを増分ロードする。"}
-      - {"links":["schedule","validate"],"note":"パイプラインが期待値を評価する。例では不正な行を除外する。"}
-      - {"links":["apply","observe"],"note":"正しい行を反映し、除外の件数を確認して訂正の範囲を決める。"}
-
+      - links:
+          - discover
+          - load
+        note: Auto Loader が新着ファイルを増分ロードする。
+      - links:
+          - schedule
+          - validate
+        note: パイプラインが期待値を評価する。例では不正な行を除外する。
+      - links:
+          - apply
+          - observe
+        note: 正しい行を反映し、除外の件数を確認して訂正の範囲を決める。
 implementations:
   - id: lakeflow-postgres
-    label: "Lakeflow Connect での PostgreSQL 取込"
-    description: "PostgreSQL の変更を Lakeflow Connect で取り込み、ファイル由来データは別の入力表に置いてから注文データを整備する例。"
+    label: Lakeflow Connect での PostgreSQL 取込
+    description: PostgreSQL の変更を Lakeflow Connect で取り込み、ファイル由来データは別の入力表に置いてから注文データを整備する例。
     sources:
-      - {title: "Lakeflow Connect DB コネクタ", url: "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview"}
-      - {title: "Auto Loader", url: "https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/"}
-      - {title: "Lakeflow パイプラインの運用", url: "https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines"}
-      - {title: "Apache Spark Declarative Pipelines と Lakeflow", url: "https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines"}
-      - {title: "Databricks の PostgreSQL ソース設定", url: "https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-source-setup"}
+      - title: Lakeflow Connect DB コネクタ
+        url: https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview
+      - title: Auto Loader
+        url: https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/
+      - title: Lakeflow パイプラインの運用
+        url: https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines
+      - title: Apache Spark Declarative Pipelines と Lakeflow
+        url: https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines
+      - title: Databricks の PostgreSQL ソース設定
+        url: https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-source-setup
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [18.5,4.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 18.5
+          - 4.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-db: {label: "PostgreSQL の ORDERS", kind: "external", tier: "flow", x: 0, y: 0, realizes: ["db"], description: "対象テーブルの初回取込と CDC を提供する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-gateway: {label: "Lakeflow Connect 取り込みゲートウェイ", kind: "service", tier: "flow", x: 3, y: 0, realizes: ["gateway"], description: "データベースの変更を取得する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-stage: {label: "Unity Catalog ステージングボリューム", kind: "db", tier: "flow", x: 6, y: 0, realizes: ["stage"], description: "ゲートウェイが取得した変更を一時保存する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-connector: {label: "Lakeflow Connect 取り込みパイプライン", kind: "worker", tier: "flow", x: 9, y: 0, realizes: ["connector"], description: "接続したソースから宛先テーブルを更新する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-files: {label: "Amazon S3 の到着ファイル", kind: "db", tier: "flow", x: 0, y: 4, svc: "s3", realizes: ["files"], description: "外部から受領したバックフィル用のファイルを配置する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-auto-loader: {label: "Auto Loader", kind: "service", tier: "flow", x: 5, y: 4, realizes: ["auto-loader"], description: "新着ファイルを別の受入表に増分取り込みする。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-raw: {label: "ソース別 RAW Delta テーブル群", kind: "db", tier: "flow", x: 10, y: 4, realizes: ["raw"], description: "DB 接続の宛先表とファイルの受入表を個別に管理する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-sdp: {label: "Lakeflow パイプラインの宣言と出力表", kind: "worker", tier: "flow", x: 14, y: 4, realizes: ["sdp","clean"], description: "入力を統合し、キーと順序に従って注文状態を更新する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-jobs: {label: "Lakeflow Jobs", kind: "service", tier: "flow", x: 13, y: 0, realizes: ["jobs"], description: "後段の変換パイプラインを定期実行する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-event-log: {label: "Lakeflow パイプラインイベントログ", kind: "db", tier: "flow", x: 18, y: 0, realizes: ["event-log"], description: "進捗と品質違反件数を調べる。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
-      example-publication: {label: "PostgreSQL の論理レプリケーション設定", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "対象表の publication とソース接続に必要な権限を設定する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
+      example-db:
+        label: PostgreSQL の ORDERS
+        kind: external
+        tier: flow
+        x: 0
+        'y': 0
+        realizes:
+          - db
+        description: 対象テーブルの初回取込と CDC を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+      example-gateway:
+        label: Lakeflow Connect 取り込みゲートウェイ
+        kind: service
+        tier: flow
+        x: 3
+        'y': 0
+        realizes:
+          - gateway
+        description: データベースの変更を取得する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+        svc: databricks:lakeflow
+      example-stage:
+        label: Unity Catalog ステージングボリューム
+        kind: db
+        tier: flow
+        x: 6
+        'y': 0
+        realizes:
+          - stage
+        description: ゲートウェイが取得した変更を一時保存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+        svc: databricks:unity
+      example-connector:
+        label: Lakeflow Connect 取り込みパイプライン
+        kind: worker
+        tier: flow
+        x: 9
+        'y': 0
+        realizes:
+          - connector
+        description: 接続したソースから宛先テーブルを更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+        svc: databricks:lakeflow
+      example-files:
+        label: Amazon S3 の到着ファイル
+        kind: db
+        tier: flow
+        x: 0
+        'y': 4
+        svc: s3
+        realizes:
+          - files
+        description: 外部から受領したバックフィル用のファイルを配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+      example-auto-loader:
+        label: Auto Loader
+        kind: service
+        tier: flow
+        svc: databricks:lakeflow
+        x: 5
+        'y': 4
+        realizes:
+          - auto-loader
+        description: 新着ファイルを別の受入表に増分取り込みする。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+      example-raw:
+        label: ソース別 RAW Delta テーブル群
+        kind: db
+        tier: flow
+        x: 10
+        'y': 4
+        realizes:
+          - raw
+        description: DB 接続の宛先表とファイルの受入表を個別に管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+        svc: databricks:delta
+      example-sdp:
+        label: Lakeflow パイプラインの宣言と出力表
+        kind: worker
+        tier: flow
+        x: 14
+        'y': 4
+        realizes:
+          - sdp
+          - clean
+        description: 入力を統合し、キーと順序に従って注文状態を更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+        svc: databricks:lakeflow
+      example-jobs:
+        label: Lakeflow Jobs
+        kind: service
+        tier: flow
+        x: 13
+        'y': 0
+        realizes:
+          - jobs
+        description: 後段の変換パイプラインを定期実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+        svc: databricks:lakeflow
+      example-event-log:
+        label: Lakeflow パイプラインイベントログ
+        kind: db
+        tier: flow
+        x: 18
+        'y': 0
+        realizes:
+          - event-log
+        description: 進捗と品質違反件数を調べる。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+        svc: databricks:delta
+      example-publication:
+        label: PostgreSQL の論理レプリケーション設定
+        kind: service
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 対象表の publication とソース接続に必要な権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
     links:
-      - {id: "example-publication-connection", from: "example-publication", to: "example-gateway", label: "変更の取得を許可", evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§6"}]}
+      - id: example-publication-connection
+        from: example-publication
+        to: example-gateway
+        label: 変更の取得を許可
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-lakeflow.md#§6
+    groups:
+      - kind: cloud
+        label: AWS・Amazon S3
+        provider: aws
+        tier:
+          - flow
+        nodes:
+          - example-files
+      - kind: cloud
+        provider: databricks
+        label: Databricks
+        tier:
+          - flow
+        nodes:
+          - example-gateway
+          - example-stage
+          - example-connector
+          - example-auto-loader
+          - example-raw
+          - example-sdp
+          - example-jobs
+          - example-event-log

@@ -1,0 +1,244 @@
+name: Graphiti の時間を扱う知識グラフ
+description: エピソードから実体と関係を抽出し、時間情報付きグラフを更新・検索する。
+reference:
+  objectives:
+    - エピソードから実体と関係を抽出し、時間情報付きグラフを更新・検索する。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: Graphiti quickstart
+      url: https://github.com/getzep/graphiti/blob/main/examples/quickstart/README.md
+    - title: Graphiti
+      url: https://github.com/getzep/graphiti
+sources:
+  - docs/reference-graphiti.md
+evidence:
+  - type: doc
+    ref: docs/reference-graphiti.md#§1
+  - type: doc
+    ref: docs/reference-graphiti.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  client:
+    label: 利用アプリ
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  ingest:
+    label: エピソードの取り込み
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  graph:
+    label: 時間情報付きグラフ
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  search:
+    label: グラフの検索
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  result:
+    label: 検索結果の利用
+    kind: actor
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  model:
+    label: 抽出・埋め込みモデル
+    kind: service
+    tier: support
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+links:
+  - id: submit
+    from: client
+    to: ingest
+    label: エピソードを渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  - id: extract
+    from: model
+    to: ingest
+    label: 実体と関係を抽出
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  - id: save
+    from: ingest
+    to: graph
+    label: 事実と時間情報を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  - id: query
+    from: graph
+    to: search
+    label: 事実を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  - id: use
+    from: search
+    to: result
+    label: 関連する事実を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+  - id: search-request
+    from: client
+    to: search
+    label: グラフを検索
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-graphiti.md#§2
+    steps:
+      - links:
+          - submit
+        note: エピソードを渡す。
+      - links:
+          - extract
+        note: 実体と関係を抽出。
+      - links:
+          - save
+        note: 事実と時間情報を保存。
+      - links:
+          - query
+        note: 事実を検索。
+      - links:
+          - use
+        note: 関連する事実を返す。
+      - links:
+          - search-request
+        note: グラフを検索。
+implementations:
+  - id: example
+    label: Graphiti の時間を扱う知識グラフの構成例
+    description: Graphiti の Python クライアントから Neo4j に接続し、エピソードを取り込み検索する公式 quickstart の例。LLM と埋め込みの提供先は別途設定する。
+    sources:
+      - title: Graphiti quickstart
+        url: https://github.com/getzep/graphiti/blob/main/examples/quickstart/README.md
+      - title: Graphiti
+        url: https://github.com/getzep/graphiti
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-client:
+        label: Python 利用アプリ
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-graphiti.md#§4
+        realizes:
+          - client
+      ex-ingest:
+        label: Graphiti エピソード取り込み
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-graphiti.md#§4
+        realizes:
+          - ingest
+      ex-graph:
+        label: Neo4j グラフ
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-graphiti.md#§4
+        realizes:
+          - graph
+      ex-search:
+        label: Graphiti 検索
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-graphiti.md#§4
+        realizes:
+          - search
+      ex-result:
+        label: 分析・エージェント
+        kind: actor
+        tier: flow
+        x: 16
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-graphiti.md#§4
+        realizes:
+          - result
+      ex-model:
+        label: 設定された LLM・埋め込み
+        kind: service
+        tier: support
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-graphiti.md#§4
+        realizes:
+          - model

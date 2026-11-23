@@ -1,0 +1,354 @@
+name: Iceberg v3 Variant と Parquet shredding
+description: 半構造化の論理列、Variant 値の辞書、Parquet の物理配置とファイル統計の関係を追う。
+reference:
+  objectives:
+    - Iceberg の列 field ID と Variant 内の名前辞書を区別する。
+    - shredding の有無による物理配置と復元を理解する。
+    - 任意の統計とファイル除外の条件を理解する。
+  sources:
+    - title: Iceberg Variant
+      url: https://iceberg.apache.org/blog/variant-in-apache-iceberg/
+    - title: Iceberg specification
+      url: https://iceberg.apache.org/spec/
+    - title: Iceberg write configuration
+      url: https://iceberg.apache.org/docs/latest/configuration/
+sources:
+  - docs/reference-iceberg-v3-variant.md
+evidence:
+  - type: doc
+    ref: docs/reference-iceberg-v3-variant.md#§1
+  - type: doc
+    ref: docs/reference-iceberg-v3-variant.md#§3
+  - type: doc
+    ref: docs/reference-iceberg-v3-variant.md#§4
+tiers:
+  - id: schema
+    label: 表の定義と計画
+    z: 2
+    size:
+      - 20
+      - 3
+  - id: files
+    label: データファイルと値
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: metadata
+    label: 参照と統計
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  engine:
+    label: 読み書きエンジン
+    kind: service
+    tier: schema
+    x: 0
+    'y': 1.5
+    description: v3 の型と物理表現に対応したエンジン。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  schema:
+    label: 表のスキーマと列 ID
+    kind: file
+    tier: schema
+    x: 4
+    'y': 1.5
+    description: payload 列は Iceberg の field ID と variant 型を持つ。
+    drill: iceberg-v3-metadata
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  plan:
+    label: ファイルを選ぶ計画
+    kind: service
+    tier: schema
+    x: 8
+    'y': 1.5
+    description: 対応する場合、任意のパス統計を使い不要なファイルを除外する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  reader:
+    label: 値の復元と抽出
+    kind: service
+    tier: schema
+    x: 12
+    'y': 1.5
+    description: metadata、value、typed_value を必要に応じて組み合わせる。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  meta:
+    label: Variant 名称辞書
+    kind: file
+    tier: files
+    x: 0
+    'y': 1.5
+    description: Variant 値の metadata。表の metadata.json とは別。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  value:
+    label: Variant の値
+    kind: file
+    tier: files
+    x: 4
+    'y': 1.5
+    description: 値の型・入れ子・オフセットを保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  typed:
+    label: 分離した型付き値
+    kind: file
+    tier: files
+    x: 8
+    'y': 1.5
+    description: shredding が有効で適用されたフィールドを型付き列で表す。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  file:
+    label: Parquet データファイル
+    kind: db
+    tier: files
+    x: 12
+    'y': 1.5
+    description: 同じ列 ID のままファイルごとに物理配置が異なり得る。
+    drill: parquet-internals
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  manifest:
+    label: Manifest のファイル統計
+    kind: file
+    tier: metadata
+    x: 8
+    'y': 1.5
+    description: Variant のパス別上下限は任意。常に存在するとは限らない。
+    drill: iceberg-v3-metadata
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+links:
+  - id: definition
+    from: engine
+    to: schema
+    label: Variant 列を定義
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  - id: plan
+    from: schema
+    to: plan
+    label: 列 ID と型を解決
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  - id: stats
+    from: manifest
+    to: plan
+    label: 任意の統計を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  - id: files
+    from: plan
+    to: file
+    label: 必要なファイルを選択
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  - id: dict
+    from: meta
+    to: reader
+    label: 名前辞書を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  - id: raw
+    from: value
+    to: reader
+    label: 非型付き値を復元
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  - id: shred
+    from: typed
+    to: reader
+    label: 型付き値を復元
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+  - id: layout
+    from: file
+    to: reader
+    label: 保存された列を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+scenarios:
+  - id: read
+    label: Variant 列の読み取り
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-variant.md#§2
+    steps:
+      - links:
+          - definition
+          - plan
+          - stats
+          - files
+        note: 表スキーマと任意のファイル統計を参照する。
+      - links:
+          - layout
+          - dict
+          - raw
+          - shred
+        note: 各ファイルの物理配置に応じて値を復元する。
+implementations:
+  - id: example
+    label: Spark 4.1・Iceberg 1.11・Parquet
+    description: v3 表の Variant を Parquet に保存する例。shredding と統計は設定および各ファイルに依存する。
+    sources:
+      - title: Iceberg Variant
+        url: https://iceberg.apache.org/blog/variant-in-apache-iceberg/
+      - title: Iceberg specification
+        url: https://iceberg.apache.org/spec/
+      - title: Iceberg write configuration
+        url: https://iceberg.apache.org/docs/latest/configuration/
+    tiers:
+      - id: schema
+        label: 表の定義と計画
+        z: 2
+        size:
+          - 20
+          - 3
+      - id: files
+        label: データファイルと値
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: metadata
+        label: 参照と統計
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-engine:
+        label: Spark SQL 4.1 / Iceberg 1.11
+        kind: service
+        tier: schema
+        x: 0
+        'y': 1.5
+        description: v3 の型と物理表現に対応したエンジン。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - engine
+      ex-schema:
+        label: Iceberg 表スキーマ / field ID
+        kind: file
+        tier: schema
+        x: 4
+        'y': 1.5
+        description: payload 列は Iceberg の field ID と variant 型を持つ。
+        drill: iceberg-v3-metadata
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - schema
+      ex-plan:
+        label: Iceberg のファイル計画
+        kind: service
+        tier: schema
+        x: 8
+        'y': 1.5
+        description: 対応する場合、任意のパス統計を使い不要なファイルを除外する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - plan
+      ex-reader:
+        label: Spark variant_get
+        kind: service
+        tier: schema
+        x: 12
+        'y': 1.5
+        description: metadata、value、typed_value を必要に応じて組み合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - reader
+      ex-meta:
+        label: Parquet Variant metadata
+        kind: file
+        tier: files
+        x: 0
+        'y': 1.5
+        description: Variant 値の metadata。表の metadata.json とは別。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - meta
+      ex-value:
+        label: Parquet Variant value
+        kind: file
+        tier: files
+        x: 4
+        'y': 1.5
+        description: 値の型・入れ子・オフセットを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - value
+      ex-typed:
+        label: Parquet typed_value（任意）
+        kind: file
+        tier: files
+        x: 8
+        'y': 1.5
+        description: shredding が有効で適用されたフィールドを型付き列で表す。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - typed
+      ex-file:
+        label: Parquet の Variant 列
+        kind: db
+        tier: files
+        x: 12
+        'y': 1.5
+        description: 同じ列 ID のままファイルごとに物理配置が異なり得る。
+        drill: parquet-internals
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - file
+      ex-manifest:
+        label: Iceberg data manifest
+        kind: file
+        tier: metadata
+        x: 8
+        'y': 1.5
+        description: Variant のパス別上下限は任意。常に存在するとは限らない。
+        drill: iceberg-v3-metadata
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-variant.md#§5
+        realizes:
+          - manifest

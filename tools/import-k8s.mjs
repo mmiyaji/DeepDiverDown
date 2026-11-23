@@ -2,52 +2,78 @@
 // Kubernetes マニフェストから実環境スナップショット（actual.yaml）を作る
 //   node tools/import-k8s.mjs manifests.yaml [...] --out models/<id>/actual.yaml
 //   kubectl get deploy,sts,svc -A -o yaml > live.yaml でも可（List 形式に対応）
-// - Deployment / StatefulSet → 部品（キーは名前。replicas 未指定は 1）
-// - 環境変数の値が「<Service 名>:<ポート>」→ その Service が指す部品への接続
+// - Deployment / StatefulSet / DaemonSet → 部品（名前空間と種類を区別）
+// - 環境変数の値が「<Service の DNS 名>:<ポート>」→ その Service が指す部品への接続
 // - 参照先の Service / 部品が存在しないものは unresolved に記録
 import fs from 'node:fs';
 import yaml from 'js-yaml';
 
 const DATA = /redis|postgres|mysql|mongo|memcached|elasticsearch|kafka|rabbitmq|cassandra/i;
+const SERVICE_ADDRESS = /^([a-z0-9-]+)(?:\.([a-z0-9-]+)(?:\.svc(?:\.[a-z0-9-]+)*)?)?\.?:\d+$/;
+const namespace = resource => resource.metadata.namespace || 'default';
+const resourceKey = resource => `${namespace(resource)}/${resource.metadata.name}`;
+const resourceLabel = resource => namespace(resource) === 'default' ? resource.metadata.name : resourceKey(resource);
 
 export function importManifests(texts) {
   const docs = texts.flatMap(t => yaml.loadAll(t)).filter(Boolean).flatMap(d => d.kind === 'List' ? d.items : [d]);
-  const workloads = docs.filter(d => ['Deployment', 'StatefulSet', 'DaemonSet'].includes(d.kind));
-  const services = docs.filter(d => d.kind === 'Service');
+  const relevant = docs.filter(d => ['Deployment', 'StatefulSet', 'DaemonSet', 'Service'].includes(d.kind));
+  const resources = [...new Map(relevant.map(d => [`${d.kind}/${resourceKey(d)}`, d])).values()];
+  const workloads = resources.filter(d => d.kind !== 'Service');
+  const services = resources.filter(d => d.kind === 'Service');
   const match = (sel, labels) => sel && Object.keys(sel).length > 0 && Object.entries(sel).every(([k, v]) => labels?.[k] === v);
-  // Service 名 → 部品名（セレクタでワークロードを引く）
-  const svcTarget = {};
-  for (const s of services) {
-    const w = workloads.find(w => match(s.spec?.selector, w.spec?.template?.metadata?.labels));
-    svcTarget[s.metadata.name] = w?.metadata.name || null;
-  }
-  const nodes = {}, links = [], unresolved = [];
+  const workloadsByName = new Map();
   for (const w of workloads) {
-    const name = w.metadata.name, pod = w.spec?.template?.spec || {};
-    const images = [...(pod.containers || [])].map(c => c.image);
-    const exposed = services.filter(s => svcTarget[s.metadata.name] === name && s.spec?.type === 'LoadBalancer').map(s => s.metadata.name);
-    nodes[name] = {
-      label: name, svc: `k8s:${w.kind.toLowerCase()}`, kind: DATA.test(images.join(' ') + name) ? 'db' : 'service', tier: DATA.test(images.join(' ') + name) ? 'data' : 'app',
-      replicas: w.kind === 'DaemonSet' ? 99 : (w.spec?.replicas ?? 1), image: images[0],
-      ...(exposed.length ? { exposed } : {}),
-    };
-    for (const c of [...(pod.containers || []), ...(pod.initContainers || [])]) for (const e of c.env || []) {
-      const m = String(e.value ?? '').match(/^([a-z0-9-]+)(?:\.[a-z0-9.-]+)?:\d+$/);
-      if (!m) continue;
-      const target = svcTarget[m[1]];
-      if (target === undefined) unresolved.push({ from: name, env: e.name, value: e.value, reason: `Service「${m[1]}」がない` });
-      else if (target === null) unresolved.push({ from: name, env: e.name, value: e.value, reason: `Service「${m[1]}」の宛先ワークロードがない` });
-      else if (target !== name && !links.some(([f, t]) => f === name && t === target)) links.push([name, target]);
+    const key = resourceKey(w);
+    workloadsByName.set(key, (workloadsByName.get(key) || 0) + 1);
+  }
+  // default の既存 ID を、同名の異種ワークロードがない限り維持する。
+  const workloadId = w => namespace(w) === 'default' && workloadsByName.get(resourceKey(w)) === 1
+    ? w.metadata.name : `${namespace(w)}/${w.kind.toLowerCase()}/${w.metadata.name}`;
+  const svcTargets = new Map();
+  const exposedByWorkload = new Map();
+  const loadBalancers = [];
+  const nodes = new Map(), links = [], unresolved = [];
+  for (const s of services) {
+    const ns = namespace(s), name = s.metadata.name;
+    const targets = workloads.filter(w => namespace(w) === ns && match(s.spec?.selector, w.spec?.template?.metadata?.labels)).map(workloadId);
+    svcTargets.set(resourceKey(s), targets);
+    if (s.spec?.type !== 'LoadBalancer') continue;
+    const id = ns === 'default' ? `service/${name}` : `${ns}/service/${name}`;
+    const label = resourceLabel(s);
+    loadBalancers.push({ id, label, targets });
+    for (const target of targets) {
+      if (!exposedByWorkload.has(target)) exposedByWorkload.set(target, []);
+      exposedByWorkload.get(target).push(label);
     }
   }
-  for (const service of services.filter(s => s.spec?.type === 'LoadBalancer')) {
-    const name = service.metadata.name, id = `service/${name}`;
-    nodes[id] = { label: name, svc: 'k8s:service', kind: 'lb', tier: 'app' };
-    const targets = workloads.filter(w => (w.metadata.namespace || 'default') === (service.metadata.namespace || 'default') &&
-      match(service.spec.selector, w.spec?.template?.metadata?.labels));
-    for (const target of targets) links.push([id, target.metadata.name]);
+  for (const w of workloads) {
+    const id = workloadId(w), pod = w.spec?.template?.spec || {};
+    const images = [...(pod.containers || [])].map(c => c.image);
+    const exposed = exposedByWorkload.get(id);
+    const data = DATA.test(images.join(' ') + w.metadata.name);
+    nodes.set(id, {
+      label: resourceLabel(w), svc: `k8s:${w.kind.toLowerCase()}`, kind: data ? 'db' : 'service', tier: data ? 'data' : 'app',
+      replicas: w.kind === 'DaemonSet' ? 99 : (w.spec?.replicas ?? 1), image: images[0],
+      ...(exposed ? { exposed } : {}),
+    });
+    const connections = new Set();
+    for (const c of [...(pod.containers || []), ...(pod.initContainers || [])]) for (const e of c.env || []) {
+      const m = String(e.value ?? '').match(SERVICE_ADDRESS);
+      if (!m) continue;
+      const [, name, ns = namespace(w)] = m;
+      const targets = svcTargets.get(`${ns}/${name}`);
+      const label = ns === 'default' ? name : `${ns}/${name}`;
+      if (!targets?.length) unresolved.push({ from: id, env: e.name, value: e.value, reason: targets
+        ? `Service「${label}」の宛先ワークロードがない` : `Service「${label}」がない` });
+      else for (const target of targets) if (target !== id) connections.add(target);
+    }
+    for (const target of connections) links.push([id, target]);
   }
-  return { capturedAt: new Date().toISOString().slice(0, 16).replace('T', ' '), source: 'kubernetes', nodes, links, ...(unresolved.length ? { unresolved } : {}) };
+  for (const { id, label, targets } of loadBalancers) {
+    nodes.set(id, { label, svc: 'k8s:service', kind: 'lb', tier: 'app' });
+    for (const target of targets) links.push([id, target]);
+  }
+  return { capturedAt: new Date().toISOString().slice(0, 16).replace('T', ' '), source: 'kubernetes', nodes: Object.fromEntries(nodes), links, ...(unresolved.length ? { unresolved } : {}) };
 }
 
 if (process.argv[1]?.endsWith('import-k8s.mjs')) {

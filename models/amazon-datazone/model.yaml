@@ -10,7 +10,8 @@ reference:
     - 管理対象と非管理対象での権限付与の違いを説明する。
   sources:
     - title: 'AWS Reference Architecture: Building a Unified Catalog with Amazon DataZone'
-      url: https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html
+      url: >-
+        https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html
     - title: Data Discovery, Subscription, and Consumption
       url: https://docs.aws.amazon.com/datazone/latest/userguide/discover-subscribe-consume-data.html
     - title: Grant Access to Unmanaged Assets
@@ -49,7 +50,7 @@ nodes:
     kind: actor
     tier: people
     x: 4
-    y: 1
+    'y': 1
     description: 資産の説明を整え、購読を審査する。
     evidence:
       - type: doc
@@ -61,7 +62,7 @@ nodes:
     kind: actor
     tier: people
     x: 10
-    y: 1
+    'y': 1
     description: 公開資産を検索し、目的とともに利用を申請する。
     evidence:
       - type: doc
@@ -71,7 +72,7 @@ nodes:
     kind: db
     tier: catalog
     x: 2
-    y: 1
+    'y': 1
     description: 取り込んだ資産を公開前に編集できる。
     evidence:
       - type: doc
@@ -81,7 +82,7 @@ nodes:
     kind: service
     tier: catalog
     x: 5
-    y: 1
+    'y': 1
     description: ドメイン内の公開済み資産とリネージを表示する。
     evidence:
       - type: doc
@@ -93,7 +94,7 @@ nodes:
     kind: service
     tier: catalog
     x: 9
-    y: 1
+    'y': 1
     description: 申請状態を管理し、承認後に資産種別に応じた処理を進める。
     evidence:
       - type: doc
@@ -105,7 +106,7 @@ nodes:
     kind: queue
     tier: catalog
     x: 13
-    y: 2.5
+    'y': 2.5
     description: 非管理対象の承認イベントを配信する。
     evidence:
       - type: doc
@@ -115,7 +116,7 @@ nodes:
     kind: external
     tier: sources
     x: 2
-    y: 1
+    'y': 1
     description: 資産メタデータの取得元。
     drill: aws-glue
     evidence:
@@ -126,7 +127,7 @@ nodes:
     kind: external
     tier: sources
     x: 4
-    y: 2.5
+    'y': 2.5
     description: 変換の実行イベントをカタログに送る。
     drill: openlineage
     evidence:
@@ -137,7 +138,7 @@ nodes:
     kind: external
     tier: sources
     x: 7
-    y: 1
+    'y': 1
     description: 管理対象のテーブルに利用権限を反映する。
     evidence:
       - type: doc
@@ -147,7 +148,7 @@ nodes:
     kind: external
     tier: sources
     x: 10
-    y: 1
+    'y': 1
     description: 購読プロジェクトで権限付与済みテーブルをクエリする。
     evidence:
       - type: doc
@@ -157,7 +158,7 @@ nodes:
     kind: external
     tier: sources
     x: 13
-    y: 2.5
+    'y': 2.5
     description: 承認イベントを受け、対象ソースの権限を付与する。
     evidence:
       - type: doc
@@ -305,7 +306,8 @@ implementations:
     description: 提供・購読プロジェクトを DataZone の DefaultDataLake ブループリントで作る構成例。非管理対象資産の通知経路も描く。
     sources:
       - title: 'AWS Reference Architecture: Building a Unified Catalog with Amazon DataZone'
-        url: https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html
+        url: >-
+          https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html
       - title: Grant Access to Unmanaged Assets
         url: https://docs.aws.amazon.com/datazone/latest/userguide/grant-access-to-unmanaged-asset.html
       - title: Data Lineage in Amazon DataZone
@@ -318,7 +320,7 @@ implementations:
         kind: actor
         tier: people
         x: 4
-        y: 1
+        'y': 1
         description: 資産を公開し、購読申請を審査する。
         realizes:
           - owner
@@ -330,7 +332,7 @@ implementations:
         kind: actor
         tier: people
         x: 10
-        y: 1
+        'y': 1
         description: 提供されたデータを利用する環境を持つ。
         realizes:
           - consumer
@@ -342,7 +344,7 @@ implementations:
         kind: catalog
         tier: catalog
         x: 6
-        y: 1
+        'y': 1
         description: インベントリ、公開カタログ、購読状態を一つのドメインで管理する。
         realizes:
           - inventory
@@ -351,12 +353,13 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-amazon-datazone.md#§7
+        svc: datazone
       aws-datalake-eventbridge:
         label: Amazon EventBridge
         kind: queue
         tier: catalog
         x: 13
-        y: 2.5
+        'y': 2.5
         description: 非管理対象の承認イベントを配信する。
         svc: eventbridge
         realizes:
@@ -369,7 +372,7 @@ implementations:
         kind: external
         tier: sources
         x: 2
-        y: 1
+        'y': 1
         description: Lake Formation 管理下の注文テーブルを登録する。
         svc: glue
         realizes:
@@ -383,7 +386,7 @@ implementations:
         kind: external
         tier: sources
         x: 4
-        y: 2.5
+        'y': 2.5
         description: 対応バージョンで OpenLineage のイベントを出す。
         realizes:
           - lineage
@@ -391,24 +394,26 @@ implementations:
           - type: doc
             ref: docs/reference-amazon-datazone.md#§7
         drill: openlineage
+        svc: glue
       aws-datalake-lakeformation:
         label: AWS Lake Formation
         kind: policy
         tier: sources
         x: 7
-        y: 1
+        'y': 1
         description: 購読側のデータアクセスを付与する。
         realizes:
           - lake
         evidence:
           - type: doc
             ref: docs/reference-amazon-datazone.md#§7
+        svc: lakeformation
       aws-datalake-athena:
         label: Amazon Athena ワークグループ
         kind: external
         tier: sources
         x: 10
-        y: 1
+        'y': 1
         description: 購読環境が付与済みテーブルをクエリする。
         svc: athena
         realizes:
@@ -421,7 +426,7 @@ implementations:
         kind: external
         tier: sources
         x: 13
-        y: 2.5
+        'y': 2.5
         description: 承認イベントに従ってソース側の権限変更を担当する。
         realizes:
           - external
@@ -433,7 +438,7 @@ implementations:
         kind: workflow
         tier: catalog
         x: 2
-        y: 2.5
+        'y': 2.5
         description: Glue 管理アクセスロールとデータレイク環境を構成する。
         evidence:
           - type: doc
@@ -454,3 +459,45 @@ implementations:
           - aws-datalake-glue
           - aws-datalake-lakeformation
           - aws-datalake-athena
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - sources
+        nodes:
+          - aws-datalake-job
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - catalog
+        nodes:
+          - aws-datalake-eventbridge
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - sources
+        nodes:
+          - aws-datalake-glue
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - sources
+        nodes:
+          - aws-datalake-athena
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - catalog
+        nodes:
+          - aws-datalake-portal
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - sources
+        nodes:
+          - aws-datalake-lakeformation

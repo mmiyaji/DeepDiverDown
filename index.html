@@ -7,7 +7,9 @@
 <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'sha256-hkzRjflwL67QuBNHfcX51SOxPQzPEfwGduwXdxJWLPQ='; object-src 'none'; base-uri 'none'">
 <title>DeepDiverDown</title>
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
-<link rel="stylesheet" href="css/style.css?v=directory1">
+<link rel="stylesheet" href="css/style.css?v=minimap1">
+<link rel="stylesheet" href="css/diagram-symbols.css?v=compare-layout3">
+<link rel="stylesheet" href="css/review-actions.css">
 <script type="importmap">
 { "imports": {
   "three": "./vendor/three/three.module.js",
@@ -31,6 +33,7 @@
       <summary>一覧 ▾</summary>
       <div class="menu-list directory-links">
         <a href="research.html">調査一覧</a>
+        <a href="knowledge-graph.html">ナレッジグラフ</a>
         <a href="objects.html">オブジェクト一覧</a>
       </div>
     </details>
@@ -52,30 +55,21 @@
 </header>
 
 <div class="shell">
-  <aside class="sidebar" id="sidebar" aria-label="表示の切り替え">
+  <aside class="sidebar" id="sidebar" aria-label="モデル一覧">
     <section class="library-section">
       <details class="library" id="library">
         <summary><h5>モデル一覧</h5><small>Ctrl+K</small></summary>
         <input id="model-filter" type="search" placeholder="名前・ラベルで絞り込む（例：OSS）" aria-label="モデルを絞り込む" autocomplete="off">
         <div id="tag-filter" class="tag-filter" aria-label="ラベルで絞り込む"></div>
         <div id="reference-section" hidden>
-          <div class="ref-head"><span class="vc-h">リファレンス</span><button type="button" class="b small" data-act="reference-compare">比較する</button></div>
+          <div class="ref-head"><span class="vc-h">リファレンス</span></div>
           <a class="research-entry" href="research.html">調査一覧</a>
+          <a class="research-entry" href="knowledge-graph.html">ナレッジグラフ</a>
           <div id="reference-list"></div>
         </div>
         <details class="my-models" id="my-models"><summary>自分の設計 <small id="my-count"></small></summary><div id="mlist" class="mlist"></div></details>
       </details>
     </section>
-    <details class="diagram-ctl" id="diagram-ctl" open>
-      <summary><h5>図の表示</h5></summary>
-      <div class="vc-row"><span class="vc-h">ビュー</span><div id="views" class="views" role="group" aria-label="ビュー"></div></div>
-      <div class="vc-row"><span class="vc-h">モード</span><nav id="modes" class="modes" aria-label="表示モード"></nav></div>
-      <details class="vc-sub"><summary>フロアと表示</summary>
-        <div id="floors" class="floors"></div>
-        <label class="chk"><input type="checkbox" id="nbr"> 選択中の部品の周辺だけ</label>
-        <label class="chk"><input type="checkbox" id="minimap"> 全体図（ミニマップ）</label>
-      </details>
-    </details>
   </aside>
   <div class="scrim" data-act="nav" aria-hidden="true"></div>
 
@@ -83,15 +77,38 @@
     <div class="stage">
       <div class="stage-head">
         <div class="stats" id="stats" aria-live="polite"></div>
+        <a class="b small" id="graph-entry" hidden>関連グラフ</a>
+        <button type="button" class="b small compare-entry" id="compare-entry" data-act="reference-compare" aria-haspopup="dialog" hidden></button>
       </div>
-      <div class="view" id="view" aria-label="構成図。部品をクリックで選択">
         <div class="toolbar" role="toolbar" aria-label="構成図の操作">
+          <div class="tb-disp" role="group" aria-label="図の表示">
+            <details class="menu tb-menu">
+              <summary title="ビューの切り替え（V）"><span class="tb-k">ビュー</span><b id="view-cur"></b><i>▾</i></summary>
+              <div id="views" class="menu-list views" role="menu" aria-label="ビュー"></div>
+            </details>
+            <details class="menu tb-menu">
+              <summary title="表示モードの切り替え（1〜）"><span class="tb-k">モード</span><b id="mode-cur"></b><i>▾</i></summary>
+              <div id="modes" class="menu-list modes" role="menu" aria-label="表示モード"></div>
+            </details>
+            <details class="menu tb-menu">
+              <summary title="フロア・周辺表示・ミニマップ"><span class="tb-k">表示</span><b id="opts-cur"></b><i>▾</i></summary>
+              <div class="menu-list tb-opts" aria-label="表示の設定">
+                <span class="tb-opts-h">フロア</span>
+                <div id="floors" class="floors"></div>
+                <span class="tb-opts-h">その他</span>
+                <label class="chk"><input type="checkbox" id="nbr"> 選択中の部品の周辺だけ</label>
+                <label class="chk"><input type="checkbox" id="spread-floors"> 3D のフロア間隔を広げる</label>
+                <label class="chk"><input type="checkbox" id="minimap"> 全体図（ミニマップ）</label>
+              </div>
+            </details>
+          </div>
           <div class="tb-group" role="group" aria-label="ドラッグの操作">
             <button data-drag="rotate" title="ドラッグで回転（R）">⟳<span>回転</span></button>
             <button data-drag="pan" title="ドラッグで移動（M）">✥<span>移動</span></button>
           </div>
           <div class="tb-group" role="group" aria-label="次元">
-            <button data-act="dimension" title="3D と 2D の切り替え（D）">3D / 2D</button>
+            <button data-dimension="2" title="依存関係を追う（D で切替）">2D 接続図</button>
+            <button data-dimension="3" title="フロアと境界を見る（D で切替）">3D 配置図</button>
           </div>
           <div class="tb-group" role="group" aria-label="視点">
             <button data-view="iso" title="斜めから">斜め</button><button data-view="top" title="真上から">真上</button><button data-view="side" title="横から">横</button><button data-view="back" title="裏側から">裏</button><button data-view="reset" title="全体が収まるように戻す">⤢<span>全体</span></button>
@@ -102,9 +119,10 @@
             <button class="detail-toggle" id="detail-toggle" aria-controls="panel" aria-expanded="true" title="詳細パネルの開閉">詳細</button>
           </div>
         </div>
+      <div class="view" id="view" aria-label="構成図。部品や矢印を選択">
         <div class="hint" id="hint"></div>
       </div>
-      <div class="legend" id="legend"></div>
+      <div class="legend" id="legend" aria-live="polite" aria-atomic="true"></div>
       <section class="filemap" id="filemap" hidden aria-label="データの見取り図"></section>
     </div>
   </main>
@@ -117,7 +135,7 @@
 
 <div id="modal" class="modal" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="dialog-head"><h2 id="modal-title"></h2><button class="close icon" aria-label="閉じる">×</button></div>
+    <div class="dialog-head"><h2 id="modal-title"></h2><button type="button" class="b small" id="compare-fullscreen" aria-pressed="false">全画面で比較</button><button class="close icon" aria-label="閉じる">×</button></div>
     <div id="modal-body" class="dialog-body"></div>
   </div>
 </div>
@@ -130,7 +148,7 @@
 <script src="js/layout.js"></script>
 <script src="js/analyze.js?v=routes1"></script>
 <script src="js/views.js?v=routes1"></script>
-<script src="js/view-controls.js?v=directory1"></script>
-<script type="module" src="js/app.js?v=directory1"></script>
+<script src="js/view-controls.js?v=tbmenu1"></script>
+<script type="module" src="js/app.js?v=minimap1"></script>
 </body>
 </html>

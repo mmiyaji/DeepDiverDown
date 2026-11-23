@@ -26,6 +26,7 @@ Unity Catalog はデータを統治し、Databricks SQLなどからクエリで�
 | Databricks SQL | [実行プロファイルとファイル配置](reference-databricks-sql-performance.md) | SQL Warehouse、Photon、Liquid clustering、保守 |
 | OpenSharing | [共有の接続と失効](reference-databricks-open-sharing.md) | Databricks と外部クライアントへの共有経路 |
 | MLflow と Model Serving | [モデルの版管理](reference-databricks-mlflow-serving.md) | 学習の追跡、UC への登録、推論時の配備 |
+| AI Search | [索引更新と検索](reference-databricks-ai-search.md) | Delta Sync、埋め込み、検索とアクセス権 |
 
 ## 6. 参考資料
 - [Databricks reference architectures](https://docs.databricks.com/aws/en/lakehouse-architecture/reference)

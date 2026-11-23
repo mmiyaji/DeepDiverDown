@@ -34,7 +34,8 @@ S3 上の同じ注文入力を使い、Glue で先に変換してロードする
 | ロード前の変換処理 | AWS Glue ETL ジョブ | 抽出と変換を行い、Redshift へロードする。 |
 | Curated Table | Redshift の ETL 整形済みテーブル | Glue で変換した結果を保持する。 |
 | Raw Landing | Redshift の raw スキーマ | COPY でロードした無変換の入力を保持する。 |
-| ロード後の SQL 変換 | dbt-redshift と Redshift SQL | dbt モデルの SQL を Redshift 内で実行する。 |
+| ロード後の SQL 変換 | Redshift 内の SQL 変換 | dbt モデルの SQL を Redshift 内で実行する。 |
+| 実装で追加 | dbt-redshift 実行環境 | dbt モデルをコンパイルし、変換 SQL を Redshift に送る。 |
 | Analytics Mart | Redshift の分析マート | 比較用に経路ごとにスキーマを分離する。 |
 | BI / Consumer | Redshift 対応の BI クライアント | 注文売上の集計を参照する。 |
 | 実装で追加 | Amazon S3 の Glue 一時領域 | Glue と Redshift の転送時に一時データを置く。 |

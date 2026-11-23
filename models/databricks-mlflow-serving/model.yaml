@@ -1,69 +1,321 @@
-name: "Databricks MLflow と Model Serving の版管理"
-description: "注文遅延の予測モデルを学習し、検証済みのバージョンを登録・配備して推論する。"
-parent: {"model":"databricks","node":"ml"}
+name: Databricks MLflow と Model Serving の版管理
+description: 注文遅延の予測モデルを学習し、検証済みのバージョンを登録・配備して推論する。
+parent:
+  model: databricks
+  node: ml
 reference:
   objectives:
-    - "実験の記録、登録モデルのバージョン、稼働中エンドポイントの状態を区別する。"
-    - "配備時に旧版と新版を確認し、切り戻せるようにする。"
+    - 実験の記録、登録モデルのバージョン、稼働中エンドポイントの状態を区別する。
+    - 配備時に旧版と新版を確認し、切り戻せるようにする。
   sources:
-    - {"title":"MLflow のモデル記録","url":"https://docs.databricks.com/aws/en/mlflow/models"}
-    - {"title":"Unity Catalog のモデルライフサイクル","url":"https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/"}
-    - {"title":"Model Serving エンドポイントの作成","url":"https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints"}
-sources: ["docs/reference-databricks-mlflow-serving.md"]
-evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§1"}]
+    - title: MLflow のモデル記録
+      url: https://docs.databricks.com/aws/en/mlflow/models
+    - title: Unity Catalog のモデルライフサイクル
+      url: https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/
+    - title: Model Serving エンドポイントの作成
+      url: https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints
+sources:
+  - docs/reference-databricks-mlflow-serving.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-mlflow-serving.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[18.5,2.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 18.5
+      - 2.5
 nodes:
-  orders: {"label":"学習用の注文テーブル","kind":"db","tier":"flow","x":0,"y":2,"description":"注文時点の特徴量。","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§1"}]}
-  train: {"label":"学習ジョブ","kind":"worker","tier":"flow","x":3,"y":2,"description":"予測モデルを学習。","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§2"}]}
-  tracking: {"label":"実験記録とモデル成果物","kind":"db","tier":"flow","x":6,"y":0,"description":"パラメータ・指標・成果物。","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§2"}]}
-  registry: {"label":"モデル版のレジストリ","kind":"db","tier":"flow","x":9,"y":2,"description":"名前・版・エイリアス。","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§3"}]}
-  deploy: {"label":"検証・配備ジョブ","kind":"worker","tier":"flow","x":12,"y":0,"description":"検証済みの版を選択。","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§3"}]}
-  endpoint: {"label":"オンライン推論エンドポイント","kind":"service","tier":"flow","x":15,"y":2,"description":"設定した版で推論。","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§4"}]}
-  app: {"label":"注文アプリ","kind":"client","tier":"flow","x":18,"y":2,"description":"オンラインでスコアを要求。","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§4"}]}
+  orders:
+    label: 学習用の注文テーブル
+    kind: db
+    tier: flow
+    x: 0
+    'y': 2
+    description: 注文時点の特徴量。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§1
+  train:
+    label: 学習ジョブ
+    kind: worker
+    tier: flow
+    x: 3
+    'y': 2
+    description: 予測モデルを学習。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§2
+  tracking:
+    label: 実験記録とモデル成果物
+    kind: db
+    tier: flow
+    x: 6
+    'y': 0
+    description: パラメータ・指標・成果物。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§2
+  registry:
+    label: モデル版のレジストリ
+    kind: db
+    tier: flow
+    x: 9
+    'y': 2
+    description: 名前・版・エイリアス。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§3
+  deploy:
+    label: 検証・配備ジョブ
+    kind: worker
+    tier: flow
+    x: 12
+    'y': 0
+    description: 検証済みの版を選択。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§3
+  endpoint:
+    label: オンライン推論エンドポイント
+    kind: service
+    tier: flow
+    x: 15
+    'y': 2
+    description: 設定した版で推論。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§4
+  app:
+    label: 注文アプリ
+    kind: client
+    tier: flow
+    x: 18
+    'y': 2
+    description: オンラインでスコアを要求。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§4
 links:
-  - {"id":"train","from":"orders","to":"train","label":"学習データを読む","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§2"}]}
-  - {"id":"record","from":"train","to":"tracking","label":"実験と成果物を記録","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§2"}]}
-  - {"id":"register","from":"tracking","to":"registry","label":"選んだ成果物を登録","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§3"}]}
-  - {"id":"promote","from":"registry","to":"deploy","label":"検証済みの版を確認","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§3"}]}
-  - {"id":"configure","from":"deploy","to":"endpoint","label":"明示したバージョンを配備","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§4"}]}
-  - {"id":"predict","from":"app","to":"endpoint","label":"スコアを要求","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§4"}]}
-  - {"id":"respond","from":"endpoint","to":"app","label":"予測を返す","evidence":[{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§4"}]}
+  - id: train
+    from: orders
+    to: train
+    label: 学習データを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§2
+  - id: record
+    from: train
+    to: tracking
+    label: 実験と成果物を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§2
+  - id: register
+    from: tracking
+    to: registry
+    label: 選んだ成果物を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§3
+  - id: promote
+    from: registry
+    to: deploy
+    label: 検証済みの版を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§3
+  - id: configure
+    from: deploy
+    to: endpoint
+    label: 明示したバージョンを配備
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§4
+  - id: predict
+    from: app
+    to: endpoint
+    label: スコアを要求
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§4
+  - id: respond
+    from: endpoint
+    to: app
+    label: 予測を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§4
 scenarios:
   - id: release
-    label: "検証済みの予測モデルを公開"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§4"}]
+    label: 検証済みの予測モデルを公開
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§4
     steps:
-      - {"links":["train","record"],"note":"注文データで学習し、どの実験で作られたかを保存する。"}
-      - {"links":["register","promote"],"note":"登録モデルの版と承認した版が一致することを確認する。"}
-      - {"links":["configure","predict","respond"],"note":"選んだバージョンを配備し、リクエストと応答を確認する。"}
+      - links:
+          - train
+          - record
+        note: 注文データで学習し、どの実験で作られたかを保存する。
+      - links:
+          - register
+          - promote
+        note: 登録モデルの版と承認した版が一致することを確認する。
+      - links:
+          - configure
+          - predict
+          - respond
+        note: 選んだバージョンを配備し、リクエストと応答を確認する。
   - id: rollback
-    label: "新版に問題があり旧版に戻す"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§4"}]
+    label: 新版に問題があり旧版に戻す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-mlflow-serving.md#§4
     steps:
-      - {"links":["predict"],"note":"推論結果の問題と現在稼働しているバージョンを調べる。"}
-      - {"links":["promote","configure"],"note":"旧版を選び、エンドポイントの配備設定を切り替える。"}
-      - {"links":["predict","respond"],"note":"戻したバージョンで結果を再確認する。"}
-
+      - links:
+          - predict
+        note: 推論結果の問題と現在稼働しているバージョンを調べる。
+      - links:
+          - promote
+          - configure
+        note: 旧版を選び、エンドポイントの配備設定を切り替える。
+      - links:
+          - predict
+          - respond
+        note: 戻したバージョンで結果を再確認する。
 implementations:
   - id: databricks-ml-serving
-    label: "Unity Catalog モデルのオンライン配備"
-    description: "実験結果から承認済みの版を選び、注文アプリから Databricks のカスタムモデルエンドポイントを呼ぶ構成。"
+    label: Unity Catalog モデルのオンライン配備
+    description: 実験結果から承認済みの版を選び、注文アプリから Databricks のカスタムモデルエンドポイントを呼ぶ構成。
     sources:
-      - {title: "MLflow のモデル記録", url: "https://docs.databricks.com/aws/en/mlflow/models"}
-      - {title: "Unity Catalog のモデルライフサイクル", url: "https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/"}
-      - {title: "Model Serving エンドポイントの作成", url: "https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints"}
-      - {title: "Query serving endpoints for custom models", url: "https://docs.databricks.com/aws/en/machine-learning/model-serving/score-custom-model-endpoints"}
+      - title: MLflow のモデル記録
+        url: https://docs.databricks.com/aws/en/mlflow/models
+      - title: Unity Catalog のモデルライフサイクル
+        url: https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/
+      - title: Model Serving エンドポイントの作成
+        url: https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints
+      - title: Query serving endpoints for custom models
+        url: https://docs.databricks.com/aws/en/machine-learning/model-serving/score-custom-model-endpoints
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [18.5,2.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 18.5
+          - 2.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-orders: {label: "Unity Catalog のモデル学習用テーブル", kind: "db", tier: "flow", x: 0, y: 2, realizes: ["orders"], description: "注文時点の特徴量を読み取れるようにする。", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
-      example-train: {label: "Databricks 学習ジョブと MLflow Experiment", kind: "worker", tier: "flow", x: 3, y: 2, realizes: ["train","tracking"], description: "モデルの学習、パラメータ、検証結果、成果物を同じ Run に記録する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
-      example-registry: {label: "Unity Catalog の登録モデル", kind: "db", tier: "flow", x: 9, y: 2, realizes: ["registry"], description: "選んだ成果物を新しいモデル版として登録する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
-      example-deploy: {label: "モデル配備ジョブ", kind: "worker", tier: "flow", x: 12, y: 0, realizes: ["deploy"], description: "モデル名と承認済みバージョンをエンドポイント設定へ渡す。", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
-      example-endpoint: {label: "Databricks Model Serving", kind: "service", tier: "flow", x: 15, y: 2, realizes: ["endpoint"], description: "設定した Unity Catalog モデルをオンラインで実行する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
-      example-app: {label: "注文アプリのエンドポイントクライアント", kind: "client", tier: "flow", x: 18, y: 2, realizes: ["app"], description: "推論 API を呼んでスコアを取得する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
-      example-identity: {label: "推論呼び出し用サービスプリンシパル", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "OAuth に使うアプリの主体に必要なエンドポイント権限を付与する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
+      example-orders:
+        label: Unity Catalog のモデル学習用テーブル
+        kind: db
+        tier: flow
+        x: 0
+        'y': 2
+        realizes:
+          - orders
+        description: 注文時点の特徴量を読み取れるようにする。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+        svc: databricks:delta
+      example-train:
+        label: Databricks 学習ジョブと MLflow Experiment
+        kind: worker
+        tier: flow
+        svc: databricks:platform
+        x: 3
+        'y': 2
+        realizes:
+          - train
+          - tracking
+        description: モデルの学習、パラメータ、検証結果、成果物を同じ Run に記録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      example-registry:
+        label: Unity Catalog の登録モデル
+        kind: db
+        tier: flow
+        x: 9
+        'y': 2
+        realizes:
+          - registry
+        description: 選んだ成果物を新しいモデル版として登録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+        svc: databricks:unity
+      example-deploy:
+        label: モデル配備ジョブ
+        kind: worker
+        tier: flow
+        svc: databricks:platform
+        x: 12
+        'y': 0
+        realizes:
+          - deploy
+        description: モデル名と承認済みバージョンをエンドポイント設定へ渡す。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      example-endpoint:
+        label: Databricks Model Serving
+        kind: service
+        tier: flow
+        svc: databricks:modelserving
+        x: 15
+        'y': 2
+        realizes:
+          - endpoint
+        description: 設定した Unity Catalog モデルをオンラインで実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      example-app:
+        label: 注文アプリのエンドポイントクライアント
+        kind: client
+        tier: flow
+        x: 18
+        'y': 2
+        realizes:
+          - app
+        description: 推論 API を呼んでスコアを取得する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      example-identity:
+        label: 推論呼び出し用サービスプリンシパル
+        kind: service
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: OAuth に使うアプリの主体に必要なエンドポイント権限を付与する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
     links:
-      - {id: "example-identity-connection", from: "example-identity", to: "example-app", label: "認証済み要求で呼び出す", evidence: [{"type":"doc","ref":"docs/reference-databricks-mlflow-serving.md#§5"}]}
+      - id: example-identity-connection
+        from: example-identity
+        to: example-app
+        label: 認証済み要求で呼び出す
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+    groups:
+      - kind: cloud
+        provider: databricks
+        label: Databricks
+        tier:
+          - flow
+        nodes:
+          - example-orders
+          - example-registry
+          - example-train
+          - example-deploy
+          - example-endpoint

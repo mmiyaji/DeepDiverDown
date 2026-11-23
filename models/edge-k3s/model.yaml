@@ -1,0 +1,241 @@
+name: K3s によるエッジクラスタ
+description: 軽量 Kubernetes のサーバー、エージェントと現場のワークロードを整理する。
+reference:
+  objectives:
+    - サーバーとエージェントの役割を区別する。
+    - 単一サーバー構成の状態保存と現場処理を追う。
+  sources:
+    - title: K3s architecture
+      url: https://docs.k3s.io/architecture
+    - title: K3s datastore
+      url: https://docs.k3s.io/datastore
+sources:
+  - docs/reference-edge-k3s.md
+evidence:
+  - type: doc
+    ref: docs/reference-edge-k3s.md#§1
+  - type: doc
+    ref: docs/reference-edge-k3s.md#§3
+tiers:
+  - id: flow
+    label: クラスタ管理と実行
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 状態と現場
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  admin:
+    label: 運用者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: クラスタを管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  server:
+    label: 管理サーバー
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: API とクラスタ管理を担う。
+    drill: k3s
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  agent:
+    label: エッジノード
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: ワークロードを実行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  workload:
+    label: 現場の処理
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: センサー値の処理を行う例。
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  state:
+    label: クラスタ状態
+    kind: db
+    tier: support
+    x: 4
+    'y': 1.5
+    description: 単一サーバー構成の状態を保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  sensor:
+    label: 現場センサー
+    kind: external
+    tier: support
+    x: 12
+    'y': 1.5
+    description: 現場から値を提供する。
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+links:
+  - id: manage
+    from: admin
+    to: server
+    label: クラスタを管理
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  - id: schedule
+    from: server
+    to: agent
+    label: ワークロードを配置
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  - id: run
+    from: agent
+    to: workload
+    label: Pod を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  - id: store
+    from: server
+    to: state
+    label: 状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+  - id: observe
+    from: sensor
+    to: workload
+    label: 現場データを入力
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+scenarios:
+  - id: edge
+    label: 現場処理の配置
+    evidence:
+      - type: doc
+        ref: docs/reference-edge-k3s.md#§2
+    steps:
+      - links:
+          - manage
+          - store
+          - schedule
+          - run
+        note: 管理者がワークロードを配置する。
+      - links:
+          - observe
+        note: 現場センサーの値を処理する。
+implementations:
+  - id: example
+    label: 単一サーバーの自主管理 K3s
+    description: K3s Server、SQLite と Agent を使う最小構成例。クラウド提供サービスは仮定しない。
+    sources:
+      - title: K3s architecture
+        url: https://docs.k3s.io/architecture
+      - title: K3s datastore
+        url: https://docs.k3s.io/datastore
+    tiers:
+      - id: flow
+        label: クラスタ管理と実行
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 状態と現場
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-admin:
+        label: 運用者
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: クラスタを管理する。
+        realizes:
+          - admin
+        evidence:
+          - type: doc
+            ref: docs/reference-edge-k3s.md#§4
+      ex-server:
+        label: K3s Server
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: API とクラスタ管理を担う。
+        drill: k3s
+        realizes:
+          - server
+        evidence:
+          - type: doc
+            ref: docs/reference-edge-k3s.md#§4
+      ex-agent:
+        label: K3s Agent
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: ワークロードを実行する。
+        realizes:
+          - agent
+        evidence:
+          - type: doc
+            ref: docs/reference-edge-k3s.md#§4
+      ex-workload:
+        label: エッジ処理 Pod
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        description: センサー値の処理を行う例。
+        realizes:
+          - workload
+        evidence:
+          - type: doc
+            ref: docs/reference-edge-k3s.md#§4
+      ex-state:
+        label: SQLite
+        kind: db
+        tier: support
+        x: 4
+        'y': 1.5
+        description: 単一サーバー構成の状態を保存する。
+        realizes:
+          - state
+        evidence:
+          - type: doc
+            ref: docs/reference-edge-k3s.md#§4
+      ex-sensor:
+        label: センサー
+        kind: external
+        tier: support
+        x: 12
+        'y': 1.5
+        description: 現場から値を提供する。
+        realizes:
+          - sensor
+        evidence:
+          - type: doc
+            ref: docs/reference-edge-k3s.md#§4

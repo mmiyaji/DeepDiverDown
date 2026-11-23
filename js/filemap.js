@@ -120,7 +120,7 @@ export class FileMap {
     const bar = segs.map(s => {
       const r = this.byId.get(s.id), st = this.state(s.id), ratio = s.bytes / total;
       return `<button type="button" class="fm-seg k-${esc(s.kind || 'data')} ${st ? 's-' + st : ''} ${this.sel === s.id ? 'sel' : ''}"
-        data-seg="${esc(s.id)}" style="flex:${Math.max(ratio, 0.0001)} 1 0" title="${esc(s.label)}｜${fmtBytes(s.bytes)}｜オフセット ${r.offset.toLocaleString()}"
+        data-seg="${esc(s.id)}" style="flex:${Math.max(ratio, 0.0001)} 1 0" title="${esc(s.label)}｜${fmtBytes(s.bytes)}｜オフセット ${esc(r.offset.toLocaleString())}"
         aria-label="${esc(s.label)} ${fmtBytes(s.bytes)}${s.children?.length ? '（中を開く）' : ''}">
         <span class="fm-name">${esc(s.label)}${s.children?.length ? ' <i>▸</i>' : ''}</span><span class="fm-size">${fmtBytes(s.bytes)}</span></button>`;
     }).join('');
@@ -135,7 +135,7 @@ export class FileMap {
     const meter = R && rb ? `<div class="fm-meter"><b>${fmtBytes(rb)}</b> / ${fmtBytes(L.size)} を読む（${(rb / L.size * 100).toFixed(rb / L.size < 0.01 ? 3 : 1)}%）${R.finished ? '・灰色は読まずに済んだ範囲' : ''}</div>` : '';
 
     const s = this.sel && this.byId.get(this.sel);
-    const info = s ? `<div class="fm-info"><div class="fm-info-head"><b>${esc(s.seg.label)}</b><span class="mono">${fmtBytes(s.seg.bytes)}・バイト ${s.offset.toLocaleString()}〜${(s.offset + s.seg.bytes - 1).toLocaleString()}</span></div>
+    const info = s ? `<div class="fm-info"><div class="fm-info-head"><b>${esc(s.seg.label)}</b><span class="mono">${fmtBytes(s.seg.bytes)}・バイト ${esc(s.offset.toLocaleString())}〜${(s.offset + s.seg.bytes - 1).toLocaleString()}</span></div>
         ${s.seg.description ? `<p>${esc(s.seg.description)}</p>` : ''}
         ${s.seg.sample ? `<div class="fm-sample-h">中身の例</div><pre class="fm-sample">${esc(String(s.seg.sample).trimEnd())}</pre>` : ''}</div>`
       : `<div class="fm-info fm-hint">区画を選ぶと中身へズームし、説明と中身の例を表示します。シナリオを再生すると、読む範囲が帯の上で光ります。</div>`;

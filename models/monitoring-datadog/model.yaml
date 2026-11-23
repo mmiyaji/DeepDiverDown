@@ -1,0 +1,261 @@
+name: Datadog による監視と分析
+description: Agent と SaaS を組み合わせ、メトリクス・ログ・トレースの収集から調査と通知までを追う。
+reference:
+  objectives:
+    - 対象から収集・保存・分析までの流れを追う。
+    - 通知と運用担当者の役割を区別する。
+    - 収集方法と保存・権限の前提を理解する。
+  sources:
+    - title: Datadog Agent architecture
+      url: https://docs.datadoghq.com/agent/architecture/
+    - title: Datadog monitors
+      url: https://docs.datadoghq.com/monitors/
+    - title: Datadog OTLP ingestion
+      url: https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest_in_the_agent/
+sources:
+  - docs/reference-monitoring-datadog.md
+evidence:
+  - type: doc
+    ref: docs/reference-monitoring-datadog.md#§1
+  - type: doc
+    ref: docs/reference-monitoring-datadog.md#§3
+tiers:
+  - id: flow
+    label: 収集と分析
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: ops
+    label: 通知と運用
+    z: 0
+    size:
+      - 14
+      - 3
+nodes:
+  app:
+    label: 監視対象
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  collector:
+    label: テレメトリ収集
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  store:
+    label: データの保存と問い合わせ
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  dashboard:
+    label: 監視画面
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  operator:
+    label: 運用担当者
+    kind: actor
+    tier: ops
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  alert:
+    label: アラートと通知
+    kind: service
+    tier: ops
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+links:
+  - id: capture
+    from: app
+    to: collector
+    label: 監視データを収集
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  - id: ingest
+    from: collector
+    to: store
+    label: 監視基盤に送信
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  - id: view
+    from: store
+    to: dashboard
+    label: データを検索・表示
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  - id: inspect
+    from: operator
+    to: dashboard
+    label: 状況を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  - id: check
+    from: store
+    to: alert
+    label: 通知条件を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+  - id: notify
+    from: alert
+    to: operator
+    label: アラートを通知
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+scenarios:
+  - id: monitor
+    label: 監視と通知
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-datadog.md#§2
+    steps:
+      - links:
+          - capture
+          - ingest
+        note: 対象の監視データを収集し SaaS に送る。
+      - links:
+          - view
+          - inspect
+        note: データを画面で確認する。
+      - links:
+          - check
+          - notify
+        note: 設定した条件に応じて担当者に通知する。
+implementations:
+  - id: example
+    label: Datadog Agent と Datadog SaaS
+    description: 対象ホストの Agent と Datadog SaaS を分けた構成。ログ・APM・Monitor の設定が必要。
+    sources:
+      - title: Datadog Agent architecture
+        url: https://docs.datadoghq.com/agent/architecture/
+      - title: Datadog monitors
+        url: https://docs.datadoghq.com/monitors/
+      - title: Datadog OTLP ingestion
+        url: https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest_in_the_agent/
+    tiers:
+      - id: flow
+        label: 収集と分析
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: ops
+        label: 通知と運用
+        z: 0
+        size:
+          - 14
+          - 3
+    nodes:
+      ex-app:
+        label: 計装アプリとホスト
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-datadog.md#§4
+        realizes:
+          - app
+      ex-collector:
+        label: Datadog Agent / APM Agent
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-datadog.md#§4
+        realizes:
+          - collector
+      ex-store:
+        label: Datadog 取り込み・保存
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        svc: datadog:platform
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-datadog.md#§4
+        realizes:
+          - store
+      ex-dashboard:
+        label: Datadog ダッシュボード
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        svc: datadog:platform
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-datadog.md#§4
+        realizes:
+          - dashboard
+      ex-operator:
+        label: 運用担当者
+        kind: actor
+        tier: ops
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-datadog.md#§4
+        realizes:
+          - operator
+      ex-alert:
+        label: Datadog Monitor
+        kind: service
+        tier: ops
+        x: 8
+        'y': 1.5
+        svc: datadog:platform
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-datadog.md#§4
+        realizes:
+          - alert
+    groups:
+      - kind: cloud
+        label: Datadog SaaS
+        provider: datadog
+        tier:
+          - flow
+        nodes:
+          - ex-store
+          - ex-dashboard
+      - kind: cloud
+        label: Datadog SaaS
+        provider: datadog
+        tier:
+          - ops
+        nodes:
+          - ex-alert

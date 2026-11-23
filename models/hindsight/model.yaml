@@ -1,0 +1,264 @@
+name: Hindsight のエージェント記憶
+description: retain・recall・reflect を使い、エージェントの記憶を保持し検索する。
+reference:
+  objectives:
+    - retain・recall・reflect を使い、エージェントの記憶を保持し検索する。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: Hindsight
+      url: https://github.com/vectorize-io/hindsight
+    - title: Recall and reflect
+      url: https://hindsight.vectorize.io/blog/2026/07/24/recall-vs-reflect
+sources:
+  - docs/reference-hindsight.md
+evidence:
+  - type: doc
+    ref: docs/reference-hindsight.md#§1
+  - type: doc
+    ref: docs/reference-hindsight.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  agent:
+    label: エージェント
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  retain:
+    label: 記憶の取り込み
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  store:
+    label: 記憶の保存
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  recall:
+    label: 記憶の検索
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  reflect:
+    label: 記憶を基にした回答
+    kind: service
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  model:
+    label: 抽出・回答用モデル
+    kind: service
+    tier: support
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+links:
+  - id: retain
+    from: agent
+    to: retain
+    label: 内容を記憶
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  - id: extract
+    from: model
+    to: retain
+    label: 事実を抽出
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  - id: save
+    from: retain
+    to: store
+    label: 記憶を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  - id: recall
+    from: store
+    to: recall
+    label: 関連する記憶を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  - id: reflect
+    from: recall
+    to: reflect
+    label: 記憶を基に回答
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  - id: return
+    from: recall
+    to: agent
+    label: 検索結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  - id: think
+    from: model
+    to: reflect
+    label: 記憶を基に回答を生成
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+  - id: reflect-request
+    from: agent
+    to: reflect
+    label: 記憶について質問
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-hindsight.md#§2
+    steps:
+      - links:
+          - retain
+        note: 内容を記憶。
+      - links:
+          - extract
+        note: 事実を抽出。
+      - links:
+          - save
+        note: 記憶を保存。
+      - links:
+          - recall
+        note: 関連する記憶を検索。
+      - links:
+          - reflect
+        note: 記憶を基に回答。
+      - links:
+          - return
+        note: 検索結果を返す。
+      - links:
+          - think
+        note: 記憶を基に回答を生成。
+      - links:
+          - reflect-request
+        note: 記憶について質問。
+implementations:
+  - id: example
+    label: Hindsight のエージェント記憶の構成例
+    description: 自己ホストした Hindsight API と外部 PostgreSQL、設定したモデルを組み合わせる例。Enterprise 専用の Memlake や Cloud 機能は前提にしない。
+    sources:
+      - title: Hindsight
+        url: https://github.com/vectorize-io/hindsight
+      - title: Recall and reflect
+        url: https://hindsight.vectorize.io/blog/2026/07/24/recall-vs-reflect
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-agent:
+        label: 利用するエージェント
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hindsight.md#§4
+        realizes:
+          - agent
+      ex-retain:
+        label: Hindsight retain
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hindsight.md#§4
+        realizes:
+          - retain
+      ex-store:
+        label: PostgreSQL 記憶データ
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hindsight.md#§4
+        realizes:
+          - store
+      ex-recall:
+        label: Hindsight recall
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hindsight.md#§4
+        realizes:
+          - recall
+      ex-reflect:
+        label: Hindsight reflect
+        kind: service
+        tier: flow
+        x: 16
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hindsight.md#§4
+        realizes:
+          - reflect
+      ex-model:
+        label: 設定された LLM
+        kind: service
+        tier: support
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-hindsight.md#§4
+        realizes:
+          - model

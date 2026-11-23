@@ -1,0 +1,299 @@
+name: AWS IoT Greengrass のエッジ処理
+description: AWS の管理サービスと、端末上の Nucleus・コンポーネント・MQTT を分ける。
+reference:
+  objectives:
+    - AWS 管理サービスと端末の境界を理解する。
+    - コンポーネントの配備と MQTT の経路を追う。
+  sources:
+    - title: How Greengrass works
+      url: https://docs.aws.amazon.com/greengrass/v2/developerguide/how-it-works.html
+    - title: Connect client devices
+      url: https://docs.aws.amazon.com/greengrass/v2/developerguide/connect-client-devices.html
+    - title: Create deployments
+      url: https://docs.aws.amazon.com/greengrass/v2/developerguide/create-deployments.html
+sources:
+  - docs/reference-aws-iot-greengrass.md
+evidence:
+  - type: doc
+    ref: docs/reference-aws-iot-greengrass.md#§1
+  - type: doc
+    ref: docs/reference-aws-iot-greengrass.md#§3
+tiers:
+  - id: cloud
+    label: AWS クラウド
+    z: 2
+    size:
+      - 20
+      - 3
+  - id: edge
+    label: エッジ端末
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: devices
+    label: 現場デバイス
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  manager:
+    label: 配備の管理
+    kind: service
+    tier: cloud
+    x: 4
+    'y': 1.5
+    description: クラウドから端末への配備を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  iot:
+    label: クラウド通信
+    kind: service
+    tier: cloud
+    x: 12
+    'y': 1.5
+    description: AWS 側の MQTT 通信を受け付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  nucleus:
+    label: 端末の実行基盤
+    kind: service
+    tier: edge
+    x: 0
+    'y': 1.5
+    description: 端末上でコンポーネントを管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  component:
+    label: 現場の処理
+    kind: service
+    tier: edge
+    x: 4
+    'y': 1.5
+    description: 端末で動くユーザー定義の処理。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  broker:
+    label: ローカル MQTT
+    kind: service
+    tier: edge
+    x: 8
+    'y': 1.5
+    description: 設定されたローカルブローカー。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  bridge:
+    label: メッセージ転送
+    kind: service
+    tier: edge
+    x: 12
+    'y': 1.5
+    description: 設定したトピックをローカルとクラウドの間で転送する。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  device:
+    label: クライアントデバイス
+    kind: external
+    tier: devices
+    x: 8
+    'y': 1.5
+    description: ローカル MQTT に接続する。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+links:
+  - id: deploy
+    from: manager
+    to: nucleus
+    label: コンポーネントを配備
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  - id: run
+    from: nucleus
+    to: component
+    label: 処理を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  - id: publish
+    from: device
+    to: broker
+    label: MQTT メッセージを発行
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  - id: route
+    from: broker
+    to: bridge
+    label: 設定したトピックを転送
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+  - id: cloud
+    from: bridge
+    to: iot
+    label: AWS IoT Core へ転送
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+scenarios:
+  - id: deploy
+    label: 配備とメッセージ転送
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-iot-greengrass.md#§2
+    steps:
+      - links:
+          - deploy
+          - run
+        note: クラウド管理から端末へ処理を配備する。
+      - links:
+          - publish
+          - route
+          - cloud
+        note: 設定した MQTT bridge を介しクラウドへ転送する。
+implementations:
+  - id: example
+    label: Greengrass V2 と MQTT bridge
+    description: AWS IoT Greengrass、AWS IoT Core と現場端末を分けた例。MQTT broker・認証・bridge は別途構成する。
+    sources:
+      - title: How Greengrass works
+        url: https://docs.aws.amazon.com/greengrass/v2/developerguide/how-it-works.html
+      - title: Connect client devices
+        url: https://docs.aws.amazon.com/greengrass/v2/developerguide/connect-client-devices.html
+      - title: Create deployments
+        url: https://docs.aws.amazon.com/greengrass/v2/developerguide/create-deployments.html
+    tiers:
+      - id: cloud
+        label: AWS クラウド
+        z: 2
+        size:
+          - 20
+          - 3
+      - id: edge
+        label: エッジ端末
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: devices
+        label: 現場デバイス
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-manager:
+        label: AWS IoT Greengrass
+        kind: service
+        tier: cloud
+        x: 4
+        'y': 1.5
+        description: クラウドから端末への配備を管理する。
+        svc: greengrass
+        realizes:
+          - manager
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-iot-greengrass.md#§4
+      ex-iot:
+        label: AWS IoT Core
+        kind: service
+        tier: cloud
+        x: 12
+        'y': 1.5
+        description: AWS 側の MQTT 通信を受け付ける。
+        svc: iotcore
+        realizes:
+          - iot
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-iot-greengrass.md#§4
+      ex-nucleus:
+        label: Greengrass Nucleus
+        kind: service
+        tier: edge
+        x: 0
+        'y': 1.5
+        description: 端末上でコンポーネントを管理する。
+        realizes:
+          - nucleus
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-iot-greengrass.md#§4
+      ex-component:
+        label: エッジコンポーネント
+        kind: service
+        tier: edge
+        x: 4
+        'y': 1.5
+        description: 端末で動くユーザー定義の処理。
+        realizes:
+          - component
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-iot-greengrass.md#§4
+      ex-broker:
+        label: Moquette MQTT broker
+        kind: service
+        tier: edge
+        x: 8
+        'y': 1.5
+        description: 設定されたローカルブローカー。
+        realizes:
+          - broker
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-iot-greengrass.md#§4
+      ex-bridge:
+        label: MQTT bridge
+        kind: service
+        tier: edge
+        x: 12
+        'y': 1.5
+        description: 設定したトピックをローカルとクラウドの間で転送する。
+        realizes:
+          - bridge
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-iot-greengrass.md#§4
+      ex-device:
+        label: センサー / クライアント
+        kind: external
+        tier: devices
+        x: 8
+        'y': 1.5
+        description: ローカル MQTT に接続する。
+        realizes:
+          - device
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-iot-greengrass.md#§4
+    groups:
+      - id: aws
+        label: AWS クラウド
+        kind: cloud
+        tier:
+          - cloud
+        nodes:
+          - ex-manager
+          - ex-iot
+        provider: aws
+      - id: edge-device
+        label: エッジ端末
+        kind: datacenter
+        tier:
+          - edge
+        nodes:
+          - ex-nucleus
+          - ex-component
+          - ex-broker
+          - ex-bridge

@@ -1,0 +1,274 @@
+name: オントロジーと RDF ナレッジグラフ
+description: 概念と関係を RDF・RDFS・OWL・SKOS で表し、推論と SPARQL を使って知識を利用する。
+reference:
+  objectives:
+    - RDF の実体・関係と語彙の定義を区別する。
+    - RDFS・OWL の推論と SKOS の用語体系の役割を理解する。
+    - SPARQL による問い合わせと推論の範囲を追う。
+  sources:
+    - title: RDF 1.1 Concepts
+      url: https://www.w3.org/TR/rdf-concepts/
+    - title: OWL 2 Primer
+      url: https://www.w3.org/TR/owl2-primer/
+    - title: SKOS Reference
+      url: https://www.w3.org/TR/skos-reference/
+    - title: Apache Jena RDFS
+      url: https://jena.apache.org/documentation/rdfs/
+sources:
+  - docs/reference-semantic-ontology.md
+evidence:
+  - type: doc
+    ref: docs/reference-semantic-ontology.md#§1
+  - type: doc
+    ref: docs/reference-semantic-ontology.md#§3
+tiers:
+  - id: flow
+    label: 問い合わせと利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: definition
+    label: 定義とデータ
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  owner:
+    label: 業務と語彙の管理者
+    kind: actor
+    tier: definition
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  vocab:
+    label: 概念・関係と語彙
+    kind: file
+    tier: definition
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  data:
+    label: 実体と関係の RDF
+    kind: file
+    tier: definition
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  graph:
+    label: RDF データセット
+    kind: db
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  infer:
+    label: 推論の設定
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  query:
+    label: グラフ問い合わせ
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  client:
+    label: 分析アプリ・利用者
+    kind: actor
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+links:
+  - id: define
+    from: owner
+    to: vocab
+    label: 概念と関係を定義
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  - id: vocab-load
+    from: vocab
+    to: infer
+    label: 語彙を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  - id: data-load
+    from: data
+    to: graph
+    label: RDF を格納
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  - id: reason
+    from: graph
+    to: infer
+    label: データから推論
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  - id: query-infer
+    from: infer
+    to: query
+    label: 推論結果を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  - id: request
+    from: client
+    to: query
+    label: グラフを問い合わせ
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+  - id: reply
+    from: query
+    to: client
+    label: 結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-ontology.md#§2
+    steps:
+      - links:
+          - define
+          - vocab-load
+          - data-load
+        note: 概念と関係を定義し実体データを用意する。
+      - links:
+          - reason
+          - query-infer
+        note: 設定した範囲の推論を問い合わせに適用する。
+      - links:
+          - request
+          - reply
+        note: SPARQL のパターンに一致する結果を取得する。
+implementations:
+  - id: example
+    label: Apache Jena Fuseki と RDFS
+    description: RDF データと語彙を使い、明示的に設定した RDFS 推論を通して SPARQL で問い合わせる。
+    sources:
+      - title: RDF 1.1 Concepts
+        url: https://www.w3.org/TR/rdf-concepts/
+      - title: OWL 2 Primer
+        url: https://www.w3.org/TR/owl2-primer/
+      - title: SKOS Reference
+        url: https://www.w3.org/TR/skos-reference/
+      - title: Apache Jena RDFS
+        url: https://jena.apache.org/documentation/rdfs/
+    tiers:
+      - id: flow
+        label: 問い合わせと利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: definition
+        label: 定義とデータ
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-owner:
+        label: 語彙の管理者
+        kind: actor
+        tier: definition
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§4
+        realizes:
+          - owner
+      ex-vocab:
+        label: RDFS 語彙ファイル
+        kind: file
+        tier: definition
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§4
+        realizes:
+          - vocab
+      ex-data:
+        label: Turtle RDF データ
+        kind: file
+        tier: definition
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§4
+        realizes:
+          - data
+      ex-graph:
+        label: Fuseki RDF データセット
+        kind: db
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§4
+        realizes:
+          - graph
+      ex-infer:
+        label: Jena RDFS 推論設定
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§4
+        realizes:
+          - infer
+      ex-query:
+        label: Fuseki SPARQL エンドポイント
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§4
+        realizes:
+          - query
+      ex-client:
+        label: SPARQL クライアント
+        kind: actor
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-ontology.md#§4
+        realizes:
+          - client

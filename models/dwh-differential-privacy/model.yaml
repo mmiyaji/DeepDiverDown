@@ -1,0 +1,371 @@
+name: DWH の差分プライバシー集計
+description: 保護単位と貢献上限、ノイズ付き集計、繰り返し利用の予算管理を組み合わせる。元データへの迂回アクセスも制限する。
+reference:
+  objectives:
+    - 保護単位と貢献の制限を理解する。
+    - 集計とプライバシー予算の関係を追う。
+    - 元データへのアクセス制御と保証の限界を確認する。
+  sources:
+    - title: NIST SP 800-226
+      url: https://csrc.nist.gov/pubs/sp/800/226/final
+    - title: BigQuery differential privacy
+      url: https://docs.cloud.google.com/bigquery/docs/differential-privacy
+    - title: BigQuery analysis rules
+      url: https://docs.cloud.google.com/bigquery/docs/analysis-rules
+sources:
+  - docs/reference-dwh-differential-privacy.md
+evidence:
+  - type: doc
+    ref: docs/reference-dwh-differential-privacy.md#§1
+  - type: doc
+    ref: docs/reference-dwh-differential-privacy.md#§3
+tiers:
+  - id: flow
+    label: データの処理と提供
+    z: 1
+    size:
+      - 32
+      - 3
+  - id: control
+    label: 評価と管理
+    z: 0
+    size:
+      - 24
+      - 3
+nodes:
+  source:
+    label: 制限された元データ
+    kind: db
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  view:
+    label: 許可された分析入口
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  bound:
+    label: 保護単位と貢献の制限
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  aggregate:
+    label: ノイズ付き集計
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  result:
+    label: 公開する集計結果
+    kind: db
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  analyst:
+    label: 分析者
+    kind: actor
+    tier: flow
+    x: 20
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  policy:
+    label: 保護方針と分析ルール
+    kind: service
+    tier: control
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  budget:
+    label: プライバシー予算
+    kind: db
+    tier: control
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  admin:
+    label: 方針管理者
+    kind: actor
+    tier: control
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+links:
+  - id: request
+    from: analyst
+    to: view
+    label: 集計を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: read
+    from: view
+    to: source
+    label: 許可されたデータを参照
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: rules
+    from: policy
+    to: view
+    label: 分析条件を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: check
+    from: view
+    to: budget
+    label: 予算を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: limit
+    from: view
+    to: bound
+    label: 保護単位ごとに制限
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: aggregate
+    from: bound
+    to: aggregate
+    label: 制限後に集計
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: spend
+    from: aggregate
+    to: budget
+    label: 利用分を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: output
+    from: aggregate
+    to: result
+    label: ノイズ付き結果を出力
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: consume
+    from: result
+    to: analyst
+    label: 結果を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: configure
+    from: admin
+    to: policy
+    label: 保護条件を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+  - id: budget-policy
+    from: admin
+    to: budget
+    label: 予算を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-differential-privacy.md#§2
+    steps:
+      - links:
+          - configure
+          - budget-policy
+        note: 管理者が保護単位、貢献上限、予算を設定する。
+      - links:
+          - request
+          - read
+          - rules
+          - check
+        note: 分析者の要求を入口と予算で制御し、予算超過時は拒否する。
+      - links:
+          - limit
+          - aggregate
+          - spend
+        note: 貢献を制限し、ノイズを加えて集計し利用分を管理する。
+      - links:
+          - output
+          - consume
+        note: 許可された集計結果を利用し誤差や残存リスクを評価する。
+implementations:
+  - id: example
+    label: BigQuery の分析ルールと差分プライバシー
+    description: BigQuery の分析ルール付きビューと差分プライバシー集計を使う例。パラメーター駆動の予算管理はプレビュー。
+    sources:
+      - title: NIST SP 800-226
+        url: https://csrc.nist.gov/pubs/sp/800/226/final
+      - title: BigQuery differential privacy
+        url: https://docs.cloud.google.com/bigquery/docs/differential-privacy
+      - title: BigQuery analysis rules
+        url: https://docs.cloud.google.com/bigquery/docs/analysis-rules
+    tiers:
+      - id: flow
+        label: データの処理と提供
+        z: 1
+        size:
+          - 32
+          - 3
+      - id: control
+        label: 評価と管理
+        z: 0
+        size:
+          - 24
+          - 3
+    nodes:
+      ex-source:
+        label: BigQuery 元テーブル
+        kind: db
+        tier: flow
+        x: 0
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - source
+      ex-view:
+        label: BigQuery 保護ビュー
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - view
+      ex-bound:
+        label: BigQuery 貢献の制限
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - bound
+      ex-aggregate:
+        label: BigQuery DP 集計
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - aggregate
+      ex-result:
+        label: BigQuery 集計結果
+        kind: db
+        tier: flow
+        x: 16
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - result
+      ex-analyst:
+        label: 分析者
+        kind: actor
+        tier: flow
+        x: 20
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - analyst
+      ex-policy:
+        label: BigQuery 分析ルール
+        kind: service
+        tier: control
+        x: 4
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - policy
+      ex-budget:
+        label: BigQuery 利用者予算（プレビュー）
+        kind: db
+        tier: control
+        x: 8
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - budget
+      ex-admin:
+        label: 方針管理者
+        kind: actor
+        tier: control
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-differential-privacy.md#§4
+        realizes:
+          - admin
+    groups:
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud / BigQuery
+        tier:
+          - flow
+        nodes:
+          - ex-source
+          - ex-view
+          - ex-bound
+          - ex-aggregate
+          - ex-result
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud / BigQuery
+        tier:
+          - control
+        nodes:
+          - ex-policy
+          - ex-budget

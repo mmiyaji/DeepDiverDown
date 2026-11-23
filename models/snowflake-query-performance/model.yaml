@@ -1,71 +1,364 @@
-name: "Snowflake のクエリ性能とウェアハウス"
-description: "同時実行時の待ち行列、マイクロパーティションの除外、条件を満たす結果の再利用を分けて調べる。"
-parent: {"model":"snowflake","node":"biwh"}
+name: Snowflake のクエリ性能とウェアハウス
+description: 同時実行時の待ち行列、マイクロパーティションの除外、条件を満たす結果の再利用を分けて調べる。
+parent:
+  model: snowflake
+  node: biwh
 reference:
   objectives:
-    - "並行実行と一つのクエリ内部のスキャン量を別々に計測する。"
-    - "結果再利用時と実行時の経路を比較する。"
+    - 並行実行と一つのクエリ内部のスキャン量を別々に計測する。
+    - 結果再利用時と実行時の経路を比較する。
   sources:
-    - {"title":"マイクロパーティション","url":"https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions"}
-    - {"title":"マルチクラスターウェアハウス","url":"https://docs.snowflake.com/en/user-guide/warehouses-multicluster"}
-    - {"title":"永続化されたクエリ結果","url":"https://docs.snowflake.com/en/user-guide/querying-persisted-results"}
-sources: ["docs/reference-snowflake-query-performance.md"]
-evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§1"}]
+    - title: マイクロパーティション
+      url: https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
+    - title: マルチクラスターウェアハウス
+      url: https://docs.snowflake.com/en/user-guide/warehouses-multicluster
+    - title: 永続化されたクエリ結果
+      url: https://docs.snowflake.com/en/user-guide/querying-persisted-results
+sources:
+  - docs/reference-snowflake-query-performance.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[13.5,5.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 13.5
+      - 5.5
 nodes:
-  bi: {"label":"BI クエリ","kind":"client","tier":"flow","x":0,"y":2,"description":"注文日別売上を集計する。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§1"}]}
-  control: {"label":"クエリ受付と計画","kind":"service","tier":"flow","x":3,"y":2,"description":"クエリを評価する入口。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§1"}]}
-  queue: {"label":"実行待ち行列","kind":"queue","tier":"flow","x":6,"y":0,"description":"同時実行の空きを待つ。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§2"}]}
-  clusters: {"label":"並列クエリ実行資源","kind":"worker","tier":"flow","x":9,"y":0,"description":"実行枠を提供する。","parallel":"N","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§2"}]}
-  metadata: {"label":"区画メタデータ","kind":"db","tier":"flow","x":9,"y":3,"description":"列の最小値・最大値など。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§3"}]}
-  micro: {"label":"列指向のストレージ区画","kind":"db","tier":"flow","x":13,"y":3,"description":"候補となる列データを読む。","partitions":4,"evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§3"}]}
-  result: {"label":"永続化済み結果","kind":"cache","tier":"flow","x":6,"y":5,"description":"対象の実行結果を再利用できる。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§4"}]}
+  bi:
+    label: BI クエリ
+    kind: client
+    tier: flow
+    x: 0
+    'y': 2
+    description: 注文日別売上を集計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§1
+  control:
+    label: クエリ受付と計画
+    kind: service
+    tier: flow
+    x: 3
+    'y': 2
+    description: クエリを評価する入口。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§1
+  queue:
+    label: 実行待ち行列
+    kind: queue
+    tier: flow
+    x: 6
+    'y': 0
+    description: 同時実行の空きを待つ。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§2
+  clusters:
+    label: 並列クエリ実行資源
+    kind: worker
+    tier: flow
+    x: 9
+    'y': 0
+    description: 実行枠を提供する。
+    parallel: 'N'
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§2
+  metadata:
+    label: 区画メタデータ
+    kind: db
+    tier: flow
+    x: 9
+    'y': 3
+    description: 列の最小値・最大値など。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§3
+  micro:
+    label: 列指向のストレージ区画
+    kind: db
+    tier: flow
+    x: 13
+    'y': 3
+    description: 候補となる列データを読む。
+    partitions: 4
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§3
+  result:
+    label: 永続化済み結果
+    kind: cache
+    tier: flow
+    x: 6
+    'y': 5
+    description: 対象の実行結果を再利用できる。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§4
 links:
-  - {"id":"submit","from":"bi","to":"control","label":"集計 SQL","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§1"}]}
-  - {"id":"wait","from":"control","to":"queue","label":"実行枠を待つ","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§2"}]}
-  - {"id":"allocate","from":"queue","to":"clusters","label":"空いたクラスターで実行","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§2"}]}
-  - {"id":"bounds","from":"control","to":"metadata","label":"候補の範囲を調べる","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§3"}]}
-  - {"id":"scan","from":"clusters","to":"micro","label":"残った区画の列を読む","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§3"}]}
-  - {"id":"reuse","from":"control","to":"result","label":"条件を満たす結果を参照","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§4"}]}
-  - {"id":"return","from":"clusters","to":"bi","label":"集計を返す","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§2"}]}
-  - {"id":"cached","from":"result","to":"bi","label":"保存済み結果を返す","evidence":[{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§4"}]}
+  - id: submit
+    from: bi
+    to: control
+    label: 集計 SQL
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§1
+  - id: wait
+    from: control
+    to: queue
+    label: 実行枠を待つ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§2
+  - id: allocate
+    from: queue
+    to: clusters
+    label: 空いたクラスターで実行
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§2
+  - id: bounds
+    from: control
+    to: metadata
+    label: 候補の範囲を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§3
+  - id: scan
+    from: clusters
+    to: micro
+    label: 残った区画の列を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§3
+  - id: reuse
+    from: control
+    to: result
+    label: 条件を満たす結果を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§4
+  - id: return
+    from: clusters
+    to: bi
+    label: 集計を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§2
+  - id: cached
+    from: result
+    to: bi
+    label: 保存済み結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§4
 scenarios:
   - id: pruning
-    label: "日付フィルターで読む区画を減らす"
+    label: 日付フィルターで読む区画を減らす
     visual: grid
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§3"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§3
     steps:
-      - {"links":["submit","bounds"],"note":"1月25日以降の注文を指定し、日付の範囲が重ならない区画を除外する。","prune":["row:p1","row:p2"]}
-      - {"links":["wait","allocate"],"note":"クエリを実行できるクラスターに割り当てる。"}
-      - {"links":["scan","return"],"note":"残った区画から必要列を読み、集計結果を返す。","read":["row:p3","row:p4"]}
+      - links:
+          - submit
+          - bounds
+        note: 1月25日以降の注文を指定し、日付の範囲が重ならない区画を除外する。
+        prune:
+          - row:p1
+          - row:p2
+      - links:
+          - wait
+          - allocate
+        note: クエリを実行できるクラスターに割り当てる。
+      - links:
+          - scan
+          - return
+        note: 残った区画から必要列を読み、集計結果を返す。
+        read:
+          - row:p3
+          - row:p4
   - id: reuse
-    label: "結果再利用と実行時の待ちを比較"
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§4"}]
+    label: 結果再利用と実行時の待ちを比較
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§4
     steps:
-      - {"links":["submit","reuse","cached"],"note":"再利用条件を満たした同じ要求では、既存の結果を返す。"}
-      - {"links":["submit","wait","allocate"],"note":"再利用できない要求が集中した場合は、実行枠の空きを待つ。"}
-      - {"links":["scan","return"],"note":"マルチクラスター構成では同時要求を別のクラスターに割り当てられる。"}
-grid: {"title":"日付条件による区画の除外","rowLabel":"区画の日付範囲","colLabel":"列","unit":" 単位","node":"micro","rows":[{"id":"p1","label":"1/01〜1/07"},{"id":"p2","label":"1/08〜1/14"},{"id":"p3","label":"1/24〜1/27"},{"id":"p4","label":"1/28〜1/31"}],"cols":[{"id":"date","label":"注文日"},{"id":"amount","label":"金額"}],"values":[[3,8],[3,8],[3,8],[3,8]],"note":"数値は例示。日付範囲が一部でも重なる 1/24〜1/27 は候補に残る。"}
-
+      - links:
+          - submit
+          - reuse
+          - cached
+        note: 再利用条件を満たした同じ要求では、既存の結果を返す。
+      - links:
+          - submit
+          - wait
+          - allocate
+        note: 再利用できない要求が集中した場合は、実行枠の空きを待つ。
+      - links:
+          - scan
+          - return
+        note: マルチクラスター構成では同時要求を別のクラスターに割り当てられる。
+grid:
+  title: 日付条件による区画の除外
+  rowLabel: 区画の日付範囲
+  colLabel: 列
+  unit: ' 単位'
+  node: micro
+  rows:
+    - id: p1
+      label: 1/01〜1/07
+    - id: p2
+      label: 1/08〜1/14
+    - id: p3
+      label: 1/24〜1/27
+    - id: p4
+      label: 1/28〜1/31
+  cols:
+    - id: date
+      label: 注文日
+    - id: amount
+      label: 金額
+  values:
+    - - 3
+      - 8
+    - - 3
+      - 8
+    - - 3
+      - 8
+    - - 3
+      - 8
+  note: 数値は例示。日付範囲が一部でも重なる 1/24〜1/27 は候補に残る。
 implementations:
   - id: snowflake-bi
-    label: "Snowflake Enterprise の BI 負荷調査"
-    description: "BI 専用のマルチクラスターウェアハウスで、待ち時間、区画の読み取り、結果再利用を調べる例。"
+    label: Snowflake Enterprise の BI 負荷調査
+    description: BI 専用のマルチクラスターウェアハウスで、待ち時間、区画の読み取り、結果再利用を調べる例。
     sources:
-      - {title: "マイクロパーティション", url: "https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions"}
-      - {title: "マルチクラスターウェアハウス", url: "https://docs.snowflake.com/en/user-guide/warehouses-multicluster"}
-      - {title: "永続化されたクエリ結果", url: "https://docs.snowflake.com/en/user-guide/querying-persisted-results"}
-      - {title: "QUERY_HISTORY ビュー", url: "https://docs.snowflake.com/en/sql-reference/account-usage/query_history"}
+      - title: マイクロパーティション
+        url: https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
+      - title: マルチクラスターウェアハウス
+        url: https://docs.snowflake.com/en/user-guide/warehouses-multicluster
+      - title: 永続化されたクエリ結果
+        url: https://docs.snowflake.com/en/user-guide/querying-persisted-results
+      - title: QUERY_HISTORY ビュー
+        url: https://docs.snowflake.com/en/sql-reference/account-usage/query_history
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [13.5,5.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 13.5
+          - 5.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-bi: {label: "注文集計 SQL クライアント", kind: "client", tier: "flow", x: 0, y: 2, realizes: ["bi"], description: "注文日を条件に、同一の SQL を実行する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§5"}]}
-      example-control: {label: "Snowflake Cloud Services", kind: "service", tier: "flow", x: 3, y: 2, realizes: ["control"], description: "クエリを受付け、計画や結果再利用の判断を調整する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§5"}]}
-      example-queue: {label: "BI_WH マルチクラスターウェアハウス", kind: "queue", tier: "flow", x: 6, y: 0, realizes: ["queue","clusters"], description: "最小・最大クラスター数とスケーリングポリシーを設定する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§5"}]}
-      example-metadata: {label: "Snowflake ORDERS のマイクロパーティション", kind: "db", tier: "flow", x: 9, y: 3, realizes: ["metadata","micro"], description: "サービスが管理する区画メタデータで不要な区画を除外する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§5"}]}
-      example-result: {label: "Snowflake の永続化クエリ結果", kind: "cache", tier: "flow", x: 6, y: 5, realizes: ["result"], description: "同一クエリなど、再利用の条件を満たすときに使う。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§5"}]}
-      example-history: {label: "ACCOUNT_USAGE.QUERY_HISTORY", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "待ち時間と読み取ったパーティション数を照合する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§5"}]}
+      example-bi:
+        label: 注文集計 SQL クライアント
+        kind: client
+        tier: flow
+        x: 0
+        'y': 2
+        realizes:
+          - bi
+        description: 注文日を条件に、同一の SQL を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-query-performance.md#§5
+      example-control:
+        label: Snowflake Cloud Services
+        kind: service
+        tier: flow
+        svc: snowflake:platform
+        x: 3
+        'y': 2
+        realizes:
+          - control
+        description: クエリを受付け、計画や結果再利用の判断を調整する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-query-performance.md#§5
+      example-queue:
+        svc: snowflake:warehouse
+        label: BI_WH マルチクラスターウェアハウス
+        kind: queue
+        tier: flow
+        x: 6
+        'y': 0
+        realizes:
+          - queue
+          - clusters
+        description: 最小・最大クラスター数とスケーリングポリシーを設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-query-performance.md#§5
+      example-metadata:
+        svc: snowflake:platform
+        label: Snowflake ORDERS のマイクロパーティション
+        kind: db
+        tier: flow
+        x: 9
+        'y': 3
+        realizes:
+          - metadata
+          - micro
+        description: サービスが管理する区画メタデータで不要な区画を除外する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-query-performance.md#§5
+      example-result:
+        svc: snowflake:platform
+        label: Snowflake の永続化クエリ結果
+        kind: cache
+        tier: flow
+        x: 6
+        'y': 5
+        realizes:
+          - result
+        description: 同一クエリなど、再利用の条件を満たすときに使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-query-performance.md#§5
+      example-history:
+        svc: snowflake:platform
+        label: ACCOUNT_USAGE.QUERY_HISTORY
+        kind: service
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 待ち時間と読み取ったパーティション数を照合する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-query-performance.md#§5
     links:
-      - {id: "example-history-connection", from: "example-queue", to: "example-history", label: "実行履歴で調査", evidence: [{"type":"doc","ref":"docs/reference-snowflake-query-performance.md#§5"}]}
+      - id: example-history-connection
+        from: example-queue
+        to: example-history
+        label: 実行履歴で調査
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-query-performance.md#§5
+    groups:
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake
+        tier:
+          - flow
+        nodes:
+          - example-control
+          - example-queue
+          - example-metadata
+          - example-result
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake
+        tier:
+          - implementation-setup
+        nodes:
+          - example-history

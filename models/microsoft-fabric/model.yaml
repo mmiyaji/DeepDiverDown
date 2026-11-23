@@ -62,13 +62,16 @@ implementations:
       - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
     nodes:
       example-source: {label: "受注 CSV の外部保存先", kind: "file", tier: "flow", x: 0, y: 3, realizes: ["source"], description: "取込接続からファイルを読み出す。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-pipeline: {label: "Fabric Data Factory の Copy activity", kind: "workflow", tier: "flow", x: 4, y: 3, realizes: ["pipeline"], description: "原本ファイルを OneLake の Lakehouse にコピーする。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-files: {label: "OneLake の Lakehouse Files と Tables", kind: "table", tier: "flow", x: 8, y: 3, realizes: ["files","delta"], description: "原本ファイルは Files、整備済み Delta は Tables に分ける。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-spark: {label: "Fabric Spark ノートブック", kind: "worker", tier: "flow", x: 12, y: 3, realizes: ["spark"], description: "型変換や品質チェックを行い、分析用 Delta を書き込む。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-sql: {label: "Lakehouse SQL 分析エンドポイント", kind: "service", tier: "flow", x: 12, y: 0, realizes: ["sql"], description: "Lakehouse のテーブルを読み取り専用 SQL で提供する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-bi: {label: "Power BI 受注レポート", kind: "client", tier: "flow", x: 8, y: 0, realizes: ["bi"], description: "公開されたセマンティックモデルの指標を表示する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-catalog: {label: "OneLake カタログ", kind: "catalog", tier: "flow", x: 16, y: 0, realizes: ["catalog"], description: "Lakehouse などの資産を確認する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-semantic: {label: "Power BI セマンティックモデル", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "注文日と売上のリレーション・指標を定義し、レポートで共有する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+      example-pipeline: {svc: "fabric:pipeline", label: "Fabric Data Factory の Copy activity", kind: "workflow", tier: "flow", x: 4, y: 3, realizes: ["pipeline"], description: "原本ファイルを OneLake の Lakehouse にコピーする。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+      example-files: {svc: "fabric:lakehouse", label: "OneLake の Lakehouse Files と Tables", kind: "table", tier: "flow", x: 8, y: 3, realizes: ["files","delta"], description: "原本ファイルは Files、整備済み Delta は Tables に分ける。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+      example-spark: {svc: "fabric:notebook", label: "Fabric Spark ノートブック", kind: "worker", tier: "flow", x: 12, y: 3, realizes: ["spark"], description: "型変換や品質チェックを行い、分析用 Delta を書き込む。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+      example-sql: {svc: "fabric:platform", label: "Lakehouse SQL 分析エンドポイント", kind: "service", tier: "flow", x: 12, y: 0, realizes: ["sql"], description: "Lakehouse のテーブルを読み取り専用 SQL で提供する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+      example-bi: {svc: "fabric:report", label: "Power BI 受注レポート", kind: "client", tier: "flow", x: 8, y: 0, realizes: ["bi"], description: "公開されたセマンティックモデルの指標を表示する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+      example-catalog: {svc: "fabric:platform", label: "OneLake カタログ", kind: "catalog", tier: "flow", x: 16, y: 0, realizes: ["catalog"], description: "Lakehouse などの資産を確認する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+      example-semantic: {svc: "fabric:semantic", label: "Power BI セマンティックモデル", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "注文日と売上のリレーション・指標を定義し、レポートで共有する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
     links:
       - {id: "example-semantic-source", from: "example-sql", to: "example-semantic", label: "モデルで使うテーブルを公開", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
       - {id: "example-semantic-connection", from: "example-semantic", to: "example-bi", label: "定義済み指標を提供", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
+    groups:
+      - {kind: cloud, provider: fabric, label: Fabric ワークスペース, tier: [flow], nodes: [example-pipeline, example-files, example-spark, example-sql, example-bi, example-catalog]}
+      - {kind: cloud, provider: fabric, label: Fabric ワークスペース, tier: [implementation-setup], nodes: [example-semantic]}

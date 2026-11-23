@@ -1,66 +1,300 @@
-name: "DWH の集約テーブルとセマンティックレイヤー"
-description: "受注明細から日次の集約を作り、指標が使える粒度と遅れて到着した明細の更新範囲を確認する。"
-parent: {"model":"dwh-design-patterns","node":"aggregates"}
+name: DWH の集約テーブルとセマンティックレイヤー
+description: 受注明細から日次の集約を作り、指標が使える粒度と遅れて到着した明細の更新範囲を確認する。
+parent:
+  model: dwh-design-patterns
+  node: aggregates
 reference:
   objectives:
-    - "事前集約で残す粒度と、明細に戻る条件を定義する。"
-    - "割合やユニーク件数の再集計条件を確認する。"
+    - 事前集約で残す粒度と、明細に戻る条件を定義する。
+    - 割合やユニーク件数の再集計条件を確認する。
   sources:
-    - {"title":"Kimball Group の集約ファクトと加法性","url":"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
-    - {"title":"dbt Semantic Layer の構成","url":"https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture"}
-sources: ["docs/reference-dwh-aggregate-tables.md"]
-evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§1"}]
+    - title: Kimball Group の集約ファクトと加法性
+      url: >-
+        https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
+    - title: dbt Semantic Layer の構成
+      url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture
+sources:
+  - docs/reference-dwh-aggregate-tables.md
+evidence:
+  - type: doc
+    ref: docs/reference-dwh-aggregate-tables.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[16.5,4.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 16.5
+      - 4.5
 nodes:
-  late: {"label":"遅延した注文イベント","kind":"external","tier":"flow","x":0,"y":3,"description":"発生した日付に後から届く。","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§3"}]}
-  fact: {"label":"受注明細ファクト","kind":"db","tier":"flow","x":4,"y":3,"description":"指標の計算に使える最小粒度。","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§1"}]}
-  refresh: {"label":"増分集計・再生成","kind":"worker","tier":"flow","x":7,"y":0,"description":"影響範囲だけを計算し直す。","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§3"}]}
-  aggregate: {"label":"日・カテゴリ・通貨の集約","kind":"db","tier":"flow","x":11,"y":0,"description":"売上と数量などを保持。","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§1"}]}
-  metrics: {"label":"指標定義と経路選択","kind":"service","tier":"flow","x":12,"y":4,"description":"集約が使える指標とディメンションを定義。","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§2"}]}
-  bi: {"label":"BI／日次レポート","kind":"client","tier":"flow","x":16,"y":4,"description":"同じ指標定義で集計を読む。","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§2"}]}
+  late:
+    label: 遅延した注文イベント
+    kind: external
+    tier: flow
+    x: 0
+    'y': 3
+    description: 発生した日付に後から届く。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§3
+  fact:
+    label: 受注明細ファクト
+    kind: db
+    tier: flow
+    x: 4
+    'y': 3
+    description: 指標の計算に使える最小粒度。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§1
+  refresh:
+    label: 増分集計・再生成
+    kind: worker
+    tier: flow
+    x: 7
+    'y': 0
+    description: 影響範囲だけを計算し直す。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§3
+  aggregate:
+    label: 日・カテゴリ・通貨の集約
+    kind: db
+    tier: flow
+    x: 11
+    'y': 0
+    description: 売上と数量などを保持。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§1
+  metrics:
+    label: 指標定義と経路選択
+    kind: service
+    tier: flow
+    x: 12
+    'y': 4
+    description: 集約が使える指標とディメンションを定義。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§2
+  bi:
+    label: BI／日次レポート
+    kind: client
+    tier: flow
+    x: 16
+    'y': 4
+    description: 同じ指標定義で集計を読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§2
 links:
-  - {"id":"arrive","from":"late","to":"fact","label":"明細を補正","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§3"}]}
-  - {"id":"build","from":"fact","to":"refresh","label":"対象の明細を再計算","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§3"}]}
-  - {"id":"publish","from":"refresh","to":"aggregate","label":"該当日の集約を置き換え","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§3"}]}
-  - {"id":"rollup","from":"aggregate","to":"metrics","label":"日次売上などに使う","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§2"}]}
-  - {"id":"atomic","from":"fact","to":"metrics","label":"購入者を明細で重複排除","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§2"}]}
-  - {"id":"read","from":"metrics","to":"bi","label":"指標と鮮度を表示","evidence":[{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§2"}]}
+  - id: arrive
+    from: late
+    to: fact
+    label: 明細を補正
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§3
+  - id: build
+    from: fact
+    to: refresh
+    label: 対象の明細を再計算
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§3
+  - id: publish
+    from: refresh
+    to: aggregate
+    label: 該当日の集約を置き換え
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§3
+  - id: rollup
+    from: aggregate
+    to: metrics
+    label: 日次売上などに使う
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§2
+  - id: atomic
+    from: fact
+    to: metrics
+    label: 購入者を明細で重複排除
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§2
+  - id: read
+    from: metrics
+    to: bi
+    label: 指標と鮮度を表示
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§2
 scenarios:
   - id: route
-    label: "日次売上と購入者数で経路を選ぶ"
-    evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§2"}]
+    label: 日次売上と購入者数で経路を選ぶ
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§2
     steps:
-      - {"links":["rollup","read"],"note":"日別・カテゴリ別の売上は集約表から返す。"}
-      - {"links":["atomic","read"],"note":"全カテゴリの購入者数は明細からユニークな顧客を数える。"}
+      - links:
+          - rollup
+          - read
+        note: 日別・カテゴリ別の売上は集約表から返す。
+      - links:
+          - atomic
+          - read
+        note: 全カテゴリの購入者数は明細からユニークな顧客を数える。
   - id: late-update
-    label: "遅延注文で該当日を再集計"
-    evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§3"}]
+    label: 遅延注文で該当日を再集計
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-aggregate-tables.md#§3
     steps:
-      - {"links":["arrive"],"note":"注文発生日より後に明細が到着する。"}
-      - {"links":["build","publish"],"note":"影響した日・カテゴリ・通貨の集約を再生成する。"}
-      - {"links":["rollup","read"],"note":"再計算後の売上と更新時刻を公開する。"}
-
+      - links:
+          - arrive
+        note: 注文発生日より後に明細が到着する。
+      - links:
+          - build
+          - publish
+        note: 影響した日・カテゴリ・通貨の集約を再生成する。
+      - links:
+          - rollup
+          - read
+        note: 再計算後の売上と更新時刻を公開する。
 implementations:
   - id: bq-aggregate
-    label: "BigQuery の日次集約と再計算"
-    description: "日付パーティションを持つ明細と集約表を BigQuery に置き、影響日だけをスケジュール SQL で再計算する例。"
+    label: BigQuery の日次集約と再計算
+    description: 日付パーティションを持つ明細と集約表を BigQuery に置き、影響日だけをスケジュール SQL で再計算する例。
     sources:
-      - {title: "Kimball Group の集約ファクトと加法性", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
-      - {title: "dbt Semantic Layer の構成", url: "https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture"}
-      - {title: "BigQuery パーティション表", url: "https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables"}
-      - {title: "BigQuery スケジュールされたクエリ", url: "https://docs.cloud.google.com/bigquery/docs/scheduling-queries"}
-      - {title: "BigQuery 論理ビュー", url: "https://docs.cloud.google.com/bigquery/docs/views-intro"}
+      - title: Kimball Group の集約ファクトと加法性
+        url: >-
+          https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
+      - title: dbt Semantic Layer の構成
+        url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture
+      - title: BigQuery パーティション表
+        url: https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables
+      - title: BigQuery スケジュールされたクエリ
+        url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries
+      - title: BigQuery 論理ビュー
+        url: https://docs.cloud.google.com/bigquery/docs/views-intro
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [16.5,4.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 16.5
+          - 4.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-late: {label: "補正対象日の記録", kind: "table", tier: "flow", x: 0, y: 3, realizes: ["late"], description: "遅く到着した明細から再計算日を記録する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
-      example-fact: {label: "sales.fact_order_line", kind: "table", tier: "flow", x: 4, y: 3, realizes: ["fact"], description: "注文日をパーティション列にした明細表。", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
-      example-refresh: {label: "BigQuery のスケジュール SQL", kind: "workflow", tier: "flow", x: 7, y: 0, realizes: ["refresh"], description: "対象日のファクトを再集計し、影響日の集約行だけを置き換える。", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
-      example-aggregate: {label: "sales.daily_category_currency", kind: "table", tier: "flow", x: 11, y: 0, realizes: ["aggregate"], description: "注文日・カテゴリ・通貨の粒度に数量と金額を保存する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
-      example-metrics: {label: "集約用と明細用の SQL ビュー", kind: "table", tier: "flow", x: 12, y: 4, realizes: ["metrics"], description: "ロールアップ可否でデータ源を選び、購入者数は明細から重複排除する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
-      example-bi: {label: "日次売上と購入者レポート", kind: "client", tier: "flow", x: 16, y: 4, realizes: ["bi"], description: "登録済みの指標と元データの基準時刻を確認する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
-      example-audit: {label: "更新履歴テーブル", kind: "monitor", tier: "implementation-setup", x: 1, y: 1.5, description: "対象日、明細の読み取り時点、再計算の完了時刻を保存して鮮度表示に使う。", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
+      example-late:
+        label: 補正対象日の記録
+        kind: table
+        tier: flow
+        x: 0
+        'y': 3
+        realizes:
+          - late
+        description: 遅く到着した明細から再計算日を記録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
+        svc: gcp:bigquery
+      example-fact:
+        label: sales.fact_order_line
+        kind: table
+        tier: flow
+        x: 4
+        'y': 3
+        realizes:
+          - fact
+        description: 注文日をパーティション列にした明細表。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
+        svc: gcp:bigquery
+      example-refresh:
+        label: BigQuery のスケジュール SQL
+        kind: workflow
+        tier: flow
+        x: 7
+        'y': 0
+        realizes:
+          - refresh
+        description: 対象日のファクトを再集計し、影響日の集約行だけを置き換える。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
+        svc: gcp:bigquery
+      example-aggregate:
+        label: sales.daily_category_currency
+        kind: table
+        tier: flow
+        x: 11
+        'y': 0
+        realizes:
+          - aggregate
+        description: 注文日・カテゴリ・通貨の粒度に数量と金額を保存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
+        svc: gcp:bigquery
+      example-metrics:
+        label: 集約用と明細用の SQL ビュー
+        kind: table
+        tier: flow
+        x: 12
+        'y': 4
+        realizes:
+          - metrics
+        description: ロールアップ可否でデータ源を選び、購入者数は明細から重複排除する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
+        svc: gcp:bigquery
+      example-bi:
+        label: 日次売上と購入者レポート
+        kind: client
+        tier: flow
+        x: 16
+        'y': 4
+        realizes:
+          - bi
+        description: 登録済みの指標と元データの基準時刻を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
+      example-audit:
+        label: 更新履歴テーブル
+        kind: monitor
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 対象日、明細の読み取り時点、再計算の完了時刻を保存して鮮度表示に使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
     links:
-      - {id: "example-audit-connection", from: "example-refresh", to: "example-audit", label: "計算の完了時刻を記録", evidence: [{"type":"doc","ref":"docs/reference-dwh-aggregate-tables.md#§4"}]}
+      - id: example-audit-connection
+        from: example-refresh
+        to: example-audit
+        label: 計算の完了時刻を記録
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-aggregate-tables.md#§4
+    groups:
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - flow
+        nodes:
+          - example-late
+          - example-fact
+          - example-refresh
+          - example-aggregate
+          - example-metrics

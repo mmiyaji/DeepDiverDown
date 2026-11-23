@@ -164,7 +164,28 @@
       linkFrom[l.id] = [].concat(realizes || []).filter(id => base.links.some(x => x.id === id));
     }
     const tiers = clone(impl.tiers || base.tiers);
-    const v = { tiers, groups: clone(impl.groups || []), nodes, links, from, linkFrom };
+    const occupied = new Set(Object.values(nodes).map(n => n.tier));
+    for (const tier of base.tiers) {
+      if (occupied.has(tier.id) && !tiers.some(t => t.id === tier.id)) tiers.push(clone(tier));
+    }
+    const groups = clone(impl.groups || []).map(group => {
+      if (!group.tier && group.nodes?.length) {
+        group.tier = [...new Set(group.nodes.map(id => nodes[id]?.tier).filter(Boolean))];
+      }
+      return group;
+    });
+    // A model can contain a broad account boundary and a later service
+    // boundary generated for the same members. Keep the account boundary
+    // when it already covers that complete service boundary.
+    const providerLabels = new Set(['AWS サービス', 'Google Cloud サービス', 'Microsoft Azure サービス', 'Oracle Cloud サービス', 'Databricks サービス']);
+    const visibleGroups = groups.filter((group, index) => {
+      if (!providerLabels.has(group.label) || !group.nodes?.length) return true;
+      return !groups.slice(0, index).some(parent =>
+        parent.kind === 'cloud' && parent.provider === group.provider &&
+        [].concat(group.tier || []).every(tier => [].concat(parent.tier || []).includes(tier)) &&
+        (!parent.nodes || group.nodes.every(id => parent.nodes.includes(id))));
+    });
+    const v = { tiers, groups: visibleGroups, nodes, links, from, linkFrom };
     window.Layout.apply(v);
     return v;
   }
@@ -179,7 +200,7 @@
 
   /* 物理部品の表示状態を、ビューの部品にまとめる（停止 > 影響 > 滞留、ずれ > 不明 > 主張 > 事実） */
   const FILL = ['down', 'impact', 'delay'], STAT = ['drift', 'unknown', 'claim', 'fact'];
-  const TONE = ['acc', 'warn', 'ok', undefined];
+  const TONE = ['acc', 'warn', 'ok', undefined, 'replicas'];
   function mergeNode(states) {
     const s = states.filter(Boolean);
     if (!s.length) return {};

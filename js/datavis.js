@@ -69,7 +69,7 @@ export class TreeMap {
     if (C) {
       const total = this.leaves.length, cut = this.leaves.filter(id => this.up(id, C.prune)).length;
       const read = this.leaves.filter(id => C.now.has(id) || C.done.has(id)).length;
-      meter = `<div class="fm-meter">${unit} ${total} 件中 <b>${cut} 件を開かずに除外</b>${read ? `・${read} 件を読む` : ''}</div>`;
+      meter = `<div class="fm-meter">${esc(unit)} ${total} 件中 <b>${cut} 件を開かずに除外</b>${read ? `・${read} 件を読む` : ''}</div>`;
     }
     const lv = (L.levels || []).map((t, i) => `<span style="left:${i * colW + 4}px;width:${boxW}px">${esc(t)}</span>`).join('');
     this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || 'メタデータの木')}</span>${meter}</div>
@@ -116,9 +116,9 @@ export class DistMap {
       const x = 36 + i * (bw + gap), h = H - Y(b.value);
       geom.set(b.id, { x, y: Y(b.value), w: bw, h: Math.max(1, h) });
       const cls = [hi.has(b.id) ? 'hi' : '', b.value === max ? 'max' : '', this.sel === b.id ? 'sel' : ''].join(' ');
-      return `<g class="dm-b ${cls}" data-bar="${esc(b.id)}" role="button" tabindex="0" aria-label="${esc(b.label)} ${b.value}${unit}">
+      return `<g class="dm-b ${cls}" data-bar="${esc(b.id)}" role="button" tabindex="0" aria-label="${esc(`${b.label} ${b.value}${unit}`)}">
         <rect x="${x}" y="${Y(b.value)}" width="${bw}" height="${Math.max(1, h)}" rx="2"/>
-        <text class="dm-v" x="${x + bw / 2}" y="${Y(b.value) - 3}">${b.value}</text>
+        <text class="dm-v" x="${x + bw / 2}" y="${Y(b.value) - 3}">${esc(b.value)}</text>
         <text class="dm-l" x="${x + bw / 2}" y="${H + 12}">${esc(b.short || b.label)}</text></g>`;
     }).join('');
     const line = (v, cls, label) => `<line class="dm-line ${cls}" x1="32" x2="${w}" y1="${Y(v)}" y2="${Y(v)}"/><text class="dm-lt ${cls}" x="${w}" y="${Y(v) - 3}">${esc(label)}</text>`;
@@ -126,8 +126,8 @@ export class DistMap {
     const sel = this.sel && bars.find(b => b.id === this.sel);
     this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || '分布')}</span>
         ${L.summary === 'files'
-          ? `<div class="fm-meter">ファイル <b>${bars.length} 個</b>・合計 ${tot}${unit}${L.target ? `・目標 ${L.target}${unit} の 3/4 未満 <b>${vals.filter(v => v < L.target * 0.75).length} 個</b>` : ''}</div>`
-          : `<div class="fm-meter">最大 <b>${max}${unit}</b> は中央値 ${med}${unit} の <b>${ratio} 倍</b>${L.maxNote ? `・${esc(L.maxNote)}` : ''}</div>`}</div>
+          ? `<div class="fm-meter">ファイル <b>${bars.length} 個</b>・合計 ${esc(`${tot}${unit}`)}${L.target ? `・目標 ${esc(`${L.target}${unit}`)} の 3/4 未満 <b>${vals.filter(v => v < L.target * 0.75).length} 個</b>` : ''}</div>`
+          : `<div class="fm-meter">最大 <b>${esc(`${max}${unit}`)}</b> は中央値 ${esc(`${med}${unit}`)} の <b>${ratio} 倍</b>${L.maxNote ? `・${esc(L.maxNote)}` : ''}</div>`}</div>
       <svg class="dm" width="${w}" height="${H + 18}" viewBox="0 0 ${w} ${H + 18}">
         ${L.summary === 'files' ? (L.target ? line(L.target, 'mx', `目標 ${L.target}${unit}`) : '') : line(med, 'med', `中央値 ${med}${unit}`) + line(max, 'mx', `最大 ${max}${unit}`)}${g}</svg>
       ${L.note ? `<div class="fm-note">${esc(L.note)}</div>` : ''}
@@ -246,9 +246,9 @@ export class GridMap {
         else if (this.match(C.read, r.id, c.id)) { st = this.match(C.rnow, r.id, c.id) ? 'now' : 'done'; readN++; readV += v; }
       }
       const id = `${r.id}:${c.id}`;
-      return `<td class="gm-c ${st ? 's-' + st : ''} ${this.sel === id ? 'sel' : ''}" data-cell="${esc(id)}" style="--a:${Math.min(1, v / (L.scaleMax || Math.max(...L.values.flat())))}" title="${esc(r.label)} × ${esc(c.label)}：${v}${unit}">${v}</td>`;
+      return `<td class="gm-c ${st ? 's-' + st : ''} ${this.sel === id ? 'sel' : ''}" data-cell="${esc(id)}" style="--a:${Math.min(1, v / (L.scaleMax || Math.max(...L.values.flat())))}" title="${esc(r.label)} × ${esc(c.label)}：${esc(`${v}${unit}`)}">${esc(v)}</td>`;
     }).join('')}</tr>`).join('');
-    const meter = C ? `<div class="fm-meter">マス ${total} 件中 <b>${cut} 件を除外</b>${readN ? `・${readN} 件を読む（${readV}${unit} / 全体 ${sum}${unit}、${(readV / sum * 100).toFixed(1)}%）` : ''}</div>` : '';
+    const meter = C ? `<div class="fm-meter">マス ${total} 件中 <b>${cut} 件を除外</b>${readN ? `・${readN} 件を読む（${esc(`${readV}${unit}`)} / 全体 ${esc(`${sum}${unit}`)}、${(readV / sum * 100).toFixed(1)}%）` : ''}</div>` : '';
     const [sr, sc] = (this.sel || '').split(':');
     const selInfo = this.sel && { label: `${L.rows.find(r => r.id === sr)?.label} × ${L.cols.find(c => c.id === sc)?.label}`, sub: `${L.values[L.rows.findIndex(r => r.id === sr)]?.[L.cols.findIndex(c => c.id === sc)]}${unit}`, description: L.cellNote };
     this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || '分布の表')}</span>${meter}</div>
@@ -277,7 +277,7 @@ export class TimelineMap {
     const hi = new Set(C ? C.steps[C.idx]?.highlight || [] : []);
     const items = cs.map(c => {
       const cls = [`k-${c.kind || 'append'}`, expired.has(c.id) ? 's-expired' : '', hi.has(c.id) ? 's-hi' : '', c.id === cur ? 'cur' : '', c.id === travel ? 'travel' : '', this.sel === c.id ? 'sel' : ''].join(' ');
-      return `<button type="button" class="tl-c ${cls}" data-commit="${esc(c.id)}" aria-label="${esc(c.label)} ${esc(c.time || '')}">
+      return `<button type="button" class="tl-c ${esc(cls)}" data-commit="${esc(c.id)}" aria-label="${esc(c.label)} ${esc(c.time || '')}">
         ${c.id === cur ? '<span class="tl-pin cur">現在</span>' : ''}${c.id === travel ? '<span class="tl-pin travel">時点指定で読む</span>' : ''}
         <span class="tl-dot"></span><span class="tl-l">${esc(c.label)}</span><span class="tl-t">${esc(c.time || '')}</span><span class="tl-k">${esc({ append: '追記', overwrite: '上書き', delete: '削除', compact: 'コンパクション' }[c.kind] || c.kind || '')}</span></button>`;
     }).join('');
@@ -322,16 +322,17 @@ export class BlockMap {
     const prevItems = this.items || new Map();
     const lanes = L.lanes.filter(l => !l.optional || S[l.id]);
     const all = new Map();
+    const width = item => Number(item.w) || 1;
     const html = lanes.map(l => {
       const its = S[l.id] || [], o = laneOver[l.id] || {};
       its.forEach(it => all.set(it.id, it));
-      const size = its.reduce((a, it) => a + (it.w || 1), 0);
+      const size = its.reduce((a, it) => a + width(it), 0);
       const sub = o.sub ?? l.sub;
-      return `<div class="bm-lane ${o.tone ? 'bm-' + o.tone : ''}" data-lane="${esc(l.id)}">
-        <div class="bm-lh"><b>${esc(o.label || l.label)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}<i>${its.length ? (L.unit ? `${+size.toFixed(1)}${L.unit}` : `${its.length} 個`) : '空'}</i></div>
-        <div class="bm-items">${its.map(it => `<button type="button" class="bm-it k${it.k ?? 0} ${hi.has(it.id) ? 'hi' : ''} ${this.sel === it.id ? 'sel' : ''}" data-item="${esc(it.id)}" data-k="${it.k ?? 0}" style="--w:${it.w || 1}" title="${esc(it.note || it.label || it.id)}">${esc(it.label ?? it.id)}</button>`).join('')}</div></div>`;
+      return `<div class="bm-lane ${o.tone ? 'bm-' + esc(o.tone) : ''}" data-lane="${esc(l.id)}">
+        <div class="bm-lh"><b>${esc(o.label || l.label)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}<i>${its.length ? (L.unit ? `${+size.toFixed(1)}${esc(L.unit)}` : `${its.length} 個`) : '空'}</i></div>
+        <div class="bm-items">${its.map(it => `<button type="button" class="bm-it k${esc(it.k ?? 0)} ${hi.has(it.id) ? 'hi' : ''} ${this.sel === it.id ? 'sel' : ''}" data-item="${esc(it.id)}" data-k="${esc(it.k ?? 0)}" style="--w:${width(it)}" title="${esc(it.note || it.label || it.id)}">${esc(it.label ?? it.id)}</button>`).join('')}</div></div>`;
     }).join('');
-    const legend = Object.entries(L.legend || {}).map(([k, v]) => `<span class="bm-lg"><span class="bm-sw k${k}"></span>${esc(v)}</span>`).join('');
+    const legend = Object.entries(L.legend || {}).map(([k, v]) => `<span class="bm-lg"><span class="bm-sw k${esc(k)}"></span>${esc(v)}</span>`).join('');
     const sel = this.sel && all.get(this.sel);
     this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || 'データの移動')}</span>${legend ? `<div class="bm-legend">${legend}</div>` : ''}</div>
       <div class="bm" style="--lanes:${lanes.length}">${html}</div>

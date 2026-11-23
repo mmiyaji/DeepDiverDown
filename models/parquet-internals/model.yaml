@@ -1,6 +1,8 @@
-name: "Parquet ファイルの内部：フッターからページまで"
+name: Parquet ファイルの内部：フッターからページまで
 description: 1 つの Parquet ファイルの中を、末尾のフッター、Row Group、列チャンク、辞書・データページまでドリルダウンし、範囲 GET で読む順序を追います。
-parent: {model: file-formats, node: parquet}
+parent:
+  model: file-formats
+  node: parquet
 reference:
   objectives:
     - Parquet のバイト配置（先頭マジック、Row Group、索引、フッター、フッター長、末尾マジック）を説明する。
@@ -8,76 +10,359 @@ reference:
     - 列チャンクのページ構造（辞書ページ、データページ、レベル）と解凍・デコードを理解する。
     - ファイル・Row Group・ページのサイズが読み取りに与える影響を説明する。
   sources:
-    - {title: Parquet File Format, url: "https://parquet.apache.org/docs/file-format/"}
-    - {title: Parquet Page Index, url: "https://parquet.apache.org/docs/file-format/pageindex/"}
-    - {title: Parquet Bloom Filter, url: "https://parquet.apache.org/docs/file-format/bloomfilter/"}
-    - {title: Parquet Data Pages, url: "https://parquet.apache.org/docs/file-format/data-pages/"}
-sources: [docs/reference-parquet-internals.md]
-evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§1"}, {type: doc, ref: "docs/reference-parquet-internals.md#§6"}, {type: doc, ref: "docs/reference-parquet-internals.md#§7"}]
+    - title: Parquet File Format
+      url: https://parquet.apache.org/docs/file-format/
+    - title: Parquet Page Index
+      url: https://parquet.apache.org/docs/file-format/pageindex/
+    - title: Parquet Bloom Filter
+      url: https://parquet.apache.org/docs/file-format/bloomfilter/
+    - title: Parquet Data Pages
+      url: https://parquet.apache.org/docs/file-format/data-pages/
+sources:
+  - docs/reference-parquet-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-parquet-internals.md#§1
+  - type: doc
+    ref: docs/reference-parquet-internals.md#§6
+  - type: doc
+    ref: docs/reference-parquet-internals.md#§7
 tiers:
-  - {id: reader, label: 読み手（Worker）, z: 2, size: [14, 3]}
-  - {id: file, label: ファイル（バイト順：先頭 → 末尾）, z: 1, size: [14, 3]}
-  - {id: chunk, label: 列チャンクの中（ページ）, z: 0, size: [14, 3]}
+  - id: reader
+    label: 読み手（Worker）
+    z: 2
+    size:
+      - 14
+      - 3
+  - id: file
+    label: ファイル（バイト順：先頭 → 末尾）
+    z: 1
+    size:
+      - 14
+      - 3
+  - id: chunk
+    label: 列チャンクの中（ページ）
+    z: 0
+    size:
+      - 14
+      - 3
 groups:
-  - {kind: parallel, label: 必要な列チャンクを並列に範囲 GET, tier: file, nodes: [rowgroup, colchunk]}
+  - kind: parallel
+    label: 必要な列チャンクを並列に範囲 GET
+    tier: file
+    nodes:
+      - rowgroup
+      - colchunk
 nodes:
-  reader: {label: 列データの読み取り役, kind: worker, tier: reader, x: 2, y: 1.5, slots: 4, description: 範囲読み取りでフッター、索引、列チャンクを順に取得する。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  decoder: {label: 列データの解凍・復号, kind: worker, tier: reader, x: 10, 'y': 1.5, description: ページを解凍し、レベルと値（辞書・RLE・差分）をデコードする。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
-  magic: {label: "Header \"PAR1\"", kind: segment, tier: file, x: 0, y: 1.5, description: 先頭 4 バイトのマジックだけ。ファイルの説明は持たない。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§2"}]}
-  rowgroup: {label: Row Groups, kind: segment, tier: file, x: 3, y: 1.5, partitions: 4, description: 行の塊。分割と並列読みの単位。各 Row Group に列ごとの列チャンクがある。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§2"}, {type: doc, ref: "docs/reference-parquet-internals.md#§7"}]}
-  colchunk: {label: Column Chunks, kind: segment, tier: file, x: 6, y: 1.5, partitions: 3, description: 1 行グループの 1 列を格納したバイト範囲。必要な列だけを読む。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  indexes: {label: Bloom / Column / Offset Index, kind: segment, tier: file, x: 9, y: 0.5, description: 任意の索引。ブルームフィルターで等値検索の Row Group を、ページ索引でページを読み飛ばす。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  footer: {label: Footer (FileMetaData), kind: segment, tier: file, x: 12, y: 1.5, description: Thrift で符号化されたスキーマ、Row Group と列チャンクの位置、統計、索引の位置。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§3"}]}
-  tail: {label: "Footer length + \"PAR1\"", kind: segment, tier: file, x: 14, y: 1.5, description: 末尾 8 バイト。フッターの長さを知るために最初に読む。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§2"}, {type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  dictpage: {label: Dictionary Page, kind: segment, tier: chunk, x: 3, y: 1.5, description: 列チャンク先頭に最大 1 つ。値の一覧を一度だけ持つ。, evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}]}
-  datapage: {label: Data Pages, kind: segment, tier: chunk, x: 7, y: 1.5, partitions: 4, description: "ページヘッダー＋繰り返しレベル・定義レベル・値。圧縮はページ単位。", evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§5"}, {type: doc, ref: "docs/reference-parquet-internals.md#§6"}]}
+  reader:
+    label: 列データの読み取り役
+    kind: worker
+    tier: reader
+    x: 2
+    'y': 1.5
+    slots: 4
+    description: 範囲読み取りでフッター、索引、列チャンクを順に取得する。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  decoder:
+    label: 列データの解凍・復号
+    kind: worker
+    tier: reader
+    x: 10
+    'y': 1.5
+    description: ページを解凍し、レベルと値（辞書・RLE・差分）をデコードする。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§5
+  magic:
+    label: Header "PAR1"
+    kind: segment
+    tier: file
+    x: 0
+    'y': 1.5
+    description: 先頭 4 バイトのマジックだけ。ファイルの説明は持たない。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§2
+  rowgroup:
+    label: Row Groups
+    kind: segment
+    tier: file
+    x: 3
+    'y': 1.5
+    partitions: 4
+    description: 行の塊。分割と並列読みの単位。各 Row Group に列ごとの列チャンクがある。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§2
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§7
+  colchunk:
+    label: Column Chunks
+    kind: segment
+    tier: file
+    x: 6
+    'y': 1.5
+    partitions: 3
+    description: 1 行グループの 1 列を格納したバイト範囲。必要な列だけを読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  indexes:
+    label: Bloom / Column / Offset Index
+    kind: segment
+    tier: file
+    x: 9
+    'y': 0.5
+    description: 任意の索引。ブルームフィルターで等値検索の Row Group を、ページ索引でページを読み飛ばす。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  footer:
+    label: Footer (FileMetaData)
+    kind: segment
+    tier: file
+    x: 12
+    'y': 1.5
+    description: Thrift で符号化されたスキーマ、Row Group と列チャンクの位置、統計、索引の位置。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§3
+  tail:
+    label: Footer length + "PAR1"
+    kind: segment
+    tier: file
+    x: 14
+    'y': 1.5
+    description: 末尾 8 バイト。フッターの長さを知るために最初に読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§2
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  dictpage:
+    label: Dictionary Page
+    kind: segment
+    tier: chunk
+    x: 3
+    'y': 1.5
+    description: 列チャンク先頭に最大 1 つ。値の一覧を一度だけ持つ。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§5
+  datapage:
+    label: Data Pages
+    kind: segment
+    tier: chunk
+    x: 7
+    'y': 1.5
+    partitions: 4
+    description: ページヘッダー＋繰り返しレベル・定義レベル・値。圧縮はページ単位。
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§5
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§6
 links:
-  - {id: read-tail, from: reader, to: tail, label: ① 末尾 8 バイトを範囲読み取り, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  - {id: read-footer, from: reader, to: footer, label: ② フッターを読む, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§3}, {type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  - {id: prune-rg, from: footer, to: rowgroup, label: ③ 統計で Row Group を選ぶ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  - {id: read-index, from: reader, to: indexes, label: ④ ブルーム・ページ索引, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  - {id: select-chunk, from: rowgroup, to: colchunk, label: 必要な列だけ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  - {id: fetch-chunk, from: reader, to: colchunk, label: ⑤ 列チャンクを範囲読み取り, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
-  - {id: chunk-dict, from: colchunk, to: dictpage, label: 先頭の辞書ページ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
-  - {id: chunk-data, from: colchunk, to: datapage, label: 続くデータページ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
-  - {id: decode, from: decoder, to: datapage, label: ⑥ 解凍・デコード, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}, {type: doc, ref: docs/reference-parquet-internals.md#§6}]}
-  - {id: dict-lookup, from: decoder, to: dictpage, label: 辞書番号を値へ, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§5}]}
-  - {id: to-decoder, from: reader, to: decoder, label: 取得したバイト列, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§4}]}
+  - id: read-tail
+    from: reader
+    to: tail
+    label: ① 末尾 8 バイトを範囲読み取り
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  - id: read-footer
+    from: reader
+    to: footer
+    label: ② フッターを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§3
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  - id: prune-rg
+    from: footer
+    to: rowgroup
+    label: ③ 統計で Row Group を選ぶ
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  - id: read-index
+    from: reader
+    to: indexes
+    label: ④ ブルーム・ページ索引
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  - id: select-chunk
+    from: rowgroup
+    to: colchunk
+    label: 必要な列だけ
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  - id: fetch-chunk
+    from: reader
+    to: colchunk
+    label: ⑤ 列チャンクを範囲読み取り
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  - id: chunk-dict
+    from: colchunk
+    to: dictpage
+    label: 先頭の辞書ページ
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§5
+  - id: chunk-data
+    from: colchunk
+    to: datapage
+    label: 続くデータページ
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§5
+  - id: decode
+    from: decoder
+    to: datapage
+    label: ⑥ 解凍・デコード
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§5
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§6
+  - id: dict-lookup
+    from: decoder
+    to: dictpage
+    label: 辞書番号を値へ
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§5
+  - id: to-decoder
+    from: reader
+    to: decoder
+    label: 取得したバイト列
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
 scenarios:
   - id: open-file
     label: ファイルを開く（フッターを読む）
-    evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§8"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§8
     steps:
-      - {links: [read-tail], read: [tail], note: "ファイルサイズから末尾 8 バイト（フッター長と PAR1）を取る。多くの実装は末尾を多めに取り 1 往復で済ませる。"}
-      - {links: [read-footer], read: [footer], note: "Thrift のフッターをデコードし、スキーマ・全 Row Group と列チャンクの位置・統計を得る。ここまでで 128 MB のうち 24 KB しか読んでいない。"}
+      - links:
+          - read-tail
+        read:
+          - tail
+        note: ファイルサイズから末尾 8 バイト（フッター長と PAR1）を取る。多くの実装は末尾を多めに取り 1 往復で済ませる。
+      - links:
+          - read-footer
+        read:
+          - footer
+        note: Thrift のフッターをデコードし、スキーマ・全 Row Group と列チャンクの位置・統計を得る。ここまでで 128 MB のうち 24 KB しか読んでいない。
   - id: prune-and-read
     label: Row Group とページを絞って読む
-    evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
     steps:
-      - {links: [read-tail, read-footer], read: [tail, footer], note: "WHERE event_ts < '06:00' AND event_type = 'purchase' で user_id を取る。まず末尾からフッターを読む。"}
-      - {links: [prune-rg], note: "event_ts の min/max で、午後のデータの Row Group 1 を丸ごと捨てる（灰色のまま残る）。"}
-      - {links: [read-index], read: [colidx, offidx], note: "Column Index（ページごとの min/max）と Offset Index（ページの位置）を読み、Row Group 0 の中で 06:00 より前のページだけを特定する。"}
-      - {links: [select-chunk, fetch-chunk], read: [rg0-ts-p0, rg0-type-dict, rg0-type-p0, rg0-user-p0], note: "必要な 3 列の、必要なページだけを範囲 GET する。payload 列は一切読まない。"}
-      - {links: [to-decoder, chunk-dict, chunk-data, decode, dict-lookup], note: "ページ単位で zstd を解凍し、event_type の辞書番号を値に戻して 'purchase' の行の user_id を返す。"}
+      - links:
+          - read-tail
+          - read-footer
+        read:
+          - tail
+          - footer
+        note: WHERE event_ts < '06:00' AND event_type = 'purchase' で user_id を取る。まず末尾からフッターを読む。
+      - links:
+          - prune-rg
+        note: event_ts の min/max で、午後のデータの Row Group 1 を丸ごと捨てる（灰色のまま残る）。
+      - links:
+          - read-index
+        read:
+          - colidx
+          - offidx
+        note: Column Index（ページごとの min/max）と Offset Index（ページの位置）を読み、Row Group 0 の中で 06:00 より前のページだけを特定する。
+      - links:
+          - select-chunk
+          - fetch-chunk
+        read:
+          - rg0-ts-p0
+          - rg0-type-dict
+          - rg0-type-p0
+          - rg0-user-p0
+        note: 必要な 3 列の、必要なページだけを範囲 GET する。payload 列は一切読まない。
+      - links:
+          - to-decoder
+          - chunk-dict
+          - chunk-data
+          - decode
+          - dict-lookup
+        note: ページ単位で zstd を解凍し、event_type の辞書番号を値に戻して 'purchase' の行の user_id を返す。
   - id: point-lookup
     label: ID の等値検索（ブルームフィルター）
-    evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
     steps:
-      - {links: [read-footer, prune-rg], read: [tail, footer], note: "WHERE user_id = 4242。ランダムな ID は両方の Row Group の min/max に入ってしまい、統計だけでは捨てられない。"}
-      - {links: [read-index], read: [bloom], note: "user_id のブルームフィルターを読む。Row Group 0 は「確実に無い」、Row Group 1 は「あるかもしれない」と分かる。"}
-      - {links: [fetch-chunk, decode], read: [rg1-user], note: Row Group 1 の user_id 列だけを読み、一致行を探す。Row Group 0 は読まない。}
+      - links:
+          - read-footer
+          - prune-rg
+        read:
+          - tail
+          - footer
+        note: WHERE user_id = 4242。ランダムな ID は両方の Row Group の min/max に入ってしまい、統計だけでは捨てられない。
+      - links:
+          - read-index
+        read:
+          - bloom
+        note: user_id のブルームフィルターを読む。Row Group 0 は「確実に無い」、Row Group 1 は「あるかもしれない」と分かる。
+      - links:
+          - fetch-chunk
+          - decode
+        read:
+          - rg1-user
+        note: Row Group 1 の user_id 列だけを読み、一致行を探す。Row Group 0 は読まない。
 requirements:
-  - {id: PQ-01, kind: rule, title: 末尾から読む, text: "フッターを先に読み、位置と統計を得てから列チャンクを取る。ファイル全体はダウンロードしない。", links: [read-tail, read-footer, fetch-chunk], evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§4"}]}
-  - {id: PQ-02, kind: nfr, title: 適切な単位サイズ, text: "ファイル・Row Group・ページのサイズを、並列度と読み飛ばしの粒度の均衡で決める。", links: [prune-rg, chunk-data], evidence: [{type: doc, ref: "docs/reference-parquet-internals.md#§7"}]}
+  - id: PQ-01
+    kind: rule
+    title: 末尾から読む
+    text: フッターを先に読み、位置と統計を得てから列チャンクを取る。ファイル全体はダウンロードしない。
+    links:
+      - read-tail
+      - read-footer
+      - fetch-chunk
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§4
+  - id: PQ-02
+    kind: nfr
+    title: 適切な単位サイズ
+    text: ファイル・Row Group・ページのサイズを、並列度と読み飛ばしの粒度の均衡で決める。
+    links:
+      - prune-rg
+      - chunk-data
+    evidence:
+      - type: doc
+        ref: docs/reference-parquet-internals.md#§7
 unknowns:
-  - {id: UNK-01, text: 書き手のバージョン、ページ索引とブルームフィルターの有無、Row Group とページのサイズは未確定。, refs: [indexes, rowgroup, datapage]}
-gates: {maxDrift: 0, maxHigh: 0}
+  - id: UNK-01
+    text: 書き手のバージョン、ページ索引とブルームフィルターの有無、Row Group とページのサイズは未確定。
+    refs:
+      - indexes
+      - rowgroup
+      - datapage
+gates:
+  maxDrift: 0
+  maxHigh: 0
 fileLayout:
   file: events-00000.parquet
-  note: "例：4 列・2 Row Group・128 MB の events ファイル（数値は説明用）。帯の幅はバイト数の比率。小さい区画は見やすさのため最小幅で表示。"
+  note: 例：4 列・2 Row Group・128 MB の events ファイル（数値は説明用）。帯の幅はバイト数の比率。小さい区画は見やすさのため最小幅で表示。
   segments:
     - id: magic-head
-      label: "\"PAR1\""
+      label: '"PAR1"'
       bytes: 4
       kind: magic
       node: magic
@@ -96,42 +381,115 @@ fileLayout:
           node: colchunk
           description: タイムスタンプ列。昇順に並ぶので DELTA_BINARY_PACKED（差分）がよく効く。
           children:
-            - {id: rg0-ts-p0, label: Data Page 0, bytes: 1048576, kind: page, node: datapage, description: "00:00〜01:29 の 262,144 行分。", sample: "PageHeader { type: DATA_PAGE_V2, num_values: 262144,\n  encoding: DELTA_BINARY_PACKED,\n  compressed: 312 KB → uncompressed: 1 MB (zstd) }\n値: 1793491200000000 (+1250) (+980) (+1410) …\n    ↑ 先頭値と差分だけを詰めて保存"}
-            - {id: rg0-ts-rest, label: Data Page 1〜7, bytes: 7340032, kind: page, node: datapage, description: 01:30〜11:59 の残りのページ。}
+            - id: rg0-ts-p0
+              label: Data Page 0
+              bytes: 1048576
+              kind: page
+              node: datapage
+              description: 00:00〜01:29 の 262,144 行分。
+              sample: |-
+                PageHeader { type: DATA_PAGE_V2, num_values: 262144,
+                  encoding: DELTA_BINARY_PACKED,
+                  compressed: 312 KB → uncompressed: 1 MB (zstd) }
+                値: 1793491200000000 (+1250) (+980) (+1410) …
+                    ↑ 先頭値と差分だけを詰めて保存
+            - id: rg0-ts-rest
+              label: Data Page 1〜7
+              bytes: 7340032
+              kind: page
+              node: datapage
+              description: 01:30〜11:59 の残りのページ。
         - id: rg0-user
           label: 列 user_id
           kind: chunk
           node: colchunk
           description: ユーザー ID 列。値がばらばらなので min/max では絞りにくく、ブルームフィルターが効く。
           children:
-            - {id: rg0-user-p0, label: Data Page 0, bytes: 1048576, kind: page, node: datapage, sample: "PageHeader { type: DATA_PAGE_V2, num_values: 131072,\n  encoding: PLAIN, compressed: 640 KB → 1 MB }\n値: 4242, 18, 9921003, 77, 4242, 501 …"}
-            - {id: rg0-user-rest, label: Data Page 1〜15, bytes: 15728640, kind: page, node: datapage}
+            - id: rg0-user-p0
+              label: Data Page 0
+              bytes: 1048576
+              kind: page
+              node: datapage
+              sample: |-
+                PageHeader { type: DATA_PAGE_V2, num_values: 131072,
+                  encoding: PLAIN, compressed: 640 KB → 1 MB }
+                値: 4242, 18, 9921003, 77, 4242, 501 …
+            - id: rg0-user-rest
+              label: Data Page 1〜15
+              bytes: 15728640
+              kind: page
+              node: datapage
         - id: rg0-type
           label: 列 event_type
           kind: chunk
           node: colchunk
           description: 種類が 4 つしかない文字列列。辞書エンコーディングで 2 MB まで縮む。
           children:
-            - {id: rg0-type-dict, label: Dictionary Page, bytes: 4096, kind: dict, node: dictpage, description: 列チャンクの先頭に 1 つ。値の一覧を一度だけ書く。, sample: "PageHeader { type: DICTIONARY_PAGE, num_values: 4 }\n0: \"view\"\n1: \"click\"\n2: \"cart\"\n3: \"purchase\""}
-            - {id: rg0-type-p0, label: Data Page 0, bytes: 1046528, kind: page, node: datapage, description: 値の代わりに辞書番号を RLE／ビットパッキングで詰める。, sample: "PageHeader { type: DATA_PAGE_V2, encoding: RLE_DICTIONARY,\n  num_values: 1000000, compressed: 180 KB → 1 MB }\n定義レベル: （必須列なので省略）\n辞書番号: 0 0 0 1 0 2 0 0 3 …\nRLE:      [0 ×3] [1] [0] [2] [0 ×2] [3] …"}
-            - {id: rg0-type-p1, label: Data Page 1, bytes: 1046528, kind: page, node: datapage}
+            - id: rg0-type-dict
+              label: Dictionary Page
+              bytes: 4096
+              kind: dict
+              node: dictpage
+              description: 列チャンクの先頭に 1 つ。値の一覧を一度だけ書く。
+              sample: |-
+                PageHeader { type: DICTIONARY_PAGE, num_values: 4 }
+                0: "view"
+                1: "click"
+                2: "cart"
+                3: "purchase"
+            - id: rg0-type-p0
+              label: Data Page 0
+              bytes: 1046528
+              kind: page
+              node: datapage
+              description: 値の代わりに辞書番号を RLE／ビットパッキングで詰める。
+              sample: |-
+                PageHeader { type: DATA_PAGE_V2, encoding: RLE_DICTIONARY,
+                  num_values: 1000000, compressed: 180 KB → 1 MB }
+                定義レベル: （必須列なので省略）
+                辞書番号: 0 0 0 1 0 2 0 0 3 …
+                RLE:      [0 ×3] [1] [0] [2] [0 ×2] [3] …
+            - id: rg0-type-p1
+              label: Data Page 1
+              bytes: 1046528
+              kind: page
+              node: datapage
         - id: rg0-payload
           label: 列 payload
           bytes: 39845888
           kind: chunk
           node: colchunk
-          description: "JSON 文字列の大きな列（null を含む）。SELECT に無ければ一切読まれない。列指向の効果がいちばん大きい部分。"
-          sample: "定義レベル: 1 1 0 1 1 …  （0 = null）\n値: {\"page\":\"/top\",\"ref\":…} …"
+          description: JSON 文字列の大きな列（null を含む）。SELECT に無ければ一切読まれない。列指向の効果がいちばん大きい部分。
+          sample: |-
+            定義レベル: 1 1 0 1 1 …  （0 = null）
+            値: {"page":"/top","ref":…} …
     - id: rg1
       label: Row Group 1（12:00〜23:59）
       kind: rowgroup
       node: rowgroup
       description: 後半 2,000,000 行。構造は Row Group 0 と同じ。
       children:
-        - {id: rg1-ts, label: 列 event_ts, bytes: 8388608, kind: chunk, node: colchunk}
-        - {id: rg1-user, label: 列 user_id, bytes: 16777216, kind: chunk, node: colchunk, description: 等値検索でブルームフィルターが「あるかもしれない」と答えた場合だけ読む。}
-        - {id: rg1-type, label: 列 event_type, bytes: 2097152, kind: chunk, node: colchunk}
-        - {id: rg1-payload, label: 列 payload, bytes: 39845888, kind: chunk, node: colchunk}
+        - id: rg1-ts
+          label: 列 event_ts
+          bytes: 8388608
+          kind: chunk
+          node: colchunk
+        - id: rg1-user
+          label: 列 user_id
+          bytes: 16777216
+          kind: chunk
+          node: colchunk
+          description: 等値検索でブルームフィルターが「あるかもしれない」と答えた場合だけ読む。
+        - id: rg1-type
+          label: 列 event_type
+          bytes: 2097152
+          kind: chunk
+          node: colchunk
+        - id: rg1-payload
+          label: 列 payload
+          bytes: 39845888
+          kind: chunk
+          node: colchunk
     - id: bloom
       label: Bloom Filter（user_id）
       bytes: 262144
@@ -192,26 +550,102 @@ fileLayout:
       node: tail
       description: 読み手が最初に取る場所。フッターの長さが分かれば、次の 1 回でフッターを取れる。
       children:
-        - {id: tail-len, label: フッター長, bytes: 4, kind: magic, node: tail, sample: "00 60 00 00    → 24,576 バイト（リトルエンディアン）"}
-        - {id: tail-magic, label: "\"PAR1\"", bytes: 4, kind: magic, node: tail, sample: "50 41 52 31    |PAR1|"}
-
+        - id: tail-len
+          label: フッター長
+          bytes: 4
+          kind: magic
+          node: tail
+          sample: 00 60 00 00    → 24,576 バイト（リトルエンディアン）
+        - id: tail-magic
+          label: '"PAR1"'
+          bytes: 4
+          kind: magic
+          node: tail
+          sample: 50 41 52 31    |PAR1|
 implementations:
   - id: trino-hive
-    label: "S3 上の Parquet を Trino Hive で読む"
-    description: "Trino Hive カタログから S3 の Parquet ファイルを読む例。索引の動作はファイルの書き手、利用できる統計、述語、読取側の設定に依存する。"
+    label: S3 上の Parquet を Trino Hive で読む
+    description: Trino Hive カタログから S3 の Parquet ファイルを読む例。索引の動作はファイルの書き手、利用できる統計、述語、読取側の設定に依存する。
     sources:
-      - {title: Parquet File Format, url: https://parquet.apache.org/docs/file-format/}
-      - {title: Parquet Page Index, url: https://parquet.apache.org/docs/file-format/pageindex/}
-      - {title: Parquet Bloom Filter, url: https://parquet.apache.org/docs/file-format/bloomfilter/}
-      - {title: Parquet Data Pages, url: https://parquet.apache.org/docs/file-format/data-pages/}
-      - {title: Trino object storage file formats, url: https://trino.io/docs/current/object-storage/file-formats.html}
-      - {title: Trino Hive connector, url: https://trino.io/docs/current/connector/hive.html}
+      - title: Parquet File Format
+        url: https://parquet.apache.org/docs/file-format/
+      - title: Parquet Page Index
+        url: https://parquet.apache.org/docs/file-format/pageindex/
+      - title: Parquet Bloom Filter
+        url: https://parquet.apache.org/docs/file-format/bloomfilter/
+      - title: Parquet Data Pages
+        url: https://parquet.apache.org/docs/file-format/data-pages/
+      - title: Trino object storage file formats
+        url: https://trino.io/docs/current/object-storage/file-formats.html
+      - title: Trino Hive connector
+        url: https://trino.io/docs/current/connector/hive.html
     tiers:
-      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
-      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+      - id: processing
+        label: データの処理と保存
+        z: 0
+        size:
+          - 14
+          - 5
+      - id: setup
+        label: 実行に必要な設定・成果物
+        z: 1
+        size:
+          - 14
+          - 3
     nodes:
-      trino-hive-trino: {label: Trino Worker の Parquet Reader, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [reader, decoder], description: 対象の列、行グループ、索引が使えるページを見つけ、取得したデータを解凍して復号する。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§9}]}
-      trino-hive-file: {label: S3 上の Parquet オブジェクト, kind: file, tier: processing, x: 1, y: 3.65, svc: s3, realizes: [magic, rowgroup, colchunk, indexes, footer, tail, dictpage, datapage], description: ファイルの末尾と各区画を同じオブジェクト内に保持する。辞書や索引は存在する場合に使う。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§9}]}
-      trino-hive-catalog: {label: Hive カタログの読取設定, kind: catalog, tier: setup, x: 1, y: 1.5, description: Parquet の列索引やブルームフィルターを使用する設定を確認する。, evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§9}]}
+      trino-hive-trino:
+        label: Trino Worker の Parquet Reader
+        kind: worker
+        tier: processing
+        x: 1
+        'y': 1.15
+        realizes:
+          - reader
+          - decoder
+        description: 対象の列、行グループ、索引が使えるページを見つけ、取得したデータを解凍して復号する。
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+      trino-hive-file:
+        label: S3 上の Parquet オブジェクト
+        kind: file
+        tier: processing
+        x: 1
+        'y': 3.65
+        svc: s3
+        realizes:
+          - magic
+          - rowgroup
+          - colchunk
+          - indexes
+          - footer
+          - tail
+          - dictpage
+          - datapage
+        description: ファイルの末尾と各区画を同じオブジェクト内に保持する。辞書や索引は存在する場合に使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+      trino-hive-catalog:
+        label: Hive カタログの読取設定
+        kind: catalog
+        tier: setup
+        x: 1
+        'y': 1.5
+        description: Parquet の列索引やブルームフィルターを使用する設定を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
     links:
-      - {id: trino-hive-catalog-connection, from: trino-hive-catalog, to: trino-hive-trino, label: 読み取りの設定を適用}
+      - id: trino-hive-catalog-connection
+        from: trino-hive-catalog
+        to: trino-hive-trino
+        label: 読み取りの設定を適用
+    groups:
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - processing
+        nodes:
+          - trino-hive-file

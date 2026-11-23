@@ -6,37 +6,362 @@ reference:
     - Iceberg の metadata tree から必要なデータファイルを選ぶ流れを理解する。
     - 書き込みコミットでテーブルの snapshot が切り替わることを追う。
   sources:
-    - {title: Databricks Reference Architectures, url: "https://docs.databricks.com/aws/en/lakehouse-architecture/reference"}
-    - {title: Apache Iceberg Terms, url: "https://iceberg.apache.org/terms/"}
-    - {title: Apache Iceberg Java API, url: "https://iceberg.apache.org/docs/latest/api/"}
-sources: [docs/reference-data-lakehouse.md]
-evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§1"}]
+    - title: Databricks Reference Architectures
+      url: https://docs.databricks.com/aws/en/lakehouse-architecture/reference
+    - title: Apache Iceberg Terms
+      url: https://iceberg.apache.org/terms/
+    - title: Apache Iceberg Java API
+      url: https://iceberg.apache.org/docs/latest/api/
+sources:
+  - docs/reference-data-lakehouse.md
+evidence:
+  - type: doc
+    ref: docs/reference-data-lakehouse.md#§1
 tiers:
-  - {id: lakehouse, label: 計算・Catalog・データとメタデータ, kind: origin, z: 0, size: [18, 3]}
+  - id: lakehouse
+    label: 計算・Catalog・データとメタデータ
+    kind: origin
+    z: 0
+    size:
+      - 18
+      - 3
 nodes:
-  engine: {label: Compute Engine, kind: service, tier: lakehouse, x: 0, y: 1.5, description: ETL とクエリを実行し、テーブルを読み書きする。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§2"}]}
-  catalog: {label: Catalog, kind: service, tier: lakehouse, x: 4, y: 0.8, description: テーブル名、場所、スキーマを解決する入口。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§3"}]}
-  snapshot: {label: Iceberg Snapshot, kind: db, tier: lakehouse, x: 8, y: 1.5, description: ある時点のテーブル状態を指す。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
-  manifests: {label: Manifest List / Files, kind: db, tier: lakehouse, x: 12, y: 1.5, description: Snapshot を構成するデータファイルと統計を列挙する。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
-  data: {label: Data Files, kind: db, tier: lakehouse, x: 16, y: 1.5, description: オブジェクトストレージに置かれたテーブル行データ。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§2"}]}
-  metadata: {label: Table Metadata, kind: db, tier: lakehouse, x: 16, y: 2.7, description: スキーマ、snapshot、manifest への参照を保持する。, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
+  engine:
+    label: Compute Engine
+    kind: service
+    tier: lakehouse
+    x: 0
+    'y': 1.5
+    description: ETL とクエリを実行し、テーブルを読み書きする。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§2
+  catalog:
+    label: Catalog
+    kind: service
+    tier: lakehouse
+    x: 4
+    'y': 0.8
+    description: テーブル名、場所、スキーマを解決する入口。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§3
+  snapshot:
+    label: Iceberg Snapshot
+    kind: db
+    tier: lakehouse
+    x: 8
+    'y': 1.5
+    description: ある時点のテーブル状態を指す。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§4
+  manifests:
+    label: Manifest List / Files
+    kind: db
+    tier: lakehouse
+    x: 12
+    'y': 1.5
+    description: Snapshot を構成するデータファイルと統計を列挙する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§4
+  data:
+    label: Data Files
+    kind: db
+    tier: lakehouse
+    x: 16
+    'y': 1.5
+    description: オブジェクトストレージに置かれたテーブル行データ。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§2
+  metadata:
+    label: Table Metadata
+    kind: db
+    tier: lakehouse
+    x: 16
+    'y': 2.7
+    description: スキーマ、snapshot、manifest への参照を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§4
 links:
-  - {id: resolve, from: engine, to: catalog, label: テーブルを解決, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§3"}]}
-  - {id: commit, from: engine, to: snapshot, label: 新しい snapshot をコミット, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§5"}]}
-  - {id: index, from: snapshot, to: manifests, label: manifest を参照, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
-  - {id: list-data, from: manifests, to: data, label: 必要なデータファイルを選択, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§4"}]}
-  - {id: write-data, from: engine, to: data, label: データファイルを書き込む, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§5"}]}
-  - {id: write-meta, from: engine, to: metadata, label: テーブルメタデータを更新, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§5"}]}
+  - id: resolve
+    from: engine
+    to: catalog
+    label: テーブルを解決
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§3
+  - id: commit
+    from: engine
+    to: snapshot
+    label: 新しい snapshot をコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§5
+  - id: index
+    from: snapshot
+    to: manifests
+    label: manifest を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§4
+  - id: list-data
+    from: manifests
+    to: data
+    label: 必要なデータファイルを選択
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§4
+  - id: write-data
+    from: engine
+    to: data
+    label: データファイルを書き込む
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§5
+  - id: write-meta
+    from: engine
+    to: metadata
+    label: テーブルメタデータを更新
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§5
 scenarios:
   - id: iceberg-read-write
     label: Iceberg テーブルの書き込みと読み出し
-    evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§1"}, {type: doc, ref: "docs/reference-data-lakehouse.md#§6"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§1
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§6
     steps:
-      - {links: [resolve, write-data, write-meta], note: 計算エンジンが Catalog でテーブルを解決し、データとメタデータを書き込む。}
-      - {links: [commit, index], note: コミットで新しい snapshot が manifest を参照する。}
-      - {links: [list-data], note: 読み手は manifest の情報から必要なデータファイルだけを選ぶ。}
-  - {"id":"tiering","label":"古いデータを安い保存先へ移す","visual":"tiers","evidence":[{"type":"doc","ref":"docs/reference-data-lakehouse.md#§7"}],"steps":[{"blocks":{"std":[{"id":"m05","label":"2026-05","k":0,"note":"05 月のパーティションのデータファイル"},{"id":"m06","label":"2026-06","k":0,"note":"06 月のパーティションのデータファイル"},{"id":"m07","label":"2026-07","k":0,"note":"07 月のパーティションのデータファイル"},{"id":"m08","label":"2026-08","k":0,"note":"08 月のパーティションのデータファイル"},{"id":"m09","label":"2026-09","k":0,"note":"09 月のパーティションのデータファイル"},{"id":"m10","label":"2026-10","k":0,"note":"10 月のパーティションのデータファイル"},{"id":"m11","label":"2026-11","k":0,"note":"11 月のパーティションのデータファイル"}],"ia":[],"arc":[]},"links":["write-data"],"note":"書いたばかりのデータファイルはすべて Standard にある。"},{"blocks":{"std":[{"id":"m09","label":"2026-09","k":0,"note":"09 月のパーティションのデータファイル"},{"id":"m10","label":"2026-10","k":0,"note":"10 月のパーティションのデータファイル"},{"id":"m11","label":"2026-11","k":0,"note":"11 月のパーティションのデータファイル"}],"ia":[{"id":"m05","label":"2026-05","k":1,"note":"05 月のパーティションのデータファイル"},{"id":"m06","label":"2026-06","k":1,"note":"06 月のパーティションのデータファイル"},{"id":"m07","label":"2026-07","k":1,"note":"07 月のパーティションのデータファイル"},{"id":"m08","label":"2026-08","k":1,"note":"08 月のパーティションのデータファイル"}],"arc":[]},"links":["list-data"],"note":"ライフサイクルルールで、作成から 90 日を過ぎたファイルを低頻度アクセスへ移す。"},{"blocks":{"std":[{"id":"m10","label":"2026-10","k":0,"note":"10 月のパーティションのデータファイル"},{"id":"m11","label":"2026-11","k":0,"note":"11 月のパーティションのデータファイル"}],"ia":[{"id":"m08","label":"2026-08","k":1,"note":"08 月のパーティションのデータファイル"},{"id":"m09","label":"2026-09","k":1,"note":"09 月のパーティションのデータファイル"}],"arc":[{"id":"m05","label":"2026-05","k":3,"note":"05 月のパーティションのデータファイル"},{"id":"m06","label":"2026-06","k":3,"note":"06 月のパーティションのデータファイル"},{"id":"m07","label":"2026-07","k":3,"note":"07 月のパーティションのデータファイル"}]},"links":["list-data"],"note":"さらに 180 日を過ぎたファイルをアーカイブへ移す。保存料金は下がるが、そのままでは読めない。"},{"blocks":{"std":[{"id":"m10","label":"2026-10","k":0,"note":"10 月のパーティションのデータファイル"},{"id":"m11","label":"2026-11","k":0,"note":"11 月のパーティションのデータファイル"},{"id":"m05r","label":"2026-05（復元）","k":2,"from":["m05"],"note":"復元して一時的に読めるようにしたコピー"}],"ia":[{"id":"m08","label":"2026-08","k":1,"note":"08 月のパーティションのデータファイル"},{"id":"m09","label":"2026-09","k":1,"note":"09 月のパーティションのデータファイル"}],"arc":[{"id":"m05","label":"2026-05","k":3,"note":"05 月のパーティションのデータファイル"},{"id":"m06","label":"2026-06","k":3,"note":"06 月のパーティションのデータファイル"},{"id":"m07","label":"2026-07","k":3,"note":"07 月のパーティションのデータファイル"}]},"highlight":["m05r"],"lanes":{"arc":{"sub":"復元に数時間かかることがある"}},"links":["list-data"],"note":"5 月の監査で古いデータが必要になったら、アーカイブから復元して一時的なコピーを読む。クエリが触れる範囲を誤って移すと、読み取りが失敗する。"}]}
-blocks: [{"id":"tiers","title":"ストレージ階層の移動","legend":{"0":"Standard","1":"低頻度アクセス","2":"復元したコピー","3":"アーカイブ"},"note":"月ごとのパーティションをライフサイクルルールで移す例（日数は説明用）。","lanes":[{"id":"std","label":"Standard","sub":"すぐ読める・保存は高い","node":"data"},{"id":"ia","label":"低頻度アクセス","sub":"取り出し料金あり","node":"data"},{"id":"arc","label":"アーカイブ","sub":"読む前に復元が必要","node":"data"}],"items":{"std":[{"id":"m05","label":"2026-05","k":0,"note":"05 月のパーティションのデータファイル"},{"id":"m06","label":"2026-06","k":0,"note":"06 月のパーティションのデータファイル"},{"id":"m07","label":"2026-07","k":0,"note":"07 月のパーティションのデータファイル"},{"id":"m08","label":"2026-08","k":0,"note":"08 月のパーティションのデータファイル"},{"id":"m09","label":"2026-09","k":0,"note":"09 月のパーティションのデータファイル"},{"id":"m10","label":"2026-10","k":0,"note":"10 月のパーティションのデータファイル"},{"id":"m11","label":"2026-11","k":0,"note":"11 月のパーティションのデータファイル"}],"ia":[],"arc":[]}}]
+      - links:
+          - resolve
+          - write-data
+          - write-meta
+        note: 計算エンジンが Catalog でテーブルを解決し、データとメタデータを書き込む。
+      - links:
+          - commit
+          - index
+        note: コミットで新しい snapshot が manifest を参照する。
+      - links:
+          - list-data
+        note: 読み手は manifest の情報から必要なデータファイルだけを選ぶ。
+  - id: tiering
+    label: 古いデータを安い保存先へ移す
+    visual: tiers
+    evidence:
+      - type: doc
+        ref: docs/reference-data-lakehouse.md#§7
+    steps:
+      - blocks:
+          std:
+            - id: m05
+              label: 2026-05
+              k: 0
+              note: 05 月のパーティションのデータファイル
+            - id: m06
+              label: 2026-06
+              k: 0
+              note: 06 月のパーティションのデータファイル
+            - id: m07
+              label: 2026-07
+              k: 0
+              note: 07 月のパーティションのデータファイル
+            - id: m08
+              label: 2026-08
+              k: 0
+              note: 08 月のパーティションのデータファイル
+            - id: m09
+              label: 2026-09
+              k: 0
+              note: 09 月のパーティションのデータファイル
+            - id: m10
+              label: 2026-10
+              k: 0
+              note: 10 月のパーティションのデータファイル
+            - id: m11
+              label: 2026-11
+              k: 0
+              note: 11 月のパーティションのデータファイル
+          ia: []
+          arc: []
+        links:
+          - write-data
+        note: 書いたばかりのデータファイルはすべて Standard にある。
+      - blocks:
+          std:
+            - id: m09
+              label: 2026-09
+              k: 0
+              note: 09 月のパーティションのデータファイル
+            - id: m10
+              label: 2026-10
+              k: 0
+              note: 10 月のパーティションのデータファイル
+            - id: m11
+              label: 2026-11
+              k: 0
+              note: 11 月のパーティションのデータファイル
+          ia:
+            - id: m05
+              label: 2026-05
+              k: 1
+              note: 05 月のパーティションのデータファイル
+            - id: m06
+              label: 2026-06
+              k: 1
+              note: 06 月のパーティションのデータファイル
+            - id: m07
+              label: 2026-07
+              k: 1
+              note: 07 月のパーティションのデータファイル
+            - id: m08
+              label: 2026-08
+              k: 1
+              note: 08 月のパーティションのデータファイル
+          arc: []
+        links:
+          - list-data
+        note: ライフサイクルルールで、作成から 90 日を過ぎたファイルを低頻度アクセスへ移す。
+      - blocks:
+          std:
+            - id: m10
+              label: 2026-10
+              k: 0
+              note: 10 月のパーティションのデータファイル
+            - id: m11
+              label: 2026-11
+              k: 0
+              note: 11 月のパーティションのデータファイル
+          ia:
+            - id: m08
+              label: 2026-08
+              k: 1
+              note: 08 月のパーティションのデータファイル
+            - id: m09
+              label: 2026-09
+              k: 1
+              note: 09 月のパーティションのデータファイル
+          arc:
+            - id: m05
+              label: 2026-05
+              k: 3
+              note: 05 月のパーティションのデータファイル
+            - id: m06
+              label: 2026-06
+              k: 3
+              note: 06 月のパーティションのデータファイル
+            - id: m07
+              label: 2026-07
+              k: 3
+              note: 07 月のパーティションのデータファイル
+        links:
+          - list-data
+        note: さらに 180 日を過ぎたファイルをアーカイブへ移す。保存料金は下がるが、そのままでは読めない。
+      - blocks:
+          std:
+            - id: m10
+              label: 2026-10
+              k: 0
+              note: 10 月のパーティションのデータファイル
+            - id: m11
+              label: 2026-11
+              k: 0
+              note: 11 月のパーティションのデータファイル
+            - id: m05r
+              label: 2026-05（復元）
+              k: 2
+              from:
+                - m05
+              note: 復元して一時的に読めるようにしたコピー
+          ia:
+            - id: m08
+              label: 2026-08
+              k: 1
+              note: 08 月のパーティションのデータファイル
+            - id: m09
+              label: 2026-09
+              k: 1
+              note: 09 月のパーティションのデータファイル
+          arc:
+            - id: m05
+              label: 2026-05
+              k: 3
+              note: 05 月のパーティションのデータファイル
+            - id: m06
+              label: 2026-06
+              k: 3
+              note: 06 月のパーティションのデータファイル
+            - id: m07
+              label: 2026-07
+              k: 3
+              note: 07 月のパーティションのデータファイル
+        highlight:
+          - m05r
+        lanes:
+          arc:
+            sub: 復元に数時間かかることがある
+        links:
+          - list-data
+        note: 5 月の監査で古いデータが必要になったら、アーカイブから復元して一時的なコピーを読む。クエリが触れる範囲を誤って移すと、読み取りが失敗する。
+blocks:
+  - id: tiers
+    title: ストレージ階層の移動
+    legend:
+      '0': Standard
+      '1': 低頻度アクセス
+      '2': 復元したコピー
+      '3': アーカイブ
+    note: 月ごとのパーティションをライフサイクルルールで移す例（日数は説明用）。
+    lanes:
+      - id: std
+        label: Standard
+        sub: すぐ読める・保存は高い
+        node: data
+      - id: ia
+        label: 低頻度アクセス
+        sub: 取り出し料金あり
+        node: data
+      - id: arc
+        label: アーカイブ
+        sub: 読む前に復元が必要
+        node: data
+    items:
+      std:
+        - id: m05
+          label: 2026-05
+          k: 0
+          note: 05 月のパーティションのデータファイル
+        - id: m06
+          label: 2026-06
+          k: 0
+          note: 06 月のパーティションのデータファイル
+        - id: m07
+          label: 2026-07
+          k: 0
+          note: 07 月のパーティションのデータファイル
+        - id: m08
+          label: 2026-08
+          k: 0
+          note: 08 月のパーティションのデータファイル
+        - id: m09
+          label: 2026-09
+          k: 0
+          note: 09 月のパーティションのデータファイル
+        - id: m10
+          label: 2026-10
+          k: 0
+          note: 10 月のパーティションのデータファイル
+        - id: m11
+          label: 2026-11
+          k: 0
+          note: 11 月のパーティションのデータファイル
+      ia: []
+      arc: []
 implementations:
   - id: aws-athena
     label: Amazon Athena・Glue・S3 の Iceberg
@@ -49,14 +374,15 @@ implementations:
       - title: Create Iceberg tables
         url: https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-creating-tables.html
       - title: S3 Lifecycle transition considerations
-        url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-transition-general-considerations.html
+        url: >-
+          https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-transition-general-considerations.html
     nodes:
       aws-athena-athena:
         label: Amazon Athena エンジン v3
         kind: service
         tier: lakehouse
         x: 0
-        y: 1.5
+        'y': 1.5
         description: Iceberg v2 のテーブル解決と SQL 読み書きを担う。
         svc: athena
         realizes:
@@ -69,7 +395,7 @@ implementations:
         kind: catalog
         tier: lakehouse
         x: 4
-        y: 0.8
+        'y': 0.8
         description: 現在のテーブルメタデータを指し、楽観的ロックを適用する。
         svc: glue
         realizes:
@@ -82,7 +408,7 @@ implementations:
         kind: file
         tier: lakehouse
         x: 8
-        y: 1.5
+        'y': 1.5
         description: テーブル定義とスナップショットをファイルに保持する。
         realizes:
           - snapshot
@@ -90,36 +416,40 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
+        svc: s3
       aws-athena-manifest:
         label: S3 の Manifest List と Manifest
         kind: file
         tier: lakehouse
         x: 12
-        y: 1.5
+        'y': 1.5
         description: 対象スナップショットのファイルと統計を格納する。
         realizes:
           - manifests
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
+        svc: s3
       aws-athena-data:
         label: S3 の Parquet ファイル
         kind: file
         tier: lakehouse
         x: 16
-        y: 1.5
+        'y': 1.5
         description: テーブルの行データを保存する。
         realizes:
           - data
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
+        svc: s3
       aws-athena-lifecycle:
         label: S3 Lifecycle ルール
         kind: policy
         tier: lakehouse
+        svc: aws:s3
         x: 14
-        y: 0.15
+        'y': 0.15
         description: データの利用頻度に応じて対象オブジェクトの保存クラスを変える。
         evidence:
           - type: doc
@@ -150,3 +480,20 @@ implementations:
           - aws-athena-manifest
           - aws-athena-data
           - aws-athena-lifecycle
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - lakehouse
+        nodes:
+          - aws-athena-metadata
+          - aws-athena-manifest
+          - aws-athena-data
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - lakehouse
+        nodes:
+          - aws-athena-athena
+          - aws-athena-glue

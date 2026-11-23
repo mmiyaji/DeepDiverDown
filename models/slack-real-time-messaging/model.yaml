@@ -1,0 +1,590 @@
+name: Slack のリアルタイムメッセージング（2023 年）
+description: クライアントの接続、通常メッセージと一時イベントの配信、チャネルの分散を記事に基づいて追う。
+reference:
+  objectives:
+    - WebSocket の接続・購読と、Webapp API による通常投稿を区別する。
+    - チャネルの一貫性ハッシュと複数リージョンへのファンアウトを追う。
+    - 一時イベント、オンライン状態とサービス発見を理解する。
+  sources:
+    - title: 'Slack Engineering: Real-time Messaging (2023)'
+      url: https://slack.engineering/real-time-messaging/
+    - title: Envoy overview
+      url: https://www.envoyproxy.io/docs/envoy/latest/intro/what_is_envoy
+    - title: Consul service discovery
+      url: https://developer.hashicorp.com/consul/docs/discover
+sources:
+  - docs/reference-slack-real-time-messaging.md
+evidence:
+  - type: doc
+    ref: docs/reference-slack-real-time-messaging.md#§1
+  - type: doc
+    ref: docs/reference-slack-real-time-messaging.md#§4
+tiers:
+  - id: client
+    label: 送信者と受信者
+    z: 3
+    size:
+      - 16
+      - 3
+  - id: edge
+    label: 地域ごとの接続と購読
+    z: 2
+    size:
+      - 16
+      - 3
+  - id: core
+    label: メッセージの振り分けと配信
+    z: 1
+    size:
+      - 16
+      - 3
+  - id: control
+    label: 状態とサービス発見
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  sender:
+    label: 送信クライアント
+    kind: actor
+    tier: client
+    x: 0
+    'y': 1.5
+    description: 送信者。通常メッセージは API、一時イベントは WebSocket を使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  receiver-a:
+    label: 受信クライアント A
+    kind: actor
+    tier: client
+    x: 8
+    'y': 1.5
+    description: 接続中で対象チャネルを購読する受信者。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  receiver-b:
+    label: 受信クライアント B
+    kind: actor
+    tier: client
+    x: 12
+    'y': 1.5
+    description: 別リージョンに接続する受信者。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  edge:
+    label: 接続を中継するプロキシ
+    kind: service
+    tier: edge
+    x: 0
+    'y': 1.5
+    description: WebSocket の TLS 終端と Gateway への転送を行う。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  gateway-a:
+    label: 接続・購読の管理 A
+    kind: service
+    tier: edge
+    x: 4
+    'y': 1.5
+    description: 地域 A のクライアント接続とチャネル購読を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  gateway-b:
+    label: 接続・購読の管理 B
+    kind: service
+    tier: edge
+    x: 12
+    'y': 1.5
+    description: 地域 B のクライアント接続とチャネル購読を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  api:
+    label: 投稿・接続情報の API
+    kind: service
+    tier: core
+    x: 0
+    'y': 1.5
+    description: トークンと接続情報を返し、投稿を受け付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  admin:
+    label: チャネルの振り分け
+    kind: service
+    tier: core
+    x: 4
+    'y': 1.5
+    description: Webapp から受けたメッセージを該当するチャネルの担当サーバーへ振り分ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  channel:
+    label: チャネル配信
+    kind: service
+    tier: core
+    x: 8
+    'y': 1.5
+    description: 一貫性ハッシュで割り当てられたチャネルの履歴の一部を保持し、購読 Gateway に配信する。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  presence:
+    label: オンライン状態の管理
+    kind: service
+    tier: control
+    x: 12
+    'y': 1.5
+    description: オンライン状態を保持し、Gateway 経由の照会と通知を扱う。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  ring:
+    label: 一貫性ハッシュの管理
+    kind: service
+    tier: control
+    x: 4
+    'y': 1.5
+    description: チャネルサーバーの一貫性ハッシュリングを管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+  discovery:
+    label: サービスの発見
+    kind: service
+    tier: control
+    x: 8
+    'y': 1.5
+    description: チャネルサーバーとリング設定の発見に使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+links:
+  - id: setup
+    from: sender
+    to: api
+    label: トークンと接続情報を取得
+    sync: true
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: connect
+    from: sender
+    to: edge
+    label: WebSocket 接続を開始
+    sync: true
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: proxy
+    from: edge
+    to: gateway-a
+    label: 接続を転送
+    sync: true
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: profile
+    from: gateway-a
+    to: api
+    label: 利用者と所属チャネルを取得
+    sync: true
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: sub-a
+    from: gateway-a
+    to: channel
+    label: 対象チャネルを非同期購読
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: sub-b
+    from: gateway-b
+    to: channel
+    label: 対象チャネルを非同期購読
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: post
+    from: sender
+    to: api
+    label: メッセージを API に投稿
+    sync: true
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: to-admin
+    from: api
+    to: admin
+    label: 投稿を転送
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: route
+    from: admin
+    to: channel
+    label: チャネル ID で振り分け
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: fan-a
+    from: channel
+    to: gateway-a
+    label: 購読中の Gateway A に配信
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: fan-b
+    from: channel
+    to: gateway-b
+    label: 購読中の Gateway B に配信
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: deliver-a
+    from: gateway-a
+    to: receiver-a
+    label: WebSocket に配信
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: deliver-b
+    from: gateway-b
+    to: receiver-b
+    label: WebSocket に配信
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: transient
+    from: sender
+    to: gateway-a
+    label: 一時イベントを WebSocket で送信
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: route-transient
+    from: gateway-a
+    to: channel
+    label: 一時イベントを担当サーバーへ転送
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: status
+    from: gateway-a
+    to: presence
+    label: オンライン状態を照会・購読
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: ring-config
+    from: ring
+    to: discovery
+    label: リング設定を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: service
+    from: channel
+    to: discovery
+    label: サーバーを登録
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: lookup
+    from: admin
+    to: discovery
+    label: サーバーとリング設定を発見
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+  - id: ring-read
+    from: channel
+    to: discovery
+    label: リング設定を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+scenarios:
+  - id: connect
+    label: 接続とチャネル購読
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+    steps:
+      - links:
+          - setup
+        note: トークンと接続情報を取得する。
+      - links:
+          - connect
+          - proxy
+          - profile
+        note: 近くの Gateway に接続し所属チャネルを取得する。
+      - links:
+          - sub-a
+          - sub-b
+        note: それぞれの Gateway がチャネルを非同期に購読する。
+  - id: message
+    label: 通常メッセージを複数リージョンに配信
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+    steps:
+      - links:
+          - post
+          - to-admin
+          - route
+        note: Webapp API から Admin Server を経由して対象 Channel Server に送る。
+      - links:
+          - fan-a
+          - fan-b
+        note: 購読中の Gateway にメッセージを配信する。
+      - links:
+          - deliver-a
+          - deliver-b
+        note: 各 Gateway が接続中の受信者へ配信する。
+  - id: typing
+    label: 入力中などの一時イベント
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§3
+    steps:
+      - links:
+          - transient
+          - route-transient
+        note: 送信者の WebSocket と Gateway から一時イベントを送る。
+      - links:
+          - fan-a
+          - fan-b
+          - deliver-a
+          - deliver-b
+        note: 購読中の Gateway と受信者に配信する。
+  - id: discovery
+    label: ハッシュリングとサービス発見
+    evidence:
+      - type: doc
+        ref: docs/reference-slack-real-time-messaging.md#§2
+    steps:
+      - links:
+          - ring-config
+          - service
+        note: リングの設定と Channel Server を登録する。
+      - links:
+          - lookup
+          - ring-read
+        note: Admin と Channel Server が構成を発見する。
+implementations:
+  - id: article-2023
+    label: Slack Engineering 公開記事の構成
+    description: 2023 年の記事に示された Slack の論理構成。リージョンの具体的な数やクラウド配置は仮定しない。
+    sources:
+      - title: 'Slack Engineering: Real-time Messaging (2023)'
+        url: https://slack.engineering/real-time-messaging/
+      - title: Envoy overview
+        url: https://www.envoyproxy.io/docs/envoy/latest/intro/what_is_envoy
+      - title: Consul service discovery
+        url: https://developer.hashicorp.com/consul/docs/discover
+    tiers:
+      - id: client
+        label: 送信者と受信者
+        z: 3
+        size:
+          - 16
+          - 3
+      - id: edge
+        label: 地域ごとの接続と購読
+        z: 2
+        size:
+          - 16
+          - 3
+      - id: core
+        label: メッセージの振り分けと配信
+        z: 1
+        size:
+          - 16
+          - 3
+      - id: control
+        label: 状態とサービス発見
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-sender:
+        label: Slack Client A
+        kind: actor
+        tier: client
+        x: 0
+        'y': 1.5
+        description: 送信者。通常メッセージは API、一時イベントは WebSocket を使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - sender
+      ex-receiver-a:
+        label: Slack Client B
+        kind: actor
+        tier: client
+        x: 8
+        'y': 1.5
+        description: 接続中で対象チャネルを購読する受信者。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - receiver-a
+      ex-receiver-b:
+        label: Slack Client C
+        kind: actor
+        tier: client
+        x: 12
+        'y': 1.5
+        description: 別リージョンに接続する受信者。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - receiver-b
+      ex-edge:
+        label: Envoy（リージョン A）
+        kind: service
+        tier: edge
+        x: 0
+        'y': 1.5
+        description: WebSocket の TLS 終端と Gateway への転送を行う。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - edge
+      ex-gateway-a:
+        label: Gateway Server A
+        kind: service
+        tier: edge
+        x: 4
+        'y': 1.5
+        description: 地域 A のクライアント接続とチャネル購読を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - gateway-a
+      ex-gateway-b:
+        label: Gateway Server B
+        kind: service
+        tier: edge
+        x: 12
+        'y': 1.5
+        description: 地域 B のクライアント接続とチャネル購読を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - gateway-b
+      ex-api:
+        label: Slack Webapp
+        kind: service
+        tier: core
+        x: 0
+        'y': 1.5
+        description: トークンと接続情報を返し、投稿を受け付ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - api
+      ex-admin:
+        label: Admin Server
+        kind: service
+        tier: core
+        x: 4
+        'y': 1.5
+        description: Webapp から受けたメッセージを該当するチャネルの担当サーバーへ振り分ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - admin
+      ex-channel:
+        label: Channel Server
+        kind: service
+        tier: core
+        x: 8
+        'y': 1.5
+        description: 一貫性ハッシュで割り当てられたチャネルの履歴の一部を保持し、購読 Gateway に配信する。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - channel
+      ex-presence:
+        label: Presence Server
+        kind: service
+        tier: control
+        x: 12
+        'y': 1.5
+        description: オンライン状態を保持し、Gateway 経由の照会と通知を扱う。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - presence
+      ex-ring:
+        label: CHARM
+        kind: service
+        tier: control
+        x: 4
+        'y': 1.5
+        description: チャネルサーバーの一貫性ハッシュリングを管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - ring
+      ex-discovery:
+        label: Consul
+        kind: service
+        tier: control
+        x: 8
+        'y': 1.5
+        description: チャネルサーバーとリング設定の発見に使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-slack-real-time-messaging.md#§5
+        realizes:
+          - discovery
+    groups:
+      - kind: cloud
+        provider: slack
+        label: Slack サービス（記事の機能範囲）
+        tier:
+          - edge
+        nodes:
+          - ex-edge
+          - ex-gateway-a
+          - ex-gateway-b
+      - kind: cloud
+        provider: slack
+        label: Slack サービス（記事の機能範囲）
+        tier:
+          - core
+        nodes:
+          - ex-api
+          - ex-admin
+          - ex-channel
+      - kind: cloud
+        provider: slack
+        label: Slack サービス（記事の機能範囲）
+        tier:
+          - control
+        nodes:
+          - ex-presence
+          - ex-ring
+          - ex-discovery

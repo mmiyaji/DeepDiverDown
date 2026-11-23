@@ -1,0 +1,234 @@
+name: MCP Toolbox for Databases
+description: エージェントから定義済みツールを通してデータベースへ安全にアクセスする。
+reference:
+  objectives:
+    - エージェントから定義済みツールを通してデータベースへ安全にアクセスする。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: MCP Toolbox introduction
+      url: https://googleapis.github.io/mcp-toolbox/
+    - title: MCP Toolbox repository
+      url: https://github.com/googleapis/mcp-toolbox
+sources:
+  - docs/reference-mcp-toolbox.md
+evidence:
+  - type: doc
+    ref: docs/reference-mcp-toolbox.md#§1
+  - type: doc
+    ref: docs/reference-mcp-toolbox.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  client:
+    label: エージェント / MCP クライアント
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  server:
+    label: MCP ツールサーバー
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  database:
+    label: データベース
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  result:
+    label: 問い合わせ結果
+    kind: file
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  config:
+    label: 接続・ツール定義
+    kind: file
+    tier: support
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  operator:
+    label: ツール管理者
+    kind: actor
+    tier: support
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+links:
+  - id: invoke
+    from: client
+    to: server
+    label: ツールを発見・呼び出し
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  - id: execute
+    from: server
+    to: database
+    label: 許可された SQL を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  - id: return
+    from: server
+    to: result
+    label: 結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  - id: define
+    from: operator
+    to: config
+    label: 接続とツールを定義
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+  - id: load
+    from: config
+    to: server
+    label: ツール設定を読み込む
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-toolbox.md#§2
+    steps:
+      - links:
+          - invoke
+        note: ツールを発見・呼び出し。
+      - links:
+          - execute
+        note: 許可された SQL を実行。
+      - links:
+          - return
+        note: 結果を返す。
+      - links:
+          - define
+        note: 接続とツールを定義。
+      - links:
+          - load
+        note: ツール設定を読み込む。
+implementations:
+  - id: example
+    label: MCP Toolbox for Databasesの構成例
+    description: MCP Toolbox のカスタムツールを PostgreSQL に接続し、MCP クライアントから問い合わせる自己運用例。クラウドサービスを前提にしない。
+    sources:
+      - title: MCP Toolbox introduction
+        url: https://googleapis.github.io/mcp-toolbox/
+      - title: MCP Toolbox repository
+        url: https://github.com/googleapis/mcp-toolbox
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-client:
+        label: エージェント / MCP クライアント
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-toolbox.md#§4
+        realizes:
+          - client
+      ex-server:
+        label: MCP Toolbox
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-toolbox.md#§4
+        realizes:
+          - server
+      ex-database:
+        label: PostgreSQL
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-toolbox.md#§4
+        realizes:
+          - database
+      ex-result:
+        label: 問い合わせ結果
+        kind: file
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-toolbox.md#§4
+        realizes:
+          - result
+      ex-config:
+        label: Toolbox 設定
+        kind: file
+        tier: support
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-toolbox.md#§4
+        realizes:
+          - config
+      ex-operator:
+        label: ツール管理者
+        kind: actor
+        tier: support
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-toolbox.md#§4
+        realizes:
+          - operator

@@ -1,0 +1,369 @@
+name: DWH の合成データ生成と公開
+description: 機微なデータから合成データを生成し、品質と開示リスクを評価してから公開する。合成データ自体はプライバシー保証ではない。
+reference:
+  objectives:
+    - 生成候補と公開済みデータを区別する。
+    - 品質と開示リスクの評価、公開承認を追う。
+    - 差分プライバシーの保証を仮定しない。
+  sources:
+    - title: NIST 合成データと差分プライバシー
+      url: https://www.nist.gov/blogs/cybersecurity-insights/differentially-private-synthetic-data
+    - title: SDV Community
+      url: https://docs.sdv.dev/sdv/explore/sdv-community
+    - title: SDMetrics Privacy
+      url: https://docs.sdv.dev/sdmetrics/data-metrics/privacy
+sources:
+  - docs/reference-dwh-synthetic-data.md
+evidence:
+  - type: doc
+    ref: docs/reference-dwh-synthetic-data.md#§1
+  - type: doc
+    ref: docs/reference-dwh-synthetic-data.md#§3
+tiers:
+  - id: flow
+    label: データの処理と提供
+    z: 1
+    size:
+      - 32
+      - 3
+  - id: control
+    label: 評価と管理
+    z: 0
+    size:
+      - 24
+      - 3
+nodes:
+  source:
+    label: 制限された元データ
+    kind: db
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  metadata:
+    label: 列と制約の確認
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  train:
+    label: 生成器の学習・生成
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  candidate:
+    label: 非公開の生成候補
+    kind: db
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  quality:
+    label: 品質の評価
+    kind: service
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  risk:
+    label: 開示リスクの評価
+    kind: service
+    tier: control
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  review:
+    label: 公開の審査
+    kind: actor
+    tier: control
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  release:
+    label: 承認済み合成データ
+    kind: db
+    tier: flow
+    x: 20
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  consumer:
+    label: 開発・分析担当者
+    kind: actor
+    tier: flow
+    x: 24
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+links:
+  - id: schema
+    from: source
+    to: metadata
+    label: 列と制約を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: configure
+    from: metadata
+    to: train
+    label: 生成条件を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: learn
+    from: source
+    to: train
+    label: 元データから学習
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: generate
+    from: train
+    to: candidate
+    label: 候補を生成
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: evaluate
+    from: candidate
+    to: quality
+    label: 品質を検証
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: privacy
+    from: candidate
+    to: risk
+    label: 開示リスクを検証
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: compare
+    from: source
+    to: risk
+    label: 元データと比較
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: quality-review
+    from: quality
+    to: review
+    label: 品質結果を報告
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: risk-review
+    from: risk
+    to: review
+    label: リスクを報告
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: approve
+    from: review
+    to: release
+    label: 公開を承認
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: publish
+    from: candidate
+    to: release
+    label: 承認後に公開
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+  - id: use
+    from: release
+    to: consumer
+    label: 検証データを利用
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-synthetic-data.md#§2
+    steps:
+      - links:
+          - schema
+          - configure
+          - learn
+        note: 権限を制限した環境で元データと制約を確認し生成器を学習する。
+      - links:
+          - generate
+          - evaluate
+          - privacy
+          - compare
+        note: 候補を非公開で保管し品質と開示リスクを評価する。
+      - links:
+          - quality-review
+          - risk-review
+          - approve
+          - publish
+        note: 用途と残存リスクを審査し承認後に公開する。
+      - links:
+          - use
+        note: 提供先で検証に利用する。
+implementations:
+  - id: example
+    label: BigQuery と SDV による合成データ
+    description: BigQuery と外部 Python 環境を組み合わせる例。GaussianCopulaSynthesizer に差分プライバシー保証は仮定しない。
+    sources:
+      - title: NIST 合成データと差分プライバシー
+        url: https://www.nist.gov/blogs/cybersecurity-insights/differentially-private-synthetic-data
+      - title: SDV Community
+        url: https://docs.sdv.dev/sdv/explore/sdv-community
+      - title: SDMetrics Privacy
+        url: https://docs.sdv.dev/sdmetrics/data-metrics/privacy
+    tiers:
+      - id: flow
+        label: データの処理と提供
+        z: 1
+        size:
+          - 32
+          - 3
+      - id: control
+        label: 評価と管理
+        z: 0
+        size:
+          - 24
+          - 3
+    nodes:
+      ex-source:
+        label: BigQuery 元テーブル
+        kind: db
+        tier: flow
+        x: 0
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - source
+      ex-metadata:
+        label: SDV Metadata
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - metadata
+      ex-train:
+        label: SDV Gaussian Copula 生成器
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - train
+      ex-candidate:
+        label: 非公開の生成候補
+        kind: db
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - candidate
+      ex-quality:
+        label: SDMetrics 品質評価
+        kind: service
+        tier: flow
+        x: 16
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - quality
+      ex-risk:
+        label: SDMetrics 等のリスク評価
+        kind: service
+        tier: control
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - risk
+      ex-review:
+        label: 公開審査担当者
+        kind: actor
+        tier: control
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - review
+      ex-release:
+        label: BigQuery 合成テーブル
+        kind: db
+        tier: flow
+        x: 20
+        'y': 1.5
+        svc: gcp:bigquery
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - release
+      ex-consumer:
+        label: 開発・分析担当者
+        kind: actor
+        tier: flow
+        x: 24
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-synthetic-data.md#§4
+        realizes:
+          - consumer
+    groups:
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud / BigQuery
+        tier:
+          - flow
+        nodes:
+          - ex-source
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud / BigQuery
+        tier:
+          - flow
+        nodes:
+          - ex-release

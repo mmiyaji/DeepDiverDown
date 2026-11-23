@@ -1,0 +1,208 @@
+name: AUTOSAR Classic Platform の層
+description: ECU のアプリ、RTE、基盤ソフトとハードウェアの役割を分ける。
+reference:
+  objectives:
+    - アプリ、RTE、BSW の責任を区別する。
+    - 基盤ソフトからハードウェアへの流れを追う。
+    - 標準の設計と実装製品を区別する。
+  sources:
+    - title: AUTOSAR Classic Platform
+      url: https://www.autosar.org/standards/classic-platform
+    - title: AUTOSAR standards
+      url: https://www.autosar.org/standards/r24-11
+sources:
+  - docs/reference-autosar-classic.md
+evidence:
+  - type: doc
+    ref: docs/reference-autosar-classic.md#§1
+  - type: doc
+    ref: docs/reference-autosar-classic.md#§3
+tiers:
+  - id: flow
+    label: アプリと実行環境
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 基盤と ECU
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  app:
+    label: 組み込みアプリ
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: アプリの機能を software component で表す。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+  runtime:
+    label: アプリの実行環境
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: アプリ部品と基盤のインターフェース。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+  services:
+    label: システム・通信サービス
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: 基盤サービスと通信を提供する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+  abstraction:
+    label: ハードウェア抽象化
+    kind: service
+    tier: support
+    x: 4
+    'y': 1.5
+    description: ECU とマイクロコントローラーを抽象化する。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+  hardware:
+    label: マイクロコントローラー
+    kind: external
+    tier: support
+    x: 8
+    'y': 1.5
+    description: 車載 ECU のハードウェア。
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+links:
+  - id: invoke
+    from: app
+    to: runtime
+    label: 機能を呼び出す
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+  - id: service
+    from: runtime
+    to: services
+    label: 基盤サービスへ接続
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+  - id: abstract
+    from: services
+    to: abstraction
+    label: ハードウェアを抽象化
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+  - id: driver
+    from: abstraction
+    to: hardware
+    label: デバイスを操作
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+scenarios:
+  - id: layers
+    label: アプリから ECU へのアクセス
+    evidence:
+      - type: doc
+        ref: docs/reference-autosar-classic.md#§2
+    steps:
+      - links:
+          - invoke
+          - service
+          - abstract
+          - driver
+        note: RTE と BSW を介して ECU の機能にアクセスする。
+implementations:
+  - id: example
+    label: Classic Platform の標準構成例
+    description: AUTOSAR Classic の仕様に基づく一般的な ECU 構成。特定の認証済み実装ではない。
+    sources:
+      - title: AUTOSAR Classic Platform
+        url: https://www.autosar.org/standards/classic-platform
+      - title: AUTOSAR standards
+        url: https://www.autosar.org/standards/r24-11
+    tiers:
+      - id: flow
+        label: アプリと実行環境
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 基盤と ECU
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-app:
+        label: Classic Application SWC
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: アプリの機能を software component で表す。
+        realizes:
+          - app
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-classic.md#§4
+      ex-runtime:
+        label: AUTOSAR RTE
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: アプリ部品と基盤のインターフェース。
+        realizes:
+          - runtime
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-classic.md#§4
+      ex-services:
+        label: Classic BSW Services
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: 基盤サービスと通信を提供する。
+        realizes:
+          - services
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-classic.md#§4
+      ex-abstraction:
+        label: ECU / MCU Abstraction
+        kind: service
+        tier: support
+        x: 4
+        'y': 1.5
+        description: ECU とマイクロコントローラーを抽象化する。
+        realizes:
+          - abstraction
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-classic.md#§4
+      ex-hardware:
+        label: 車載マイクロコントローラー
+        kind: external
+        tier: support
+        x: 8
+        'y': 1.5
+        description: 車載 ECU のハードウェア。
+        realizes:
+          - hardware
+        evidence:
+          - type: doc
+            ref: docs/reference-autosar-classic.md#§4

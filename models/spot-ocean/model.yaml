@@ -1,0 +1,318 @@
+name: Spot Ocean による Kubernetes 容量管理
+description: Pod の要求と VNG の設定を基にノード容量を確保し、中断時は drain と再配置を試みる。
+reference:
+  objectives:
+    - Ocean の外部サービスとクラスタ内 Controller を分ける。
+    - VNG の設定と実際のノードの違いを理解する。
+    - 中断時の drain と Pod の再配置を追う。
+  sources:
+    - title: Spot Ocean Kubernetes guide
+      url: https://spot.io/wp-content/uploads/2024/09/Guide_Automating_Kubernetes_infrastructure.pdf
+    - title: Ocean AWS VNG workshop
+      url: https://labs.spot.io/ocean/ocean_workshop/vng_workshop/vng_workshop_instructions.html
+    - title: Ocean headroom
+      url: https://labs.spot.io/ocean/ocean_workshop/headroom/headroom_overview.html
+    - title: Amazon EKS managed nodes
+      url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+sources:
+  - docs/reference-spot-ocean.md
+evidence:
+  - type: doc
+    ref: docs/reference-spot-ocean.md#§1
+  - type: doc
+    ref: docs/reference-spot-ocean.md#§3
+tiers:
+  - id: compute
+    label: ワークロードと容量
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: control
+    label: 容量管理と復旧
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  pods:
+    label: Pod ワークロード
+    kind: service
+    tier: compute
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  cluster:
+    label: クラスタの制御
+    kind: service
+    tier: compute
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  nodes:
+    label: ワーカーノード容量
+    kind: service
+    tier: compute
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  controller:
+    label: クラスタ内の状態収集と drain
+    kind: service
+    tier: control
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  autoscaler:
+    label: 外部の容量管理
+    kind: service
+    tier: control
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  vng:
+    label: ノード選択の設定
+    kind: file
+    tier: control
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  cloud:
+    label: クラウド容量の起動
+    kind: service
+    tier: control
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+links:
+  - id: observe
+    from: cluster
+    to: controller
+    label: Pod とノードを観測
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  - id: report
+    from: controller
+    to: autoscaler
+    label: クラスタ状態を報告
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  - id: configure
+    from: vng
+    to: autoscaler
+    label: 種類と配置の条件を指定
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  - id: request
+    from: autoscaler
+    to: cloud
+    label: 容量の起動を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  - id: launch
+    from: cloud
+    to: nodes
+    label: ノードを起動
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  - id: schedule
+    from: cluster
+    to: pods
+    label: Pod を配置・再配置
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  - id: host
+    from: nodes
+    to: pods
+    label: Pod を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+  - id: drain
+    from: controller
+    to: cluster
+    label: ノードを drain
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+scenarios:
+  - id: main
+    label: 容量管理と復旧
+    evidence:
+      - type: doc
+        ref: docs/reference-spot-ocean.md#§2
+    steps:
+      - links:
+          - observe
+          - report
+          - configure
+        note: 状態と VNG 条件に基づき必要な容量を判断する。
+      - links:
+          - request
+          - launch
+          - schedule
+          - host
+        note: クラウドに容量を要求し利用可能なノードに配置する。
+      - links:
+          - drain
+          - schedule
+        note: 中断や交換時に drain と再配置を試みる。
+implementations:
+  - id: example
+    label: Spot Ocean と Amazon EKS
+    description: 外部の Ocean 容量管理と、EKS 内の Controller および EC2 ノードを分けた例。
+    sources:
+      - title: Spot Ocean Kubernetes guide
+        url: https://spot.io/wp-content/uploads/2024/09/Guide_Automating_Kubernetes_infrastructure.pdf
+      - title: Ocean AWS VNG workshop
+        url: https://labs.spot.io/ocean/ocean_workshop/vng_workshop/vng_workshop_instructions.html
+      - title: Ocean headroom
+        url: https://labs.spot.io/ocean/ocean_workshop/headroom/headroom_overview.html
+      - title: Amazon EKS managed nodes
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+    tiers:
+      - id: compute
+        label: ワークロードと容量
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: control
+        label: 容量管理と復旧
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-pods:
+        label: アプリ Pod
+        kind: service
+        tier: compute
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-spot-ocean.md#§4
+        realizes:
+          - pods
+      ex-cluster:
+        label: Amazon EKS
+        kind: service
+        tier: compute
+        x: 4
+        'y': 1.5
+        svc: eks
+        evidence:
+          - type: doc
+            ref: docs/reference-spot-ocean.md#§4
+        realizes:
+          - cluster
+      ex-nodes:
+        label: EC2 ワーカーノード
+        kind: service
+        tier: compute
+        x: 8
+        'y': 1.5
+        svc: ec2
+        evidence:
+          - type: doc
+            ref: docs/reference-spot-ocean.md#§4
+        realizes:
+          - nodes
+      ex-controller:
+        label: Ocean Controller
+        kind: service
+        tier: control
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-spot-ocean.md#§4
+        realizes:
+          - controller
+      ex-autoscaler:
+        label: Ocean オートスケーラー
+        kind: service
+        tier: control
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-spot-ocean.md#§4
+        realizes:
+          - autoscaler
+      ex-vng:
+        label: Ocean VNG 設定
+        kind: file
+        tier: control
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-spot-ocean.md#§4
+        realizes:
+          - vng
+      ex-cloud:
+        label: Amazon EC2 API
+        kind: service
+        tier: control
+        x: 12
+        'y': 1.5
+        svc: ec2
+        evidence:
+          - type: doc
+            ref: docs/reference-spot-ocean.md#§4
+        realizes:
+          - cloud
+    groups:
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント / EKS
+        tier:
+          - compute
+        nodes:
+          - ex-pods
+          - ex-cluster
+          - ex-nodes
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント / EKS
+        tier:
+          - control
+        nodes:
+          - ex-controller
+      - kind: cloud
+        provider: spotnetapp
+        label: Spot Ocean サービス
+        tier:
+          - control
+        nodes:
+          - ex-autoscaler
+          - ex-vng
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - control
+        nodes:
+          - ex-cloud

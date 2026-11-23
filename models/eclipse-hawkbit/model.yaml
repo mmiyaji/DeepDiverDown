@@ -1,0 +1,225 @@
+name: Eclipse hawkBit の端末更新
+description: 更新管理サーバーと端末側の updater を分け、配布と状態報告を追う。
+reference:
+  objectives:
+    - 管理サーバーと端末 updater の役割を区別する。
+    - 成果物の配布と結果報告を追う。
+  sources:
+    - title: Eclipse hawkBit
+      url: https://hawkbit.eclipse.dev/
+    - title: Device integration API
+      url: https://hawkbit.eclipse.dev/concepts/device-integration/
+sources:
+  - docs/reference-eclipse-hawkbit.md
+evidence:
+  - type: doc
+    ref: docs/reference-eclipse-hawkbit.md#§1
+  - type: doc
+    ref: docs/reference-eclipse-hawkbit.md#§3
+tiers:
+  - id: flow
+    label: 更新管理と端末
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 成果物と適用先
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  operator:
+    label: 更新運用者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 更新を登録し配布する。
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  server:
+    label: 更新配布管理
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: ターゲットとロールアウトを管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  client:
+    label: 端末の更新クライアント
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: DDI をポーリングし更新を取得する。
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  software:
+    label: 端末ソフトウェア
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 検証と適用の対象。
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  artifact:
+    label: 更新成果物
+    kind: file
+    tier: support
+    x: 4
+    'y': 1.5
+    description: 配布対象のバイナリー。
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+links:
+  - id: manage
+    from: operator
+    to: server
+    label: 更新を管理
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  - id: upload
+    from: artifact
+    to: server
+    label: 成果物を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  - id: poll
+    from: client
+    to: server
+    label: DDI をポーリング
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  - id: download
+    from: server
+    to: client
+    label: 成果物を配布
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  - id: install
+    from: client
+    to: software
+    label: 検証して適用
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+  - id: report
+    from: client
+    to: server
+    label: 適用結果を報告
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+scenarios:
+  - id: rollout
+    label: 更新の配布
+    evidence:
+      - type: doc
+        ref: docs/reference-eclipse-hawkbit.md#§2
+    steps:
+      - links:
+          - manage
+          - upload
+          - poll
+          - download
+        note: 配布対象を登録し端末が取得する。
+      - links:
+          - install
+          - report
+        note: 端末が検証・適用し結果を報告する。
+implementations:
+  - id: example
+    label: hawkBit と端末 updater
+    description: hawkBit DDI と端末側 updater の組み合わせ。検証とインストールの具体的な実装は利用者が用意する。
+    sources:
+      - title: Eclipse hawkBit
+        url: https://hawkbit.eclipse.dev/
+      - title: Device integration API
+        url: https://hawkbit.eclipse.dev/concepts/device-integration/
+    tiers:
+      - id: flow
+        label: 更新管理と端末
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 成果物と適用先
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-operator:
+        label: 更新運用者
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 更新を登録し配布する。
+        realizes:
+          - operator
+        evidence:
+          - type: doc
+            ref: docs/reference-eclipse-hawkbit.md#§4
+      ex-server:
+        label: Eclipse hawkBit
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: ターゲットとロールアウトを管理する。
+        realizes:
+          - server
+        evidence:
+          - type: doc
+            ref: docs/reference-eclipse-hawkbit.md#§4
+      ex-client:
+        label: 端末 updater
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: DDI をポーリングし更新を取得する。
+        realizes:
+          - client
+        evidence:
+          - type: doc
+            ref: docs/reference-eclipse-hawkbit.md#§4
+      ex-software:
+        label: 端末ソフトウェア
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        description: 検証と適用の対象。
+        realizes:
+          - software
+        evidence:
+          - type: doc
+            ref: docs/reference-eclipse-hawkbit.md#§4
+      ex-artifact:
+        label: 更新アーティファクト
+        kind: file
+        tier: support
+        x: 4
+        'y': 1.5
+        description: 配布対象のバイナリー。
+        realizes:
+          - artifact
+        evidence:
+          - type: doc
+            ref: docs/reference-eclipse-hawkbit.md#§4

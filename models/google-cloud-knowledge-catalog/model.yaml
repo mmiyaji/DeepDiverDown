@@ -57,7 +57,7 @@ nodes:
     kind: actor
     tier: people
     x: 5
-    y: 1
+    'y': 1
     description: 利用文脈とアクセスグループを設定し、申請を処理する。
     evidence:
       - type: doc
@@ -69,7 +69,7 @@ nodes:
     kind: actor
     tier: people
     x: 11
-    y: 1
+    'y': 1
     description: 資産を検索し、製品の利用を申請する。
     evidence:
       - type: doc
@@ -79,7 +79,7 @@ nodes:
     kind: db
     tier: catalog
     x: 2
-    y: 1
+    'y': 1
     description: 分析基盤や外部ソースから取り込んだ資産を登録する。
     evidence:
       - type: doc
@@ -89,7 +89,7 @@ nodes:
     kind: service
     tier: catalog
     x: 5
-    y: 2.5
+    'y': 2.5
     description: 項目を型で定義して資産・列に構造化情報を付ける。
     evidence:
       - type: doc
@@ -99,7 +99,7 @@ nodes:
     kind: service
     tier: catalog
     x: 8
-    y: 1
+    'y': 1
     description: 収集した処理の入出力を資産に関連付ける。
     drill: openlineage
     evidence:
@@ -110,7 +110,7 @@ nodes:
     kind: service
     tier: catalog
     x: 12
-    y: 1
+    'y': 1
     description: 用途に沿って資産をまとめ、グループごとの利用を承認する。
     evidence:
       - type: doc
@@ -120,7 +120,7 @@ nodes:
     kind: db
     tier: sources
     x: 3
-    y: 1
+    'y': 1
     description: テーブルのスキーマを提供し、実行時にデータ権限を評価する。
     drill: bigquery
     evidence:
@@ -135,7 +135,7 @@ nodes:
     kind: external
     tier: sources
     x: 12
-    y: 1
+    'y': 1
     description: 承認経路に応じて利用者をグループに追加し、資産のアクセス権限と対応付ける。
     evidence:
       - type: doc
@@ -237,13 +237,18 @@ scenarios:
           - curate
           - enrich
         note: 登録した注文テーブルと列に運用の文脈を付ける。
-        read: [schema, purpose, classification]
+        read:
+          - schema
+          - purpose
+          - classification
       - links:
           - collect-lineage
           - link-lineage
           - search
         note: 上流の処理と利用目的を確認する。
-        read: [upstream, purpose]
+        read:
+          - upstream
+          - purpose
   - id: request-access
     label: データ製品の利用を申請する
     evidence:
@@ -332,7 +337,7 @@ implementations:
         kind: actor
         tier: people
         x: 5
-        y: 1
+        'y': 1
         description: Google Cloud コンソールでアクセスグループとメタデータを管理する。
         realizes:
           - owner
@@ -344,7 +349,7 @@ implementations:
         kind: actor
         tier: people
         x: 11
-        y: 1
+        'y': 1
         description: 個人 ID でデータ製品の申請を行う。
         realizes:
           - consumer
@@ -352,11 +357,12 @@ implementations:
           - type: doc
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
       gcp-bigquery-metadata:
+        svc: gcp:knowledgecatalog
         label: Knowledge Catalog（Entry・Aspect）
         kind: catalog
         tier: catalog
         x: 3
-        y: 1
+        'y': 1
         description: BigQuery テーブルの自動 Entry とカスタム Aspect を管理する。
         realizes:
           - entries
@@ -365,11 +371,12 @@ implementations:
           - type: doc
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
       gcp-bigquery-lineage:
+        svc: gcp:knowledgecatalog
         label: Google Cloud Data Lineage API
         kind: service
         tier: catalog
         x: 8
-        y: 1
+        'y': 1
         description: 対応する BigQuery ジョブの入出力を記録する。
         realizes:
           - lineage
@@ -378,11 +385,12 @@ implementations:
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
         drill: openlineage
       gcp-bigquery-products:
+        svc: gcp:knowledgecatalog
         label: Knowledge Catalog データ製品
         kind: catalog
         tier: catalog
         x: 12
-        y: 1
+        'y': 1
         description: 関連資産とアクセス要求を管理する。
         realizes:
           - products
@@ -394,7 +402,7 @@ implementations:
         kind: table
         tier: sources
         x: 3
-        y: 1
+        'y': 1
         description: スキーマを公開し、クエリ時に資産の IAM を評価する。
         svc: gcp:bigquery
         realizes:
@@ -408,7 +416,7 @@ implementations:
         kind: external
         tier: sources
         x: 12
-        y: 1
+        'y': 1
         description: アクセスグループから利用者と資産権限を対応付ける。
         realizes:
           - group
@@ -420,7 +428,7 @@ implementations:
         kind: service
         tier: sources
         x: 7
-        y: 1
+        'y': 1
         description: BigQuery Job User などクエリを実行するための権限を持つ。
         evidence:
           - type: doc
@@ -443,3 +451,10 @@ implementations:
           - gcp-bigquery-products
           - gcp-bigquery-bigquery
           - gcp-bigquery-job-project
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud サービス
+        tier:
+          - sources
+        nodes:
+          - gcp-bigquery-bigquery

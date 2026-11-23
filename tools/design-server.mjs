@@ -1,9 +1,11 @@
 import { execFile } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
+import { createAdminChat } from './admin-chat.mjs';
 import { ROOT } from './load.mjs';
 import { NODE_KINDS } from '../js/node-kinds.js';
 
@@ -35,12 +37,15 @@ const taskInstructions = {
 };
 
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.yaml': 'application/yaml', '.md': 'text/plain', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
-const port = 8125;
+const adminEnabled = process.argv.includes('--admin');
+const port = adminEnabled ? 8126 : 8125;
 const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 const send = (res, code, data) => {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(data));
 };
+const adminToken = adminEnabled ? randomBytes(24).toString('base64url') : null;
+let admin;
 let running = false;
 
 async function askCLI(input) {
@@ -114,10 +119,11 @@ async function interview(req, res) {
   finally { running = false; }
 }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   if (!hosts.has(req.headers.host)) return send(res, 403, { error: 'ローカル接続のみ利用できます。' });
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    if (pathname.startsWith('/api/admin-chat/') && admin) return await admin.handle(req, res, pathname);
     if (pathname === '/api/design-interview') return await interview(req, res);
     const file = pathname === '/' ? '/index.html' : pathname;
     if (!['GET', 'HEAD'].includes(req.method) ||
@@ -136,4 +142,26 @@ createServer(async (req, res) => {
   } catch (error) {
     if (!res.headersSent) send(res, error.code === 'ENOENT' ? 404 : 500, { error: 'リクエストを処理できませんでした。' });
   }
-}).listen(port, '127.0.0.1', () => console.log(`設計対話: http://127.0.0.1:${port}/`));
+});
+server.listen(port, '127.0.0.1', async () => {
+  if (adminEnabled) {
+    try {
+      const cwd = await realpath(ROOT);
+      const workspace = createHash('sha256').update(cwd).digest('hex').slice(0, 24);
+      const stateFile = path.join(homedir(), '.deepdiverdown', 'admin', workspace, 'sessions.json');
+      admin = await createAdminChat({ cwd, stateFile, token: adminToken, send });
+    } catch (error) {
+      console.error(`管理者チャットの履歴を開けませんでした。${error.code || ''}`);
+      process.exitCode = 1;
+      server.close();
+      return;
+    }
+  }
+  console.log(`${adminEnabled ? '管理者チャット' : '設計対話'}: http://127.0.0.1:${port}/`);
+  if (adminToken) console.log(`管理者チャットのアクセスキー: ${adminToken}`);
+});
+if (adminEnabled) {
+  const shutdown = () => { server.close(); admin?.stop(); };
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+}

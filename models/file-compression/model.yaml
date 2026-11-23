@@ -1,0 +1,379 @@
+name: ファイル圧縮と分析データの読み書き
+description: 圧縮方式とファイル形式を区別し、データの圧縮・保存・伸長の流れを追う。
+reference:
+  objectives:
+    - gzip・Zstd・Snappy などの特徴と選択基準を理解する。
+    - Parquet のページ圧縮とストリーム全体の圧縮を区別する。
+    - 互換性、速度、容量、分割読み込みを考慮する。
+  sources:
+    - title: Parquet compression
+      url: https://parquet.apache.org/docs/file-format/data-pages/compression/
+    - title: PyArrow Parquet writer
+      url: https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html
+    - title: Snappy
+      url: https://github.com/google/snappy/blob/main/README.md
+    - title: Zstd manual
+      url: https://github.com/facebook/zstd/blob/dev/doc/zstd_manual.html
+    - title: GZIP RFC 1952
+      url: https://www.rfc-editor.org/rfc/rfc1952
+    - title: GNU gzip
+      url: https://www.gnu.org/s/gzip/manual/html_node/Advanced-usage.html
+sources:
+  - docs/reference-file-compression.md
+evidence:
+  - type: doc
+    ref: docs/reference-file-compression.md#§1
+  - type: doc
+    ref: docs/reference-file-compression.md#§3
+tiers:
+  - id: write
+    label: 書き込み
+    z: 1
+    size:
+      - 16
+      - 3
+  - id: read
+    label: 読み取り
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  source:
+    label: 入力データ
+    kind: file
+    tier: write
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  encode:
+    label: データの符号化
+    kind: service
+    tier: write
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  compress:
+    label: 圧縮コーデック
+    kind: service
+    tier: write
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  stored:
+    label: 圧縮データと形式情報
+    kind: file
+    tier: write
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  decompress:
+    label: コーデックで伸長
+    kind: service
+    tier: read
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  decode:
+    label: データの復号・解析
+    kind: service
+    tier: read
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  consumer:
+    label: 読み取り結果
+    kind: file
+    tier: read
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+links:
+  - id: encode
+    from: source
+    to: encode
+    label: 入力を符号化
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  - id: compress
+    from: encode
+    to: compress
+    label: 符号化データを圧縮
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  - id: save
+    from: compress
+    to: stored
+    label: 圧縮データを保存
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  - id: load
+    from: stored
+    to: decompress
+    label: 圧縮データを読み取る
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  - id: decode
+    from: decompress
+    to: decode
+    label: 伸長後に復号・解析
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+  - id: return
+    from: decode
+    to: consumer
+    label: 結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+scenarios:
+  - id: roundtrip
+    label: 書き込みと読み戻し
+    evidence:
+      - type: doc
+        ref: docs/reference-file-compression.md#§2
+    steps:
+      - links:
+          - encode
+          - compress
+          - save
+        note: 入力を符号化し、コーデックで圧縮して保存する。
+      - links:
+          - load
+          - decode
+          - return
+        note: 保存データを伸長して復号し、読み取り結果を得る。
+implementations:
+  - id: parquet-zstd
+    label: PyArrow Parquet と Zstd
+    description: Parquet のページを Zstd で圧縮し、必要なページを読み取る例。
+    sources:
+      - title: Parquet compression
+        url: https://parquet.apache.org/docs/file-format/data-pages/compression/
+      - title: PyArrow Parquet writer
+        url: https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html
+      - title: Snappy
+        url: https://github.com/google/snappy/blob/main/README.md
+      - title: Zstd manual
+        url: https://github.com/facebook/zstd/blob/dev/doc/zstd_manual.html
+      - title: GZIP RFC 1952
+        url: https://www.rfc-editor.org/rfc/rfc1952
+      - title: GNU gzip
+        url: https://www.gnu.org/s/gzip/manual/html_node/Advanced-usage.html
+    tiers:
+      - id: write
+        label: 書き込み
+        z: 1
+        size:
+          - 16
+          - 3
+      - id: read
+        label: 読み取り
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-source:
+        label: Arrow テーブル
+        kind: file
+        tier: write
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - source
+      ex-encode:
+        label: Parquet 列のエンコード
+        kind: service
+        tier: write
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - encode
+      ex-compress:
+        label: ページを Zstd 圧縮
+        kind: service
+        tier: write
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - compress
+      ex-stored:
+        label: Parquet ページとメタデータ
+        kind: file
+        tier: write
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - stored
+      ex-decompress:
+        label: Parquet ページを Zstd 伸長
+        kind: service
+        tier: read
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - decompress
+      ex-decode:
+        label: Parquet 列をデコード
+        kind: service
+        tier: read
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - decode
+      ex-consumer:
+        label: 読み取り結果
+        kind: file
+        tier: read
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - consumer
+  - id: csv-gzip
+    label: CSV と gzip
+    description: CSV ストリーム全体を gzip で圧縮し、伸長後に CSV として解析する例。
+    sources:
+      - title: Parquet compression
+        url: https://parquet.apache.org/docs/file-format/data-pages/compression/
+      - title: PyArrow Parquet writer
+        url: https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html
+      - title: Snappy
+        url: https://github.com/google/snappy/blob/main/README.md
+      - title: Zstd manual
+        url: https://github.com/facebook/zstd/blob/dev/doc/zstd_manual.html
+      - title: GZIP RFC 1952
+        url: https://www.rfc-editor.org/rfc/rfc1952
+      - title: GNU gzip
+        url: https://www.gnu.org/s/gzip/manual/html_node/Advanced-usage.html
+    tiers:
+      - id: write
+        label: 書き込み
+        z: 1
+        size:
+          - 16
+          - 3
+      - id: read
+        label: 読み取り
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-source:
+        label: 表データ
+        kind: file
+        tier: write
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - source
+      ex-encode:
+        label: CSV 文字列へ変換
+        kind: service
+        tier: write
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - encode
+      ex-compress:
+        label: gzip / DEFLATE 圧縮
+        kind: service
+        tier: write
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - compress
+      ex-stored:
+        label: .csv.gz ファイル
+        kind: file
+        tier: write
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - stored
+      ex-decompress:
+        label: gzip ストリームの伸長
+        kind: service
+        tier: read
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - decompress
+      ex-decode:
+        label: CSV を解析
+        kind: service
+        tier: read
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - decode
+      ex-consumer:
+        label: 読み取り結果
+        kind: file
+        tier: read
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        realizes:
+          - consumer

@@ -1,0 +1,350 @@
+name: MCP を使うデータ分析エージェント
+description: MCP クライアント が指標と文書を扱い、認可と実行結果を確認する構成例。
+reference:
+  objectives:
+    - 指標の問い合わせと文書検索の責務を区別する。
+    - 認証・権限と回答の出典を追う。
+    - エージェントの実行を観測し評価する。
+  sources:
+    - title: 公式資料 1
+      url: https://modelcontextprotocol.io/docs/learn/architecture
+    - title: 公式資料 2
+      url: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+sources:
+  - docs/reference-mcp-data-agent.md
+evidence:
+  - type: doc
+    ref: docs/reference-mcp-data-agent.md#§1
+tiers:
+  - id: access
+    label: 利用と調整
+    z: 2
+    size:
+      - 12
+      - 3
+  - id: data
+    label: 指標と文書
+    z: 1
+    size:
+      - 14
+      - 3
+  - id: ops
+    label: 運用と評価
+    z: 0
+    size:
+      - 12
+      - 3
+nodes:
+  question:
+    label: 利用者
+    kind: actor
+    tier: access
+    x: 0
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  agent:
+    label: MCP クライアント
+    kind: service
+    tier: access
+    x: 4
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  identity:
+    label: 認可サーバー
+    kind: service
+    tier: access
+    x: 8
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  metrics:
+    label: 指標ツール
+    kind: service
+    tier: data
+    x: 0
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  warehouse:
+    label: 分析データ
+    kind: db
+    tier: data
+    x: 4
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  search:
+    label: 文書検索ツール
+    kind: service
+    tier: data
+    x: 8
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  documents:
+    label: 文書データ
+    kind: db
+    tier: data
+    x: 12
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  trace:
+    label: 実行トレース
+    kind: service
+    tier: ops
+    x: 4
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  review:
+    label: 運用担当
+    kind: actor
+    tier: ops
+    x: 8
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+links:
+  - id: ask
+    from: question
+    to: agent
+    label: 売上と返品理由を質問
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: authorize
+    from: agent
+    to: identity
+    label: 利用権限を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: query
+    from: agent
+    to: metrics
+    label: 対象期間の指標を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: read
+    from: metrics
+    to: warehouse
+    label: 注文と返品を集計
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: retrieve
+    from: agent
+    to: search
+    label: 関連文書を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: lookup
+    from: search
+    to: documents
+    label: 出典と本文を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: record
+    from: agent
+    to: trace
+    label: 実行と結果を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: evaluate
+    from: review
+    to: trace
+    label: 実行を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+  - id: answer
+    from: agent
+    to: question
+    label: 数値と出典を回答
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+scenarios:
+  - id: answer
+    label: 売上と返品理由を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-mcp-data-agent.md#§2
+    steps:
+      - links:
+          - ask
+          - authorize
+        note: 質問を受け、利用者の権限を確認する。
+      - links:
+          - query
+          - read
+        note: 指標の定義に基づいて対象期間を集計する。
+      - links:
+          - retrieve
+          - lookup
+        note: 権限のある文書から関連する出典を取得する。
+      - links:
+          - record
+          - answer
+        note: 実行を記録し、数値と出典を付けて回答する。
+      - links:
+          - evaluate
+        note: 数値と出典を評価する。
+implementations:
+  - id: example
+    label: MCP クライアントとツール
+    description: 各機能の担い手と接続を示す構成例。
+    sources:
+      - title: 公式資料 1
+        url: https://modelcontextprotocol.io/docs/learn/architecture
+      - title: 公式資料 2
+        url: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+    tiers:
+      - id: access
+        label: 利用と調整
+        z: 2
+        size:
+          - 12
+          - 3
+      - id: data
+        label: 指標と文書
+        z: 1
+        size:
+          - 14
+          - 3
+      - id: ops
+        label: 運用と評価
+        z: 0
+        size:
+          - 14
+          - 3
+    nodes:
+      ex-question:
+        label: 利用者
+        kind: actor
+        tier: access
+        x: 0
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - question
+      ex-agent:
+        label: MCP クライアント
+        kind: service
+        tier: access
+        x: 4
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - agent
+      ex-identity:
+        label: 認可サーバー
+        kind: service
+        tier: access
+        x: 8
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - identity
+      ex-metrics:
+        label: 指標ツール
+        kind: service
+        tier: data
+        x: 0
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - metrics
+      ex-warehouse:
+        label: 分析データ
+        kind: db
+        tier: data
+        x: 4
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - warehouse
+      ex-search:
+        label: 文書検索ツール
+        kind: service
+        tier: data
+        x: 8
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - search
+      ex-documents:
+        label: 文書データ
+        kind: db
+        tier: data
+        x: 12
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - documents
+      ex-trace:
+        label: 実行トレース
+        kind: service
+        tier: ops
+        x: 4
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - trace
+      ex-review:
+        label: 運用担当
+        kind: actor
+        tier: ops
+        x: 8
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+        realizes:
+          - review
+      ex-logpolicy:
+        label: ログの記録・保持方針
+        kind: file
+        tier: ops
+        x: 12
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-mcp-data-agent.md#§3
+    links:
+      - id: ex-record-policy
+        from: ex-logpolicy
+        to: ex-trace
+        label: 記録方針を適用

@@ -17,6 +17,17 @@ test('Catalog：AWS の省略形式とマルチクラウドの接頭辞を解決
   assert.equal(A.Catalog.lookup('other:missing'), null);
 });
 
+test('Catalog：Snowflake の個別アイコンを優先し、未配置なら公式ロゴに戻す', () => {
+  try {
+    A.Catalog.setIcons({ 'snowflake:platform': '/logo.png' });
+    assert.equal(A.Catalog.lookup('snowflake:warehouse').iconUrl, '/logo.png');
+    A.Catalog.setIcons({ 'snowflake:platform': '/logo.png', 'snowflake:warehouse': '/warehouse.svg' });
+    assert.equal(A.Catalog.lookup('snowflake:warehouse').iconUrl, '/warehouse.svg');
+  } finally {
+    A.Catalog.setIcons({});
+  }
+});
+
 test('layout：座標のない部品をリンクの向きに沿って並べ、フロアの大きさを決める', () => {
   const m = A.layout({
     tiers: [{ id: 'app', label: 'app' }],
@@ -70,6 +81,43 @@ test('import-k8s：*_ADDR から接続を作り、存在しない宛先を未解
   assert.deepEqual(a.nodes.frontend.exposed, ['frontend-external']);
   assert.ok(a.links.some(([f, t]) => f === 'checkoutservice' && t === 'paymentservice'));
   assert.equal(a.unresolved[0].from, 'frontend');
+});
+
+test('import-k8s：同名のワークロードと LoadBalancer を区別し、Service DNS 名から名前空間を解決する', () => {
+  const workload = (name, namespace, app, addresses = [], kind = 'Deployment') => ({
+    kind, metadata: { name, namespace }, spec: { template: {
+      metadata: { labels: { app } },
+      spec: { containers: [{ image: 'app', env: addresses.map(([name, value]) => ({ name, value })) }] },
+    } },
+  });
+  const service = (name, namespace, app) => ({
+    kind: 'Service', metadata: { name, namespace }, spec: { type: 'LoadBalancer', selector: { app } },
+  });
+  const items = [
+    workload('web', 'default', 'web'),
+    workload('web', 'staging', 'web'),
+    workload('web', 'staging', 'web', [], 'StatefulSet'),
+    workload('client', 'staging', 'client', [
+      ['LOCAL_ADDR', 'public:80'], ['QUALIFIED_ADDR', 'public.staging:80'],
+      ['CROSS_NAMESPACE_ADDR', 'public.default.svc.cluster.local.:80'],
+      ['OTHER_NAMESPACE_ADDR', 'missing.default:80'], ['EMPTY_ADDR', 'empty:80'],
+    ]),
+    service('public', undefined, 'web'), service('public', 'staging', 'web'),
+    service('missing', 'staging', 'web'), service('empty', 'staging', 'other'),
+  ];
+  const manifests = JSON.stringify({ kind: 'List', items });
+  const a = importManifests([manifests, manifests]);
+  assert.equal(Object.keys(a.nodes).length, 8);
+  assert.deepEqual(a.nodes.web.exposed, ['public']);
+  assert.deepEqual(a.nodes['staging/deployment/web'].exposed, ['staging/public', 'staging/missing']);
+  const outgoing = id => a.links.filter(([from]) => from === id).map(([, to]) => to).sort();
+  assert.deepEqual(outgoing('service/public'), ['web']);
+  assert.deepEqual(outgoing('staging/service/public'), ['staging/deployment/web', 'staging/statefulset/web']);
+  assert.deepEqual(outgoing('staging/deployment/client'), ['staging/deployment/web', 'staging/statefulset/web', 'web']);
+  assert.deepEqual(a.unresolved.map(u => [u.from, u.env, u.reason]), [
+    ['staging/deployment/client', 'OTHER_NAMESPACE_ADDR', 'Service「missing」がない'],
+    ['staging/deployment/client', 'EMPTY_ADDR', 'Service「staging/empty」の宛先ワークロードがない'],
+  ]);
 });
 
 test('diff：IaC の参照（根拠の ref）で設計と実環境を対応付ける', () => {

@@ -6,86 +6,414 @@ reference:
     - 管理ストレージとクエリコンピュートが独立して伸縮する理由を理解する。
     - ロードとクエリが API、データセット、ワーカーを通る流れを追う。
   sources:
-    - {title: BigQuery overview, url: https://cloud.google.com/bigquery/docs/introduction}
-    - {title: Overview of BigQuery storage, url: https://cloud.google.com/bigquery/docs/storage_overview}
-    - {title: Introduction to the resource hierarchy, url: https://cloud.google.com/bigquery/docs/resource-hierarchy}
-    - {title: Query plan and timeline, url: https://cloud.google.com/bigquery/docs/query-plan-explanation}
-    - {title: Overview of BigQuery analytics, url: https://cloud.google.com/bigquery/docs/query-overview}
-sources: [docs/reference-bigquery.md]
+    - title: BigQuery overview
+      url: https://cloud.google.com/bigquery/docs/introduction
+    - title: Overview of BigQuery storage
+      url: https://cloud.google.com/bigquery/docs/storage_overview
+    - title: Introduction to the resource hierarchy
+      url: https://cloud.google.com/bigquery/docs/resource-hierarchy
+    - title: Query plan and timeline
+      url: https://cloud.google.com/bigquery/docs/query-plan-explanation
+    - title: Overview of BigQuery analytics
+      url: https://cloud.google.com/bigquery/docs/query-overview
+sources:
+  - docs/reference-bigquery.md
 evidence:
-  - {type: doc, ref: docs/reference-bigquery.md#§1}
-  - {type: doc, ref: docs/reference-bigquery.md#§7}
-  - {type: doc, ref: docs/reference-bigquery.md#§8}
+  - type: doc
+    ref: docs/reference-bigquery.md#§1
+  - type: doc
+    ref: docs/reference-bigquery.md#§7
+  - type: doc
+    ref: docs/reference-bigquery.md#§8
 tiers:
-  - {id: interface, label: 利用と管理, z: 2, size: [12, 3]}
-  - {id: data, label: "永続データ", z: 0, size: [8, 3]}
-  - {id: compute, label: クエリコンピュート, z: 1, origin: [1, 0], size: [8, 3]}
+  - id: interface
+    label: 利用と管理
+    z: 2
+    size:
+      - 12
+      - 3
+  - id: data
+    label: 永続データ
+    z: 0
+    size:
+      - 8
+      - 3
+  - id: compute
+    label: クエリコンピュート
+    z: 1
+    origin:
+      - 1
+      - 0
+    size:
+      - 8
+      - 3
 nodes:
-  client: {label: "ジョブ実行クライアント", kind: external, tier: interface, x: 0, y: 1.5, description: コンソール、CLI、APIクライアントからジョブを送る利用者側の入口。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§1}]}
-  api: {label: "SQL 計画とステージ分割", kind: worker, tier: interface, x: 4, y: 1.5, description: SQLを複数のステージからなる実行グラフへ分解する。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§6}]}
-  bi: {label: "BI 利用者", kind: actor, tier: interface, x: 8, y: 1.5, description: クエリ結果を分析に利用する利用者。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§7}]}
-  dataset: {label: "分析テーブルの名前空間", kind: db, tier: data, x: 1, y: 1.5, description: "テーブルやビューをまとめて権限と所在を管理する。", evidence: [{type: doc, ref: docs/reference-bigquery.md#§2}]}
-  storage: {label: "管理された列指向ストレージ", kind: db, tier: data, x: 6, y: 1.5, description: 列指向のテーブルデータを保持する管理ストレージ。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§3}]}
-  engine: {slots: 8, label: "並列クエリ実行枠", kind: worker, tier: compute, x: 2, y: 1.5, description: "ステージの作業単位を実行枠が並列に処理する。", evidence: [{type: doc, ref: docs/reference-bigquery.md#§6}]}
-  workers: {label: "分散シャッフル", kind: queue, tier: compute, x: 7, y: 1.5, description: ステージ間の中間データを保持して次のステージへ渡す分散層。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§6}]}
+  client:
+    label: ジョブ実行クライアント
+    kind: external
+    tier: interface
+    x: 0
+    'y': 1.5
+    description: コンソール、CLI、APIクライアントからジョブを送る利用者側の入口。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§1
+  api:
+    label: SQL 計画とステージ分割
+    kind: worker
+    tier: interface
+    x: 4
+    'y': 1.5
+    description: SQLを複数のステージからなる実行グラフへ分解する。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+  bi:
+    label: BI 利用者
+    kind: actor
+    tier: interface
+    x: 8
+    'y': 1.5
+    description: クエリ結果を分析に利用する利用者。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§7
+  dataset:
+    label: 分析テーブルの名前空間
+    kind: db
+    tier: data
+    x: 1
+    'y': 1.5
+    description: テーブルやビューをまとめて権限と所在を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§2
+  storage:
+    label: 管理された列指向ストレージ
+    kind: db
+    tier: data
+    x: 6
+    'y': 1.5
+    description: 列指向のテーブルデータを保持する管理ストレージ。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§3
+  engine:
+    slots: 8
+    label: 並列クエリ実行枠
+    kind: worker
+    tier: compute
+    x: 2
+    'y': 1.5
+    description: ステージの作業単位を実行枠が並列に処理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+  workers:
+    label: 分散シャッフル
+    kind: queue
+    tier: compute
+    x: 7
+    'y': 1.5
+    description: ステージ間の中間データを保持して次のステージへ渡す分散層。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
 links:
-  - {id: submit, from: client, to: api, label: ジョブを送信, evidence: [{type: doc, ref: docs/reference-bigquery.md#§1}, {type: doc, ref: docs/reference-bigquery.md#§5}]}
-  - {id: bi-submit, from: bi, to: api, label: 分析クエリを送信, evidence: [{type: doc, ref: docs/reference-bigquery.md#§5}]}
-  - {id: organize, from: api, to: dataset, label: データセットを指定, evidence: [{type: doc, ref: docs/reference-bigquery.md#§2}]}
-  - {id: persist, from: dataset, to: storage, label: テーブルを保持, evidence: [{type: doc, ref: docs/reference-bigquery.md#§3}]}
-  - {id: plan, from: api, to: engine, label: "実行ステージを並列計算に割り当てる", evidence: [{type: doc, ref: docs/reference-bigquery.md#§6}]}
-  - {id: scan, from: engine, to: storage, label: 必要なデータを読む, evidence: [{type: doc, ref: docs/reference-bigquery.md#§4}, {type: doc, ref: docs/reference-bigquery.md#§6}]}
-  - {id: distribute, from: engine, to: workers, label: 中間データをshuffle, evidence: [{type: doc, ref: docs/reference-bigquery.md#§6}]}
-  - {id: aggregate, from: workers, to: engine, label: 次のステージへ渡す, evidence: [{type: doc, ref: docs/reference-bigquery.md#§6}]}
-  - {id: serve, from: engine, to: bi, label: 結果を返す, evidence: [{type: doc, ref: docs/reference-bigquery.md#§5}]}
+  - id: submit
+    from: client
+    to: api
+    label: ジョブを送信
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§1
+      - type: doc
+        ref: docs/reference-bigquery.md#§5
+  - id: bi-submit
+    from: bi
+    to: api
+    label: 分析クエリを送信
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§5
+  - id: organize
+    from: api
+    to: dataset
+    label: データセットを指定
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§2
+  - id: persist
+    from: dataset
+    to: storage
+    label: テーブルを保持
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§3
+  - id: plan
+    from: api
+    to: engine
+    label: 実行ステージを並列計算に割り当てる
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+  - id: scan
+    from: engine
+    to: storage
+    label: 必要なデータを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§4
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+  - id: distribute
+    from: engine
+    to: workers
+    label: 中間データをshuffle
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+  - id: aggregate
+    from: workers
+    to: engine
+    label: 次のステージへ渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+  - id: serve
+    from: engine
+    to: bi
+    label: 結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§5
 scenarios:
   - id: load-query
     label: 取り込み後にクエリする
-    evidence: [{type: doc, ref: docs/reference-bigquery.md#§1}, {type: doc, ref: docs/reference-bigquery.md#§3}, {type: doc, ref: docs/reference-bigquery.md#§4}, {type: doc, ref: docs/reference-bigquery.md#§5}, {type: doc, ref: docs/reference-bigquery.md#§6}, {type: doc, ref: docs/reference-bigquery.md#§7}]
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§1
+      - type: doc
+        ref: docs/reference-bigquery.md#§3
+      - type: doc
+        ref: docs/reference-bigquery.md#§4
+      - type: doc
+        ref: docs/reference-bigquery.md#§5
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+      - type: doc
+        ref: docs/reference-bigquery.md#§7
     steps:
-      - {links: [submit, organize], note: 受付。クライアントがBigQuery APIへロードジョブを送り、対象データセットを指定する。}
-      - {links: [persist], note: 保存。データセットのテーブルデータを管理ストレージへ保持する。}
-      - {links: [bi-submit, plan], note: 実行。BI利用者のクエリをステージへ分解し、スロットが処理する。}
-      - {links: [scan, distribute], note: 分散。スロットがストレージを読み、中間データを分散shuffleへ書く。}
-      - {links: [aggregate, serve], note: 返却。shuffleの中間結果を次のステージで集約し、分析利用者へ返す。}
+      - links:
+          - submit
+          - organize
+        note: 受付。クライアントがBigQuery APIへロードジョブを送り、対象データセットを指定する。
+      - links:
+          - persist
+        note: 保存。データセットのテーブルデータを管理ストレージへ保持する。
+      - links:
+          - bi-submit
+          - plan
+        note: 実行。BI利用者のクエリをステージへ分解し、スロットが処理する。
+      - links:
+          - scan
+          - distribute
+        note: 分散。スロットがストレージを読み、中間データを分散shuffleへ書く。
+      - links:
+          - aggregate
+          - serve
+        note: 返却。shuffleの中間結果を次のステージで集約し、分析利用者へ返す。
   - id: independent-scale
     label: ストレージとコンピュートを別に伸縮する
-    evidence: [{type: doc, ref: docs/reference-bigquery.md#§3}, {type: doc, ref: docs/reference-bigquery.md#§4}]
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§3
+      - type: doc
+        ref: docs/reference-bigquery.md#§4
     steps:
-      - {links: [persist], note: データ量。テーブルは管理ストレージに蓄積される。}
-      - {links: [scan, distribute], note: 需要。クエリ需要に応じてワーカーへ処理を分散する。}
-      - {links: [aggregate], note: 分離。ステージ間のshuffleを介して、ストレージとコンピュートを独立に扱う。}
+      - links:
+          - persist
+        note: データ量。テーブルは管理ストレージに蓄積される。
+      - links:
+          - scan
+          - distribute
+        note: 需要。クエリ需要に応じてワーカーへ処理を分散する。
+      - links:
+          - aggregate
+        note: 分離。ステージ間のshuffleを介して、ストレージとコンピュートを独立に扱う。
 requirements:
-  - {id: BR-01, kind: usecase, title: 分離した分析基盤, text: 管理ストレージに保持したテーブルをステージとスロットで分析する。, links: [persist, plan, scan, serve], evidence: [{type: doc, ref: docs/reference-bigquery.md#§3}, {type: doc, ref: docs/reference-bigquery.md#§6}]}
-  - {id: NFR-01, kind: nfr, title: 独立した伸縮, text: ストレージとコンピュートを別々にリソース割り当てできる。, links: [persist, distribute], evidence: [{type: doc, ref: docs/reference-bigquery.md#§4}]}
-unknowns: [{id: UNK-01, text: 実際のプロジェクト、リージョン、予約スロット、権限設定は未確定。, refs: [api, storage, workers]}]
-gates: {maxDrift: 0, maxHigh: 0}
-
+  - id: BR-01
+    kind: usecase
+    title: 分離した分析基盤
+    text: 管理ストレージに保持したテーブルをステージとスロットで分析する。
+    links:
+      - persist
+      - plan
+      - scan
+      - serve
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§3
+      - type: doc
+        ref: docs/reference-bigquery.md#§6
+  - id: NFR-01
+    kind: nfr
+    title: 独立した伸縮
+    text: ストレージとコンピュートを別々にリソース割り当てできる。
+    links:
+      - persist
+      - distribute
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§4
+unknowns:
+  - id: UNK-01
+    text: 実際のプロジェクト、リージョン、予約スロット、権限設定は未確定。
+    refs:
+      - api
+      - storage
+      - workers
+gates:
+  maxDrift: 0
+  maxHigh: 0
 implementations:
   - id: bq-reservation
-    label: "BigQuery と Cloud Storage の受注分析"
-    description: "Cloud Storage から同一ロケーションの BigQuery データセットへロードし、分析プロジェクトのクエリに予約を割り当てる例。"
+    label: BigQuery と Cloud Storage の受注分析
+    description: Cloud Storage から同一ロケーションの BigQuery データセットへロードし、分析プロジェクトのクエリに予約を割り当てる例。
     sources:
-      - {title: "BigQuery overview", url: "https://cloud.google.com/bigquery/docs/introduction"}
-      - {title: "Overview of BigQuery storage", url: "https://cloud.google.com/bigquery/docs/storage_overview"}
-      - {title: "Introduction to the resource hierarchy", url: "https://cloud.google.com/bigquery/docs/resource-hierarchy"}
-      - {title: "Query plan and timeline", url: "https://cloud.google.com/bigquery/docs/query-plan-explanation"}
-      - {title: "Overview of BigQuery analytics", url: "https://cloud.google.com/bigquery/docs/query-overview"}
-      - {title: "BigQuery のワークロード管理", url: "https://docs.cloud.google.com/bigquery/docs/reservations-intro"}
-      - {title: "Cloud Storage の CSV をロード", url: "https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv"}
+      - title: BigQuery overview
+        url: https://cloud.google.com/bigquery/docs/introduction
+      - title: Overview of BigQuery storage
+        url: https://cloud.google.com/bigquery/docs/storage_overview
+      - title: Introduction to the resource hierarchy
+        url: https://cloud.google.com/bigquery/docs/resource-hierarchy
+      - title: Query plan and timeline
+        url: https://cloud.google.com/bigquery/docs/query-plan-explanation
+      - title: Overview of BigQuery analytics
+        url: https://cloud.google.com/bigquery/docs/query-overview
+      - title: BigQuery のワークロード管理
+        url: https://docs.cloud.google.com/bigquery/docs/reservations-intro
+      - title: Cloud Storage の CSV をロード
+        url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv
     tiers:
-      - {id: "interface", label: "利用と管理", z: 2, size: [12,3]}
-      - {id: "data", label: "永続データ", z: 0, size: [8,3]}
-      - {id: "compute", label: "クエリコンピュート", z: 1, origin: [1,0], size: [8,3]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 3, size: [8,3]}
+      - id: interface
+        label: 利用と管理
+        z: 2
+        size:
+          - 12
+          - 3
+      - id: data
+        label: 永続データ
+        z: 0
+        size:
+          - 8
+          - 3
+      - id: compute
+        label: クエリコンピュート
+        z: 1
+        origin:
+          - 1
+          - 0
+        size:
+          - 8
+          - 3
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 3
+        size:
+          - 8
+          - 3
     groups:
-      - {kind: "cloud", label: "Google Cloud 分析環境", provider: "gcp", tier: ["interface","data","compute","implementation-setup"]}
+      - kind: cloud
+        label: Google Cloud 分析環境
+        provider: gcp
+        tier:
+          - interface
+          - data
+          - compute
+          - implementation-setup
     nodes:
-      example-client: {label: "bq CLI とロードジョブ", kind: "external", tier: "interface", x: 0, y: 1.5, realizes: ["client"], description: "受注ファイルの URI と出力テーブル名を指定する。", evidence: [{"type":"doc","ref":"docs/reference-bigquery.md#§9"}]}
-      example-api: {label: "BigQuery ジョブとクエリ計画", kind: "worker", tier: "interface", x: 4, y: 1.5, realizes: ["api"], description: "ジョブを受け付け、クエリのステージを作る。", evidence: [{"type":"doc","ref":"docs/reference-bigquery.md#§9"}]}
-      example-bi: {label: "BI 利用者", kind: "actor", tier: "interface", x: 8, y: 1.5, realizes: ["bi"], description: "分析プロジェクトの資格情報でクエリする。", evidence: [{"type":"doc","ref":"docs/reference-bigquery.md#§9"}]}
-      example-dataset: {label: "BigQuery sales データセットと管理表", kind: "table", tier: "data", x: 1, y: 1.5, svc: "gcp:bigquery", realizes: ["dataset","storage"], description: "ロケーションを設定し、受注データを BigQuery の管理ストレージに保持する。", evidence: [{"type":"doc","ref":"docs/reference-bigquery.md#§9"}]}
-      example-engine: {label: "BigQuery の分析用予約と実行", kind: "worker", tier: "compute", x: 2, y: 1.5, realizes: ["engine","workers"], description: "分析プロジェクトにクエリジョブの予約割当を付け、実行時のステージとシャッフルはクエリ計画で確認する。", evidence: [{"type":"doc","ref":"docs/reference-bigquery.md#§9"}]}
-      example-gcs: {label: "Cloud Storage の取込バケット", kind: "file", tier: "implementation-setup", x: 1, y: 1.5, svc: "gcp:gcs", description: "データセットとロケーション要件を満たす場所に CSV を着地させる。", evidence: [{"type":"doc","ref":"docs/reference-bigquery.md#§9"}]}
+      example-client:
+        label: bq CLI とロードジョブ
+        kind: external
+        tier: interface
+        x: 0
+        'y': 1.5
+        realizes:
+          - client
+        description: 受注ファイルの URI と出力テーブル名を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-bigquery.md#§9
+      example-api:
+        label: BigQuery ジョブとクエリ計画
+        kind: worker
+        tier: interface
+        x: 4
+        'y': 1.5
+        realizes:
+          - api
+        description: ジョブを受け付け、クエリのステージを作る。
+        evidence:
+          - type: doc
+            ref: docs/reference-bigquery.md#§9
+        svc: gcp:bigquery
+      example-bi:
+        label: BI 利用者
+        kind: actor
+        tier: interface
+        x: 8
+        'y': 1.5
+        realizes:
+          - bi
+        description: 分析プロジェクトの資格情報でクエリする。
+        evidence:
+          - type: doc
+            ref: docs/reference-bigquery.md#§9
+      example-dataset:
+        label: BigQuery sales データセットと管理表
+        kind: table
+        tier: data
+        x: 1
+        'y': 1.5
+        svc: gcp:bigquery
+        realizes:
+          - dataset
+          - storage
+        description: ロケーションを設定し、受注データを BigQuery の管理ストレージに保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-bigquery.md#§9
+      example-engine:
+        label: BigQuery の分析用予約と実行
+        kind: worker
+        tier: compute
+        x: 2
+        'y': 1.5
+        realizes:
+          - engine
+          - workers
+        description: 分析プロジェクトにクエリジョブの予約割当を付け、実行時のステージとシャッフルはクエリ計画で確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-bigquery.md#§9
+        svc: gcp:bigquery
+      example-gcs:
+        label: Cloud Storage の取込バケット
+        kind: file
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        svc: gcp:gcs
+        description: データセットとロケーション要件を満たす場所に CSV を着地させる。
+        evidence:
+          - type: doc
+            ref: docs/reference-bigquery.md#§9
     links:
-      - {id: "example-gcs-connection", from: "example-gcs", to: "example-client", label: "ロードするファイルを指定", evidence: [{"type":"doc","ref":"docs/reference-bigquery.md#§9"}]}
+      - id: example-gcs-connection
+        from: example-gcs
+        to: example-client
+        label: ロードするファイルを指定
+        evidence:
+          - type: doc
+            ref: docs/reference-bigquery.md#§9

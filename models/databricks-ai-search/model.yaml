@@ -1,0 +1,446 @@
+name: Databricks AI Search の索引更新と検索
+description: 文書の索引更新、検索時の権限、エージェントへの出典付き結果を追う。
+reference:
+  objectives:
+    - Delta Sync と埋め込み生成の役割を区別する。
+    - 検索時の権限と検索結果の利用を追う。
+    - 同期の方式と索引の鮮度を確認する。
+  sources:
+    - title: Databricks AI Search
+      url: https://docs.databricks.com/aws/en/ai-search/ai-search
+    - title: Create AI Search indexes
+      url: https://docs.databricks.com/aws/en/ai-search/create-ai-search
+    - title: Query AI Search
+      url: https://docs.databricks.com/aws/en/ai-search/query-ai-search
+    - title: Agent retrieval tools
+      url: https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools
+sources:
+  - docs/reference-databricks-ai-search.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-ai-search.md#§1
+tiers:
+  - id: query
+    label: 質問と検索
+    z: 2
+    size:
+      - 16
+      - 3
+  - id: index
+    label: 索引の更新
+    z: 1
+    size:
+      - 16
+      - 3
+  - id: governance
+    label: 権限と運用
+    z: 0
+    size:
+      - 12
+      - 3
+nodes:
+  user:
+    label: 利用者
+    kind: actor
+    tier: query
+    x: 0
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  agent:
+    label: 回答エージェント
+    kind: service
+    tier: query
+    x: 4
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  retriever:
+    label: 検索ツール
+    kind: service
+    tier: query
+    x: 8
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  endpoint:
+    label: 検索エンドポイント
+    kind: service
+    tier: query
+    x: 12
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  source:
+    label: 文書の元データ
+    kind: db
+    tier: index
+    x: 0
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  sync:
+    label: 差分の同期
+    kind: worker
+    tier: index
+    x: 4
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  embedding:
+    label: 埋め込みの生成
+    kind: service
+    tier: index
+    x: 8
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  index:
+    label: 検索インデックス
+    kind: db
+    tier: index
+    x: 12
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  catalog:
+    label: カタログとアクセス権
+    kind: service
+    tier: governance
+    x: 4
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  operator:
+    label: 運用担当
+    kind: actor
+    tier: governance
+    x: 8
+    'y': 1
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§3
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§5
+links:
+  - id: ask
+    from: user
+    to: agent
+    label: 文書について質問
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: query
+    from: agent
+    to: retriever
+    label: 関連文書の取得を依頼
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: search
+    from: retriever
+    to: endpoint
+    label: 検索と条件を送信
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: find
+    from: endpoint
+    to: index
+    label: 類似する文書を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: return
+    from: retriever
+    to: agent
+    label: 本文と出典を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: answer
+    from: agent
+    to: user
+    label: 出典を添えて回答
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: update
+    from: source
+    to: sync
+    label: 元テーブルの変更を検出
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: encode
+    from: sync
+    to: embedding
+    label: 文書の埋め込みを生成
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: write
+    from: embedding
+    to: index
+    label: ベクトルと文書を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: grant
+    from: catalog
+    to: index
+    label: 索引への権限を管理
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+  - id: check
+    from: operator
+    to: sync
+    label: 同期状況を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+scenarios:
+  - id: refresh
+    label: 文書の変更を索引へ反映
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+    steps:
+      - links:
+          - update
+          - encode
+        note: 元テーブルの変更を同期し、埋め込みを生成する。
+      - links:
+          - write
+          - check
+        note: 索引を更新し、同期状況を確認する。
+  - id: retrieve
+    label: エージェントが文書を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-ai-search.md#§2
+    steps:
+      - links:
+          - ask
+          - query
+        note: 利用者の質問を検索ツールへ渡す。
+      - links:
+          - search
+          - find
+          - grant
+        note: アクセス権と検索条件を確認し索引を検索する。
+      - links:
+          - return
+          - answer
+        note: 取得した文書と出典を回答に使う。
+implementations:
+  - id: delta-sync
+    label: Databricks on AWS・Delta Sync
+    description: Amazon S3 の文書を Delta テーブルに取り込み、Databricks AI Search と AI Bridge で検索する例。
+    sources:
+      - title: Databricks AI Search
+        url: https://docs.databricks.com/aws/en/ai-search/ai-search
+      - title: Create AI Search indexes
+        url: https://docs.databricks.com/aws/en/ai-search/create-ai-search
+      - title: Query AI Search
+        url: https://docs.databricks.com/aws/en/ai-search/query-ai-search
+      - title: Agent retrieval tools
+        url: https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools
+      - title: Databricks S3 data
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3
+    tiers:
+      - id: client
+        label: 利用者・アプリケーション
+        z: 3
+        size:
+          - 12
+          - 3
+      - id: databricks
+        label: Databricks ワークスペース
+        z: 2
+        size:
+          - 18
+          - 5
+      - id: aws
+        label: AWS・文書ストレージ
+        z: 1
+        size:
+          - 10
+          - 3
+    nodes:
+      db-user:
+        label: 利用者
+        kind: actor
+        tier: client
+        x: 0
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - user
+      db-agent:
+        label: Python エージェント
+        kind: service
+        tier: client
+        x: 4
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - agent
+      db-retriever:
+        label: AI Bridge Retriever Tool
+        kind: service
+        tier: client
+        x: 8
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - retriever
+      db-endpoint:
+        label: AI Search Endpoint
+        kind: service
+        tier: databricks
+        svc: databricks:aisearch
+        x: 15
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - endpoint
+      db-source:
+        label: Unity Catalog の Delta テーブル
+        kind: db
+        tier: databricks
+        x: 0
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - source
+        svc: databricks:delta
+      db-sync:
+        label: Delta Sync パイプライン
+        kind: worker
+        tier: databricks
+        x: 5
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - sync
+        svc: databricks:lakeflow
+      db-embedding:
+        label: Embedding Model Serving
+        kind: service
+        tier: databricks
+        svc: databricks:modelserving
+        x: 10
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - embedding
+      db-index:
+        label: Delta Sync Index
+        kind: db
+        tier: databricks
+        svc: databricks:aisearch
+        x: 15
+        'y': 4.4
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - index
+      db-catalog:
+        label: Unity Catalog の権限
+        kind: service
+        tier: databricks
+        x: 5
+        'y': 4.4
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - catalog
+        svc: databricks:unity
+      db-operator:
+        label: 索引の運用担当
+        kind: actor
+        tier: client
+        x: 0
+        'y': 4
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+        realizes:
+          - operator
+      db-sync-mode:
+        label: Triggered / Continuous の設定
+        kind: file
+        tier: client
+        x: 8
+        'y': 4
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+      db-s3:
+        label: Amazon S3 の原本文書
+        kind: db
+        svc: s3
+        tier: aws
+        x: 4
+        'y': 1
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+    links:
+      - id: db-mode
+        from: db-sync-mode
+        to: db-sync
+        label: 同期方式を設定
+      - id: db-s3-ingest
+        from: db-s3
+        to: db-source
+        label: 文書を取り込み
+    groups:
+      - kind: cloud
+        label: Databricks
+        provider: databricks
+        tier:
+          - databricks
+        nodes:
+          - db-endpoint
+          - db-source
+          - db-sync
+          - db-embedding
+          - db-index
+          - db-catalog
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - aws
+        nodes:
+          - db-s3

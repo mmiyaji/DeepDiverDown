@@ -6,57 +6,307 @@ reference:
     - AWS Glue Job がサーバーレス実行環境で抽出・変換・ロードする流れを追う。
     - Trigger と Workflow による依存関係・監視を理解する。
   sources:
-    - {title: AWS Glue concepts, url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html}
-    - {title: AWS Glue components, url: https://docs.aws.amazon.com/glue/latest/dg/components-overview.html}
-    - {title: AWS Glue How it works, url: https://docs.aws.amazon.com/glue/latest/dg/how-it-works.html}
-    - {title: AWS Glue workflows, url: https://docs.aws.amazon.com/glue/latest/dg/workflows_overview.html}
-sources: [docs/reference-aws-glue.md]
-evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]
+    - title: AWS Glue concepts
+      url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html
+    - title: AWS Glue components
+      url: https://docs.aws.amazon.com/glue/latest/dg/components-overview.html
+    - title: AWS Glue How it works
+      url: https://docs.aws.amazon.com/glue/latest/dg/how-it-works.html
+    - title: AWS Glue workflows
+      url: https://docs.aws.amazon.com/glue/latest/dg/workflows_overview.html
+sources:
+  - docs/reference-aws-glue.md
+evidence:
+  - type: doc
+    ref: docs/reference-aws-glue.md#§1
 tiers:
-  - {id: discover, label: 発見と制御, z: 1, size: [15,3]}
-  - {id: data, label: データ処理, z: 0, origin: [2,0], size: [14,3]}
+  - id: discover
+    label: 発見と制御
+    z: 1
+    size:
+      - 15
+      - 3
+  - id: data
+    label: データ処理
+    z: 0
+    origin:
+      - 2
+      - 0
+    size:
+      - 14
+      - 3
 nodes:
-  source: {label: 変換前のデータ置き場, kind: external, tier: data, x: 0, 'y': 1.5, description: 注文ファイルなどの元データ。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
-  crawler: {label: 入力スキーマの発見, kind: worker, tier: discover, x: 2, 'y': 1.5, description: データを走査しスキーマを推測する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
-  catalog: {label: テーブルの定義台帳, kind: db, tier: discover, x: 5, 'y': 1.5, description: テーブルとジョブが使う技術メタデータを管理する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§2}]}
-  trigger: {label: 処理の起動と依存制御, kind: service, tier: discover, x: 8, 'y': 1.5, description: スケジュール・イベント・依存関係で Job を起動する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§4}]}
-  job: {label: 抽出・変換の実行, kind: worker, tier: data, x: 10, y: 1.5, description: 入力データを抽出し、型や項目を変換して分析用の出力に書く。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§3}]}
-  target: {label: 分析データの保存先, kind: db, shape3D: crate, tier: data, x: 13, 'y': 1.5, description: 整備済みデータを置くデータレイク等。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
-  monitor: {label: 実行ログと監視, kind: service, tier: discover, x: 13, 'y': 2.5, description: ジョブ実行の状態、ログ、通知を追う。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
+  source:
+    label: 変換前のデータ置き場
+    kind: external
+    tier: data
+    x: 0
+    'y': 1.5
+    description: 注文ファイルなどの元データ。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§1
+  crawler:
+    label: 入力スキーマの発見
+    kind: worker
+    tier: discover
+    x: 2
+    'y': 1.5
+    description: データを走査しスキーマを推測する。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§1
+  catalog:
+    label: テーブルの定義台帳
+    kind: db
+    tier: discover
+    x: 5
+    'y': 1.5
+    description: テーブルとジョブが使う技術メタデータを管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§2
+  trigger:
+    label: 処理の起動と依存制御
+    kind: service
+    tier: discover
+    x: 8
+    'y': 1.5
+    description: スケジュール・イベント・依存関係で Job を起動する。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§4
+  job:
+    label: 抽出・変換の実行
+    kind: worker
+    tier: data
+    x: 10
+    'y': 1.5
+    description: 入力データを抽出し、型や項目を変換して分析用の出力に書く。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§3
+  target:
+    label: 分析データの保存先
+    kind: db
+    shape3D: crate
+    tier: data
+    x: 13
+    'y': 1.5
+    description: 整備済みデータを置くデータレイク等。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§5
+  monitor:
+    label: 実行ログと監視
+    kind: service
+    tier: discover
+    x: 13
+    'y': 2.5
+    description: ジョブ実行の状態、ログ、通知を追う。
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§5
 links:
-  - {id: crawl, from: source, to: crawler, label: スキーマを発見, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
-  - {id: catalog, from: crawler, to: catalog, label: テーブル定義を登録, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§1}]}
-  - {id: trigger, from: trigger, to: job, label: Job を起動, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§4}]}
-  - {id: metadata, from: catalog, to: job, label: ソース・ターゲット定義を提供, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§2}]}
-  - {id: process, from: source, to: job, label: データを抽出・変換, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§3}]}
-  - {id: load, from: job, to: target, label: 結果をロード, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
-  - {id: observe, from: job, to: monitor, label: 実行を監視, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§5}]}
+  - id: crawl
+    from: source
+    to: crawler
+    label: スキーマを発見
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§1
+  - id: catalog
+    from: crawler
+    to: catalog
+    label: テーブル定義を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§1
+  - id: trigger
+    from: trigger
+    to: job
+    label: Job を起動
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§4
+  - id: metadata
+    from: catalog
+    to: job
+    label: ソース・ターゲット定義を提供
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§2
+  - id: process
+    from: source
+    to: job
+    label: データを抽出・変換
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§3
+  - id: load
+    from: job
+    to: target
+    label: 結果をロード
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§5
+  - id: observe
+    from: job
+    to: monitor
+    label: 実行を監視
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§5
 scenarios:
-  - {id: catalog-etl, label: Catalog から分析用データへ, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§6}], steps: [{links: [crawl, catalog], note: Crawler がソースを走査し、Data Catalog にテーブル定義を登録する。}, {links: [trigger, metadata, process], note: Trigger が Job を起動し、Catalog の定義を使って抽出・変換する。}, {links: [load, observe], note: 結果をターゲットへ書き、ログと状態を監視する。}]}
-
+  - id: catalog-etl
+    label: Catalog から分析用データへ
+    evidence:
+      - type: doc
+        ref: docs/reference-aws-glue.md#§6
+    steps:
+      - links:
+          - crawl
+          - catalog
+        note: Crawler がソースを走査し、Data Catalog にテーブル定義を登録する。
+      - links:
+          - trigger
+          - metadata
+          - process
+        note: Trigger が Job を起動し、Catalog の定義を使って抽出・変換する。
+      - links:
+          - load
+          - observe
+        note: 結果をターゲットへ書き、ログと状態を監視する。
 implementations:
   - id: aws
-    label: "AWS Glue で S3 の CSV を Parquet に変換"
-    description: "S3 の raw プレフィックスにある注文 CSV をクロールし、登録した定義を Glue の Spark ジョブで読む例。処理後は別のプレフィックスに Parquet を保存する。"
+    label: AWS Glue で S3 の CSV を Parquet に変換
+    description: S3 の raw プレフィックスにある注文 CSV をクロールし、登録した定義を Glue の Spark ジョブで読む例。処理後は別のプレフィックスに Parquet を保存する。
     sources:
-      - {title: AWS Glue concepts, url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html}
-      - {title: AWS Glue components, url: https://docs.aws.amazon.com/glue/latest/dg/components-overview.html}
-      - {title: AWS Glue How it works, url: https://docs.aws.amazon.com/glue/latest/dg/how-it-works.html}
-      - {title: AWS Glue workflows, url: https://docs.aws.amazon.com/glue/latest/dg/workflows_overview.html}
-      - {title: Crawler prerequisites, url: https://docs.aws.amazon.com/glue/latest/dg/crawler-prereqs.html}
-      - {title: Logging and monitoring in AWS Glue, url: https://docs.aws.amazon.com/glue/latest/dg/logging-and-monitoring.html}
+      - title: AWS Glue concepts
+        url: https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html
+      - title: AWS Glue components
+        url: https://docs.aws.amazon.com/glue/latest/dg/components-overview.html
+      - title: AWS Glue How it works
+        url: https://docs.aws.amazon.com/glue/latest/dg/how-it-works.html
+      - title: AWS Glue workflows
+        url: https://docs.aws.amazon.com/glue/latest/dg/workflows_overview.html
+      - title: Crawler prerequisites
+        url: https://docs.aws.amazon.com/glue/latest/dg/crawler-prereqs.html
+      - title: Logging and monitoring in AWS Glue
+        url: https://docs.aws.amazon.com/glue/latest/dg/logging-and-monitoring.html
     tiers:
-      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
-      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+      - id: processing
+        label: データの処理と保存
+        z: 0
+        size:
+          - 14
+          - 5
+      - id: setup
+        label: 実行に必要な設定・成果物
+        z: 1
+        size:
+          - 14
+          - 3
     groups:
-      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [processing, setup]}
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - processing
+          - setup
     nodes:
-      aws-s3: {label: Amazon S3 の raw・curated プレフィックス, kind: db, tier: processing, x: 1, y: 1.15, svc: s3, realizes: [source, target], description: raw へ CSV を置き、curated に Parquet を書く。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
-      aws-crawler: {label: Glue Crawler, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [crawler], description: raw プレフィックスを分類し、テーブル定義を更新する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
-      aws-catalog: {label: Glue Data Catalog, kind: catalog, tier: processing, x: 5, y: 1.15, realizes: [catalog], description: クロール結果のスキーマと S3 上の位置を持つ。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
-      aws-workflow: {label: Glue Workflow と Trigger, kind: workflow, tier: processing, x: 5, y: 3.65, realizes: [trigger], description: Crawler の成功を条件にジョブを起動する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
-      aws-spark: {label: Glue Spark ETL ジョブ, kind: worker, tier: processing, x: 9, y: 1.15, realizes: [job], description: カタログから入力を読み、必要列の型を整えて Parquet を保存する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
-      aws-logs: {label: Amazon CloudWatch Logs, kind: monitor, tier: processing, x: 9, y: 3.65, svc: cloudwatch, realizes: [monitor], description: ジョブ実行ログから処理結果とエラーを確認する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
-      aws-role: {label: Glue の IAM 実行ロール, kind: policy, tier: setup, x: 1, y: 1.5, description: Crawler とジョブに必要な S3・Data Catalog へのアクセスを用途に応じて付与する。, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
+      aws-s3:
+        label: Amazon S3 の raw・curated プレフィックス
+        kind: db
+        tier: processing
+        x: 1
+        'y': 1.15
+        svc: s3
+        realizes:
+          - source
+          - target
+        description: raw へ CSV を置き、curated に Parquet を書く。
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-glue.md#§7
+      aws-crawler:
+        label: Glue Crawler
+        kind: worker
+        tier: processing
+        x: 1
+        'y': 3.65
+        svc: glue
+        realizes:
+          - crawler
+        description: raw プレフィックスを分類し、テーブル定義を更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-glue.md#§7
+      aws-catalog:
+        label: Glue Data Catalog
+        kind: catalog
+        tier: processing
+        x: 5
+        'y': 1.15
+        svc: glue
+        realizes:
+          - catalog
+        description: クロール結果のスキーマと S3 上の位置を持つ。
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-glue.md#§7
+      aws-workflow:
+        label: Glue Workflow と Trigger
+        kind: workflow
+        tier: processing
+        x: 5
+        'y': 3.65
+        svc: glue
+        realizes:
+          - trigger
+        description: Crawler の成功を条件にジョブを起動する。
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-glue.md#§7
+      aws-spark:
+        label: Glue Spark ETL ジョブ
+        kind: worker
+        tier: processing
+        x: 9
+        'y': 1.15
+        svc: glue
+        realizes:
+          - job
+        description: カタログから入力を読み、必要列の型を整えて Parquet を保存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-glue.md#§7
+      aws-logs:
+        label: Amazon CloudWatch Logs
+        kind: monitor
+        tier: processing
+        x: 9
+        'y': 3.65
+        svc: cloudwatch
+        realizes:
+          - monitor
+        description: ジョブ実行ログから処理結果とエラーを確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-glue.md#§7
+      aws-role:
+        label: Glue の IAM 実行ロール
+        kind: policy
+        tier: setup
+        x: 1
+        'y': 1.5
+        description: Crawler とジョブに必要な S3・Data Catalog へのアクセスを用途に応じて付与する。
+        evidence:
+          - type: doc
+            ref: docs/reference-aws-glue.md#§7
+        svc: iam
     links:
-      - {id: aws-role-connection, from: aws-role, to: aws-spark, label: ジョブのアクセス権限を渡す}
+      - id: aws-role-connection
+        from: aws-role
+        to: aws-spark
+        label: ジョブのアクセス権限を渡す

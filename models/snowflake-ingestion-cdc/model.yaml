@@ -1,82 +1,459 @@
-name: "Snowflake の取り込みと増分処理"
-description: "注文ファイルと行ストリームの取り込みから、Streams／Tasks または Dynamic Tables で増分を整える。"
-parent: {"model":"snowflake","node":"load"}
+name: Snowflake の取り込みと増分処理
+description: 注文ファイルと行ストリームの取り込みから、Streams／Tasks または Dynamic Tables で増分を整える。
+parent:
+  model: snowflake
+  node: load
 reference:
   objectives:
-    - "ファイルのロードと行の連続取り込みを区別する。"
-    - "CDC の消費位置と、変換結果の鮮度目標を区別する。"
+    - ファイルのロードと行の連続取り込みを区別する。
+    - CDC の消費位置と、変換結果の鮮度目標を区別する。
   sources:
-    - {"title":"Snowpipe","url":"https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro"}
-    - {"title":"Snowpipe Streaming","url":"https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"}
-    - {"title":"Streams and Tasks","url":"https://docs.snowflake.com/en/user-guide/data-pipelines-intro"}
-    - {"title":"Dynamic Tables の選択ガイド","url":"https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide"}
-sources: ["docs/reference-snowflake-ingestion-cdc.md"]
-evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§1"}]
+    - title: Snowpipe
+      url: https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro
+    - title: Snowpipe Streaming
+      url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+    - title: Streams and Tasks
+      url: https://docs.snowflake.com/en/user-guide/data-pipelines-intro
+    - title: Dynamic Tables の選択ガイド
+      url: https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide
+sources:
+  - docs/reference-snowflake-ingestion-cdc.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-ingestion-cdc.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[15.5,4.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 15.5
+      - 4.5
 nodes:
-  files: {"label":"到着した注文ファイル","kind":"external","tier":"flow","x":0,"y":0,"description":"取込前のファイルをオブジェクトストレージに置く。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
-  pipe: {"label":"通知駆動のファイル取込","kind":"service","tier":"flow","x":3,"y":0,"description":"ファイル到着通知を受け、対象ファイルを読み込む。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
-  client: {"label":"注文イベント送信元","kind":"external","tier":"flow","x":0,"y":4,"description":"取込 API と接続する送信側。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
-  streaming: {"label":"連続行取込","kind":"service","tier":"flow","x":3,"y":4,"description":"送信元から行を順次受け取る。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
-  raw: {"label":"注文変更の受入表","kind":"db","tier":"flow","x":6,"y":2,"description":"到着順の変更イベントを保持。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§1"}]}
-  change: {"label":"未処理変更と読取位置","kind":"service","tier":"flow","x":9,"y":0,"description":"変更範囲のオフセットを管理。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
-  task: {"label":"変更適用ジョブ","kind":"worker","tier":"flow","x":12,"y":0,"description":"注文の現在状態を更新。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
-  orders: {"label":"注文の現在状態表","kind":"db","tier":"flow","x":15,"y":0,"description":"業務キー別の現在状態。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
-  dynamic: {"label":"鮮度目標付き注文集計","kind":"db","tier":"flow","x":11,"y":4,"description":"定義と目標遅延に基づく分析用テーブル。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
-  bi: {"label":"BI","kind":"client","tier":"flow","x":15,"y":4,"description":"集計結果の利用先。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
+  files:
+    label: 到着した注文ファイル
+    kind: external
+    tier: flow
+    x: 0
+    'y': 0
+    description: 取込前のファイルをオブジェクトストレージに置く。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§2
+  pipe:
+    label: 通知駆動のファイル取込
+    kind: service
+    tier: flow
+    x: 3
+    'y': 0
+    description: ファイル到着通知を受け、対象ファイルを読み込む。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§2
+  client:
+    label: 注文イベント送信元
+    kind: external
+    tier: flow
+    x: 0
+    'y': 4
+    description: 取込 API と接続する送信側。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§3
+  streaming:
+    label: 連続行取込
+    kind: service
+    tier: flow
+    x: 3
+    'y': 4
+    description: 送信元から行を順次受け取る。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§3
+  raw:
+    label: 注文変更の受入表
+    kind: db
+    tier: flow
+    x: 6
+    'y': 2
+    description: 到着順の変更イベントを保持。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§1
+  change:
+    label: 未処理変更と読取位置
+    kind: service
+    tier: flow
+    x: 9
+    'y': 0
+    description: 変更範囲のオフセットを管理。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
+  task:
+    label: 変更適用ジョブ
+    kind: worker
+    tier: flow
+    x: 12
+    'y': 0
+    description: 注文の現在状態を更新。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
+  orders:
+    label: 注文の現在状態表
+    kind: db
+    tier: flow
+    x: 15
+    'y': 0
+    description: 業務キー別の現在状態。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
+  dynamic:
+    label: 鮮度目標付き注文集計
+    kind: db
+    tier: flow
+    x: 11
+    'y': 4
+    description: 定義と目標遅延に基づく分析用テーブル。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§5
+  bi:
+    label: BI
+    kind: client
+    tier: flow
+    x: 15
+    'y': 4
+    description: 集計結果の利用先。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§5
 links:
-  - {"id":"notify","from":"files","to":"pipe","label":"到着通知とファイル名","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
-  - {"id":"copy","from":"pipe","to":"raw","label":"ファイルを読み込む","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
-  - {"id":"send","from":"client","to":"streaming","label":"注文イベント行を送る","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
-  - {"id":"commit","from":"streaming","to":"raw","label":"行をコミット","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
-  - {"id":"delta","from":"raw","to":"change","label":"未消費の変更を参照","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
-  - {"id":"consume","from":"change","to":"task","label":"変更行を読む","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
-  - {"id":"merge","from":"task","to":"orders","label":"注文状態を更新","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
-  - {"id":"refresh","from":"raw","to":"dynamic","label":"集計定義に従い更新する","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
-  - {"id":"serve","from":"dynamic","to":"bi","label":"集計を参照","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
+  - id: notify
+    from: files
+    to: pipe
+    label: 到着通知とファイル名
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§2
+  - id: copy
+    from: pipe
+    to: raw
+    label: ファイルを読み込む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§2
+  - id: send
+    from: client
+    to: streaming
+    label: 注文イベント行を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§3
+  - id: commit
+    from: streaming
+    to: raw
+    label: 行をコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§3
+  - id: delta
+    from: raw
+    to: change
+    label: 未消費の変更を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
+  - id: consume
+    from: change
+    to: task
+    label: 変更行を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
+  - id: merge
+    from: task
+    to: orders
+    label: 注文状態を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
+  - id: refresh
+    from: raw
+    to: dynamic
+    label: 集計定義に従い更新する
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§5
+  - id: serve
+    from: dynamic
+    to: bi
+    label: 集計を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§5
 scenarios:
   - id: load-files
-    label: "ファイルを取り込んで現在状態を更新"
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]
+    label: ファイルを取り込んで現在状態を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
     steps:
-      - {"links":["notify","copy"],"note":"日次ファイルの到着通知を受け、Snowpipe が RAW にロードする。"}
-      - {"links":["delta","consume"],"note":"Task が未消費の Stream の差分を読む。"}
-      - {"links":["merge"],"note":"MERGE をコミットし、現在状態と Stream の消費位置を進める。"}
+      - links:
+          - notify
+          - copy
+        note: 日次ファイルの到着通知を受け、Snowpipe が RAW にロードする。
+      - links:
+          - delta
+          - consume
+        note: Task が未消費の Stream の差分を読む。
+      - links:
+          - merge
+        note: MERGE をコミットし、現在状態と Stream の消費位置を進める。
   - id: stream-rows
-    label: "連続取り込みから定義済み集計へ"
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]
+    label: 連続取り込みから定義済み集計へ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§5
     steps:
-      - {"links":["send"],"note":"送信元はチャネルに注文イベントを行単位で送る。"}
-      - {"links":["commit"],"note":"RAW へのコミットと送信元の再開位置を対応付ける。"}
-      - {"links":["refresh"],"note":"依存テーブルをもとに目標遅延を意識して集計を更新する。"}
-      - {"links":["serve"],"note":"BI は直近のリフレッシュ結果を参照する。"}
+      - links:
+          - send
+        note: 送信元はチャネルに注文イベントを行単位で送る。
+      - links:
+          - commit
+        note: RAW へのコミットと送信元の再開位置を対応付ける。
+      - links:
+          - refresh
+        note: 依存テーブルをもとに目標遅延を意識して集計を更新する。
+      - links:
+          - serve
+        note: BI は直近のリフレッシュ結果を参照する。
 requirements:
-  - {"id":"REQ-1","kind":"usecase","title":"増分で注文状態を更新","text":"処理済みデータと未処理の変更を再開位置で区別できる。","scenario":"load-files","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
-
+  - id: REQ-1
+    kind: usecase
+    title: 増分で注文状態を更新
+    text: 処理済みデータと未処理の変更を再開位置で区別できる。
+    scenario: load-files
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-ingestion-cdc.md#§4
 implementations:
   - id: snowflake-ingest
-    label: "Snowflake のファイルと行ストリーム取込"
-    description: "外部ステージ経由のファイル取込と SDK による行取込を、別々の入力経路として使う例。"
+    label: Snowflake のファイルと行ストリーム取込
+    description: 外部ステージ経由のファイル取込と SDK による行取込を、別々の入力経路として使う例。
     sources:
-      - {title: "Snowpipe", url: "https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro"}
-      - {title: "Snowpipe Streaming", url: "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"}
-      - {title: "Streams and Tasks", url: "https://docs.snowflake.com/en/user-guide/data-pipelines-intro"}
-      - {title: "Dynamic Tables の選択ガイド", url: "https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide"}
-      - {title: "Snowpipe の S3 自動取込", url: "https://docs.snowflake.com/en/user-guide/data-load-snowpipe-auto-s3"}
+      - title: Snowpipe
+        url: https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro
+      - title: Snowpipe Streaming
+        url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+      - title: Streams and Tasks
+        url: https://docs.snowflake.com/en/user-guide/data-pipelines-intro
+      - title: Dynamic Tables の選択ガイド
+        url: https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide
+      - title: Snowpipe の S3 自動取込
+        url: https://docs.snowflake.com/en/user-guide/data-load-snowpipe-auto-s3
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [15.5,4.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 15.5
+          - 4.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-files: {label: "Amazon S3 外部ステージ", kind: "db", tier: "flow", x: 0, y: 0, svc: "s3", realizes: ["files"], description: "注文ファイルを外部ステージに関連付ける。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-pipe: {label: "Snowpipe AUTO_INGEST", kind: "service", tier: "flow", x: 3, y: 0, realizes: ["pipe"], description: "S3 オブジェクト通知を受けて COPY を行う。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-client: {label: "注文イベント送信アプリ", kind: "external", tier: "flow", x: 0, y: 4, realizes: ["client"], description: "Snowpipe Streaming SDK でイベントを送る。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-streaming: {label: "Snowpipe Streaming のチャネル", kind: "service", tier: "flow", x: 3, y: 4, realizes: ["streaming"], description: "行をチャネルで取り込み、SDK の進捗管理を行う。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-raw: {label: "RAW_ORDERS と Stream", kind: "db", tier: "flow", x: 6, y: 2, realizes: ["raw","change"], description: "同じ Snowflake スキーマで受入表と未消費の変更範囲を管理する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-task: {label: "Task の MERGE", kind: "worker", tier: "flow", x: 12, y: 0, realizes: ["task"], description: "注文キーとソース順序を使って、対象表に変更を反映する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-orders: {label: "ORDERS_CURRENT", kind: "db", tier: "flow", x: 15, y: 0, realizes: ["orders"], description: "検証済みの受注の現在状態を持つ。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-dynamic: {label: "日別集計 Dynamic Table", kind: "db", tier: "flow", x: 11, y: 4, realizes: ["dynamic"], description: "目標遅延を設定してクエリ結果を更新する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-bi: {label: "BI 用 SQL クライアント", kind: "client", tier: "flow", x: 15, y: 4, realizes: ["bi"], description: "注文日別の集計を利用する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
-      example-notif: {label: "S3 イベント通知", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "新しい注文オブジェクトのキーを Snowpipe に伝える。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
+      example-files:
+        label: Amazon S3 注文ファイル
+        kind: db
+        tier: flow
+        x: 0
+        'y': 0
+        svc: s3
+        realizes:
+          - files
+        description: 注文ファイルを S3 バケットに置く。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-pipe:
+        label: Snowpipe AUTO_INGEST
+        kind: service
+        tier: flow
+        svc: snowflake:pipe
+        x: 3
+        'y': 0
+        realizes:
+          - pipe
+        description: S3 オブジェクト通知を受けて COPY を行う。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-client:
+        label: 注文イベント送信アプリ
+        kind: external
+        tier: flow
+        x: 0
+        'y': 4
+        realizes:
+          - client
+        description: Snowpipe Streaming SDK でイベントを送る。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-streaming:
+        label: Snowpipe Streaming のチャネル
+        kind: service
+        tier: flow
+        svc: snowflake:pipe
+        x: 3
+        'y': 4
+        realizes:
+          - streaming
+        description: 行をチャネルで取り込み、SDK の進捗管理を行う。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-raw:
+        svc: snowflake:platform
+        label: RAW_ORDERS と Stream
+        kind: db
+        tier: flow
+        x: 6
+        'y': 2
+        realizes:
+          - raw
+          - change
+        description: 同じ Snowflake スキーマで受入表と未消費の変更範囲を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-task:
+        svc: snowflake:task
+        label: Task の MERGE
+        kind: worker
+        tier: flow
+        x: 12
+        'y': 0
+        realizes:
+          - task
+        description: 注文キーとソース順序を使って、対象表に変更を反映する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-orders:
+        svc: snowflake:platform
+        label: ORDERS_CURRENT
+        kind: db
+        tier: flow
+        x: 15
+        'y': 0
+        realizes:
+          - orders
+        description: 検証済みの受注の現在状態を持つ。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-dynamic:
+        svc: snowflake:dynamic
+        label: 日別集計 Dynamic Table
+        kind: db
+        tier: flow
+        x: 11
+        'y': 4
+        realizes:
+          - dynamic
+        description: 目標遅延を設定してクエリ結果を更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-bi:
+        label: BI 用 SQL クライアント
+        kind: client
+        tier: flow
+        x: 19
+        'y': 4
+        realizes:
+          - bi
+        description: 注文日別の集計を利用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-notif:
+        label: S3 イベント通知
+        kind: service
+        tier: implementation-setup
+        svc: aws:s3
+        x: 1
+        'y': 1.5
+        description: 新しい注文オブジェクトのキーを Snowpipe に伝える。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      example-stage:
+        label: Snowflake 外部ステージ
+        kind: service
+        tier: implementation-setup
+        svc: snowflake:platform
+        x: 5
+        y: 1.5
+        description: S3 のバケットを参照する Snowflake 側のステージを定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
     links:
-      - {id: "example-notif-connection", from: "example-notif", to: "example-pipe", label: "オブジェクト作成を通知", evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§6"}]}
+      - id: example-stage-bucket
+        from: example-stage
+        to: example-files
+        label: バケットのファイルを参照
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      - id: example-pipe-stage
+        from: example-pipe
+        to: example-stage
+        label: 取込対象のステージを指定
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+      - id: example-notif-connection
+        from: example-notif
+        to: example-pipe
+        label: オブジェクト作成を通知
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-ingestion-cdc.md#§6
+    groups:
+      - kind: cloud
+        label: AWS・Amazon S3
+        provider: aws
+        tier: [implementation-setup]
+        nodes: [example-notif]
+      - kind: cloud
+        label: Snowflake
+        provider: snowflake
+        tier: [implementation-setup]
+        nodes: [example-stage]
+      - kind: cloud
+        label: AWS・Amazon S3
+        provider: aws
+        tier:
+          - flow
+        nodes:
+          - example-files
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake
+        tier:
+          - flow
+        nodes:
+          - example-pipe
+          - example-streaming
+          - example-raw
+          - example-task
+          - example-orders
+          - example-dynamic

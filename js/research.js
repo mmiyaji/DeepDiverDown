@@ -5,6 +5,8 @@ applyAppearance(loadSettings());
 const byId = id => document.getElementById(id);
 const query = byId('research-query');
 const domain = byId('research-domain');
+const intents = byId('research-intents');
+const intentOptions = byId('research-intent-options');
 const reset = byId('research-reset');
 const status = byId('research-status');
 const table = byId('research-table-wrap');
@@ -17,11 +19,17 @@ const narrow = matchMedia('(max-width: 760px)');
 const candidatesPath = 'docs/reference-modern-data-stack-candidates.md';
 const validDocument = path => path === 'README.md' || /^docs\/[a-z0-9-]+\.md$/.test(path);
 
-if (narrow.matches) historyPanel.open = false;
+const intentLabels = new Map([
+  ['', 'すべて'],
+  ['製品・技術のアーキテクチャ', '製品・技術の構成を知る'],
+  ['設計パターン・ユースケース', '設計パターンを学ぶ'],
+  ['仕組みの深掘り', '内部の仕組みを理解する'],
+]);
 
 let entries = [];
 let historyEntries = [];
 let selectedHistory = '';
+let selectedIntent = '';
 let normalizedEntries = [];
 
 function element(tag, text, className) {
@@ -88,6 +96,7 @@ function rowFor(entry) {
   name.scope = 'row';
   name.setAttribute('role', 'rowheader');
   name.append(element('div', entry.name, 'research-title'));
+  if (entry.description) name.append(element('p', entry.description, 'research-description'));
   for (const metadata of [
     [entry.domain, entry.kind, entry.category].filter(Boolean).join(' / '),
     entry.tags.join('・'),
@@ -142,6 +151,25 @@ function renderHistoryChoices() {
   historyList.replaceChildren(all, ...choices);
 }
 
+function renderIntentChoices() {
+  const available = new Set(entries.map(entry => entry.kind).filter(Boolean));
+  const choices = new Map(intentLabels);
+  for (const kind of available) if (!choices.has(kind)) choices.set(kind, kind);
+  const options = [];
+  for (const [kind, label] of choices) {
+    if (kind && !available.has(kind)) continue;
+    const option = element('label', '', 'research-intent');
+    const radio = element('input');
+    radio.type = 'radio';
+    radio.name = 'kind';
+    radio.value = kind;
+    radio.checked = kind === selectedIntent;
+    option.append(radio, element('span', label));
+    options.push(option);
+  }
+  intentOptions.replaceChildren(...options);
+}
+
 function renderHistorySelection(event) {
   for (const button of historyList.querySelectorAll('button')) {
     button.setAttribute('aria-pressed', String(button.dataset.history === selectedHistory));
@@ -164,6 +192,7 @@ function updateAddress() {
   for (const [key, value] of [
     ['q', query.value.trim()],
     ['domain', domain.value],
+    ['kind', selectedIntent],
     ['history', selectedHistory],
   ]) {
     if (value) address.searchParams.set(key, value);
@@ -180,6 +209,7 @@ function render() {
   const output = normalizedEntries.filter(({ entry, searchable }) =>
     (!eventIds || eventIds.has(entry.id))
     && (!domain.value || entry.domain === domain.value)
+    && (!selectedIntent || entry.kind === selectedIntent)
     && words.every(word => searchable.includes(word)));
   renderHistorySelection(event);
   results.replaceChildren(...output.map(({ entry }) => rowFor(entry)));
@@ -187,7 +217,7 @@ function render() {
   status.textContent = output.length
     ? output.length + '件 / リファレンス全' + entries.length + '件'
     : '条件に一致するリファレンスがありません。キーワードや絞り込み条件を変更してください。';
-  reset.disabled = !(query.value.trim() || domain.value || selectedHistory);
+  reset.disabled = !(query.value.trim() || domain.value || selectedIntent || selectedHistory);
 }
 
 async function load() {
@@ -215,8 +245,11 @@ async function load() {
     byId('research-candidates').href = readerAddress(candidatesPath);
     query.value = filters.get('q') || '';
     domain.value = domains.includes(filters.get('domain')) ? filters.get('domain') : '';
+    selectedIntent = entries.find(entry => entry.kind === filters.get('kind'))?.kind || '';
     selectedHistory = historyEntries.find(event => event.id === filters.get('history'))?.id || '';
-    query.disabled = domain.disabled = false;
+    if (selectedHistory) historyPanel.open = true;
+    query.disabled = domain.disabled = intents.disabled = false;
+    renderIntentChoices();
     renderHistoryChoices();
     render();
   } catch {
@@ -341,10 +374,15 @@ function refreshFilters() {
 
 query.addEventListener('input', refreshFilters);
 domain.addEventListener('change', refreshFilters);
+intentOptions.addEventListener('change', event => {
+  selectedIntent = event.target.value;
+  refreshFilters();
+});
 byId('filters').addEventListener('submit', event => event.preventDefault());
 byId('filters').addEventListener('reset', event => {
   event.preventDefault();
-  query.value = domain.value = selectedHistory = '';
+  query.value = domain.value = selectedHistory = selectedIntent = '';
+  intentOptions.querySelector('input').checked = true;
   refreshFilters();
   query.focus();
 });

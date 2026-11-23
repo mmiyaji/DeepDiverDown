@@ -28,6 +28,16 @@ export const SHAPE_OVERRIDES = {
 };
 
 const GLYPHS = {
+  client: '<rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21h8m-4-4v4M7 8l3 2.5L7 13m5 0h4"/>',
+  service: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M7 8h10m-10 4h10m-10 4h6"/>',
+  worker: '<path d="m14 3-9 10h6l-1 8 9-11h-6l1-7Z"/>',
+  external: '<path d="M11 5H5v14h14v-6M13 5h6v6m0-6-8 8"/>',
+  lb: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v5m-7 5v-5h14v5"/>',
+  cdn: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18m-9-9a16 16 0 0 1 0 18 16 16 0 0 1 0-18z"/>',
+  gateway: '<path d="M4 4h7v5m0 6v5H4m10-8h7m-3-3 3 3-3 3M4 12h10"/>',
+  host: '<rect x="4" y="4" width="16" height="7" rx="1"/><rect x="4" y="13" width="16" height="7" rx="1"/><path d="M7 7.5h1m-1 9h1m4-9h5m-5 9h5"/>',
+  scheduler: '<rect x="4" y="5" width="16" height="16" rx="1"/><path d="M8 3v4m8-4v4M4 10h16m-8 3v3l2 1"/>',
+  cache: '<path d="M4 5h16v14H4zM7 3v2m5-2v2m5-2v2M7 19v2m5-2v2m5-2v2M8 9h8v6H8z"/>',
   plug: '<path d="M8 7h4a5 5 0 0 1 0 10H8zM3 9.5h5M3 14.5h5M17 12h4"/>',
   crate: '<path d="M3 4h18v4H3zM4 8v12h16V8M8 11v6m4-6v6m4-6v6"/>',
   cyl: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12a7 3 0 0 0 14 0V6M5 12a7 3 0 0 0 14 0"/>',
@@ -48,6 +58,9 @@ export function nodeShape(kind, serviceShape) {
   return type?.preferShape ? type.shape : serviceShape || type?.shape || 'box';
 }
 
-export function nodeGlyph(shape) {
+export function nodeGlyph(shape, kind) {
+  if (Object.hasOwn(NODE_KINDS, kind)) {
+    return Object.hasOwn(GLYPHS, kind) ? GLYPHS[kind] : GLYPHS[NODE_KINDS[kind].shape];
+  }
   return Object.hasOwn(GLYPHS, shape) ? GLYPHS[shape] : GLYPHS.box;
 }

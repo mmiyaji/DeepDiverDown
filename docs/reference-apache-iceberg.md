@@ -4,6 +4,8 @@
 
 SQL エンジンはテーブルの現在のメタデータを読み、そこから対象スナップショットを選ぶ。ストレージ上のデータファイル一覧を直接推測するのではなく、テーブルメタデータを起点に読む。出典 [Iceberg Specification](https://iceberg.apache.org/spec/)
 
+v3 の詳細は [Variant と Parquet shredding](reference-iceberg-v3-variant.md)、[メタデータと削除参照](reference-iceberg-v3-metadata.md) を参照する。
+
 ## 2. スナップショットの切り替え
 
 ライターは新しいデータファイルを準備し、メタデータを更新してスナップショットをコミットする。読み手は読み込み時点のスナップショットを使い、更新をリフレッシュするまで同じ状態を見続ける。出典 [Iceberg Specification](https://iceberg.apache.org/spec/)
@@ -26,7 +28,7 @@ SQL エンジンはテーブルの現在のメタデータを読み、そこか�
 
 ## 7. スナップショットの履歴と失効
 
-コミットのたびに新しいスナップショットが作られ、テーブルメタデータの `snapshots` と `snapshot-log` に履歴が残る。操作の種類（append、overwrite、delete、replace＝コンパクションなど）と追加・削除したファイル数が `summary` に記録される。`FOR TIMESTAMP AS OF` や `FOR VERSION AS OF` で過去のスナップショットを選ぶと、その版の Manifest List から当時の生存ファイルを読む。古いスナップショットは `expire_snapshots` で失効させ、失効した版だけが参照していたファイルを削除する。失効させた版へはタイムトラベルできない。出典 [Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
+データの追加・削除などの更新では新しいスナップショットが作られ、テーブルメタデータの `snapshots` と `snapshot-log` に履歴が残る。スキーマ変更などのメタデータ更新では、必ずしも新しいスナップショットは作られない。操作の種類（append、overwrite、delete、replace＝コンパクションなど）と追加・削除したファイル数が `summary` に記録される。`FOR TIMESTAMP AS OF` や `FOR VERSION AS OF` で過去のスナップショットを選ぶと、その版の Manifest List から当時の生存ファイルを読む。古いスナップショットは `expire_snapshots` で失効させ、失効した版だけが参照していたファイルを削除する。失効させた版へはタイムトラベルできない。出典 [Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
 
 ## 8. パーティションの進化と孤立ファイル
 

@@ -1,6 +1,8 @@
-name: "Iceberg カタログ経由の読み取り：カタログからページまで"
+name: Iceberg カタログ経由の読み取り：カタログからページまで
 description: REST カタログへの問い合わせから metadata.json、Manifest List、Manifest を経て、Parquet のフッターとページを読むまでの全経路を追います。
-parent: {model: iceberg-distributed-scan, node: metajson}
+parent:
+  model: iceberg-distributed-scan
+  node: metajson
 reference:
   objectives:
     - カタログが持つもの（現在の metadata.json へのポインタ）と持たないもの（データ・Manifest）を区別する。
@@ -8,66 +10,299 @@ reference:
     - 一時資格情報（credential vending）とキャッシュが読み取りに与える影響を理解する。
     - 読み取り中のコミットとスナップショット分離の関係を説明する。
   sources:
-    - {title: Iceberg REST Catalog Spec, url: "https://iceberg.apache.org/rest-catalog-spec/"}
-    - {title: Iceberg REST Catalog OpenAPI, url: "https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml"}
-    - {title: Iceberg Catalogs, url: "https://iceberg.apache.org/docs/latest/catalogs/"}
-    - {title: Apache Iceberg Specification, url: "https://iceberg.apache.org/spec/"}
-sources: [docs/reference-iceberg-catalog-read.md]
-evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§1"}, {type: doc, ref: "docs/reference-iceberg-catalog-read.md#§4"}]
+    - title: Iceberg REST Catalog Spec
+      url: https://iceberg.apache.org/rest-catalog-spec/
+    - title: Iceberg REST Catalog OpenAPI
+      url: https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml
+    - title: Iceberg Catalogs
+      url: https://iceberg.apache.org/docs/latest/catalogs/
+    - title: Apache Iceberg Specification
+      url: https://iceberg.apache.org/spec/
+sources:
+  - docs/reference-iceberg-catalog-read.md
+evidence:
+  - type: doc
+    ref: docs/reference-iceberg-catalog-read.md#§1
+  - type: doc
+    ref: docs/reference-iceberg-catalog-read.md#§4
 tiers:
-  - {id: engine, label: エンジン（コーディネーター・Worker）, z: 2, size: [14, 3]}
-  - {id: catalog, label: カタログ, z: 1, size: [14, 3]}
-  - {id: storage, label: オブジェクトストレージ, z: 0, size: [14, 3]}
+  - id: engine
+    label: エンジン（コーディネーター・Worker）
+    z: 2
+    size:
+      - 14
+      - 3
+  - id: catalog
+    label: カタログ
+    z: 1
+    size:
+      - 14
+      - 3
+  - id: storage
+    label: オブジェクトストレージ
+    z: 0
+    size:
+      - 14
+      - 3
 nodes:
-  coordinator: {label: Coordinator, kind: service, tier: engine, x: 2, y: 1.5, description: カタログでテーブルを解決し、メタデータの木をたどって読むファイルを決める。, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  worker: {label: Worker, kind: worker, tier: engine, x: 10, y: 1.5, parallel: N, description: Split を受け取り、Parquet を範囲 GET で読み、Delete を適用する。, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  rest: {label: REST Catalog, kind: service, tier: catalog, x: 4, y: 1.5, description: "テーブル名 → 現在の metadata.json の場所を返す。コミットはこのポインタの原子的な差し替え。", evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
-  creds: {label: Vended Credentials, kind: cache, tier: catalog, x: 9, y: 1.5, description: そのテーブルの場所だけに使える一時的なストレージ資格情報。, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
-  metajson: {label: metadata.json, kind: db, tier: storage, x: 1, y: 1.5, description: "スナップショット一覧、current-snapshot-id、スキーマ、パーティション仕様、ソート順。", evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  mlist: {label: Manifest List (Avro), kind: db, tier: storage, x: 4, y: 1.5, description: Manifest ごとのパーティション要約。, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  manifest: {label: Manifests (Avro), kind: db, tier: storage, x: 7, y: 1.5, partitions: 3, description: "データファイルの完全パス・サイズ・split_offsets・パーティション値・列統計と、Delete ファイル。", evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  data: {label: Data Files (Parquet), kind: db, shape3D: crate, tier: storage, x: 11, y: 1.5, partitions: 4, drill: parquet-internals, description: "フッター→Row Group→列チャンク→ページの順に範囲 GET する。ダブルクリックで内部構造へ。", evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  deletes: {label: Delete Files, kind: db, tier: storage, x: 14, y: 1.5, description: 位置削除・等値削除・削除ベクトル。, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
+  coordinator:
+    label: Coordinator
+    kind: service
+    tier: engine
+    x: 2
+    'y': 1.5
+    description: カタログでテーブルを解決し、メタデータの木をたどって読むファイルを決める。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  worker:
+    label: Worker
+    kind: worker
+    tier: engine
+    x: 10
+    'y': 1.5
+    parallel: 'N'
+    description: Split を受け取り、Parquet を範囲 GET で読み、Delete を適用する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  rest:
+    label: REST Catalog
+    kind: service
+    tier: catalog
+    x: 4
+    'y': 1.5
+    description: テーブル名 → 現在の metadata.json の場所を返す。コミットはこのポインタの原子的な差し替え。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
+  creds:
+    label: Vended Credentials
+    kind: cache
+    tier: catalog
+    x: 9
+    'y': 1.5
+    description: そのテーブルの場所だけに使える一時的なストレージ資格情報。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
+  metajson:
+    label: metadata.json
+    kind: db
+    tier: storage
+    x: 1
+    'y': 1.5
+    description: スナップショット一覧、current-snapshot-id、スキーマ、パーティション仕様、ソート順。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  mlist:
+    label: Manifest List (Avro)
+    kind: db
+    tier: storage
+    x: 4
+    'y': 1.5
+    description: Manifest ごとのパーティション要約。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  manifest:
+    label: Manifests (Avro)
+    kind: db
+    tier: storage
+    x: 7
+    'y': 1.5
+    partitions: 3
+    description: データファイルの完全パス・サイズ・split_offsets・パーティション値・列統計と、Delete ファイル。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  data:
+    label: Data Files (Parquet)
+    kind: db
+    shape3D: crate
+    tier: storage
+    x: 11
+    'y': 1.5
+    partitions: 4
+    drill: parquet-internals
+    description: フッター→Row Group→列チャンク→ページの順に範囲 GET する。ダブルクリックで内部構造へ。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  deletes:
+    label: Delete Files
+    kind: db
+    tier: storage
+    x: 14
+    'y': 1.5
+    description: 位置削除・等値削除・削除ベクトル。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
 links:
-  - {id: load-table, from: coordinator, to: rest, label: ① loadTable, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
-  - {id: vend, from: rest, to: creds, label: 一時資格情報を発行, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
-  - {id: pointer, from: rest, to: metajson, label: 現在の場所を指す, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
-  - {id: read-meta, from: coordinator, to: metajson, label: ② スナップショット選択, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  - {id: read-mlist, from: coordinator, to: mlist, label: ③ Manifest を除外, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  - {id: read-manifest, from: coordinator, to: manifest, label: ④ ファイルを除外・Delete 対応づけ, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  - {id: dispatch, from: coordinator, to: worker, label: ⑤ Split を配る, sync: false, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  - {id: use-creds, from: worker, to: creds, label: 資格情報で署名, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
-  - {id: read-parquet, from: worker, to: data, label: ⑥ フッター→ページを範囲 GET, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  - {id: read-deletes, from: worker, to: deletes, label: ⑦ 削除行を除く, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§3"}]}
-  - {id: commit, from: rest, to: metajson, label: コミット（ポインタ差し替え）, evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§5"}]}
+  - id: load-table
+    from: coordinator
+    to: rest
+    label: ① loadTable
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
+  - id: vend
+    from: rest
+    to: creds
+    label: 一時資格情報を発行
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
+  - id: pointer
+    from: rest
+    to: metajson
+    label: 現在の場所を指す
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
+  - id: read-meta
+    from: coordinator
+    to: metajson
+    label: ② スナップショット選択
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  - id: read-mlist
+    from: coordinator
+    to: mlist
+    label: ③ Manifest を除外
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  - id: read-manifest
+    from: coordinator
+    to: manifest
+    label: ④ ファイルを除外・Delete 対応づけ
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  - id: dispatch
+    from: coordinator
+    to: worker
+    label: ⑤ Split を配る
+    sync: false
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  - id: use-creds
+    from: worker
+    to: creds
+    label: 資格情報で署名
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
+  - id: read-parquet
+    from: worker
+    to: data
+    label: ⑥ フッター→ページを範囲 GET
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  - id: read-deletes
+    from: worker
+    to: deletes
+    label: ⑦ 削除行を除く
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§3
+  - id: commit
+    from: rest
+    to: metajson
+    label: コミット（ポインタ差し替え）
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§5
 scenarios:
   - id: catalog-to-page
     label: カタログからページまで読む
-    evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§6"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§6
     steps:
-      - {links: [load-table, pointer], note: "loadTable で現在の metadata.json の場所（とメタデータ本体）を得る。"}
-      - {links: [read-meta], note: "current-snapshot-id（時点指定ならその版）、スキーマ、パーティション仕様を得る。"}
-      - {links: [read-mlist, read-manifest], note: "Avro の Manifest List・Manifest を読み、読むデータファイルと Delete ファイルを決める。LIST は使わない。"}
-      - {links: [dispatch], note: 完全パス・サイズ・split_offsets から Split を作り Worker に配る。}
-      - {links: [read-parquet, read-deletes], note: "Worker が Parquet の末尾→フッター→Row Group→ページを範囲 GET し、削除行を除く。Data Files をダブルクリックするとこの内部を追える。"}
+      - links:
+          - load-table
+          - pointer
+        note: loadTable で現在の metadata.json の場所（とメタデータ本体）を得る。
+      - links:
+          - read-meta
+        note: current-snapshot-id（時点指定ならその版）、スキーマ、パーティション仕様を得る。
+      - links:
+          - read-mlist
+          - read-manifest
+        note: Avro の Manifest List・Manifest を読み、読むデータファイルと Delete ファイルを決める。LIST は使わない。
+      - links:
+          - dispatch
+        note: 完全パス・サイズ・split_offsets から Split を作り Worker に配る。
+      - links:
+          - read-parquet
+          - read-deletes
+        note: Worker が Parquet の末尾→フッター→Row Group→ページを範囲 GET し、削除行を除く。Data Files をダブルクリックするとこの内部を追える。
   - id: vended-credentials
     label: 一時資格情報で読む
-    evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
     steps:
-      - {links: [load-table, vend], note: アクセス委任のヘッダーを付けて loadTable し、そのテーブルの場所だけに使える一時資格情報を受け取る。}
-      - {links: [use-creds, read-parquet], note: Worker はその資格情報でストレージを読む。エンジンに広いバケット権限は要らない。}
+      - links:
+          - load-table
+          - vend
+        note: アクセス委任のヘッダーを付けて loadTable し、そのテーブルの場所だけに使える一時資格情報を受け取る。
+      - links:
+          - use-creds
+          - read-parquet
+        note: Worker はその資格情報でストレージを読む。エンジンに広いバケット権限は要らない。
   - id: concurrent-commit
     label: 読み取り中に書き手がコミットする
-    evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§5"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§5
     steps:
-      - {links: [load-table, read-meta], note: 読み手はこの時点のスナップショットを選ぶ。}
-      - {links: [commit], note: 書き手が新しい metadata.json を書き、カタログのポインタを原子的に差し替える。}
-      - {links: [read-manifest, read-parquet], note: 読み手は選んだスナップショットのファイルを読み続ける。ファイルは不変なので結果は混ざらない。}
+      - links:
+          - load-table
+          - read-meta
+        note: 読み手はこの時点のスナップショットを選ぶ。
+      - links:
+          - commit
+        note: 書き手が新しい metadata.json を書き、カタログのポインタを原子的に差し替える。
+      - links:
+          - read-manifest
+          - read-parquet
+        note: 読み手は選んだスナップショットのファイルを読み続ける。ファイルは不変なので結果は混ざらない。
 requirements:
-  - {id: CR-01, kind: rule, title: カタログはポインタだけ, text: "カタログは現在の metadata.json の場所を管理し、データと Manifest はストレージから直接読む。", links: [pointer, read-meta, read-parquet], evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
-  - {id: CR-02, kind: nfr, title: 最小権限の読み取り, text: 一時資格情報でテーブルの場所だけを読めるようにする。, links: [vend, use-creds], evidence: [{type: doc, ref: "docs/reference-iceberg-catalog-read.md#§2"}]}
+  - id: CR-01
+    kind: rule
+    title: カタログはポインタだけ
+    text: カタログは現在の metadata.json の場所を管理し、データと Manifest はストレージから直接読む。
+    links:
+      - pointer
+      - read-meta
+      - read-parquet
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
+  - id: CR-02
+    kind: nfr
+    title: 最小権限の読み取り
+    text: 一時資格情報でテーブルの場所だけを読めるようにする。
+    links:
+      - vend
+      - use-creds
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-catalog-read.md#§2
 unknowns:
-  - {id: UNK-01, text: 実際のカタログ実装、認証方式、資格情報の委任とサーバー側スキャン計画への対応は未確定。, refs: [rest, creds]}
+  - id: UNK-01
+    text: 実際のカタログ実装、認証方式、資格情報の委任とサーバー側スキャン計画への対応は未確定。
+    refs:
+      - rest
+      - creds
 implementations:
   - id: trino-rest
     label: Trino・Polaris・Amazon S3
@@ -80,14 +315,15 @@ implementations:
       - title: Trino REST Catalog metastores
         url: https://trino.io/docs/current/object-storage/metastores.html
       - title: Polaris Configuring S3 Storage
-        url: https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
+        url: >-
+          https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
     nodes:
       trino-rest-coord:
         label: Trino Coordinator
         kind: service
         tier: engine
         x: 2
-        y: 1.5
+        'y': 1.5
         description: カタログ解決、メタデータ読み取りとタスク計画を調停する。
         realizes:
           - coordinator
@@ -99,7 +335,7 @@ implementations:
         kind: worker
         tier: engine
         x: 10
-        y: 1.5
+        'y': 1.5
         description: 割り当てられたファイルの読み取りとフィルタを実行する。
         realizes:
           - worker
@@ -111,7 +347,7 @@ implementations:
         kind: catalog
         tier: catalog
         x: 4
-        y: 1.5
+        'y': 1.5
         description: 対象テーブルのメタデータを返す。
         realizes:
           - rest
@@ -119,14 +355,25 @@ implementations:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
       trino-rest-sts:
-        label: Polaris と AWS STS の一時認証情報
+        label: Polaris が返す一時認証情報
         kind: cache
         tier: catalog
         x: 9
-        y: 1.5
-        description: カタログ用 IAM ロールの短期認証情報を払い出す。
+        'y': 1.5
+        description: AWS STS で取得した短期認証情報を Polaris がクライアントに返す。
         realizes:
           - creds
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      trino-rest-aws-sts:
+        label: AWS STS
+        kind: service
+        tier: catalog
+        svc: aws:sts
+        x: 13
+        y: 1.5
+        description: IAM ロールの短期セッションを発行する。
         evidence:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
@@ -135,43 +382,46 @@ implementations:
         kind: file
         tier: storage
         x: 1
-        y: 1.5
+        'y': 1.5
         description: スナップショットとテーブル定義を保持する。
         realizes:
           - metajson
         evidence:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
+        svc: s3
       trino-rest-list:
         label: S3 の Manifest List（Avro）
         kind: file
         tier: storage
         x: 4
-        y: 1.5
+        'y': 1.5
         description: 対象スナップショットの Manifest を列挙する。
         realizes:
           - mlist
         evidence:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
+        svc: s3
       trino-rest-manifest:
         label: S3 の Manifest（Avro）
         kind: file
         tier: storage
         x: 7
-        y: 1.5
+        'y': 1.5
         description: ファイル位置と統計を保持する。
         realizes:
           - manifest
         evidence:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
+        svc: s3
       trino-rest-parquet:
         label: S3 の Parquet ファイル
         kind: file
         tier: storage
         x: 11
-        y: 1.5
+        'y': 1.5
         description: 該当するデータファイルを読む。
         realizes:
           - data
@@ -179,29 +429,45 @@ implementations:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
         drill: parquet-internals
+        svc: s3
       trino-rest-delete:
         label: S3 の位置削除ファイル
         kind: file
         tier: storage
         x: 14
-        y: 1.5
+        'y': 1.5
         description: v2 の削除対象の位置を記録する。
         realizes:
           - deletes
         evidence:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
+        svc: s3
       trino-rest-config:
         label: etc/catalog/iceberg.properties
         kind: file
         tier: catalog
         x: 1
-        y: 1
+        'y': 1
         description: REST URI と一時認証情報取得を設定する。
         evidence:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
     links:
+      - id: trino-rest-assume-role
+        from: trino-rest-rest
+        to: trino-rest-aws-sts
+        label: IAM ロールの一時認証情報を要求
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
+      - id: trino-rest-return-session
+        from: trino-rest-aws-sts
+        to: trino-rest-sts
+        label: 短期認証情報を発行
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-catalog-read.md#§7
       - id: trino-rest-client-config
         from: trino-rest-config
         to: trino-rest-coord
@@ -210,6 +476,11 @@ implementations:
           - type: doc
             ref: docs/reference-iceberg-catalog-read.md#§7
     groups:
+      - kind: cloud
+        provider: aws
+        label: AWS STS
+        tier: [catalog]
+        nodes: [trino-rest-aws-sts]
       - label: Amazon S3 のテーブル
         kind: cloud
         provider: aws
@@ -219,4 +490,17 @@ implementations:
           - trino-rest-manifest
           - trino-rest-parquet
           - trino-rest-delete
-gates: {maxDrift: 0, maxHigh: 0}
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - storage
+        nodes:
+          - trino-rest-meta
+          - trino-rest-list
+          - trino-rest-manifest
+          - trino-rest-parquet
+          - trino-rest-delete
+gates:
+  maxDrift: 0
+  maxHigh: 0

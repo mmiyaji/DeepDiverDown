@@ -1,0 +1,234 @@
+name: RustFS の S3 互換オブジェクトストレージ
+description: S3 互換 API からオブジェクトを保存し、分散配置されたディスクを利用する。
+reference:
+  objectives:
+    - S3 互換 API からオブジェクトを保存し、分散配置されたディスクを利用する。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: RustFS Helm deployment
+      url: https://docs.rustfs.com/en/installation/cloud-native
+    - title: S3 compatibility
+      url: https://docs.rustfs.com/en/reference/s3-compatibility
+sources:
+  - docs/reference-rustfs.md
+evidence:
+  - type: doc
+    ref: docs/reference-rustfs.md#§1
+  - type: doc
+    ref: docs/reference-rustfs.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  client:
+    label: オブジェクト利用者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  api:
+    label: オブジェクト API
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  nodes:
+    label: ストレージノード群
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  disk:
+    label: 永続ディスク群
+    kind: db
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  operator:
+    label: ストレージ運用者
+    kind: actor
+    tier: support
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  settings:
+    label: 配置・冗長化の設定
+    kind: file
+    tier: support
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+links:
+  - id: request
+    from: client
+    to: api
+    label: オブジェクトを読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  - id: route
+    from: api
+    to: nodes
+    label: 要求を処理
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  - id: save
+    from: nodes
+    to: disk
+    label: データを分散保存
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  - id: configure
+    from: operator
+    to: settings
+    label: 構成を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+  - id: apply
+    from: settings
+    to: nodes
+    label: 設定を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-rustfs.md#§2
+    steps:
+      - links:
+          - request
+        note: オブジェクトを読み書き。
+      - links:
+          - route
+        note: 要求を処理。
+      - links:
+          - save
+        note: データを分散保存。
+      - links:
+          - configure
+        note: 構成を設定。
+      - links:
+          - apply
+        note: 設定を適用。
+implementations:
+  - id: example
+    label: RustFS の S3 互換オブジェクトストレージの構成例
+    description: RustFS Helm の分散構成で複数 Pod と PVC を使う例。Kubernetes の実行場所と PVC の提供先は固定しない。
+    sources:
+      - title: RustFS Helm deployment
+        url: https://docs.rustfs.com/en/installation/cloud-native
+      - title: S3 compatibility
+        url: https://docs.rustfs.com/en/reference/s3-compatibility
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-client:
+        label: S3 互換クライアント
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-rustfs.md#§4
+        realizes:
+          - client
+      ex-api:
+        label: RustFS S3 API
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-rustfs.md#§4
+        realizes:
+          - api
+      ex-nodes:
+        label: RustFS 分散 Pod
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-rustfs.md#§4
+        realizes:
+          - nodes
+      ex-disk:
+        label: Kubernetes PVC
+        kind: db
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-rustfs.md#§4
+        realizes:
+          - disk
+      ex-operator:
+        label: 運用担当者
+        kind: actor
+        tier: support
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-rustfs.md#§4
+        realizes:
+          - operator
+      ex-settings:
+        label: RustFS Helm 設定
+        kind: file
+        tier: support
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-rustfs.md#§4
+        realizes:
+          - settings

@@ -10,6 +10,7 @@
 > - 次の機能は、設計書・回答・モデルの内容を外部の AI サービスに送信します。機密情報を含む資料に使う場合は、各自の責任で利用規約・社内規程を確認してください
 >   - 抽出 CLI（`npm run extract`）：Anthropic の Claude API
 >   - AI 設計支援（`npm run serve:ai`）：Claude Code CLI 経由で Anthropic、Codex CLI 経由で OpenAI
+>   - 管理者チャット（`npm run serve:admin`）：選択した CLI を通じて依頼と作業コンテキストを外部に送信し、起動したリポジトリを編集します
 > - 公式アイコンは同梱していません。各社の配布物を手元に置いて使う場合は、各社の利用規約に従ってください
 > - 予告なく仕様変更・公開停止することがあります。Issue / PR への対応も約束しません
 
@@ -64,15 +65,17 @@ tools/gates.mjs ── 網羅率・参照切れ・未登録の不明・ずれ・
 | 場所 | 機能 |
 |---|---|
 | ヘッダー | 検索（部品・ID・要件・根拠の参照先）、開く（YAML）、共有（視点込みのリンクをコピー）、画像（PNG / SVG）、レポート（Markdown）、ヘルプ、設定 |
-| サイドバー | 設計モデル一覧と分野別のアーキテクチャリファレンス、表示モード、フロアの表示切替、選択部品の周辺だけ表示 |
-| 構成図 | 3D / 2D、画面内最大化、回転 / 移動の切替、視点（斜め・真上・横・裏側）、クリックで選択 |
+| サイドバー | 設計モデル一覧と分野別のアーキテクチャリファレンス |
+| 構成図 | 左上のプルダウンでビュー・表示モード・表示（フロアの表示切替、選択部品の周辺だけ表示、ミニマップ）を切替、3D / 2D、画面内最大化、回転 / 移動の切替、視点（斜め・真上・横・裏側）、クリックで選択 |
 | 詳細パネル | モードごとの一覧・詳細。狭い画面では下から出るシート |
 
 設計モデルでは論理構成・サービス・ネットワークを、リファレンスでは機能配置・実装例を切り替えます。`V` キーでも切り替えられます。ヘッダーの「一覧」から調査一覧とオブジェクト一覧を開けます。
 
 表示モード：構造 / シナリオ / 障害シミュレーション / 指摘 / メトリクス / 根拠と確度 / 要件 / 比較
 
-- **2D のラベル**：重なる場合は選択中の部品名と他の部品名を優先します。拡大すると、収まるラベルが再表示されます。
+- **2D 接続図**では、部品の役割と台数をカードに表示します。矢印で依存の向きを確認でき、接続を選ぶと両端の部品と根拠をたどれます。狭い画面ではフロアを縦に並べます。密集した箇所は拡大すると、収まるラベルが再表示されます。
+- **3D 配置図**では、同じ部品をフロアと境界の中に配置します。「表示」からフロア間隔を広げられます。「シナリオ」では、そのステップの送信元・接続・宛先を強調します。
+- **設計のレビュー**では、構成図上部の「指摘」「点検」から対象を開けます。指摘を選ぶと、関連部品・接続と、モデルに登録された根拠を表示します。
 - **画像の書き出し**：ヘッダーの「PNG」「SVG」で、現在の視点と表示中のラベルを保存します。2D の「SVG 全体」は、ズームや移動に関係なく、現在のビューと表示設定で描画される図全体を保存します。書き出し用にラベルの重なりを計算し直します。SVG の図形と文字は編集でき、アイコンは PNG として SVG 内に埋め込まれます。
 - **URL**：`#/m/<model>/<mode>?s=<部品>&…` で画面の状態を表す。2D は `d=2`。「共有」は視点（`v=`）も含める
 - **YAML の読み込み**：画面へドラッグ＆ドロップ、または「開く」。ブラウザ内（localStorage）に最大 5 件保存し、外部には送信しない。比較モードでドロップすると比較対象として読み込む
@@ -109,6 +112,14 @@ AI 用ビューアの「設計」→「AI で設計書を取り込む」で、Ma
 
 点検で出た指摘を選択して「AI に対応を相談」すると、対応案とモデル差分を確認できます。反映前に同じ指摘が再点検で残るかを表示します。既存モデルから始めた場合は対応案の下書きを作り、元のモデルは書き換えません。この点検はモデル上の判定です。実環境への変更と確認は別途行ってください。
 
+## 管理者チャットでリポジトリを編集する
+
+`claude auth login` または `codex login` 済みで、使う CLI が PATH にある起動PCで `npm run serve:admin` を実行します。[管理者用ビューア](http://127.0.0.1:8126/) の右下から「管理者チャット」を開き、起動ターミナルのアクセスキーを入力してください。新しい会話で実行先を選び、モデルの修正やリファレンスの追加を依頼できます。収録モデルを開いている場合は、そのモデル ID を依頼に添えます。
+
+会話は起動PCの `~/.deepdiverdown/admin/` にリポジトリごとに保存されます。「会話」で以前の履歴を選ぶと、作成時の CLI と同じセッションを再開します。ブラウザを閉じても実行は続き、「実行を停止」で中断できます。編集内容を見るには「図を再読み込み」を押してください。再起動後は新しいアクセスキーで開きます。
+
+Codex CLI はワークスペースへの書き込みを許可するサンドボックスで実行します。Claude Code CLI はファイル編集用の制限モードで実行するため、シェルが必要な操作はターミナルで確認してください。通常のビューアと設計支援用ビューアからは管理者チャットを起動できません。
+
 ## 取り込みと抽出（CLI）
 | コマンド | 内容 |
 |---|---|
@@ -117,6 +128,7 @@ AI 用ビューアの「設計」→「AI で設計書を取り込む」で、Ma
 | `npm run extract -- --id <id> --doc docs/x.md [--actual …]` | Claude API（claude-opus-5-5）で 書き手→形式チェック→検証役→点検。`ant auth login` か `ANTHROPIC_API_KEY` が必要。`--dry-run` で API を呼ばずに確認 |
 
 - モデルの部品と取り込んだ部品は、同じ ID か、根拠の `{ type: iac, ref: <アドレス> }` で対応付く
+- Kubernetes で `default` 以外の名前空間を取り込むと、部品 ID は `<名前空間>/<種類>/<名前>` になる（例 `staging/deployment/api`、`staging/service/web`）。`default` は従来の ID を使い、異なる種類に同名のワークロードがある場合は名前空間と種類で区別する
 - 座標（x, y）を省いた部品は自動配置される（`layout: auto` で全部並べ直し）
 
 ### 公開サンプルでの試行（online-boutique）
@@ -127,6 +139,23 @@ AI 用ビューアの「設計」→「AI で設計書を取り込む」で、Ma
 ## 公式アイコン
 
 公式アイコンはリポジトリに同梱しません。各社の利用条件に従って、手元の SVG / PNG を `icons/<provider>/` に展開し、`npm run icons` で対応表 `icons/manifest.json` を生成してください。対応表がある場合は設定で「公式アイコンを使う」を切り替えられます。対応する画像がないサービスは略称で表示します。
+
+AWS、Google Cloud、Azure、Kubernetes のアイコンセット、Databricks の Unity Catalog・SQL・Lakeflow・Delta Table・AI Search・Model Serving、Microsoft Fabric のアイテムと Microsoft Purview のアイコン、および Databricks と Snowflake のロゴは、各社の公開配布物から次のコマンドで取得できます。ZIP の読み込みには Python が必要です。画像の利用は各社のブランドガイドラインに従ってください。
+
+```sh
+node tools/fetch-provider-icons.mjs
+npm run icons
+```
+
+Oracle Cloud のアイコンも同じコマンドで公式の draw.io ライブラリから SVG に変換します。変換には [draw.io Desktop](https://github.com/jgraph/drawio-desktop/releases) が必要です。通常の場所にインストールされていない場合は実行ファイルのパスを `DRAWIO_BIN` に設定してください。draw.io がない環境では OCI の変換を省略し、メッセージを表示します。
+
+Snowflake の Warehouse、Task、Pipe、Stream、Database、Dynamic Tables、Horizon、Cortex などのアイコンは、公式ブランドガイドの PowerPoint テンプレートから変換します。変換には Windows と Microsoft PowerPoint が必要です。PowerPoint を使用中の場合は他のプレゼンテーションを保護するため変換を省略します。変換できない場合は Snowflake の製品ロゴを表示します。
+
+配布元は [Databricks Brand Guidelines](https://brand.databricks.com/)、[Snowflake Newsroom](https://www.snowflake.com/en/news/)、[Microsoft Fabric の公式アイコン](https://learn.microsoft.com/en-us/fabric/fundamentals/icons) です。Snowflake と一部 Databricks の製品ロゴは、固有アイコンが確認できないサービスで所属を示すためにも使います。
+
+AI Search と Model Serving の図案の対応は、Databricks Field Solutions の [アイコン一覧](https://github.com/databricks-solutions/solution-builder/blob/main/.claude/skills/databricks-architecture/reference/icons.tsv) も参照しています。
+
+Google Cloud Knowledge Catalog は旧 Dataplex Universal Catalog のアイコンを使用します。Google の配布セットでは旧版アイコンに含まれるため、現行名称に対応する新しいアイコンが配布された場合は差し替えてください。
 
 手元の AWS PowerPoint ツールキット（`.pptx`）は `icons/aws/` に置いて `npm run icons` を実行するか、次のようにファイルを指定できます。
 
@@ -224,6 +253,8 @@ Kubernetes、主要なディストリビューション・マネージドサー�
 | 分散実行 | [シャッフルとデータスキュー](docs/reference-shuffle-skew.md) | 結合キーで再配分し、作業が一部のタスクに偏る理由を追う |
 
 ClickHouse と DuckDB の物理読み取り比較、PostgreSQL の WAL、Paimon、スキーマ互換性、基盤運用の追加項目は [追加調査と対応リファレンス](docs/reference-modern-data-stack-candidates.md#追加調査と対応リファレンス) に整理しています。
+
+AI エージェントの構成例として、[指標と文書を使う分析エージェント](docs/reference-analytics-agent.md)を追加しています。
 
 詳細は `docs/model-schema.md`。
 

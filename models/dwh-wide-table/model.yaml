@@ -1,90 +1,377 @@
-name: "ワイドテーブルの粒度と BigQuery のネスト"
-description: "注文明細を1行に平坦化するワイドテーブルと、注文1行に明細配列を持つ構造を、重複集計と後着更新で比較する設計パターンです。"
-parent: {model: dwh-design-patterns, node: wide}
+name: ワイドテーブルの粒度と BigQuery のネスト
+description: 注文明細を1行に平坦化するワイドテーブルと、注文1行に明細配列を持つ構造を、重複集計と後着更新で比較する設計パターンです。
+parent:
+  model: dwh-design-patterns
+  node: wide
 reference:
   objectives:
-    - "平坦なワイドテーブルとネストされた注文表の1行の意味を説明する。"
-    - "1対多の展開と集計粒度の違いが二重計上を起こすことを確認する。"
-    - "後着変更で置き換える対象を、明細キーまたは注文キーで特定する。"
+    - 平坦なワイドテーブルとネストされた注文表の1行の意味を説明する。
+    - 1対多の展開と集計粒度の違いが二重計上を起こすことを確認する。
+    - 後着変更で置き換える対象を、明細キーまたは注文キーで特定する。
   sources:
-    - {title: "BigQuery: Use nested and repeated fields", url: "https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested"}
-    - {title: "BigQuery: Work with arrays", url: "https://docs.cloud.google.com/bigquery/docs/arrays"}
-    - {title: "BigQuery: Data manipulation language", url: "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax"}
-sources: [docs/reference-dwh-wide-table.md]
-evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§1"}]
+    - title: 'BigQuery: Use nested and repeated fields'
+      url: https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested
+    - title: 'BigQuery: Work with arrays'
+      url: https://docs.cloud.google.com/bigquery/docs/arrays
+    - title: 'BigQuery: Data manipulation language'
+      url: https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax
+sources:
+  - docs/reference-dwh-wide-table.md
+evidence:
+  - type: doc
+    ref: docs/reference-dwh-wide-table.md#§1
 tiers:
-  - {id: "sources", label: "注文と注文明細の入力", z: 2, size: [16,4], kind: "origin"}
-  - {id: "tables", label: "公開テーブル", z: 1, size: [16,4]}
-  - {id: "reports", label: "集計", z: 0, size: [16,4]}
+  - id: sources
+    label: 注文と注文明細の入力
+    z: 2
+    size:
+      - 16
+      - 4
+    kind: origin
+  - id: tables
+    label: 公開テーブル
+    z: 1
+    size:
+      - 16
+      - 4
+  - id: reports
+    label: 集計
+    z: 0
+    size:
+      - 16
+      - 4
 nodes:
-  orders: {label: "注文ヘッダー", kind: "db", tier: "sources", x: 0, y: 1.5, description: "1注文1行で、注文全体の金額・顧客地域を持つ。", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§1"}]}
-  items: {label: "注文明細", kind: "db", tier: "sources", x: 4, y: 1.5, description: "注文 ID と明細 ID の組で識別し、明細金額を持つ。", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§1"}]}
-  transform: {label: "注文テーブルの生成", kind: "worker", tier: "sources", x: 9, y: 1.5, description: "注文 ID で関連付け、粒度に応じて平坦またはネスト構造にする。", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}]}
-  flat: {label: "明細粒度のワイドテーブル", kind: "db", tier: "tables", x: 4, y: 1.5, description: "1明細1行。注文金額や顧客地域を明細行ごとに複製する。", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}]}
-  nested: {label: "注文粒度のネストテーブル", kind: "db", tier: "tables", x: 11, y: 1.5, description: "1注文1行で、明細を注文行の繰り返し構造に入れる。", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}]}
-  report: {label: "注文・明細の集計", kind: "service", tier: "reports", x: 7, y: 1.5, description: "注文粒度と明細粒度を使い分けて集計する。", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§3"}]}
+  orders:
+    label: 注文ヘッダー
+    kind: db
+    tier: sources
+    x: 0
+    'y': 1.5
+    description: 1注文1行で、注文全体の金額・顧客地域を持つ。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§1
+  items:
+    label: 注文明細
+    kind: db
+    tier: sources
+    x: 4
+    'y': 1.5
+    description: 注文 ID と明細 ID の組で識別し、明細金額を持つ。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§1
+  transform:
+    label: 注文テーブルの生成
+    kind: worker
+    tier: sources
+    x: 9
+    'y': 1.5
+    description: 注文 ID で関連付け、粒度に応じて平坦またはネスト構造にする。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+  flat:
+    label: 明細粒度のワイドテーブル
+    kind: db
+    tier: tables
+    x: 4
+    'y': 1.5
+    description: 1明細1行。注文金額や顧客地域を明細行ごとに複製する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+  nested:
+    label: 注文粒度のネストテーブル
+    kind: db
+    tier: tables
+    x: 11
+    'y': 1.5
+    description: 1注文1行で、明細を注文行の繰り返し構造に入れる。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+  report:
+    label: 注文・明細の集計
+    kind: service
+    tier: reports
+    x: 7
+    'y': 1.5
+    description: 注文粒度と明細粒度を使い分けて集計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§3
 links:
-  - {id: "read-order", from: "orders", to: "transform", label: "注文ヘッダーを取得", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}]}
-  - {id: "read-items", from: "items", to: "transform", label: "対象注文の明細を取得", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}]}
-  - {id: "line-rows", from: "transform", to: "flat", label: "明細ごとにヘッダーを付ける", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}]}
-  - {id: "order-row", from: "transform", to: "nested", label: "明細を注文行の配列にまとめる", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}]}
-  - {id: "flat-report", from: "flat", to: "report", label: "集計粒度をそろえて集計", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§3"}]}
-  - {id: "nested-report", from: "nested", to: "report", label: "注文行を集計し、明細分析では配列を展開する", evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§3"}]}
+  - id: read-order
+    from: orders
+    to: transform
+    label: 注文ヘッダーを取得
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+  - id: read-items
+    from: items
+    to: transform
+    label: 対象注文の明細を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+  - id: line-rows
+    from: transform
+    to: flat
+    label: 明細ごとにヘッダーを付ける
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+  - id: order-row
+    from: transform
+    to: nested
+    label: 明細を注文行の配列にまとめる
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+  - id: flat-report
+    from: flat
+    to: report
+    label: 集計粒度をそろえて集計
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§3
+  - id: nested-report
+    from: nested
+    to: report
+    label: 注文行を集計し、明細分析では配列を展開する
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§3
 scenarios:
   - id: aggregate-grain
-    label: "2明細の注文で二重計上を見分ける"
-    evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§1"}, {type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}, {type: doc, ref: "docs/reference-dwh-wide-table.md#§3"}]
+    label: 2明細の注文で二重計上を見分ける
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§1
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§3
     visual: order-grain
     steps:
-      - {links: ["read-order","read-items"], note: "注文 O-101 の総額は 1,200 円で、明細は 700 円と 500 円の2件ある。"}
-      - links: [line-rows, flat-report]
+      - links:
+          - read-order
+          - read-items
+        note: 注文 O-101 の総額は 1,200 円で、明細は 700 円と 500 円の2件ある。
+      - links:
+          - line-rows
+          - flat-report
         note: 平坦な表では注文総額 1,200 円が2行に現れる。総額列をそのまま合計すると 2,400 円になる。注文を一意にした後で総額を合計するか、この例では明細金額を合計する。
         blocks:
           flat:
-            - {id: flat-1, label: 明細1, k: 0, note: "注文総額 1,200 円、明細金額 700 円"}
-            - {id: flat-2, label: 明細2, k: 0, note: "注文総額 1,200 円、明細金額 500 円"}
-      - links: [order-row, nested-report]
+            - id: flat-1
+              label: 明細1
+              k: 0
+              note: 注文総額 1,200 円、明細金額 700 円
+            - id: flat-2
+              label: 明細2
+              k: 0
+              note: 注文総額 1,200 円、明細金額 500 円
+      - links:
+          - order-row
+          - nested-report
         note: ネスト表では注文総額が1行にだけ入る。注文総額は展開前に集計し、明細を分析するときに UNNEST で2行に展開する。
         blocks:
           nested:
-            - {id: nested-order, label: 注文 O-101, k: 2, note: "注文総額 1,200 円、明細配列 [700 円, 500 円]"}
+            - id: nested-order
+              label: 注文 O-101
+              k: 2
+              note: 注文総額 1,200 円、明細配列 [700 円, 500 円]
   - id: late-line-update
-    label: "後着する金額訂正と置換範囲"
-    evidence: [{type: doc, ref: "docs/reference-dwh-wide-table.md#§2"}, {type: doc, ref: "docs/reference-dwh-wide-table.md#§4"}]
+    label: 後着する金額訂正と置換範囲
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§2
+      - type: doc
+        ref: docs/reference-dwh-wide-table.md#§4
     steps:
-      - {links: ["read-order","read-items"], note: "2番目の明細金額が 500 円から 450 円に訂正され、注文総額も 1,150 円に変わる。最新のヘッダーと全明細を注文 ID で特定する。"}
-      - {links: ["line-rows"], note: "平坦な表では明細2の金額を直し、2行とも複製した注文総額を 1,150 円に置き換える。"}
-      - {links: ["order-row"], note: "ネスト表では注文 O-101 の行の総額と明細配列を再生成し、注文 ID をキーに更新する。"}
+      - links:
+          - read-order
+          - read-items
+        note: 2番目の明細金額が 500 円から 450 円に訂正され、注文総額も 1,150 円に変わる。最新のヘッダーと全明細を注文 ID で特定する。
+      - links:
+          - line-rows
+        note: 平坦な表では明細2の金額を直し、2行とも複製した注文総額を 1,150 円に置き換える。
+      - links:
+          - order-row
+        note: ネスト表では注文 O-101 の行の総額と明細配列を再生成し、注文 ID をキーに更新する。
 blocks:
   id: order-grain
   title: 注文 O-101 を表す行
   note: 箱の中のブロックがテーブルの1行に対応する。選択すると注文総額と明細金額を確認できる。
-  legend: {0: 注文明細の行, 2: 注文の行}
+  legend:
+    '0': 注文明細の行
+    '2': 注文の行
   lanes:
-    - {id: flat, label: 平坦なワイドテーブル, node: flat}
-    - {id: nested, label: ネストテーブル, node: nested}
-  items: {flat: [], nested: []}
-
+    - id: flat
+      label: 平坦なワイドテーブル
+      node: flat
+    - id: nested
+      label: ネストテーブル
+      node: nested
+  items:
+    flat: []
+    nested: []
 implementations:
   - id: bigquery-wide-orders
-    label: "BigQuery での注文行と明細行"
-    description: "合成の注文データを二つの分析テーブルに生成し、明細の後着訂正を同じ取込単位から反映する例。"
+    label: BigQuery での注文行と明細行
+    description: 合成の注文データを二つの分析テーブルに生成し、明細の後着訂正を同じ取込単位から反映する例。
     sources:
-      - {title: "BigQuery: Use nested and repeated fields", url: "https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested"}
-      - {title: "BigQuery: Work with arrays", url: "https://docs.cloud.google.com/bigquery/docs/arrays"}
-      - {title: "BigQuery: Data manipulation language", url: "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax"}
-      - {title: "BigQuery 論理ビュー", url: "https://docs.cloud.google.com/bigquery/docs/views-intro"}
+      - title: 'BigQuery: Use nested and repeated fields'
+        url: https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested
+      - title: 'BigQuery: Work with arrays'
+        url: https://docs.cloud.google.com/bigquery/docs/arrays
+      - title: 'BigQuery: Data manipulation language'
+        url: https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax
+      - title: BigQuery 論理ビュー
+        url: https://docs.cloud.google.com/bigquery/docs/views-intro
     tiers:
-      - {id: "sources", label: "注文と注文明細の入力", z: 2, size: [16,4], kind: "origin"}
-      - {id: "tables", label: "公開テーブル", z: 1, size: [16,4]}
-      - {id: "reports", label: "集計", z: 0, size: [16,4]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 3, size: [8,3]}
+      - id: sources
+        label: 注文と注文明細の入力
+        z: 2
+        size:
+          - 16
+          - 4
+        kind: origin
+      - id: tables
+        label: 公開テーブル
+        z: 1
+        size:
+          - 16
+          - 4
+      - id: reports
+        label: 集計
+        z: 0
+        size:
+          - 16
+          - 4
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 3
+        size:
+          - 8
+          - 3
     nodes:
-      example-orders: {label: "landing.orders と landing.order_items", kind: "table", tier: "sources", x: 0, y: 1.5, realizes: ["orders","items"], description: "ヘッダーと明細を粒度ごとに別テーブルに置く。", evidence: [{"type":"doc","ref":"docs/reference-dwh-wide-table.md#§5"}]}
-      example-transform: {label: "BigQuery の注文単位の再生成 SQL", kind: "workflow", tier: "sources", x: 9, y: 1.5, realizes: ["transform"], description: "対象注文の最新ヘッダーと明細から、両配置の行を組み立てる。", evidence: [{"type":"doc","ref":"docs/reference-dwh-wide-table.md#§5"}]}
-      example-flat: {label: "reporting.order_lines_wide", kind: "table", tier: "tables", x: 4, y: 1.5, realizes: ["flat"], description: "1 明細 1 行で総額を複製し、注文情報で明細を絞れるようにする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-wide-table.md#§5"}]}
-      example-nested: {label: "reporting.orders_nested", kind: "table", tier: "tables", x: 11, y: 1.5, realizes: ["nested"], description: "ARRAY<STRUCT> に注文明細をまとめ、注文 ID ごとに 1 行とする。", evidence: [{"type":"doc","ref":"docs/reference-dwh-wide-table.md#§5"}]}
-      example-report: {label: "注文用と明細用の BigQuery SQL ビュー", kind: "table", tier: "reports", x: 7, y: 1.5, realizes: ["report"], description: "注文用は注文行を読み、明細用は UNNEST で明細に展開する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-wide-table.md#§5"}]}
-      example-affected: {label: "後着訂正の対象注文 ID 表", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "変更時刻を照合し、注文総額などの親属性も含めて再生成する注文を特定する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-wide-table.md#§5"}]}
+      example-orders:
+        label: landing.orders と landing.order_items
+        kind: table
+        tier: sources
+        x: 0
+        'y': 1.5
+        realizes:
+          - orders
+          - items
+        description: ヘッダーと明細を粒度ごとに別テーブルに置く。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+        svc: gcp:bigquery
+      example-transform:
+        label: BigQuery の注文単位の再生成 SQL
+        kind: workflow
+        tier: sources
+        x: 9
+        'y': 1.5
+        realizes:
+          - transform
+        description: 対象注文の最新ヘッダーと明細から、両配置の行を組み立てる。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+        svc: gcp:bigquery
+      example-flat:
+        label: reporting.order_lines_wide
+        kind: table
+        tier: tables
+        x: 4
+        'y': 1.5
+        realizes:
+          - flat
+        description: 1 明細 1 行で総額を複製し、注文情報で明細を絞れるようにする。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+        svc: gcp:bigquery
+      example-nested:
+        label: reporting.orders_nested
+        kind: table
+        tier: tables
+        x: 11
+        'y': 1.5
+        realizes:
+          - nested
+        description: ARRAY<STRUCT> に注文明細をまとめ、注文 ID ごとに 1 行とする。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+        svc: gcp:bigquery
+      example-report:
+        label: 注文用と明細用の BigQuery SQL ビュー
+        kind: table
+        tier: reports
+        x: 7
+        'y': 1.5
+        realizes:
+          - report
+        description: 注文用は注文行を読み、明細用は UNNEST で明細に展開する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+        svc: gcp:bigquery
+      example-affected:
+        label: 後着訂正の対象注文 ID 表
+        kind: table
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 変更時刻を照合し、注文総額などの親属性も含めて再生成する注文を特定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+        svc: gcp:bigquery
     links:
-      - {id: "example-affected-connection", from: "example-affected", to: "example-transform", label: "再構築する注文を指定", evidence: [{"type":"doc","ref":"docs/reference-dwh-wide-table.md#§5"}]}
+      - id: example-affected-connection
+        from: example-affected
+        to: example-transform
+        label: 再構築する注文を指定
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+    groups:
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - sources
+        nodes:
+          - example-orders
+          - example-transform
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - tables
+        nodes:
+          - example-flat
+          - example-nested
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - reports
+        nodes:
+          - example-report
+      - kind: cloud
+        provider: gcp
+        label: Google Cloud・BigQuery
+        tier:
+          - implementation-setup
+        nodes:
+          - example-affected

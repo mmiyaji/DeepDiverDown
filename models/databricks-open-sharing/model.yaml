@@ -1,70 +1,355 @@
-name: "Databricks OpenSharing（Delta Sharing）の接続と失効"
-description: "Unity Catalog の共有オブジェクトから、Databricks と外部クライアントに注文集計を提供する。"
-parent: {"model":"databricks","node":"sharing"}
+name: Databricks OpenSharing（Delta Sharing）の接続と失効
+description: Unity Catalog の共有オブジェクトから、Databricks と外部クライアントに注文集計を提供する。
+parent:
+  model: databricks
+  node: sharing
 reference:
   objectives:
-    - "Share、Recipient、Provider の役割を確認する。"
-    - "Databricks-to-Databricks と Databricks-to-Open の認証・利用経路を区別する。"
+    - Share、Recipient、Provider の役割を確認する。
+    - Databricks-to-Databricks と Databricks-to-Open の認証・利用経路を区別する。
   sources:
-    - {"title":"OpenSharing の概念","url":"https://docs.databricks.com/aws/en/opensharing"}
-    - {"title":"OpenSharing の SQL リファレンス","url":"https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-sharing"}
-sources: ["docs/reference-databricks-open-sharing.md"]
-evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§1"}]
+    - title: OpenSharing の概念
+      url: https://docs.databricks.com/aws/en/opensharing
+    - title: OpenSharing の SQL リファレンス
+      url: https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-sharing
+sources:
+  - docs/reference-databricks-open-sharing.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-open-sharing.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[13.5,4.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 13.5
+      - 4.5
 nodes:
-  owner: {"label":"提供側管理者","kind":"actor","tier":"flow","x":0,"y":0,"description":"公開データを選ぶ。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§1"}]}
-  table: {"label":"注文集計テーブル","kind":"db","tier":"flow","x":0,"y":4,"description":"提供する資産。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§1"}]}
-  share: {"label":"公開資産と受領者の定義","kind":"service","tier":"flow","x":5,"y":2,"description":"提供対象と受領者。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§1"}]}
-  dbcatalog: {"label":"受領側のデータカタログ","kind":"service","tier":"flow","x":9,"y":0,"description":"同種プラットフォームの管理下で共有資産を登録する。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§2"}]}
-  databricks: {"label":"受領側のクエリ実行","kind":"client","tier":"flow","x":13,"y":0,"description":"カタログを経由して読む。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§2"}]}
-  endpoint: {"label":"外部クライアント向け共有接続口","kind":"service","tier":"flow","x":9,"y":4,"description":"外部クライアント用のプロトコル。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§3"}]}
-  outside: {"label":"外部分析クライアント","kind":"client","tier":"flow","x":13,"y":4,"description":"公開された読み取り経路を使う。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§3"}]}
-  revoke: {"label":"失効","kind":"service","tier":"flow","x":5,"y":0,"description":"受領者への許可を取り消す。","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§4"}]}
+  owner:
+    label: 提供側管理者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 0
+    description: 公開データを選ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§1
+  table:
+    label: 注文集計テーブル
+    kind: db
+    tier: flow
+    x: 0
+    'y': 4
+    description: 提供する資産。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§1
+  share:
+    label: 公開資産と受領者の定義
+    kind: service
+    tier: flow
+    x: 5
+    'y': 2
+    description: 提供対象と受領者。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§1
+  dbcatalog:
+    label: 受領側のデータカタログ
+    kind: service
+    tier: flow
+    x: 9
+    'y': 0
+    description: 同種プラットフォームの管理下で共有資産を登録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§2
+  databricks:
+    label: 受領側のクエリ実行
+    kind: client
+    tier: flow
+    x: 13
+    'y': 0
+    description: カタログを経由して読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§2
+  endpoint:
+    label: 外部クライアント向け共有接続口
+    kind: service
+    tier: flow
+    x: 9
+    'y': 4
+    description: 外部クライアント用のプロトコル。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§3
+  outside:
+    label: 外部分析クライアント
+    kind: client
+    tier: flow
+    x: 13
+    'y': 4
+    description: 公開された読み取り経路を使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§3
+  revoke:
+    label: 失効
+    kind: service
+    tier: flow
+    x: 5
+    'y': 0
+    description: 受領者への許可を取り消す。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§4
 links:
-  - {"id":"publish","from":"owner","to":"share","label":"受領者への提供を設定","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§1"}]}
-  - {"id":"include","from":"table","to":"share","label":"対象の集計を登録","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§1"}]}
-  - {"id":"catalog","from":"share","to":"dbcatalog","label":"受領側カタログを作成","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§2"}]}
-  - {"id":"db-read","from":"databricks","to":"dbcatalog","label":"受領カタログから参照","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§2"}]}
-  - {"id":"api","from":"share","to":"endpoint","label":"対応する共有を公開","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§3"}]}
-  - {"id":"open-read","from":"outside","to":"endpoint","label":"認証しクライアントで取得","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§3"}]}
-  - {"id":"cancel","from":"owner","to":"revoke","label":"許可の取り消しを実行","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§4"}]}
-  - {"id":"deny","from":"revoke","to":"share","label":"以後の共有アクセスを止める","evidence":[{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§4"}]}
+  - id: publish
+    from: owner
+    to: share
+    label: 受領者への提供を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§1
+  - id: include
+    from: table
+    to: share
+    label: 対象の集計を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§1
+  - id: catalog
+    from: share
+    to: dbcatalog
+    label: 受領側カタログを作成
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§2
+  - id: db-read
+    from: databricks
+    to: dbcatalog
+    label: 受領カタログから参照
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§2
+  - id: api
+    from: share
+    to: endpoint
+    label: 対応する共有を公開
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§3
+  - id: open-read
+    from: outside
+    to: endpoint
+    label: 認証しクライアントで取得
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§3
+  - id: cancel
+    from: owner
+    to: revoke
+    label: 許可の取り消しを実行
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§4
+  - id: deny
+    from: revoke
+    to: share
+    label: 以後の共有アクセスを止める
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§4
 scenarios:
   - id: protocols
-    label: "Databricks 内と外部クライアントで読み方を比較"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§1"}]
+    label: Databricks 内と外部クライアントで読み方を比較
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§1
     steps:
-      - {"links":["publish","include"],"note":"共有対象と受領者を指定する。"}
-      - {"links":["catalog","db-read"],"note":"Unity Catalog 対応の受領側から共有用カタログを経由して参照する。"}
-      - {"links":["api","open-read"],"note":"外部クライアントは構成された認証方式でプロトコルに接続する。"}
+      - links:
+          - publish
+          - include
+        note: 共有対象と受領者を指定する。
+      - links:
+          - catalog
+          - db-read
+        note: Unity Catalog 対応の受領側から共有用カタログを経由して参照する。
+      - links:
+          - api
+          - open-read
+        note: 外部クライアントは構成された認証方式でプロトコルに接続する。
   - id: revocation
-    label: "受領者へのアクセスを取り消す"
-    evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§4"}]
+    label: 受領者へのアクセスを取り消す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-open-sharing.md#§4
     steps:
-      - {"links":["open-read"],"note":"現在の公開対象と受領者を確認する。"}
-      - {"links":["cancel","deny"],"note":"受領者が今後取得できる範囲を取り消す。取得済みデータは契約上の手続きで扱う。"}
-
+      - links:
+          - open-read
+        note: 現在の公開対象と受領者を確認する。
+      - links:
+          - cancel
+          - deny
+        note: 受領者が今後取得できる範囲を取り消す。取得済みデータは契約上の手続きで扱う。
 implementations:
   - id: databricks-sharing
-    label: "OpenSharing の受領者別公開"
-    description: "同じ集計表を、別 Databricks アカウントと外部ツールに向けた二つの受領者設定で公開する例。"
+    label: OpenSharing の受領者別公開
+    description: 同じ集計表を、別 Databricks アカウントと外部ツールに向けた二つの受領者設定で公開する例。
     sources:
-      - {title: "OpenSharing の概念", url: "https://docs.databricks.com/aws/en/opensharing"}
-      - {title: "OpenSharing の SQL リファレンス", url: "https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-sharing"}
-      - {title: "OpenSharing 受領者の作成", url: "https://docs.databricks.com/aws/en/opensharing/create-recipient"}
-      - {title: "OpenSharing Share の作成", url: "https://docs.databricks.com/aws/en/opensharing/create-share"}
+      - title: OpenSharing の概念
+        url: https://docs.databricks.com/aws/en/opensharing
+      - title: OpenSharing の SQL リファレンス
+        url: https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-sharing
+      - title: OpenSharing 受領者の作成
+        url: https://docs.databricks.com/aws/en/opensharing/create-recipient
+      - title: OpenSharing Share の作成
+        url: https://docs.databricks.com/aws/en/opensharing/create-share
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [13.5,4.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 13.5
+          - 4.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-owner: {label: "提供側 Unity Catalog 管理者", kind: "actor", tier: "flow", x: 0, y: 0, realizes: ["owner"], description: "集計表と提供相手を決める。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
-      example-table: {label: "sales.orders_summary", kind: "db", tier: "flow", x: 0, y: 4, realizes: ["table"], description: "提供側で整備した集計テーブル。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
-      example-share: {label: "OpenSharing の SHARE・RECIPIENT・権限", kind: "service", tier: "flow", x: 5, y: 2, realizes: ["share","revoke"], description: "受領者を経路別に登録して、Share へのアクセスを付与・取り消しする。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
-      example-dbcatalog: {label: "受領者の Unity Catalog 共有カタログ", kind: "service", tier: "flow", x: 9, y: 0, realizes: ["dbcatalog"], description: "Databricks-to-Databricks の提供者と Share を指定して作る。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
-      example-databricks: {label: "受領者の Databricks SQL Warehouse", kind: "client", tier: "flow", x: 13, y: 0, realizes: ["databricks"], description: "受領側で共有カタログを読む。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
-      example-endpoint: {label: "オープン共有の Delta Sharing 接続口", kind: "service", tier: "flow", x: 9, y: 4, realizes: ["endpoint"], description: "外部ツール向けの共有プロトコルを提供する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
-      example-outside: {label: "外部 Delta Sharing 対応クライアント", kind: "client", tier: "flow", x: 13, y: 4, realizes: ["outside"], description: "許可された接続情報で集計を参照する。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
-      example-recipient-id: {label: "Databricks 受領側の共有 ID", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "Databricks-to-Databricks 受領者の登録に使う共有識別子。", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
+      example-owner:
+        label: 提供側 Unity Catalog 管理者
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 0
+        realizes:
+          - owner
+        description: 集計表と提供相手を決める。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+      example-table:
+        label: sales.orders_summary
+        kind: db
+        tier: flow
+        x: 0
+        'y': 4
+        realizes:
+          - table
+        description: 提供側で整備した集計テーブル。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+        svc: databricks:delta
+      example-share:
+        label: OpenSharing の SHARE・RECIPIENT・権限
+        kind: service
+        tier: flow
+        svc: databricks:unity
+        x: 5
+        'y': 3
+        realizes:
+          - share
+          - revoke
+        description: 受領者を経路別に登録して、Share へのアクセスを付与・取り消しする。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+      example-dbcatalog:
+        label: 受領者の Unity Catalog 共有カタログ
+        kind: service
+        tier: flow
+        x: 9
+        'y': 0
+        realizes:
+          - dbcatalog
+        description: Databricks-to-Databricks の提供者と Share を指定して作る。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+        svc: databricks:unity
+      example-databricks:
+        label: 受領者の Databricks SQL Warehouse
+        kind: client
+        tier: flow
+        x: 13
+        'y': 0
+        realizes:
+          - databricks
+        description: 受領側で共有カタログを読む。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+        svc: databricks:sql
+      example-endpoint:
+        label: オープン共有の Delta Sharing 接続口
+        kind: service
+        tier: flow
+        svc: databricks:platform
+        x: 9
+        'y': 4
+        realizes:
+          - endpoint
+        description: 外部ツール向けの共有プロトコルを提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+      example-outside:
+        label: 外部 Delta Sharing 対応クライアント
+        kind: client
+        tier: flow
+        x: 13
+        'y': 4
+        realizes:
+          - outside
+        description: 許可された接続情報で集計を参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+      example-recipient-id:
+        label: Databricks 受領側の共有 ID
+        kind: service
+        tier: implementation-setup
+        svc: databricks:unity
+        x: 1
+        'y': 1.5
+        description: Databricks-to-Databricks 受領者の登録に使う共有識別子。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
     links:
-      - {id: "example-recipient-id-connection", from: "example-recipient-id", to: "example-share", label: "受領側メタストアを特定", evidence: [{"type":"doc","ref":"docs/reference-databricks-open-sharing.md#§5"}]}
+      - id: example-recipient-id-connection
+        from: example-recipient-id
+        to: example-share
+        label: 受領側メタストアを特定
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-open-sharing.md#§5
+    groups:
+      - kind: cloud
+        provider: databricks
+        label: 受領側 Unity Catalog
+        tier: [implementation-setup]
+        nodes: [example-recipient-id]
+      - kind: cloud
+        provider: databricks
+        label: 提供側 Databricks
+        tier:
+          - flow
+        nodes:
+          - example-table
+          - example-share
+          - example-endpoint
+      - kind: cloud
+        provider: databricks
+        label: 受領側 Databricks
+        tier:
+          - flow
+        nodes:
+          - example-dbcatalog
+          - example-databricks

@@ -1,0 +1,323 @@
+name: スポット容量と中断への対応
+description: クラウドの余剰容量を利用し、予告・チェックポイント・代替容量と再試行で中断に備える。
+reference:
+  objectives:
+    - 余剰容量と通常容量の違いを理解する。
+    - 中断通知と進捗の保存・再開を追う。
+    - 各クラウドの事前通知と容量の制約を確認する。
+  sources:
+    - title: AWS Spot interruption notice
+      url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html
+    - title: AWS EC2 rebalance recommendations
+      url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/rebalance-recommendations.html
+    - title: Azure Spot eviction
+      url: https://learn.microsoft.com/en-us/azure/architecture/guide/spot/spot-eviction
+    - title: Google Cloud Spot VMs
+      url: https://docs.cloud.google.com/compute/docs/instances/spot
+    - title: OCI preemptible instances
+      url: https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/preemptible.htm
+    - title: EC2 Auto Scaling Capacity Rebalancing
+      url: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-capacity-rebalancing.html
+sources:
+  - docs/reference-cloud-spot-capacity.md
+evidence:
+  - type: doc
+    ref: docs/reference-cloud-spot-capacity.md#§1
+  - type: doc
+    ref: docs/reference-cloud-spot-capacity.md#§3
+tiers:
+  - id: compute
+    label: ワークロードと容量
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: control
+    label: 容量管理と復旧
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  work:
+    label: 中断可能なワークロード
+    kind: service
+    tier: compute
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  spot:
+    label: 中断可能な計算容量
+    kind: service
+    tier: compute
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  standard:
+    label: 通常の計算容量
+    kind: service
+    tier: compute
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  checkpoint:
+    label: 永続的な処理進捗
+    kind: db
+    tier: compute
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  manager:
+    label: 容量の選択と補充
+    kind: service
+    tier: control
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  notice:
+    label: 中断の通知
+    kind: service
+    tier: control
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  recovery:
+    label: 停止・再開の制御
+    kind: service
+    tier: control
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+links:
+  - id: run
+    from: work
+    to: spot
+    label: 処理を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: alternate
+    from: work
+    to: standard
+    label: 必要に応じて実行
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: save
+    from: work
+    to: checkpoint
+    label: 進捗を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: notice
+    from: spot
+    to: notice
+    label: 中断を通知
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: handle
+    from: notice
+    to: recovery
+    label: 停止処理を開始
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: restore
+    from: checkpoint
+    to: recovery
+    label: 進捗を読み戻す
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: resume
+    from: recovery
+    to: work
+    label: 処理を再開
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: supply
+    from: manager
+    to: spot
+    label: 容量を確保
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+  - id: supply-standard
+    from: manager
+    to: standard
+    label: 通常容量を確保
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+scenarios:
+  - id: main
+    label: 容量管理と復旧
+    evidence:
+      - type: doc
+        ref: docs/reference-cloud-spot-capacity.md#§2
+    steps:
+      - links:
+          - supply
+          - supply-standard
+          - run
+          - alternate
+        note: 通常容量と中断可能な容量を組み合わせる。
+      - links:
+          - save
+          - notice
+          - handle
+        note: 通知を受け停止処理を試み、進捗を永続化する。
+      - links:
+          - restore
+          - resume
+        note: 代替容量で保存した進捗から再開する。
+implementations:
+  - id: example
+    label: AWS EC2 Spot と Auto Scaling
+    description: 複数タイプの Spot と On-Demand を混合し、アプリが S3 に進捗を保存する例。
+    sources:
+      - title: AWS Spot interruption notice
+        url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html
+      - title: AWS EC2 rebalance recommendations
+        url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/rebalance-recommendations.html
+      - title: Azure Spot eviction
+        url: https://learn.microsoft.com/en-us/azure/architecture/guide/spot/spot-eviction
+      - title: Google Cloud Spot VMs
+        url: https://docs.cloud.google.com/compute/docs/instances/spot
+      - title: OCI preemptible instances
+        url: https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/preemptible.htm
+      - title: EC2 Auto Scaling Capacity Rebalancing
+        url: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-capacity-rebalancing.html
+    tiers:
+      - id: compute
+        label: ワークロードと容量
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: control
+        label: 容量管理と復旧
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-work:
+        label: 実行アプリ
+        kind: service
+        tier: compute
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-cloud-spot-capacity.md#§4
+        realizes:
+          - work
+      ex-spot:
+        label: EC2 Spot
+        kind: service
+        tier: compute
+        x: 4
+        'y': 1.5
+        svc: ec2
+        evidence:
+          - type: doc
+            ref: docs/reference-cloud-spot-capacity.md#§4
+        realizes:
+          - spot
+      ex-standard:
+        label: EC2 On-Demand
+        kind: service
+        tier: compute
+        x: 8
+        'y': 1.5
+        svc: ec2
+        evidence:
+          - type: doc
+            ref: docs/reference-cloud-spot-capacity.md#§4
+        realizes:
+          - standard
+      ex-checkpoint:
+        label: S3 進捗オブジェクト
+        kind: db
+        tier: compute
+        x: 12
+        'y': 1.5
+        svc: s3
+        evidence:
+          - type: doc
+            ref: docs/reference-cloud-spot-capacity.md#§4
+        realizes:
+          - checkpoint
+      ex-manager:
+        label: EC2 Auto Scaling
+        kind: service
+        tier: control
+        x: 0
+        'y': 1.5
+        svc: autoscaling
+        evidence:
+          - type: doc
+            ref: docs/reference-cloud-spot-capacity.md#§4
+        realizes:
+          - manager
+      ex-notice:
+        label: EventBridge 中断イベント
+        kind: service
+        tier: control
+        x: 4
+        'y': 1.5
+        svc: eventbridge
+        evidence:
+          - type: doc
+            ref: docs/reference-cloud-spot-capacity.md#§4
+        realizes:
+          - notice
+      ex-recovery:
+        label: アプリの停止・再開処理
+        kind: service
+        tier: control
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-cloud-spot-capacity.md#§4
+        realizes:
+          - recovery
+    groups:
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - compute
+        nodes:
+          - ex-work
+          - ex-spot
+          - ex-standard
+          - ex-checkpoint
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - control
+        nodes:
+          - ex-manager
+          - ex-notice
+          - ex-recovery

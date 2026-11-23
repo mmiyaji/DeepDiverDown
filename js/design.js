@@ -17,8 +17,11 @@ const KINDS = Object.entries(NODE_KINDS).map(([id, { label }]) => [id, label]);
 const REQUIREMENTS = [['usecase', 'ユースケース'], ['rule', '業務ルール'], ['nfr', '非機能要件']];
 const esc = value => String(value ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const idFor = prefix => `${prefix}-${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
-const options = (items, value) => items.map(([id, label]) =>
-  `<option value="${esc(id)}"${id === value ? ' selected' : ''}>${esc(label)}</option>`).join('');
+function options(items, value) {
+  const choices = value && !items.some(([id]) => id === value) ? [...items, [value, value]] : items;
+  return choices.map(([id, label]) =>
+    `<option value="${esc(id)}"${id === value ? ' selected' : ''}>${esc(label)}</option>`).join('');
+}
 const select = (name, items, value, required = true) => `<select name="${name}"${required ? ' required' : ''}>${options(items, value)}</select>`;
 const input = (name, value, extra = '') => `<input name="${name}" value="${esc(value)}" ${extra}>`;
 const area = (name, value, required = false) => `<textarea name="${name}" rows="3"${required ? ' required' : ''}>${esc(value)}</textarea>`;
@@ -92,17 +95,24 @@ export function openDesign(root, { key, download, finding, base, aiProvider }) {
         <label>受け入れ条件 ${area('text', entry.text)}</label>
         ${references('nodes', nodeChoices(), entry.nodes)}
         ${references('links', linkChoices(), entry.links)}`)}`;
-    if (step === 'nodes') return `
+    if (step === 'nodes') {
+      const currentService = Catalog.lookup(entry.svc)?.id;
+      const services = Object.entries(Catalog.SERVICES).flatMap(([provider, catalog]) =>
+        Object.entries(catalog).map(([id, service]) => {
+          const canonicalId = `${provider}:${id}`;
+          return [canonicalId === currentService ? entry.svc : canonicalId, `${Catalog.PROVIDERS[provider].label} / ${service.name}`];
+        }));
+      return `
       <label>部品名 ${input('label', entry.label, 'required')}</label>
       ${details('種別・配置・台数など（任意）', `
       <label>種別 ${select('kind', KINDS, entry.kind || 'service')}</label>
       <label>配置 ${select('tier', model().tiers.map(tier => [tier.id, tier.label]), entry.tier || model().tiers.find(t => t.id === 'app')?.id)}</label>
       <label>クラウドサービス（任意）
-        ${select('svc', [['', '指定なし'], ...Object.entries(Catalog.SERVICES).flatMap(([provider, services]) =>
-          Object.entries(services).map(([id, service]) => [`${provider}:${id}`, `${Catalog.PROVIDERS[provider].label} / ${service.name}`]))], entry.svc, false)}
+        ${select('svc', [['', '指定なし'], ...services], entry.svc, false)}
       </label>
       <label>台数（未決なら空欄） ${input('replicas', entry.replicas, 'type="number" min="1" step="1"')}</label>
       <label>採用理由・前提（任意） ${area('description', entry.description)}</label>`)}`;
+    }
     if (step === 'links') return `
       <label>送信元 ${select('from', nodeChoices(), entry.from)}</label>
       <label>宛先 ${select('to', nodeChoices(), entry.to || nodeChoices()[1]?.[0])}</label>
@@ -130,8 +140,8 @@ export function openDesign(root, { key, download, finding, base, aiProvider }) {
     return `<p>${hints[step]}</p>
       <ul class="design-records">${entries.map(([id, item]) => `
         <li><span>${esc(labelOf(step, item))}</span>
-          <button type="button" class="b small" data-design-edit="${id}">編集</button>
-          <button type="button" class="b small" data-design-delete="${id}">削除</button></li>`).join('')}</ul>
+          <button type="button" class="b small" data-design-edit="${esc(id)}">編集</button>
+          <button type="button" class="b small" data-design-delete="${esc(id)}">削除</button></li>`).join('')}</ul>
       ${locked ? '<p class="sub">接続を追加するには部品を2つ以上登録してください。</p>' : `
         <form class="design-form" data-design-form>
           ${editFields(step, current)}
@@ -168,7 +178,7 @@ export function openDesign(root, { key, download, finding, base, aiProvider }) {
       </div>`;
   }
 
-  const localAI = () => ['127.0.0.1:8125', 'localhost:8125'].includes(location.host);
+  const localAI = () => ['127.0.0.1', 'localhost'].includes(location.hostname) && ['8125', '8126'].includes(location.port);
   const localAIHelp = () => `<p>起動PCで <code>npm run serve:ai</code> を実行し、<a href="${AI_LOCAL_URL}">AI 用ビューア</a>を開いてください。</p>`;
   async function askAI(input) {
     const response = await fetch('/api/design-interview', {

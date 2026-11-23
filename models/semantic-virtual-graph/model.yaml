@@ -1,0 +1,266 @@
+name: RDB と仮想ナレッジグラフ
+description: 関係データを業務概念へ対応付け、データをコピーせず SPARQL で参照する方式を追う。
+reference:
+  objectives:
+    - R2RML の対応定義と元データを区別する。
+    - 仮想グラフで SPARQL を SQL に変換する流れを追う。
+    - 仮想化と実体化の違いと制約を理解する。
+  sources:
+    - title: W3C R2RML
+      url: https://www.w3.org/TR/r2rml/
+    - title: Ontop Introduction
+      url: https://ontop-vkg.org/guide/
+sources:
+  - docs/reference-semantic-virtual-graph.md
+evidence:
+  - type: doc
+    ref: docs/reference-semantic-virtual-graph.md#§1
+  - type: doc
+    ref: docs/reference-semantic-virtual-graph.md#§3
+tiers:
+  - id: flow
+    label: 問い合わせと利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: definition
+    label: 定義とデータ
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  analyst:
+    label: 利用者・分析アプリ
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  endpoint:
+    label: グラフ問い合わせ
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  translate:
+    label: 問い合わせの変換
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  db:
+    label: 関係データベース
+    kind: db
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  designer:
+    label: 対応の設計者
+    kind: actor
+    tier: definition
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  mapping:
+    label: 列と RDF の対応定義
+    kind: file
+    tier: definition
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  ontology:
+    label: 概念・関係の定義
+    kind: file
+    tier: definition
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+links:
+  - id: ask
+    from: analyst
+    to: endpoint
+    label: SPARQL を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  - id: plan
+    from: endpoint
+    to: translate
+    label: 問い合わせを計画
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  - id: execute
+    from: translate
+    to: db
+    label: SQL で元データを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  - id: returned
+    from: endpoint
+    to: analyst
+    label: グラフの結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  - id: define
+    from: designer
+    to: mapping
+    label: 対応を定義
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  - id: mapping
+    from: mapping
+    to: translate
+    label: 対応を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+  - id: ontology
+    from: ontology
+    to: translate
+    label: 概念を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-semantic-virtual-graph.md#§2
+    steps:
+      - links:
+          - define
+          - mapping
+          - ontology
+        note: 概念と関係データの対応を定義する。
+      - links:
+          - ask
+          - plan
+          - execute
+        note: SPARQL を対応に従って SQL に変換し元 DB で実行する。
+      - links:
+          - returned
+        note: 取得した結果をグラフの用語として返す。
+implementations:
+  - id: example
+    label: Ontop とリレーショナル DB
+    description: Ontop の仮想グラフを通じて、元 DB へ SQL を発行する例。配置と権限は環境に依存する。
+    sources:
+      - title: W3C R2RML
+        url: https://www.w3.org/TR/r2rml/
+      - title: Ontop Introduction
+        url: https://ontop-vkg.org/guide/
+    tiers:
+      - id: flow
+        label: 問い合わせと利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: definition
+        label: 定義とデータ
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-analyst:
+        label: SPARQL クライアント
+        kind: actor
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-virtual-graph.md#§4
+        realizes:
+          - analyst
+      ex-endpoint:
+        label: Ontop SPARQL エンドポイント
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-virtual-graph.md#§4
+        realizes:
+          - endpoint
+      ex-translate:
+        label: Ontop SQL 変換
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-virtual-graph.md#§4
+        realizes:
+          - translate
+      ex-db:
+        label: リレーショナル DB
+        kind: db
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-virtual-graph.md#§4
+        realizes:
+          - db
+      ex-designer:
+        label: マッピング設計者
+        kind: actor
+        tier: definition
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-virtual-graph.md#§4
+        realizes:
+          - designer
+      ex-mapping:
+        label: R2RML マッピング
+        kind: file
+        tier: definition
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-virtual-graph.md#§4
+        realizes:
+          - mapping
+      ex-ontology:
+        label: RDFS / OWL 2 QL 定義
+        kind: file
+        tier: definition
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-semantic-virtual-graph.md#§4
+        realizes:
+          - ontology

@@ -1,0 +1,256 @@
+name: CARLA の自動運転シミュレーション
+description: 仮想環境、センサー生成、外部の運転処理と制御のループを追う。
+reference:
+  objectives:
+    - シミュレーターと運転ソフトの境界を区別する。
+    - 仮想センサーと制御のループを追う。
+    - シナリオと実車評価の違いを理解する。
+  sources:
+    - title: CARLA introduction
+      url: https://carla.readthedocs.io/en/latest/start_introduction/
+    - title: CARLA sensors
+      url: https://carla.readthedocs.io/en/latest/ref_sensors/
+sources:
+  - docs/reference-carla-simulation.md
+evidence:
+  - type: doc
+    ref: docs/reference-carla-simulation.md#§1
+  - type: doc
+    ref: docs/reference-carla-simulation.md#§3
+tiers:
+  - id: flow
+    label: シミュレーションと運転
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 環境と評価
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  world:
+    label: 仮想世界と車両
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 物理、車両と周辺環境を更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  sensor:
+    label: 仮想センサー
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: カメラや LiDAR 等を生成する。
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  api:
+    label: シミュレーター接続
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: 外部クライアントから制御と観測にアクセスする。
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  stack:
+    label: 運転処理
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 外部の運転ソフトが観測を使い制御する。
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  scenario:
+    label: 地図・テスト条件
+    kind: file
+    tier: support
+    x: 0
+    'y': 1.5
+    description: 地図、交通や天候などの条件。
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  results:
+    label: 観測・評価
+    kind: service
+    tier: support
+    x: 12
+    'y': 1.5
+    description: ログや結果を用いて評価する。
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+links:
+  - id: configure
+    from: scenario
+    to: world
+    label: 環境と条件を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  - id: sense
+    from: world
+    to: sensor
+    label: 仮想センサーを生成
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  - id: read
+    from: sensor
+    to: api
+    label: センサーデータを提供
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  - id: consume
+    from: api
+    to: stack
+    label: 観測を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  - id: control
+    from: stack
+    to: api
+    label: 車両の制御を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  - id: apply
+    from: api
+    to: world
+    label: 制御を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+  - id: review
+    from: stack
+    to: results
+    label: 実行結果を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+scenarios:
+  - id: simulation
+    label: センサーと制御のループ
+    evidence:
+      - type: doc
+        ref: docs/reference-carla-simulation.md#§2
+    steps:
+      - links:
+          - configure
+          - sense
+          - read
+          - consume
+        note: 仮想環境から運転ソフトへ観測を渡す。
+      - links:
+          - control
+          - apply
+          - review
+        note: 制御を適用して結果を評価する。
+implementations:
+  - id: example
+    label: CARLA Server と運転クライアント
+    description: CARLA Server と API クライアントを分離した例。自動運転スタックと評価処理は利用者が選ぶ。
+    sources:
+      - title: CARLA introduction
+        url: https://carla.readthedocs.io/en/latest/start_introduction/
+      - title: CARLA sensors
+        url: https://carla.readthedocs.io/en/latest/ref_sensors/
+    tiers:
+      - id: flow
+        label: シミュレーションと運転
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 環境と評価
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-world:
+        label: CARLA Server
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 物理、車両と周辺環境を更新する。
+        realizes:
+          - world
+        evidence:
+          - type: doc
+            ref: docs/reference-carla-simulation.md#§4
+      ex-sensor:
+        label: CARLA センサー
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: カメラや LiDAR 等を生成する。
+        realizes:
+          - sensor
+        evidence:
+          - type: doc
+            ref: docs/reference-carla-simulation.md#§4
+      ex-api:
+        label: CARLA Python / C++ API
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: 外部クライアントから制御と観測にアクセスする。
+        realizes:
+          - api
+        evidence:
+          - type: doc
+            ref: docs/reference-carla-simulation.md#§4
+      ex-stack:
+        label: 自動運転クライアント
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        description: 外部の運転ソフトが観測を使い制御する。
+        realizes:
+          - stack
+        evidence:
+          - type: doc
+            ref: docs/reference-carla-simulation.md#§4
+      ex-scenario:
+        label: CARLA マップとシナリオ
+        kind: file
+        tier: support
+        x: 0
+        'y': 1.5
+        description: 地図、交通や天候などの条件。
+        realizes:
+          - scenario
+        evidence:
+          - type: doc
+            ref: docs/reference-carla-simulation.md#§4
+      ex-results:
+        label: 評価担当・評価処理
+        kind: service
+        tier: support
+        x: 12
+        'y': 1.5
+        description: ログや結果を用いて評価する。
+        realizes:
+          - results
+        evidence:
+          - type: doc
+            ref: docs/reference-carla-simulation.md#§4

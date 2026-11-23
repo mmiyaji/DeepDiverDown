@@ -273,14 +273,25 @@ implementations:
         url: https://archive.docs.datahub.com/docs/1.2.0/architecture/docker-containers
     nodes:
       datahub-compose-warehouse:
-        label: Snowflake と dbt モデル
+        label: Snowflake のデータセット
         kind: external
+        svc: snowflake:platform
         tier: people
         x: 1
         y: 1
-        description: スキーマと変換情報を提供する。
+        description: スキーマのメタデータを提供する。
         realizes:
           - source
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
+      datahub-compose-dbt:
+        label: dbt モデル
+        kind: file
+        tier: people
+        x: 5
+        y: 1
+        description: 変換定義と依存関係を提供する。
         evidence:
           - type: doc
             ref: docs/reference-datahub.md#§7
@@ -288,7 +299,7 @@ implementations:
         label: dbt テスト結果
         kind: worker
         tier: people
-        x: 5
+        x: 9
         y: 1
         description: 既存のテスト結果を assertion として取り込む。
         realizes:
@@ -300,7 +311,7 @@ implementations:
         label: 分析担当者・資産所有者
         kind: actor
         tier: people
-        x: 10
+        x: 13
         y: 1
         description: ブラウザーで資産と検証結果を確認する。
         realizes:
@@ -379,6 +390,13 @@ implementations:
           - type: doc
             ref: docs/reference-datahub.md#§7
     links:
+      - id: datahub-compose-dbt-ingest
+        from: datahub-compose-dbt
+        to: datahub-compose-cli
+        label: dbt の変換定義を取り込む
+        evidence:
+          - type: doc
+            ref: docs/reference-datahub.md#§7
       - id: datahub-compose-metadata-change
         from: datahub-compose-gms
         to: datahub-compose-kafka
@@ -393,3 +411,9 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-datahub.md#§7
+    groups:
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake
+        tier: [people]
+        nodes: [datahub-compose-warehouse]

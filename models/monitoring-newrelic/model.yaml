@@ -1,0 +1,269 @@
+name: New Relic による監視と分析
+description: APM とインフラの監視データを収集し、SaaS で問い合わせ・分析・通知する。
+reference:
+  objectives:
+    - 対象から収集・保存・分析までの流れを追う。
+    - 通知と運用担当者の役割を区別する。
+    - 収集方法と保存・権限の前提を理解する。
+  sources:
+    - title: New Relic infrastructure monitoring
+      url: https://docs.newrelic.com/docs/infrastructure/introduction-infra-monitoring/
+    - title: New Relic NRDB
+      url: https://docs.newrelic.com/docs/data-apis/get-started/nrdb-horsepower-under-hood/
+    - title: New Relic data limits
+      url: https://docs.newrelic.com/docs/data-apis/manage-data/view-system-limits/
+sources:
+  - docs/reference-monitoring-newrelic.md
+evidence:
+  - type: doc
+    ref: docs/reference-monitoring-newrelic.md#§1
+  - type: doc
+    ref: docs/reference-monitoring-newrelic.md#§3
+tiers:
+  - id: flow
+    label: 収集と分析
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: ops
+    label: 通知と運用
+    z: 0
+    size:
+      - 14
+      - 3
+nodes:
+  app:
+    label: 監視対象アプリとホスト
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  collector:
+    label: テレメトリ収集
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  store:
+    label: データの保存と問い合わせ
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  dashboard:
+    label: 監視画面
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  operator:
+    label: 運用担当者
+    kind: actor
+    tier: ops
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  alert:
+    label: アラートと通知
+    kind: service
+    tier: ops
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+links:
+  - id: capture
+    from: app
+    to: collector
+    label: ホストの情報を収集
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  - id: ingest
+    from: collector
+    to: store
+    label: 監視基盤に送信
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  - id: view
+    from: store
+    to: dashboard
+    label: データを検索・表示
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  - id: inspect
+    from: operator
+    to: dashboard
+    label: 状況を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  - id: check
+    from: store
+    to: alert
+    label: 通知条件を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+  - id: notify
+    from: alert
+    to: operator
+    label: アラートを通知
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+scenarios:
+  - id: monitor
+    label: 監視と通知
+    evidence:
+      - type: doc
+        ref: docs/reference-monitoring-newrelic.md#§2
+    steps:
+      - links:
+          - capture
+          - ingest
+        note: 対象の監視データを収集し SaaS に送る。
+      - links:
+          - view
+          - inspect
+        note: データを画面で確認する。
+      - links:
+          - check
+          - notify
+        note: 設定した条件に応じて担当者に通知する。
+implementations:
+  - id: example
+    label: New Relic Agents と SaaS
+    description: アプリ内 APM Agent とホストの Infrastructure Agent、New Relic SaaS を使う例。
+    sources:
+      - title: New Relic infrastructure monitoring
+        url: https://docs.newrelic.com/docs/infrastructure/introduction-infra-monitoring/
+      - title: New Relic NRDB
+        url: https://docs.newrelic.com/docs/data-apis/get-started/nrdb-horsepower-under-hood/
+      - title: New Relic data limits
+        url: https://docs.newrelic.com/docs/data-apis/manage-data/view-system-limits/
+    tiers:
+      - id: flow
+        label: 収集と分析
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: ops
+        label: 通知と運用
+        z: 0
+        size:
+          - 14
+          - 3
+    nodes:
+      ex-app:
+        label: アプリ内 APM Agent とホスト
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+        realizes:
+          - app
+      ex-collector:
+        label: Infrastructure Agent
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+        realizes:
+          - collector
+      ex-store:
+        label: New Relic NRDB
+        kind: db
+        tier: flow
+        x: 8
+        'y': 1.5
+        svc: newrelic:platform
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+        realizes:
+          - store
+      ex-dashboard:
+        label: New Relic NRQL と画面
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        svc: newrelic:platform
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+        realizes:
+          - dashboard
+      ex-operator:
+        label: 運用担当者
+        kind: actor
+        tier: ops
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+        realizes:
+          - operator
+      ex-alert:
+        label: New Relic Alerts
+        kind: service
+        tier: ops
+        x: 8
+        'y': 1.5
+        svc: newrelic:platform
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4
+        realizes:
+          - alert
+    groups:
+      - kind: cloud
+        label: New Relic SaaS
+        provider: newrelic
+        tier:
+          - flow
+        nodes:
+          - ex-store
+          - ex-dashboard
+      - kind: cloud
+        label: New Relic SaaS
+        provider: newrelic
+        tier:
+          - ops
+        nodes:
+          - ex-alert
+    links:
+      - id: ex-apm-send
+        from: ex-app
+        to: ex-store
+        label: APM データを SaaS に送信
+        evidence:
+          - type: doc
+            ref: docs/reference-monitoring-newrelic.md#§4

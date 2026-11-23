@@ -88,6 +88,13 @@ implementations:
           - 8
     groups:
       - kind: cloud
+        label: Microsoft Entra テナント
+        provider: azure
+        tier:
+          - interface
+        nodes:
+          - azure-identity
+      - kind: cloud
         label: Azure サブスクリプション
         provider: azure
         tier:
@@ -115,12 +122,22 @@ implementations:
           - azure-svc
     nodes:
       azure-operator:
-        label: kubectl と Microsoft Entra ID
+        label: 運用者の kubectl
         kind: actor
         tier: interface
-        svc: azure:entra
         realizes:
           - operator
+        description: 運用者が kubectl で AKS を操作する。
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
+      azure-identity:
+        label: Microsoft Entra ID
+        kind: service
+        tier: interface
+        x: 5
+        y: 1.5
+        svc: azure:entra
         description: 運用者を認証し、認可は設定済みの RBAC で制御する。
         evidence:
           - type: doc
@@ -201,6 +218,13 @@ implementations:
           - type: doc
             ref: docs/reference-azure-aks.md#§9
     links:
+      - id: azure-authenticate
+        from: azure-operator
+        to: azure-identity
+        label: 認証する
+        evidence:
+          - type: doc
+            ref: docs/reference-azure-aks.md#§9
       - id: azure-publish-service
         from: azure-workload
         to: azure-svc

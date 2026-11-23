@@ -1,0 +1,244 @@
+name: ROS 2 と DDS の通信
+description: ROS 2 のノード、トピック、QoS と DDS 系ミドルウェアの関係を追う。
+reference:
+  objectives:
+    - ノードとトピックの送受信を追う。
+    - QoS と RMW・DDS の責任を区別する。
+    - サービスや action との用途の違いを理解する。
+  sources:
+    - title: ROS 2 topics
+      url: https://docs.ros.org/en/rolling/Concepts/Basic/About-Topics.html
+    - title: ROS middleware interface
+      url: https://docs.ros.org/en/rolling/Concepts/Intermediate/About-Different-Middleware-Vendors.html
+    - title: ROS 2 QoS
+      url: https://docs.ros.org/en/rolling/Concepts/Intermediate/About-Quality-of-Service-Settings.html
+sources:
+  - docs/reference-ros2-dds-communication.md
+evidence:
+  - type: doc
+    ref: docs/reference-ros2-dds-communication.md#§1
+  - type: doc
+    ref: docs/reference-ros2-dds-communication.md#§3
+tiers:
+  - id: flow
+    label: 発行と購読
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 通信の設定と実装
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  publisher:
+    label: 送信ノード
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: センサーデータを発行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  topic:
+    label: 名前付きの通信
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: 発行者と購読者が同じトピックを利用する。
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  subscriber:
+    label: 受信ノード
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: トピックを購読する。
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  rmw:
+    label: ミドルウェア接続
+    kind: service
+    tier: support
+    x: 0
+    'y': 1.5
+    description: ROS 2 の RMW 実装を通じて通信する。
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  dds:
+    label: データ配信実装
+    kind: service
+    tier: support
+    x: 4
+    'y': 1.5
+    description: 例として DDS ベースの RMW を使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  qos:
+    label: 通信品質の方針
+    kind: file
+    tier: support
+    x: 8
+    'y': 1.5
+    description: 信頼性や履歴等を設定し互換性を確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+links:
+  - id: publish
+    from: publisher
+    to: topic
+    label: メッセージを発行
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  - id: receive
+    from: topic
+    to: subscriber
+    label: メッセージを購読
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  - id: middleware
+    from: publisher
+    to: rmw
+    label: RMW を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  - id: implementation
+    from: rmw
+    to: dds
+    label: DDS 実装を使う
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+  - id: policy
+    from: qos
+    to: topic
+    label: QoS を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+scenarios:
+  - id: topic
+    label: トピックの送受信
+    evidence:
+      - type: doc
+        ref: docs/reference-ros2-dds-communication.md#§2
+    steps:
+      - links:
+          - middleware
+          - implementation
+          - policy
+        note: 送受信側で RMW と QoS を設定する。
+      - links:
+          - publish
+          - receive
+        note: トピックを通じてメッセージを送受信する。
+implementations:
+  - id: example
+    label: ROS 2 と DDS による pub/sub
+    description: ROS 2 の Publisher と Subscriber が DDS ベースの RMW を介してトピックを交換する例。DDS 実装やプロセス配置は環境による。
+    sources:
+      - title: ROS 2 topics
+        url: https://docs.ros.org/en/rolling/Concepts/Basic/About-Topics.html
+      - title: ROS middleware interface
+        url: https://docs.ros.org/en/rolling/Concepts/Intermediate/About-Different-Middleware-Vendors.html
+      - title: ROS 2 QoS
+        url: https://docs.ros.org/en/rolling/Concepts/Intermediate/About-Quality-of-Service-Settings.html
+    tiers:
+      - id: flow
+        label: 発行と購読
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 通信の設定と実装
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-publisher:
+        label: ROS 2 Publisher
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: センサーデータを発行する。
+        realizes:
+          - publisher
+        evidence:
+          - type: doc
+            ref: docs/reference-ros2-dds-communication.md#§4
+      ex-topic:
+        label: ROS 2 Topic
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: 発行者と購読者が同じトピックを利用する。
+        realizes:
+          - topic
+        evidence:
+          - type: doc
+            ref: docs/reference-ros2-dds-communication.md#§4
+      ex-subscriber:
+        label: ROS 2 Subscriber
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: トピックを購読する。
+        realizes:
+          - subscriber
+        evidence:
+          - type: doc
+            ref: docs/reference-ros2-dds-communication.md#§4
+      ex-rmw:
+        label: ROS 2 RMW
+        kind: service
+        tier: support
+        x: 0
+        'y': 1.5
+        description: ROS 2 の RMW 実装を通じて通信する。
+        realizes:
+          - rmw
+        evidence:
+          - type: doc
+            ref: docs/reference-ros2-dds-communication.md#§4
+      ex-dds:
+        label: DDS / RTPS 実装
+        kind: service
+        tier: support
+        x: 4
+        'y': 1.5
+        description: 例として DDS ベースの RMW を使う。
+        realizes:
+          - dds
+        evidence:
+          - type: doc
+            ref: docs/reference-ros2-dds-communication.md#§4
+      ex-qos:
+        label: ROS 2 QoS 設定
+        kind: file
+        tier: support
+        x: 8
+        'y': 1.5
+        description: 信頼性や履歴等を設定し互換性を確認する。
+        realizes:
+          - qos
+        evidence:
+          - type: doc
+            ref: docs/reference-ros2-dds-communication.md#§4

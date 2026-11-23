@@ -1,36 +1,143 @@
-name: "データクリーンルームの基本構成"
-description: "広告接触と受注を合意した条件で照合し、許可された集計を返します。"
+name: データクリーンルームの基本構成
+description: 広告接触と受注を合意した条件で照合し、許可された集計を返します。
 reference:
-  objectives: ["元データ、実行権限、受領範囲を区別する。", "最小件数の制約が適用される場所を確認する。"]
+  objectives:
+    - 元データ、実行権限、受領範囲を区別する。
+    - 最小件数の制約が適用される場所を確認する。
   sources:
-    - {"title": "AWS · AWS Clean Rooms", "url": "https://docs.aws.amazon.com/clean-rooms/latest/userguide/what-is.html"}
-    - {"title": "AWS · 集計分析ルール", "url": "https://docs.aws.amazon.com/clean-rooms/latest/userguide/analysis-rules-aggregation.html"}
-sources: [docs/reference-data-clean-room.md]
-evidence: [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§1"}]
+    - title: AWS · AWS Clean Rooms
+      url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/what-is.html
+    - title: AWS · 集計分析ルール
+      url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/analysis-rules-aggregation.html
+sources:
+  - docs/reference-data-clean-room.md
+evidence:
+  - type: doc
+    ref: docs/reference-data-clean-room.md#§1
 tiers:
-  - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+  - id: flow
+    label: データと処理
+    z: 0
+    size:
+      - 16
+      - 5
 nodes:
-  media: {"label": "媒体社の広告接触", "kind": "db", "tier": "flow", "x": 0, "y": 1, "description": "広告接触の行を保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§2"}]}
-  sales: {"label": "小売社の受注", "kind": "db", "tier": "flow", "x": 0, "y": 4, "description": "注文の行を保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§2"}]}
-  policy: {"label": "分析ルール", "kind": "service", "tier": "flow", "x": 4, "y": 0, "description": "結合列と集計、出力条件を定める。", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§3"}]}
-  room: {"label": "共同分析環境", "kind": "worker", "tier": "flow", "x": 8, "y": 2, "description": "ルールに従ってクエリを実行する。", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§1"}]}
-  release: {"label": "結果の出力制約", "kind": "service", "tier": "flow", "x": 12, "y": 2, "description": "小さいグループを除く。", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§3"}]}
-  recipient: {"label": "結果受領者", "kind": "client", "tier": "flow", "x": 16, "y": 2, "description": "許可された集計を受け取る。", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§1"}]}
+  media:
+    label: 媒体社の広告接触
+    kind: db
+    tier: flow
+    x: 0
+    'y': 1
+    description: 広告接触の行を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§2
+  sales:
+    label: 小売社の受注
+    kind: db
+    tier: flow
+    x: 0
+    'y': 4
+    description: 注文の行を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§2
+  policy:
+    label: 分析ルール
+    kind: service
+    tier: flow
+    x: 4
+    'y': 0
+    description: 結合列と集計、出力条件を定める。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§3
+  room:
+    label: 共同分析環境
+    kind: worker
+    tier: flow
+    x: 8
+    'y': 2
+    description: ルールに従ってクエリを実行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§1
+  release:
+    label: 結果の出力制約
+    kind: service
+    tier: flow
+    x: 12
+    'y': 2
+    description: 小さいグループを除く。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§3
+  recipient:
+    label: 結果受領者
+    kind: client
+    tier: flow
+    x: 16
+    'y': 2
+    description: 許可された集計を受け取る。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§1
 links:
-  - {"id": "media-input", "from": "media", "to": "room", "label": "広告接触を照合に利用", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§2"}]}
-  - {"id": "sales-input", "from": "sales", "to": "room", "label": "受注を照合に利用", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§2"}]}
-  - {"id": "check-query", "from": "policy", "to": "room", "label": "許可する結合・集計", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§3"}]}
-  - {"id": "check-result", "from": "room", "to": "release", "label": "集計結果を制約に照合", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§3"}]}
-  - {"id": "receive", "from": "release", "to": "recipient", "label": "許された集計を返す", "evidence": [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§3"}]}
+  - id: media-input
+    from: media
+    to: room
+    label: 広告接触を照合に利用
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§2
+  - id: sales-input
+    from: sales
+    to: room
+    label: 受注を照合に利用
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§2
+  - id: check-query
+    from: policy
+    to: room
+    label: 許可する結合・集計
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§3
+  - id: check-result
+    from: room
+    to: release
+    label: 集計結果を制約に照合
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§3
+  - id: receive
+    from: release
+    to: recipient
+    label: 許された集計を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§3
 scenarios:
   - id: measure
-    label: "広告接触後の受注を集計"
-    evidence: [{"type": "doc", "ref": "docs/reference-data-clean-room.md#§1"}]
+    label: 広告接触後の受注を集計
+    evidence:
+      - type: doc
+        ref: docs/reference-data-clean-room.md#§1
     steps:
-      - {"links": ["check-query"], "note": "許可するデータと分析条件を決める。"}
-      - {"links": ["media-input", "sales-input"], "note": "許可された列で照合し、キャンペーン単位に集計する。"}
-      - {"links": ["check-result"], "note": "指定列の一意値が最小件数に届かない結果行を除く。"}
-      - {"links": ["receive"], "note": "受領権限がある参加者が集計を受け取る。"}
+      - links:
+          - check-query
+        note: 許可するデータと分析条件を決める。
+      - links:
+          - media-input
+          - sales-input
+        note: 許可された列で照合し、キャンペーン単位に集計する。
+      - links:
+          - check-result
+        note: 指定列の一意値が最小件数に届かない結果行を除く。
+      - links:
+          - receive
+        note: 受領権限がある参加者が集計を受け取る。
 implementations:
   - id: aws-cleanrooms
     label: AWS Clean Rooms・Glue・S3
@@ -50,7 +157,7 @@ implementations:
         kind: table
         tier: flow
         x: 0
-        y: 1
+        'y': 1
         description: 広告接触ログを指す設定済みテーブル。
         svc: glue
         realizes:
@@ -63,7 +170,7 @@ implementations:
         kind: table
         tier: flow
         x: 0
-        y: 4
+        'y': 4
         description: 注文履歴を指す設定済みテーブル。
         svc: glue
         realizes:
@@ -76,7 +183,7 @@ implementations:
         kind: policy
         tier: flow
         x: 4
-        y: 0
+        'y': 0
         description: 許可する結合や集計と最小集計しきい値を設定する。
         realizes:
           - policy
@@ -84,24 +191,26 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-data-clean-room.md#§4
+        svc: cleanrooms
       aws-cleanrooms-collab:
         label: AWS Clean Rooms コラボレーション
         kind: worker
         tier: flow
         x: 8
-        y: 2
+        'y': 2
         description: 許可されたメンバーが制約内で共同クエリを実行する。
         realizes:
           - room
         evidence:
           - type: doc
             ref: docs/reference-data-clean-room.md#§4
+        svc: cleanrooms
       aws-cleanrooms-member:
         label: 結果受領が許可されたメンバー
         kind: client
         tier: flow
         x: 16
-        y: 2
+        'y': 2
         description: 自社の Amazon S3 に集計結果を受け取る。
         realizes:
           - recipient
@@ -113,17 +222,18 @@ implementations:
         kind: service
         tier: flow
         x: 4
-        y: 2.5
+        'y': 2.5
         description: AWS Clean Rooms が関連付けた入力テーブルへアクセスする権限を与える。
         evidence:
           - type: doc
             ref: docs/reference-data-clean-room.md#§4
+        svc: iam
       aws-cleanrooms-output:
         label: 結果受領者の Amazon S3
         kind: service
         tier: flow
         x: 12
-        y: 2.5
+        'y': 2.5
         description: 結果設定で指定された S3 バケットに出力する。
         svc: s3
         evidence:
@@ -151,3 +261,46 @@ implementations:
         nodes:
           - aws-cleanrooms-controls
           - aws-cleanrooms-collab
+          - aws-cleanrooms-iam
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - flow
+        nodes:
+          - aws-cleanrooms-media
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - flow
+        nodes:
+          - aws-cleanrooms-retail
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - flow
+        nodes:
+          - aws-cleanrooms-output
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - flow
+        nodes:
+          - aws-cleanrooms-controls
+      - kind: cloud
+        provider: aws
+        label: AWS サービス
+        tier:
+          - flow
+        nodes:
+          - aws-cleanrooms-collab
+      - kind: cloud
+        label: AWS サービス
+        provider: aws
+        tier:
+          - flow
+        nodes:
+          - aws-cleanrooms-iam

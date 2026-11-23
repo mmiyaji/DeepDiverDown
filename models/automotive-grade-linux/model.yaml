@@ -1,0 +1,208 @@
+name: Automotive Grade Linux の車載基盤
+description: 車載 HMI、アプリフレームワーク、サービスと Linux OS の層を追う。
+reference:
+  objectives:
+    - HMI とアプリの層を理解する。
+    - フレームワーク、サービス、OS とハードウェアを区別する。
+    - 車載向け配布物と安全性の評価を区別する。
+  sources:
+    - title: AGL architecture overview
+      url: https://docs.automotivelinux.org/en/vimba/03_Architecture_Guides/01_Introduction/01_Overview/
+    - title: AGL platform
+      url: https://docs.automotivelinux.org/en/quillback/03_Architecture_Guides/02_Security_Blueprint/06_Platform/
+sources:
+  - docs/reference-automotive-grade-linux.md
+evidence:
+  - type: doc
+    ref: docs/reference-automotive-grade-linux.md#§1
+  - type: doc
+    ref: docs/reference-automotive-grade-linux.md#§3
+tiers:
+  - id: flow
+    label: 車載アプリとサービス
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: OS とハードウェア
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  ui:
+    label: 車載アプリと HMI
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 利用者向けアプリと HMI。
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+  framework:
+    label: アプリ管理 API
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: アプリの実行・管理を支える。
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+  services:
+    label: ユーザー空間サービス
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: アプリが利用する共通サービス。
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+  os:
+    label: OS とドライバー
+    kind: service
+    tier: support
+    x: 4
+    'y': 1.5
+    description: Linux カーネルとデバイスドライバー。
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+  hardware:
+    label: 車載ハードウェア
+    kind: external
+    tier: support
+    x: 8
+    'y': 1.5
+    description: 実装対象の車載ハードウェア。
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+links:
+  - id: call
+    from: ui
+    to: framework
+    label: アプリ API を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+  - id: use
+    from: framework
+    to: services
+    label: 共通サービスを利用
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+  - id: kernel
+    from: services
+    to: os
+    label: OS の機能を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+  - id: device
+    from: os
+    to: hardware
+    label: デバイスにアクセス
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+scenarios:
+  - id: application
+    label: 車載アプリからデバイスへ
+    evidence:
+      - type: doc
+        ref: docs/reference-automotive-grade-linux.md#§2
+    steps:
+      - links:
+          - call
+          - use
+          - kernel
+          - device
+        note: アプリから各層を介してデバイスにアクセスする。
+implementations:
+  - id: example
+    label: AGL の IVI 向け層構成
+    description: AGL の公式アーキテクチャに基づく IVI 向けの層構成例。具体的なハードウェアやリリースは固定しない。
+    sources:
+      - title: AGL architecture overview
+        url: https://docs.automotivelinux.org/en/vimba/03_Architecture_Guides/01_Introduction/01_Overview/
+      - title: AGL platform
+        url: https://docs.automotivelinux.org/en/quillback/03_Architecture_Guides/02_Security_Blueprint/06_Platform/
+    tiers:
+      - id: flow
+        label: 車載アプリとサービス
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: OS とハードウェア
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-ui:
+        label: AGL App / HMI
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        description: 利用者向けアプリと HMI。
+        realizes:
+          - ui
+        evidence:
+          - type: doc
+            ref: docs/reference-automotive-grade-linux.md#§4
+      ex-framework:
+        label: AGL Application Framework
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        description: アプリの実行・管理を支える。
+        realizes:
+          - framework
+        evidence:
+          - type: doc
+            ref: docs/reference-automotive-grade-linux.md#§4
+      ex-services:
+        label: AGL Services
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        description: アプリが利用する共通サービス。
+        realizes:
+          - services
+        evidence:
+          - type: doc
+            ref: docs/reference-automotive-grade-linux.md#§4
+      ex-os:
+        label: Linux kernel / drivers
+        kind: service
+        tier: support
+        x: 4
+        'y': 1.5
+        description: Linux カーネルとデバイスドライバー。
+        realizes:
+          - os
+        evidence:
+          - type: doc
+            ref: docs/reference-automotive-grade-linux.md#§4
+      ex-hardware:
+        label: 車載ボード
+        kind: external
+        tier: support
+        x: 8
+        'y': 1.5
+        description: 実装対象の車載ハードウェア。
+        realizes:
+          - hardware
+        evidence:
+          - type: doc
+            ref: docs/reference-automotive-grade-linux.md#§4

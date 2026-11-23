@@ -1,67 +1,334 @@
-name: "Snowflake Secure Data Sharing の公開と失効"
-description: "同一リージョンのアカウント間で限定した注文情報を共有し、提供者と受領者の責任を分ける。"
-parent: {"model":"snowflake","node":"sharing"}
+name: Snowflake Secure Data Sharing の公開と失効
+description: 同一リージョンのアカウント間で限定した注文情報を共有し、提供者と受領者の責任を分ける。
+parent:
+  model: snowflake
+  node: sharing
 reference:
   objectives:
-    - "基表、共有用の secure view、share、受領側の読み取り専用データベースを区別する。"
-    - "権限の失効で止まるアクセスと、すでに取得した結果の扱いを区別する。"
+    - 基表、共有用の secure view、share、受領側の読み取り専用データベースを区別する。
+    - 権限の失効で止まるアクセスと、すでに取得した結果の扱いを区別する。
   sources:
-    - {"title":"Secure Data Sharing の概念","url":"https://docs.snowflake.com/en/user-guide/data-sharing-intro"}
-    - {"title":"共有用の secure object","url":"https://docs.snowflake.com/en/user-guide/data-sharing-secure-views"}
-sources: ["docs/reference-snowflake-secure-sharing.md"]
-evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§1"}]
+    - title: Secure Data Sharing の概念
+      url: https://docs.snowflake.com/en/user-guide/data-sharing-intro
+    - title: 共有用の secure object
+      url: https://docs.snowflake.com/en/user-guide/data-sharing-secure-views
+sources:
+  - docs/reference-snowflake-secure-sharing.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-secure-sharing.md#§1
 tiers:
-  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[14.5,3.5]}
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+      - 14.5
+      - 3.5
 nodes:
-  provider: {"label":"提供側の管理者","kind":"actor","tier":"flow","x":0,"y":0,"description":"公開先を決める。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§1"}]}
-  orders: {"label":"提供側の注文集計","kind":"db","tier":"flow","x":0,"y":3,"description":"提供元のデータ。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§2"}]}
-  view: {"label":"共有用のアクセス制御ビュー","kind":"db","tier":"flow","x":4,"y":3,"description":"行・列を公開用に投影。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§2"}]}
-  share: {"label":"データ公開と受領者の定義","kind":"service","tier":"flow","x":7,"y":1,"description":"対象オブジェクト、権限と受領者。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§2"}]}
-  imported: {"label":"受領者の読み取り専用参照口","kind":"db","tier":"flow","x":10,"y":3,"description":"Share から作る参照口。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§3"}]}
-  consumer: {"label":"受領側のクエリ実行資源","kind":"worker","tier":"flow","x":14,"y":3,"description":"受領側が実行する分析。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§3"}]}
-  revoke: {"label":"共有の取り消し","kind":"service","tier":"flow","x":10,"y":0,"description":"対象オブジェクトまたは受領者へのアクセスを失効。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§4"}]}
+  provider:
+    label: 提供側の管理者
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 0
+    description: 公開先を決める。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§1
+  orders:
+    label: 提供側の注文集計
+    kind: db
+    tier: flow
+    x: 0
+    'y': 3
+    description: 提供元のデータ。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§2
+  view:
+    label: 共有用のアクセス制御ビュー
+    kind: db
+    tier: flow
+    x: 4
+    'y': 3
+    description: 行・列を公開用に投影。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§2
+  share:
+    label: データ公開と受領者の定義
+    kind: service
+    tier: flow
+    x: 7
+    'y': 1
+    description: 対象オブジェクト、権限と受領者。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§2
+  imported:
+    label: 受領者の読み取り専用参照口
+    kind: db
+    tier: flow
+    x: 10
+    'y': 3
+    description: Share から作る参照口。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§3
+  consumer:
+    label: 受領側のクエリ実行資源
+    kind: worker
+    tier: flow
+    x: 14
+    'y': 3
+    description: 受領側が実行する分析。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§3
+  revoke:
+    label: 共有の取り消し
+    kind: service
+    tier: flow
+    x: 10
+    'y': 0
+    description: 対象オブジェクトまたは受領者へのアクセスを失効。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§4
 links:
-  - {"id":"prepare","from":"orders","to":"view","label":"共有可能な行・列を選ぶ","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§2"}]}
-  - {"id":"grant","from":"view","to":"share","label":"参照権限を付与","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§2"}]}
-  - {"id":"publish","from":"provider","to":"share","label":"受領するアカウントを指定","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§2"}]}
-  - {"id":"import","from":"share","to":"imported","label":"共有を読み取り専用 DB として利用","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§3"}]}
-  - {"id":"query","from":"consumer","to":"imported","label":"受領側でクエリ","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§3"}]}
-  - {"id":"resolve","from":"imported","to":"view","label":"提供側の共有ビューを読む","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§3"}]}
-  - {"id":"revoke","from":"provider","to":"revoke","label":"共有アクセスを取り消し","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§4"}]}
-  - {"id":"effect","from":"revoke","to":"share","label":"将来の参照を制限","evidence":[{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§4"}]}
+  - id: prepare
+    from: orders
+    to: view
+    label: 共有可能な行・列を選ぶ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§2
+  - id: grant
+    from: view
+    to: share
+    label: 参照権限を付与
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§2
+  - id: publish
+    from: provider
+    to: share
+    label: 受領するアカウントを指定
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§2
+  - id: import
+    from: share
+    to: imported
+    label: 共有を読み取り専用 DB として利用
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§3
+  - id: query
+    from: consumer
+    to: imported
+    label: 受領側でクエリ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§3
+  - id: resolve
+    from: imported
+    to: view
+    label: 提供側の共有ビューを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§3
+  - id: revoke
+    from: provider
+    to: revoke
+    label: 共有アクセスを取り消し
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§4
+  - id: effect
+    from: revoke
+    to: share
+    label: 将来の参照を制限
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§4
 scenarios:
   - id: publish
-    label: "限定ビューを共有して分析する"
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§3"}]
+    label: 限定ビューを共有して分析する
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§3
     steps:
-      - {"links":["prepare","grant","publish"],"note":"公開用ビューと権限を定義し、受領アカウントを指定する。"}
-      - {"links":["import"],"note":"受領側から共有を参照するデータベースを作る。"}
-      - {"links":["query","resolve"],"note":"受領側ウェアハウスが、許可されたデータを読む。"}
+      - links:
+          - prepare
+          - grant
+          - publish
+        note: 公開用ビューと権限を定義し、受領アカウントを指定する。
+      - links:
+          - import
+        note: 受領側から共有を参照するデータベースを作る。
+      - links:
+          - query
+          - resolve
+        note: 受領側ウェアハウスが、許可されたデータを読む。
   - id: stop-sharing
-    label: "共有契約の終了"
-    evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§4"}]
+    label: 共有契約の終了
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-secure-sharing.md#§4
     steps:
-      - {"links":["query","resolve"],"note":"終了前に公開対象と利用状況を確認する。"}
-      - {"links":["revoke","effect"],"note":"対象の共有を取り消し、以後のクエリを制限する。"}
-
+      - links:
+          - query
+          - resolve
+        note: 終了前に公開対象と利用状況を確認する。
+      - links:
+          - revoke
+          - effect
+        note: 対象の共有を取り消し、以後のクエリを制限する。
 implementations:
   - id: snowflake-direct-share
-    label: "Snowflake アカウント間の Direct Share"
-    description: "同一リージョンの 2 つの Snowflake アカウント間で、受注の公開用ビューを共有する例。"
+    label: Snowflake アカウント間の Direct Share
+    description: 同一リージョンの 2 つの Snowflake アカウント間で、受注の公開用ビューを共有する例。
     sources:
-      - {title: "Secure Data Sharing の概念", url: "https://docs.snowflake.com/en/user-guide/data-sharing-intro"}
-      - {title: "共有用の secure object", url: "https://docs.snowflake.com/en/user-guide/data-sharing-secure-views"}
-      - {title: "Snowflake: Create and configure shares", url: "https://docs.snowflake.com/en/user-guide/data-sharing-provider"}
+      - title: Secure Data Sharing の概念
+        url: https://docs.snowflake.com/en/user-guide/data-sharing-intro
+      - title: 共有用の secure object
+        url: https://docs.snowflake.com/en/user-guide/data-sharing-secure-views
+      - title: 'Snowflake: Create and configure shares'
+        url: https://docs.snowflake.com/en/user-guide/data-sharing-provider
     tiers:
-      - {id: "flow", label: "構成と処理の流れ", z: 0, size: [14.5,3.5]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [8,3]}
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size:
+          - 14.5
+          - 3.5
+      - id: implementation-setup
+        label: 実装時の設定・観測
+        z: 1
+        size:
+          - 8
+          - 3
     nodes:
-      example-provider: {label: "提供者側データ管理ロール", kind: "actor", tier: "flow", x: 0, y: 0, realizes: ["provider"], description: "共有先アカウントを選択する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
-      example-orders: {label: "提供側 SALES.ORDERS_SUMMARY", kind: "db", tier: "flow", x: 0, y: 3, realizes: ["orders"], description: "社内分析用の集計表。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
-      example-view: {label: "SALES.ORDERS_PUBLIC SECURE VIEW", kind: "db", tier: "flow", x: 4, y: 3, realizes: ["view"], description: "提供を許可した行・列だけを公開する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
-      example-share: {label: "Snowflake SHARE と受領者割当", kind: "service", tier: "flow", x: 7, y: 1, realizes: ["share","revoke"], description: "共有対象の権限と受領者を変更して以後の参照を制御する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
-      example-imported: {label: "受領側 ORDERS_SHARED データベース", kind: "db", tier: "flow", x: 10, y: 3, realizes: ["imported"], description: "CREATE DATABASE FROM SHARE で作る読み取り専用の参照口。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
-      example-consumer: {label: "受領側の BI_WH", kind: "worker", tier: "flow", x: 14, y: 3, realizes: ["consumer"], description: "受領側の計算資源で共有データをクエリする。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
-      example-role: {label: "受領側の BI ロール", kind: "service", tier: "implementation-setup", x: 1, y: 1.5, description: "受領側で共有データベースへの参照を許可する。", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
+      example-provider:
+        label: 提供者側データ管理ロール
+        kind: actor
+        tier: flow
+        x: -4
+        'y': 0
+        realizes:
+          - provider
+        description: 共有先アカウントを選択する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
+      example-orders:
+        svc: snowflake:platform
+        label: 提供側 SALES.ORDERS_SUMMARY
+        kind: db
+        tier: flow
+        x: 0
+        'y': 3
+        realizes:
+          - orders
+        description: 社内分析用の集計表。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
+      example-view:
+        svc: snowflake:platform
+        label: SALES.ORDERS_PUBLIC SECURE VIEW
+        kind: db
+        tier: flow
+        x: 4
+        'y': 3
+        realizes:
+          - view
+        description: 提供を許可した行・列だけを公開する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
+      example-share:
+        label: Snowflake SHARE と受領者割当
+        kind: service
+        tier: flow
+        svc: snowflake:platform
+        x: 7
+        'y': 1
+        realizes:
+          - share
+          - revoke
+        description: 共有対象の権限と受領者を変更して以後の参照を制御する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
+      example-imported:
+        svc: snowflake:database
+        label: 受領側 ORDERS_SHARED データベース
+        kind: db
+        tier: flow
+        x: 10
+        'y': 3
+        realizes:
+          - imported
+        description: CREATE DATABASE FROM SHARE で作る読み取り専用の参照口。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
+      example-consumer:
+        svc: snowflake:warehouse
+        label: 受領側の BI_WH
+        kind: worker
+        tier: flow
+        x: 14
+        'y': 3
+        realizes:
+          - consumer
+        description: 受領側の計算資源で共有データをクエリする。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
+      example-role:
+        svc: snowflake:platform
+        label: 受領側の BI ロール
+        kind: service
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 受領側で共有データベースへの参照を許可する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
     links:
-      - {id: "example-role-connection", from: "example-role", to: "example-imported", label: "インポートしたデータの利用権限", evidence: [{"type":"doc","ref":"docs/reference-snowflake-secure-sharing.md#§5"}]}
+      - id: example-role-connection
+        from: example-role
+        to: example-imported
+        label: インポートしたデータの利用権限
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-secure-sharing.md#§5
+    groups:
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake 提供側アカウント
+        tier:
+          - flow
+        nodes:
+          - example-orders
+          - example-view
+          - example-share
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake 受領側アカウント
+        tier:
+          - flow
+        nodes:
+          - example-imported
+          - example-consumer
+      - kind: cloud
+        provider: snowflake
+        label: Snowflake 受領側アカウント
+        tier:
+          - implementation-setup
+        nodes:
+          - example-role

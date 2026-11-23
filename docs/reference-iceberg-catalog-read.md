@@ -57,7 +57,8 @@ Trino の Iceberg REST カタログで委任認証情報を有効化し、Polari
 | Coordinator | Trino Coordinator | カタログ解決、メタデータ読み取りとタスク計画を調停する。 |
 | Worker | Trino Workers | 割り当てられたファイルの読み取りとフィルタを実行する。 |
 | REST Catalog | Polaris Iceberg REST API | 対象テーブルのメタデータを返す。 |
-| Vended Credentials | Polaris と AWS STS の一時認証情報 | カタログ用 IAM ロールの短期認証情報を払い出す。 |
+| Vended Credentials | Polaris が返す一時認証情報 | AWS STS で取得した短期認証情報をクライアントに返す。 |
+| 実装で追加 | AWS STS | IAM ロールの短期セッションを発行する。 |
 | metadata.json | S3 の metadata.json | スナップショットとテーブル定義を保持する。 |
 | Manifest List (Avro) | S3 の Manifest List（Avro） | 対象スナップショットの Manifest を列挙する。 |
 | Manifests (Avro) | S3 の Manifest（Avro） | ファイル位置と統計を保持する。 |

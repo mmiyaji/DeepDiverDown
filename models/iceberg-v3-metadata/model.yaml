@@ -1,0 +1,474 @@
+name: Iceberg v3 のメタデータと削除参照
+description: カタログからスキーマ・スナップショット・Manifest・データと削除情報をたどる。
+reference:
+  objectives:
+    - テーブルメタデータ、スナップショットと Manifest の参照関係を追う。
+    - Variant 値内部の辞書と表のスキーマを区別する。
+    - deletion vector の参照先と Puffin の位置を理解する。
+    - 行 ID と最終更新の情報を表メタデータと区別する。
+  sources:
+    - title: Iceberg specification
+      url: https://iceberg.apache.org/spec/
+    - title: Iceberg Variant
+      url: https://iceberg.apache.org/blog/variant-in-apache-iceberg/
+    - title: Spark quickstart
+      url: https://iceberg.apache.org/spark-quickstart/
+sources:
+  - docs/reference-iceberg-v3-metadata.md
+evidence:
+  - type: doc
+    ref: docs/reference-iceberg-v3-metadata.md#§1
+  - type: doc
+    ref: docs/reference-iceberg-v3-metadata.md#§3
+  - type: doc
+    ref: docs/reference-iceberg-v3-metadata.md#§4
+tiers:
+  - id: schema
+    label: 表の定義と参照
+    z: 2
+    size:
+      - 20
+      - 3
+  - id: files
+    label: データファイルと値
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: metadata
+    label: 削除参照と読み取り
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  catalog:
+    label: 表の参照点
+    kind: service
+    tier: schema
+    x: 0
+    'y': 1.5
+    description: 現在の表メタデータの位置を管理する。
+    drill: iceberg-catalog-read
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  metadata:
+    label: 表のメタデータ
+    kind: file
+    tier: schema
+    x: 4
+    'y': 1.5
+    description: バージョン・スキーマ・snapshot 等を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  schema:
+    label: スキーマと列 ID
+    kind: file
+    tier: schema
+    x: 8
+    'y': 1.5
+    description: 列 ID と型 variant を持ち、値の名前辞書とは異なる。
+    drill: iceberg-v3-variant
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  snapshot:
+    label: 選択した snapshot
+    kind: file
+    tier: schema
+    x: 12
+    'y': 1.5
+    description: 特定の時点の表の状態と manifest list を参照する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  list:
+    label: Manifest List
+    kind: file
+    tier: schema
+    x: 16
+    'y': 1.5
+    description: その snapshot の manifest を列挙する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  data-manifest:
+    label: Data Manifest
+    kind: file
+    tier: files
+    x: 4
+    'y': 1.5
+    description: データファイルの位置、パーティションと任意の統計を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  data:
+    label: データファイル
+    kind: db
+    tier: files
+    x: 8
+    'y': 1.5
+    description: Parquet などのデータ。Variant の物理配置を含む。
+    drill: iceberg-v3-variant
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  dictionary:
+    label: Variant 値の辞書
+    kind: file
+    tier: files
+    x: 12
+    'y': 1.5
+    description: Variant 内の名前辞書で表の metadata JSON ではない。
+    drill: iceberg-v3-variant
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  delete-manifest:
+    label: Delete Manifest
+    kind: file
+    tier: metadata
+    x: 4
+    'y': 1.5
+    description: 削除ファイルや DV の参照先と位置を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  dv:
+    label: 削除ベクトル
+    kind: file
+    tier: metadata
+    x: 8
+    'y': 1.5
+    description: Puffin blob の行位置ビットマップ。参照するデータファイルに適用する。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  reader:
+    label: 読み取り・計画
+    kind: service
+    tier: metadata
+    x: 12
+    'y': 1.5
+    description: 選択した snapshot のファイルと適用される削除を組み合わせる。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  lineage:
+    label: 行 ID と更新履歴
+    kind: file
+    tier: metadata
+    x: 16
+    'y': 1.5
+    description: v3 の row lineage は行 ID と最終更新シーケンスを扱い、値の継承規則がある。
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§3
+links:
+  - id: resolve
+    from: catalog
+    to: metadata
+    label: 最新 metadata の位置を解決
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: schema
+    from: metadata
+    to: schema
+    label: 表スキーマを参照
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: snapshot
+    from: metadata
+    to: snapshot
+    label: snapshot を選ぶ
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: list
+    from: snapshot
+    to: list
+    label: Manifest List を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: data-manifest
+    from: list
+    to: data-manifest
+    label: データ manifest を列挙
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: data
+    from: data-manifest
+    to: data
+    label: 対象ファイルと統計を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: dictionary
+    from: data
+    to: dictionary
+    label: Variant 値の辞書を保持
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: delete-manifest
+    from: list
+    to: delete-manifest
+    label: delete manifest を列挙
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: dv
+    from: delete-manifest
+    to: dv
+    label: DV の位置を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: target
+    from: dv
+    to: data
+    label: 対象ファイルの削除行を示す
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: read
+    from: reader
+    to: data
+    label: 対象データを読み取る
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: apply
+    from: reader
+    to: dv
+    label: 適用対象の削除を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+  - id: lineage
+    from: metadata
+    to: lineage
+    label: 行 ID と継承情報を管理
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§3
+scenarios:
+  - id: metadata-read
+    label: 表とファイルの参照を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+    steps:
+      - links:
+          - resolve
+          - schema
+          - snapshot
+          - list
+        note: カタログから表スキーマと snapshot を解決する。
+      - links:
+          - data-manifest
+          - data
+          - dictionary
+        note: ファイルを選び、Variant の値を読む。
+  - id: deletes
+    label: 削除ベクトルの参照を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-iceberg-v3-metadata.md#§2
+    steps:
+      - links:
+          - snapshot
+          - list
+          - delete-manifest
+          - dv
+        note: snapshot から delete manifest と Puffin の位置をたどる。
+      - links:
+          - target
+          - apply
+          - read
+        note: 該当データファイルの削除行を除いて読む。
+implementations:
+  - id: example
+    label: Iceberg REST・MinIO の v3 概念例
+    description: REST Catalog と S3 互換 MinIO の上に v3 のメタデータ・DV を区別して示す。対象エンジンの v3 対応が必要。
+    sources:
+      - title: Iceberg specification
+        url: https://iceberg.apache.org/spec/
+      - title: Iceberg Variant
+        url: https://iceberg.apache.org/blog/variant-in-apache-iceberg/
+      - title: Spark quickstart
+        url: https://iceberg.apache.org/spark-quickstart/
+    tiers:
+      - id: schema
+        label: 表の定義と参照
+        z: 2
+        size:
+          - 20
+          - 3
+      - id: files
+        label: データファイルと値
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: metadata
+        label: 削除参照と読み取り
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-catalog:
+        label: Iceberg REST Catalog
+        kind: service
+        tier: schema
+        x: 0
+        'y': 1.5
+        description: 現在の表メタデータの位置を管理する。
+        drill: iceberg-catalog-read
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - catalog
+      ex-metadata:
+        label: MinIO の table metadata JSON
+        kind: file
+        tier: schema
+        x: 4
+        'y': 1.5
+        description: バージョン・スキーマ・snapshot 等を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - metadata
+      ex-schema:
+        label: 表スキーマと field ID
+        kind: file
+        tier: schema
+        x: 8
+        'y': 1.5
+        description: 列 ID と型 variant を持ち、値の名前辞書とは異なる。
+        drill: iceberg-v3-variant
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - schema
+      ex-snapshot:
+        label: 選択した Snapshot
+        kind: file
+        tier: schema
+        x: 12
+        'y': 1.5
+        description: 特定の時点の表の状態と manifest list を参照する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - snapshot
+      ex-list:
+        label: MinIO の Manifest List
+        kind: file
+        tier: schema
+        x: 16
+        'y': 1.5
+        description: その snapshot の manifest を列挙する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - list
+      ex-data-manifest:
+        label: MinIO の Data Manifest
+        kind: file
+        tier: files
+        x: 4
+        'y': 1.5
+        description: データファイルの位置、パーティションと任意の統計を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - data-manifest
+      ex-data:
+        label: MinIO の Parquet ファイル
+        kind: db
+        tier: files
+        x: 8
+        'y': 1.5
+        description: Parquet などのデータ。Variant の物理配置を含む。
+        drill: iceberg-v3-variant
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - data
+      ex-dictionary:
+        label: Variant の metadata
+        kind: file
+        tier: files
+        x: 12
+        'y': 1.5
+        description: Variant 内の名前辞書で表の metadata JSON ではない。
+        drill: iceberg-v3-variant
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - dictionary
+      ex-delete-manifest:
+        label: MinIO の Delete Manifest
+        kind: file
+        tier: metadata
+        x: 4
+        'y': 1.5
+        description: 削除ファイルや DV の参照先と位置を記録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - delete-manifest
+      ex-dv:
+        label: MinIO の Puffin DV
+        kind: file
+        tier: metadata
+        x: 8
+        'y': 1.5
+        description: Puffin blob の行位置ビットマップ。参照するデータファイルに適用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - dv
+      ex-reader:
+        label: Iceberg 対応 reader
+        kind: service
+        tier: metadata
+        x: 12
+        'y': 1.5
+        description: 選択した snapshot のファイルと適用される削除を組み合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - reader
+      ex-lineage:
+        label: v3 行 ID と更新シーケンス
+        kind: file
+        tier: metadata
+        x: 16
+        'y': 1.5
+        description: v3 の row lineage は行 ID と最終更新シーケンスを扱い、値の継承規則がある。
+        evidence:
+          - type: doc
+            ref: docs/reference-iceberg-v3-metadata.md#§5
+        realizes:
+          - lineage

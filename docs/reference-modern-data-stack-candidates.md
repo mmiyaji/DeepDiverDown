@@ -91,3 +91,57 @@ Kafka Connect は Kafka と外部システムの間でデータを運ぶ。Kafka
 | 履歴再生と外部処理の再試行 | [Temporal](reference-temporal.md) |
 
 [カタログの責務](reference-data-catalog-architecture.md)、[DWH 設計パターン](reference-dwh-design-patterns.md)、[Snowflake](reference-snowflake.md)、[Databricks](reference-databricks.md)から各分野の詳細図を辿れます。
+
+## 追加候補・AI エージェントとデータ基盤（2026年11月調査）
+
+以下は追加調査した**図解候補**です。上の公開済みリファレンスと合わせて検討します。
+
+| テーマ・技術 | 図解するシナリオ | 確認する点・公式資料 |
+|---|---|---|
+| セマンティック層・dbt MetricFlow | 売上指標と期間・顧客の軸を定義し、BI と AI が同じ指標定義から SQL を組み立てる | 指標の粒度、結合経路、権限と利用するインターフェースの提供条件を確認する。[MetricFlow](https://docs.getdbt.com/docs/build/about-metricflow)・[Semantic Layer](https://docs.getdbt.com/docs/use-dbt-semantic-layer/dbt-sl) |
+| AI エージェントと MCP | 利用者の質問を受けたエージェントが、認可されたカタログ・指標・検索ツールを発見し、結果を根拠付きで返す | MCP はツール接続のプロトコル。接続先ごとの認可、入力検証、利用者の識別を設計する。[MCP 仕様](https://modelcontextprotocol.io/specification/2026-07-28)・[MCP 認可](https://apps.extensions.modelcontextprotocol.io/api/documents/authorization.html) |
+| [エージェント向け文書検索・Databricks AI Search](reference-databricks-ai-search.md) | 注文規約を索引化し、質問に対応する箇所を検索ツールから取り出して回答に添える | 索引の更新、検索結果のアクセス権、回答に使った文書と版の記録を確認する。[Databricks の検索ツール](https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools) |
+| 構造化データと文書の複合分析・Snowflake Cortex Agents | 注文指標は分析用データ、返品理由は文書検索から取得し、根拠を照合して答える | 検索結果の対象範囲と集計結果の母集団を確認する。Snowflake の Analytical Search は資料上プレビュー機能。[Cortex Search](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/cortex-search-agents)・[Analytical Search](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-analytical-search) |
+| 特徴量ストア・Feast | 注文履歴から学習用の過去特徴量を作り、推論時にオンライン特徴量を参照する | 学習時点と推論時点、更新遅延、オンラインストアの運用を確認する。[Feast の推論構成](https://docs.feast.dev/getting-started/architecture/model-inference) |
+| AI エージェントの観測・OpenTelemetry | 質問、モデル呼び出し、検索、ツール呼び出しをトレースで追い、遅延や失敗を分析する | 記録内容に機微情報が含まれる可能性と、GenAI 向け規約の更新を確認する。[エージェントの観測](https://opentelemetry.io/blog/2025/ai-agent-observability/)・[GenAI 属性](https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/) |
+
+### システム構成の例
+
+利用者の「先月の売上と返品増加の理由」という質問に答える構成を想定します。
+
+1. データ基盤が注文・返品を取り込み、品質検査と変換を経て分析用テーブルと指標定義を公開する。
+2. エージェントは利用者の認可を確認し、指標ツールで売上・返品率を取得する。文書検索ツールで返品理由の関連資料を取得する。
+3. 指標の定義、対象期間、検索した資料の参照先を添えて回答する。ツール呼び出しと実行結果は観測基盤で追跡する。
+4. 設定変更や外部への書き込みを行う場合は、実行主体と権限を確認し、処理の再試行と承認を設計する。
+
+指標の取得、文書検索、外部操作はそれぞれ異なる権限と実行結果を持つ。回答の評価では、数値の一致、出典の妥当性、アクセス制御、ツールの失敗時の挙動を確認する。
+
+### 追加する図の優先候補
+
+1. **[指標と文書を使う分析エージェント](reference-analytics-agent.md)** — セマンティック層、認可付きツール、SQL 実行、出典付き回答を一続きで示す。
+2. **文書検索を組み合わせたエージェント** — 索引の更新、検索、権限、回答の根拠を示す。
+3. **エージェントの運用** — トレース、評価、再試行、人による承認と外部操作の境界を示す。
+4. **オンライン推論と特徴量** — 特徴量の生成からオンライン取得、モデル推論までを既存の MLflow リファレンスとつなぐ。
+
+## エージェント運用とオンライン推論の追加調査（2026年11月）
+
+### エージェントの停止・再開と評価
+
+| 観点 | 調査結果 | 図で追う例 |
+|---|---|---|
+| 状態と再開 | LangGraph はチェックポイントを使って処理の状態を保存し、割り込み後に入力を受けて再開できる。再開時のノード処理と外部操作の重複は実装側で考慮する。[LangGraph](https://docs.langchain.com/oss/javascript/langgraph/thinking-in-langgraph) | 問い合わせ分類 → 指標取得 → 外部更新の承認待ち → 承認後に再開 |
+| 実行の観測 | OpenTelemetry の GenAI 向け規約を使い、エージェント、モデル、ツール呼び出しをトレースで追える。規約と計装の対応状況は採用バージョンごとに確認する。[OpenTelemetry](https://opentelemetry.io/blog/2026/genai-observability/) | 失敗した検索の再試行をたどり、処理時間と呼び出し回数を確認 |
+| 回答と行動の評価 | MLflow は評価用データ、scorer、トレースを使い、最終回答だけでなくツール利用などの途中の振る舞いも評価できる。[MLflow](https://mlflow.org/docs/latest/genai/eval-monitor/running-evaluation/agents/) | 正答・出典・認可されたツールの利用をテストケースで検証 |
+
+構成例では、利用者の要求を受けるアプリ、エージェントの状態保存、ツール、承認画面、観測基盤、評価データを分けて描く。外部更新の承認では、更新対象と引数、承認結果、実行結果をひも付ける。再試行できる外部操作には重複防止の識別子を設け、承認前後で対象や権限が変わった場合の再確認を扱う。
+
+### 特徴量ストアとオンライン推論
+
+Feast の構成例では、バッチやストリームで作った特徴量を定義・登録し、学習時にはオフライン側の履歴から対象時点に対応する値を取得する。オンラインストアにはエンティティごとの最新値を反映し、推論アプリが特徴量を取得してモデルへ渡す。[Feast の構成要素](https://docs.feast.dev/master/getting-started/components/overview)・[特徴量の提供と推論](https://docs.feast.dev/getting-started/architecture/model-inference)
+
+注文遅延の予測を題材にする場合、注文履歴の整備 → 学習時点に対応した特徴量の取得 → モデルの学習・登録 → オンラインストアへの反映 → 注文時の特徴量取得と推論を追う。特徴量の欠損、更新遅延、学習時と推論時の定義の一致、履歴への未来情報の混入を評価する。既存の [Databricks MLflow の学習・配備](reference-databricks-mlflow-serving.md) と接続し、モデルの登録・配備と特徴量の提供を見比べられる。
+
+### 図解候補の設計
+
+1. **エージェントの承認・再開** — 保存した状態、承認、外部ツール、再試行を分ける。LangGraph を使う配置例と、実行トレースの評価例を添える。
+2. **オンライン特徴量と推論** — 履歴データ、特徴量の定義、学習データ、オンラインストア、推論サービスを分ける。Feast の配置例と MLflow によるモデル登録への接続を示す。

@@ -162,7 +162,7 @@ implementations:
 - `node.az`：`['a','c']` のように配置 AZ。1つだけだと SINGLE_AZ 指摘
 - `node.subnet`：`public` / `private`。データストアが public だと PUBLIC_DATA 指摘
 - `groups` の `tier` にはフロア ID または配列を指定する。`x0, y0, x1, y1` でフロア内の範囲を固定できる。座標を省略すると `nodes` に列挙した部品から範囲を求める。`nodes` も省略すると対象フロアの全部品が対象になる。クラウドなどが重なる場合は境界の種類に応じて余白が異なる。
-- `group.provider` には `aws` / `gcp` / `azure` / `oci` / `cloudflare` / `onprem` / `k8s` を指定できる。
+- `group.provider` には `aws` / `gcp` / `azure` / `oci` / `cloudflare` / `onprem` / `k8s` / `databricks` / `snowflake` / `fabric` / `purview` を指定できる。
 
 | 枠の種類 | 表示 |
 |---|---|
@@ -231,7 +231,7 @@ views:
       order: { label: 注文・決済, tier: app, realizedBy: [checkoutservice, paymentservice], description: … }
 ```
 - 基盤として隠したくない部品は、モデル側で `role` を変えるか components に含める（`role: infra` で明示的に隠すこともできる）
-- 画面ではサイドバーの「ビュー」か `V` キーで切り替え。URL は `?w=logical` など
+- 画面では構成図の左上の「ビュー」か `V` キーで切り替え。URL は `?w=logical` など
 
 ## 並列表現（分散・並列処理）
 分散・並列で動く部分を図で分かるようにする。数値は説明用の例でよい（実際の数が設定で変わる場合は `N`）。

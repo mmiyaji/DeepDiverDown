@@ -1,0 +1,304 @@
+name: Langfuse による AI アプリの可観測性
+description: LLM とエージェントの実行記録を収集し、保存・評価・調査する。
+reference:
+  objectives:
+    - LLM とエージェントの実行記録を収集し、保存・評価・調査する。
+    - 機能配置と実装上の担い手を区別する。
+    - 保存先、権限、運用上の制約を確認する。
+  sources:
+    - title: Langfuse architecture
+      url: https://langfuse.com/handbook/product-engineering/architecture
+    - title: Self-hosting infrastructure
+      url: https://langfuse.com/self-hosting/configuration/scaling
+sources:
+  - docs/reference-langfuse.md
+evidence:
+  - type: doc
+    ref: docs/reference-langfuse.md#§1
+  - type: doc
+    ref: docs/reference-langfuse.md#§3
+tiers:
+  - id: flow
+    label: データ処理と利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: support
+    label: 保存・設定・補助
+    z: 0
+    size:
+      - 16
+      - 3
+nodes:
+  app:
+    label: AI アプリ
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  web:
+    label: 記録の受付・画面
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  worker:
+    label: 非同期処理
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  observations:
+    label: 観測データ
+    kind: db
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  operator:
+    label: 運用・評価担当者
+    kind: actor
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  queue:
+    label: 処理待ち
+    kind: db
+    tier: support
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  settings:
+    label: 設定と管理データ
+    kind: db
+    tier: support
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  blob:
+    label: イベントと添付の保管
+    kind: db
+    tier: support
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+links:
+  - id: send
+    from: app
+    to: web
+    label: 実行記録を送信
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  - id: queue
+    from: web
+    to: queue
+    label: 処理を依頼
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  - id: process
+    from: queue
+    to: worker
+    label: 非同期処理を開始
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  - id: store
+    from: worker
+    to: observations
+    label: 観測データを保存
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  - id: blob
+    from: web
+    to: blob
+    label: イベントを保存
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  - id: settings
+    from: web
+    to: settings
+    label: 設定を読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  - id: inspect
+    from: operator
+    to: web
+    label: 実行を調査
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+  - id: read
+    from: web
+    to: observations
+    label: 観測データを検索
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+scenarios:
+  - id: main
+    label: 構成と処理を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-langfuse.md#§2
+    steps:
+      - links:
+          - send
+        note: 実行記録を送信。
+      - links:
+          - queue
+        note: 処理を依頼。
+      - links:
+          - process
+        note: 非同期処理を開始。
+      - links:
+          - store
+        note: 観測データを保存。
+      - links:
+          - blob
+        note: イベントを保存。
+      - links:
+          - settings
+        note: 設定を読み書き。
+      - links:
+          - inspect
+        note: 実行を調査。
+      - links:
+          - read
+        note: 観測データを検索。
+implementations:
+  - id: example
+    label: Langfuse による AI アプリの可観測性の構成例
+    description: Langfuse の自己ホスト構成。Web と Worker、ClickHouse、PostgreSQL、Redis / Valkey と S3 互換の blob ストレージを組み合わせる。配置先のクラウドは固定しない。
+    sources:
+      - title: Langfuse architecture
+        url: https://langfuse.com/handbook/product-engineering/architecture
+      - title: Self-hosting infrastructure
+        url: https://langfuse.com/self-hosting/configuration/scaling
+    tiers:
+      - id: flow
+        label: データ処理と利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: support
+        label: 保存・設定・補助
+        z: 0
+        size:
+          - 16
+          - 3
+    nodes:
+      ex-app:
+        label: 計装した AI アプリ
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - app
+      ex-web:
+        label: Langfuse Web
+        kind: service
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - web
+      ex-worker:
+        label: Langfuse Worker
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - worker
+      ex-observations:
+        label: ClickHouse
+        kind: db
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - observations
+      ex-operator:
+        label: 運用・評価担当者
+        kind: actor
+        tier: flow
+        x: 16
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - operator
+      ex-queue:
+        label: Redis / Valkey
+        kind: db
+        tier: support
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - queue
+      ex-settings:
+        label: PostgreSQL
+        kind: db
+        tier: support
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - settings
+      ex-blob:
+        label: S3 互換 blob ストレージ
+        kind: db
+        tier: support
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-langfuse.md#§4
+        realizes:
+          - blob

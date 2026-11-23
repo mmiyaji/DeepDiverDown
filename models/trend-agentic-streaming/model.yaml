@@ -1,0 +1,277 @@
+name: イベント駆動のデータ管理エージェント
+description: データのイベントを受け、エージェントの判断と人の承認を経て管理操作を行う。
+reference:
+  objectives:
+    - イベントとエージェント実行の接続を追う。
+    - 承認・実行状態と操作結果を区別する。
+    - 再試行と重複防止を設計する。
+  sources:
+    - title: Gartner 2026 Data & Analytics trends
+      url: >-
+        https://www.gartner.com/en/newsroom/press-releases/2026-06-16-gartner-identifies-the-top-trends-for-data-and-analytics
+    - title: Kafka Consumer API
+      url: https://kafka.apache.org/documentation/#consumerapi
+    - title: LangGraph interrupts
+      url: https://docs.langchain.com/oss/python/langgraph/interrupts
+    - title: LangGraph durable execution
+      url: https://docs.langchain.com/oss/python/langgraph/durable-execution
+sources:
+  - docs/reference-trend-agentic-streaming.md
+evidence:
+  - type: doc
+    ref: docs/reference-trend-agentic-streaming.md#§1
+  - type: doc
+    ref: docs/reference-trend-agentic-streaming.md#§3
+tiers:
+  - id: flow
+    label: 問い合わせと利用
+    z: 1
+    size:
+      - 20
+      - 3
+  - id: definition
+    label: 定義とデータ
+    z: 0
+    size:
+      - 20
+      - 3
+nodes:
+  source:
+    label: データのイベント発行元
+    kind: service
+    tier: flow
+    x: 0
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  log:
+    label: イベントログ
+    kind: db
+    tier: flow
+    x: 4
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  consumer:
+    label: イベントの受信
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  agent:
+    label: 状況を評価するエージェント
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  tool:
+    label: 許可された管理操作
+    kind: service
+    tier: flow
+    x: 16
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  reviewer:
+    label: 承認担当者
+    kind: actor
+    tier: definition
+    x: 8
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  state:
+    label: 実行状態と操作の記録
+    kind: db
+    tier: definition
+    x: 12
+    'y': 1.5
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+links:
+  - id: emit
+    from: source
+    to: log
+    label: イベントを発行
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  - id: consume
+    from: log
+    to: consumer
+    label: イベントを受信
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  - id: invoke
+    from: consumer
+    to: agent
+    label: イベントを渡して評価
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  - id: approval
+    from: agent
+    to: reviewer
+    label: 変更案の承認を依頼
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  - id: approve
+    from: reviewer
+    to: agent
+    label: 承認結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  - id: execute
+    from: agent
+    to: tool
+    label: 承認済み操作を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+  - id: save
+    from: agent
+    to: state
+    label: 実行状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+scenarios:
+  - id: main-flow
+    label: 処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-trend-agentic-streaming.md#§2
+    steps:
+      - links:
+          - emit
+          - consume
+          - invoke
+        note: イベントを受信しエージェントで評価する。
+      - links:
+          - save
+          - approval
+          - approve
+        note: 状態を保存して担当者の判断を待つ。
+      - links:
+          - execute
+          - save
+        note: 承認された操作を実行し状態を記録する。
+implementations:
+  - id: example
+    label: Kafka と LangGraph の組み合わせ
+    description: アプリが Kafka を消費し LangGraph を呼び出す例。両製品の接続や冪等性は別途実装する。
+    sources:
+      - title: Gartner 2026 Data & Analytics trends
+        url: >-
+          https://www.gartner.com/en/newsroom/press-releases/2026-06-16-gartner-identifies-the-top-trends-for-data-and-analytics
+      - title: Kafka Consumer API
+        url: https://kafka.apache.org/documentation/#consumerapi
+      - title: LangGraph interrupts
+        url: https://docs.langchain.com/oss/python/langgraph/interrupts
+      - title: LangGraph durable execution
+        url: https://docs.langchain.com/oss/python/langgraph/durable-execution
+    tiers:
+      - id: flow
+        label: 問い合わせと利用
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: definition
+        label: 定義とデータ
+        z: 0
+        size:
+          - 20
+          - 3
+    nodes:
+      ex-source:
+        label: イベント発行アプリ
+        kind: service
+        tier: flow
+        x: 0
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-agentic-streaming.md#§4
+        realizes:
+          - source
+      ex-log:
+        label: Kafka トピック
+        kind: db
+        tier: flow
+        x: 4
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-agentic-streaming.md#§4
+        realizes:
+          - log
+      ex-consumer:
+        label: Kafka コンシューマー
+        kind: service
+        tier: flow
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-agentic-streaming.md#§4
+        realizes:
+          - consumer
+      ex-agent:
+        label: LangGraph 実行
+        kind: service
+        tier: flow
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-agentic-streaming.md#§4
+        realizes:
+          - agent
+      ex-tool:
+        label: アプリの管理ツール
+        kind: service
+        tier: flow
+        x: 16
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-agentic-streaming.md#§4
+        realizes:
+          - tool
+      ex-reviewer:
+        label: 承認担当者
+        kind: actor
+        tier: definition
+        x: 8
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-agentic-streaming.md#§4
+        realizes:
+          - reviewer
+      ex-state:
+        label: チェックポインターと操作記録
+        kind: db
+        tier: definition
+        x: 12
+        'y': 1.5
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-agentic-streaming.md#§4
+        realizes:
+          - state

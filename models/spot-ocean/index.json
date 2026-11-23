@@ -1,0 +1,235 @@
+{
+  "model": "spot-ocean",
+  "name": "Spot Ocean による Kubernetes 容量管理",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "pods": {
+      "type": "node",
+      "label": "Pod ワークロード",
+      "status": "claim"
+    },
+    "cluster": {
+      "type": "node",
+      "label": "クラスタの制御",
+      "status": "claim"
+    },
+    "nodes": {
+      "type": "node",
+      "label": "ワーカーノード容量",
+      "status": "claim"
+    },
+    "controller": {
+      "type": "node",
+      "label": "クラスタ内の状態収集と drain",
+      "status": "claim"
+    },
+    "autoscaler": {
+      "type": "node",
+      "label": "外部の容量管理",
+      "status": "claim"
+    },
+    "vng": {
+      "type": "node",
+      "label": "ノード選択の設定",
+      "status": "claim"
+    },
+    "cloud": {
+      "type": "node",
+      "label": "クラウド容量の起動",
+      "status": "claim"
+    },
+    "observe": {
+      "type": "link",
+      "label": "クラスタの制御 → クラスタ内の状態収集と drain",
+      "status": "claim"
+    },
+    "report": {
+      "type": "link",
+      "label": "クラスタ内の状態収集と drain → 外部の容量管理",
+      "status": "claim"
+    },
+    "configure": {
+      "type": "link",
+      "label": "ノード選択の設定 → 外部の容量管理",
+      "status": "claim"
+    },
+    "request": {
+      "type": "link",
+      "label": "外部の容量管理 → クラウド容量の起動",
+      "status": "claim"
+    },
+    "launch": {
+      "type": "link",
+      "label": "クラウド容量の起動 → ワーカーノード容量",
+      "status": "claim"
+    },
+    "schedule": {
+      "type": "link",
+      "label": "クラスタの制御 → Pod ワークロード",
+      "status": "claim"
+    },
+    "host": {
+      "type": "link",
+      "label": "ワーカーノード容量 → Pod ワークロード",
+      "status": "claim"
+    },
+    "drain": {
+      "type": "link",
+      "label": "クラスタ内の状態収集と drain → クラスタの制御",
+      "status": "claim"
+    },
+    "main": {
+      "type": "scenario",
+      "label": "容量管理と復旧"
+    },
+    "ex-pods": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "アプリ Pod",
+      "realizes": [
+        "pods"
+      ]
+    },
+    "ex-cluster": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "Amazon EKS",
+      "realizes": [
+        "cluster"
+      ]
+    },
+    "ex-nodes": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "EC2 ワーカーノード",
+      "realizes": [
+        "nodes"
+      ]
+    },
+    "ex-controller": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "Ocean Controller",
+      "realizes": [
+        "controller"
+      ]
+    },
+    "ex-autoscaler": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "Ocean オートスケーラー",
+      "realizes": [
+        "autoscaler"
+      ]
+    },
+    "ex-vng": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "Ocean VNG 設定",
+      "realizes": [
+        "vng"
+      ]
+    },
+    "ex-cloud": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "Amazon EC2 API",
+      "realizes": [
+        "cloud"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-spot-ocean.md#§1": [
+      "model"
+    ],
+    "docs/reference-spot-ocean.md": [
+      "model",
+      "pods",
+      "cluster",
+      "nodes",
+      "controller",
+      "autoscaler",
+      "vng",
+      "cloud",
+      "observe",
+      "report",
+      "configure",
+      "request",
+      "launch",
+      "schedule",
+      "host",
+      "drain",
+      "main",
+      "ex-pods",
+      "ex-cluster",
+      "ex-nodes",
+      "ex-controller",
+      "ex-autoscaler",
+      "ex-vng",
+      "ex-cloud"
+    ],
+    "docs/reference-spot-ocean.md#§3": [
+      "model"
+    ],
+    "docs/reference-spot-ocean.md#§2": [
+      "pods",
+      "cluster",
+      "nodes",
+      "controller",
+      "autoscaler",
+      "vng",
+      "cloud",
+      "observe",
+      "report",
+      "configure",
+      "request",
+      "launch",
+      "schedule",
+      "host",
+      "drain",
+      "main"
+    ],
+    "docs/reference-spot-ocean.md#§4": [
+      "ex-pods",
+      "ex-cluster",
+      "ex-nodes",
+      "ex-controller",
+      "ex-autoscaler",
+      "ex-vng",
+      "ex-cloud"
+    ]
+  },
+  "reference": {
+    "category": "クラウドの容量とコスト",
+    "order": 20,
+    "domain": "運用基盤",
+    "kind": "設計パターン・ユースケース",
+    "objectives": [
+      "Ocean の外部サービスとクラスタ内 Controller を分ける。",
+      "VNG の設定と実際のノードの違いを理解する。",
+      "中断時の drain と Pod の再配置を追う。"
+    ],
+    "sources": [
+      {
+        "title": "Spot Ocean Kubernetes guide",
+        "url": "https://spot.io/wp-content/uploads/2024/09/Guide_Automating_Kubernetes_infrastructure.pdf"
+      },
+      {
+        "title": "Ocean AWS VNG workshop",
+        "url": "https://labs.spot.io/ocean/ocean_workshop/vng_workshop/vng_workshop_instructions.html"
+      },
+      {
+        "title": "Ocean headroom",
+        "url": "https://labs.spot.io/ocean/ocean_workshop/headroom/headroom_overview.html"
+      },
+      {
+        "title": "Amazon EKS managed nodes",
+        "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+      }
+    ]
+  }
+}

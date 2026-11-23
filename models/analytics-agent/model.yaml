@@ -1,0 +1,414 @@
+name: 指標と文書を使う分析エージェント
+description: 売上・返品率の指標と返品理由の文書を取得し、利用権限と出典を確認して回答する構成例。
+reference:
+  objectives:
+    - 指標の問い合わせと文書検索の責務を区別する。
+    - 認証・権限と回答の出典を追う。
+    - エージェントの実行を観測し評価する。
+  sources:
+    - title: dbt Semantic Layer
+      url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/dbt-sl
+    - title: Databricks agent retrieval tools
+      url: https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools
+    - title: OpenTelemetry AI agent observability
+      url: https://opentelemetry.io/blog/2025/ai-agent-observability/
+sources:
+  - docs/reference-analytics-agent.md
+evidence:
+  - type: doc
+    ref: docs/reference-analytics-agent.md#§1
+tiers:
+  - id: access
+    label: 利用と調整
+    z: 2
+    size:
+      - 12
+      - 3
+  - id: data
+    label: 指標と文書
+    z: 1
+    size:
+      - 14
+      - 3
+  - id: ops
+    label: 運用と評価
+    z: 0
+    size:
+      - 12
+      - 3
+nodes:
+  question:
+    label: 利用者の質問
+    kind: actor
+    tier: access
+    x: 0
+    'y': 1
+    description: 対象期間と調べたい売上・返品を指定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  agent:
+    label: 分析エージェント
+    kind: service
+    tier: access
+    x: 4
+    'y': 1
+    description: 指標と文書の取得を調整し、根拠とともに回答する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  identity:
+    label: 認証・権限判定
+    kind: service
+    tier: access
+    x: 8
+    'y': 1
+    description: 利用者とツールのアクセス権を確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  metrics:
+    label: 指標の定義と問合せ
+    kind: service
+    tier: data
+    x: 0
+    'y': 1
+    description: 売上と返品率を共通の定義に従って問い合わせる。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  warehouse:
+    label: 分析用データ
+    kind: db
+    tier: data
+    x: 4
+    'y': 1
+    description: 整備済みの注文と返品を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  search:
+    label: 文書の検索
+    kind: service
+    tier: data
+    x: 8
+    'y': 1
+    description: 返品理由に関する文書を検索する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  documents:
+    label: 文書と検索索引
+    kind: db
+    tier: data
+    x: 12
+    'y': 1
+    description: 出典をたどれる文書と索引を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  trace:
+    label: 実行履歴と観測
+    kind: service
+    tier: ops
+    x: 4
+    'y': 1
+    description: モデル・検索・ツールの呼び出しと結果を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  review:
+    label: 評価と確認
+    kind: actor
+    tier: ops
+    x: 8
+    'y': 1
+    description: 回答の数値、出典、権限と失敗時の振る舞いを確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§3
+links:
+  - id: ask
+    from: question
+    to: agent
+    label: 売上と返品理由を質問
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: authorize
+    from: agent
+    to: identity
+    label: 利用権限を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: query
+    from: agent
+    to: metrics
+    label: 対象期間の指標を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: read
+    from: metrics
+    to: warehouse
+    label: 注文と返品を集計
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: retrieve
+    from: agent
+    to: search
+    label: 関連文書を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: lookup
+    from: search
+    to: documents
+    label: 出典と本文を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: record
+    from: agent
+    to: trace
+    label: 実行と結果を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: evaluate
+    from: review
+    to: trace
+    label: 実行を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+  - id: answer
+    from: agent
+    to: question
+    label: 数値と出典を回答
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+scenarios:
+  - id: answer
+    label: 売上と返品理由を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-analytics-agent.md#§2
+    steps:
+      - links:
+          - ask
+          - authorize
+        note: 質問を受け、利用者の権限を確認する。
+      - links:
+          - query
+          - read
+        note: 指標の定義に基づいて対象期間を集計する。
+      - links:
+          - retrieve
+          - lookup
+        note: 権限のある文書から関連する出典を取得する。
+      - links:
+          - record
+          - answer
+        note: 実行を記録し、数値と出典を付けて回答する。
+      - links:
+          - evaluate
+        note: 数値と出典を評価する。
+implementations:
+  - id: example
+    label: dbt と Databricks の組み合わせ
+    description: 指標・文書検索・観測をそれぞれのサービスで組む概念例。認証連携は採用環境に合わせて実装する。
+    sources:
+      - title: dbt Semantic Layer
+        url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/dbt-sl
+      - title: Databricks agent retrieval tools
+        url: https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools
+      - title: OpenTelemetry AI agent observability
+        url: https://opentelemetry.io/blog/2025/ai-agent-observability/
+    tiers:
+      - id: access
+        label: 利用と調整
+        z: 2
+        size:
+          - 12
+          - 3
+      - id: data
+        label: 指標と文書
+        z: 1
+        size:
+          - 14
+          - 3
+      - id: ops
+        label: 運用と評価
+        z: 0
+        size:
+          - 14
+          - 3
+    nodes:
+      ex-question:
+        label: 利用者の分析画面
+        kind: actor
+        tier: access
+        x: 0
+        'y': 1
+        description: 対象期間と調べたい売上・返品を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - question
+      ex-agent:
+        label: エージェント実行アプリ
+        kind: service
+        tier: access
+        x: 4
+        'y': 1
+        description: 指標と文書の取得を調整し、根拠とともに回答する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - agent
+      ex-identity:
+        label: アプリの認証と権限
+        kind: service
+        tier: access
+        x: 8
+        'y': 1
+        description: 利用者とツールのアクセス権を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - identity
+      ex-metrics:
+        label: dbt Semantic Layer
+        kind: service
+        tier: data
+        x: 0
+        'y': 1
+        description: 売上と返品率を共通の定義に従って問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - metrics
+      ex-warehouse:
+        label: 分析ウェアハウス
+        kind: db
+        tier: data
+        x: 4
+        'y': 1
+        description: 整備済みの注文と返品を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - warehouse
+      ex-search:
+        label: Databricks AI Search ツール
+        kind: service
+        tier: data
+        svc: databricks:aisearch
+        x: 8
+        'y': 1
+        description: 返品理由に関する文書を検索する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - search
+      ex-documents:
+        label: 文書を格納する Delta テーブル
+        kind: db
+        tier: data
+        svc: databricks:delta
+        x: 12
+        'y': 1
+        description: 文書と出典を AI Search の索引元テーブルに保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - documents
+      ex-index:
+        label: AI Search インデックス
+        kind: db
+        tier: data
+        svc: databricks:aisearch
+        x: 16
+        y: 1
+        description: Delta テーブルの内容を検索できるよう索引付けする。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      ex-trace:
+        label: OpenTelemetry Collector・追跡基盤
+        kind: service
+        tier: ops
+        x: 4
+        'y': 1
+        description: モデル・検索・ツールの呼び出しと結果を記録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - trace
+      ex-review:
+        label: 評価担当者
+        kind: actor
+        tier: ops
+        x: 8
+        'y': 1
+        description: 回答の数値、出典、権限と失敗時の振る舞いを確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - review
+      ex-logpolicy:
+        label: ログの記録・保持方針
+        kind: file
+        tier: ops
+        x: 12
+        'y': 1
+        description: 入力や検索結果を記録する範囲と保持期間を決める。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+    links:
+      - id: ex-search-index
+        from: ex-search
+        to: ex-index
+        label: 関連する文書を検索
+        realizes: [lookup]
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      - id: ex-index-source
+        from: ex-index
+        to: ex-documents
+        label: 索引元の文書を読み取る
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      - id: ex-record-policy
+        from: ex-logpolicy
+        to: ex-trace
+        label: 記録方針を適用
+    groups:
+      - kind: cloud
+        provider: databricks
+        label: Databricks
+        tier:
+          - data
+        nodes:
+          - ex-search
+          - ex-documents
+          - ex-index
