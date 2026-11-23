@@ -6,104 +6,921 @@ reference:
     - バッチ間隔ごとの変換と状態付き集計を追う。
     - チェックポイントからドライバーを復旧する流れを理解する。
   sources:
-    - {title: Spark Streaming Programming Guide, url: "https://spark.apache.org/docs/latest/streaming-programming-guide.html"}
-sources: [docs/reference-spark-streaming.md]
-evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§1"}]
+    - title: Spark Streaming Programming Guide
+      url: https://spark.apache.org/docs/latest/streaming-programming-guide.html
+sources:
+  - docs/reference-spark-streaming.md
+evidence:
+  - type: doc
+    ref: docs/reference-spark-streaming.md#§1
 tiers:
-  - {id: runtime, label: 入力と Streaming 実行, kind: origin, z: 0, size: [14, 3]}
-  - {id: recovery, label: 復旧, z: 1, origin: [0, 0], size: [14, 3]}
+  - id: runtime
+    label: 入力と Streaming 実行
+    kind: origin
+    z: 0
+    size:
+      - 14
+      - 3
+  - id: recovery
+    label: 復旧
+    z: 1
+    origin:
+      - 0
+      - 0
+    size:
+      - 14
+      - 3
 nodes:
-  source: {label: Input Stream, kind: queue, tier: runtime, x: 0, y: 1.5, description: 入力ストリームからイベントや新しいファイルを取得する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§2}]}
-  context: {label: ストリーミング処理の調整役, kind: service, tier: runtime, x: 4, 'y': 1.5, description: バッチ間隔と実行の開始・復旧を管理する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§3}]}
-  dstream: {label: 区間ごとのデータ集合, kind: service, tier: runtime, x: 7, 'y': 1.5, description: 連続入力を処理間隔ごとの分散データ集合として表す。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§2}]}
-  executors: {parallel: 'N', slots: 4, label: 分散バッチの実行担当, kind: worker, tier: runtime, x: 10, 'y': 1.5, description: 区間内のデータを変換・集計する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§4}]}
-  output: {label: Batch Output, kind: db, tier: runtime, x: 13, y: 1.5, description: 区間ごとに外部ストレージまたはテーブルへ結果を保存する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§5}]}
-  checkpoint: {label: 復旧用の状態保存先, kind: db, tier: recovery, x: 7, 'y': 1.5, description: 状態と進捗を信頼できるファイルシステムへ保存する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§6}]}
+  source:
+    label: Input Stream
+    kind: queue
+    tier: runtime
+    x: 0
+    'y': 1.5
+    description: 入力ストリームからイベントや新しいファイルを取得する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§2
+  context:
+    label: ストリーミング処理の調整役
+    kind: service
+    tier: runtime
+    x: 4
+    'y': 1.5
+    description: バッチ間隔と実行の開始・復旧を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§3
+  dstream:
+    label: 区間ごとのデータ集合
+    kind: service
+    tier: runtime
+    x: 7
+    'y': 1.5
+    description: 連続入力を処理間隔ごとの分散データ集合として表す。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§2
+  executors:
+    parallel: 'N'
+    slots: 4
+    label: 分散バッチの実行担当
+    kind: worker
+    tier: runtime
+    x: 10
+    'y': 1.5
+    description: 区間内のデータを変換・集計する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§4
+  output:
+    label: Batch Output
+    kind: db
+    tier: runtime
+    x: 13
+    'y': 1.5
+    description: 区間ごとに外部ストレージまたはテーブルへ結果を保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§5
+  checkpoint:
+    label: 復旧用の状態保存先
+    kind: db
+    tier: recovery
+    x: 7
+    'y': 1.5
+    description: 状態と進捗を信頼できるファイルシステムへ保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§6
 links:
-  - {id: receive, from: source, to: context, label: 入力を受信, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§2}]}
-  - {id: batches, from: context, to: dstream, label: 処理間隔ごとの分散データ集合を作る, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§3}]}
-  - {id: transform, from: dstream, to: executors, label: 変換・集計, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§4}]}
-  - {id: emit, from: executors, to: output, label: バッチを出力, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§5}]}
-  - {id: save, from: context, to: checkpoint, label: 状態を保存, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§6}]}
-  - {id: restore, from: checkpoint, to: context, label: 保存先から処理の状態を復元, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§6}]}
+  - id: receive
+    from: source
+    to: context
+    label: 入力を受信
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§2
+  - id: batches
+    from: context
+    to: dstream
+    label: 処理間隔ごとの分散データ集合を作る
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§3
+  - id: transform
+    from: dstream
+    to: executors
+    label: 変換・集計
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§4
+  - id: emit
+    from: executors
+    to: output
+    label: バッチを出力
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§5
+  - id: save
+    from: context
+    to: checkpoint
+    label: 状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§6
+  - id: restore
+    from: checkpoint
+    to: context
+    label: 保存先から処理の状態を復元
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§6
 scenarios:
   - id: dstream-recovery
     label: DStream のバッチ処理と復旧
-    evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§1"}, {type: doc, ref: "docs/reference-spark-streaming.md#§7"}]
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§1
+      - type: doc
+        ref: docs/reference-spark-streaming.md#§7
     steps:
-      - {links: [receive, batches], note: 入力を受け、バッチ間隔ごとに RDD 列へ変換する。}
-      - {links: [transform], note: RDD の変換と状態付き集計を実行する。}
-      - {links: [emit, save], note: バッチを出力し、チェックポイントへ状態を保存する。}
-      - {links: [restore], note: ドライバー障害時はチェックポイントから StreamingContext を再生成する。}
-
+      - links:
+          - receive
+          - batches
+        note: 入力を受け、バッチ間隔ごとに RDD 列へ変換する。
+      - links:
+          - transform
+        note: RDD の変換と状態付き集計を実行する。
+      - links:
+          - emit
+          - save
+        note: バッチを出力し、チェックポイントへ状態を保存する。
+      - links:
+          - restore
+        note: ドライバー障害時はチェックポイントから StreamingContext を再生成する。
 implementations:
   - id: dstream-files
-    label: "DStreams のファイル入力と HDFS"
-    description: "既存の DStreams アプリが新しいファイルを監視し、区間ごとに RDD を処理する例。メタデータや必要な RDD 状態のチェックポイントには HDFS を使う。"
+    label: DStreams のファイル入力と HDFS
+    description: 既存の DStreams アプリが新しいファイルを監視し、区間ごとに RDD を処理する例。メタデータや必要な RDD 状態のチェックポイントには HDFS を使う。
     sources:
-      - {title: Spark Streaming Programming Guide, url: https://spark.apache.org/docs/latest/streaming-programming-guide.html}
+      - title: Spark Streaming Programming Guide
+        url: https://spark.apache.org/docs/latest/streaming-programming-guide.html
     tiers:
-      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
-      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+      - id: processing
+        label: データの処理と保存
+        z: 0
+        size:
+          - 14
+          - 5
+      - id: setup
+        label: 実行に必要な設定・成果物
+        z: 1
+        size:
+          - 14
+          - 3
     nodes:
-      dstream-files-input: {label: HDFS 入力ディレクトリー, kind: db, tier: processing, x: 1, y: 1.15, realizes: [source], description: 新しいファイルを監視するファイル入力を使う。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]}
-      dstream-files-driver: {label: Driver 内の StreamingContext と DStream, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [context, dstream], description: 処理間隔と変換グラフを持ち、バッチごとの RDD 処理を起動する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]}
-      dstream-files-executors: {label: Spark Executor JVM, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [executors], description: 分散 RDD の変換を実行する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]}
-      dstream-files-hdfs: {label: HDFS 内の出力とチェックポイント, kind: db, tier: processing, x: 5, y: 3.65, realizes: [output, checkpoint], description: 結果とメタデータ・状態は別ディレクトリーに書く。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]}
-      dstream-files-batch: {label: バッチ間隔の設定, kind: file, tier: setup, x: 1, y: 1.5, description: アプリケーションで処理間隔を決め、入力到着速度と変換処理時間を照合する。, evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]}
+      dstream-files-input:
+        label: HDFS 入力ディレクトリー
+        kind: db
+        tier: processing
+        x: 1
+        'y': 1.15
+        realizes:
+          - source
+        description: 新しいファイルを監視するファイル入力を使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§8
+      dstream-files-driver:
+        label: Driver 内の StreamingContext と DStream
+        kind: worker
+        tier: processing
+        x: 1
+        'y': 3.65
+        realizes:
+          - context
+          - dstream
+        description: 処理間隔と変換グラフを持ち、バッチごとの RDD 処理を起動する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§8
+      dstream-files-executors:
+        label: Spark Executor JVM
+        kind: worker
+        tier: processing
+        x: 5
+        'y': 1.15
+        realizes:
+          - executors
+        description: 分散 RDD の変換を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§8
+      dstream-files-hdfs:
+        label: HDFS 内の出力とチェックポイント
+        kind: db
+        tier: processing
+        x: 5
+        'y': 3.65
+        realizes:
+          - output
+          - checkpoint
+        description: 結果とメタデータ・状態は別ディレクトリーに書く。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§8
+      dstream-files-batch:
+        label: バッチ間隔の設定
+        kind: file
+        tier: setup
+        x: 1
+        'y': 1.5
+        description: アプリケーションで処理間隔を決め、入力到着速度と変換処理時間を照合する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§8
     links:
-      - {id: dstream-files-batch-connection, from: dstream-files-batch, to: dstream-files-driver, label: 処理間隔を設定}
+      - id: dstream-files-batch-connection
+        from: dstream-files-batch
+        to: dstream-files-driver
+        label: 処理間隔を設定
   - id: aws-emr-ec2
-    label: "AWS：EMR on EC2 / YARN"
-    description: "Amazon MSK の Kafka を DStreams の Direct API で読み、Amazon EMR の EC2 クラスタ上で集計し、S3 に出力とチェックポイントを保存する構成例。"
+    label: AWS：EMR on EC2 / YARN
+    description: Amazon MSK の Kafka を DStreams の Direct API で読み、Amazon EMR の EC2 クラスタ上で集計し、S3 に出力とチェックポイントを保存する構成例。
     sources:
-      - {title: Spark Streaming Kafka integration, url: https://spark.apache.org/docs/3.5.7/streaming-kafka-0-10-integration.html}
-      - {title: Spark Streaming checkpointing, url: https://spark.apache.org/docs/3.5.7/streaming-programming-guide.html}
-      - {title: Amazon EMR node types, url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-master-core-task-nodes.html}
-      - {title: Add a Spark step, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-submit-step.html}
+      - title: Spark Streaming Kafka integration
+        url: https://spark.apache.org/docs/3.5.7/streaming-kafka-0-10-integration.html
+      - title: Spark Streaming checkpointing
+        url: https://spark.apache.org/docs/3.5.7/streaming-programming-guide.html
+      - title: Amazon EMR node types
+        url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-master-core-task-nodes.html
+      - title: Add a Spark step
+        url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-submit-step.html
+      - title: AWS shared responsibility model
+        url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html
+      - title: Security in Amazon EMR
+        url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-security.html
     tiers:
-      - {id: input, label: イベント入力, z: 2, size: [18, 3]}
-      - {id: compute, label: EMR クラスタの実行, z: 1, size: [18, 3]}
-      - {id: storage, label: 保存と復旧, z: 0, size: [18, 3]}
+      - id: input
+        label: イベント入力
+        z: 2
+        size:
+          - 18
+          - 3
+      - id: compute
+        label: EMR クラスタの実行
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: storage
+        label: 保存と復旧
+        z: 0
+        size:
+          - 18
+          - 3
     groups:
-      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [input, compute, storage], nodes: [emr-msk, emr-service, emr-ec2, emr-driver, emr-executor, emr-output, emr-checkpoint]}
-      - {kind: cluster, label: EMR on EC2 クラスタ, tier: [compute], nodes: [emr-ec2, emr-driver, emr-executor]}
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - input
+          - compute
+          - storage
+        nodes:
+          - emr-msk
+          - emr-service
+          - emr-ec2
+          - emr-driver
+          - emr-executor
+          - emr-output
+          - emr-checkpoint
+      - kind: cluster
+        label: EMR on EC2 クラスタ
+        tier:
+          - compute
+        nodes:
+          - emr-ec2
+          - emr-driver
+          - emr-executor
     nodes:
-      emr-msk: {label: Amazon MSK / Kafka トピック, svc: msk, kind: queue, tier: input, x: 1, y: 1.5, realizes: [source], description: Kafka のパーティションから Direct API がレコードを読み取る。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§9"}]}
-      emr-service: {label: Amazon EMR, svc: emr, kind: service, tier: input, x: 9, y: 1.5, description: EC2 上の EMR クラスタを管理し Spark step を受け付ける。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§9"}]}
-      emr-driver: {label: Spark Driver / StreamingContext, kind: worker, tier: compute, x: 4, y: 1.5, realizes: [context, dstream], description: YARN cluster mode の Driver がバッチと DStream を調整する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§9"}]}
-      emr-executor: {label: Spark Executor / Kafka Direct, kind: worker, tier: compute, x: 10, y: 1.5, realizes: [executors], description: YARN コンテナーの Executor が Kafka から入力を読み RDD を処理する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§9"}]}
-      emr-ec2: {label: EC2 / EMR ノード, svc: ec2, kind: host, tier: compute, x: 15, y: 1.5, description: EMR の primary / core ノードは EC2 で動き YARN コンテナーを実行する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§9"}]}
-      emr-output: {label: S3 / 集計結果, svc: s3, kind: db, tier: storage, x: 10, y: 1.5, realizes: [output], description: foreachRDD で集計結果を書き込む。出力の冪等性はアプリ側で設計する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§9"}]}
-      emr-checkpoint: {label: S3 / チェックポイント, svc: s3, kind: db, tier: storage, x: 4, y: 1.5, realizes: [checkpoint], description: DStreams のメタデータと必要な状態の復旧先。出力とは別のパス。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§9"}]}
+      emr-msk:
+        label: Amazon MSK / Kafka トピック
+        svc: msk
+        kind: queue
+        tier: input
+        x: 1
+        'y': 1.5
+        realizes:
+          - source
+        description: Kafka のパーティションから Direct API がレコードを読み取る。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§9
+        management:
+          type: aws
+          scope: AWS が MSK のブローカー基盤を管理する。クラスター設定、アクセスとデータは利用者が管理する。
+      emr-service:
+        label: Amazon EMR
+        svc: emr
+        kind: service
+        tier: input
+        x: 9
+        'y': 1.5
+        description: EC2 上の EMR クラスタを管理し Spark step を受け付ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§9
+        management:
+          type: aws
+          scope: AWS が EMR サービスを提供し、クラスタのプロビジョニングを支援する。クラスタ構成、更新とアプリケーションは利用者が管理する。
+      emr-driver:
+        label: Spark Driver / StreamingContext
+        kind: worker
+        tier: compute
+        x: 4
+        'y': 1.5
+        realizes:
+          - context
+          - dstream
+        description: YARN cluster mode の Driver がバッチと DStream を調整する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§9
+        management:
+          type: customer
+          scope: 利用者が Spark アプリケーション、設定と再起動・出力の設計を管理する。
+      emr-executor:
+        label: Spark Executor / Kafka Direct
+        kind: worker
+        tier: compute
+        x: 10
+        'y': 1.5
+        realizes:
+          - executors
+        description: YARN コンテナーの Executor が Kafka から入力を読み RDD を処理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§9
+        management:
+          type: customer
+          scope: 利用者が Spark アプリケーション、設定と再起動・出力の設計を管理する。
+      emr-ec2:
+        label: EC2 / EMR ノード
+        svc: ec2
+        kind: host
+        tier: compute
+        x: 15
+        'y': 1.5
+        description: EMR の primary / core ノードは EC2 で動き YARN コンテナーを実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§9
+        management:
+          type: customer
+          scope: EMR クラスタの EC2 とゲスト上の設定・アプリケーションは利用者側で管理する。基盤の物理設備と仮想化は AWS の責任。
+      emr-output:
+        label: S3 / 集計結果
+        svc: s3
+        kind: db
+        tier: storage
+        x: 10
+        'y': 1.5
+        realizes:
+          - output
+        description: foreachRDD で集計結果を書き込む。出力の冪等性はアプリ側で設計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§9
+        management:
+          type: aws
+          scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
+      emr-checkpoint:
+        label: S3 / チェックポイント
+        svc: s3
+        kind: db
+        tier: storage
+        x: 4
+        'y': 1.5
+        realizes:
+          - checkpoint
+        description: DStreams のメタデータと必要な状態の復旧先。出力とは別のパス。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§9
+        management:
+          type: aws
+          scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
     links:
-      - {id: emr-read, from: emr-msk, to: emr-executor, label: Kafka パーティションを読み取る, realizes: [receive], replace: true}
-      - {id: emr-submit, from: emr-service, to: emr-driver, label: Spark step を実行}
-      - {id: emr-host, from: emr-ec2, to: emr-executor, label: YARN コンテナーを実行}
+      - id: emr-read
+        from: emr-msk
+        to: emr-executor
+        label: Kafka パーティションを読み取る
+        realizes:
+          - receive
+        replace: true
+      - id: emr-submit
+        from: emr-service
+        to: emr-driver
+        label: Spark step を実行
+      - id: emr-host
+        from: emr-ec2
+        to: emr-executor
+        label: YARN コンテナーを実行
+    layout3d:
+      tiers:
+        - id: workloads
+          label: Spark の実行
+          z: 1
+          size:
+            - 8
+            - 3
+        - id: platform
+          label: EMR / EC2 の実行基盤
+          z: 0
+          size:
+            - 8
+            - 3
+        - id: services
+          label: ストリームと保存
+          z: 0
+          origin:
+            - 12
+            - 0
+          size:
+            - 10
+            - 3
+      nodes:
+        emr-driver:
+          tier: workloads
+          x: 1
+          'y': 1.5
+        emr-executor:
+          tier: workloads
+          x: 5
+          'y': 1.5
+        emr-service:
+          tier: platform
+          x: 1
+          'y': 1.5
+        emr-ec2:
+          tier: platform
+          x: 5
+          'y': 1.5
+        emr-msk:
+          tier: services
+          x: 1
+          'y': 1.5
+        emr-checkpoint:
+          tier: services
+          x: 5
+          'y': 1.5
+        emr-output:
+          tier: services
+          x: 9
+          'y': 1.5
+      groups:
+        - kind: cloud
+          label: AWS アカウント
+          provider: aws
+          tier:
+            - workloads
+            - platform
+            - services
+          nodes:
+            - emr-driver
+            - emr-executor
+            - emr-service
+            - emr-ec2
+            - emr-msk
+            - emr-checkpoint
+            - emr-output
+        - kind: cluster
+          label: EMR クラスタ
+          tier:
+            - workloads
+            - platform
+          nodes:
+            - emr-driver
+            - emr-executor
+            - emr-ec2
+    layout2d:
+      tiers:
+        - id: diagram
+          label: AWS の実装構成
+          z: 0
+          size:
+            - 17
+            - 12
+      nodes:
+        emr-driver:
+          tier: diagram
+          x: 2
+          'y': 8
+        emr-executor:
+          tier: diagram
+          x: 6
+          'y': 8
+        emr-ec2:
+          tier: diagram
+          x: 4
+          'y': 5
+        emr-msk:
+          tier: diagram
+          x: 13
+          'y': 4
+        emr-checkpoint:
+          tier: diagram
+          x: 13
+          'y': 7
+        emr-output:
+          tier: diagram
+          x: 13
+          'y': 10
+        emr-service:
+          tier: diagram
+          x: 13
+          'y': 1
+      groups:
+        - kind: cloud
+          provider: aws
+          label: AWS アカウント
+          tier:
+            - diagram
+          x0: -1
+          y0: -1
+          x1: 16
+          y1: 12
+          nodes:
+            - emr-driver
+            - emr-executor
+            - emr-ec2
+            - emr-msk
+            - emr-checkpoint
+            - emr-output
+            - emr-service
+        - kind: cluster
+          label: EMR クラスタ
+          tier:
+            - diagram
+          x0: 0
+          y0: 3
+          x1: 8
+          y1: 10
+          nodes:
+            - emr-driver
+            - emr-executor
+            - emr-ec2
+        - kind: nodegroup
+          label: EC2 / YARN
+          tier:
+            - diagram
+          x0: 0.8
+          y0: 3.5
+          x1: 7.5
+          y1: 9.6
+          nodes:
+            - emr-driver
+            - emr-executor
+            - emr-ec2
   - id: aws-eks-spark
-    label: "AWS：EKS / Spark on Kubernetes"
-    description: "Amazon MSK と S3 を使い、EKS の EC2 ノード上で Spark Driver と Executor を Pod として実行する DStreams 構成例。"
+    label: AWS：EKS / Spark on Kubernetes
+    description: Amazon MSK と S3 を使い、EKS の EC2 ノード上で Spark Driver と Executor を Pod として実行する DStreams 構成例。
     sources:
-      - {title: Running Spark on Kubernetes, url: https://spark.apache.org/docs/3.5.7/running-on-kubernetes.html}
-      - {title: Spark Streaming Kafka integration, url: https://spark.apache.org/docs/3.5.7/streaming-kafka-0-10-integration.html}
-      - {title: Spark Streaming checkpointing, url: https://spark.apache.org/docs/3.5.7/streaming-programming-guide.html}
-      - {title: Amazon EKS managed node groups, url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+      - title: Running Spark on Kubernetes
+        url: https://spark.apache.org/docs/3.5.7/running-on-kubernetes.html
+      - title: Spark Streaming Kafka integration
+        url: https://spark.apache.org/docs/3.5.7/streaming-kafka-0-10-integration.html
+      - title: Spark Streaming checkpointing
+        url: https://spark.apache.org/docs/3.5.7/streaming-programming-guide.html
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: AWS shared responsibility model
+        url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html
+      - title: EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
     tiers:
-      - {id: input, label: 入力とクラスタ管理, z: 2, size: [18, 3]}
-      - {id: compute, label: EKS の Spark 実行, z: 1, size: [18, 3]}
-      - {id: storage, label: 保存と復旧, z: 0, size: [18, 3]}
+      - id: input
+        label: 入力とクラスタ管理
+        z: 2
+        size:
+          - 18
+          - 3
+      - id: compute
+        label: EKS の Spark 実行
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: storage
+        label: 保存と復旧
+        z: 0
+        size:
+          - 18
+          - 3
     groups:
-      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [input, compute, storage], nodes: [eks-msk, eks-control, eks-ec2, eks-driver, eks-executor, eks-output, eks-checkpoint]}
-      - {kind: cluster, label: EKS クラスタ / namespace, tier: [compute], nodes: [eks-ec2, eks-driver, eks-executor]}
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - input
+          - compute
+          - storage
+        nodes:
+          - eks-msk
+          - eks-control
+          - eks-ec2
+          - eks-driver
+          - eks-executor
+          - eks-output
+          - eks-checkpoint
+      - kind: cluster
+        label: EKS クラスタ / namespace
+        tier:
+          - compute
+        nodes:
+          - eks-ec2
+          - eks-driver
+          - eks-executor
     nodes:
-      eks-msk: {label: Amazon MSK / Kafka トピック, svc: msk, kind: queue, tier: input, x: 1, y: 1.5, realizes: [source], description: Kafka パーティションを Spark Direct API で読み取る。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§10"}]}
-      eks-control: {label: Amazon EKS / Kubernetes API, svc: eks, kind: service, tier: input, x: 9, y: 1.5, description: Kubernetes API とスケジューラーが Spark の Pod を配置する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§10"}]}
-      eks-driver: {label: Spark Driver Pod, kind: worker, tier: compute, x: 4, y: 1.5, realizes: [context, dstream], description: StreamingContext が Kubernetes API を使い Executor Pod を要求する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§10"}]}
-      eks-executor: {label: Spark Executor Pod, kind: worker, tier: compute, x: 10, y: 1.5, realizes: [executors], description: Pod 内の Executor が Kafka 入力と RDD の処理を担当する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§10"}]}
-      eks-ec2: {label: EC2 / EKS ノードグループ, svc: ec2, kind: host, tier: compute, x: 15, y: 1.5, description: マネージドノードグループの EC2 上で Pod を実行する例。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§10"}]}
-      eks-output: {label: S3 / 集計結果, svc: s3, kind: db, tier: storage, x: 10, y: 1.5, realizes: [output], description: foreachRDD の結果を保存する。出力の重複対策はアプリ側で設計する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§10"}]}
-      eks-checkpoint: {label: S3 / チェックポイント, svc: s3, kind: db, tier: storage, x: 4, y: 1.5, realizes: [checkpoint], description: チェックポイントは出力先とは別パスに保存する。, evidence: [{type: doc, ref: "docs/reference-spark-streaming.md#§10"}]}
+      eks-msk:
+        label: Amazon MSK / Kafka トピック
+        svc: msk
+        kind: queue
+        tier: input
+        x: 1
+        'y': 1.5
+        realizes:
+          - source
+        description: Kafka パーティションを Spark Direct API で読み取る。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§10
+        management:
+          type: aws
+          scope: AWS が MSK のブローカー基盤を管理する。クラスター設定、アクセスとデータは利用者が管理する。
+      eks-control:
+        label: Amazon EKS / Kubernetes API
+        svc: eks
+        kind: service
+        tier: input
+        x: 9
+        'y': 1.5
+        description: Kubernetes API とスケジューラーが Spark の Pod を配置する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§10
+        management:
+          type: aws
+          scope: AWS が EKS の Kubernetes 制御プレーンを管理する。クラスター設定とアクセス権は利用者が管理する。
+      eks-driver:
+        label: Spark Driver Pod
+        kind: worker
+        tier: compute
+        x: 4
+        'y': 1.5
+        realizes:
+          - context
+          - dstream
+        description: StreamingContext が Kubernetes API を使い Executor Pod を要求する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§10
+        management:
+          type: customer
+          scope: 利用者が Spark アプリケーション、設定と再起動・出力の設計を管理する。
+      eks-executor:
+        label: Spark Executor Pod
+        kind: worker
+        tier: compute
+        x: 10
+        'y': 1.5
+        realizes:
+          - executors
+        description: Pod 内の Executor が Kafka 入力と RDD の処理を担当する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§10
+        management:
+          type: customer
+          scope: 利用者が Spark アプリケーション、設定と再起動・出力の設計を管理する。
+      eks-ec2:
+        label: EC2 / EKS ノードグループ
+        svc: ec2
+        kind: host
+        tier: compute
+        x: 15
+        'y': 1.5
+        description: マネージドノードグループの EC2 上で Pod を実行する例。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§10
+        management:
+          type: shared
+          scope: EKS マネージドノードグループは AWS がノードのプロビジョニング等を支援する。AMI 更新の適用、構成とワークロードは利用者が管理する。
+      eks-output:
+        label: S3 / 集計結果
+        svc: s3
+        kind: db
+        tier: storage
+        x: 10
+        'y': 1.5
+        realizes:
+          - output
+        description: foreachRDD の結果を保存する。出力の重複対策はアプリ側で設計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§10
+        management:
+          type: aws
+          scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
+      eks-checkpoint:
+        label: S3 / チェックポイント
+        svc: s3
+        kind: db
+        tier: storage
+        x: 4
+        'y': 1.5
+        realizes:
+          - checkpoint
+        description: チェックポイントは出力先とは別パスに保存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-streaming.md#§10
+        management:
+          type: aws
+          scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
     links:
-      - {id: eks-read, from: eks-msk, to: eks-executor, label: Kafka パーティションを読み取る, realizes: [receive], replace: true}
-      - {id: eks-schedule, from: eks-control, to: eks-driver, label: Driver Pod を配置}
-      - {id: eks-host, from: eks-ec2, to: eks-executor, label: Executor Pod を実行}
+      - id: eks-read
+        from: eks-msk
+        to: eks-executor
+        label: Kafka パーティションを読み取る
+        realizes:
+          - receive
+        replace: true
+      - id: eks-schedule
+        from: eks-control
+        to: eks-driver
+        label: Driver Pod を配置
+      - id: eks-host
+        from: eks-ec2
+        to: eks-executor
+        label: Executor Pod を実行
+    layout3d:
+      tiers:
+        - id: workloads
+          label: Spark の実行
+          z: 1
+          size:
+            - 8
+            - 3
+        - id: platform
+          label: EKS / EC2 の実行基盤
+          z: 0
+          size:
+            - 8
+            - 3
+        - id: services
+          label: ストリームと保存
+          z: 0
+          origin:
+            - 12
+            - 0
+          size:
+            - 10
+            - 3
+      nodes:
+        eks-driver:
+          tier: workloads
+          x: 1
+          'y': 1.5
+        eks-executor:
+          tier: workloads
+          x: 5
+          'y': 1.5
+        eks-control:
+          tier: platform
+          x: 1
+          'y': 1.5
+        eks-ec2:
+          tier: platform
+          x: 5
+          'y': 1.5
+        eks-msk:
+          tier: services
+          x: 1
+          'y': 1.5
+        eks-checkpoint:
+          tier: services
+          x: 5
+          'y': 1.5
+        eks-output:
+          tier: services
+          x: 9
+          'y': 1.5
+      groups:
+        - kind: cloud
+          label: AWS アカウント
+          provider: aws
+          tier:
+            - workloads
+            - platform
+            - services
+          nodes:
+            - eks-driver
+            - eks-executor
+            - eks-control
+            - eks-ec2
+            - eks-msk
+            - eks-checkpoint
+            - eks-output
+        - kind: cluster
+          label: EKS クラスタ
+          tier:
+            - workloads
+            - platform
+          nodes:
+            - eks-driver
+            - eks-executor
+            - eks-ec2
+    layout2d:
+      tiers:
+        - id: diagram
+          label: AWS の実装構成
+          z: 0
+          size:
+            - 17
+            - 12
+      nodes:
+        eks-driver:
+          tier: diagram
+          x: 2
+          'y': 8
+        eks-executor:
+          tier: diagram
+          x: 6
+          'y': 8
+        eks-ec2:
+          tier: diagram
+          x: 4
+          'y': 5
+        eks-msk:
+          tier: diagram
+          x: 13
+          'y': 2
+        eks-checkpoint:
+          tier: diagram
+          x: 13
+          'y': 5
+        eks-output:
+          tier: diagram
+          x: 13
+          'y': 8
+        eks-control:
+          tier: diagram
+          x: 4
+          'y': 2
+      groups:
+        - kind: cloud
+          provider: aws
+          label: AWS アカウント
+          tier:
+            - diagram
+          x0: -1
+          y0: -1
+          x1: 16
+          y1: 12
+          nodes:
+            - eks-driver
+            - eks-executor
+            - eks-ec2
+            - eks-msk
+            - eks-checkpoint
+            - eks-output
+            - eks-control
+        - kind: cluster
+          label: EKS クラスタ
+          tier:
+            - diagram
+          x0: 0
+          y0: 0
+          x1: 8
+          y1: 10
+          nodes:
+            - eks-driver
+            - eks-executor
+            - eks-ec2
+            - eks-control
+        - kind: nodegroup
+          label: EC2 ノードグループ
+          tier:
+            - diagram
+          x0: 0.8
+          y0: 3.5
+          x1: 7.5
+          y1: 9.6
+          nodes:
+            - eks-driver
+            - eks-executor
+            - eks-ec2

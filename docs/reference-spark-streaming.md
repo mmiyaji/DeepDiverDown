@@ -90,3 +90,7 @@ EKS の Kubernetes API に Spark アプリを投入し、EC2 マネージドノ�
 Spark と Kafka 連携ライブラリーを含むイメージ、Kubernetes のサービスアカウント・権限、MSK / S3 接続を用意する。Driver Pod の再起動、チェックポイントの利用、出力の冪等性、オフセットとコード更新の扱いは別途設計する。DStreams の例であり、EMR Serverless の Structured Streaming 専用 streaming job を示すものではない。
 
 出典：[Spark on Kubernetes](https://spark.apache.org/docs/3.5.7/running-on-kubernetes.html)、[Spark Streaming と Kafka](https://spark.apache.org/docs/3.5.7/streaming-kafka-0-10-integration.html)、[EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)。
+
+AWS のマネージド範囲を 3D 図に表示する。「AWS管理」は表示したサービス基盤に AWS の運用範囲があることを示し、設定・データ・権限を含むすべてを AWS が担う意味ではない。「共同管理」はマネージドノードグループなど役割が分かれる場合、「利用者管理」は Spark アプリなど利用者が主に運用する部品を示す。詳しい分担は各部品を選択して確認する。
+
+[AWS 共有責任モデル](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)、[EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)、[EMR のセキュリティ](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-security.html)。

@@ -622,12 +622,12 @@ export class Scene3D {
       m.rotation.x = -Math.PI / 2; m.position.set((a[0] + c[0]) / 2, y + 0.005, (a[1] + c[1]) / 2); this.root.add(m);
     }
   }
-  group({ pts, y, kind, label, color, brandIcon }) {
+  group({ pts, y, kind, label, color, brandIcon, labelY }) {
     const vpc = ['--ink', 'dash'];
     const [fallback, style, fill] = {
       vpc, vnet: vpc, vcn: vpc, az: ['--mute', 'dot'], subnet: ['--line', null, '--grid'],
       cloud: ['--mute'], region: ['--mute', 'dash'], cluster: ['#326CE5', 'dashdot'], parallel: ['--par', 'dash'],
-      namespace: ['--mute', 'dot'], datacenter: ['#6d6a63'],
+      namespace: ['--mute', 'dot'], nodegroup: ['--mute', 'dot'], datacenter: ['#6d6a63'],
     }[kind] || ['--mute', 'dash'];
     const ink = ['cluster', 'datacenter', 'parallel'].includes(kind) ? fallback : color || fallback;
     this.loop(pts, y, ink, style, fill);
@@ -641,7 +641,7 @@ export class Scene3D {
     }
     if (!label) return; // 複数フロアにまたがる枠は、ラベルを 1 か所だけに出す
     const [x, z] = kind === 'az' ? pts[1] : kind === 'cloud' ? pts[0] : pts[3];
-    const text = this.label(label, [x, y + 0.02, z], `g-lbl g-${kind}`, kind === 'az' || kind === 'cloud' ? [0, 1] : [0, 0], { color: this.color(ink).getStyle(), borderColor: this.color(ink).getStyle() });
+    const text = this.label(label, [x, (labelY ?? y) + 0.02, z], `g-lbl g-${kind}`, kind === 'az' || kind === 'cloud' ? [0, 1] : [0, 0], { color: this.color(ink).getStyle(), borderColor: this.color(ink).getStyle() });
     if (brandIcon) {
       const icon = document.createElement('img');
       icon.className = 'group-brand-icon';
@@ -650,6 +650,18 @@ export class Scene3D {
       icon.src = brandIcon;
       text.prepend(icon);
     }
+  }
+
+  // A light frame makes the provider boundary surround the full stack in 3D.
+  platformEnvelope({ pts, bottom, top, color }) {
+    const vertices = [];
+    for (let i = 0; i < pts.length; i++) {
+      const [x, z] = pts[i], [nx, nz] = pts[(i + 1) % pts.length];
+      vertices.push(x, bottom, z, x, top, z, x, top, z, nx, top, nz);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    this.root.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: this.color(color || '--mute'), transparent: true, opacity: 0.58 })));
   }
 
   /* ---------- ノード ---------- */
@@ -855,6 +867,14 @@ export class Scene3D {
     if (external) name.dataset.external = 'true';
     const symbolInk = external ? '--diagram-external' : silhouette ? (s.labelAccent ? '--card' : '--bg') : '--ink';
     name.append(this.nodeSymbol(s, symbolInk), this.nodeText(s.label));
+    const managementLabel = { aws: 'AWS管理', shared: '共同管理', customer: '利用者管理' }[s.management?.type];
+    if (managementLabel) {
+      const badge = document.createElement('span');
+      badge.className = 'n-management n-management-' + s.management.type;
+      badge.textContent = managementLabel;
+      badge.title = s.management.scope || managementLabel;
+      name.append(badge);
+    }
     if (s.flat && s.icon) name.style.marginTop = '10px';
     if (s.sub) {
       const sub = this.label(s.sub.text, [x, y, z + (s.solidStyle ? 0.68 : 0.5)], 'n-sub', [0.5, -0.3],
@@ -951,6 +971,15 @@ export class Scene3D {
     if (s.labelAccent) card.classList.add('acc');
 
     card.append(this.nodeSymbol(s, external ? '--diagram-external' : '--ink'), this.nodeText(s.label));
+    const managementLabel = { aws: 'AWS管理', shared: '共同管理', customer: '利用者管理' }[s.management?.type];
+    if (managementLabel) {
+      const badge = document.createElement('span');
+      badge.className = 'n-management n-management-' + s.management.type;
+      badge.textContent = managementLabel;
+      badge.title = s.management.scope || managementLabel;
+      card.dataset.managed = 'true';
+      card.append(badge);
+    }
     if (s.icon) {
       const mark = document.createElement('span');
       mark.className = 'n-card-mark n-card-provider';

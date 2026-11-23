@@ -1,6 +1,7 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
 import { Scene3D } from './scene3d.js?v=minimap1';
 import { buildDiagramLayout } from './diagram-layout.js?v=compare-layout3';
+import { implementation3D } from './implementation-3d.js';
 import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=compare-layout3';
 import { NODE_KINDS, nodeShape } from './node-kinds.js';
 import { loadServiceIcons } from './service-icons.js';
@@ -126,7 +127,7 @@ addEventListener('hashchange', () => { if (parseRoute().id !== KEY || parseRoute
  * 解析・モードの状態は物理モデル（allNodes / allLinks）で計算し、描画だけ VW() の部品に写す */
 let PROJ = null, PROJKEY = '';
 function VW() {
-  const key = `${st.view}|${st.mode === 'evidence' ? 'e' : st.mode === 'compare' ? 'c' : ''}`;
+  const key = `${st.view}|${st.dimension}|${st.mode === 'evidence' ? 'e' : st.mode === 'compare' ? 'c' : ''}`;
   if (key !== PROJKEY) {
     let tiers = M.tiers;
     if (st.mode === 'compare' && CMPR) {
@@ -134,6 +135,9 @@ function VW() {
       tiers = [...tiers, ...CMP.model.tiers.filter(t => removedFloors.has(t.id) && !tiers.some(now => now.id === t.id))];
     }
     PROJ = Views.project({ tiers, groups: M.groups || [], nodes: allNodes(), links: allLinks() }, M, st.view);
+    const impl = Views.implOf(M, st.view);
+    PROJ = implementation3D(PROJ, st.dimension === '3' ? impl?.layout3d : impl?.layout2d,
+      { flat: st.dimension === '2' });
     PROJKEY = key;
   }
   return PROJ;
@@ -380,6 +384,7 @@ function nodeSpec(id, n, s) {
     // 並列表現：parallel（同じ実行単位が N 個）・slots（同時に走る Task 数）・partitions（データの分割数）
     parallel: n.parallel, slots: n.slots, partitions: n.partitions,
     badge: s.badge || (n.parallel ? { text: `×${n.parallel} 並列`, tone: 'par' } : n.drill ? { text: '▼ 詳細図', tone: 'drill' } : null),
+    management: (!flat || VW().platform2D) && n.management?.type ? n.management : null,
     sub: svc ? { text: serviceLabel(svc), color: svc.providerColor } : (n.slots || n.partitions) ? { text: [n.slots && `同時 ${n.slots} Task`, n.partitions && `${n.partitions} 分割`].filter(Boolean).join('・'), color: 'var(--par)' } : undefined,
   };
 }
@@ -452,7 +457,26 @@ function drawScene() {
       y: f.y, origin: t.kind === 'origin', label: t.label });
   }
   const labeled = new Set();
+  // In the stack view the cloud is one shared footprint beneath the layers,
+  // rather than a separate cloud rectangle on every floor.
+  if (P.platformStack && st.dimension === '3') for (const gr of P.groups || []) {
+    if (gr.kind !== 'cloud') continue;
+    const members = Object.entries(N).filter(([id, n]) => visible(n) && (!gr.nodes || gr.nodes.includes(id)));
+    if (!members.length) continue;
+    const points = members.map(([, n]) => W(n.x, n.y, n.tier));
+    const ys = points.map(p => p[1]);
+    const floors = [...new Set(members.map(([, n]) => n.tier))].map(t => plan.floors.get(t)).filter(Boolean);
+    const [left, right] = [Math.min(...floors.map(f => f.x + f.left)) - 1.2, Math.max(...floors.map(f => f.x + f.right)) + 1.2];
+    const [back, front] = [Math.min(...floors.map(f => f.z + f.back)) - 1.2, Math.max(...floors.map(f => f.z + f.front)) + 1.2];
+    const bottom = Math.min(...ys) - 0.18, top = Math.max(...ys) + 2.1;
+    const provider = Catalog.PROVIDERS[gr.provider];
+    const pts = [[left, back], [right, back], [right, front], [left, front]];
+    scene.group({ y: bottom, labelY: top, kind: gr.kind, label: gr.label, color: provider?.color, pts });
+    scene.platformEnvelope({ pts, bottom, top, color: provider?.color });
+    labeled.add(gr);
+  }
   for (const gr of P.groups || []) for (const t of [].concat(gr.tier)) {
+    if (P.platformStack && st.dimension === '3' && gr.kind === 'cloud') continue;
     if (st.hidden.has(t) || !P.tiers.some(x => x.id === t)) continue;
     let { x0, y0, x1, y1 } = gr;
     if (![x0, y0, x1, y1].every(Number.isFinite)) {
@@ -646,7 +670,7 @@ function contextLegend() {
   const { nodes, groups } = VW();
   const provs = [...new Set([...Object.values(nodes).map(n => Catalog.providerOf(n)), ...groups.map(g => g.provider)].filter(p => Object.hasOwn(Catalog.PROVIDERS, p)))];
   const kinds = [...new Set(groups.map(g => g.kind))];
-  const KIND = { cloud: 'クラウド', region: 'リージョン', vpc: 'VPC', vnet: 'VNet', vcn: 'VCN', az: 'AZ', subnet: 'サブネット', cluster: 'クラスタ', namespace: 'Namespace', datacenter: 'データセンター', parallel: '並列に実行' };
+  const KIND = { cloud: 'クラウド', region: 'リージョン', vpc: 'VPC', vnet: 'VNet', vcn: 'VCN', az: 'AZ', subnet: 'サブネット', cluster: 'クラスタ', namespace: 'Namespace', nodegroup: '実行ノード', datacenter: 'データセンター', parallel: '並列に実行' };
   return (provs.length ? '<span class="lg-sep"></span>' + provs.map(p => `<span><b class="sw" style="background:${Catalog.PROVIDERS[p].color}"></b>${esc(Catalog.PROVIDERS[p].label)}</span>`).join('') : '') +
     (kinds.length ? '<span class="lg-sep"></span>' + kinds.map(k => `<span><b class="fr fr-${k}"></b>${KIND[k] || k}</span>`).join('') : '');
 }
@@ -767,6 +791,7 @@ function implDetail(id) {
     .map(s => `<div class="item"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a></div>`).join('');
   return `<h4>実装例の部品</h4><h3>${esc(c.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${type ? esc(type) + ' / ' : ''}${esc(Views.info(M, st.view).label)}</div>
     ${c.description ? `<p>${esc(c.description)}</p>` : ''}
+    ${c.management?.scope ? `<h4>運用の分担</h4><p>${esc(c.management.scope)}</p>` : ''}
     <div class="row"><button class="b small" data-focus="${esc(id)}">この部品に寄る（F）</button><button class="b small" data-viewmode="cloud">機能配置で見る</button><button class="b small" data-sel="">選択を解除</button></div>
     <h4>担う機能（${parts.length}）</h4>${parts.map(p => `<div class="item">${esc(M.nodes[p]?.label || p)} <span class="mono mute">${esc(p)}</span></div>`).join('') || '<div class="sub">機能配置にはない、実装で加わる部品</div>'}
     <h4>接続元</h4>${ins.map(l => itemButton('edge', l.id, ln(l, l.from), st.edge === l.id)).join('') || none}
