@@ -1,6 +1,6 @@
 /* モデル解析：指摘ルール（lint）・障害影響の伝播・実環境との差分 */
 (function () {
-  const INFRA = ['client', 'external', 'cdn', 'actor'];
+  const INFRA = ['client', 'external', 'cdn', 'actor', 'segment'];  // segment はファイル内の区画で、台数の概念がない
   const syncLinks = m => m.links.filter(l => l.sync);
 
   const RULES = [

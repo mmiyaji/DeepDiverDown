@@ -33,3 +33,7 @@ Iceberg の snapshot はある時点のテーブル状態を示し、manifest li
 ## 6. シナリオ
 
 「Iceberg テーブルの書き込みと読み出し」シナリオをクリックすると、計算、Catalog、snapshot、manifest、データファイルの順に追える。
+
+## 7. ストレージ階層とライフサイクル
+
+オブジェクトストレージには、アクセス頻度に応じた保存クラスがある（例：S3 の Standard、Standard-IA、Glacier 系）。ライフサイクルルールで、作成から一定日数を過ぎたオブジェクトを安い保存クラスへ自動的に移せる。安いクラスほど保存料金は下がるが、取り出し料金や最低保存期間がかかり、アーカイブ系のクラスは読む前に復元（restore）が必要で、すぐには読めない。テーブルのデータファイルを移すときは、クエリが参照する可能性のある範囲を移さないよう、パーティションや保持期間と合わせて設計する。出典 [Amazon S3 storage classes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html)、[S3 Lifecycle](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html)

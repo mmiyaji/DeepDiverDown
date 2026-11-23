@@ -59,3 +59,7 @@ Trino では、Split はデータセットの読み取り範囲で、Worker 上�
 この流れは、書き込み時の決定的な配置、読み出し時の pruning／ルーティング、分析時のタスク並列化を一続きで見るための例である。実際に必要な一貫性、再試行、レプリカ、再シャーディング、バックフィルの方式は採用するデータベースやテーブル形式の仕様に従って別途決める。
 
 出典 [PostgreSQL Table Partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html)・[Apache Iceberg Partitioning](https://iceberg.apache.org/docs/latest/partitioning/)・[Amazon DynamoDB Partitions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html)・[Trino・Tasks と Splits](https://trino.io/docs/current/overview/concepts.html#split)
+
+## 8. ノード追加とシャードの再配置
+
+保存先のノードを増やすとき、キーをノード数で割った余り（hash mod N）で置き場所を決めていると、N が変わるだけでほとんどのキーの置き場所が変わり、大量のデータ移動が起きる。固定数のスロット（論理シャード）にキーを割り当て、スロットをノードに割り当てる方式や、コンシステントハッシュでは、新しいノードへ一部のスロットだけを移せばよく、移動量はおよそ全体の 1/N に抑えられる。移動中も読み書きを続けるため、移すスロットを順に複製してから担当を切り替える。

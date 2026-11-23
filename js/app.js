@@ -1,8 +1,10 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=card-icons';
+import { Scene3D } from './scene3d.js?v=dv1';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=nc1';
+import { FileMap } from './filemap.js?v=dv2';
+import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=bm1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -225,7 +227,56 @@ function decorate() {
 const fmt = (k, v) => { const u = (METRICS.find(x => x[0] === k) || [])[2] || ''; return u === '$' ? `$${v}` : `${v}${u}`; };
 
 /* ================= 3D 描画 ================= */
-const scene = new Scene3D($('view'), { onPick: id => onPick(id) });
+const scene = new Scene3D($('view'), { onPick: id => onPick(id), onDrill: id => drillInto(id) });
+/* ドリルダウン：部品へズームインしながら詳細図へ、パンくずではズームアウトしながら上位の図へ移る */
+/* 図の下のデータの見取り図：ファイルの解剖図・メタデータの木・分布のいずれか */
+const onVisNode = { onNode: id => { if (M.nodes[id] && st.sel !== id) select(id); } };
+/* 1 つのモデルが複数の見取り図を持てる。タブで切り替え、シナリオの visual（見取り図の ID）で自動的に切り替える */
+const VIS_DEFS = [
+  M.fileLayout?.segments?.length && { id: 'file', title: 'ファイルの解剖図', make: el => new FileMap(el, M.fileLayout, onVisNode) },
+  M.treeLayout?.root && { id: 'tree', title: M.treeLayout.title || 'メタデータの木', make: el => new TreeMap(el, M.treeLayout, onVisNode) },
+  M.distribution?.bars?.length && { id: 'distribution', title: M.distribution.title || '分布', make: el => new DistMap(el, M.distribution, onVisNode) },
+  M.grid?.rows?.length && { id: 'grid', title: M.grid.title || '表', make: el => new GridMap(el, M.grid, onVisNode) },
+  M.timeline?.commits?.length && { id: 'timeline', title: M.timeline.title || 'タイムライン', make: el => new TimelineMap(el, M.timeline, onVisNode) },
+  ...[].concat(M.blocks || []).filter(b => b?.lanes?.length).map((b, i) => ({ id: b.id || 'blocks' + i, title: b.title || 'データの移動', make: el => new BlockMap(el, b, onVisNode) })),
+].filter(Boolean);
+const VIS = new Map();
+let visActive = VIS_DEFS[0]?.id;
+if (VIS_DEFS.length) {
+  const dock = $('filemap');
+  dock.innerHTML = (VIS_DEFS.length > 1 ? `<div class="vis-tabs" role="tablist">${VIS_DEFS.map(d => `<button type="button" role="tab" data-vis="${esc(d.id)}">${esc(d.title)}</button>`).join('')}</div>` : '')
+    + VIS_DEFS.map(d => `<div class="vis-pane" data-pane="${esc(d.id)}"></div>`).join('');
+  for (const d of VIS_DEFS) VIS.set(d.id, d.make(dock.querySelector(`[data-pane="${CSS.escape(d.id)}"]`)));
+  dock.addEventListener('click', e => { const t = e.target.closest('[data-vis]'); if (t) { visActive = t.dataset.vis; syncFileMap(); } });
+}
+const FM = VIS.size ? { sync: (ctx, sel) => { for (const [id, v] of VIS) if (id === visActive) v.sync(ctx, sel); } } : null;
+$('filemap').hidden = !FM;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function transitionTo(hash, dir, origin, from) {
+  try { sessionStorage.setItem('ddd.drill', JSON.stringify({ dir, at: Date.now(), from })); } catch {}
+  if (REDUCED) { location.hash = hash; return; }
+  const v = $('view');
+  if (origin) v.style.transformOrigin = `${origin[0] * 100}% ${origin[1] * 100}%`;
+  v.classList.add(dir === 'in' ? 'drill-leave-in' : 'drill-leave-out');
+  setTimeout(() => { location.hash = hash; }, 420);
+}
+function drillInto(id) {
+  const d = allNodes()[id]?.drill;
+  if (!d || !REGISTRY.some(r => r.id === d)) return;
+  const p = scene.nodePos(id);
+  if (p && !REDUCED) scene.focusOn(p, scene.camera.zoom * 2.6);
+  transitionTo(`#/m/${encodeURIComponent(d)}/struct`, 'in', scene.nodeScreen(id), { model: KEY, node: id });
+}
+/* 遷移してきた直後は、入ってくる演出を付ける（詳細図：奥から手前へ広がる／上位の図：手前から引いて戻る） */
+try {
+  const t = JSON.parse(sessionStorage.getItem('ddd.drill') || 'null'); sessionStorage.removeItem('ddd.drill');
+  // 来た図を覚えておき、パンくずはそこへ戻す（同じ詳細図に複数の入口があるため）
+  if (t?.dir === 'in' && t.from?.model) sessionStorage.setItem('ddd.back.' + KEY, JSON.stringify(t.from));
+  if (t && Date.now() - t.at < 4000 && !REDUCED) {
+    const v = $('view'); v.classList.add(t.dir === 'in' ? 'drill-enter-in' : 'drill-enter-out');
+    setTimeout(() => v.classList.remove('drill-enter-in', 'drill-enter-out'), 700);
+  }
+} catch {}
 scene.speed = S.packetSpeed;
 scene.initialView = S.defaultView;
 
@@ -233,7 +284,7 @@ const serviceLabel = svc => svc && `${svc.name}｜${svc.providerLabel}`;
 
 function nodeSpec(id, n, s) {
   const svc = Catalog.lookup(n.svc);
-  const shape = n.kind === 'actor' ? 'person' : (svc?.shape ?? (['db', 'cache'].includes(n.kind) ? 'cyl' : n.kind === 'queue' ? 'queue' : 'box'));
+  const shape = n.kind === 'actor' ? 'person' : n.kind === 'segment' ? 'slab' : (svc?.shape ?? (['db', 'cache'].includes(n.kind) ? 'cyl' : n.kind === 'queue' ? 'queue' : 'box'));
   const flat = st.dimension === '2';
   const solidStyle = style3D();
   const flatStyle = flat ? (S.nodeStyle2D === 'silhouette' ? 'silhouette' : 'card') : null;
@@ -244,12 +295,12 @@ function nodeSpec(id, n, s) {
   else if (['db', 'queue', 'cache'].includes(n.kind)) color = scene.color('--dark');
   if (flatStyle === 'silhouette' && !svc && n.kind !== 'actor') {
     const tint = n.shape3D === 'crate' ? '#348573'
-      : { cyl: '#477786', queue: '#397972', box: '#526885' }[shape];
+      : { cyl: '#477786', queue: '#397972', slab: '#a06a42', box: '#526885' }[shape] || '#526885';
     color = scene.mix(tint, '--paper', 0.48);
   }
   if (solidStyle === 'components' && !svc && n.kind !== 'actor') {
     const tint = n.shape3D === 'crate' ? '#348573'
-      : { cyl: '#32778f', queue: '#258477', box: n.kind === 'worker' ? '#3e718b' : '#627c96' }[shape];
+      : { cyl: '#32778f', queue: '#258477', slab: '#b0703f', box: n.kind === 'worker' ? '#3e718b' : '#627c96' }[shape] || '#627c96';
     color = scene.mix(tint, '--paper', 0.82);
   } else if (solidStyle === 'flow') color = scene.color('--paper');
   if (ext) opacity = Math.min(opacity, 0.35);
@@ -267,7 +318,7 @@ function nodeSpec(id, n, s) {
     label: n.label, selected: VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', abbr: svc && { text: svc.abbr, color: svc.color },
     // 並列表現：parallel（同じ実行単位が N 個）・slots（同時に走る Task 数）・partitions（データの分割数）
     parallel: n.parallel, slots: n.slots, partitions: n.partitions,
-    badge: s.badge || (n.parallel ? { text: `×${n.parallel} 並列`, tone: 'par' } : null),
+    badge: s.badge || (n.parallel ? { text: `×${n.parallel} 並列`, tone: 'par' } : n.drill ? { text: '▼ 詳細図', tone: 'drill' } : null),
     sub: svc ? { text: serviceLabel(svc), color: svc.providerColor } : (n.slots || n.partitions) ? { text: [n.slots && `同時 ${n.slots} Task`, n.partitions && `${n.partitions} 分割`].filter(Boolean).join('・'), color: 'var(--par)' } : undefined,
   };
 }
@@ -309,7 +360,21 @@ function projectState(ns, ls) {
   return { nsV, lsV };
 }
 
-function draw() {
+function draw() { drawScene(); syncFileMap(); }
+/* ファイルの解剖図：部品の選択と、シナリオの読み取り範囲（steps[].read）を帯に反映する */
+function syncFileMap() {
+  if (!FM) return;
+  const sc = st.mode === 'scenario' && M.scenarios?.length ? M.scenarios[st.scen] : null;
+  const ctx = sc ? { steps: sc.steps, idx: st.step } : null;
+  // シナリオが見取り図を指定していればそれを前に出す（指定が無ければ今のまま）
+  if (sc?.visual && VIS.has(sc.visual) && sc !== syncFileMap.lastSc) visActive = sc.visual;
+  syncFileMap.lastSc = sc;
+  const dock = $('filemap');
+  dock.querySelectorAll('[data-vis]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vis === visActive)));
+  dock.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== visActive; });
+  FM.sync(ctx, st.sel);
+}
+function drawScene() {
   const d = decorate(), { nsV: ns, lsV: ls } = projectState(d.ns, d.ls), P = VW(), N = P.nodes;
   scene.begin();
   for (const t of P.tiers) {
@@ -360,8 +425,10 @@ function modelLink(entry) {
   const coverage = COV.total ? Math.round(COV.covered / COV.total * 100) : 100;
   const detail = selected && !entry.reference
     ? `<span class="tag ${GATES.pass ? 'ok' : 'high'}">${GATES.pass ? '合格' : '不合格'}</span> 網羅 ${coverage}%` : '';
-  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''}" ${selected ? 'aria-current="page"' : ''}>
-    <span class="mname">${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}</span>
+  const tags = entry.tags || [], sub = entry.reference?.detailOf;
+  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''} ${sub ? 'mdetail' : ''}" data-tags="${esc(tags.join('|'))}" ${selected ? 'aria-current="page"' : ''}>
+    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}</span>
+    ${tags.length ? `<span class="mtags">${tags.map(t => `<span class="mtag ${TAG_KIND(t)}">${esc(t)}</span>`).join('')}</span>` : ''}
     ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
 }
 
@@ -372,18 +439,32 @@ function renderLibrary() {
   $('mlist').innerHTML = REGISTRY.filter(entry => !entry.reference).map(modelLink).join('') +
     '<button class="b small" data-act="open">＋ YAML を開く</button>';
 
-  const groups = new Map();
-  for (const entry of REGISTRY.filter(r => r.reference)) {
-    const category = entry.reference.category || 'その他';
-    if (!groups.has(category)) groups.set(category, []);
-    groups.get(category).push(entry);
+  const refs = REGISTRY.filter(r => r.reference);
+  $('reference-section').hidden = !refs.length;
+  const tree = new Map(); // 領域 → 種別 → 分類 → 項目
+  const put = (m, k) => m.get(k) || m.set(k, new Map()).get(k);
+  for (const e of refs) {
+    const { domain = 'その他', kind = 'その他', category = 'その他' } = e.reference;
+    const cat = put(put(tree, domain), kind);
+    (cat.get(category) || cat.set(category, []).get(category)).push(e);
   }
-  $('reference-section').hidden = !groups.size;
-  $('reference-list').innerHTML = [...groups].map(([category, entries]) =>
-    `<details class="reference-category" data-cat="${esc(category)}"${LIB_OPEN.has(category) || entries.some(entry => entry.id === KEY) ? ' open' : ''}>
-      <summary>${esc(category)} <small>${entries.length}</small></summary><div class="mlist">${entries
-        .sort((a, b) => (a.reference.order ?? Number.MAX_SAFE_INTEGER) - (b.reference.order ?? Number.MAX_SAFE_INTEGER))
-        .map(modelLink).join('')}</div></details>`).join('');
+  const order = (list, pref) => [...list].sort((a, b) => (pref.indexOf(a[0]) + 1 || 99) - (pref.indexOf(b[0]) + 1 || 99));
+  const ord = e => e.reference.order ?? Number.MAX_SAFE_INTEGER;
+  const has = list => list.some(e => e.id === KEY);
+  const box = (cls, key, label, count, inner, open) => `<details class="${cls}" data-cat="${esc(key)}"${open ? ' open' : ''}><summary>${esc(label)} <small>${count}</small></summary>${inner}</details>`;
+  $('reference-list').innerHTML = order(tree, REF_DOMAINS).map(([domain, kinds]) => {
+    const dAll = [...kinds.values()].flatMap(c => [...c.values()].flat());
+    return box('ref-domain', 'd:' + domain, domain, dAll.length, order(kinds, REF_KINDS).map(([kind, cats]) => {
+      const kAll = [...cats.values()].flat();
+      return box('ref-kind', `k:${domain}/${kind}`, kind, kAll.length, order(cats, REF_CATS).map(([cat, list]) => {
+        const top = list.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf)).sort((a, b) => ord(a) - ord(b));
+        const rows = top.flatMap(e => [e, ...list.filter(c => c.reference.detailOf === e.id).sort((a, b) => ord(a) - ord(b))]);
+        const key = `${domain}/${kind}/${cat}`;
+        return box('reference-category', key, cat, list.length, `<div class="mlist">${rows.map(modelLink).join('')}</div>`, LIB_OPEN.has(key) || has(list));
+      }).join(''), LIB_OPEN.has(`k:${domain}/${kind}`) || has(kAll));
+    }).join(''), LIB_OPEN.has('d:' + domain) || has(dAll));
+  }).join('');
+  renderTagFilter();
   if (entryIsRef()) $('library').open = true;
   const q = $('model-filter').value; if (q) filterLibrary(q);
   if (aside) aside.scrollTop = top;
@@ -394,13 +475,39 @@ function entryIsRef() { return REGISTRY.some(r => r.reference && r.id === KEY); 
 function saveLibOpen() { try { localStorage.setItem('ddd.libOpen', JSON.stringify([...LIB_OPEN])); localStorage.setItem('ddd.libMain', $('library').open ? '1' : ''); } catch {} }
 
 /* モデル一覧の絞り込み：一致したモデルのある分類だけ開く */
-function filterLibrary(q) {
-  const s = q.trim().toLowerCase();
-  document.querySelectorAll('#library .mitem').forEach(a => { a.hidden = !!s && !a.textContent.toLowerCase().includes(s); });
+function filterLibrary(q = $('model-filter').value) {
+  const s = q.trim().toLowerCase(), tags = [...LIB_TAGS];
+  document.querySelectorAll('#library .mitem').forEach(a => {
+    const own = (a.dataset.tags || '').split('|');
+    a.hidden = (!!s && !a.textContent.toLowerCase().includes(s)) || !tags.every(t => own.includes(t));
+  });
+  const active = !!s || tags.length;
   document.querySelectorAll('#reference-list details').forEach(d => {
     const any = [...d.querySelectorAll('.mitem')].some(a => !a.hidden);
-    d.hidden = !any; if (s) d.open = any;
+    d.hidden = !any; if (active) d.open = any;
   });
+  const n = document.querySelectorAll('#reference-list .mitem:not([hidden])').length;
+  $('tag-count').textContent = active ? `${n} 件` : '';
+}
+/* ラベル（提供形態・提供元）で絞り込む。複数選ぶとすべてを持つものだけ */
+const LIB_TAGS = new Set();
+const REF_DOMAINS = ['データ基盤', 'コンテナ基盤'];
+const REF_CATS = ['取り込み', 'ストリーム処理', 'バッチ・SQL エンジン', 'テーブル形式とカタログ', '変換とオーケストレーション', 'クラウド分析基盤', '運用とガバナンス', 'データ配置と読み取り', 'ファイル形式', '分散実行と保守', '構成パターン', 'ユースケース', 'Kubernetes 系', 'マネージド Kubernetes', 'その他のオーケストレーター', '比較と選び方'];
+const REF_KINDS = ['製品・技術のアーキテクチャ', '仕組みの深掘り', '設計パターン・ユースケース'];
+const DELIVERY = ['OSS', '商用サービス', 'クラウドマネージド', '商用製品', 'ソース公開（BSL）', '商用サービスあり', '仕様', '概念', 'パターン'];
+const TAG_KIND = t => DELIVERY.includes(t) ? 'tk-' + ({ OSS: 'oss', 商用サービス: 'saas', クラウドマネージド: 'cloud', 商用製品: 'prod', 'ソース公開（BSL）': 'src', 商用サービスあり: 'saas2', 仕様: 'spec', 概念: 'idea', パターン: 'idea' })[t] : 'tk-org';
+function renderTagFilter() {
+  const count = new Map();
+  for (const e of REGISTRY) for (const t of e.tags || []) count.set(t, (count.get(t) || 0) + 1);
+  const chip = t => `<button type="button" class="mtag ${TAG_KIND(t)} ${LIB_TAGS.has(t) ? 'on' : ''}" data-tag="${esc(t)}" aria-pressed="${LIB_TAGS.has(t)}">${esc(t)} <small>${count.get(t)}</small></button>`;
+  const delivery = DELIVERY.filter(t => count.has(t)), orgs = [...count.keys()].filter(t => !DELIVERY.includes(t)).sort((a, b) => count.get(b) - count.get(a) || a.localeCompare(b));
+  $('tag-filter').innerHTML = `<div class="tf-row"><span class="tf-h">提供形態</span>${delivery.map(chip).join('')}</div>
+    <div class="tf-row"><span class="tf-h">提供元・団体</span>${orgs.map(chip).join('')}</div>
+    ${LIB_TAGS.size ? '<button type="button" class="b small" data-tag-clear>ラベルを解除</button>' : ''}<span id="tag-count" class="tf-count"></span>`;
+}
+function toggleTag(t, only = false) {
+  if (only) { LIB_TAGS.clear(); LIB_TAGS.add(t); } else LIB_TAGS.has(t) ? LIB_TAGS.delete(t) : LIB_TAGS.add(t);
+  renderTagFilter(); filterLibrary();
 }
 /* モデルを選ぶ（Ctrl+K・ヘッダーのモデル名）：サイドバーのモデル一覧を開いて絞り込み欄へ */
 function pickModel() {
@@ -489,6 +596,7 @@ function nodeDetail(id) {
   const reqs = (M.requirements || []).filter(q => q.nodes?.includes(id));
   return `<h4>選択中の部品</h4><h3>${esc(n.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${esc(n.subnet)} subnet` : ''} / ${esc(TI(n.tier).label || '')}</div>
     ${n.description ? `<p>${esc(n.description)}</p>` : ''}
+    ${n.drill && REGISTRY.some(r => r.id === n.drill) ? `<a class="b drill" href="#/m/${encodeURIComponent(n.drill)}/struct" data-drill="${id}">▼ 内部構造を見る：${esc(REGISTRY.find(r => r.id === n.drill).name || n.drill)}</a>` : ''}
     <div class="row"><button class="b small" data-focus="${id}">この部品に寄る（F）</button><button class="b small ${st.nbr ? 'on' : ''}" data-nbr>周辺だけ表示（N）</button><button class="b small" data-sel="">選択を解除</button></div>
     ${c ? `<div class="row">${tag(c.status)}<span class="sub m0">${esc(c.why)}</span></div>` : ''}
     <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${n.parallel ? `<tr><td>並列数</td><td>${esc(n.parallel)}（同じ実行単位が並列に動く）</td></tr>` : ''}${n.slots ? `<tr><td>同時 Task</td><td>${esc(n.slots)}（例）</td></tr>` : ''}${n.partitions ? `<tr><td>分割数</td><td>${esc(n.partitions)}（例）</td></tr>` : ''}${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
@@ -562,7 +670,10 @@ function referenceDetails() {
   if (!ENTRY.reference) return '';
   const { objectives = [], sources = [] } = M.reference || {};
   const links = sources.filter(source => /^https?:\/\//i.test(source.url));
-  return `${objectives.length ? `<h4>学べること</h4><ul>${objectives.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}
+  const tags = ENTRY.tags || [], ref = ENTRY.reference;
+  return `<div class="ref-meta"><span class="mute">${esc([ref.domain, ref.kind, ref.category].filter(Boolean).join(' › '))}</span>
+    ${tags.length ? `<div class="mtags">${tags.map(t => `<button type="button" class="mtag ${TAG_KIND(t)}" data-tag-only="${esc(t)}" title="このラベルで一覧を絞り込む">${esc(t)}</button>`).join('')}</div>` : ''}</div>
+    ${objectives.length ? `<h4>学べること</h4><ul>${objectives.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}
     ${links.length ? `<h4>公式資料</h4><ul>${links.map(source =>
       `<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a></li>`).join('')}</ul>` : ''}`;
 }
@@ -681,7 +792,7 @@ const SEARCH = [
   ...(M.scenarios || []).map((s, i) => ({ t: 'scenario', id: i, label: s.label, sub: 'シナリオ', key: s.label })),
   ...Object.entries(IDX.byRef).map(([ref, ids]) => ({ t: 'ref', id: ref, label: ref, sub: `→ ${ids.slice(0, 4).join(', ')}${ids.length > 4 ? '…' : ''}`, key: ref, sel: ids.find(x => M.nodes[x]) || ids.map(x => M.links.find(l => l.id === x)?.from).find(Boolean) })),
   // 他のモデルへも検索から移動できる（一覧をたどらずに済む）
-  ...REGISTRY.filter(r => r.id !== KEY).map(r => ({ t: 'model', id: r.id, label: r.name || r.id, sub: r.reference?.category || (r.local ? 'ローカル' : '設計モデル'), key: `${r.name || ''} ${r.id} ${r.reference?.category || ''}` })),
+  ...REGISTRY.filter(r => r.id !== KEY).map(r => ({ t: 'model', id: r.id, label: r.name || r.id, sub: [r.reference?.category, ...(r.tags || [])].filter(Boolean).join('・') || (r.local ? 'ローカル' : '設計モデル'), key: `${r.name || ''} ${r.id} ${r.reference?.domain || ''} ${r.reference?.kind || ''} ${r.reference?.category || ''} ${(r.tags || []).join(' ')}` })),
 ];
 const T_LABEL = { node: '部品', link: '接続', req: '要件', scenario: 'シナリオ', ref: '根拠', model: 'モデル' };
 let qHits = [], qIdx = 0;
@@ -924,6 +1035,12 @@ document.addEventListener('change', e => {
   if (e.target.matches('[data-cmp-only]')) { st.cmpOnly = e.target.checked; draw(); }
 });
 $('model-filter').addEventListener('input', e => filterLibrary(e.target.value));
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tag]'); if (t) return toggleTag(t.dataset.tag);
+  if (e.target.closest('[data-tag-clear]')) { LIB_TAGS.clear(); renderTagFilter(); return filterLibrary(); }
+  const o = e.target.closest('[data-tag-only]');
+  if (o) { $('library').open = true; document.body.classList.remove('nav-closed'); if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open'); toggleTag(o.dataset.tagOnly, true); }
+});
 $('model-filter').addEventListener('keydown', e => {
   if (e.key === 'Enter') { const a = [...document.querySelectorAll('#library .mitem')].find(x => !x.hidden); if (a) location.hash = a.getAttribute('href'); }
   if (e.key === 'Escape') { e.target.value = ''; filterLibrary(''); e.target.blur(); }
@@ -963,6 +1080,13 @@ addEventListener('keydown', e => {
 /* ================= 起動 ================= */
 document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
+/* ドリルダウン：上位の図（parent）があればパンくずで戻れるようにする */
+{
+  let back = M.parent; try { back = JSON.parse(sessionStorage.getItem('ddd.back.' + KEY) || 'null') || back; } catch {}
+  const up = $('mparent'), p = back?.model && REGISTRY.find(r => r.id === back.model);
+  up.hidden = !p;
+  if (p) { up.href = `#/m/${encodeURIComponent(p.id)}/struct${back.node ? '?s=' + encodeURIComponent(back.node) : ''}`; up.textContent = `↑ ${p.name}`; up.title = '上位の図に戻る'; up.onclick = e => { e.preventDefault(); transitionTo(up.getAttribute('href'), 'out'); }; }
+}
 setDimension(st.dimension, false);
 try { if (localStorage.getItem('ddd.libMain')) $('library').open = true; } catch {}
 $('library').addEventListener('toggle', e => {
@@ -970,6 +1094,10 @@ $('library').addEventListener('toggle', e => {
   if (d.dataset?.cat && !$('model-filter').value.trim()) { d.open ? LIB_OPEN.add(d.dataset.cat) : LIB_OPEN.delete(d.dataset.cat); }
   saveLibOpen();
 }, true);
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('a[data-drill]'); if (!a) return;
+  e.preventDefault(); drillInto(a.dataset.drill);
+});
 renderLibrary();
 scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();

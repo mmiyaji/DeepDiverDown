@@ -11,6 +11,7 @@ const CARD_ICONS = {
   cyl: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12a7 3 0 0 0 14 0V6M5 12a7 3 0 0 0 14 0"/>',
   queue: '<path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Zm-9 9 9 4.5 9-4.5M3 16.5l9 4.5 9-4.5"/>',
   person: '<circle cx="12" cy="7" r="3"/><path d="M5 20v-2a7 5 0 0 1 14 0v2Z"/>',
+  slab: '<path d="M3 9h18v6H3zM8 9v6m5-6v6m4-6v6"/>',
   box: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9"/>',
 };
 const overlaps = (a, b, gap = 0) => a.left < b.right + gap && a.right + gap > b.left &&
@@ -19,8 +20,8 @@ const overlaps = (a, b, gap = 0) => a.left < b.right + gap && a.right + gap > b.
 const VIEWS = { iso: [1, 1.05, 1], top: [0, 1, 0.0001], side: [0.05, 0.35, 1], back: [-1, 1.05, -1] };
 
 export class Scene3D {
-  constructor(el, { onPick } = {}) {
-    this.el = el; this.onPick = onPick;
+  constructor(el, { onPick, onDrill } = {}) {
+    this.el = el; this.onPick = onPick; this.onDrill = onDrill;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); // PNG 書き出しのため保持
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     el.appendChild(this.renderer.domElement);
@@ -52,6 +53,12 @@ export class Scene3D {
       this.ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), this.camera);
       const hit = this.ray.intersectObjects(this.pick, false)[0];
       this.onPick?.(hit?.object.userData.id ?? null);
+    });
+    this.renderer.domElement.addEventListener('dblclick', e => {
+      const r = this.renderer.domElement.getBoundingClientRect();
+      this.ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), this.camera);
+      const hit = this.ray.intersectObjects(this.pick, false)[0];
+      if (hit) this.onDrill?.(hit.object.userData.id);
     });
     /* ホバー：部品の上ではカーソルを変え、その部品のラベルを優先して表示する */
     let hoverQueued = null;
@@ -178,6 +185,17 @@ export class Scene3D {
   focusOn(pos, zoom = Math.max(this.camera.zoom, 1.8)) {
     this.fitView = null;
     this.anim = { from: this.controls.target.clone(), to: new THREE.Vector3(...pos), z0: this.camera.zoom, z1: zoom, t0: performance.now() };
+  }
+  /* 部品の中心位置（ワールド座標）。ドリルダウンのズーム演出に使う */
+  nodePos(id) {
+    const m = this.pick.find(p => p.userData.id === id); if (!m) return null;
+    const v = new THREE.Vector3(); m.getWorldPosition(v); return v.toArray();
+  }
+  /* 部品の画面上の位置（0〜1）。CSS のズーム演出の基点に使う */
+  nodeScreen(id) {
+    const p = this.nodePos(id); if (!p) return null;
+    const v = new THREE.Vector3(...p).project(this.camera);
+    return [(v.x + 1) / 2, (1 - v.y) / 2];
   }
   /* 共有リンク用：視点の保存と復元 */
   getView() {
@@ -543,6 +561,12 @@ export class Scene3D {
       }
       top = 0.22;
     }
+    else if (s.shape === 'slab') { // ファイル内の区画：薄い板に区切り線を入れる
+      add(new THREE.BoxGeometry(1.5, 0.2, 0.9), 0.1);
+      const tick = this.edges(new THREE.BoxGeometry(0.001, 0.2, 0.9), this.color('--ink'), 0.5);
+      for (const px of [-0.4, 0, 0.4]) { const t = tick.clone(); t.position.set(px, 0.1, 0); g.add(t); }
+      top = 0.2;
+    }
     else if (s.shape === 'queue') { for (let i = 0; i < 3; i++) add(new THREE.BoxGeometry(0.92, 0.22, 0.92), 0.11 + i * 0.3); top = 0.85; }
     else if (s.shape === 'person') {
       add(new THREE.CylinderGeometry(0.16, 0.28, 0.62, 20), 0.31);
@@ -633,6 +657,7 @@ export class Scene3D {
     if (s.badge) {
       const badge = this.label(s.badge.text, [x, y + top + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]);
       badge.dataset.node = s.id;
+      if (s.badge.tone === 'drill') { badge.title = '詳細図を開く'; badge.addEventListener('click', e => { e.stopPropagation(); this.onDrill?.(s.id); }); }
       // 真上からは高さの差が画面に出ないので、公式アイコンの上に離して配置する。
       if (s.flat && s.icon) badge.style.marginTop = '-16px';
       if (s.opacity < 0.5) badge.style.opacity = 0.4;
@@ -680,6 +705,7 @@ export class Scene3D {
     if (s.badge) {
       const badge = this.label(s.badge.text, [x, y + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]);
       badge.style.marginTop = 'calc(-24px * var(--lbl-scale))';
+      if (s.badge.tone === 'drill') { badge.title = '詳細図を開く'; badge.addEventListener('click', e => { e.stopPropagation(); this.onDrill?.(s.id); }); }
     }
   }
 

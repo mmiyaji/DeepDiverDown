@@ -11,7 +11,7 @@ reference:
     - {"title": "KRaft","url": "https://kafka.apache.org/44/operations/kraft/"}
     - {"title": "Producer Configs","url": "https://kafka.apache.org/44/configuration/producer-configs/"}
 sources: [docs/reference-kafka.md]
-evidence: [{"type": "doc","ref": "docs/reference-kafka.md#§1"}]
+evidence: [{"type": "doc","ref": "docs/reference-kafka.md#§1"},{"type": "doc","ref": "docs/reference-kafka.md#§7"}]
 tiers:
   - {"id": "producer","label": "書き込み側","kind": "origin","z": 0,"origin": [-5,0],"size": [2.5,9]}
   - {"id": "brokers","label": "Kafka クラスタ","z": 0,"size": [8,9]}
@@ -49,16 +49,61 @@ scenarios:
     label: 書き込みから消費まで
     evidence: [{"type": "doc","ref": "docs/reference-kafka.md#§2"},{"type": "doc","ref": "docs/reference-kafka.md#§3"},{"type": "doc","ref": "docs/reference-kafka.md#§4"},{"type": "doc","ref": "docs/reference-kafka.md#§5"}]
     steps:
-      - {"links": ["produce"],"note": "追記。Producer は P0 のリーダーをメタデータから調べ、Broker 1 にイベントを送る。"}
-      - {"links": ["replicate-2","replicate-3"],"note": "複製。フォロワーの Broker 2 と 3 が、リーダーから P0 の新しいログを取り込む。"}
-      - {"links": ["ack"],"note": "応答。acks=all の例では、最小 ISR 数を満たし、ISR が追記を確認すると成功応答が返る。"}
-      - {"links": ["read-p0","read-p1","read-p2"],"note": "消費。Consumer 1 が P0 と P1、Consumer 2 が P2 を取りに行く。図は取得したデータの流れ。"}
-      - {"links": ["commit"],"note": "進捗を保存。Consumer 1 が Group Coordinator に次に読む位置をコミットする。"}
-      - {"links": ["read-p0"],"note": "再読込。ログに残っている範囲なら、Consumer は位置を戻してイベントを読み直せる。"}
+      - {"write": ["seg2-new"], "marks": [{"label": "Consumer 1 の位置", "at": ["seg2-unread", 0], "tone": "consumer"}, {"label": "High Watermark", "at": ["seg2-new", 0], "tone": "hw"}, {"label": "LEO（末尾）", "at": ["seg2-new", 1], "tone": "end"}], "links": ["produce"],"note": "追記。Producer は P0 のリーダーをメタデータから調べ、Broker 1 にイベントを送る。"}
+      - {"write": ["seg2-new"], "links": ["replicate-2","replicate-3"],"note": "複製。フォロワーの Broker 2 と 3 が、リーダーから P0 の新しいログを取り込む。"}
+      - {"marks": [{"label": "Consumer 1 の位置", "at": ["seg2-unread", 0], "tone": "consumer"}, {"label": "High Watermark ＝ LEO", "at": ["seg2-new", 1], "tone": "hw"}], "links": ["ack"],"note": "応答。acks=all の例では、最小 ISR 数を満たし、ISR が追記を確認すると成功応答が返る。"}
+      - {"read": ["seg2-unread", "seg2-new"], "links": ["read-p0","read-p1","read-p2"],"note": "消費。Consumer 1 が P0 と P1、Consumer 2 が P2 を取りに行く。図は取得したデータの流れ。"}
+      - {"marks": [{"label": "コミット済みの位置", "at": ["seg2-new", 1], "tone": "consumer"}, {"label": "High Watermark", "at": ["seg2-new", 1], "tone": "hw"}], "links": ["commit"],"note": "進捗を保存。Consumer 1 が Group Coordinator に次に読む位置をコミットする。"}
+      - {"read": ["seg1-log"], "marks": [{"label": "Consumer 1 を巻き戻した位置", "at": ["seg1-log", 0.35], "tone": "consumer"}, {"label": "High Watermark", "at": ["seg2-new", 1], "tone": "hw"}], "links": ["read-p0"],"note": "再読込。ログに残っている範囲なら、Consumer は位置を戻してイベントを読み直せる。"}
   - id: kafka-failover
+    visual: replicas
     label: Broker 障害とリーダー切り替え
     evidence: [{"type": "doc","ref": "docs/reference-kafka.md#§6"}]
     steps:
-      - {"links": ["produce"],"note": "障害。P0 のリーダーだった Broker 1 が停止する。図は停止直前の書き込み経路を示す。"}
-      - {"links": ["elect"],"note": "選出。KRaft Controller が ISR に残る Broker 2 を P0 の新リーダーに選出する。"}
-      - {"links": ["retry","replicate-after"],"note": "再開。Producer はメタデータを更新して Broker 2 に再送し、Broker 3 が新リーダーからログを取得する。"}
+      - {"blocks": {"b1":[{"id":"b1@1","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 1 の複製）"},{"id":"b2@1","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 1 の複製）"},{"id":"b3@1","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 1 の複製）"},{"id":"b4@1","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 1 の複製）"},{"id":"b5@1","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 1 の複製）"},{"id":"b6@1","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 1 の複製）"}],"b2":[{"id":"b1@2","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 2 の複製）"},{"id":"b2@2","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 2 の複製）"},{"id":"b3@2","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 2 の複製）"},{"id":"b4@2","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 2 の複製）"},{"id":"b5@2","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 2 の複製）"},{"id":"b6@2","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 2 の複製）"}],"b3":[{"id":"b1@3","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 3 の複製）"},{"id":"b2@3","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 3 の複製）"},{"id":"b3@3","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 3 の複製）"},{"id":"b4@3","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 3 の複製）"}]}, "lanes": {"b1":{"tone":"down","sub":"停止"}}, "links": ["produce"],"note": "障害。P0 のリーダーだった Broker 1 が停止する。図は停止直前の書き込み経路を示す。"}
+      - {"blocks": {"b1":[{"id":"b1@1","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 1 の複製）"},{"id":"b2@1","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 1 の複製）"},{"id":"b3@1","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 1 の複製）"},{"id":"b4@1","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 1 の複製）"},{"id":"b5@1","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 1 の複製）"},{"id":"b6@1","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 1 の複製）"}],"b2":[{"id":"b1@2","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 2 の複製）"},{"id":"b2@2","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 2 の複製）"},{"id":"b3@2","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 2 の複製）"},{"id":"b4@2","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 2 の複製）"},{"id":"b5@2","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 2 の複製）"},{"id":"b6@2","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 2 の複製）"}],"b3":[{"id":"b1@3","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 3 の複製）"},{"id":"b2@3","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 3 の複製）"},{"id":"b3@3","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 3 の複製）"},{"id":"b4@3","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 3 の複製）"}]}, "lanes": {"b1":{"tone":"down","sub":"停止"},"b2":{"tone":"new","sub":"新リーダー"}}, "links": ["elect"],"note": "選出。KRaft Controller が ISR に残る Broker 2 を P0 の新リーダーに選出する。"}
+      - {"blocks": {"b1":[{"id":"b1@1","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 1 の複製）"},{"id":"b2@1","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 1 の複製）"},{"id":"b3@1","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 1 の複製）"},{"id":"b4@1","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 1 の複製）"},{"id":"b5@1","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 1 の複製）"},{"id":"b6@1","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 1 の複製）"}],"b2":[{"id":"b1@2","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 2 の複製）"},{"id":"b2@2","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 2 の複製）"},{"id":"b3@2","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 2 の複製）"},{"id":"b4@2","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 2 の複製）"},{"id":"b5@2","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 2 の複製）"},{"id":"b6@2","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 2 の複製）"},{"id":"b7@2","label":"#7","k":4,"note":"P0 のバッチ 7（Broker 2 の複製）"}],"b3":[{"id":"b1@3","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 3 の複製）"},{"id":"b2@3","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 3 の複製）"},{"id":"b3@3","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 3 の複製）"},{"id":"b4@3","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 3 の複製）"},{"id":"b5@3","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 3 の複製）","from":["b5@2"]},{"id":"b6@3","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 3 の複製）","from":["b6@2"]},{"id":"b7@3","label":"#7","k":4,"note":"P0 のバッチ 7（Broker 3 の複製）","from":["b7@2"]}]}, "highlight": ["b7@2","b5@3","b6@3","b7@3"], "lanes": {"b1":{"tone":"down","sub":"停止"},"b2":{"tone":"new","sub":"新リーダー"},"b3":{"sub":"追い付いて ISR に復帰"}}, "links": ["retry","replicate-after"],"note": "再開。Producer はメタデータを更新して Broker 2 に再送し、Broker 3 が新リーダーからログを取得する。"}
+  - {"id":"rebalance","label":"Consumer の追加と離脱（リバランス）","visual":"rebalance","evidence":[{"type":"doc","ref":"docs/reference-kafka.md#§8"}],"steps":[{"blocks":{"c1":[{"id":"p0","label":"P0","k":0,"note":"パーティション 0"},{"id":"p1","label":"P1","k":1,"note":"パーティション 1"},{"id":"p2","label":"P2","k":2,"note":"パーティション 2"}],"c2":[{"id":"p3","label":"P3","k":3,"note":"パーティション 3"},{"id":"p4","label":"P4","k":4,"note":"パーティション 4"},{"id":"p5","label":"P5","k":5,"note":"パーティション 5"}]},"links":["read-p0","read-p1","read-p2"],"note":"2 つの Consumer が 3 パーティションずつ読んでいる。"},{"blocks":{"c1":[{"id":"p0","label":"P0","k":0,"note":"パーティション 0"},{"id":"p1","label":"P1","k":1,"note":"パーティション 1"}],"c2":[{"id":"p3","label":"P3","k":3,"note":"パーティション 3"},{"id":"p4","label":"P4","k":4,"note":"パーティション 4"}],"c3":[{"id":"p2","label":"P2","k":2,"note":"パーティション 2"},{"id":"p5","label":"P5","k":5,"note":"パーティション 5"}]},"highlight":["p2","p5"],"lanes":{"c3":{"tone":"new","sub":"参加"}},"links":["read-p2"],"note":"Consumer 3 が参加すると、Group Coordinator が担当を割り当て直す。協調的リバランスでは P2 と P5 だけが移り、他は読み続ける。"},{"blocks":{"c1":[],"c2":[{"id":"p3","label":"P3","k":3,"note":"パーティション 3"},{"id":"p4","label":"P4","k":4,"note":"パーティション 4"},{"id":"p0","label":"P0","k":0,"note":"パーティション 0"}],"c3":[{"id":"p2","label":"P2","k":2,"note":"パーティション 2"},{"id":"p5","label":"P5","k":5,"note":"パーティション 5"},{"id":"p1","label":"P1","k":1,"note":"パーティション 1"}]},"highlight":["p0","p1"],"lanes":{"c1":{"tone":"down","sub":"離脱"}},"links":["read-p0","read-p1","commit"],"note":"Consumer 1 が停止すると、その担当の P0・P1 が残る 2 つへ移る。新しい担当はコミット済みオフセットから読み始める。"}]}
+fileLayout:
+  file: "orders-0/（パーティション P0 のログ・Broker 1）"
+  note: "パーティションのログはセグメントファイルの並び。帯の幅はバイト数の比率（数値は説明用）。新しいバッチは見やすさのため大きめに描いている。"
+  markers:
+    - {label: "Consumer 1 の位置", at: [seg2-unread, 0], tone: consumer}
+    - {label: "High Watermark ＝ LEO", at: [seg2-new, 0], tone: hw}
+    - {label: "保持期限切れ", at: [seg0, 0.5], tone: retention}
+  segments:
+    - id: seg0
+      label: "Segment …00000000（期限切れ）"
+      kind: expired
+      node: broker-1
+      description: "オフセット 0〜1,048,575。閉じたセグメントで、retention.ms（既定 7 日）を過ぎたため、セグメントごとまとめて削除される。"
+      children:
+        - {id: seg0-log, label: .log（レコードバッチ）, bytes: 1073741824, kind: log, node: broker-1, description: "レコードバッチを追記順に並べた本体。"}
+        - {id: seg0-index, label: .index, bytes: 1258291, kind: index, node: broker-1, description: "オフセット → .log 内の位置の疎な索引。指定オフセットから読むときに使う。", sample: "offset 1048576 → position 0\noffset 1052672 → position 4194304\noffset 1056768 → position 8392011\n…（約 4 KB ごとに 1 件）"}
+        - {id: seg0-time, label: .timeindex, bytes: 1887437, kind: index, node: broker-1, description: "タイムスタンプ → オフセットの索引。時刻を指定した巻き戻しや、時間による保持期限の判定に使う。"}
+    - id: seg1
+      label: "Segment …01048576"
+      kind: log
+      node: broker-1
+      description: "オフセット 1,048,576〜2,097,151。segment.bytes（既定 1 GiB）に達して閉じたセグメント。以後は読み取り専用。"
+      children:
+        - {id: seg1-log, label: .log（レコードバッチ）, bytes: 1073741824, kind: log, node: broker-1, description: "レコードバッチを追記順に並べた本体。"}
+        - {id: seg1-index, label: .index, bytes: 1258291, kind: index, node: broker-1, description: "オフセット → .log 内の位置の疎な索引。指定オフセットから読むときに使う。", sample: "offset 1048576 → position 0\noffset 1052672 → position 4194304\noffset 1056768 → position 8392011\n…（約 4 KB ごとに 1 件）"}
+        - {id: seg1-time, label: .timeindex, bytes: 1887437, kind: index, node: broker-1, description: "タイムスタンプ → オフセットの索引。時刻を指定した巻き戻しや、時間による保持期限の判定に使う。"}
+    - id: seg2
+      label: "Segment …02097152（アクティブ）"
+      kind: active
+      node: broker-1
+      description: "現在追記中のセグメント。末尾（LEO）に新しいバッチが付く。ファイル名は先頭オフセット（20 桁）。"
+      children:
+        - id: seg2-log
+          label: .log（追記中）
+          kind: active
+          node: broker-1
+          children:
+            - {id: seg2-read, label: 既読, bytes: 629145600, kind: log, node: broker-1, description: "Consumer Group がコミット済みの範囲。ログからは消えず、保持期限まで残る。"}
+            - {id: seg2-unread, label: 未読, bytes: 125829120, kind: log, node: consumer-1, description: "コミット済みの位置から High Watermark までの、まだ読まれていない範囲（コンシューマーラグ）。"}
+            - {id: seg2-new, label: 新しいバッチ, bytes: 25165824, kind: new, node: producer, description: "Producer が今追記したレコードバッチ。全 ISR に複製されて High Watermark を越えるまで、Consumer からは見えない。", sample: "RecordBatch {\n  baseOffset: 2,866,112, records: 512\n  producerId: 4001, producerEpoch: 0, baseSequence: 1536\n  compression: zstd, timestamps: 2026-11-23T10:15:02.118Z …\n}"}
+        - {id: seg2-index, label: .index, bytes: 1258291, kind: index, node: broker-1, description: "オフセット → .log 内の位置の疎な索引。指定オフセットから読むときに使う。", sample: "offset 1048576 → position 0\noffset 1052672 → position 4194304\noffset 1056768 → position 8392011\n…（約 4 KB ごとに 1 件）"}
+        - {id: seg2-time, label: .timeindex, bytes: 1887437, kind: index, node: broker-1, description: "タイムスタンプ → オフセットの索引。時刻を指定した巻き戻しや、時間による保持期限の判定に使う。"}
+blocks: [{"id":"rebalance","title":"Consumer Group のパーティション担当","legend":{},"note":"6 パーティションの Topic を同じ Consumer Group で読む例。","lanes":[{"id":"c1","label":"Consumer 1","node":"consumer-1"},{"id":"c2","label":"Consumer 2","node":"consumer-2"},{"id":"c3","label":"Consumer 3","node":"consumer-2","optional":true}],"items":{"c1":[{"id":"p0","label":"P0","k":0,"note":"パーティション 0"},{"id":"p1","label":"P1","k":1,"note":"パーティション 1"},{"id":"p2","label":"P2","k":2,"note":"パーティション 2"}],"c2":[{"id":"p3","label":"P3","k":3,"note":"パーティション 3"},{"id":"p4","label":"P4","k":4,"note":"パーティション 4"},{"id":"p5","label":"P5","k":5,"note":"パーティション 5"}]}},{"id":"replicas","title":"P0 の複製（各 Broker のログ）","legend":{"0":"複製済みのバッチ","4":"新リーダーが受けたバッチ"},"note":"Broker 3 は遅れていて ISR から外れている例。数値は説明用。","lanes":[{"id":"b1","label":"Broker 1","sub":"リーダー","node":"broker-1"},{"id":"b2","label":"Broker 2","sub":"フォロワー（ISR）","node":"broker-2"},{"id":"b3","label":"Broker 3","sub":"フォロワー（遅れ・ISR 外）","node":"broker-3"}],"items":{"b1":[{"id":"b1@1","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 1 の複製）"},{"id":"b2@1","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 1 の複製）"},{"id":"b3@1","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 1 の複製）"},{"id":"b4@1","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 1 の複製）"},{"id":"b5@1","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 1 の複製）"},{"id":"b6@1","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 1 の複製）"}],"b2":[{"id":"b1@2","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 2 の複製）"},{"id":"b2@2","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 2 の複製）"},{"id":"b3@2","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 2 の複製）"},{"id":"b4@2","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 2 の複製）"},{"id":"b5@2","label":"#5","k":0,"note":"P0 のバッチ 5（Broker 2 の複製）"},{"id":"b6@2","label":"#6","k":0,"note":"P0 のバッチ 6（Broker 2 の複製）"}],"b3":[{"id":"b1@3","label":"#1","k":0,"note":"P0 のバッチ 1（Broker 3 の複製）"},{"id":"b2@3","label":"#2","k":0,"note":"P0 のバッチ 2（Broker 3 の複製）"},{"id":"b3@3","label":"#3","k":0,"note":"P0 のバッチ 3（Broker 3 の複製）"},{"id":"b4@3","label":"#4","k":0,"note":"P0 のバッチ 4（Broker 3 の複製）"}]}}]

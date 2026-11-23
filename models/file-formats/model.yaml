@@ -23,9 +23,9 @@ nodes:
   engine: {label: Query Engine, kind: worker, tier: compute, x: 10, y: 1.5, parallel: N, slots: 4, description: Parquet・ORC をフッターと統計で絞って並列に読む。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}, {type: doc, ref: "docs/reference-file-formats.md#§4"}]}
   dataframe: {label: DataFrame / Python, kind: service, tier: compute, x: 14, y: 1.5, description: Pandas・Polars・DuckDB など Arrow で受け取る処理系。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
   csv: {label: CSV / JSON Lines, kind: db, tier: row, x: 1, y: 1.5, description: "スキーマ・統計なしのテキスト。ファイル全体の gzip は分割できない。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
-  avro: {label: Avro, kind: db, tier: row, x: 5, y: 1.5, partitions: 4, description: "ヘッダーにスキーマ、ブロックごとに圧縮、16 バイトの同期マーカーで分割可能。スキーマ進化に強い。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
-  parquet: {label: Parquet, kind: db, shape3D: crate, tier: col, x: 2, y: 1.5, partitions: 4, description: "Row Group → 列チャンク → ページ。末尾フッターに位置と統計、ページ索引・ブルームフィルターも持てる。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}]}
-  orc: {label: ORC, kind: db, shape3D: crate, tier: col, x: 7, y: 1.5, partitions: 4, description: "Stripe → Index/Row Data。ファイル・Stripe・10,000 行ごとの 3 段の統計。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§4"}]}
+  avro: {drill: avro-internals, label: Avro, kind: db, tier: row, x: 5, y: 1.5, partitions: 4, description: "ヘッダーにスキーマ、ブロックごとに圧縮、16 バイトの同期マーカーで分割可能。スキーマ進化に強い。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
+  parquet: {drill: parquet-internals, label: Parquet, kind: db, shape3D: crate, tier: col, x: 2, y: 1.5, partitions: 4, description: "Row Group → 列チャンク → ページ。末尾フッターに位置と統計、ページ索引・ブルームフィルターも持てる。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}]}
+  orc: {drill: orc-internals, label: ORC, kind: db, shape3D: crate, tier: col, x: 7, y: 1.5, partitions: 4, description: "Stripe → Index/Row Data。ファイル・Stripe・10,000 行ごとの 3 段の統計。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§4"}]}
   arrow: {label: Arrow IPC / Feather, kind: cache, tier: col, x: 12, y: 1.5, description: メモリ配置そのままの列指向。デコード不要・ゼロコピーで処理系間を受け渡す。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
 links:
   - {id: land-csv, from: source, to: csv, label: テキストで着地, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}

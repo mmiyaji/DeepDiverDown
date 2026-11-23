@@ -1,0 +1,252 @@
+{
+  "model": "parquet-internals",
+  "name": "Parquet ファイルの内部：フッターからページまで",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "reader": {
+      "type": "node",
+      "label": "Parquet Reader",
+      "status": "claim"
+    },
+    "decoder": {
+      "type": "node",
+      "label": "Decompress / Decode",
+      "status": "claim"
+    },
+    "magic": {
+      "type": "node",
+      "label": "Header \"PAR1\"",
+      "status": "claim"
+    },
+    "rowgroup": {
+      "type": "node",
+      "label": "Row Groups",
+      "status": "claim"
+    },
+    "colchunk": {
+      "type": "node",
+      "label": "Column Chunks",
+      "status": "claim"
+    },
+    "indexes": {
+      "type": "node",
+      "label": "Bloom / Column / Offset Index",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "node",
+      "label": "Footer (FileMetaData)",
+      "status": "claim"
+    },
+    "tail": {
+      "type": "node",
+      "label": "Footer length + \"PAR1\"",
+      "status": "claim"
+    },
+    "dictpage": {
+      "type": "node",
+      "label": "Dictionary Page",
+      "status": "claim"
+    },
+    "datapage": {
+      "type": "node",
+      "label": "Data Pages",
+      "status": "claim"
+    },
+    "read-tail": {
+      "type": "link",
+      "label": "Parquet Reader → Footer length + \"PAR1\"",
+      "status": "claim"
+    },
+    "read-footer": {
+      "type": "link",
+      "label": "Parquet Reader → Footer (FileMetaData)",
+      "status": "claim"
+    },
+    "prune-rg": {
+      "type": "link",
+      "label": "Footer (FileMetaData) → Row Groups",
+      "status": "claim"
+    },
+    "read-index": {
+      "type": "link",
+      "label": "Parquet Reader → Bloom / Column / Offset Index",
+      "status": "claim"
+    },
+    "select-chunk": {
+      "type": "link",
+      "label": "Row Groups → Column Chunks",
+      "status": "claim"
+    },
+    "fetch-chunk": {
+      "type": "link",
+      "label": "Parquet Reader → Column Chunks",
+      "status": "claim"
+    },
+    "chunk-dict": {
+      "type": "link",
+      "label": "Column Chunks → Dictionary Page",
+      "status": "claim"
+    },
+    "chunk-data": {
+      "type": "link",
+      "label": "Column Chunks → Data Pages",
+      "status": "claim"
+    },
+    "decode": {
+      "type": "link",
+      "label": "Decompress / Decode → Data Pages",
+      "status": "claim"
+    },
+    "dict-lookup": {
+      "type": "link",
+      "label": "Decompress / Decode → Dictionary Page",
+      "status": "claim"
+    },
+    "to-decoder": {
+      "type": "link",
+      "label": "Parquet Reader → Decompress / Decode",
+      "status": "claim"
+    },
+    "open-file": {
+      "type": "scenario",
+      "label": "ファイルを開く（フッターを読む）"
+    },
+    "prune-and-read": {
+      "type": "scenario",
+      "label": "Row Group とページを絞って読む"
+    },
+    "point-lookup": {
+      "type": "scenario",
+      "label": "ID の等値検索（ブルームフィルター）"
+    },
+    "PQ-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "末尾から読む",
+      "status": "claim"
+    },
+    "PQ-02": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "適切な単位サイズ",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "書き手のバージョン、ページ索引とブルームフィルターの有無、Row Group とページのサイズは未確定。"
+    }
+  },
+  "byRef": {
+    "docs/reference-parquet-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-parquet-internals.md": [
+      "model",
+      "reader",
+      "decoder",
+      "magic",
+      "rowgroup",
+      "colchunk",
+      "indexes",
+      "footer",
+      "tail",
+      "dictpage",
+      "datapage",
+      "read-tail",
+      "read-footer",
+      "prune-rg",
+      "read-index",
+      "select-chunk",
+      "fetch-chunk",
+      "chunk-dict",
+      "chunk-data",
+      "decode",
+      "dict-lookup",
+      "to-decoder",
+      "open-file",
+      "prune-and-read",
+      "point-lookup",
+      "PQ-01",
+      "PQ-02"
+    ],
+    "docs/reference-parquet-internals.md#§6": [
+      "model",
+      "datapage",
+      "decode"
+    ],
+    "docs/reference-parquet-internals.md#§7": [
+      "model",
+      "rowgroup",
+      "PQ-02"
+    ],
+    "docs/reference-parquet-internals.md#§4": [
+      "reader",
+      "colchunk",
+      "indexes",
+      "tail",
+      "read-tail",
+      "read-footer",
+      "prune-rg",
+      "read-index",
+      "select-chunk",
+      "fetch-chunk",
+      "to-decoder",
+      "prune-and-read",
+      "point-lookup",
+      "PQ-01"
+    ],
+    "docs/reference-parquet-internals.md#§5": [
+      "decoder",
+      "dictpage",
+      "datapage",
+      "chunk-dict",
+      "chunk-data",
+      "decode",
+      "dict-lookup"
+    ],
+    "docs/reference-parquet-internals.md#§2": [
+      "magic",
+      "rowgroup",
+      "tail"
+    ],
+    "docs/reference-parquet-internals.md#§3": [
+      "footer",
+      "read-footer"
+    ],
+    "docs/reference-parquet-internals.md#§8": [
+      "open-file"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 28,
+    "objectives": [
+      "Parquet のバイト配置（先頭マジック、Row Group、索引、フッター、フッター長、末尾マジック）を説明する。",
+      "末尾からフッターを読み、統計・ブルームフィルター・ページ索引で読む範囲を絞る順序を追う。",
+      "列チャンクのページ構造（辞書ページ、データページ、レベル）と解凍・デコードを理解する。",
+      "ファイル・Row Group・ページのサイズが読み取りに与える影響を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Parquet File Format",
+        "url": "https://parquet.apache.org/docs/file-format/"
+      },
+      {
+        "title": "Parquet Page Index",
+        "url": "https://parquet.apache.org/docs/file-format/pageindex/"
+      },
+      {
+        "title": "Parquet Bloom Filter",
+        "url": "https://parquet.apache.org/docs/file-format/bloomfilter/"
+      },
+      {
+        "title": "Parquet Data Pages",
+        "url": "https://parquet.apache.org/docs/file-format/data-pages/"
+      }
+    ]
+  }
+}

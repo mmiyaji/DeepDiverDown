@@ -1,0 +1,186 @@
+{
+  "model": "orc-internals",
+  "name": "ORC ファイルの内部：Postscript から Stream まで",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "reader": {
+      "type": "node",
+      "label": "ORC Reader",
+      "status": "claim"
+    },
+    "magic": {
+      "type": "node",
+      "label": "Header \"ORC\"",
+      "status": "claim"
+    },
+    "stripes": {
+      "type": "node",
+      "label": "Stripes",
+      "status": "claim"
+    },
+    "metadata": {
+      "type": "node",
+      "label": "Metadata（Stripe 統計）",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "node",
+      "label": "File Footer",
+      "status": "claim"
+    },
+    "postscript": {
+      "type": "node",
+      "label": "Postscript + 長さ",
+      "status": "claim"
+    },
+    "index": {
+      "type": "node",
+      "label": "Index Data（Row Index）",
+      "status": "claim"
+    },
+    "streams": {
+      "type": "node",
+      "label": "Row Data（Streams）",
+      "status": "claim"
+    },
+    "sfooter": {
+      "type": "node",
+      "label": "Stripe Footer",
+      "status": "claim"
+    },
+    "read-ps": {
+      "type": "link",
+      "label": "ORC Reader → Postscript + 長さ",
+      "status": "claim"
+    },
+    "read-footer": {
+      "type": "link",
+      "label": "ORC Reader → File Footer",
+      "status": "claim"
+    },
+    "read-meta": {
+      "type": "link",
+      "label": "ORC Reader → Metadata（Stripe 統計）",
+      "status": "claim"
+    },
+    "skip-stripe": {
+      "type": "link",
+      "label": "Metadata（Stripe 統計） → Stripes",
+      "status": "claim"
+    },
+    "read-sfooter": {
+      "type": "link",
+      "label": "ORC Reader → Stripe Footer",
+      "status": "claim"
+    },
+    "read-index": {
+      "type": "link",
+      "label": "ORC Reader → Index Data（Row Index）",
+      "status": "claim"
+    },
+    "read-streams": {
+      "type": "link",
+      "label": "ORC Reader → Row Data（Streams）",
+      "status": "claim"
+    },
+    "open-orc": {
+      "type": "scenario",
+      "label": "ORC ファイルを開く"
+    },
+    "orc-predicate": {
+      "type": "scenario",
+      "label": "Stripe と行グループを絞って読む"
+    },
+    "ORC-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "末尾から読む",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "書き手の版、Stripe サイズ、ブルームフィルターの有無、圧縮方式は未確定。"
+    }
+  },
+  "byRef": {
+    "docs/reference-orc-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-orc-internals.md": [
+      "model",
+      "reader",
+      "magic",
+      "stripes",
+      "metadata",
+      "footer",
+      "postscript",
+      "index",
+      "streams",
+      "sfooter",
+      "read-ps",
+      "read-footer",
+      "read-meta",
+      "skip-stripe",
+      "read-sfooter",
+      "read-index",
+      "read-streams",
+      "open-orc",
+      "orc-predicate",
+      "ORC-01"
+    ],
+    "docs/reference-orc-internals.md#§5": [
+      "model"
+    ],
+    "docs/reference-orc-internals.md#§3": [
+      "reader",
+      "metadata",
+      "postscript",
+      "index",
+      "read-ps",
+      "read-footer",
+      "read-meta",
+      "skip-stripe",
+      "read-sfooter",
+      "read-index",
+      "orc-predicate",
+      "ORC-01"
+    ],
+    "docs/reference-orc-internals.md#§2": [
+      "magic",
+      "stripes",
+      "footer",
+      "postscript",
+      "sfooter"
+    ],
+    "docs/reference-orc-internals.md#§4": [
+      "streams",
+      "read-streams"
+    ],
+    "docs/reference-orc-internals.md#§6": [
+      "open-orc"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 29,
+    "objectives": [
+      "ORC のバイト配置（マジック、Stripe、Metadata、File Footer、Postscript、最後の 1 バイト）を説明する。",
+      "Postscript → フッター → Stripe 統計 → Row Index の順に読む範囲を絞る流れを追う。",
+      "列を役割ごとの Stream（PRESENT／DATA／LENGTH／DICTIONARY_DATA）に分けて保存する仕組みを理解する。",
+      "Parquet との構造の違いを比べる。"
+    ],
+    "sources": [
+      {
+        "title": "ORC Specification v1",
+        "url": "https://orc.apache.org/specification/ORCv1/"
+      },
+      {
+        "title": "ORC Indexes",
+        "url": "https://orc.apache.org/docs/indexes.html"
+      }
+    ]
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "model": "iceberg-catalog-read",
+  "name": "Iceberg カタログ経由の読み取り：カタログからページまで",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "coordinator": {
+      "type": "node",
+      "label": "Coordinator",
+      "status": "claim"
+    },
+    "worker": {
+      "type": "node",
+      "label": "Worker",
+      "status": "claim"
+    },
+    "rest": {
+      "type": "node",
+      "label": "REST Catalog",
+      "status": "claim"
+    },
+    "creds": {
+      "type": "node",
+      "label": "Vended Credentials",
+      "status": "claim"
+    },
+    "metajson": {
+      "type": "node",
+      "label": "metadata.json",
+      "status": "claim"
+    },
+    "mlist": {
+      "type": "node",
+      "label": "Manifest List (Avro)",
+      "status": "claim"
+    },
+    "manifest": {
+      "type": "node",
+      "label": "Manifests (Avro)",
+      "status": "claim"
+    },
+    "data": {
+      "type": "node",
+      "label": "Data Files (Parquet)",
+      "status": "claim"
+    },
+    "deletes": {
+      "type": "node",
+      "label": "Delete Files",
+      "status": "claim"
+    },
+    "load-table": {
+      "type": "link",
+      "label": "Coordinator → REST Catalog",
+      "status": "claim"
+    },
+    "vend": {
+      "type": "link",
+      "label": "REST Catalog → Vended Credentials",
+      "status": "claim"
+    },
+    "pointer": {
+      "type": "link",
+      "label": "REST Catalog → metadata.json",
+      "status": "claim"
+    },
+    "read-meta": {
+      "type": "link",
+      "label": "Coordinator → metadata.json",
+      "status": "claim"
+    },
+    "read-mlist": {
+      "type": "link",
+      "label": "Coordinator → Manifest List (Avro)",
+      "status": "claim"
+    },
+    "read-manifest": {
+      "type": "link",
+      "label": "Coordinator → Manifests (Avro)",
+      "status": "claim"
+    },
+    "dispatch": {
+      "type": "link",
+      "label": "Coordinator → Worker",
+      "status": "claim"
+    },
+    "use-creds": {
+      "type": "link",
+      "label": "Worker → Vended Credentials",
+      "status": "claim"
+    },
+    "read-parquet": {
+      "type": "link",
+      "label": "Worker → Data Files (Parquet)",
+      "status": "claim"
+    },
+    "read-deletes": {
+      "type": "link",
+      "label": "Worker → Delete Files",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "REST Catalog → metadata.json",
+      "status": "claim"
+    },
+    "catalog-to-page": {
+      "type": "scenario",
+      "label": "カタログからページまで読む"
+    },
+    "vended-credentials": {
+      "type": "scenario",
+      "label": "一時資格情報で読む"
+    },
+    "concurrent-commit": {
+      "type": "scenario",
+      "label": "読み取り中に書き手がコミットする"
+    },
+    "CR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "カタログはポインタだけ",
+      "status": "claim"
+    },
+    "CR-02": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "最小権限の読み取り",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実際のカタログ実装、認証方式、資格情報の委任とサーバー側スキャン計画への対応は未確定。"
+    }
+  },
+  "byRef": {
+    "docs/reference-iceberg-catalog-read.md#§1": [
+      "model"
+    ],
+    "docs/reference-iceberg-catalog-read.md": [
+      "model",
+      "coordinator",
+      "worker",
+      "rest",
+      "creds",
+      "metajson",
+      "mlist",
+      "manifest",
+      "data",
+      "deletes",
+      "load-table",
+      "vend",
+      "pointer",
+      "read-meta",
+      "read-mlist",
+      "read-manifest",
+      "dispatch",
+      "use-creds",
+      "read-parquet",
+      "read-deletes",
+      "commit",
+      "catalog-to-page",
+      "vended-credentials",
+      "concurrent-commit",
+      "CR-01",
+      "CR-02"
+    ],
+    "docs/reference-iceberg-catalog-read.md#§4": [
+      "model"
+    ],
+    "docs/reference-iceberg-catalog-read.md#§3": [
+      "coordinator",
+      "worker",
+      "metajson",
+      "mlist",
+      "manifest",
+      "data",
+      "deletes",
+      "read-meta",
+      "read-mlist",
+      "read-manifest",
+      "dispatch",
+      "read-parquet",
+      "read-deletes"
+    ],
+    "docs/reference-iceberg-catalog-read.md#§2": [
+      "rest",
+      "creds",
+      "load-table",
+      "vend",
+      "pointer",
+      "use-creds",
+      "vended-credentials",
+      "CR-01",
+      "CR-02"
+    ],
+    "docs/reference-iceberg-catalog-read.md#§5": [
+      "commit",
+      "concurrent-commit"
+    ],
+    "docs/reference-iceberg-catalog-read.md#§6": [
+      "catalog-to-page"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 26,
+    "objectives": [
+      "カタログが持つもの（現在の metadata.json へのポインタ）と持たないもの（データ・Manifest）を区別する。",
+      "loadTable からスナップショット選択、Manifest List・Manifest のプルーニング、Parquet の範囲 GET までを順に追う。",
+      "一時資格情報（credential vending）とキャッシュが読み取りに与える影響を理解する。",
+      "読み取り中のコミットとスナップショット分離の関係を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Iceberg REST Catalog Spec",
+        "url": "https://iceberg.apache.org/rest-catalog-spec/"
+      },
+      {
+        "title": "Iceberg REST Catalog OpenAPI",
+        "url": "https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml"
+      },
+      {
+        "title": "Iceberg Catalogs",
+        "url": "https://iceberg.apache.org/docs/latest/catalogs/"
+      },
+      {
+        "title": "Apache Iceberg Specification",
+        "url": "https://iceberg.apache.org/spec/"
+      }
+    ]
+  }
+}

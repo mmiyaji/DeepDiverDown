@@ -65,3 +65,7 @@ BigQuery は `PARTITION BY` と `CLUSTER BY` を組み合わせ、パーティ�
 - 保存時のソート／クラスタリングと、クエリの `ORDER BY` の意味を分けて説明できる。
 - `order_date` のパーティション・プルーニングと `customer_id` のブロック／ファイル・スキップを、異なる最適化として追跡できる。
 - 最適化後も残ったデータをスキャンし、必要なら結果を並べ替えるという実行の境界を説明できる。
+
+## 8. 保存順序の書き直し（sort rewrite）
+
+ランダムな順で書かれたファイルは、どのファイルも customer_id の最小値〜最大値がほぼ全範囲になり、統計で 1 つも除外できない。テーブル形式の sort rewrite（Iceberg の `rewrite_data_files` の sort 戦略、Delta Lake の Z-order など）で customer_id の順に並べ替えて書き直すと、各ファイルの範囲が狭くなり、customer_id = 42 を含むファイルだけを読めばよくなる。書き直しは読み取りとは別の保守作業で、計算とストレージ書き込みの費用がかかる。出典 [Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)

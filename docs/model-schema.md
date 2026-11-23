@@ -201,3 +201,60 @@ groups:
 | `slots` | 上面に小さな立方体を並べ、同時に走る Task を示す。部品の下に「同時 N Task」 |
 | `partitions` | データストアを分割数の段（帯）で描く。部品の下に「N 分割」 |
 | `groups` の `kind: parallel` | 並列に動く部品群を、色付きの破線の枠と淡い塗りで囲む（範囲は部品から自動計算） |
+
+## ドリルダウン（drill / parent）
+
+- 部品に `drill: <モデルID>` を書くと、その部品の内部構造を表す別モデルへ移れる。図にバッジ「▼ 詳細図」が付き、詳細パネルのボタンか、部品のダブルクリックで開く。
+- モデルに `parent: {model: <モデルID>, node: <部品ID>}` を書くと、ヘッダーに「↑ 上位の図」のパンくずが出て、上位の図のその部品を選んだ状態で戻れる。
+- 例：物理ファイルフォーマットの Parquet → Parquet ファイルの内部、Iceberg 分散スキャンの metadata.json → Iceberg カタログ経由の読み取り → Data Files → Parquet ファイルの内部。
+
+## ファイルの解剖図（fileLayout）と区画（kind: segment）
+
+- 部品の `kind: segment` は、ファイル内の区画（ヘッダー、Row Group、ページ、フッターなど）を表す。3D では薄い板、2D では帯のアイコンで描き、単一障害点の指摘の対象外になる。
+- モデルの `fileLayout` は 1 つの物理ファイルを、バイト順・大きさの比率どおりの帯で描く。
+  - `file`：ファイル名、`note`：注記
+  - `segments[]`：`id`、`label`、`bytes`（省略すると子の合計）、`kind`（magic / header / rowgroup / chunk / dict / page / index / footer で色分け）、`node`（対応する部品の ID。選ぶと図の部品も選ばれる）、`description`、`sample`（中身の例）、`children`（入れ子の区画）
+- シナリオのステップに `read: [区画 ID]` を書くと、再生中にその範囲が帯の上で光る。読んだバイト数と全体に占める割合を表示し、最後のステップでは読まなかった範囲を灰色にする。
+
+### 書き込みと位置の印（fileLayout の拡張）
+
+- ステップの `write: [区画 ID]` は書き込み中の範囲をアクセント色で光らせる。
+- `markers`（モデル）とステップの `marks` は、帯の上の位置の印。`[{label, at, tone}]` の形で書き、`at` はバイト数か `[区画 ID, 区画内の割合]`。`tone` は end／hw／consumer／retention／pos。ステップでは最新の `marks` を使う。
+- 例：Kafka のパーティションログで、LEO・High Watermark・Consumer の位置を示す。
+
+## メタデータの木（treeLayout）
+
+- `treeLayout: {title, unit, levels, note, root}` で、左から右へ枝分かれする木を描く。各ノードは `id`・`label`・`kind`（meta／snapshot／list／manifest／data／delete）・`node`・`sub`・`description`・`sample`・`children`。
+- ステップの `prune: [ID]` はその枝を除外（そのステップでは取り消し線、以後は灰色）、`read: [ID]` は読む葉を光らせる。除外した葉の件数を表示する。
+
+## 分布（distribution）
+
+- `distribution: {title, unit, maxNote, scaleMax, note, bars}` で棒グラフを描き、中央値と最大値の線、最大÷中央値の倍率を表示する。
+- ステップの `highlight: [ID]` は棒を強調し、`bars: [...]` は分布を差し替える（例：AQE によるパーティション分割の前後）。`scaleMax` を書くと縦軸を固定して前後を比べやすくする。
+
+- 分布に `summary: files` と `target`（目標サイズ）を書くと、ファイルサイズの集計（個数・合計・目標未満の個数）と目標線を表示する（コンパクションの前後比較）。
+
+## 表（grid）
+
+- `grid: {title, rowLabel, colLabel, unit, node, rows, cols, values, cellNote, note}` で、行×列のマス目（パーティション×保存ブロックなど）を描く。値の大きさで濃淡を付ける。
+- ステップの `prune` / `read` は `row:行ID`、`col:列ID`、`行ID:列ID` で指定する。除外したマスと読むデータ量の割合を表示する。
+
+## タイムライン（timeline）
+
+- `timeline: {title, current, note, commits: [{id, label, time, kind, node, description, sample}]}` で、コミット（スナップショット）を時間順に並べる。`kind` は append／overwrite／delete／compact。
+- ステップの `current`（現在の版）、`travel`（時点指定で読む版）、`expire`（失効した版）、`highlight` を反映する。
+
+- 分布の棒に `from: [元の棒の ID]` を書くと、ステップの切り替えで動きが付く。複数を指定すると元の棒が飛んできて積み重なり 1 本にまとまり（結合）、1 本を指定すると元の棒から切り出されて移動する（分割）。同じ ID の棒は新しい位置へ滑る。前のステップに戻ると逆向きに動く。OS の「視差効果を減らす」設定では動かさない。
+
+## ブロックの移動（blocks）と見取り図のタブ
+
+- `blocks`（1 つ、または配列）で、箱（Worker・Consumer・ノード・層など）の間をデータの塊が動く図を描く。`{id, title, note, unit, legend: {色番号: 説明}, lanes: [{id, label, sub, node, optional}], items: {箱 ID: [塊]}}`。塊は `{id, label, k（色 0〜7）, w（幅）, from, note}`。
+- ステップの `blocks: {箱 ID: [塊]}` で配置を差し替える。同じ ID の塊は新しい箱へ移動し、`from` が複数なら元の塊が飛んできて 1 つに結合、元が残っていれば複製、元が消えれば分割として動く。消えた塊はその場で沈んで消える。前のステップに戻ると逆向きに動く。
+- ステップの `lanes: {箱 ID: {label, sub, tone}}` で箱の見出しや状態（tone: down／new／cold）を変え、`highlight` で塊を強調する。`optional: true` の箱は塊が入ったときだけ表示する。
+- 見取り図が複数あるモデルでは、図の下の欄にタブが出る。シナリオに `visual: <見取り図の ID>`（file／tree／distribution／grid／timeline、または blocks の id）を書くと、再生時にその見取り図へ切り替わる。
+
+## リファレンスの階層とラベル（registry.json）
+
+- `reference.domain`（領域：データ基盤／コンテナ基盤）、`reference.kind`（種別：製品・技術のアーキテクチャ／仕組みの深掘り／設計パターン・ユースケース）、`reference.category`（分類）、`reference.order` でサイドバーの階層と並びを決める。
+- `reference.detailOf: <親のモデル ID>` を書いた詳細図は、親の直後に字下げして並ぶ。
+- `tags` は検索・絞り込み用のラベル。提供形態（OSS／商用サービス／クラウドマネージド／商用製品／ソース公開（BSL）／商用サービスあり／仕様／概念／パターン）と、提供元・団体（Apache、CNCF、AWS など）を書く。サイドバーのラベルを押すと絞り込み（複数はすべてを持つもの）、ヘッダーの検索もラベルで引ける。
