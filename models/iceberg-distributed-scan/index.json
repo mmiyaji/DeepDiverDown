@@ -1,0 +1,257 @@
+{
+  "model": "iceberg-distributed-scan",
+  "name": "Iceberg の分散スキャン：データ分散とファイル取得",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "analyst": {
+      "type": "node",
+      "label": "Analyst / SQL",
+      "status": "claim"
+    },
+    "planner": {
+      "type": "node",
+      "label": "Coordinator / Planner",
+      "status": "claim"
+    },
+    "splits": {
+      "type": "node",
+      "label": "Split Queue",
+      "status": "claim"
+    },
+    "worker": {
+      "type": "node",
+      "label": "Worker",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "Parquet Reader",
+      "status": "claim"
+    },
+    "mlist": {
+      "type": "node",
+      "label": "Manifest List",
+      "status": "claim"
+    },
+    "manifest": {
+      "type": "node",
+      "label": "Manifests",
+      "status": "claim"
+    },
+    "deletes": {
+      "type": "node",
+      "label": "Delete Files",
+      "status": "claim"
+    },
+    "data": {
+      "type": "node",
+      "label": "Data Files (Parquet)",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "Analyst / SQL → Coordinator / Planner",
+      "status": "claim"
+    },
+    "prune-mlist": {
+      "type": "link",
+      "label": "Coordinator / Planner → Manifest List",
+      "status": "claim"
+    },
+    "prune-manifest": {
+      "type": "link",
+      "label": "Coordinator / Planner → Manifests",
+      "status": "claim"
+    },
+    "attach-deletes": {
+      "type": "link",
+      "label": "Coordinator / Planner → Delete Files",
+      "status": "claim"
+    },
+    "plan-splits": {
+      "type": "link",
+      "label": "Coordinator / Planner → Split Queue",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "Split Queue → Worker",
+      "status": "claim"
+    },
+    "open": {
+      "type": "link",
+      "label": "Worker → Parquet Reader",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "link",
+      "label": "Parquet Reader → Data Files (Parquet)",
+      "status": "claim"
+    },
+    "chunks": {
+      "type": "link",
+      "label": "Parquet Reader → Data Files (Parquet)",
+      "status": "claim"
+    },
+    "apply-deletes": {
+      "type": "link",
+      "label": "Worker → Delete Files",
+      "status": "claim"
+    },
+    "result": {
+      "type": "link",
+      "label": "Worker → Analyst / SQL",
+      "status": "claim"
+    },
+    "pruned-scan": {
+      "type": "scenario",
+      "label": "日付とユーザーで絞って検索する"
+    },
+    "delete-merge": {
+      "type": "scenario",
+      "label": "Delete ファイルがあるテーブルを読む"
+    },
+    "small-files": {
+      "type": "scenario",
+      "label": "小さなファイルが多い場合"
+    },
+    "IS-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "メタデータだけで読む範囲を決める",
+      "status": "claim"
+    },
+    "IS-02": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "並列な範囲取得",
+      "status": "claim"
+    },
+    "IS-03": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "ファイル数と Delete の管理",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実際のエンジン、Worker 数、Split サイズ設定、統計の有無とソート順は未確定。"
+    }
+  },
+  "byRef": {
+    "docs/reference-iceberg-distributed-scan.md#§1": [
+      "model",
+      "analyst"
+    ],
+    "docs/reference-iceberg-distributed-scan.md": [
+      "model",
+      "analyst",
+      "planner",
+      "splits",
+      "worker",
+      "reader",
+      "mlist",
+      "manifest",
+      "deletes",
+      "data",
+      "submit",
+      "prune-mlist",
+      "prune-manifest",
+      "attach-deletes",
+      "plan-splits",
+      "assign",
+      "open",
+      "footer",
+      "chunks",
+      "apply-deletes",
+      "result",
+      "pruned-scan",
+      "delete-merge",
+      "small-files",
+      "IS-01",
+      "IS-02",
+      "IS-03"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§2": [
+      "planner",
+      "data",
+      "submit"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§3": [
+      "planner",
+      "mlist",
+      "manifest",
+      "prune-mlist",
+      "prune-manifest",
+      "IS-01"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§5": [
+      "splits",
+      "worker",
+      "plan-splits",
+      "assign",
+      "result",
+      "IS-02"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§4": [
+      "worker",
+      "deletes",
+      "attach-deletes",
+      "apply-deletes",
+      "delete-merge"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§6": [
+      "reader",
+      "open",
+      "footer",
+      "chunks",
+      "IS-02"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§8": [
+      "pruned-scan"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§7": [
+      "small-files",
+      "IS-03"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 25,
+    "objectives": [
+      "隠しパーティション（day・bucket 変換）がデータをどう分散し、どの述語で効くかを説明する。",
+      "Manifest List・Manifest・ファイル内統計の 3 段階で読まないファイルを決める流れを追う。",
+      "Split への分割、Worker への割り当て、範囲 GET による列単位のファイル取得を理解する。",
+      "小さなファイル・Delete ファイル・偏りが性能を壊す理由を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Apache Iceberg Specification",
+        "url": "https://iceberg.apache.org/spec/"
+      },
+      {
+        "title": "Iceberg Partitioning",
+        "url": "https://iceberg.apache.org/docs/latest/partitioning/"
+      },
+      {
+        "title": "Iceberg Performance",
+        "url": "https://iceberg.apache.org/docs/latest/performance/"
+      },
+      {
+        "title": "Iceberg Configuration",
+        "url": "https://iceberg.apache.org/docs/latest/configuration/"
+      },
+      {
+        "title": "Trino Iceberg connector",
+        "url": "https://trino.io/docs/current/connector/iceberg.html"
+      },
+      {
+        "title": "Apache Parquet File Format",
+        "url": "https://parquet.apache.org/docs/file-format/"
+      }
+    ]
+  }
+}
