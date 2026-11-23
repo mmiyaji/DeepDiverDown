@@ -50,3 +50,55 @@ Worker は Parquet ファイルを丸ごとダウンロードしない。まず�
 - `pruned-scan`：日付とユーザーで絞った検索。Manifest List → Manifest → Split → 並列の範囲 GET までを順に追う。
 - `delete-merge`：Delete ファイルがあるテーブルの読み取り。計画時の対応づけと Worker 側の除外を追う。
 - `small-files`：小さなファイルが多い場合に、計画とファイル取得の両方でコストが増える様子を追う。
+
+## 9. 物理ファイルの配置
+
+Iceberg テーブルの実体は、オブジェクトストレージ上のテーブル位置（例 `s3://lake/db/events/`）の下にある 2 種類のファイル群である。
+
+```text
+s3://lake/db/events/
+├── metadata/
+│   ├── 00042-<uuid>.metadata.json      … テーブルメタデータ（JSON。gzip 圧縮も可）
+│   ├── snap-<snapshot-id>-<uuid>.avro  … Manifest List（Avro）
+│   └── <uuid>-m0.avro                  … Manifest（Avro）
+└── data/
+    └── event_ts_day=2026-11-01/user_id_bucket=7/
+        ├── 00000-12-<uuid>.parquet     … データファイル
+        └── 00001-12-<uuid>-deletes.parquet … 位置削除ファイル
+```
+
+- データファイルの場所は Manifest に**完全パスで記録**される。ディレクトリ名のパーティション表記は人が見るための慣習で、読み取りはこのパスを使わず、ディレクトリを LIST しない。そのためパーティション仕様を変えても既存ファイルを移動する必要がない。
+- `write.object-storage.enabled=true` にすると、パスの先頭にハッシュを入れてファイルを多数のプレフィックスへ散らす。S3 などはプレフィックス単位でリクエスト数の上限があるため、同じ日付ディレクトリに書き込みと読み取りが集中してスロットリングされるのを避けられる。
+- コミットは新しい `metadata.json` を書き、カタログのポインタを差し替えることで行う。既存のデータファイルは書き換えない（イミュータブル）ので、読み手は古いスナップショットのファイルを読み続けられる。
+
+出典 [Iceberg Specification - File System Operations](https://iceberg.apache.org/spec/#file-system-operations)、[Iceberg AWS - Object Store File Layout](https://iceberg.apache.org/docs/latest/aws/#object-store-file-layout)
+
+## 10. ファイル形式：メタデータは Avro、データは Parquet
+
+| 層 | 形式 | 理由 |
+|---|---|---|
+| テーブルメタデータ | JSON | 小さく、コミットのたびに丸ごと書き直す |
+| Manifest List / Manifest | Avro（行指向） | 1 エントリ＝1 ファイルの記録を順に読み、統計で除外するため全列を使う。スキーマ付きで進化に強い |
+| データファイル | Parquet（既定）／ORC／Avro | 分析は少数の列を大量の行で読むため、列指向の Parquet・ORC が基本。Avro はストリーミングの書き込みなど行単位で扱う用途 |
+| Delete ファイル | データと同じ形式／削除ベクトルは Puffin | 位置削除はファイルパスと行位置の列を持つ |
+
+**Parquet の内部構造**は、ファイル → Row Group（行の塊、既定 128 MB 目安：`write.parquet.row-group-size-bytes`）→ 列チャンク → ページ（既定 1 MB 目安：`write.parquet.page-size-bytes`）の入れ子で、末尾のフッターに全 Row Group・列チャンクの位置と統計が入る。§6 の「フッター→必要な列チャンクだけ範囲 GET」は、この構造があるから成り立つ。Row Group は Split の分割点（`split_offsets`）にもなるため、Row Group が大きすぎると並列度が下がり、小さすぎると統計とフッターが増える。
+
+**Avro** はブロック単位で書かれ、ブロック間に同期マーカー（sync marker）がある。途中のバイト位置から読み始めても次のマーカーで同期できるので、分割して並列に読める。
+
+出典 [Iceberg Specification - File Formats](https://iceberg.apache.org/spec/#appendix-a-format-specific-requirements)、[Apache Parquet - File Format](https://parquet.apache.org/docs/file-format/)、[Apache Avro Specification - Object Container Files](https://avro.apache.org/docs/current/specification/#object-container-files)
+
+## 11. エンコーディングと圧縮
+
+Parquet の列データは、まず**エンコーディング**（値の表現を詰める）、次に**圧縮コーデック**（バイト列を縮める）の 2 段で小さくなる。
+
+- **エンコーディング**：値の種類が少ない列は辞書エンコーディング（値を辞書番号に置換）と RLE／ビットパッキング、単調に増える整数や時刻は差分エンコーディング（DELTA_BINARY_PACKED）が効く。ソートして書くと同じ値や近い値が並び、エンコーディングと統計の両方が効きやすくなる。
+- **圧縮コーデック**：Iceberg の Parquet 書き込みの既定は **zstd**（`write.parquet.compression-codec`。1.4 以降。以前は gzip）。ほかに snappy・lz4（速いが縮みは小さい）、gzip（縮むが遅い）、無圧縮を選べる。Avro は `write.avro.compression-codec`（既定 gzip）、メタデータ JSON は `write.metadata.compression-codec`（none／gzip）で指定する。
+- **圧縮の単位はページ**（Avro はブロック）。ファイル全体を一つの gzip にするわけではないので、圧縮しても列チャンク単位の範囲 GET と Row Group 単位の分割はそのまま使える。CSV を丸ごと gzip した場合のように「分割できない」問題は起きない。
+- **トレードオフ**：圧縮率が高いほどストレージから取るバイト数（＝転送時間・料金）が減り、解凍の CPU が増える。オブジェクトストレージ越しの読み取りでは通常転送量が支配的なので、zstd のような高圧縮・高速解凍のコーデックが既定になっている。
+
+出典 [Iceberg Configuration - Write properties](https://iceberg.apache.org/docs/latest/configuration/#write-properties)、[Apache Parquet - Encodings](https://parquet.apache.org/docs/file-format/data-pages/encodings/)、[Apache Parquet - Compression](https://parquet.apache.org/docs/file-format/data-pages/compression/)
+
+## 12. 物理読み取りシナリオの見方
+
+`physical-read` では、Avro の Manifest からデータファイルの完全パスとサイズを得て、Parquet のフッター→Row Group→列チャンク（zstd 圧縮のページ）を範囲 GET し、Worker が解凍・デコードするまでを追う。

@@ -2,8 +2,8 @@
   "model": "iceberg-distributed-scan",
   "name": "Iceberg の分散スキャン：データ分散とファイル取得",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 12,
+    "total": 12
   },
   "byId": {
     "analyst": {
@@ -46,6 +46,11 @@
       "label": "Delete Files",
       "status": "claim"
     },
+    "metajson": {
+      "type": "node",
+      "label": "metadata.json",
+      "status": "claim"
+    },
     "data": {
       "type": "node",
       "label": "Data Files (Parquet)",
@@ -54,6 +59,11 @@
     "submit": {
       "type": "link",
       "label": "Analyst / SQL → Coordinator / Planner",
+      "status": "claim"
+    },
+    "resolve": {
+      "type": "link",
+      "label": "Coordinator / Planner → metadata.json",
       "status": "claim"
     },
     "prune-mlist": {
@@ -96,6 +106,11 @@
       "label": "Parquet Reader → Data Files (Parquet)",
       "status": "claim"
     },
+    "decode": {
+      "type": "link",
+      "label": "Parquet Reader → Worker",
+      "status": "claim"
+    },
     "apply-deletes": {
       "type": "link",
       "label": "Worker → Delete Files",
@@ -118,6 +133,10 @@
       "type": "scenario",
       "label": "小さなファイルが多い場合"
     },
+    "physical-read": {
+      "type": "scenario",
+      "label": "物理ファイルを読む（Avro と Parquet）"
+    },
     "IS-01": {
       "type": "requirement",
       "kind": "usecase",
@@ -136,9 +155,15 @@
       "label": "ファイル数と Delete の管理",
       "status": "claim"
     },
+    "IS-04": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "分割できる形式と圧縮",
+      "status": "claim"
+    },
     "UNK-01": {
       "type": "unknown",
-      "label": "実際のエンジン、Worker 数、Split サイズ設定、統計の有無とソート順は未確定。"
+      "label": "実際のエンジン、Worker 数、Split サイズ設定、統計の有無とソート順、圧縮コーデックと Row Group サイズは未確定。"
     }
   },
   "byRef": {
@@ -156,8 +181,10 @@
       "mlist",
       "manifest",
       "deletes",
+      "metajson",
       "data",
       "submit",
+      "resolve",
       "prune-mlist",
       "prune-manifest",
       "attach-deletes",
@@ -166,14 +193,17 @@
       "open",
       "footer",
       "chunks",
+      "decode",
       "apply-deletes",
       "result",
       "pruned-scan",
       "delete-merge",
       "small-files",
+      "physical-read",
       "IS-01",
       "IS-02",
-      "IS-03"
+      "IS-03",
+      "IS-04"
     ],
     "docs/reference-iceberg-distributed-scan.md#§2": [
       "planner",
@@ -210,12 +240,29 @@
       "chunks",
       "IS-02"
     ],
+    "docs/reference-iceberg-distributed-scan.md#§9": [
+      "metajson",
+      "resolve"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§10": [
+      "metajson",
+      "chunks",
+      "IS-04"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§11": [
+      "chunks",
+      "decode",
+      "IS-04"
+    ],
     "docs/reference-iceberg-distributed-scan.md#§8": [
       "pruned-scan"
     ],
     "docs/reference-iceberg-distributed-scan.md#§7": [
       "small-files",
       "IS-03"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§12": [
+      "physical-read"
     ]
   },
   "reference": {
@@ -225,7 +272,8 @@
       "隠しパーティション（day・bucket 変換）がデータをどう分散し、どの述語で効くかを説明する。",
       "Manifest List・Manifest・ファイル内統計の 3 段階で読まないファイルを決める流れを追う。",
       "Split への分割、Worker への割り当て、範囲 GET による列単位のファイル取得を理解する。",
-      "小さなファイル・Delete ファイル・偏りが性能を壊す理由を説明する。"
+      "小さなファイル・Delete ファイル・偏りが性能を壊す理由を説明する。",
+      "metadata／data の物理配置、Avro・Parquet の使い分け、エンコーディングと圧縮が読み取りに与える影響を理解する。"
     ],
     "sources": [
       {
@@ -251,6 +299,14 @@
       {
         "title": "Apache Parquet File Format",
         "url": "https://parquet.apache.org/docs/file-format/"
+      },
+      {
+        "title": "Apache Avro Specification",
+        "url": "https://avro.apache.org/docs/current/specification/"
+      },
+      {
+        "title": "Iceberg AWS - Object Store File Layout",
+        "url": "https://iceberg.apache.org/docs/latest/aws/#object-store-file-layout"
       }
     ]
   }
