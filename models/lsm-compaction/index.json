@@ -1,0 +1,169 @@
+{
+  "model": "lsm-compaction",
+  "name": "LSM ツリーのフラッシュとコンパクション",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "Writer / Reader",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "WAL",
+      "status": "claim"
+    },
+    "memtable": {
+      "type": "node",
+      "label": "MemTable",
+      "status": "claim"
+    },
+    "l0": {
+      "type": "node",
+      "label": "L0 SSTables",
+      "status": "claim"
+    },
+    "l1": {
+      "type": "node",
+      "label": "L1",
+      "status": "claim"
+    },
+    "l2": {
+      "type": "node",
+      "label": "L2",
+      "status": "claim"
+    },
+    "write-wal": {
+      "type": "link",
+      "label": "Writer / Reader → WAL",
+      "status": "claim"
+    },
+    "write-mem": {
+      "type": "link",
+      "label": "Writer / Reader → MemTable",
+      "status": "claim"
+    },
+    "flush": {
+      "type": "link",
+      "label": "MemTable → L0 SSTables",
+      "status": "claim"
+    },
+    "compact-01": {
+      "type": "link",
+      "label": "L0 SSTables → L1",
+      "status": "claim"
+    },
+    "compact-12": {
+      "type": "link",
+      "label": "L1 → L2",
+      "status": "claim"
+    },
+    "read-mem": {
+      "type": "link",
+      "label": "Writer / Reader → MemTable",
+      "status": "claim"
+    },
+    "read-l0": {
+      "type": "link",
+      "label": "Writer / Reader → L0 SSTables",
+      "status": "claim"
+    },
+    "read-l1": {
+      "type": "link",
+      "label": "Writer / Reader → L1",
+      "status": "claim"
+    },
+    "flush-compact": {
+      "type": "scenario",
+      "label": "書き込みからフラッシュ・コンパクションまで"
+    },
+    "lsm-read": {
+      "type": "scenario",
+      "label": "キーを探す"
+    },
+    "LSM-01": {
+      "type": "requirement",
+      "kind": "nfr",
+      "label": "コンパクションの費用を見積もる",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実際のエンジン、コンパクション方式（レベル型・サイズ階層型）、階層の数とサイズは未確定。"
+    }
+  },
+  "byRef": {
+    "docs/reference-lsm-compaction.md#§1": [
+      "model"
+    ],
+    "docs/reference-lsm-compaction.md": [
+      "model",
+      "client",
+      "wal",
+      "memtable",
+      "l0",
+      "l1",
+      "l2",
+      "write-wal",
+      "write-mem",
+      "flush",
+      "compact-01",
+      "compact-12",
+      "read-mem",
+      "read-l0",
+      "read-l1",
+      "flush-compact",
+      "lsm-read",
+      "LSM-01"
+    ],
+    "docs/reference-lsm-compaction.md#§2": [
+      "client",
+      "wal",
+      "memtable",
+      "write-wal",
+      "write-mem"
+    ],
+    "docs/reference-lsm-compaction.md#§3": [
+      "l0",
+      "flush"
+    ],
+    "docs/reference-lsm-compaction.md#§4": [
+      "l1",
+      "l2",
+      "compact-01",
+      "compact-12",
+      "LSM-01"
+    ],
+    "docs/reference-lsm-compaction.md#§5": [
+      "read-mem",
+      "read-l0",
+      "read-l1",
+      "lsm-read"
+    ],
+    "docs/reference-lsm-compaction.md#§6": [
+      "flush-compact"
+    ]
+  },
+  "reference": {
+    "category": "大規模データ分析の基本概念",
+    "order": 35,
+    "objectives": [
+      "WAL と MemTable による速い書き込みと、フラッシュで SSTable ができる流れを説明する。",
+      "L0 の重なり、レベル型コンパクションで階層を下りながらマージする理由を理解する。",
+      "読み取りが MemTable と各階層を順に確認する流れと、書き込み増幅の費用を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "RocksDB Wiki - Compaction",
+        "url": "https://github.com/facebook/rocksdb/wiki/Compaction"
+      },
+      {
+        "title": "Apache Cassandra - Compaction",
+        "url": "https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/index.html"
+      }
+    ]
+  }
+}

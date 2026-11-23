@@ -4,7 +4,7 @@ import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDE
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=nc1';
 import { FileMap } from './filemap.js?v=dv2';
-import { TreeMap, DistMap, GridMap, TimelineMap } from './datavis.js?v=anim3';
+import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=bm1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -231,11 +231,25 @@ const scene = new Scene3D($('view'), { onPick: id => onPick(id), onDrill: id => 
 /* ドリルダウン：部品へズームインしながら詳細図へ、パンくずではズームアウトしながら上位の図へ移る */
 /* 図の下のデータの見取り図：ファイルの解剖図・メタデータの木・分布のいずれか */
 const onVisNode = { onNode: id => { if (M.nodes[id] && st.sel !== id) select(id); } };
-const FM = M.fileLayout?.segments?.length ? new FileMap($('filemap'), M.fileLayout, onVisNode)
-  : M.treeLayout?.root ? new TreeMap($('filemap'), M.treeLayout, onVisNode)
-  : M.distribution?.bars?.length ? new DistMap($('filemap'), M.distribution, onVisNode)
-  : M.grid?.rows?.length ? new GridMap($('filemap'), M.grid, onVisNode)
-  : M.timeline?.commits?.length ? new TimelineMap($('filemap'), M.timeline, onVisNode) : null;
+/* 1 つのモデルが複数の見取り図を持てる。タブで切り替え、シナリオの visual（見取り図の ID）で自動的に切り替える */
+const VIS_DEFS = [
+  M.fileLayout?.segments?.length && { id: 'file', title: 'ファイルの解剖図', make: el => new FileMap(el, M.fileLayout, onVisNode) },
+  M.treeLayout?.root && { id: 'tree', title: M.treeLayout.title || 'メタデータの木', make: el => new TreeMap(el, M.treeLayout, onVisNode) },
+  M.distribution?.bars?.length && { id: 'distribution', title: M.distribution.title || '分布', make: el => new DistMap(el, M.distribution, onVisNode) },
+  M.grid?.rows?.length && { id: 'grid', title: M.grid.title || '表', make: el => new GridMap(el, M.grid, onVisNode) },
+  M.timeline?.commits?.length && { id: 'timeline', title: M.timeline.title || 'タイムライン', make: el => new TimelineMap(el, M.timeline, onVisNode) },
+  ...[].concat(M.blocks || []).filter(b => b?.lanes?.length).map((b, i) => ({ id: b.id || 'blocks' + i, title: b.title || 'データの移動', make: el => new BlockMap(el, b, onVisNode) })),
+].filter(Boolean);
+const VIS = new Map();
+let visActive = VIS_DEFS[0]?.id;
+if (VIS_DEFS.length) {
+  const dock = $('filemap');
+  dock.innerHTML = (VIS_DEFS.length > 1 ? `<div class="vis-tabs" role="tablist">${VIS_DEFS.map(d => `<button type="button" role="tab" data-vis="${esc(d.id)}">${esc(d.title)}</button>`).join('')}</div>` : '')
+    + VIS_DEFS.map(d => `<div class="vis-pane" data-pane="${esc(d.id)}"></div>`).join('');
+  for (const d of VIS_DEFS) VIS.set(d.id, d.make(dock.querySelector(`[data-pane="${CSS.escape(d.id)}"]`)));
+  dock.addEventListener('click', e => { const t = e.target.closest('[data-vis]'); if (t) { visActive = t.dataset.vis; syncFileMap(); } });
+}
+const FM = VIS.size ? { sync: (ctx, sel) => { for (const [id, v] of VIS) if (id === visActive) v.sync(ctx, sel); } } : null;
 $('filemap').hidden = !FM;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function transitionTo(hash, dir, origin, from) {
@@ -350,7 +364,14 @@ function draw() { drawScene(); syncFileMap(); }
 /* ファイルの解剖図：部品の選択と、シナリオの読み取り範囲（steps[].read）を帯に反映する */
 function syncFileMap() {
   if (!FM) return;
-  const ctx = st.mode === 'scenario' && M.scenarios?.length ? { steps: M.scenarios[st.scen].steps, idx: st.step } : null;
+  const sc = st.mode === 'scenario' && M.scenarios?.length ? M.scenarios[st.scen] : null;
+  const ctx = sc ? { steps: sc.steps, idx: st.step } : null;
+  // シナリオが見取り図を指定していればそれを前に出す（指定が無ければ今のまま）
+  if (sc?.visual && VIS.has(sc.visual) && sc !== syncFileMap.lastSc) visActive = sc.visual;
+  syncFileMap.lastSc = sc;
+  const dock = $('filemap');
+  dock.querySelectorAll('[data-vis]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.vis === visActive)));
+  dock.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== visActive; });
   FM.sync(ctx, st.sel);
 }
 function drawScene() {

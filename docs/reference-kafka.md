@@ -41,3 +41,7 @@ P0 のリーダー Broker 1 が停止し、Broker 2 と Broker 3 が ISR に残�
 パーティションは Broker のディスク上で `<topic>-<partition>/` ディレクトリになり、その中は**セグメント**の並びである。各セグメントは先頭オフセット（20 桁）を名前に持つ `.log`（レコードバッチ本体）、`.index`（オフセット → ファイル内位置の疎な索引）、`.timeindex`（時刻 → オフセット）の組で、末尾の 1 つだけが追記中の**アクティブセグメント**になる。`segment.bytes`（既定 1 GiB）や `segment.ms` に達すると閉じて新しいセグメントが始まり、保持期限（`retention.ms`、既定 7 日）や容量上限は**閉じたセグメント単位**で削除される。
 
 ログ上の位置として、末尾の **LEO**（Log End Offset）、全 ISR に複製済みの境界である **High Watermark**、Consumer Group ごとの**コミット済みオフセット**（`__consumer_offsets` に保存）がある。Consumer は High Watermark までしか読めず、コミット済みオフセットと High Watermark の差がコンシューマーラグになる。読み取りは `.index` で開始位置を引き、`.log` を順に読む（多くの場合 OS のページキャッシュから返る）。出典 [Apache Kafka Design](https://kafka.apache.org/documentation/#design)、[Topic Configs](https://kafka.apache.org/documentation/#topicconfigs)
+
+## 8. Consumer Group のリバランスと ISR の追い付き
+
+Consumer Group にメンバーが加わる・抜けると、Group Coordinator がパーティションの担当を割り当て直す（リバランス）。担当が移ったパーティションは、新しい担当がコミット済みオフセットから読み始める。協調的リバランス（CooperativeStickyAssignor）では、動かす必要のある担当だけを移し、他の担当は読み続けられる。複製では、フォロワーがリーダーのログを取り込んで追い付き、遅れすぎたフォロワーは ISR から外れる。リーダーが停止すると、ISR に残るフォロワーが新しいリーダーに選ばれ、外れていたフォロワーは新リーダーから追い付いて ISR に戻る。出典 [Apache Kafka Design](https://kafka.apache.org/documentation/#design)、[Consumer Configs](https://kafka.apache.org/documentation/#consumerconfigs)

@@ -288,3 +288,103 @@ export class TimelineMap {
       ${infoBox(this.sel && cs.find(c => c.id === this.sel), 'コミットを選ぶと内容を表示します。シナリオを再生すると、現在の版・時点指定で読む版・失効した版が変わります。')}`;
   }
 }
+
+/* ---------- ブロックの移動：箱（Worker・Consumer・ノード・層など）の間をデータの塊が動く ----------
+   blocks: { id, title, note, legend: {k: 説明}, lanes: [{ id, label, sub?, node?, optional? }], items: { 箱 ID: [塊] } }
+   塊：{ id, label?, k?（色 0〜7）, w?（幅の倍率）, from?: [元の塊 ID], note? }
+   ステップの blocks: { 箱 ID: [塊] } で配置を差し替えると、同じ ID の塊は新しい箱へ移動し、
+   from を持つ塊は元の塊から飛んで来る（複数なら結合、元が残っていれば複製、1 つなら分割）。消えた塊はその場で消える。
+   ステップの highlight: [塊 ID] で強調、lanes: { 箱 ID: { label, sub, tone } } で箱の見出しを差し替える */
+export class BlockMap {
+  constructor(el, layout, { onNode } = {}) {
+    this.el = el; this.L = layout; this.onNode = onNode; this.ctx = null; this.key = undefined; this.sel = null;
+    el.addEventListener('click', e => {
+      const t = e.target.closest('[data-item]'); if (t) { this.sel = t.dataset.item; this.render(false); return; }
+      const l = e.target.closest('[data-lane]'); if (l) { const lane = this.L.lanes.find(x => x.id === l.dataset.lane); if (lane?.node) this.onNode?.(lane.node); }
+    });
+    this.render(false);
+  }
+  latest(k) { const C = this.ctx; return C ? [...C.steps.slice(0, C.idx + 1)].reverse().find(x => x[k])?.[k] : undefined; }
+  state() { return this.latest('blocks') || this.L.items || {}; }
+  sync(ctx) {
+    const key = ctx ? ctx.steps[ctx.idx] : null;
+    if (this.key === key && this.ctx?.steps === ctx?.steps) return;
+    this.ctx = ctx; this.key = key; this.render(true);
+  }
+  render(animate) {
+    const L = this.L, S = this.state(), C = this.ctx;
+    const hi = new Set(C ? C.steps[C.idx]?.highlight || [] : []);
+    const laneOver = this.latest('lanes') || {};
+    // 直前の位置を覚えておく（FLIP）
+    const box = this.el.querySelector('.bm'), base = box?.getBoundingClientRect();
+    const before = new Map();
+    if (box && animate) box.querySelectorAll('[data-item]').forEach(n => { const r = n.getBoundingClientRect(); before.set(n.dataset.item, { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height, k: n.dataset.k, label: n.textContent }); });
+    const prevItems = this.items || new Map();
+    const lanes = L.lanes.filter(l => !l.optional || S[l.id]);
+    const all = new Map();
+    const html = lanes.map(l => {
+      const its = S[l.id] || [], o = laneOver[l.id] || {};
+      its.forEach(it => all.set(it.id, it));
+      const size = its.reduce((a, it) => a + (it.w || 1), 0);
+      const sub = o.sub ?? l.sub;
+      return `<div class="bm-lane ${o.tone ? 'bm-' + o.tone : ''}" data-lane="${esc(l.id)}">
+        <div class="bm-lh"><b>${esc(o.label || l.label)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}<i>${its.length ? (L.unit ? `${+size.toFixed(1)}${L.unit}` : `${its.length} 個`) : '空'}</i></div>
+        <div class="bm-items">${its.map(it => `<button type="button" class="bm-it k${it.k ?? 0} ${hi.has(it.id) ? 'hi' : ''} ${this.sel === it.id ? 'sel' : ''}" data-item="${esc(it.id)}" data-k="${it.k ?? 0}" style="--w:${it.w || 1}" title="${esc(it.note || it.label || it.id)}">${esc(it.label ?? it.id)}</button>`).join('')}</div></div>`;
+    }).join('');
+    const legend = Object.entries(L.legend || {}).map(([k, v]) => `<span class="bm-lg"><span class="bm-sw k${k}"></span>${esc(v)}</span>`).join('');
+    const sel = this.sel && all.get(this.sel);
+    this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || 'データの移動')}</span>${legend ? `<div class="bm-legend">${legend}</div>` : ''}</div>
+      <div class="bm" style="--lanes:${lanes.length}">${html}</div>
+      ${L.note ? `<div class="fm-note">${esc(L.note)}</div>` : ''}
+      ${infoBox(sel && { label: sel.label ?? sel.id, description: sel.note }, '塊を選ぶと説明を表示します。シナリオを再生すると、データの塊が箱の間を移動・結合・分割・複製します。')}`;
+    this.items = all;
+    if (before.size && !matchMedia('(prefers-reduced-motion: reduce)').matches) this.animate(before, prevItems, all);
+  }
+  animate(before, prevItems, all) {
+    const box = this.el.querySelector('.bm'), base = box.getBoundingClientRect(), D = 850, EASE = 'cubic-bezier(.45,0,.2,1)';
+    const rectOf = n => { const r = n.getBoundingClientRect(); return { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }; };
+    const ghost = (g, cls) => { const d = document.createElement('div'); d.className = `bm-it bm-ghost k${g.k} ${cls || ''}`; d.textContent = g.label;
+      Object.assign(d.style, { left: g.x + 'px', top: g.y + 'px', width: g.w + 'px', height: g.h + 'px' }); box.append(d); return d; };
+    const consumed = new Set();
+    box.querySelectorAll('[data-item]').forEach((n, i) => {
+      const id = n.dataset.item, it = all.get(id), to = rectOf(n), was = before.get(id);
+      if (was) {                                                   // 同じ塊：箱の間を移動
+        if (Math.abs(was.x - to.x) + Math.abs(was.y - to.y) > 1) n.animate([{ transform: `translate(${was.x - to.x}px, ${was.y - to.y}px)` }, { transform: 'none' }], { duration: D, easing: EASE, delay: (i % 12) * 15, fill: 'backwards' });
+        return;
+      }
+      const src = (it.from || []).filter(f => before.has(f));
+      if (src.length > 1) {                                        // 結合：元の塊が飛んできて 1 つになる
+        src.forEach((f, k) => {
+          consumed.add(f); const o = before.get(f), g = ghost(o), tr = `translate(${to.x - o.x}px, ${to.y - o.y}px)`;
+          g.animate([{ transform: 'none', opacity: 1 }, { transform: tr, opacity: 0.9, offset: 0.85 }, { transform: tr, opacity: 0 }],
+            { duration: D, delay: k * 50, easing: EASE, fill: 'forwards' }).finished.then(() => g.remove());
+        });
+        n.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 0, transform: 'scale(.6)', offset: 0.75 }, { opacity: 1, transform: 'none' }], { duration: D + src.length * 50 + 150, easing: EASE, fill: 'backwards' });
+        return;
+      }
+      if (src.length === 1) {                                      // 分割・複製：元の塊の位置から出てくる
+        const o = before.get(src[0]); if (!all.has(src[0])) consumed.add(src[0]);
+        n.animate([{ transform: `translate(${o.x - to.x}px, ${o.y - to.y}px)`, opacity: 0.35 }, { transform: 'none', opacity: 1 }],
+          { duration: D, delay: (i % 12) * 20, easing: EASE, fill: 'backwards' });
+        return;
+      }
+      // 逆向き：前に 1 つへ結合していた塊から、元の塊へばらける
+      const parent = [...prevItems.values()].find(p => p.from?.includes(id) && before.has(p.id));
+      if (parent) {
+        consumed.add(parent.id); const o = before.get(parent.id);
+        n.animate([{ transform: `translate(${o.x - to.x}px, ${o.y - to.y}px)`, opacity: 0.3 }, { transform: 'none', opacity: 1 }], { duration: D, easing: EASE, fill: 'backwards' });
+        return;
+      }
+      n.animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'none' }], { duration: D * 0.6, easing: EASE, fill: 'backwards' });
+    });
+    // 消えた塊：戻る方向の分割元なら子の位置へ吸い込まれ、そうでなければその場で沈んで消える
+    for (const [id, g] of before) {
+      if (all.has(id) || consumed.has(id)) continue;
+      const d = ghost(g, 'bm-gone');
+      const child = [...all.values()].find(x => prevItems.get(id)?.from?.includes(x.id));
+      const n = child && box.querySelector(`[data-item="${CSS.escape(child.id)}"]`);
+      if (n) { const to = rectOf(n); d.animate([{ transform: 'none' }, { transform: `translate(${to.x - g.x}px, ${to.y - g.y}px)`, opacity: 0 }], { duration: D, easing: EASE, fill: 'forwards' }).finished.then(() => d.remove()); continue; }
+      d.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(14px) scale(.7)' }], { duration: D * 0.7, easing: EASE, fill: 'forwards' }).finished.then(() => d.remove());
+    }
+  }
+}

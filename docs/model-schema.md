@@ -245,3 +245,10 @@ groups:
 - ステップの `current`（現在の版）、`travel`（時点指定で読む版）、`expire`（失効した版）、`highlight` を反映する。
 
 - 分布の棒に `from: [元の棒の ID]` を書くと、ステップの切り替えで動きが付く。複数を指定すると元の棒が飛んできて積み重なり 1 本にまとまり（結合）、1 本を指定すると元の棒から切り出されて移動する（分割）。同じ ID の棒は新しい位置へ滑る。前のステップに戻ると逆向きに動く。OS の「視差効果を減らす」設定では動かさない。
+
+## ブロックの移動（blocks）と見取り図のタブ
+
+- `blocks`（1 つ、または配列）で、箱（Worker・Consumer・ノード・層など）の間をデータの塊が動く図を描く。`{id, title, note, unit, legend: {色番号: 説明}, lanes: [{id, label, sub, node, optional}], items: {箱 ID: [塊]}}`。塊は `{id, label, k（色 0〜7）, w（幅）, from, note}`。
+- ステップの `blocks: {箱 ID: [塊]}` で配置を差し替える。同じ ID の塊は新しい箱へ移動し、`from` が複数なら元の塊が飛んできて 1 つに結合、元が残っていれば複製、元が消えれば分割として動く。消えた塊はその場で沈んで消える。前のステップに戻ると逆向きに動く。
+- ステップの `lanes: {箱 ID: {label, sub, tone}}` で箱の見出しや状態（tone: down／new／cold）を変え、`highlight` で塊を強調する。`optional: true` の箱は塊が入ったときだけ表示する。
+- 見取り図が複数あるモデルでは、図の下の欄にタブが出る。シナリオに `visual: <見取り図の ID>`（file／tree／distribution／grid／timeline、または blocks の id）を書くと、再生時にその見取り図へ切り替わる。

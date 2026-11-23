@@ -27,3 +27,7 @@ SQL エンジンはテーブルの現在のメタデータを読み、そこか�
 ## 7. スナップショットの履歴と失効
 
 コミットのたびに新しいスナップショットが作られ、テーブルメタデータの `snapshots` と `snapshot-log` に履歴が残る。操作の種類（append、overwrite、delete、replace＝コンパクションなど）と追加・削除したファイル数が `summary` に記録される。`FOR TIMESTAMP AS OF` や `FOR VERSION AS OF` で過去のスナップショットを選ぶと、その版の Manifest List から当時の生存ファイルを読む。古いスナップショットは `expire_snapshots` で失効させ、失効した版だけが参照していたファイルを削除する。失効させた版へはタイムトラベルできない。出典 [Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
+
+## 8. パーティションの進化と孤立ファイル
+
+パーティション仕様は変更でき（partition evolution）、変更はメタデータに新しい仕様を追加するだけで、既存のデータファイルは書き直さない。古いファイルは古い仕様（例：月）のまま残り、新しく書くファイルだけが新しい仕様（例：日）で置かれる。クエリは各ファイルに記録された仕様ごとにプルーニングする。また、スナップショットを失効させると、失効した版だけが参照していたファイルが削除される。どのメタデータからも参照されないまま残ったファイル（書き込み失敗の残骸など）は `remove_orphan_files` で掃除する。出典 [Iceberg Partitioning](https://iceberg.apache.org/docs/latest/partitioning/)、[Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
