@@ -1,9 +1,10 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=fm1';
+import { Scene3D } from './scene3d.js?v=dv1';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=nc1';
-import { FileMap } from './filemap.js?v=fm1';
+import { FileMap } from './filemap.js?v=dv2';
+import { TreeMap, DistMap } from './datavis.js?v=dv2';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -228,7 +229,11 @@ const fmt = (k, v) => { const u = (METRICS.find(x => x[0] === k) || [])[2] || ''
 /* ================= 3D 描画 ================= */
 const scene = new Scene3D($('view'), { onPick: id => onPick(id), onDrill: id => drillInto(id) });
 /* ドリルダウン：部品へズームインしながら詳細図へ、パンくずではズームアウトしながら上位の図へ移る */
-const FM = M.fileLayout?.segments?.length ? new FileMap($('filemap'), M.fileLayout, { onNode: id => { if (M.nodes[id] && st.sel !== id) select(id); } }) : null;
+/* 図の下のデータの見取り図：ファイルの解剖図・メタデータの木・分布のいずれか */
+const onVisNode = { onNode: id => { if (M.nodes[id] && st.sel !== id) select(id); } };
+const FM = M.fileLayout?.segments?.length ? new FileMap($('filemap'), M.fileLayout, onVisNode)
+  : M.treeLayout?.root ? new TreeMap($('filemap'), M.treeLayout, onVisNode)
+  : M.distribution?.bars?.length ? new DistMap($('filemap'), M.distribution, onVisNode) : null;
 $('filemap').hidden = !FM;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function transitionTo(hash, dir, origin, from) {
@@ -343,12 +348,8 @@ function draw() { drawScene(); syncFileMap(); }
 /* ファイルの解剖図：部品の選択と、シナリオの読み取り範囲（steps[].read）を帯に反映する */
 function syncFileMap() {
   if (!FM) return;
-  if (st.mode === 'scenario' && M.scenarios?.length) {
-    const steps = M.scenarios[st.scen].steps;
-    const done = new Set(steps.slice(0, st.step).flatMap(s => s.read || []));
-    FM.setReads({ done, now: new Set(steps[st.step]?.read || []), finished: st.step >= steps.length - 1 });
-  } else if (FM.reads) FM.setReads(null);
-  FM.showNode(st.sel);
+  const ctx = st.mode === 'scenario' && M.scenarios?.length ? { steps: M.scenarios[st.scen].steps, idx: st.step } : null;
+  FM.sync(ctx, st.sel);
 }
 function drawScene() {
   const d = decorate(), { nsV: ns, lsV: ls } = projectState(d.ns, d.ls), P = VW(), N = P.nodes;

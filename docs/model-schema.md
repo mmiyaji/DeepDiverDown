@@ -215,3 +215,19 @@ groups:
   - `file`：ファイル名、`note`：注記
   - `segments[]`：`id`、`label`、`bytes`（省略すると子の合計）、`kind`（magic / header / rowgroup / chunk / dict / page / index / footer で色分け）、`node`（対応する部品の ID。選ぶと図の部品も選ばれる）、`description`、`sample`（中身の例）、`children`（入れ子の区画）
 - シナリオのステップに `read: [区画 ID]` を書くと、再生中にその範囲が帯の上で光る。読んだバイト数と全体に占める割合を表示し、最後のステップでは読まなかった範囲を灰色にする。
+
+### 書き込みと位置の印（fileLayout の拡張）
+
+- ステップの `write: [区画 ID]` は書き込み中の範囲をアクセント色で光らせる。
+- `markers`（モデル）とステップの `marks` は、帯の上の位置の印。`[{label, at, tone}]` の形で書き、`at` はバイト数か `[区画 ID, 区画内の割合]`。`tone` は end／hw／consumer／retention／pos。ステップでは最新の `marks` を使う。
+- 例：Kafka のパーティションログで、LEO・High Watermark・Consumer の位置を示す。
+
+## メタデータの木（treeLayout）
+
+- `treeLayout: {title, unit, levels, note, root}` で、左から右へ枝分かれする木を描く。各ノードは `id`・`label`・`kind`（meta／snapshot／list／manifest／data／delete）・`node`・`sub`・`description`・`sample`・`children`。
+- ステップの `prune: [ID]` はその枝を除外（そのステップでは取り消し線、以後は灰色）、`read: [ID]` は読む葉を光らせる。除外した葉の件数を表示する。
+
+## 分布（distribution）
+
+- `distribution: {title, unit, maxNote, scaleMax, note, bars}` で棒グラフを描き、中央値と最大値の線、最大÷中央値の倍率を表示する。
+- ステップの `highlight: [ID]` は棒を強調し、`bars: [...]` は分布を差し替える（例：AQE によるパーティション分割の前後）。`scaleMax` を書くと縦軸を固定して前後を比べやすくする。
