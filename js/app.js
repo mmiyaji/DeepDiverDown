@@ -4,6 +4,7 @@ import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDE
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=nc1';
 import { FileMap } from './filemap.js?v=dv2';
+import { initResize } from './resize.js?v=rz2';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=bm1';
 
 const $ = id => document.getElementById(id);
@@ -251,6 +252,7 @@ if (VIS_DEFS.length) {
 }
 const FM = VIS.size ? { sync: (ctx, sel) => { for (const [id, v] of VIS) if (id === visActive) v.sync(ctx, sel); } } : null;
 $('filemap').hidden = !FM;
+initResize();
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function transitionTo(hash, dir, origin, from) {
   try { sessionStorage.setItem('ddd.drill', JSON.stringify({ dir, at: Date.now(), from })); } catch {}
