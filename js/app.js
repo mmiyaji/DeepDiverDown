@@ -425,8 +425,10 @@ function modelLink(entry) {
   const coverage = COV.total ? Math.round(COV.covered / COV.total * 100) : 100;
   const detail = selected && !entry.reference
     ? `<span class="tag ${GATES.pass ? 'ok' : 'high'}">${GATES.pass ? '合格' : '不合格'}</span> 網羅 ${coverage}%` : '';
-  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''}" ${selected ? 'aria-current="page"' : ''}>
-    <span class="mname">${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}</span>
+  const tags = entry.tags || [], sub = entry.reference?.detailOf;
+  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''} ${sub ? 'mdetail' : ''}" data-tags="${esc(tags.join('|'))}" ${selected ? 'aria-current="page"' : ''}>
+    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}</span>
+    ${tags.length ? `<span class="mtags">${tags.map(t => `<span class="mtag ${TAG_KIND(t)}">${esc(t)}</span>`).join('')}</span>` : ''}
     ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
 }
 
@@ -437,18 +439,32 @@ function renderLibrary() {
   $('mlist').innerHTML = REGISTRY.filter(entry => !entry.reference).map(modelLink).join('') +
     '<button class="b small" data-act="open">＋ YAML を開く</button>';
 
-  const groups = new Map();
-  for (const entry of REGISTRY.filter(r => r.reference)) {
-    const category = entry.reference.category || 'その他';
-    if (!groups.has(category)) groups.set(category, []);
-    groups.get(category).push(entry);
+  const refs = REGISTRY.filter(r => r.reference);
+  $('reference-section').hidden = !refs.length;
+  const tree = new Map(); // 領域 → 種別 → 分類 → 項目
+  const put = (m, k) => m.get(k) || m.set(k, new Map()).get(k);
+  for (const e of refs) {
+    const { domain = 'その他', kind = 'その他', category = 'その他' } = e.reference;
+    const cat = put(put(tree, domain), kind);
+    (cat.get(category) || cat.set(category, []).get(category)).push(e);
   }
-  $('reference-section').hidden = !groups.size;
-  $('reference-list').innerHTML = [...groups].map(([category, entries]) =>
-    `<details class="reference-category" data-cat="${esc(category)}"${LIB_OPEN.has(category) || entries.some(entry => entry.id === KEY) ? ' open' : ''}>
-      <summary>${esc(category)} <small>${entries.length}</small></summary><div class="mlist">${entries
-        .sort((a, b) => (a.reference.order ?? Number.MAX_SAFE_INTEGER) - (b.reference.order ?? Number.MAX_SAFE_INTEGER))
-        .map(modelLink).join('')}</div></details>`).join('');
+  const order = (list, pref) => [...list].sort((a, b) => (pref.indexOf(a[0]) + 1 || 99) - (pref.indexOf(b[0]) + 1 || 99));
+  const ord = e => e.reference.order ?? Number.MAX_SAFE_INTEGER;
+  const has = list => list.some(e => e.id === KEY);
+  const box = (cls, key, label, count, inner, open) => `<details class="${cls}" data-cat="${esc(key)}"${open ? ' open' : ''}><summary>${esc(label)} <small>${count}</small></summary>${inner}</details>`;
+  $('reference-list').innerHTML = order(tree, REF_DOMAINS).map(([domain, kinds]) => {
+    const dAll = [...kinds.values()].flatMap(c => [...c.values()].flat());
+    return box('ref-domain', 'd:' + domain, domain, dAll.length, order(kinds, REF_KINDS).map(([kind, cats]) => {
+      const kAll = [...cats.values()].flat();
+      return box('ref-kind', `k:${domain}/${kind}`, kind, kAll.length, order(cats, REF_CATS).map(([cat, list]) => {
+        const top = list.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf)).sort((a, b) => ord(a) - ord(b));
+        const rows = top.flatMap(e => [e, ...list.filter(c => c.reference.detailOf === e.id).sort((a, b) => ord(a) - ord(b))]);
+        const key = `${domain}/${kind}/${cat}`;
+        return box('reference-category', key, cat, list.length, `<div class="mlist">${rows.map(modelLink).join('')}</div>`, LIB_OPEN.has(key) || has(list));
+      }).join(''), LIB_OPEN.has(`k:${domain}/${kind}`) || has(kAll));
+    }).join(''), LIB_OPEN.has('d:' + domain) || has(dAll));
+  }).join('');
+  renderTagFilter();
   if (entryIsRef()) $('library').open = true;
   const q = $('model-filter').value; if (q) filterLibrary(q);
   if (aside) aside.scrollTop = top;
@@ -459,13 +475,39 @@ function entryIsRef() { return REGISTRY.some(r => r.reference && r.id === KEY); 
 function saveLibOpen() { try { localStorage.setItem('ddd.libOpen', JSON.stringify([...LIB_OPEN])); localStorage.setItem('ddd.libMain', $('library').open ? '1' : ''); } catch {} }
 
 /* モデル一覧の絞り込み：一致したモデルのある分類だけ開く */
-function filterLibrary(q) {
-  const s = q.trim().toLowerCase();
-  document.querySelectorAll('#library .mitem').forEach(a => { a.hidden = !!s && !a.textContent.toLowerCase().includes(s); });
+function filterLibrary(q = $('model-filter').value) {
+  const s = q.trim().toLowerCase(), tags = [...LIB_TAGS];
+  document.querySelectorAll('#library .mitem').forEach(a => {
+    const own = (a.dataset.tags || '').split('|');
+    a.hidden = (!!s && !a.textContent.toLowerCase().includes(s)) || !tags.every(t => own.includes(t));
+  });
+  const active = !!s || tags.length;
   document.querySelectorAll('#reference-list details').forEach(d => {
     const any = [...d.querySelectorAll('.mitem')].some(a => !a.hidden);
-    d.hidden = !any; if (s) d.open = any;
+    d.hidden = !any; if (active) d.open = any;
   });
+  const n = document.querySelectorAll('#reference-list .mitem:not([hidden])').length;
+  $('tag-count').textContent = active ? `${n} 件` : '';
+}
+/* ラベル（提供形態・提供元）で絞り込む。複数選ぶとすべてを持つものだけ */
+const LIB_TAGS = new Set();
+const REF_DOMAINS = ['データ基盤', 'コンテナ基盤'];
+const REF_CATS = ['取り込み', 'ストリーム処理', 'バッチ・SQL エンジン', 'テーブル形式とカタログ', '変換とオーケストレーション', 'クラウド分析基盤', '運用とガバナンス', 'データ配置と読み取り', 'ファイル形式', '分散実行と保守', '構成パターン', 'ユースケース', 'Kubernetes 系', 'マネージド Kubernetes', 'その他のオーケストレーター', '比較と選び方'];
+const REF_KINDS = ['製品・技術のアーキテクチャ', '仕組みの深掘り', '設計パターン・ユースケース'];
+const DELIVERY = ['OSS', '商用サービス', 'クラウドマネージド', '商用製品', 'ソース公開（BSL）', '商用サービスあり', '仕様', '概念', 'パターン'];
+const TAG_KIND = t => DELIVERY.includes(t) ? 'tk-' + ({ OSS: 'oss', 商用サービス: 'saas', クラウドマネージド: 'cloud', 商用製品: 'prod', 'ソース公開（BSL）': 'src', 商用サービスあり: 'saas2', 仕様: 'spec', 概念: 'idea', パターン: 'idea' })[t] : 'tk-org';
+function renderTagFilter() {
+  const count = new Map();
+  for (const e of REGISTRY) for (const t of e.tags || []) count.set(t, (count.get(t) || 0) + 1);
+  const chip = t => `<button type="button" class="mtag ${TAG_KIND(t)} ${LIB_TAGS.has(t) ? 'on' : ''}" data-tag="${esc(t)}" aria-pressed="${LIB_TAGS.has(t)}">${esc(t)} <small>${count.get(t)}</small></button>`;
+  const delivery = DELIVERY.filter(t => count.has(t)), orgs = [...count.keys()].filter(t => !DELIVERY.includes(t)).sort((a, b) => count.get(b) - count.get(a) || a.localeCompare(b));
+  $('tag-filter').innerHTML = `<div class="tf-row"><span class="tf-h">提供形態</span>${delivery.map(chip).join('')}</div>
+    <div class="tf-row"><span class="tf-h">提供元・団体</span>${orgs.map(chip).join('')}</div>
+    ${LIB_TAGS.size ? '<button type="button" class="b small" data-tag-clear>ラベルを解除</button>' : ''}<span id="tag-count" class="tf-count"></span>`;
+}
+function toggleTag(t, only = false) {
+  if (only) { LIB_TAGS.clear(); LIB_TAGS.add(t); } else LIB_TAGS.has(t) ? LIB_TAGS.delete(t) : LIB_TAGS.add(t);
+  renderTagFilter(); filterLibrary();
 }
 /* モデルを選ぶ（Ctrl+K・ヘッダーのモデル名）：サイドバーのモデル一覧を開いて絞り込み欄へ */
 function pickModel() {
@@ -628,7 +670,10 @@ function referenceDetails() {
   if (!ENTRY.reference) return '';
   const { objectives = [], sources = [] } = M.reference || {};
   const links = sources.filter(source => /^https?:\/\//i.test(source.url));
-  return `${objectives.length ? `<h4>学べること</h4><ul>${objectives.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}
+  const tags = ENTRY.tags || [], ref = ENTRY.reference;
+  return `<div class="ref-meta"><span class="mute">${esc([ref.domain, ref.kind, ref.category].filter(Boolean).join(' › '))}</span>
+    ${tags.length ? `<div class="mtags">${tags.map(t => `<button type="button" class="mtag ${TAG_KIND(t)}" data-tag-only="${esc(t)}" title="このラベルで一覧を絞り込む">${esc(t)}</button>`).join('')}</div>` : ''}</div>
+    ${objectives.length ? `<h4>学べること</h4><ul>${objectives.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}
     ${links.length ? `<h4>公式資料</h4><ul>${links.map(source =>
       `<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a></li>`).join('')}</ul>` : ''}`;
 }
@@ -747,7 +792,7 @@ const SEARCH = [
   ...(M.scenarios || []).map((s, i) => ({ t: 'scenario', id: i, label: s.label, sub: 'シナリオ', key: s.label })),
   ...Object.entries(IDX.byRef).map(([ref, ids]) => ({ t: 'ref', id: ref, label: ref, sub: `→ ${ids.slice(0, 4).join(', ')}${ids.length > 4 ? '…' : ''}`, key: ref, sel: ids.find(x => M.nodes[x]) || ids.map(x => M.links.find(l => l.id === x)?.from).find(Boolean) })),
   // 他のモデルへも検索から移動できる（一覧をたどらずに済む）
-  ...REGISTRY.filter(r => r.id !== KEY).map(r => ({ t: 'model', id: r.id, label: r.name || r.id, sub: r.reference?.category || (r.local ? 'ローカル' : '設計モデル'), key: `${r.name || ''} ${r.id} ${r.reference?.category || ''}` })),
+  ...REGISTRY.filter(r => r.id !== KEY).map(r => ({ t: 'model', id: r.id, label: r.name || r.id, sub: [r.reference?.category, ...(r.tags || [])].filter(Boolean).join('・') || (r.local ? 'ローカル' : '設計モデル'), key: `${r.name || ''} ${r.id} ${r.reference?.domain || ''} ${r.reference?.kind || ''} ${r.reference?.category || ''} ${(r.tags || []).join(' ')}` })),
 ];
 const T_LABEL = { node: '部品', link: '接続', req: '要件', scenario: 'シナリオ', ref: '根拠', model: 'モデル' };
 let qHits = [], qIdx = 0;
@@ -990,6 +1035,12 @@ document.addEventListener('change', e => {
   if (e.target.matches('[data-cmp-only]')) { st.cmpOnly = e.target.checked; draw(); }
 });
 $('model-filter').addEventListener('input', e => filterLibrary(e.target.value));
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tag]'); if (t) return toggleTag(t.dataset.tag);
+  if (e.target.closest('[data-tag-clear]')) { LIB_TAGS.clear(); renderTagFilter(); return filterLibrary(); }
+  const o = e.target.closest('[data-tag-only]');
+  if (o) { $('library').open = true; document.body.classList.remove('nav-closed'); if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open'); toggleTag(o.dataset.tagOnly, true); }
+});
 $('model-filter').addEventListener('keydown', e => {
   if (e.key === 'Enter') { const a = [...document.querySelectorAll('#library .mitem')].find(x => !x.hidden); if (a) location.hash = a.getAttribute('href'); }
   if (e.key === 'Escape') { e.target.value = ''; filterLibrary(''); e.target.blur(); }
