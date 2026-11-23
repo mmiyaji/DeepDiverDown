@@ -23,3 +23,7 @@ SQL エンジンはテーブルの現在のメタデータを読み、そこか�
 ## 6. シナリオの見方
 
 「注文のスナップショットを読む」では、コミット済みメタデータから snapshot、Manifest List、Manifest を順にたどり、必要なデータファイルだけを読む。`snapshot-read` のリンクを順番に選択すると流れを追える。
+
+## 7. スナップショットの履歴と失効
+
+コミットのたびに新しいスナップショットが作られ、テーブルメタデータの `snapshots` と `snapshot-log` に履歴が残る。操作の種類（append、overwrite、delete、replace＝コンパクションなど）と追加・削除したファイル数が `summary` に記録される。`FOR TIMESTAMP AS OF` や `FOR VERSION AS OF` で過去のスナップショットを選ぶと、その版の Manifest List から当時の生存ファイルを読む。古いスナップショットは `expire_snapshots` で失効させ、失効した版だけが参照していたファイルを削除する。失効させた版へはタイムトラベルできない。出典 [Iceberg Maintenance](https://iceberg.apache.org/docs/latest/maintenance/)

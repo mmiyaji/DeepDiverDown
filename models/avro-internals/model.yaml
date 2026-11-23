@@ -1,0 +1,85 @@
+name: "Avro ファイルの内部：ヘッダー・ブロック・同期マーカー"
+description: 行指向の Avro ファイルを、先頭のヘッダー（スキーマ）、データブロック、16 バイトの同期マーカーまでドリルダウンし、分割読みの仕組みを追います。
+parent: {model: file-formats, node: avro}
+reference:
+  objectives:
+    - Avro Object Container File のバイト配置（ヘッダー、ブロック、同期マーカー）を説明する。
+    - 説明が先頭にありフッターが無い、行の追記に向いた構造を Parquet・ORC と比べる。
+    - 同期マーカーで、ファイルの途中から担当するタスクがブロック境界に揃える流れを追う。
+  sources:
+    - {title: Avro Specification - Object Container Files, url: "https://avro.apache.org/docs/current/specification/#object-container-files"}
+    - {title: Avro Schema Resolution, url: "https://avro.apache.org/docs/current/specification/#schema-resolution"}
+sources: [docs/reference-avro-internals.md]
+evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§1"}, {type: doc, ref: "docs/reference-avro-internals.md#§4"}, {type: doc, ref: "docs/reference-avro-internals.md#§5"}]
+tiers:
+  - {id: reader, label: 読み手（タスク）, z: 1, size: [14, 3]}
+  - {id: file, label: ファイル（バイト順：先頭 → 末尾）, z: 0, size: [14, 3]}
+groups:
+  - {kind: parallel, label: 範囲ごとにタスクが並列に読む, tier: reader, nodes: [task-a, task-b]}
+nodes:
+  task-a: {label: タスク A（前半を担当）, kind: worker, tier: reader, x: 2, y: 1.5, description: ファイルの先頭から中央までを担当する。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+  task-b: {label: タスク B（後半を担当）, kind: worker, tier: reader, x: 10, y: 1.5, description: ファイルの中央から末尾までを担当する。途中から読み始める。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+  header: {label: ヘッダー（スキーマ）, kind: segment, tier: file, x: 0, y: 1.5, description: マジック、JSON のスキーマ、コーデック、同期マーカー。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§2"}]}
+  blocks: {label: データブロック, kind: segment, tier: file, x: 5, y: 1.5, partitions: 4, description: レコード数・バイト数・圧縮したレコード本体。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§2"}]}
+  sync: {label: 同期マーカー, kind: segment, tier: file, x: 10, y: 1.5, description: 各ブロックの後ろに置く 16 バイト。ヘッダーと同じ値。, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+links:
+  - {id: a-header, from: task-a, to: header, label: スキーマを読む, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+  - {id: a-blocks, from: task-a, to: blocks, label: 先頭から順に読む, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§2"}]}
+  - {id: b-header, from: task-b, to: header, label: スキーマと同期マーカーを得る, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+  - {id: b-sync, from: task-b, to: sync, label: 次の同期マーカーを探す, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+  - {id: b-blocks, from: task-b, to: blocks, label: ブロック境界から読む, evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+scenarios:
+  - id: avro-scan
+    label: 先頭から全件を読む
+    evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§6"}]
+    steps:
+      - {read: [hdr-magic, hdr-meta, hdr-sync], links: [a-header], note: "ヘッダーのスキーマ（JSON）とコーデックを読む。列の統計は無いので、読み飛ばしはできない。"}
+      - {read: [b1, b2, b3], links: [a-blocks], note: ブロックを先頭から順にデコードする。ブロック単位で圧縮されているので、ブロックごとに解凍する。}
+  - id: avro-split
+    label: ファイルの途中から分割して読む
+    evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]
+    steps:
+      - {marks: [{label: "タスク A の範囲 →", at: 0, tone: pos}, {label: "タスク B の範囲 →", at: [b2-data, 0.5], tone: consumer}], read: [hdr-magic, hdr-meta, hdr-sync], links: [a-header, b-header], note: "ファイルをバイト位置で半分に分ける。タスク B の開始位置はブロック 2 の途中に当たる。どちらもまずヘッダーを読む。"}
+      - {marks: [{label: "タスク B の開始位置", at: [b2-data, 0.5], tone: consumer}, {label: "次の同期マーカー", at: [b2-sync, 1], tone: end}], read: [b2-sync], links: [b-sync], note: "タスク B は開始位置から同期マーカーを探し、ブロック 2 の残りは読まずに飛ばす（ブロック 2 はタスク A が読む）。"}
+      - {marks: [{label: "A はここまで", at: [b2-sync, 1], tone: pos}, {label: "B はここから", at: [b2-sync, 1], tone: consumer}], read: [b1, b2, b3], links: [a-blocks, b-blocks], note: "A は範囲の終わりを越えた最初の同期マーカー（ブロック 2 の後ろ）まで、B はその直後のブロック 3 から読む。二重読みも読み落としも無い。"}
+requirements:
+  - {id: AV-01, kind: rule, title: 同期マーカーで境界を揃える, text: 分割読みでは、担当範囲の先頭から最初の同期マーカーを探してブロック境界から読む。, links: [b-sync, b-blocks], evidence: [{type: doc, ref: "docs/reference-avro-internals.md#§3"}]}
+unknowns:
+  - {id: UNK-01, text: 書き手のブロックサイズ（同期間隔）とコーデックは未確定。, refs: [blocks]}
+gates: {maxDrift: 0, maxHigh: 0}
+fileLayout:
+  file: events-00000.avro
+  note: "例：ブロックを 3 つに省略して描いた Avro ファイル（数値は説明用）。実際のファイルには多数のブロックが並ぶ。"
+  segments:
+    - id: hdr
+      label: ヘッダー
+      kind: header
+      node: header
+      children:
+        - {id: hdr-magic, label: "\"Obj\" 01", bytes: 4, kind: magic, node: header, sample: "4F 62 6A 01    |Obj.|"}
+        - {id: hdr-meta, label: ファイルメタデータ, bytes: 1536, kind: header, node: header, description: map 型のメタデータ。avro.schema に書き手のスキーマ（JSON）、avro.codec に圧縮方式。, sample: "avro.schema: {\"type\":\"record\",\"name\":\"Event\",\"fields\":[\n  {\"name\":\"event_ts\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-micros\"}},\n  {\"name\":\"user_id\",\"type\":\"long\"},\n  {\"name\":\"event_type\",\"type\":\"string\"},\n  {\"name\":\"payload\",\"type\":[\"null\",\"string\"]} ]}\navro.codec: zstandard"}
+        - {id: hdr-sync, label: 同期マーカー, bytes: 16, kind: magic, node: sync, sample: "9C 2E 71 0B  D4 58 A3 1F  66 0E C2 97  3B 85 E1 4A\n（16 バイトの乱数。各ブロックの後ろにも同じ値）"}
+    - id: b1
+      label: ブロック 1
+      kind: chunk
+      node: blocks
+      children:
+        - {id: b1-head, label: 件数・長さ, bytes: 8, kind: header, node: blocks, sample: "count: 4,000   size: 262,144（zigzag 可変長の long）"}
+        - {id: b1-data, label: レコード（圧縮）, bytes: 262144, kind: page, node: blocks, sample: "1793491200000000 | 4242 | \"view\" | {…}\n1793491200001250 | 18   | \"click\" | null\n…（スキーマ順に詰めたバイナリを zstd で圧縮）"}
+        - {id: b1-sync, label: 同期マーカー, bytes: 16, kind: magic, node: sync}
+    - id: b2
+      label: ブロック 2
+      kind: chunk
+      node: blocks
+      children:
+        - {id: b2-head, label: 件数・長さ, bytes: 8, kind: header, node: blocks}
+        - {id: b2-data, label: レコード（圧縮）, bytes: 262144, kind: page, node: blocks}
+        - {id: b2-sync, label: 同期マーカー, bytes: 16, kind: magic, node: sync}
+    - id: b3
+      label: ブロック 3
+      kind: chunk
+      node: blocks
+      children:
+        - {id: b3-head, label: 件数・長さ, bytes: 8, kind: header, node: blocks}
+        - {id: b3-data, label: レコード（圧縮）, bytes: 262144, kind: page, node: blocks}
+        - {id: b3-sync, label: 同期マーカー, bytes: 16, kind: magic, node: sync}

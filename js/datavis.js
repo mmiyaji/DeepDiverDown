@@ -109,13 +109,85 @@ export class DistMap {
         <text class="dm-l" x="${x + bw / 2}" y="${H + 12}">${esc(b.short || b.label)}</text></g>`;
     }).join('');
     const line = (v, cls, label) => `<line class="dm-line ${cls}" x1="32" x2="${w}" y1="${Y(v)}" y2="${Y(v)}"/><text class="dm-lt ${cls}" x="${w}" y="${Y(v) - 3}">${esc(label)}</text>`;
-    const ratio = med ? (max / med).toFixed(1) : '—';
+    const ratio = med ? (max / med).toFixed(1) : '—', tot = vals.reduce((a, b) => a + b, 0);
     const sel = this.sel && bars.find(b => b.id === this.sel);
     this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || '分布')}</span>
-        <div class="fm-meter">最大 <b>${max}${unit}</b> は中央値 ${med}${unit} の <b>${ratio} 倍</b>${L.maxNote ? `・${esc(L.maxNote)}` : ''}</div></div>
+        ${L.summary === 'files'
+          ? `<div class="fm-meter">ファイル <b>${bars.length} 個</b>・合計 ${tot}${unit}${L.target ? `・目標 ${L.target}${unit} の 3/4 未満 <b>${vals.filter(v => v < L.target * 0.75).length} 個</b>` : ''}</div>`
+          : `<div class="fm-meter">最大 <b>${max}${unit}</b> は中央値 ${med}${unit} の <b>${ratio} 倍</b>${L.maxNote ? `・${esc(L.maxNote)}` : ''}</div>`}</div>
       <svg class="dm" width="${w}" height="${H + 18}" viewBox="0 0 ${w} ${H + 18}">
-        ${line(med, 'med', `中央値 ${med}${unit}`)}${line(max, 'mx', `最大 ${max}${unit}`)}${g}</svg>
+        ${L.summary === 'files' ? (L.target ? line(L.target, 'mx', `目標 ${L.target}${unit}`) : '') : line(med, 'med', `中央値 ${med}${unit}`) + line(max, 'mx', `最大 ${max}${unit}`)}${g}</svg>
       ${L.note ? `<div class="fm-note">${esc(L.note)}</div>` : ''}
       ${infoBox(sel && { ...sel, sub: `${sel.value}${unit}` }, '棒を選ぶと説明を表示します。シナリオを再生すると、注目する棒が強調され、対処後の分布に切り替わります。')}`;
+  }
+}
+
+/* ---------- 表：行×列のマス目（パーティション×保存ブロックなど） ----------
+   grid: { title, rowLabel, colLabel, unit, note, rows: [{id,label}], cols: [{id,label}], values: [[行ごとの値]], node? }
+   ステップの prune / read は 'row:行ID'、'col:列ID'、'行ID:列ID' で指定する */
+export class GridMap {
+  constructor(el, layout, { onNode } = {}) {
+    this.el = el; this.L = layout; this.onNode = onNode; this.ctx = null; this.sel = null;
+    el.addEventListener('click', e => { const c = e.target.closest('[data-cell]'); if (c) { this.sel = c.dataset.cell; if (layout.node) onNode?.(layout.node); this.render(); } });
+    this.render();
+  }
+  sync(ctx) {
+    this.ctx = ctx && { prune: acc(ctx.steps.slice(0, ctx.idx + 1), 'prune'), pnow: new Set(ctx.steps[ctx.idx]?.prune || []),
+      read: acc(ctx.steps.slice(0, ctx.idx + 1), 'read'), rnow: new Set(ctx.steps[ctx.idx]?.read || []) };
+    this.render();
+  }
+  match(set, r, c) { return set.has(`${r}:${c}`) || set.has(`row:${r}`) || set.has(`col:${c}`); }
+  render() {
+    const L = this.L, C = this.ctx, unit = L.unit || '';
+    let total = 0, cut = 0, readN = 0, readV = 0, sum = 0;
+    const head = `<tr><th class="gm-corner">${esc(L.rowLabel || '')} ＼ ${esc(L.colLabel || '')}</th>${L.cols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr>`;
+    const body = L.rows.map((r, i) => `<tr><th>${esc(r.label)}</th>${L.cols.map((c, j) => {
+      const v = L.values[i][j]; total++; sum += v;
+      let st = '';
+      if (C) {
+        if (this.match(C.prune, r.id, c.id)) { st = this.match(C.pnow, r.id, c.id) ? 'cut' : 'skip'; cut++; }
+        else if (this.match(C.read, r.id, c.id)) { st = this.match(C.rnow, r.id, c.id) ? 'now' : 'done'; readN++; readV += v; }
+      }
+      const id = `${r.id}:${c.id}`;
+      return `<td class="gm-c ${st ? 's-' + st : ''} ${this.sel === id ? 'sel' : ''}" data-cell="${esc(id)}" style="--a:${Math.min(1, v / (L.scaleMax || Math.max(...L.values.flat())))}" title="${esc(r.label)} × ${esc(c.label)}：${v}${unit}">${v}</td>`;
+    }).join('')}</tr>`).join('');
+    const meter = C ? `<div class="fm-meter">マス ${total} 件中 <b>${cut} 件を除外</b>${readN ? `・${readN} 件を読む（${readV}${unit} / 全体 ${sum}${unit}、${(readV / sum * 100).toFixed(1)}%）` : ''}</div>` : '';
+    const [sr, sc] = (this.sel || '').split(':');
+    const selInfo = this.sel && { label: `${L.rows.find(r => r.id === sr)?.label} × ${L.cols.find(c => c.id === sc)?.label}`, sub: `${L.values[L.rows.findIndex(r => r.id === sr)]?.[L.cols.findIndex(c => c.id === sc)]}${unit}`, description: L.cellNote };
+    this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || '分布の表')}</span>${meter}</div>
+      <div class="gm-scroll"><table class="gm">${head}${body}</table></div>
+      ${L.note ? `<div class="fm-note">${esc(L.note)}</div>` : ''}
+      ${infoBox(selInfo, 'マスはパーティションと保存ブロックの組で、数値はデータ量です。シナリオを再生すると、除外されたマスが灰色になり、読むマスが光ります。')}`;
+  }
+}
+
+/* ---------- タイムライン：コミット（スナップショット）の並び ----------
+   timeline: { title, note, commits: [{ id, label, time, kind, node?, description?, sample? }] }
+   ステップの current（現在の版）、travel（時点指定で読む版）、expire（失効した版）、highlight を反映する */
+export class TimelineMap {
+  constructor(el, layout, { onNode } = {}) {
+    this.el = el; this.L = layout; this.onNode = onNode; this.ctx = null; this.sel = null;
+    el.addEventListener('click', e => { const c = e.target.closest('[data-commit]'); if (c) this.pick(c.dataset.commit); });
+    this.render();
+  }
+  pick(id) { this.sel = id; const c = this.L.commits.find(x => x.id === id); if (c?.node) this.onNode?.(c.node); this.render(); }
+  sync(ctx) { this.ctx = ctx; this.render(); }
+  latest(k) { const C = this.ctx; if (!C) return this.L[k]; const s = [...C.steps.slice(0, C.idx + 1)].reverse().find(x => x[k] !== undefined); return s ? s[k] : this.L[k]; }
+  render() {
+    const L = this.L, C = this.ctx, cs = L.commits;
+    const cur = this.latest('current'), travel = this.latest('travel');
+    const expired = new Set(C ? C.steps.slice(0, C.idx + 1).flatMap(x => x.expire || []) : []);
+    const hi = new Set(C ? C.steps[C.idx]?.highlight || [] : []);
+    const items = cs.map(c => {
+      const cls = [`k-${c.kind || 'append'}`, expired.has(c.id) ? 's-expired' : '', hi.has(c.id) ? 's-hi' : '', c.id === cur ? 'cur' : '', c.id === travel ? 'travel' : '', this.sel === c.id ? 'sel' : ''].join(' ');
+      return `<button type="button" class="tl-c ${cls}" data-commit="${esc(c.id)}" aria-label="${esc(c.label)} ${esc(c.time || '')}">
+        ${c.id === cur ? '<span class="tl-pin cur">現在</span>' : ''}${c.id === travel ? '<span class="tl-pin travel">時点指定で読む</span>' : ''}
+        <span class="tl-dot"></span><span class="tl-l">${esc(c.label)}</span><span class="tl-t">${esc(c.time || '')}</span><span class="tl-k">${esc({ append: '追記', overwrite: '上書き', delete: '削除', compact: 'コンパクション' }[c.kind] || c.kind || '')}</span></button>`;
+    }).join('');
+    const meter = expired.size ? `<div class="fm-meter">失効 <b>${expired.size} 件</b>・それらだけが参照するファイルは削除対象</div>` : '';
+    this.el.innerHTML = `<div class="fm-head"><span class="fm-title">${esc(L.title || 'コミットのタイムライン')}</span>${meter}</div>
+      <div class="tl-scroll"><div class="tl">${items}</div></div>
+      ${L.note ? `<div class="fm-note">${esc(L.note)}</div>` : ''}
+      ${infoBox(this.sel && cs.find(c => c.id === this.sel), 'コミットを選ぶと内容を表示します。シナリオを再生すると、現在の版・時点指定で読む版・失効した版が変わります。')}`;
   }
 }

@@ -40,8 +40,8 @@ scenarios:
     label: 注文の日次パーティションを整理する
     evidence: [{type: doc, ref: docs/reference-compaction.md#§8}]
     steps:
-      - {links: [ingest, inspect], note: マイクロバッチで増えた order_date パーティションの小ファイルを観測し、対象を選ぶ。}
-      - {links: [plan, rewrite-files], note: 既定は bin-packing とし、検索局所性が必要な場合だけ sort rewrite を実行する。}
+      - {highlight: [f1, f3, f5, f7, f9, f12, f14, f16, f18, f22, f24, f26, f29, f31], links: [ingest, inspect], note: マイクロバッチで増えた order_date パーティションの小ファイルを観測し、対象を選ぶ。}
+      - {bars: [{id: c0, label: "まとめた後のファイル 1", short: "新1", value: 128, node: orders, description: "目標サイズ近くまで詰めて書いた新しいファイル。"}, {id: c1, label: "まとめた後のファイル 2", short: "新2", value: 128, node: orders, description: "目標サイズ近くまで詰めて書いた新しいファイル。"}, {id: c2, label: "まとめた後のファイル 3", short: "新3", value: 104, node: orders, description: "残りを詰めたファイル。"}], highlight: [c0, c1, c2], links: [plan, rewrite-files], note: 既定は bin-packing とし、検索局所性が必要な場合だけ sort rewrite を実行する。}
       - {links: [commit, publish, read], note: 新ファイルと旧ファイルの参照をメタデータへコミットし、読み取りは新しい一貫したスナップショットを使う。}
       - {links: [expire], note: 過去の読み取りに必要な保持期間を過ぎてから旧ファイルを掃除する。}
 requirements:
@@ -51,3 +51,11 @@ requirements:
 unknowns:
   - {id: UNK-01, text: 実際の target file size、閾値、保持日数、実行スケジュールは利用環境ごとに決める。, refs: [planner, cleanup]}
 gates: {maxDrift: 0, maxHigh: 0}
+distribution:
+  title: order_date=2026-11-01 パーティションのデータファイル
+  unit: " MB"
+  summary: files
+  target: 128
+  scaleMax: 140
+  note: "マイクロバッチごとに数 MB〜20 MB のファイルが増えた例。コンパクションで目標 128 MB 前後の少数のファイルにまとめる（数値は説明用）。"
+  bars: [{id: f0, label: "ファイル 1", short: "1", value: 12, node: orders}, {id: f1, label: "ファイル 2", short: "2", value: 8, node: orders}, {id: f2, label: "ファイル 3", short: "3", value: 15, node: orders}, {id: f3, label: "ファイル 4", short: "4", value: 6, node: orders}, {id: f4, label: "ファイル 5", short: "5", value: 22, node: orders}, {id: f5, label: "ファイル 6", short: "6", value: 9, node: orders}, {id: f6, label: "ファイル 7", short: "7", value: 11, node: orders}, {id: f7, label: "ファイル 8", short: "8", value: 7, node: orders}, {id: f8, label: "ファイル 9", short: "9", value: 18, node: orders}, {id: f9, label: "ファイル 10", short: "10", value: 5, node: orders}, {id: f10, label: "ファイル 11", short: "11", value: 14, node: orders}, {id: f11, label: "ファイル 12", short: "12", value: 10, node: orders}, {id: f12, label: "ファイル 13", short: "13", value: 9, node: orders}, {id: f13, label: "ファイル 14", short: "14", value: 16, node: orders}, {id: f14, label: "ファイル 15", short: "15", value: 6, node: orders}, {id: f15, label: "ファイル 16", short: "16", value: 13, node: orders}, {id: f16, label: "ファイル 17", short: "17", value: 8, node: orders}, {id: f17, label: "ファイル 18", short: "18", value: 21, node: orders}, {id: f18, label: "ファイル 19", short: "19", value: 7, node: orders}, {id: f19, label: "ファイル 20", short: "20", value: 12, node: orders}, {id: f20, label: "ファイル 21", short: "21", value: 10, node: orders}, {id: f21, label: "ファイル 22", short: "22", value: 15, node: orders}, {id: f22, label: "ファイル 23", short: "23", value: 9, node: orders}, {id: f23, label: "ファイル 24", short: "24", value: 11, node: orders}, {id: f24, label: "ファイル 25", short: "25", value: 6, node: orders}, {id: f25, label: "ファイル 26", short: "26", value: 14, node: orders}, {id: f26, label: "ファイル 27", short: "27", value: 8, node: orders}, {id: f27, label: "ファイル 28", short: "28", value: 19, node: orders}, {id: f28, label: "ファイル 29", short: "29", value: 10, node: orders}, {id: f29, label: "ファイル 30", short: "30", value: 7, node: orders}, {id: f30, label: "ファイル 31", short: "31", value: 13, node: orders}, {id: f31, label: "ファイル 32", short: "32", value: 9, node: orders}]

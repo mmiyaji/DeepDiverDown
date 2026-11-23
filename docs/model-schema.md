@@ -231,3 +231,15 @@ groups:
 
 - `distribution: {title, unit, maxNote, scaleMax, note, bars}` で棒グラフを描き、中央値と最大値の線、最大÷中央値の倍率を表示する。
 - ステップの `highlight: [ID]` は棒を強調し、`bars: [...]` は分布を差し替える（例：AQE によるパーティション分割の前後）。`scaleMax` を書くと縦軸を固定して前後を比べやすくする。
+
+- 分布に `summary: files` と `target`（目標サイズ）を書くと、ファイルサイズの集計（個数・合計・目標未満の個数）と目標線を表示する（コンパクションの前後比較）。
+
+## 表（grid）
+
+- `grid: {title, rowLabel, colLabel, unit, node, rows, cols, values, cellNote, note}` で、行×列のマス目（パーティション×保存ブロックなど）を描く。値の大きさで濃淡を付ける。
+- ステップの `prune` / `read` は `row:行ID`、`col:列ID`、`行ID:列ID` で指定する。除外したマスと読むデータ量の割合を表示する。
+
+## タイムライン（timeline）
+
+- `timeline: {title, current, note, commits: [{id, label, time, kind, node, description, sample}]}` で、コミット（スナップショット）を時間順に並べる。`kind` は append／overwrite／delete／compact。
+- ステップの `current`（現在の版）、`travel`（時点指定で読む版）、`expire`（失効した版）、`highlight` を反映する。

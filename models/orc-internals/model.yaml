@@ -1,0 +1,98 @@
+name: "ORC ファイルの内部：Postscript から Stream まで"
+description: 1 つの ORC ファイルの中を、末尾の Postscript とフッター、Stripe の索引・Stream までドリルダウンし、範囲 GET で読む順序を追います。
+parent: {model: file-formats, node: orc}
+reference:
+  objectives:
+    - ORC のバイト配置（マジック、Stripe、Metadata、File Footer、Postscript、最後の 1 バイト）を説明する。
+    - Postscript → フッター → Stripe 統計 → Row Index の順に読む範囲を絞る流れを追う。
+    - 列を役割ごとの Stream（PRESENT／DATA／LENGTH／DICTIONARY_DATA）に分けて保存する仕組みを理解する。
+    - Parquet との構造の違いを比べる。
+  sources:
+    - {title: ORC Specification v1, url: "https://orc.apache.org/specification/ORCv1/"}
+    - {title: ORC Indexes, url: "https://orc.apache.org/docs/indexes.html"}
+sources: [docs/reference-orc-internals.md]
+evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§1"}, {type: doc, ref: "docs/reference-orc-internals.md#§5"}]
+tiers:
+  - {id: reader, label: 読み手（Worker）, z: 2, size: [14, 3]}
+  - {id: file, label: ファイル（バイト順：先頭 → 末尾）, z: 1, size: [14, 3]}
+  - {id: stripe, label: Stripe の中, z: 0, size: [14, 3]}
+nodes:
+  reader: {label: ORC Reader, kind: worker, tier: reader, x: 6, y: 1.5, description: 末尾から Postscript とフッターを読み、Stripe と行グループを選んで必要な Stream を取る。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  magic: {label: "Header \"ORC\"", kind: segment, tier: file, x: 0, y: 1.5, description: 先頭 3 バイトのマジック。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
+  stripes: {label: Stripes, kind: segment, tier: file, x: 3, y: 1.5, partitions: 2, description: 行の塊（既定 64 MB）。それぞれが索引・データ・フッターを持つ。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
+  metadata: {label: Metadata（Stripe 統計）, kind: segment, tier: file, x: 7, y: 1.5, description: Stripe ごとの列統計。Stripe を丸ごと捨てる判断に使う。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  footer: {label: File Footer, kind: segment, tier: file, x: 10, y: 1.5, description: "スキーマ、Stripe の一覧と位置、ファイル全体の列統計（Protocol Buffers）。", evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
+  postscript: {label: Postscript + 長さ, kind: segment, tier: file, x: 13, y: 1.5, description: 圧縮しない。圧縮方式とフッター長を持つ。最後の 1 バイトがこの長さ。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}, {type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  index: {label: Index Data（Row Index）, kind: segment, tier: stripe, x: 2, y: 1.5, description: 列ごとに 10,000 行ごとの min/max と位置。任意でブルームフィルター。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  streams: {label: Row Data（Streams）, kind: segment, tier: stripe, x: 7, y: 1.5, partitions: 4, description: "列ごとの PRESENT／DATA／LENGTH／DICTIONARY_DATA。", evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§4"}]}
+  sfooter: {label: Stripe Footer, kind: segment, tier: stripe, x: 12, y: 1.5, description: この Stripe の Stream の一覧・位置・エンコーディング。, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§2"}]}
+links:
+  - {id: read-ps, from: reader, to: postscript, label: ① 末尾と Postscript, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  - {id: read-footer, from: reader, to: footer, label: ② File Footer, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  - {id: read-meta, from: reader, to: metadata, label: ③ Stripe 統計で選ぶ, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  - {id: skip-stripe, from: metadata, to: stripes, label: 範囲外の Stripe を捨てる, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  - {id: read-sfooter, from: reader, to: sfooter, label: ④ Stream の位置, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  - {id: read-index, from: reader, to: index, label: ⑤ Row Index で行グループを選ぶ, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+  - {id: read-streams, from: reader, to: streams, label: ⑥ 必要な Stream だけ, evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§4"}]}
+scenarios:
+  - id: open-orc
+    label: ORC ファイルを開く
+    evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§6"}]
+    steps:
+      - {read: [ps-len, ps], links: [read-ps], note: "最後の 1 バイトで Postscript の長さを知り、Postscript から圧縮方式とフッター長を得る。"}
+      - {read: [footer], links: [read-footer], note: "File Footer を解凍してスキーマと Stripe の位置を得る。"}
+  - id: orc-predicate
+    label: Stripe と行グループを絞って読む
+    evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]
+    steps:
+      - {read: [ps-len, ps, footer, meta], links: [read-ps, read-footer, read-meta], note: "WHERE event_ts < '06:00' で user_id と event_type を取る。末尾から Postscript・フッター・Stripe 統計を読む。"}
+      - {links: [skip-stripe], note: Stripe 統計で、午後のデータの Stripe 1 を丸ごと捨てる。}
+      - {read: [s0-footer, s0-idx-ts], links: [read-sfooter, read-index], note: "Stripe 0 の Stripe Footer で Stream の位置を知り、event_ts の Row Index で 06:00 より前の行グループだけを選ぶ。"}
+      - {read: [s0-ts-data, s0-user-data, s0-type-dict, s0-type-data], links: [read-streams], note: "必要な 3 列の Stream だけを範囲 GET する。payload 列の Stream は読まない。"}
+requirements:
+  - {id: ORC-01, kind: rule, title: 末尾から読む, text: "Postscript とフッターを先に読み、Stripe・行グループを選んでから Stream を取る。", links: [read-ps, read-footer, read-streams], evidence: [{type: doc, ref: "docs/reference-orc-internals.md#§3"}]}
+unknowns:
+  - {id: UNK-01, text: 書き手の版、Stripe サイズ、ブルームフィルターの有無、圧縮方式は未確定。, refs: [stripes, index]}
+gates: {maxDrift: 0, maxHigh: 0}
+fileLayout:
+  file: events-00000.orc
+  note: "例：4 列・2 Stripe の events ファイル（数値は説明用）。帯の幅はバイト数の比率。小さい区画は最小幅で表示。"
+  segments:
+    - {id: magic, label: "\"ORC\"", bytes: 3, kind: magic, node: magic, sample: "4F 52 43    |ORC|"}
+    - id: s0
+      label: Stripe 0（00:00〜11:59）
+      kind: rowgroup
+      node: stripes
+      children:
+        - id: s0-index
+          label: Index Data
+          kind: index
+          node: index
+          children:
+            - {id: s0-idx-ts, label: Row Index（event_ts）, bytes: 98304, kind: index, node: index, description: 10,000 行ごとの min/max と、各 Stream 内の位置。, sample: "rowgroup 0: min 00:00:00 max 00:03:21  positions: [0, 0, 0]\nrowgroup 1: min 00:03:21 max 00:06:40  positions: [18304, 0, 1]\n…\nrowgroup 200: min 11:56:40 max 11:59:59"}
+            - {id: s0-idx-rest, label: Row Index（他の列）, bytes: 294912, kind: index, node: index}
+        - id: s0-data
+          label: Row Data
+          kind: chunk
+          node: streams
+          children:
+            - {id: s0-ts-data, label: "event_ts DATA", bytes: 8388608, kind: page, node: streams, description: RLE v2 の差分エンコーディングで詰めたタイムスタンプ。}
+            - {id: s0-user-data, label: "user_id DATA", bytes: 16777216, kind: page, node: streams}
+            - {id: s0-type-dict, label: "event_type DICTIONARY_DATA", bytes: 4096, kind: dict, node: streams, sample: "view\nclick\ncart\npurchase"}
+            - {id: s0-type-data, label: "event_type DATA（辞書番号）", bytes: 2093056, kind: page, node: streams, sample: "0 0 0 1 0 2 0 0 3 …  （RLE v2）"}
+            - {id: s0-pl-present, label: "payload PRESENT", bytes: 262144, kind: page, node: streams, description: null かどうかのビット列。, sample: "1 1 0 1 1 1 0 …  （0 = null）"}
+            - {id: s0-pl-len, label: "payload LENGTH", bytes: 1048576, kind: page, node: streams}
+            - {id: s0-pl-data, label: "payload DATA", bytes: 38535168, kind: page, node: streams}
+        - {id: s0-footer, label: Stripe Footer, bytes: 2048, kind: footer, node: sfooter, description: "この Stripe の Stream の一覧・位置・列のエンコーディング。", sample: "streams: [ {column: 1, kind: ROW_INDEX, length: 98304}, …\n           {column: 1, kind: DATA, length: 8388608}, … ]\ncolumns: [ {kind: DIRECT_V2}, {kind: DIRECT_V2}, {kind: DICTIONARY_V2, dictionarySize: 4}, … ]"}
+    - id: s1
+      label: Stripe 1（12:00〜23:59）
+      kind: rowgroup
+      node: stripes
+      children:
+        - {id: s1-index, label: Index Data, bytes: 393216, kind: index, node: index}
+        - {id: s1-data, label: Row Data, bytes: 67108864, kind: chunk, node: streams}
+        - {id: s1-footer, label: Stripe Footer, bytes: 2048, kind: footer, node: sfooter}
+    - {id: meta, label: Metadata（Stripe 統計）, bytes: 4096, kind: index, node: metadata, sample: "stripe 0: event_ts min 00:00:00 max 11:59:59\nstripe 1: event_ts min 12:00:00 max 23:59:59"}
+    - {id: footer, label: File Footer, bytes: 8192, kind: footer, node: footer, sample: "Footer {\n  numberOfRows: 4,000,000\n  types: struct<event_ts:timestamp,user_id:bigint,event_type:string,payload:string>\n  stripes: [ {offset: 3, indexLength: 393216, dataLength: 67108864, footerLength: 2048}, … ]\n  statistics: [ … ファイル全体の列統計 … ]\n}"}
+    - {id: ps, label: Postscript, bytes: 24, kind: header, node: postscript, description: 圧縮しないので、そのまま読める。, sample: "PostScript {\n  footerLength: 8192, compression: ZSTD,\n  compressionBlockSize: 262144, version: [0, 12], magic: \"ORC\"\n}"}
+    - {id: ps-len, label: 長さ（1 バイト）, bytes: 1, kind: magic, node: postscript, sample: "18    → Postscript は 24 バイト"}
