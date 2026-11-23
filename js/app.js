@@ -225,7 +225,7 @@ function decorate() {
 const fmt = (k, v) => { const u = (METRICS.find(x => x[0] === k) || [])[2] || ''; return u === '$' ? `$${v}` : `${v}${u}`; };
 
 /* ================= 3D 描画 ================= */
-const scene = new Scene3D($('view'), { onPick: id => onPick(id) });
+const scene = new Scene3D($('view'), { onPick: id => onPick(id), onDrill: id => { const d = allNodes()[id]?.drill; if (d && REGISTRY.some(r => r.id === d)) location.hash = `#/m/${encodeURIComponent(d)}/struct`; } });
 scene.speed = S.packetSpeed;
 scene.initialView = S.defaultView;
 
@@ -267,7 +267,7 @@ function nodeSpec(id, n, s) {
     label: n.label, selected: VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', abbr: svc && { text: svc.abbr, color: svc.color },
     // 並列表現：parallel（同じ実行単位が N 個）・slots（同時に走る Task 数）・partitions（データの分割数）
     parallel: n.parallel, slots: n.slots, partitions: n.partitions,
-    badge: s.badge || (n.parallel ? { text: `×${n.parallel} 並列`, tone: 'par' } : null),
+    badge: s.badge || (n.parallel ? { text: `×${n.parallel} 並列`, tone: 'par' } : n.drill ? { text: '▼ 詳細図', tone: 'drill' } : null),
     sub: svc ? { text: serviceLabel(svc), color: svc.providerColor } : (n.slots || n.partitions) ? { text: [n.slots && `同時 ${n.slots} Task`, n.partitions && `${n.partitions} 分割`].filter(Boolean).join('・'), color: 'var(--par)' } : undefined,
   };
 }
@@ -489,6 +489,7 @@ function nodeDetail(id) {
   const reqs = (M.requirements || []).filter(q => q.nodes?.includes(id));
   return `<h4>選択中の部品</h4><h3>${esc(n.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${esc(n.subnet)} subnet` : ''} / ${esc(TI(n.tier).label || '')}</div>
     ${n.description ? `<p>${esc(n.description)}</p>` : ''}
+    ${n.drill && REGISTRY.some(r => r.id === n.drill) ? `<a class="b drill" href="#/m/${encodeURIComponent(n.drill)}/struct">▼ 内部構造を見る：${esc(REGISTRY.find(r => r.id === n.drill).name || n.drill)}</a>` : ''}
     <div class="row"><button class="b small" data-focus="${id}">この部品に寄る（F）</button><button class="b small ${st.nbr ? 'on' : ''}" data-nbr>周辺だけ表示（N）</button><button class="b small" data-sel="">選択を解除</button></div>
     ${c ? `<div class="row">${tag(c.status)}<span class="sub m0">${esc(c.why)}</span></div>` : ''}
     <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${n.parallel ? `<tr><td>並列数</td><td>${esc(n.parallel)}（同じ実行単位が並列に動く）</td></tr>` : ''}${n.slots ? `<tr><td>同時 Task</td><td>${esc(n.slots)}（例）</td></tr>` : ''}${n.partitions ? `<tr><td>分割数</td><td>${esc(n.partitions)}（例）</td></tr>` : ''}${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
@@ -963,6 +964,12 @@ addEventListener('keydown', e => {
 /* ================= 起動 ================= */
 document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
+/* ドリルダウン：上位の図（parent）があればパンくずで戻れるようにする */
+{
+  const up = $('mparent'), p = M.parent?.model && REGISTRY.find(r => r.id === M.parent.model);
+  up.hidden = !p;
+  if (p) { up.href = `#/m/${encodeURIComponent(p.id)}/struct${M.parent.node ? '?s=' + encodeURIComponent(M.parent.node) : ''}`; up.textContent = `↑ ${p.name}`; up.title = '上位の図に戻る'; }
+}
 setDimension(st.dimension, false);
 try { if (localStorage.getItem('ddd.libMain')) $('library').open = true; } catch {}
 $('library').addEventListener('toggle', e => {

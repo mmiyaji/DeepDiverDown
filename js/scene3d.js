@@ -19,8 +19,8 @@ const overlaps = (a, b, gap = 0) => a.left < b.right + gap && a.right + gap > b.
 const VIEWS = { iso: [1, 1.05, 1], top: [0, 1, 0.0001], side: [0.05, 0.35, 1], back: [-1, 1.05, -1] };
 
 export class Scene3D {
-  constructor(el, { onPick } = {}) {
-    this.el = el; this.onPick = onPick;
+  constructor(el, { onPick, onDrill } = {}) {
+    this.el = el; this.onPick = onPick; this.onDrill = onDrill;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); // PNG 書き出しのため保持
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     el.appendChild(this.renderer.domElement);
@@ -52,6 +52,12 @@ export class Scene3D {
       this.ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), this.camera);
       const hit = this.ray.intersectObjects(this.pick, false)[0];
       this.onPick?.(hit?.object.userData.id ?? null);
+    });
+    this.renderer.domElement.addEventListener('dblclick', e => {
+      const r = this.renderer.domElement.getBoundingClientRect();
+      this.ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), this.camera);
+      const hit = this.ray.intersectObjects(this.pick, false)[0];
+      if (hit) this.onDrill?.(hit.object.userData.id);
     });
     /* ホバー：部品の上ではカーソルを変え、その部品のラベルを優先して表示する */
     let hoverQueued = null;
