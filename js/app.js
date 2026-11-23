@@ -1,5 +1,5 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=card-icons';
+import { Scene3D } from './scene3d.js?v=drill2';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=nc1';
@@ -225,7 +225,34 @@ function decorate() {
 const fmt = (k, v) => { const u = (METRICS.find(x => x[0] === k) || [])[2] || ''; return u === '$' ? `$${v}` : `${v}${u}`; };
 
 /* ================= 3D 描画 ================= */
-const scene = new Scene3D($('view'), { onPick: id => onPick(id), onDrill: id => { const d = allNodes()[id]?.drill; if (d && REGISTRY.some(r => r.id === d)) location.hash = `#/m/${encodeURIComponent(d)}/struct`; } });
+const scene = new Scene3D($('view'), { onPick: id => onPick(id), onDrill: id => drillInto(id) });
+/* ドリルダウン：部品へズームインしながら詳細図へ、パンくずではズームアウトしながら上位の図へ移る */
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function transitionTo(hash, dir, origin, from) {
+  try { sessionStorage.setItem('ddd.drill', JSON.stringify({ dir, at: Date.now(), from })); } catch {}
+  if (REDUCED) { location.hash = hash; return; }
+  const v = $('view');
+  if (origin) v.style.transformOrigin = `${origin[0] * 100}% ${origin[1] * 100}%`;
+  v.classList.add(dir === 'in' ? 'drill-leave-in' : 'drill-leave-out');
+  setTimeout(() => { location.hash = hash; }, 420);
+}
+function drillInto(id) {
+  const d = allNodes()[id]?.drill;
+  if (!d || !REGISTRY.some(r => r.id === d)) return;
+  const p = scene.nodePos(id);
+  if (p && !REDUCED) scene.focusOn(p, scene.camera.zoom * 2.6);
+  transitionTo(`#/m/${encodeURIComponent(d)}/struct`, 'in', scene.nodeScreen(id), { model: KEY, node: id });
+}
+/* 遷移してきた直後は、入ってくる演出を付ける（詳細図：奥から手前へ広がる／上位の図：手前から引いて戻る） */
+try {
+  const t = JSON.parse(sessionStorage.getItem('ddd.drill') || 'null'); sessionStorage.removeItem('ddd.drill');
+  // 来た図を覚えておき、パンくずはそこへ戻す（同じ詳細図に複数の入口があるため）
+  if (t?.dir === 'in' && t.from?.model) sessionStorage.setItem('ddd.back.' + KEY, JSON.stringify(t.from));
+  if (t && Date.now() - t.at < 4000 && !REDUCED) {
+    const v = $('view'); v.classList.add(t.dir === 'in' ? 'drill-enter-in' : 'drill-enter-out');
+    setTimeout(() => v.classList.remove('drill-enter-in', 'drill-enter-out'), 700);
+  }
+} catch {}
 scene.speed = S.packetSpeed;
 scene.initialView = S.defaultView;
 
@@ -489,7 +516,7 @@ function nodeDetail(id) {
   const reqs = (M.requirements || []).filter(q => q.nodes?.includes(id));
   return `<h4>選択中の部品</h4><h3>${esc(n.label)} <span class="mono mute">${esc(id)}</span></h3><div class="sub">${kind}${n.az ? ` / AZ ${n.az.join(',')}` : ''}${n.subnet ? ` / ${esc(n.subnet)} subnet` : ''} / ${esc(TI(n.tier).label || '')}</div>
     ${n.description ? `<p>${esc(n.description)}</p>` : ''}
-    ${n.drill && REGISTRY.some(r => r.id === n.drill) ? `<a class="b drill" href="#/m/${encodeURIComponent(n.drill)}/struct">▼ 内部構造を見る：${esc(REGISTRY.find(r => r.id === n.drill).name || n.drill)}</a>` : ''}
+    ${n.drill && REGISTRY.some(r => r.id === n.drill) ? `<a class="b drill" href="#/m/${encodeURIComponent(n.drill)}/struct" data-drill="${id}">▼ 内部構造を見る：${esc(REGISTRY.find(r => r.id === n.drill).name || n.drill)}</a>` : ''}
     <div class="row"><button class="b small" data-focus="${id}">この部品に寄る（F）</button><button class="b small ${st.nbr ? 'on' : ''}" data-nbr>周辺だけ表示（N）</button><button class="b small" data-sel="">選択を解除</button></div>
     ${c ? `<div class="row">${tag(c.status)}<span class="sub m0">${esc(c.why)}</span></div>` : ''}
     <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${n.parallel ? `<tr><td>並列数</td><td>${esc(n.parallel)}（同じ実行単位が並列に動く）</td></tr>` : ''}${n.slots ? `<tr><td>同時 Task</td><td>${esc(n.slots)}（例）</td></tr>` : ''}${n.partitions ? `<tr><td>分割数</td><td>${esc(n.partitions)}（例）</td></tr>` : ''}${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
@@ -966,9 +993,10 @@ document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
 /* ドリルダウン：上位の図（parent）があればパンくずで戻れるようにする */
 {
-  const up = $('mparent'), p = M.parent?.model && REGISTRY.find(r => r.id === M.parent.model);
+  let back = M.parent; try { back = JSON.parse(sessionStorage.getItem('ddd.back.' + KEY) || 'null') || back; } catch {}
+  const up = $('mparent'), p = back?.model && REGISTRY.find(r => r.id === back.model);
   up.hidden = !p;
-  if (p) { up.href = `#/m/${encodeURIComponent(p.id)}/struct${M.parent.node ? '?s=' + encodeURIComponent(M.parent.node) : ''}`; up.textContent = `↑ ${p.name}`; up.title = '上位の図に戻る'; }
+  if (p) { up.href = `#/m/${encodeURIComponent(p.id)}/struct${back.node ? '?s=' + encodeURIComponent(back.node) : ''}`; up.textContent = `↑ ${p.name}`; up.title = '上位の図に戻る'; up.onclick = e => { e.preventDefault(); transitionTo(up.getAttribute('href'), 'out'); }; }
 }
 setDimension(st.dimension, false);
 try { if (localStorage.getItem('ddd.libMain')) $('library').open = true; } catch {}
@@ -977,6 +1005,10 @@ $('library').addEventListener('toggle', e => {
   if (d.dataset?.cat && !$('model-filter').value.trim()) { d.open ? LIB_OPEN.add(d.dataset.cat) : LIB_OPEN.delete(d.dataset.cat); }
   saveLibOpen();
 }, true);
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('a[data-drill]'); if (!a) return;
+  e.preventDefault(); drillInto(a.dataset.drill);
+});
 renderLibrary();
 scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();

@@ -185,6 +185,17 @@ export class Scene3D {
     this.fitView = null;
     this.anim = { from: this.controls.target.clone(), to: new THREE.Vector3(...pos), z0: this.camera.zoom, z1: zoom, t0: performance.now() };
   }
+  /* 部品の中心位置（ワールド座標）。ドリルダウンのズーム演出に使う */
+  nodePos(id) {
+    const m = this.pick.find(p => p.userData.id === id); if (!m) return null;
+    const v = new THREE.Vector3(); m.getWorldPosition(v); return v.toArray();
+  }
+  /* 部品の画面上の位置（0〜1）。CSS のズーム演出の基点に使う */
+  nodeScreen(id) {
+    const p = this.nodePos(id); if (!p) return null;
+    const v = new THREE.Vector3(...p).project(this.camera);
+    return [(v.x + 1) / 2, (1 - v.y) / 2];
+  }
   /* 共有リンク用：視点の保存と復元 */
   getView() {
     const r = v => v.toArray().map(x => +x.toFixed(2));
@@ -639,6 +650,7 @@ export class Scene3D {
     if (s.badge) {
       const badge = this.label(s.badge.text, [x, y + top + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]);
       badge.dataset.node = s.id;
+      if (s.badge.tone === 'drill') { badge.title = '詳細図を開く'; badge.addEventListener('click', e => { e.stopPropagation(); this.onDrill?.(s.id); }); }
       // 真上からは高さの差が画面に出ないので、公式アイコンの上に離して配置する。
       if (s.flat && s.icon) badge.style.marginTop = '-16px';
       if (s.opacity < 0.5) badge.style.opacity = 0.4;
@@ -686,6 +698,7 @@ export class Scene3D {
     if (s.badge) {
       const badge = this.label(s.badge.text, [x, y + 0.25, z], 'n-badge ' + (s.badge.tone || ''), [0.5, 1]);
       badge.style.marginTop = 'calc(-24px * var(--lbl-scale))';
+      if (s.badge.tone === 'drill') { badge.title = '詳細図を開く'; badge.addEventListener('click', e => { e.stopPropagation(); this.onDrill?.(s.id); }); }
     }
   }
 
