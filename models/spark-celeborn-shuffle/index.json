@@ -1,0 +1,289 @@
+{
+  "model": "spark-celeborn-shuffle",
+  "name": "Spark と Celeborn：リモートシャッフルの内部",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "lifecycle": {
+      "type": "node",
+      "label": "配置と進捗の管理",
+      "status": "claim"
+    },
+    "master": {
+      "type": "node",
+      "label": "Worker とスロットの管理",
+      "status": "claim"
+    },
+    "map": {
+      "type": "node",
+      "label": "Map タスクと書き込み",
+      "status": "claim"
+    },
+    "worker": {
+      "type": "node",
+      "label": "Shuffle Worker",
+      "status": "claim"
+    },
+    "replica": {
+      "type": "node",
+      "label": "複製先 Worker",
+      "status": "claim"
+    },
+    "reduce": {
+      "type": "node",
+      "label": "Reduce タスクと読み戻し",
+      "status": "claim"
+    },
+    "files": {
+      "type": "node",
+      "label": "Partition ファイルと chunk 索引",
+      "status": "claim"
+    },
+    "fail": {
+      "type": "node",
+      "label": "再試行・配置変更",
+      "status": "claim"
+    },
+    "register": {
+      "type": "link",
+      "label": "Map タスクと書き込み → 配置と進捗の管理",
+      "status": "claim"
+    },
+    "allocate": {
+      "type": "link",
+      "label": "配置と進捗の管理 → Worker とスロットの管理",
+      "status": "claim"
+    },
+    "reserve": {
+      "type": "link",
+      "label": "配置と進捗の管理 → Shuffle Worker",
+      "status": "claim"
+    },
+    "push": {
+      "type": "link",
+      "label": "Map タスクと書き込み → Shuffle Worker",
+      "status": "claim"
+    },
+    "replicate": {
+      "type": "link",
+      "label": "Shuffle Worker → 複製先 Worker",
+      "status": "claim"
+    },
+    "store": {
+      "type": "link",
+      "label": "Shuffle Worker → Partition ファイルと chunk 索引",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "配置と進捗の管理 → Shuffle Worker",
+      "status": "claim"
+    },
+    "location": {
+      "type": "link",
+      "label": "Reduce タスクと読み戻し → 配置と進捗の管理",
+      "status": "claim"
+    },
+    "fetch": {
+      "type": "link",
+      "label": "Shuffle Worker → Reduce タスクと読み戻し",
+      "status": "claim"
+    },
+    "retry": {
+      "type": "link",
+      "label": "Shuffle Worker → 再試行・配置変更",
+      "status": "claim"
+    },
+    "revive": {
+      "type": "link",
+      "label": "再試行・配置変更 → 配置と進捗の管理",
+      "status": "claim"
+    },
+    "cleanup": {
+      "type": "link",
+      "label": "配置と進捗の管理 → Worker とスロットの管理",
+      "status": "claim"
+    },
+    "shuffle": {
+      "type": "scenario",
+      "label": "登録から読み取り・解放"
+    },
+    "failure": {
+      "type": "scenario",
+      "label": "失敗時の配置変更"
+    },
+    "ex-driver": {
+      "type": "implementation",
+      "impl": "standalone-celeborn",
+      "label": "Driver と LifecycleManager",
+      "realizes": [
+        "lifecycle",
+        "fail"
+      ]
+    },
+    "ex-map": {
+      "type": "implementation",
+      "impl": "standalone-celeborn",
+      "label": "Executor の map task",
+      "realizes": [
+        "map"
+      ]
+    },
+    "ex-reduce": {
+      "type": "implementation",
+      "impl": "standalone-celeborn",
+      "label": "Executor の reduce task",
+      "realizes": [
+        "reduce"
+      ]
+    },
+    "ex-master": {
+      "type": "implementation",
+      "impl": "standalone-celeborn",
+      "label": "Celeborn Master",
+      "realizes": [
+        "master"
+      ]
+    },
+    "ex-worker": {
+      "type": "implementation",
+      "impl": "standalone-celeborn",
+      "label": "Celeborn Worker",
+      "realizes": [
+        "worker"
+      ]
+    },
+    "ex-replica": {
+      "type": "implementation",
+      "impl": "standalone-celeborn",
+      "label": "複製先 Celeborn Worker",
+      "realizes": [
+        "replica"
+      ]
+    },
+    "ex-files": {
+      "type": "implementation",
+      "impl": "standalone-celeborn",
+      "label": "Worker ローカルディスク",
+      "realizes": [
+        "files"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-celeborn-shuffle.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-celeborn-shuffle.md": [
+      "model",
+      "lifecycle",
+      "master",
+      "map",
+      "worker",
+      "replica",
+      "reduce",
+      "files",
+      "fail",
+      "register",
+      "allocate",
+      "reserve",
+      "push",
+      "replicate",
+      "store",
+      "commit",
+      "location",
+      "fetch",
+      "retry",
+      "revive",
+      "cleanup",
+      "ex-driver",
+      "ex-map",
+      "ex-reduce",
+      "ex-master",
+      "ex-worker",
+      "ex-replica",
+      "ex-files"
+    ],
+    "docs/reference-spark-celeborn-shuffle.md#§6": [
+      "model"
+    ],
+    "docs/reference-spark-celeborn-shuffle.md#§7": [
+      "model",
+      "ex-driver",
+      "ex-map",
+      "ex-reduce",
+      "ex-master",
+      "ex-worker",
+      "ex-replica",
+      "ex-files"
+    ],
+    "docs/reference-spark-celeborn-shuffle.md#§2": [
+      "lifecycle",
+      "master",
+      "register",
+      "allocate",
+      "reserve"
+    ],
+    "docs/reference-spark-celeborn-shuffle.md#§3": [
+      "map",
+      "worker",
+      "replica",
+      "files",
+      "push",
+      "replicate",
+      "store",
+      "commit"
+    ],
+    "docs/reference-spark-celeborn-shuffle.md#§4": [
+      "reduce",
+      "location",
+      "fetch",
+      "cleanup"
+    ],
+    "docs/reference-spark-celeborn-shuffle.md#§5": [
+      "fail",
+      "retry",
+      "revive"
+    ]
+  },
+  "reference": {
+    "category": "分散実行と保守",
+    "order": 41,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "spark",
+    "objectives": [
+      "Spark 標準のローカル shuffle、External Shuffle Service、リモート shuffle を区別する。",
+      "制御経路とデータ経路、配置から書き込み・読み取り・解放までを追う。",
+      "Worker の複製、chunk、再試行と動的割り当ての前提を理解する。"
+    ],
+    "sources": [
+      {
+        "title": "Spark Dynamic Resource Allocation",
+        "url": "https://spark.apache.org/docs/4.0.0/job-scheduling.html#dynamic-resource-allocation"
+      },
+      {
+        "title": "Celeborn Architecture",
+        "url": "https://celeborn.apache.org/docs/latest/developers/overview/"
+      },
+      {
+        "title": "Celeborn ShuffleClient",
+        "url": "https://celeborn.apache.org/docs/latest/developers/shuffleclient/"
+      },
+      {
+        "title": "Celeborn Worker Storage",
+        "url": "https://celeborn.apache.org/docs/latest/developers/storage/"
+      },
+      {
+        "title": "Celeborn Fault Tolerance",
+        "url": "https://celeborn.apache.org/docs/latest/developers/faulttolerant/"
+      },
+      {
+        "title": "Apache Uniffle",
+        "url": "https://uniffle.apache.org/docs/intro/"
+      }
+    ]
+  }
+}

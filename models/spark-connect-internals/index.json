@@ -1,0 +1,201 @@
+{
+  "model": "spark-connect-internals",
+  "name": "Spark Connect：クライアントと Driver の分離",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "薄いクライアント",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "node",
+      "label": "未解決の論理計画",
+      "status": "claim"
+    },
+    "proxy": {
+      "type": "node",
+      "label": "認証プロキシ（任意）",
+      "status": "claim"
+    },
+    "server": {
+      "type": "node",
+      "label": "Spark Connect Server / Driver",
+      "status": "claim"
+    },
+    "executor": {
+      "type": "node",
+      "label": "Executor",
+      "status": "claim"
+    },
+    "result": {
+      "type": "node",
+      "label": "Arrow 結果バッチ",
+      "status": "claim"
+    },
+    "build": {
+      "type": "link",
+      "label": "薄いクライアント → 未解決の論理計画",
+      "status": "claim"
+    },
+    "rpc": {
+      "type": "link",
+      "label": "未解決の論理計画 → 認証プロキシ（任意）",
+      "status": "claim"
+    },
+    "forward": {
+      "type": "link",
+      "label": "認証プロキシ（任意） → Spark Connect Server / Driver",
+      "status": "claim"
+    },
+    "execute": {
+      "type": "link",
+      "label": "Spark Connect Server / Driver → Executor",
+      "status": "claim"
+    },
+    "collect": {
+      "type": "link",
+      "label": "Executor → Arrow 結果バッチ",
+      "status": "claim"
+    },
+    "response": {
+      "type": "link",
+      "label": "Arrow 結果バッチ → 薄いクライアント",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "処理の流れ"
+    },
+    "ex-client": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "薄いクライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "ex-plan": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "未解決の論理計画",
+      "realizes": [
+        "plan"
+      ]
+    },
+    "ex-proxy": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "認証プロキシ（任意）",
+      "realizes": [
+        "proxy"
+      ]
+    },
+    "ex-server": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：Spark Connect Server / Driver",
+      "realizes": [
+        "server"
+      ]
+    },
+    "ex-executor": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Executor",
+      "realizes": [
+        "executor"
+      ]
+    },
+    "ex-result": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：Arrow 結果バッチ",
+      "realizes": [
+        "result"
+      ]
+    },
+    "ex-cluster": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Spark Standalone の Master / Worker",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-connect-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-connect-internals.md": [
+      "model",
+      "client",
+      "plan",
+      "proxy",
+      "server",
+      "executor",
+      "result",
+      "build",
+      "rpc",
+      "forward",
+      "execute",
+      "collect",
+      "response",
+      "ex-client",
+      "ex-plan",
+      "ex-proxy",
+      "ex-server",
+      "ex-executor",
+      "ex-result",
+      "ex-cluster"
+    ],
+    "docs/reference-spark-connect-internals.md#§2": [
+      "client",
+      "plan",
+      "proxy",
+      "server",
+      "executor",
+      "result"
+    ],
+    "docs/reference-spark-connect-internals.md#§3": [
+      "build",
+      "rpc",
+      "forward",
+      "execute",
+      "collect",
+      "response"
+    ],
+    "docs/reference-spark-connect-internals.md#§4": [
+      "ex-client",
+      "ex-plan",
+      "ex-proxy",
+      "ex-server",
+      "ex-executor",
+      "ex-result",
+      "ex-cluster"
+    ]
+  },
+  "reference": {
+    "category": "分散実行と保守",
+    "order": 65,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "objectives": [
+      "クライアントが未解決計画を送信し、Spark Server が実行して Arrow バッチを返す。",
+      "Spark Connect は 3.4 で導入。",
+      "認証プロキシは任意の構成要素。"
+    ],
+    "sources": [
+      {
+        "title": "Spark Connect Overview",
+        "url": "https://spark.apache.org/docs/4.3.0/spark-connect-overview.html"
+      },
+      {
+        "title": "Connect Application Development",
+        "url": "https://spark.apache.org/docs/4.3.0/app-dev-spark-connect.html"
+      }
+    ]
+  }
+}

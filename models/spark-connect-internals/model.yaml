@@ -1,0 +1,380 @@
+name: Spark Connect：クライアントと Driver の分離
+description: クライアントが未解決計画を送信し、Spark Server が実行して Arrow バッチを返す。
+reference:
+  objectives:
+    - クライアントが未解決計画を送信し、Spark Server が実行して Arrow バッチを返す。
+    - Spark Connect は 3.4 で導入。
+    - 認証プロキシは任意の構成要素。
+  sources:
+    - title: Spark Connect Overview
+      url: https://spark.apache.org/docs/4.3.0/spark-connect-overview.html
+    - title: Connect Application Development
+      url: https://spark.apache.org/docs/4.3.0/app-dev-spark-connect.html
+sources:
+  - docs/reference-spark-connect-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-spark-connect-internals.md#§1
+tiers:
+  - id: flow
+    label: 処理の流れ
+    z: 0
+    size:
+      - 21
+      - 8
+nodes:
+  client:
+    label: 薄いクライアント
+    kind: client
+    tier: flow
+    x: 1
+    'y': 1.5
+    description: アプリ・notebook が DataFrame 操作を組み立てる。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§2
+  plan:
+    label: 未解決の論理計画
+    kind: file
+    tier: flow
+    x: 6
+    'y': 1.5
+    description: クライアントが protobuf にシリアライズする。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§2
+  proxy:
+    label: 認証プロキシ（任意）
+    kind: gateway
+    tier: flow
+    x: 11
+    'y': 1.5
+    description: 必要に応じ gRPC の前段で認証を行う。Spark Connect 自体には認証機能が組み込まれていない。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§2
+  server:
+    label: Spark Connect Server / Driver
+    kind: service
+    tier: flow
+    x: 16
+    'y': 1.5
+    description: gRPC の要求から Spark の論理計画を作り通常の Spark 実行に渡す。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§2
+  executor:
+    label: Executor
+    kind: worker
+    tier: flow
+    x: 1
+    'y': 5
+    description: Driver が計画した task を分散実行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§2
+  result:
+    label: Arrow 結果バッチ
+    kind: file
+    tier: flow
+    x: 6
+    'y': 5
+    description: 結果が Arrow 形式のバッチとして gRPC でクライアントに返る。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§2
+links:
+  - id: build
+    from: client
+    to: plan
+    label: 論理計画を構築
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§3
+  - id: rpc
+    from: plan
+    to: proxy
+    label: protobuf / gRPC で送信
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§3
+  - id: forward
+    from: proxy
+    to: server
+    label: 要求を転送
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§3
+  - id: execute
+    from: server
+    to: executor
+    label: Task を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§3
+  - id: collect
+    from: executor
+    to: result
+    label: 結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§3
+  - id: response
+    from: result
+    to: client
+    label: Arrow バッチを返す
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-connect-internals.md#§3
+scenarios:
+  - id: flow
+    label: 処理の流れ
+    steps:
+      - links:
+          - build
+        note: 論理計画を構築。
+      - links:
+          - rpc
+        note: protobuf / gRPC で送信。
+      - links:
+          - forward
+        note: 要求を転送。
+      - links:
+          - execute
+        note: Task を実行。
+      - links:
+          - collect
+        note: 結果を返す。
+      - links:
+          - response
+        note: Arrow バッチを返す。
+implementations:
+  - id: spark-standalone
+    label: 自己管理 Spark Standalone の代表構成
+    description: Spark Standalone のホスト、Driver、Executor と入力・出力を使う概念的な代表例。製品・プラグイン・バージョンの互換性および実機動作は別途確認する。
+    sources:
+      - title: Spark Connect Overview
+        url: https://spark.apache.org/docs/4.3.0/spark-connect-overview.html
+      - title: Connect Application Development
+        url: https://spark.apache.org/docs/4.3.0/app-dev-spark-connect.html
+      - title: Spark Standalone Mode
+        url: https://spark.apache.org/docs/4.3.0/spark-standalone.html
+    tiers:
+      - id: runtime
+        label: 自己管理環境
+        z: 0
+        size:
+          - 24
+          - 11
+    groups:
+      - kind: cluster
+        label: Spark Standalone クラスター
+        tier:
+          - runtime
+        nodes:
+          - ex-cluster
+          - ex-server
+          - ex-executor
+          - ex-result
+    nodes:
+      ex-client:
+        label: 薄いクライアント
+        kind: client
+        tier: runtime
+        x: 2
+        'y': 2
+        realizes:
+          - client
+        description: アプリ・notebook が DataFrame 操作を組み立てる。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-connect-internals.md#§4
+      ex-plan:
+        label: 未解決の論理計画
+        kind: file
+        tier: runtime
+        x: 7
+        'y': 2
+        realizes:
+          - plan
+        description: クライアントが protobuf にシリアライズする。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-connect-internals.md#§4
+      ex-proxy:
+        label: 認証プロキシ（任意）
+        kind: gateway
+        tier: runtime
+        x: 12
+        'y': 2
+        realizes:
+          - proxy
+        description: 必要に応じ gRPC の前段で認証を行う。Spark Connect 自体には認証機能が組み込まれていない。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-connect-internals.md#§4
+      ex-server:
+        label: Driver：Spark Connect Server / Driver
+        kind: service
+        tier: runtime
+        x: 17
+        'y': 2
+        realizes:
+          - server
+        description: gRPC の要求から Spark の論理計画を作り通常の Spark 実行に渡す。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-connect-internals.md#§4
+      ex-executor:
+        label: Executor：Executor
+        kind: worker
+        tier: runtime
+        x: 2
+        'y': 6
+        realizes:
+          - executor
+        description: Driver が計画した task を分散実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-connect-internals.md#§4
+      ex-result:
+        label: Driver：Arrow 結果バッチ
+        kind: file
+        tier: runtime
+        x: 7
+        'y': 6
+        realizes:
+          - result
+        description: 結果が Arrow 形式のバッチとして gRPC でクライアントに返る。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-connect-internals.md#§4
+      ex-cluster:
+        label: Spark Standalone の Master / Worker
+        kind: host
+        tier: runtime
+        x: 2
+        'y': 9
+        description: 自己管理するホスト上で Spark Standalone クラスターの資源を管理し Driver と Executor を動かす。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-connect-internals.md#§4
+    links:
+      - id: ex-start
+        from: ex-cluster
+        to: ex-executor
+        label: Executor の実行資源を割り当て
+    layout2d:
+      tiers:
+        - id: diagram
+          label: 自己管理環境
+          z: 0
+          size:
+            - 26
+            - 16
+      nodes:
+        ex-client:
+          tier: diagram
+          x: 1
+          'y': 3
+        ex-plan:
+          tier: diagram
+          x: 24
+          'y': 3
+        ex-proxy:
+          tier: diagram
+          x: 1
+          'y': 7
+        ex-server:
+          tier: diagram
+          x: 8
+          'y': 4
+        ex-executor:
+          tier: diagram
+          x: 8
+          'y': 10
+        ex-result:
+          tier: diagram
+          x: 13
+          'y': 4
+        ex-cluster:
+          tier: diagram
+          x: 12
+          'y': 1
+      groups:
+        - kind: cluster
+          label: Spark Standalone クラスター
+          tier:
+            - diagram
+          x0: 5
+          y0: -1
+          x1: 21
+          y1: 15
+          nodes:
+            - ex-cluster
+            - ex-server
+            - ex-executor
+            - ex-result
+    layout3d:
+      tiers:
+        - id: hosts
+          label: Spark ホストと Worker
+          z: 0
+          size:
+            - 16
+            - 8
+        - id: process
+          label: Driver / Executor の実行
+          z: 1
+          size:
+            - 16
+            - 8
+        - id: external
+          label: クライアント・外部データ
+          z: 0
+          origin:
+            - 19
+            - 0
+          size:
+            - 10
+            - 8
+      nodes:
+        ex-client:
+          tier: external
+          x: 1
+          'y': 1.5
+        ex-plan:
+          tier: external
+          x: 6
+          'y': 1.5
+        ex-proxy:
+          tier: external
+          x: 1
+          'y': 3.5
+        ex-server:
+          tier: process
+          x: 2
+          'y': 1.5
+        ex-executor:
+          tier: process
+          x: 9
+          'y': 1.5
+        ex-result:
+          tier: process
+          x: 5
+          'y': 1.5
+        ex-cluster:
+          tier: hosts
+          x: 6
+          'y': 3
+      groups:
+        - kind: cluster
+          label: Spark Standalone クラスター
+          tier:
+            - hosts
+            - process
+          nodes:
+            - ex-cluster
+            - ex-server
+            - ex-executor
+            - ex-result

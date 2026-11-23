@@ -1,0 +1,225 @@
+{
+  "model": "spark-gluten-velox",
+  "name": "Apache Gluten：Spark と Velox の列指向実行",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "plan": {
+      "type": "node",
+      "label": "Spark 物理計画",
+      "status": "claim"
+    },
+    "convert": {
+      "type": "node",
+      "label": "Gluten の計画変換",
+      "status": "claim"
+    },
+    "jni": {
+      "type": "node",
+      "label": "JNI 境界",
+      "status": "claim"
+    },
+    "velox": {
+      "type": "node",
+      "label": "Velox ネイティブ実行",
+      "status": "claim"
+    },
+    "arrow": {
+      "type": "node",
+      "label": "Arrow / ColumnarBatch",
+      "status": "claim"
+    },
+    "fallback": {
+      "type": "node",
+      "label": "Spark fallback と形式変換",
+      "status": "claim"
+    },
+    "metrics": {
+      "type": "node",
+      "label": "Spark UI の実行指標",
+      "status": "claim"
+    },
+    "transform": {
+      "type": "link",
+      "label": "Spark 物理計画 → Gluten の計画変換",
+      "status": "claim"
+    },
+    "native": {
+      "type": "link",
+      "label": "Gluten の計画変換 → JNI 境界",
+      "status": "claim"
+    },
+    "run": {
+      "type": "link",
+      "label": "JNI 境界 → Velox ネイティブ実行",
+      "status": "claim"
+    },
+    "batch": {
+      "type": "link",
+      "label": "Velox ネイティブ実行 → Arrow / ColumnarBatch",
+      "status": "claim"
+    },
+    "unsupported": {
+      "type": "link",
+      "label": "Spark 物理計画 → Spark fallback と形式変換",
+      "status": "claim"
+    },
+    "convertrow": {
+      "type": "link",
+      "label": "Spark fallback と形式変換 → Arrow / ColumnarBatch",
+      "status": "claim"
+    },
+    "observe": {
+      "type": "link",
+      "label": "Velox ネイティブ実行 → Spark UI の実行指標",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "処理の流れ"
+    },
+    "ex-plan": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：Spark 物理計画",
+      "realizes": [
+        "plan"
+      ]
+    },
+    "ex-convert": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：Gluten の計画変換",
+      "realizes": [
+        "convert"
+      ]
+    },
+    "ex-jni": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：JNI 境界",
+      "realizes": [
+        "jni"
+      ]
+    },
+    "ex-velox": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Velox ネイティブ実行",
+      "realizes": [
+        "velox"
+      ]
+    },
+    "ex-arrow": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Arrow / ColumnarBatch",
+      "realizes": [
+        "arrow"
+      ]
+    },
+    "ex-fallback": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Spark fallback と形式変換",
+      "realizes": [
+        "fallback"
+      ]
+    },
+    "ex-metrics": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Spark UI の実行指標",
+      "realizes": [
+        "metrics"
+      ]
+    },
+    "ex-cluster": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Spark Standalone の Master / Worker",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-gluten-velox.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-gluten-velox.md": [
+      "model",
+      "plan",
+      "convert",
+      "jni",
+      "velox",
+      "arrow",
+      "fallback",
+      "metrics",
+      "transform",
+      "native",
+      "run",
+      "batch",
+      "unsupported",
+      "convertrow",
+      "observe",
+      "ex-plan",
+      "ex-convert",
+      "ex-jni",
+      "ex-velox",
+      "ex-arrow",
+      "ex-fallback",
+      "ex-metrics",
+      "ex-cluster"
+    ],
+    "docs/reference-spark-gluten-velox.md#§2": [
+      "plan",
+      "convert",
+      "jni",
+      "velox",
+      "arrow",
+      "fallback",
+      "metrics"
+    ],
+    "docs/reference-spark-gluten-velox.md#§3": [
+      "transform",
+      "native",
+      "run",
+      "batch",
+      "unsupported",
+      "convertrow",
+      "observe"
+    ],
+    "docs/reference-spark-gluten-velox.md#§4": [
+      "ex-plan",
+      "ex-convert",
+      "ex-jni",
+      "ex-velox",
+      "ex-arrow",
+      "ex-fallback",
+      "ex-metrics",
+      "ex-cluster"
+    ]
+  },
+  "reference": {
+    "category": "分散実行と保守",
+    "order": 64,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "objectives": [
+      "Spark の物理計画を Substrait に変換し、対応する演算をネイティブ実行する。",
+      "Gluten は Spark 全体の置き換えではなく、対応する物理演算を Velox や ClickHouse バックエンドに委譲する中間層。",
+      "参照した Gluten の README は Spark 3.4・3.5・4.0・4.1 を列挙しており、4.3 対応を仮定しない。"
+    ],
+    "sources": [
+      {
+        "title": "Apache Gluten Architecture",
+        "url": "https://github.com/apache/gluten"
+      },
+      {
+        "title": "Gluten Configuration",
+        "url": "https://github.com/apache/gluten/blob/main/docs/Configuration.md"
+      }
+    ]
+  }
+}

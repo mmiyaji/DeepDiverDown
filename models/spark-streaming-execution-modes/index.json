@@ -1,0 +1,311 @@
+{
+  "model": "spark-streaming-execution-modes",
+  "name": "Spark Structured Streaming：3つの実行モード",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "再読可能な入力",
+      "status": "claim"
+    },
+    "driver": {
+      "type": "node",
+      "label": "Driver・進捗管理",
+      "status": "claim"
+    },
+    "batch": {
+      "type": "node",
+      "label": "短時間のタスクと通常 shuffle",
+      "status": "claim"
+    },
+    "continuous": {
+      "type": "scenario",
+      "label": "Continuous Processing",
+      "status": "claim"
+    },
+    "producer": {
+      "type": "node",
+      "label": "Real-Time 入力 Stage",
+      "status": "claim"
+    },
+    "shuffle": {
+      "type": "node",
+      "label": "Pipelined / streaming shuffle",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "状態あり Stage",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "State Store",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "node",
+      "label": "進捗と状態のチェックポイント",
+      "status": "claim"
+    },
+    "sink": {
+      "type": "node",
+      "label": "外部出力",
+      "status": "claim"
+    },
+    "mb-plan": {
+      "type": "link",
+      "label": "再読可能な入力 → Driver・進捗管理",
+      "status": "claim"
+    },
+    "mb-run": {
+      "type": "link",
+      "label": "Driver・進捗管理 → 短時間のタスクと通常 shuffle",
+      "status": "claim"
+    },
+    "mb-output": {
+      "type": "link",
+      "label": "短時間のタスクと通常 shuffle → 外部出力",
+      "status": "claim"
+    },
+    "cp-read": {
+      "type": "link",
+      "label": "再読可能な入力 → Continuous の長時間タスク",
+      "status": "claim"
+    },
+    "cp-save": {
+      "type": "link",
+      "label": "Continuous の長時間タスク → 進捗と状態のチェックポイント",
+      "status": "claim"
+    },
+    "cp-output": {
+      "type": "link",
+      "label": "Continuous の長時間タスク → 外部出力",
+      "status": "claim"
+    },
+    "rt-read": {
+      "type": "link",
+      "label": "再読可能な入力 → Real-Time 入力 Stage",
+      "status": "claim"
+    },
+    "rt-shuffle": {
+      "type": "link",
+      "label": "Real-Time 入力 Stage → Pipelined / streaming shuffle",
+      "status": "claim"
+    },
+    "rt-route": {
+      "type": "link",
+      "label": "Pipelined / streaming shuffle → 状態あり Stage",
+      "status": "claim"
+    },
+    "rt-state": {
+      "type": "link",
+      "label": "状態あり Stage → State Store",
+      "status": "claim"
+    },
+    "rt-output": {
+      "type": "link",
+      "label": "状態あり Stage → 外部出力",
+      "status": "claim"
+    },
+    "rt-save": {
+      "type": "link",
+      "label": "State Store → 進捗と状態のチェックポイント",
+      "status": "claim"
+    },
+    "rt-resume": {
+      "type": "link",
+      "label": "進捗と状態のチェックポイント → Driver・進捗管理",
+      "status": "claim"
+    },
+    "micro": {
+      "type": "scenario",
+      "label": "マイクロバッチ"
+    },
+    "realtime": {
+      "type": "scenario",
+      "label": "Real-Time の状態あり処理と復旧"
+    },
+    "ex-input": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "Kafka 入力トピック",
+      "realizes": [
+        "source"
+      ]
+    },
+    "ex-master": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "Standalone Master",
+      "realizes": []
+    },
+    "ex-driver": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "Spark Driver",
+      "realizes": [
+        "driver"
+      ]
+    },
+    "ex-producer": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "Executor 入力タスク",
+      "realizes": [
+        "producer",
+        "batch",
+        "continuous"
+      ]
+    },
+    "ex-consumer": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "Executor 状態タスク",
+      "realizes": [
+        "consumer",
+        "shuffle"
+      ]
+    },
+    "ex-state": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "RocksDB State Store",
+      "realizes": [
+        "state"
+      ]
+    },
+    "ex-checkpoint": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "共有 checkpointLocation",
+      "realizes": [
+        "checkpoint"
+      ]
+    },
+    "ex-output": {
+      "type": "implementation",
+      "impl": "standalone-kafka",
+      "label": "Kafka 出力トピック",
+      "realizes": [
+        "sink"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-streaming-execution-modes.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-streaming-execution-modes.md": [
+      "model",
+      "source",
+      "driver",
+      "batch",
+      "continuous",
+      "producer",
+      "shuffle",
+      "consumer",
+      "state",
+      "checkpoint",
+      "sink",
+      "mb-plan",
+      "mb-run",
+      "mb-output",
+      "cp-read",
+      "cp-save",
+      "cp-output",
+      "rt-read",
+      "rt-shuffle",
+      "rt-route",
+      "rt-state",
+      "rt-output",
+      "rt-save",
+      "rt-resume",
+      "ex-input",
+      "ex-master",
+      "ex-driver",
+      "ex-producer",
+      "ex-consumer",
+      "ex-state",
+      "ex-checkpoint",
+      "ex-output"
+    ],
+    "docs/reference-spark-streaming-execution-modes.md#§6": [
+      "model"
+    ],
+    "docs/reference-spark-streaming-execution-modes.md#§2": [
+      "source",
+      "driver",
+      "batch",
+      "mb-plan",
+      "mb-run",
+      "mb-output"
+    ],
+    "docs/reference-spark-streaming-execution-modes.md#§3": [
+      "continuous",
+      "cp-read",
+      "cp-save",
+      "cp-output"
+    ],
+    "docs/reference-spark-streaming-execution-modes.md#§4": [
+      "producer",
+      "shuffle",
+      "consumer",
+      "rt-read",
+      "rt-shuffle",
+      "rt-route"
+    ],
+    "docs/reference-spark-streaming-execution-modes.md#§5": [
+      "state",
+      "checkpoint",
+      "sink",
+      "rt-state",
+      "rt-output",
+      "rt-save",
+      "rt-resume"
+    ],
+    "docs/reference-spark-streaming-execution-modes.md#§7": [
+      "ex-input",
+      "ex-master",
+      "ex-driver",
+      "ex-producer",
+      "ex-consumer",
+      "ex-state",
+      "ex-checkpoint",
+      "ex-output"
+    ]
+  },
+  "reference": {
+    "category": "ストリーム処理",
+    "order": 41,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "spark-structured-streaming",
+    "objectives": [
+      "Spark 3.5 と 4.3 の実行モードの位置付けと処理保証を区別する。",
+      "4.3 Real-Time の並行 Stage、pipelined shuffle、状態復旧を追う。",
+      "エンジンの状態と外部出力の保証を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Spark 3.5.7 Continuous Processing",
+        "url": "https://spark.apache.org/docs/3.5.7/structured-streaming-programming-guide.html#continuous-processing"
+      },
+      {
+        "title": "Spark 4.3 Real-Time Mode",
+        "url": "https://spark.apache.org/docs/4.3.0/streaming/real-time-mode.html"
+      },
+      {
+        "title": "Spark 4.1 release",
+        "url": "https://spark.apache.org/releases/spark-release-4.1.0.html"
+      },
+      {
+        "title": "Spark 4.3 release",
+        "url": "https://spark.apache.org/releases/spark-release-4-3-0.html"
+      }
+    ]
+  }
+}

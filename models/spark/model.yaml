@@ -21,11 +21,11 @@ groups:
   - {kind: parallel, label: Executor を並列に実行（数は設定による）, tier: workers, nodes: [executor-a, executor-b]}
 nodes:
   submitter: {label: アプリケーションの投入元, kind: client, tier: entry, x: 0, 'y': 1, description: 注文集計のプログラムと実行時設定を渡す。, evidence: [{type: doc, ref: docs/reference-spark.md#§2}]}
-  driver: {label: ジョブの調整プロセス, kind: service, tier: control, x: 1, 'y': 1.5, description: 処理の段階を組み立て、実行担当へタスクを割り当てる。, evidence: [{type: doc, ref: docs/reference-spark.md#§2}, {type: doc, ref: docs/reference-spark.md#§4}]}
+  driver: {drill: spark-catalyst-planning, label: ジョブの調整プロセス, kind: service, tier: control, x: 1, 'y': 1.5, description: 処理の段階を組み立て、実行担当へタスクを割り当てる。, evidence: [{type: doc, ref: docs/reference-spark.md#§2}, {type: doc, ref: docs/reference-spark.md#§4}]}
   manager: {label: クラスター資源管理, kind: service, tier: control, x: 7, 'y': 1.5, description: 実行プロセスのために各ホストの CPU とメモリーを割り当てる。, evidence: [{type: doc, ref: docs/reference-spark.md#§3}]}
-  executor-a: {slots: 4, label: タスク実行担当 A, kind: worker, tier: workers, x: 2, 'y': 2, description: 担当データを読み、他の実行担当と中間データを交換する。, evidence: [{type: doc, ref: docs/reference-spark.md#§3}]}
-  executor-b: {slots: 4, label: タスク実行担当 B, kind: worker, tier: workers, x: 7, 'y': 2, description: 別の分割を読み、再分配先のタスクを実行する。, evidence: [{type: doc, ref: docs/reference-spark.md#§3}, {type: doc, ref: docs/reference-spark.md#§4}]}
-  input: {partitions: 6, label: 入力データ, kind: db, tier: storage, x: 0.5, y: 0, description: 入力分割ごとにタスクが読む、共有された元データ。, evidence: [{type: doc, ref: docs/reference-spark.md#§5}]}
+  executor-a: {drill: spark-celeborn-shuffle, slots: 4, label: タスク実行担当 A, kind: worker, tier: workers, x: 2, 'y': 2, description: 担当データを読み、他の実行担当と中間データを交換する。, evidence: [{type: doc, ref: docs/reference-spark.md#§3}]}
+  executor-b: {drill: spark-aqe-join-skew, slots: 4, label: タスク実行担当 B, kind: worker, tier: workers, x: 7, 'y': 2, description: 別の分割を読み、再分配先のタスクを実行する。, evidence: [{type: doc, ref: docs/reference-spark.md#§3}, {type: doc, ref: docs/reference-spark.md#§4}]}
+  input: {drill: spark-datasource-v2-iceberg, partitions: 6, label: 入力データ, kind: db, tier: storage, x: 0.5, y: 0, description: 入力分割ごとにタスクが読む、共有された元データ。, evidence: [{type: doc, ref: docs/reference-spark.md#§5}]}
   output:
     {label: 集計結果, kind: db, tier: storage, x: 0.5, y: 3.5, description: このシナリオでは集計結果をファイルに保存する。, evidence: [{type: doc, ref: "docs/reference-spark.md#§6"}]}
 links:

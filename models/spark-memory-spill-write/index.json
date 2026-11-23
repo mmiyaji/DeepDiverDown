@@ -1,0 +1,223 @@
+{
+  "model": "spark-memory-spill-write",
+  "name": "Spark：メモリ・spill とファイル書き込み",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "input": {
+      "type": "node",
+      "label": "読み取り partition",
+      "status": "claim"
+    },
+    "task": {
+      "type": "node",
+      "label": "Executor の処理 task",
+      "status": "claim"
+    },
+    "memory": {
+      "type": "node",
+      "label": "Execution / Storage 領域",
+      "status": "claim"
+    },
+    "spill": {
+      "type": "link",
+      "label": "Execution / Storage 領域 → ローカルディスクへの spill",
+      "status": "claim"
+    },
+    "exchange": {
+      "type": "node",
+      "label": "書き込み前の分配",
+      "status": "claim"
+    },
+    "writer": {
+      "type": "node",
+      "label": "並列 writer",
+      "status": "claim"
+    },
+    "files": {
+      "type": "node",
+      "label": "出力ファイルと表",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "読み取り partition → Executor の処理 task",
+      "status": "claim"
+    },
+    "allocate": {
+      "type": "link",
+      "label": "Executor の処理 task → Execution / Storage 領域",
+      "status": "claim"
+    },
+    "restore": {
+      "type": "link",
+      "label": "ローカルディスクへの spill → Executor の処理 task",
+      "status": "claim"
+    },
+    "partition": {
+      "type": "link",
+      "label": "Executor の処理 task → 書き込み前の分配",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "書き込み前の分配 → 並列 writer",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "並列 writer → 出力ファイルと表",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "処理の流れ"
+    },
+    "ex-input": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "読み取り partition",
+      "realizes": [
+        "input"
+      ]
+    },
+    "ex-task": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Executor の処理 task",
+      "realizes": [
+        "task"
+      ]
+    },
+    "ex-memory": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Execution / Storage 領域",
+      "realizes": [
+        "memory"
+      ]
+    },
+    "ex-spill": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：ローカルディスクへの spill",
+      "realizes": [
+        "spill"
+      ]
+    },
+    "ex-exchange": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：書き込み前の分配",
+      "realizes": [
+        "exchange"
+      ]
+    },
+    "ex-writer": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：並列 writer",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "ex-files": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "出力ファイルと表",
+      "realizes": [
+        "files"
+      ]
+    },
+    "ex-cluster": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Spark Standalone の Master / Worker",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-memory-spill-write.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-memory-spill-write.md": [
+      "model",
+      "input",
+      "task",
+      "memory",
+      "spill",
+      "exchange",
+      "writer",
+      "files",
+      "read",
+      "allocate",
+      "restore",
+      "partition",
+      "write",
+      "persist",
+      "ex-input",
+      "ex-task",
+      "ex-memory",
+      "ex-spill",
+      "ex-exchange",
+      "ex-writer",
+      "ex-files",
+      "ex-cluster"
+    ],
+    "docs/reference-spark-memory-spill-write.md#§2": [
+      "input",
+      "task",
+      "memory",
+      "spill",
+      "exchange",
+      "writer",
+      "files"
+    ],
+    "docs/reference-spark-memory-spill-write.md#§3": [
+      "read",
+      "allocate",
+      "spill",
+      "restore",
+      "partition",
+      "write",
+      "persist"
+    ],
+    "docs/reference-spark-memory-spill-write.md#§4": [
+      "ex-input",
+      "ex-task",
+      "ex-memory",
+      "ex-spill",
+      "ex-exchange",
+      "ex-writer",
+      "ex-files",
+      "ex-cluster"
+    ]
+  },
+  "reference": {
+    "category": "分散実行と保守",
+    "order": 66,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "objectives": [
+      "Executor の execution / storage メモリ、spill、partition と出力ファイルの関係を追う。",
+      "Spark の unified memory の概念と、JVM heap、off-heap、Python / native メモリ、コンテナー overhead を分けて考える。",
+      "小ファイルは単に partition 数だけで決まらない。"
+    ],
+    "sources": [
+      {
+        "title": "Spark Tuning",
+        "url": "https://spark.apache.org/docs/4.3.0/tuning.html"
+      },
+      {
+        "title": "Spark Configuration",
+        "url": "https://spark.apache.org/docs/4.3.0/configuration.html"
+      },
+      {
+        "title": "Iceberg Spark Writes",
+        "url": "https://iceberg.apache.org/docs/latest/spark-writes/"
+      }
+    ]
+  }
+}

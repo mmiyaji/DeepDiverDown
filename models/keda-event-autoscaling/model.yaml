@@ -1,0 +1,78 @@
+name: KEDA：イベント駆動の自動スケーリング
+description: イベントソースの指標から 0↔1 と 1↔N のスケーリングを行い、別経路でイベントを処理する。
+reference:
+  objectives:
+    - KEDA の起動判定と HPA のレプリカ調整、イベントの処理経路を区別する。
+    - ScaledObject、Scaler、Metrics Server、HPA と認証の関係を追う。
+    - Kafka lag と SQS、ScaledJob の制約を理解する。
+  sources:
+    - {title: KEDA 2.21 Concepts, url: 'https://keda.sh/docs/2.21/concepts/'}
+    - {title: ScaledObject specification, url: 'https://keda.sh/docs/2.21/reference/scaledobject-spec/'}
+    - {title: Kafka scaler, url: 'https://keda.sh/docs/2.21/scalers/apache-kafka/'}
+    - {title: ScaledJob, url: 'https://keda.sh/docs/2.21/concepts/scaling-jobs/'}
+    - {title: Knative Broker, url: 'https://knative.dev/docs/eventing/brokers/'}
+sources: [docs/reference-keda-event-autoscaling.md]
+evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§1'}, {type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§5'}, {type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§6'}]
+tiers:
+  - {id: control, label: 伸縮の制御, z: 1, size: [18, 4]}
+  - {id: data, label: イベントと処理, z: 0, size: [18, 4]}
+nodes:
+  definition: {label: 伸縮設定, kind: file, tier: control, x: 0, y: 1.5, description: ScaledObject に対象、trigger、閾値とレプリカ範囲を指定する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§2'}]}
+  operator: {label: イベント監視と 0↔1, kind: service, tier: control, x: 4.5, y: 1.5, description: Operator と scaler が活動を判定しゼロから起動する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§3'}]}
+  metrics: {label: 外部メトリクス API, kind: service, tier: control, x: 9, y: 1.5, description: Kubernetes API を通じ HPA に外部指標を提供する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§4'}]}
+  hpa: {label: HPA・1↔N の調整, kind: service, tier: control, x: 14, y: 1.5, description: 指標と目標値に基づき希望レプリカ数を調整する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§4'}]}
+  source: {label: イベントソース, kind: queue, tier: data, x: 0, y: 1.5, description: キューや Kafka にイベントを保持し長さや lag を公開する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§5'}]}
+  auth: {label: 指標取得の認証, kind: policy, tier: data, x: 5, y: 3, description: TriggerAuthentication が scaler の認証方法を定める。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§2'}]}
+  workload: {label: イベント処理ワークロード, kind: worker, tier: data, x: 14, y: 1.5, description: Pod がイベントソースから取得して処理する。KEDA は配送しない。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§1'}]}
+  job: {label: ScaledJob の Job 作成, kind: worker, tier: data, x: 9, y: 3, description: 長時間処理などでは ScaledJob で個別の Kubernetes Job を作成できる。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§6'}]}
+links:
+  - {id: config, from: definition, to: operator, label: 対象と trigger を設定, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§2'}]}
+  - {id: access, from: auth, to: operator, label: 指標取得の認証を設定, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§2'}]}
+  - {id: poll, from: source, to: operator, label: キュー量などを取得, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§3'}]}
+  - {id: activate, from: operator, to: workload, label: 活動を検知して 0 から起動, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§3'}]}
+  - {id: expose, from: operator, to: metrics, label: scaler の指標を提供, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§4'}]}
+  - {id: query, from: metrics, to: hpa, label: API 経由で指標を返す, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§4'}]}
+  - {id: scale, from: hpa, to: workload, label: 1↔N のレプリカ数を調整, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§4'}]}
+  - {id: consume, from: source, to: workload, label: イベントを取得して処理, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§5'}]}
+  - {id: makejob, from: operator, to: job, label: ScaledJob に基づき Job を作成, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§6'}]}
+  - {id: processjob, from: source, to: job, label: Job がイベントを取得, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§6'}]}
+scenarios:
+  - id: scale
+    label: キューによる Deployment の伸縮
+    steps:
+      - {links: [config, access, poll], note: 設定と認証を読み、イベント量を確認する。}
+      - {links: [activate], note: 活動を検知しゼロから起動する。}
+      - {links: [expose, query, scale], note: HPA が外部指標を使ってレプリカを調整する。}
+      - {links: [consume], note: アプリが独立してイベントを取得・処理する。}
+  - id: scaled-job
+    label: ScaledJob による処理
+    steps:
+      - {links: [poll, makejob], note: イベント量と Job の状態に基づき Job を作成する。}
+      - {links: [processjob], note: Job がイベントを取得し処理する。}
+implementations:
+  - id: eks-sqs
+    label: AWS EKS・KEDA・SQS
+    description: EKS 上の KEDA が SQS キューの指標を監視し、別の consumer Deployment を伸縮する代表例。
+    sources:
+      - {title: KEDA SQS scaler, url: 'https://keda.sh/docs/2.21/scalers/aws-sqs/'}
+      - {title: KEDA AWS IRSA, url: 'https://keda.sh/docs/2.21/authentication-providers/aws/'}
+      - {title: Amazon EKS, url: 'https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html'}
+    tiers:
+      - {id: cloud, label: AWS アカウント, z: 0, size: [23, 10]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [cloud], nodes: [ex-eks, ex-config, ex-operator, ex-metrics, ex-hpa, ex-consumer, ex-job, ex-queue, ex-iam, ex-consumer-iam]}
+      - {kind: cluster, label: EKS クラスター, provider: aws, tier: [cloud], nodes: [ex-eks, ex-config, ex-operator, ex-metrics, ex-hpa, ex-consumer, ex-job]}
+    nodes:
+      ex-eks: {label: Amazon EKS, kind: service, svc: eks, tier: cloud, x: 5, y: 0, description: AWS が制御プレーンを運用し利用者がワークロードを管理する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-config: {label: ScaledObject / ScaledJob, kind: file, tier: cloud, x: 2, y: 3, realizes: [definition], description: 監視する SQS と対象ワークロードを定義する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-operator: {label: KEDA Operator・SQS scaler, kind: service, tier: cloud, x: 6, y: 3, realizes: [operator], description: SQS の指標を取得しゼロからの起動と HPA を管理する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-metrics: {label: KEDA Metrics Server, kind: service, tier: cloud, x: 10, y: 3, realizes: [metrics], description: 外部指標を Kubernetes API 経由で公開する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-hpa: {label: Kubernetes HPA, kind: service, tier: cloud, x: 14, y: 3, realizes: [hpa], description: 1 以上のレプリカ数を調整する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-consumer: {label: Consumer Deployment / Pods, kind: worker, tier: cloud, x: 14, y: 7, realizes: [workload], description: SQS からメッセージを受信、処理、削除する。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-job: {label: Kubernetes Job（別方式）, kind: worker, tier: cloud, x: 10, y: 7, realizes: [job], description: ScaledJob を使う場合の代替処理方式。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§6'}]}
+      ex-queue: {label: Amazon SQS キュー, kind: queue, svc: sqs, tier: cloud, x: 21, y: 5, realizes: [source], description: メッセージを保持し、キュー属性を返す。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-iam: {label: KEDA 用 IAM ロール / IRSA, kind: policy, svc: iam, tier: cloud, x: 5, y: 8, realizes: [auth], description: KEDA の scaler にキュー属性の読み取り権限を与える。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+      ex-consumer-iam: {label: Consumer 用 IAM ロール / IRSA, kind: policy, svc: iam, tier: cloud, x: 18, y: 9, description: consumer Pod にメッセージの受信・削除権限を与える。, evidence: [{type: doc, ref: 'docs/reference-keda-event-autoscaling.md#§7'}]}
+    links:
+      - {id: eks-host, from: ex-eks, to: ex-operator, label: KEDA を実行}
+      - {id: consumer-auth, from: ex-consumer-iam, to: ex-consumer, label: 受信と削除の権限を付与}

@@ -1,0 +1,96 @@
+name: Spark と Celeborn：リモートシャッフルの内部
+description: Spark の map 出力を別の Worker 群に保存し、partition 別に読み戻す仕組みと復旧を追う。
+parent: {model: spark, node: executor-a}
+reference:
+  objectives:
+    - Spark 標準のローカル shuffle、External Shuffle Service、リモート shuffle を区別する。
+    - 制御経路とデータ経路、配置から書き込み・読み取り・解放までを追う。
+    - Worker の複製、chunk、再試行と動的割り当ての前提を理解する。
+  sources:
+    - {title: Spark Dynamic Resource Allocation, url: 'https://spark.apache.org/docs/4.0.0/job-scheduling.html#dynamic-resource-allocation'}
+    - {title: Celeborn Architecture, url: 'https://celeborn.apache.org/docs/latest/developers/overview/'}
+    - {title: Celeborn ShuffleClient, url: 'https://celeborn.apache.org/docs/latest/developers/shuffleclient/'}
+    - {title: Celeborn Worker Storage, url: 'https://celeborn.apache.org/docs/latest/developers/storage/'}
+    - {title: Celeborn Fault Tolerance, url: 'https://celeborn.apache.org/docs/latest/developers/faulttolerant/'}
+    - {title: Apache Uniffle, url: 'https://uniffle.apache.org/docs/intro/'}
+sources: [docs/reference-spark-celeborn-shuffle.md]
+evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§1'}, {type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§6'}, {type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]
+tiers:
+  - {id: control, label: Shuffle の制御, z: 2, size: [20, 4]}
+  - {id: data, label: 分散処理と中間データ, z: 1, size: [20, 4]}
+  - {id: disk, label: Worker の保存領域, z: 0, size: [20, 4]}
+nodes:
+  lifecycle: {label: 配置と進捗の管理, kind: service, tier: control, x: 2, y: 1.5, description: Driver 内で shuffle の登録・場所・成功 attempt とコミットを管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§2'}]}
+  master: {label: Worker とスロットの管理, kind: service, tier: control, x: 9, y: 1.5, description: Worker の資源を管理し要求に応じて配置を決める。HA は Raft を利用できる。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§2'}]}
+  map: {label: Map タスクと書き込み, kind: worker, tier: data, x: 2, y: 1.5, description: パーティション分割した中間データを push する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  worker: {label: Shuffle Worker, kind: service, tier: data, x: 9, y: 1.5, description: 受信したバッチを統合して格納し、読み取り要求を処理する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  replica: {label: 複製先 Worker, kind: service, tier: data, x: 14, y: 3, description: 複製が有効な場合、別 Worker がバッチを受け取る。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  reduce: {label: Reduce タスクと読み戻し, kind: worker, tier: data, x: 19, y: 1.5, description: ファイル位置を取得し対象 partition を読み戻す。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§4'}]}
+  files: {label: Partition ファイルと chunk 索引, kind: db, tier: disk, x: 9, y: 1.5, description: reducer partition のデータを chunk と索引で保持する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  fail: {label: 再試行・配置変更, kind: service, tier: control, x: 16, y: 1.5, description: Revive と replica 切替を行い、復旧不能ならエラーを返す。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§5'}]}
+links:
+  - {id: register, from: map, to: lifecycle, label: shuffle を登録, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§2'}]}
+  - {id: allocate, from: lifecycle, to: master, label: スロットを要求, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§2'}]}
+  - {id: reserve, from: lifecycle, to: worker, label: Worker のスロットを予約, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§2'}]}
+  - {id: push, from: map, to: worker, label: partition のデータを push, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  - {id: replicate, from: worker, to: replica, label: 有効時に複製, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  - {id: store, from: worker, to: files, label: マージして保存, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  - {id: commit, from: lifecycle, to: worker, label: mapper 完了後にファイルを確定, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§3'}]}
+  - {id: location, from: reduce, to: lifecycle, label: 読み取り位置を取得, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§4'}]}
+  - {id: fetch, from: worker, to: reduce, label: 索引と chunk を読み戻す, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§4'}]}
+  - {id: retry, from: worker, to: fail, label: 障害を検出, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§5'}]}
+  - {id: revive, from: fail, to: lifecycle, label: 新しい配置を要求, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§5'}]}
+  - {id: cleanup, from: lifecycle, to: master, label: shuffle を解放, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§4'}]}
+scenarios:
+  - id: shuffle
+    label: 登録から読み取り・解放
+    steps:
+      - {links: [register, allocate, reserve], note: 初回 push に合わせて shuffle を登録し Worker の位置を決める。}
+      - {links: [push, replicate, store], note: partition 別に送信し、複製が有効なら peer にも送る。}
+      - {links: [commit], note: mapper が完了すると Worker のファイルを確定する。}
+      - {links: [location, fetch], note: reduce task は配置を問い合わせ、索引と chunk を取得する。}
+      - {links: [cleanup], note: 不要な shuffle を解放する。}
+  - id: failure
+    label: 失敗時の配置変更
+    steps:
+      - {links: [push, retry], note: 書き込み失敗を検出する。}
+      - {links: [revive, reserve], note: 新しい epoch の配置を決め、送信を続ける。}
+      - {links: [location, fetch], note: 成功 attempt と batch ID により重複を除いて読み取る。}
+blocks:
+  - id: files
+    title: Reduce partition ファイル（概念例）
+    note: 同じ partition のバッチをまとめて保存する。複製先の chunk 境界は一致するとは限らない。
+    lanes:
+      - {id: batches, label: map 出力, node: map}
+      - {id: chunks, label: Worker のファイル, node: files}
+      - {id: reader, label: 読み取り, node: reduce}
+    items:
+      batches:
+        - {id: a, label: 'map A / batch 1', k: 0, note: 成功 attempt のバッチ。}
+        - {id: b, label: 'map B / batch 1', k: 1, note: 同じ reducer partition 宛て。}
+      chunks:
+        - {id: c, label: chunk 0, k: 0, note: 索引に開始位置を保持する。}
+        - {id: d, label: chunk 1, k: 1, note: chunk 番号だけで replica の内容を対応付けない。}
+      reader:
+        - {id: r, label: chunk を取得, k: 0, note: 読み取り時に成功 attempt と batch ID を確認する。}
+implementations:
+  - id: standalone-celeborn
+    label: Spark Standalone と独立 Celeborn クラスター
+    description: Spark Executor と Celeborn Worker を別の自前ホスト群に配置し、Worker 間の複製を有効にする代表構成。
+    sources:
+      - {title: Celeborn Spark configuration, url: 'https://celeborn.apache.org/docs/latest/deploy/'}
+      - {title: Spark Standalone Mode, url: 'https://spark.apache.org/docs/4.0.0/spark-standalone.html'}
+    tiers:
+      - {id: platform, label: 自己管理環境, z: 0, size: [24, 10]}
+    groups:
+      - {kind: cluster, label: Spark Standalone, tier: [platform], nodes: [ex-driver, ex-map, ex-reduce]}
+      - {kind: cluster, label: 独立した Celeborn クラスター, tier: [platform], nodes: [ex-master, ex-worker, ex-replica, ex-files]}
+    nodes:
+      ex-driver: {label: Driver と LifecycleManager, kind: service, tier: platform, x: 4, y: 2, realizes: [lifecycle, fail], description: Spark Driver 内で shuffle の登録と配置を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]}
+      ex-map: {label: Executor の map task, kind: worker, tier: platform, x: 4, y: 6, realizes: [map], description: Celeborn クライアントで partition データを送信する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]}
+      ex-reduce: {label: Executor の reduce task, kind: worker, tier: platform, x: 9, y: 6, realizes: [reduce], description: Celeborn クライアントで chunk を取得する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]}
+      ex-master: {label: Celeborn Master, kind: service, tier: platform, x: 15, y: 2, realizes: [master], description: Worker 資源とスロット割り当てを管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]}
+      ex-worker: {label: Celeborn Worker, kind: service, tier: platform, x: 15, y: 6, realizes: [worker], description: partition のバッチを受信しファイルに保存する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]}
+      ex-replica: {label: 複製先 Celeborn Worker, kind: service, tier: platform, x: 21, y: 6, realizes: [replica], description: 複製を有効にした場合の peer。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]}
+      ex-files: {label: Worker ローカルディスク, kind: db, tier: platform, x: 21, y: 9, realizes: [files], description: partition ファイルを一時保存する。, evidence: [{type: doc, ref: 'docs/reference-spark-celeborn-shuffle.md#§7'}]}
+    links: []

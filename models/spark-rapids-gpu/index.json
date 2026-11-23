@@ -1,0 +1,218 @@
+{
+  "model": "spark-rapids-gpu",
+  "name": "Spark RAPIDS：GPU 実行と fallback",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "query": {
+      "type": "node",
+      "label": "SQL / DataFrame",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "link",
+      "label": "SQL / DataFrame → Spark 物理計画",
+      "status": "claim"
+    },
+    "plugin": {
+      "type": "node",
+      "label": "RAPIDS plugin",
+      "status": "claim"
+    },
+    "gpu": {
+      "type": "link",
+      "label": "RAPIDS plugin → GPU と device memory",
+      "status": "claim"
+    },
+    "cpu": {
+      "type": "node",
+      "label": "CPU fallback",
+      "status": "claim"
+    },
+    "transfer": {
+      "type": "node",
+      "label": "CPU / GPU データ転送",
+      "status": "claim"
+    },
+    "result": {
+      "type": "link",
+      "label": "GPU と device memory → 結果と診断",
+      "status": "claim"
+    },
+    "convert": {
+      "type": "link",
+      "label": "Spark 物理計画 → RAPIDS plugin",
+      "status": "claim"
+    },
+    "fallback": {
+      "type": "link",
+      "label": "RAPIDS plugin → CPU fallback",
+      "status": "claim"
+    },
+    "move": {
+      "type": "link",
+      "label": "CPU fallback → CPU / GPU データ転送",
+      "status": "claim"
+    },
+    "batch": {
+      "type": "link",
+      "label": "CPU / GPU データ転送 → GPU と device memory",
+      "status": "claim"
+    },
+    "cpu-result": {
+      "type": "link",
+      "label": "CPU fallback → 結果と診断",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "処理の流れ"
+    },
+    "ex-query": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "SQL / DataFrame",
+      "realizes": [
+        "query"
+      ]
+    },
+    "ex-plan": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：Spark 物理計画",
+      "realizes": [
+        "plan"
+      ]
+    },
+    "ex-plugin": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：RAPIDS plugin",
+      "realizes": [
+        "plugin"
+      ]
+    },
+    "ex-gpu": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：GPU と device memory",
+      "realizes": [
+        "gpu"
+      ]
+    },
+    "ex-cpu": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：CPU fallback",
+      "realizes": [
+        "cpu"
+      ]
+    },
+    "ex-transfer": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：CPU / GPU データ転送",
+      "realizes": [
+        "transfer"
+      ]
+    },
+    "ex-result": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "結果と診断",
+      "realizes": [
+        "result"
+      ]
+    },
+    "ex-cluster": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Spark Standalone の Master / Worker",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-rapids-gpu.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-rapids-gpu.md": [
+      "model",
+      "query",
+      "plan",
+      "plugin",
+      "gpu",
+      "cpu",
+      "transfer",
+      "result",
+      "convert",
+      "fallback",
+      "move",
+      "batch",
+      "cpu-result",
+      "ex-query",
+      "ex-plan",
+      "ex-plugin",
+      "ex-gpu",
+      "ex-cpu",
+      "ex-transfer",
+      "ex-result",
+      "ex-cluster"
+    ],
+    "docs/reference-spark-rapids-gpu.md#§2": [
+      "query",
+      "plan",
+      "plugin",
+      "gpu",
+      "cpu",
+      "transfer",
+      "result"
+    ],
+    "docs/reference-spark-rapids-gpu.md#§3": [
+      "plan",
+      "convert",
+      "gpu",
+      "fallback",
+      "move",
+      "batch",
+      "result",
+      "cpu-result"
+    ],
+    "docs/reference-spark-rapids-gpu.md#§4": [
+      "ex-query",
+      "ex-plan",
+      "ex-plugin",
+      "ex-gpu",
+      "ex-cpu",
+      "ex-transfer",
+      "ex-result",
+      "ex-cluster"
+    ]
+  },
+  "reference": {
+    "category": "分散実行と保守",
+    "order": 67,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "objectives": [
+      "Spark の SQL 演算を GPU に委譲し、未対応部分を CPU に戻す構成を追う。",
+      "RAPIDS の資料は 24.12 を参照。",
+      "GPU の導入が常に高速・低コストになるわけではない。"
+    ],
+    "sources": [
+      {
+        "title": "RAPIDS Accelerator Overview",
+        "url": "https://docs.nvidia.com/spark-rapids/user-guide/24.12/getting-started/overview.html"
+      },
+      {
+        "title": "RAPIDS Accelerator FAQ",
+        "url": "https://docs.nvidia.com/spark-rapids/user-guide/24.12/faq.html"
+      },
+      {
+        "title": "Spark Resource Configuration",
+        "url": "https://spark.apache.org/docs/4.3.0/configuration.html"
+      }
+    ]
+  }
+}

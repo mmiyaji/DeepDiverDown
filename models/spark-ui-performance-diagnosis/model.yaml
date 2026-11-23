@@ -1,0 +1,372 @@
+name: Spark UI：実行計画と性能診断
+description: SQL 演算子、Job、Stage、Task、Executor の観測値から遅延要因を追う。
+reference:
+  objectives:
+    - SQL 演算子、Job、Stage、Task、Executor の観測値から遅延要因を追う。
+    - EXPLAIN の推定値と実行後の SQL UI の実測を照合する。
+    - spill や長い task は原因を一意に示さない。
+  sources:
+    - title: Spark Web UI
+      url: https://spark.apache.org/docs/4.3.0/web-ui.html
+    - title: Spark Monitoring
+      url: https://spark.apache.org/docs/4.3.0/monitoring.html
+    - title: Spark SQL performance tuning
+      url: https://spark.apache.org/docs/4.3.0/sql-performance-tuning.html
+sources:
+  - docs/reference-spark-ui-performance-diagnosis.md
+evidence:
+  - type: doc
+    ref: docs/reference-spark-ui-performance-diagnosis.md#§1
+tiers:
+  - id: flow
+    label: 処理の流れ
+    z: 0
+    size:
+      - 21
+      - 8
+nodes:
+  sql:
+    label: SQL UI と物理計画
+    kind: client
+    tier: flow
+    x: 1
+    'y': 1.5
+    description: Scan、Exchange、Join などの演算子と統計を見る。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§2
+  job:
+    label: Job と Stage
+    kind: service
+    tier: flow
+    x: 6
+    'y': 1.5
+    description: SQL と Job の対応、shuffle の境界と実行時間を見る。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§2
+  tasks:
+    label: Task の時間分布
+    kind: worker
+    tier: flow
+    x: 11
+    'y': 1.5
+    description: 中央値と長い task を比べ偏りや straggler を検討する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§2
+  metrics:
+    label: Shuffle / spill / GC
+    kind: file
+    tier: flow
+    x: 16
+    'y': 1.5
+    description: 読み書き量、spill、GC を他の指標や plan と合わせて解釈する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§2
+  eventlog:
+    label: 永続 Event Log
+    kind: db
+    tier: flow
+    x: 1
+    'y': 5
+    description: 設定時にイベントを保存し、アプリ終了後の調査に使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§2
+  history:
+    label: History Server
+    kind: service
+    tier: flow
+    x: 6
+    'y': 5
+    description: Event Log から終了済みアプリの UI を再構成する。
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§2
+links:
+  - id: inspect
+    from: sql
+    to: job
+    label: 計画から Job を追う
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§3
+  - id: stage
+    from: job
+    to: tasks
+    label: Stage の task を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§3
+  - id: measure
+    from: tasks
+    to: metrics
+    label: shuffle・spill・GC を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§3
+  - id: record
+    from: job
+    to: eventlog
+    label: イベントを保存
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§3
+  - id: replay
+    from: eventlog
+    to: history
+    label: 履歴 UI を再構成
+    evidence:
+      - type: doc
+        ref: docs/reference-spark-ui-performance-diagnosis.md#§3
+scenarios:
+  - id: flow
+    label: 処理の流れ
+    steps:
+      - links:
+          - inspect
+        note: 計画から Job を追う。
+      - links:
+          - stage
+        note: Stage の task を確認。
+      - links:
+          - measure
+        note: shuffle・spill・GC を確認。
+      - links:
+          - record
+        note: イベントを保存。
+      - links:
+          - replay
+        note: 履歴 UI を再構成。
+implementations:
+  - id: spark-standalone
+    label: 自己管理 Spark Standalone の代表構成
+    description: Spark Standalone のホスト、Driver、Executor と入力・出力を使う概念的な代表例。製品・プラグイン・バージョンの互換性および実機動作は別途確認する。
+    sources:
+      - title: Spark Web UI
+        url: https://spark.apache.org/docs/4.3.0/web-ui.html
+      - title: Spark Monitoring
+        url: https://spark.apache.org/docs/4.3.0/monitoring.html
+      - title: Spark Standalone Mode
+        url: https://spark.apache.org/docs/4.3.0/spark-standalone.html
+    tiers:
+      - id: runtime
+        label: 自己管理環境
+        z: 0
+        size:
+          - 24
+          - 11
+    groups:
+      - kind: cluster
+        label: Spark Standalone クラスター
+        tier:
+          - runtime
+        nodes:
+          - ex-cluster
+          - ex-job
+          - ex-tasks
+          - ex-metrics
+    nodes:
+      ex-sql:
+        label: SQL UI と物理計画
+        kind: client
+        tier: runtime
+        x: 2
+        'y': 2
+        realizes:
+          - sql
+        description: Scan、Exchange、Join などの演算子と統計を見る。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-ui-performance-diagnosis.md#§4
+      ex-job:
+        label: Driver：Job と Stage
+        kind: service
+        tier: runtime
+        x: 7
+        'y': 2
+        realizes:
+          - job
+        description: SQL と Job の対応、shuffle の境界と実行時間を見る。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-ui-performance-diagnosis.md#§4
+      ex-tasks:
+        label: Executor：Task の時間分布
+        kind: worker
+        tier: runtime
+        x: 12
+        'y': 2
+        realizes:
+          - tasks
+        description: 中央値と長い task を比べ偏りや straggler を検討する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-ui-performance-diagnosis.md#§4
+      ex-metrics:
+        label: Executor：Shuffle / spill / GC
+        kind: file
+        tier: runtime
+        x: 17
+        'y': 2
+        realizes:
+          - metrics
+        description: 読み書き量、spill、GC を他の指標や plan と合わせて解釈する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-ui-performance-diagnosis.md#§4
+      ex-eventlog:
+        label: 永続 Event Log
+        kind: db
+        tier: runtime
+        x: 2
+        'y': 6
+        realizes:
+          - eventlog
+        description: 設定時にイベントを保存し、アプリ終了後の調査に使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-ui-performance-diagnosis.md#§4
+      ex-history:
+        label: History Server
+        kind: service
+        tier: runtime
+        x: 7
+        'y': 6
+        realizes:
+          - history
+        description: Event Log から終了済みアプリの UI を再構成する。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-ui-performance-diagnosis.md#§4
+      ex-cluster:
+        label: Spark Standalone の Master / Worker
+        kind: host
+        tier: runtime
+        x: 2
+        'y': 9
+        description: 自己管理するホスト上で Spark Standalone クラスターの資源を管理し Driver と Executor を動かす。
+        evidence:
+          - type: doc
+            ref: docs/reference-spark-ui-performance-diagnosis.md#§4
+    links:
+      - id: ex-start
+        from: ex-cluster
+        to: ex-tasks
+        label: Executor の実行資源を割り当て
+    layout2d:
+      tiers:
+        - id: diagram
+          label: 自己管理環境
+          z: 0
+          size:
+            - 26
+            - 16
+      nodes:
+        ex-sql:
+          tier: diagram
+          x: 1
+          'y': 3
+        ex-job:
+          tier: diagram
+          x: 8
+          'y': 4
+        ex-tasks:
+          tier: diagram
+          x: 8
+          'y': 10
+        ex-metrics:
+          tier: diagram
+          x: 13
+          'y': 10
+        ex-eventlog:
+          tier: diagram
+          x: 24
+          'y': 3
+        ex-history:
+          tier: diagram
+          x: 1
+          'y': 7
+        ex-cluster:
+          tier: diagram
+          x: 12
+          'y': 1
+      groups:
+        - kind: cluster
+          label: Spark Standalone クラスター
+          tier:
+            - diagram
+          x0: 5
+          y0: -1
+          x1: 21
+          y1: 15
+          nodes:
+            - ex-cluster
+            - ex-job
+            - ex-tasks
+            - ex-metrics
+    layout3d:
+      tiers:
+        - id: hosts
+          label: Spark ホストと Worker
+          z: 0
+          size:
+            - 16
+            - 8
+        - id: process
+          label: Driver / Executor の実行
+          z: 1
+          size:
+            - 16
+            - 8
+        - id: external
+          label: クライアント・外部データ
+          z: 0
+          origin:
+            - 19
+            - 0
+          size:
+            - 10
+            - 8
+      nodes:
+        ex-sql:
+          tier: external
+          x: 1
+          'y': 1.5
+        ex-job:
+          tier: process
+          x: 2
+          'y': 1.5
+        ex-tasks:
+          tier: process
+          x: 9
+          'y': 1.5
+        ex-metrics:
+          tier: process
+          x: 12
+          'y': 1.5
+        ex-eventlog:
+          tier: external
+          x: 6
+          'y': 1.5
+        ex-history:
+          tier: external
+          x: 1
+          'y': 3.5
+        ex-cluster:
+          tier: hosts
+          x: 6
+          'y': 3
+      groups:
+        - kind: cluster
+          label: Spark Standalone クラスター
+          tier:
+            - hosts
+            - process
+          nodes:
+            - ex-cluster
+            - ex-job
+            - ex-tasks
+            - ex-metrics

@@ -1,0 +1,86 @@
+name: Spark Structured Streaming：3つの実行モード
+description: マイクロバッチ、Continuous Processing、Real-Time Mode の処理経路と復旧を比較する。
+parent: {model: spark-structured-streaming, node: driver}
+reference:
+  objectives:
+    - Spark 3.5 と 4.3 の実行モードの位置付けと処理保証を区別する。
+    - 4.3 Real-Time の並行 Stage、pipelined shuffle、状態復旧を追う。
+    - エンジンの状態と外部出力の保証を区別する。
+  sources:
+    - {title: Spark 3.5.7 Continuous Processing, url: 'https://spark.apache.org/docs/3.5.7/structured-streaming-programming-guide.html#continuous-processing'}
+    - {title: Spark 4.3 Real-Time Mode, url: 'https://spark.apache.org/docs/4.3.0/streaming/real-time-mode.html'}
+    - {title: Spark 4.1 release, url: 'https://spark.apache.org/releases/spark-release-4.1.0.html'}
+    - {title: Spark 4.3 release, url: 'https://spark.apache.org/releases/spark-release-4-3-0.html'}
+sources: [docs/reference-spark-streaming-execution-modes.md]
+evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§1'}, {type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§6'}]
+tiers:
+  - {id: micro, label: マイクロバッチ：3.5 / 4.3, z: 2, size: [20, 4]}
+  - {id: continuous, label: Continuous：2.3 以降・実験的, z: 1, size: [20, 4]}
+  - {id: realtime, label: Real-Time：4.1 導入・状態ありは 4.3, z: 0, size: [20, 4]}
+nodes:
+  source: {label: 再読可能な入力, kind: queue, tier: micro, x: 0, y: 1.5, description: 入力レコードとオフセットを提供する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§2'}]}
+  driver: {label: Driver・進捗管理, kind: service, tier: micro, x: 4, y: 1.5, description: マイクロバッチの入力範囲を決めタスクを起動する。Real-Time では長時間バッチの進捗を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§2'}]}
+  batch: {label: 短時間のタスクと通常 shuffle, kind: worker, tier: micro, x: 9, y: 1.5, description: バッチごとにタスクを実行し通常の shuffle 出力を実体化する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§2'}]}
+  continuous: {label: Continuous の長時間タスク, kind: worker, tier: continuous, x: 9, y: 1.5, description: 実験的な map 系処理。状態あり演算は非対応で at-least-once。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§3'}]}
+  producer: {label: Real-Time 入力 Stage, kind: worker, tier: realtime, x: 4, y: 1.5, description: 入力パーティションごとに長時間タスクがレコードを読む。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§4'}]}
+  shuffle: {label: Pipelined / streaming shuffle, kind: gateway, tier: realtime, x: 9, y: 1.5, description: Stage を並行実行し、レコードをネットワークでキー別に転送する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§4'}]}
+  consumer: {label: 状態あり Stage, kind: worker, tier: realtime, x: 14, y: 1.5, description: Spark 4.3 の集計・重複排除・JVM transformWithState を連続実行する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§4'}]}
+  state: {label: State Store, kind: db, tier: realtime, x: 19, y: 1.5, description: キー別状態を保持しチェックポイントから復旧する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§5'}]}
+  checkpoint: {label: 進捗と状態のチェックポイント, kind: db, tier: continuous, x: 14, y: 1.5, description: 進捗と必要な状態を保存する。Real-Time 4.3 の状態あり処理は形式 v2 を用いる。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§5'}]}
+  sink: {label: 外部出力, kind: queue, tier: micro, x: 19, y: 1.5, description: 出力先の保証は別途確認する。Kafka sink は障害後に重複し得る。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§5'}]}
+links:
+  - {id: mb-plan, from: source, to: driver, label: 入力範囲を決定, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§2'}]}
+  - {id: mb-run, from: driver, to: batch, label: バッチごとに起動, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§2'}]}
+  - {id: mb-output, from: batch, to: sink, label: バッチ結果を出力, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§2'}]}
+  - {id: cp-read, from: source, to: continuous, label: レコードを連続取得, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§3'}]}
+  - {id: cp-save, from: continuous, to: checkpoint, label: 進捗を記録, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§3'}]}
+  - {id: cp-output, from: continuous, to: sink, label: 結果を連続出力, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§3'}]}
+  - {id: rt-read, from: source, to: producer, label: レコードを取得, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§4'}]}
+  - {id: rt-shuffle, from: producer, to: shuffle, label: レコードを転送, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§4'}]}
+  - {id: rt-route, from: shuffle, to: consumer, label: キー別に配信, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§4'}]}
+  - {id: rt-state, from: consumer, to: state, label: 状態を更新, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§5'}]}
+  - {id: rt-output, from: consumer, to: sink, label: 更新結果を出力, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§5'}]}
+  - {id: rt-save, from: state, to: checkpoint, label: 状態を保存, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§5'}]}
+  - {id: rt-resume, from: checkpoint, to: driver, label: 進捗から再開, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§5'}]}
+scenarios:
+  - id: micro
+    label: マイクロバッチ
+    steps:
+      - {links: [mb-plan, mb-run], note: 入力範囲を決め短時間のタスクを起動する。}
+      - {links: [mb-output], note: バッチ結果を出力する。}
+  - id: continuous
+    label: Continuous Processing
+    steps:
+      - {links: [cp-read, cp-output], note: 実験的モードで map 系のレコードを連続処理する。}
+      - {links: [cp-save], note: 定期的に進捗を記録する。障害時は at-least-once。}
+  - id: realtime
+    label: Real-Time の状態あり処理と復旧
+    steps:
+      - {links: [rt-read, rt-shuffle, rt-route], note: 上流と下流を同時に動かしキー別に転送する。}
+      - {links: [rt-state, rt-output], note: 状態を更新しバッチ境界を待たずに結果を出力する。}
+      - {links: [rt-save, rt-resume], note: チェックポイントから復旧する。出力先では重複が起こり得る。}
+implementations:
+  - id: standalone-kafka
+    label: Spark 4.3 Standalone・Kafka・共有ストレージ
+    description: Kafka と Spark Standalone の代表構成。図には代替モードの接続も含むためシナリオで切り替える。Real-Time の Kafka 出力は重複対策が必要。
+    sources:
+      - {title: Spark 4.3 Real-Time Mode, url: 'https://spark.apache.org/docs/4.3.0/streaming/real-time-mode.html'}
+      - {title: Spark Standalone Mode, url: 'https://spark.apache.org/docs/4.3.0/spark-standalone.html'}
+    tiers:
+      - {id: platform, label: 自己管理環境, z: 0, size: [22, 7]}
+    groups:
+      - {kind: cluster, label: Spark Standalone クラスター, tier: [platform], nodes: [ex-master, ex-driver, ex-producer, ex-consumer, ex-state]}
+    nodes:
+      ex-input: {label: Kafka 入力トピック, kind: queue, tier: platform, x: 1, y: 2, realizes: [source], description: 入力を保持し再読できる。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-master: {label: Standalone Master, kind: service, tier: platform, x: 5, y: 0, description: Worker を登録し Executor の資源を割り当てる。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-driver: {label: Spark Driver, kind: service, tier: platform, x: 5, y: 2, realizes: [driver], description: Real-Time クエリの実行と進捗を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-producer: {label: Executor 入力タスク, kind: worker, tier: platform, x: 9, y: 2, realizes: [producer, batch, continuous], description: モードに応じた入力タスク。Real-Time では長時間動作する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-consumer: {label: Executor 状態タスク, kind: worker, tier: platform, x: 14, y: 2, realizes: [consumer, shuffle], description: Real-Time では入力タスクと並行動作しネットワークでキー別の入力を受け取る。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-state: {label: RocksDB State Store, kind: db, tier: platform, x: 14, y: 5, realizes: [state], description: Executor のローカル状態を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-checkpoint: {label: 共有 checkpointLocation, kind: db, tier: platform, x: 9, y: 5, realizes: [checkpoint], description: 状態と進捗を共有ストレージへ永続化する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-output: {label: Kafka 出力トピック, kind: queue, tier: platform, x: 20, y: 2, realizes: [sink], description: Kafka sink の出力は障害後に重複し得る。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+    links:
+      - {id: ex-allocate, from: ex-master, to: ex-producer, label: Executor の資源を割り当て}
+      - {id: ex-schedule, from: ex-driver, to: ex-producer, label: タスクを起動}
+      - {id: ex-checkpoint, from: ex-driver, to: ex-checkpoint, label: 進捗を保存}
+      - {id: ex-restore, from: ex-state, to: ex-checkpoint, label: 状態を保存}

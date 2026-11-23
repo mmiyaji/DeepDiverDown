@@ -1,0 +1,230 @@
+{
+  "model": "spark-catalyst-planning",
+  "name": "Spark SQL：Catalyst と実行計画",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "query": {
+      "type": "node",
+      "label": "SQL / DataFrame",
+      "status": "claim"
+    },
+    "parsed": {
+      "type": "node",
+      "label": "未解決の論理計画",
+      "status": "claim"
+    },
+    "analyzed": {
+      "type": "node",
+      "label": "名前と型の解決",
+      "status": "claim"
+    },
+    "optimized": {
+      "type": "node",
+      "label": "論理最適化",
+      "status": "claim"
+    },
+    "physical": {
+      "type": "node",
+      "label": "物理計画と codegen",
+      "status": "claim"
+    },
+    "tasks": {
+      "type": "node",
+      "label": "Stage / Task",
+      "status": "claim"
+    },
+    "input": {
+      "type": "node",
+      "label": "入力データ",
+      "status": "claim"
+    },
+    "parse": {
+      "type": "link",
+      "label": "SQL / DataFrame → 未解決の論理計画",
+      "status": "claim"
+    },
+    "resolve": {
+      "type": "link",
+      "label": "未解決の論理計画 → 名前と型の解決",
+      "status": "claim"
+    },
+    "rewrite": {
+      "type": "link",
+      "label": "名前と型の解決 → 論理最適化",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "link",
+      "label": "論理最適化 → 物理計画と codegen",
+      "status": "claim"
+    },
+    "execute": {
+      "type": "link",
+      "label": "物理計画と codegen → Stage / Task",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "入力データ → Stage / Task",
+      "status": "claim"
+    },
+    "catalog": {
+      "type": "link",
+      "label": "入力データ → 名前と型の解決",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "処理の流れ"
+    },
+    "ex-query": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "SQL / DataFrame",
+      "realizes": [
+        "query"
+      ]
+    },
+    "ex-parsed": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：未解決の論理計画",
+      "realizes": [
+        "parsed"
+      ]
+    },
+    "ex-analyzed": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：名前と型の解決",
+      "realizes": [
+        "analyzed"
+      ]
+    },
+    "ex-optimized": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：論理最適化",
+      "realizes": [
+        "optimized"
+      ]
+    },
+    "ex-physical": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：物理計画と codegen",
+      "realizes": [
+        "physical"
+      ]
+    },
+    "ex-tasks": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Stage / Task",
+      "realizes": [
+        "tasks"
+      ]
+    },
+    "ex-input": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "入力データ",
+      "realizes": [
+        "input"
+      ]
+    },
+    "ex-cluster": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Spark Standalone の Master / Worker",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-catalyst-planning.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-catalyst-planning.md": [
+      "model",
+      "query",
+      "parsed",
+      "analyzed",
+      "optimized",
+      "physical",
+      "tasks",
+      "input",
+      "parse",
+      "resolve",
+      "rewrite",
+      "plan",
+      "execute",
+      "read",
+      "catalog",
+      "ex-query",
+      "ex-parsed",
+      "ex-analyzed",
+      "ex-optimized",
+      "ex-physical",
+      "ex-tasks",
+      "ex-input",
+      "ex-cluster"
+    ],
+    "docs/reference-spark-catalyst-planning.md#§2": [
+      "query",
+      "parsed",
+      "analyzed",
+      "optimized",
+      "physical",
+      "tasks",
+      "input"
+    ],
+    "docs/reference-spark-catalyst-planning.md#§3": [
+      "parse",
+      "resolve",
+      "rewrite",
+      "plan",
+      "execute",
+      "read",
+      "catalog"
+    ],
+    "docs/reference-spark-catalyst-planning.md#§4": [
+      "ex-query",
+      "ex-parsed",
+      "ex-analyzed",
+      "ex-optimized",
+      "ex-physical",
+      "ex-tasks",
+      "ex-input",
+      "ex-cluster"
+    ]
+  },
+  "reference": {
+    "category": "分散実行と保守",
+    "order": 60,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "spark",
+    "objectives": [
+      "SQL の解析、名前解決、ルール最適化、物理計画、Stage と Task への変換を追う。",
+      "EXTENDED は parsed / analyzed / optimized / physical plan を表示する。",
+      "EXPLAIN は実行後の AQE 最終計画や実際のタスク時間を単独で保証しない。"
+    ],
+    "sources": [
+      {
+        "title": "Spark EXPLAIN",
+        "url": "https://spark.apache.org/docs/4.3.0/sql-ref-syntax-qry-explain.html"
+      },
+      {
+        "title": "Spark SQL 性能",
+        "url": "https://spark.apache.org/docs/4.3.0/sql-performance-tuning.html"
+      },
+      {
+        "title": "Spark Cluster Mode",
+        "url": "https://spark.apache.org/docs/4.3.0/cluster-overview.html"
+      }
+    ]
+  }
+}

@@ -1,0 +1,226 @@
+{
+  "model": "spark-aqe-join-skew",
+  "name": "Spark SQL：AQE と Join・データスキュー",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "scan": {
+      "type": "node",
+      "label": "入力と推定統計",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "node",
+      "label": "初期物理計画",
+      "status": "claim"
+    },
+    "shuffle": {
+      "type": "node",
+      "label": "Shuffle 書き込み",
+      "status": "claim"
+    },
+    "stats": {
+      "type": "node",
+      "label": "実行時統計",
+      "status": "claim"
+    },
+    "aqe": {
+      "type": "node",
+      "label": "適応的再計画",
+      "status": "claim"
+    },
+    "join": {
+      "type": "node",
+      "label": "下流 Join と集約",
+      "status": "claim"
+    },
+    "output": {
+      "type": "node",
+      "label": "結果",
+      "status": "claim"
+    },
+    "initial": {
+      "type": "link",
+      "label": "入力と推定統計 → 初期物理計画",
+      "status": "claim"
+    },
+    "run": {
+      "type": "link",
+      "label": "初期物理計画 → Shuffle 書き込み",
+      "status": "claim"
+    },
+    "measure": {
+      "type": "link",
+      "label": "Shuffle 書き込み → 実行時統計",
+      "status": "claim"
+    },
+    "adapt": {
+      "type": "link",
+      "label": "実行時統計 → 適応的再計画",
+      "status": "claim"
+    },
+    "next": {
+      "type": "link",
+      "label": "適応的再計画 → 下流 Join と集約",
+      "status": "claim"
+    },
+    "fetch": {
+      "type": "link",
+      "label": "Shuffle 書き込み → 下流 Join と集約",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "下流 Join と集約 → 結果",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "処理の流れ"
+    },
+    "ex-scan": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "入力と推定統計",
+      "realizes": [
+        "scan"
+      ]
+    },
+    "ex-plan": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：初期物理計画",
+      "realizes": [
+        "plan"
+      ]
+    },
+    "ex-shuffle": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：Shuffle 書き込み",
+      "realizes": [
+        "shuffle"
+      ]
+    },
+    "ex-stats": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：実行時統計",
+      "realizes": [
+        "stats"
+      ]
+    },
+    "ex-aqe": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Driver：適応的再計画",
+      "realizes": [
+        "aqe"
+      ]
+    },
+    "ex-join": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Executor：下流 Join と集約",
+      "realizes": [
+        "join"
+      ]
+    },
+    "ex-output": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "結果",
+      "realizes": [
+        "output"
+      ]
+    },
+    "ex-cluster": {
+      "type": "implementation",
+      "impl": "spark-standalone",
+      "label": "Spark Standalone の Master / Worker",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-spark-aqe-join-skew.md#§1": [
+      "model"
+    ],
+    "docs/reference-spark-aqe-join-skew.md": [
+      "model",
+      "scan",
+      "plan",
+      "shuffle",
+      "stats",
+      "aqe",
+      "join",
+      "output",
+      "initial",
+      "run",
+      "measure",
+      "adapt",
+      "next",
+      "fetch",
+      "write",
+      "ex-scan",
+      "ex-plan",
+      "ex-shuffle",
+      "ex-stats",
+      "ex-aqe",
+      "ex-join",
+      "ex-output",
+      "ex-cluster"
+    ],
+    "docs/reference-spark-aqe-join-skew.md#§2": [
+      "scan",
+      "plan",
+      "shuffle",
+      "stats",
+      "aqe",
+      "join",
+      "output"
+    ],
+    "docs/reference-spark-aqe-join-skew.md#§3": [
+      "initial",
+      "run",
+      "measure",
+      "adapt",
+      "next",
+      "fetch",
+      "write"
+    ],
+    "docs/reference-spark-aqe-join-skew.md#§4": [
+      "ex-scan",
+      "ex-plan",
+      "ex-shuffle",
+      "ex-stats",
+      "ex-aqe",
+      "ex-join",
+      "ex-output",
+      "ex-cluster"
+    ]
+  },
+  "reference": {
+    "category": "分散実行と保守",
+    "order": 61,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "spark",
+    "objectives": [
+      "shuffle の実測統計を使って Join 方式や partition を調整する適応実行を追う。",
+      "AQE は Spark 3.2 以降デフォルト有効。",
+      "skew 対策の分割、サイズに基づく partition 結合は条件と設定に依存する。"
+    ],
+    "sources": [
+      {
+        "title": "Spark SQL performance tuning",
+        "url": "https://spark.apache.org/docs/4.3.0/sql-performance-tuning.html"
+      },
+      {
+        "title": "Spark SQL UI",
+        "url": "https://spark.apache.org/docs/4.3.0/web-ui.html"
+      }
+    ]
+  }
+}

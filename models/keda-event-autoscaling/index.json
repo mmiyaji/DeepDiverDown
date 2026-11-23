@@ -1,0 +1,291 @@
+{
+  "model": "keda-event-autoscaling",
+  "name": "KEDA：イベント駆動の自動スケーリング",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "definition": {
+      "type": "node",
+      "label": "伸縮設定",
+      "status": "claim"
+    },
+    "operator": {
+      "type": "node",
+      "label": "イベント監視と 0↔1",
+      "status": "claim"
+    },
+    "metrics": {
+      "type": "node",
+      "label": "外部メトリクス API",
+      "status": "claim"
+    },
+    "hpa": {
+      "type": "node",
+      "label": "HPA・1↔N の調整",
+      "status": "claim"
+    },
+    "source": {
+      "type": "node",
+      "label": "イベントソース",
+      "status": "claim"
+    },
+    "auth": {
+      "type": "node",
+      "label": "指標取得の認証",
+      "status": "claim"
+    },
+    "workload": {
+      "type": "node",
+      "label": "イベント処理ワークロード",
+      "status": "claim"
+    },
+    "job": {
+      "type": "node",
+      "label": "ScaledJob の Job 作成",
+      "status": "claim"
+    },
+    "config": {
+      "type": "link",
+      "label": "伸縮設定 → イベント監視と 0↔1",
+      "status": "claim"
+    },
+    "access": {
+      "type": "link",
+      "label": "指標取得の認証 → イベント監視と 0↔1",
+      "status": "claim"
+    },
+    "poll": {
+      "type": "link",
+      "label": "イベントソース → イベント監視と 0↔1",
+      "status": "claim"
+    },
+    "activate": {
+      "type": "link",
+      "label": "イベント監視と 0↔1 → イベント処理ワークロード",
+      "status": "claim"
+    },
+    "expose": {
+      "type": "link",
+      "label": "イベント監視と 0↔1 → 外部メトリクス API",
+      "status": "claim"
+    },
+    "query": {
+      "type": "link",
+      "label": "外部メトリクス API → HPA・1↔N の調整",
+      "status": "claim"
+    },
+    "scale": {
+      "type": "scenario",
+      "label": "キューによる Deployment の伸縮",
+      "status": "claim"
+    },
+    "consume": {
+      "type": "link",
+      "label": "イベントソース → イベント処理ワークロード",
+      "status": "claim"
+    },
+    "makejob": {
+      "type": "link",
+      "label": "イベント監視と 0↔1 → ScaledJob の Job 作成",
+      "status": "claim"
+    },
+    "processjob": {
+      "type": "link",
+      "label": "イベントソース → ScaledJob の Job 作成",
+      "status": "claim"
+    },
+    "scaled-job": {
+      "type": "scenario",
+      "label": "ScaledJob による処理"
+    },
+    "ex-eks": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "Amazon EKS",
+      "realizes": []
+    },
+    "ex-config": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "ScaledObject / ScaledJob",
+      "realizes": [
+        "definition"
+      ]
+    },
+    "ex-operator": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "KEDA Operator・SQS scaler",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "ex-metrics": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "KEDA Metrics Server",
+      "realizes": [
+        "metrics"
+      ]
+    },
+    "ex-hpa": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "Kubernetes HPA",
+      "realizes": [
+        "hpa"
+      ]
+    },
+    "ex-consumer": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "Consumer Deployment / Pods",
+      "realizes": [
+        "workload"
+      ]
+    },
+    "ex-job": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "Kubernetes Job（別方式）",
+      "realizes": [
+        "job"
+      ]
+    },
+    "ex-queue": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "Amazon SQS キュー",
+      "realizes": [
+        "source"
+      ]
+    },
+    "ex-iam": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "KEDA 用 IAM ロール / IRSA",
+      "realizes": [
+        "auth"
+      ]
+    },
+    "ex-consumer-iam": {
+      "type": "implementation",
+      "impl": "eks-sqs",
+      "label": "Consumer 用 IAM ロール / IRSA",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-keda-event-autoscaling.md#§1": [
+      "model",
+      "workload"
+    ],
+    "docs/reference-keda-event-autoscaling.md": [
+      "model",
+      "definition",
+      "operator",
+      "metrics",
+      "hpa",
+      "source",
+      "auth",
+      "workload",
+      "job",
+      "config",
+      "access",
+      "poll",
+      "activate",
+      "expose",
+      "query",
+      "scale",
+      "consume",
+      "makejob",
+      "processjob",
+      "ex-eks",
+      "ex-config",
+      "ex-operator",
+      "ex-metrics",
+      "ex-hpa",
+      "ex-consumer",
+      "ex-job",
+      "ex-queue",
+      "ex-iam",
+      "ex-consumer-iam"
+    ],
+    "docs/reference-keda-event-autoscaling.md#§5": [
+      "model",
+      "source",
+      "consume"
+    ],
+    "docs/reference-keda-event-autoscaling.md#§6": [
+      "model",
+      "job",
+      "makejob",
+      "processjob",
+      "ex-job"
+    ],
+    "docs/reference-keda-event-autoscaling.md#§2": [
+      "definition",
+      "auth",
+      "config",
+      "access"
+    ],
+    "docs/reference-keda-event-autoscaling.md#§3": [
+      "operator",
+      "poll",
+      "activate"
+    ],
+    "docs/reference-keda-event-autoscaling.md#§4": [
+      "metrics",
+      "hpa",
+      "expose",
+      "query",
+      "scale"
+    ],
+    "docs/reference-keda-event-autoscaling.md#§7": [
+      "ex-eks",
+      "ex-config",
+      "ex-operator",
+      "ex-metrics",
+      "ex-hpa",
+      "ex-consumer",
+      "ex-queue",
+      "ex-iam",
+      "ex-consumer-iam"
+    ]
+  },
+  "reference": {
+    "category": "コンテナの自動スケーリング",
+    "order": 45,
+    "domain": "コンテナ基盤",
+    "kind": "製品・技術のアーキテクチャ",
+    "objectives": [
+      "KEDA の起動判定と HPA のレプリカ調整、イベントの処理経路を区別する。",
+      "ScaledObject、Scaler、Metrics Server、HPA と認証の関係を追う。",
+      "Kafka lag と SQS、ScaledJob の制約を理解する。"
+    ],
+    "sources": [
+      {
+        "title": "KEDA 2.21 Concepts",
+        "url": "https://keda.sh/docs/2.21/concepts/"
+      },
+      {
+        "title": "ScaledObject specification",
+        "url": "https://keda.sh/docs/2.21/reference/scaledobject-spec/"
+      },
+      {
+        "title": "Kafka scaler",
+        "url": "https://keda.sh/docs/2.21/scalers/apache-kafka/"
+      },
+      {
+        "title": "ScaledJob",
+        "url": "https://keda.sh/docs/2.21/concepts/scaling-jobs/"
+      },
+      {
+        "title": "Knative Broker",
+        "url": "https://knative.dev/docs/eventing/brokers/"
+      }
+    ]
+  }
+}
