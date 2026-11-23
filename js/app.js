@@ -365,7 +365,10 @@ function modelLink(entry) {
     ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
 }
 
+/* 開いている分類・スクロール位置・絞り込みは再描画しても保つ（切り替えのたびに畳まない） */
+const LIB_OPEN = new Set((() => { try { return JSON.parse(localStorage.getItem('ddd.libOpen') || '[]'); } catch { return []; } })());
 function renderLibrary() {
+  const aside = $('library').closest('aside'), top = aside?.scrollTop;
   $('mlist').innerHTML = REGISTRY.filter(entry => !entry.reference).map(modelLink).join('') +
     '<button class="b small" data-act="open">＋ YAML を開く</button>';
 
@@ -377,11 +380,18 @@ function renderLibrary() {
   }
   $('reference-section').hidden = !groups.size;
   $('reference-list').innerHTML = [...groups].map(([category, entries]) =>
-    `<details class="reference-category"${entries.some(entry => entry.id === KEY) ? ' open' : ''}>
+    `<details class="reference-category" data-cat="${esc(category)}"${LIB_OPEN.has(category) || entries.some(entry => entry.id === KEY) ? ' open' : ''}>
       <summary>${esc(category)} <small>${entries.length}</small></summary><div class="mlist">${entries
         .sort((a, b) => (a.reference.order ?? Number.MAX_SAFE_INTEGER) - (b.reference.order ?? Number.MAX_SAFE_INTEGER))
         .map(modelLink).join('')}</div></details>`).join('');
+  if (entryIsRef()) $('library').open = true;
+  const q = $('model-filter').value; if (q) filterLibrary(q);
+  if (aside) aside.scrollTop = top;
+  const cur = $('library').querySelector('.mitem.on');
+  if (cur && aside) { const r = cur.getBoundingClientRect(), a = aside.getBoundingClientRect(); if (r.top < a.top || r.bottom > a.bottom) cur.scrollIntoView({ block: 'nearest' }); }
 }
+function entryIsRef() { return REGISTRY.some(r => r.reference && r.id === KEY); }
+function saveLibOpen() { try { localStorage.setItem('ddd.libOpen', JSON.stringify([...LIB_OPEN])); localStorage.setItem('ddd.libMain', $('library').open ? '1' : ''); } catch {} }
 
 /* モデル一覧の絞り込み：一致したモデルのある分類だけ開く */
 function filterLibrary(q) {
@@ -954,6 +964,12 @@ addEventListener('keydown', e => {
 document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
 setDimension(st.dimension, false);
+try { if (localStorage.getItem('ddd.libMain')) $('library').open = true; } catch {}
+$('library').addEventListener('toggle', e => {
+  const d = e.target;
+  if (d.dataset?.cat && !$('model-filter').value.trim()) { d.open ? LIB_OPEN.add(d.dataset.cat) : LIB_OPEN.delete(d.dataset.cat); }
+  saveLibOpen();
+}, true);
 renderLibrary();
 scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();
