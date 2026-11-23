@@ -243,3 +243,5 @@ groups:
 
 - `timeline: {title, current, note, commits: [{id, label, time, kind, node, description, sample}]}` で、コミット（スナップショット）を時間順に並べる。`kind` は append／overwrite／delete／compact。
 - ステップの `current`（現在の版）、`travel`（時点指定で読む版）、`expire`（失効した版）、`highlight` を反映する。
+
+- 分布の棒に `from: [元の棒の ID]` を書くと、ステップの切り替えで動きが付く。複数を指定すると元の棒が飛んできて積み重なり 1 本にまとまり（結合）、1 本を指定すると元の棒から切り出されて移動する（分割）。同じ ID の棒は新しい位置へ滑る。前のステップに戻ると逆向きに動く。OS の「視差効果を減らす」設定では動かさない。

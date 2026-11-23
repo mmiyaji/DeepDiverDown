@@ -4,7 +4,7 @@ import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDE
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=nc1';
 import { FileMap } from './filemap.js?v=dv2';
-import { TreeMap, DistMap, GridMap, TimelineMap } from './datavis.js?v=dv3';
+import { TreeMap, DistMap, GridMap, TimelineMap } from './datavis.js?v=anim3';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

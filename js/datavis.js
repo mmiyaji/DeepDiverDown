@@ -84,7 +84,13 @@ export class DistMap {
   constructor(el, layout, { onNode } = {}) {
     this.el = el; this.L = layout; this.onNode = onNode; this.sel = null; this.ctx = null;
     el.addEventListener('click', e => { const b = e.target.closest('[data-bar]'); if (b) this.pick(b.dataset.bar); });
-    new ResizeObserver(() => { if (el.clientWidth !== this.w0) { this.w0 = el.clientWidth; this.render(); } }).observe(el);
+    // 幅が変わったら描き直す。ただし動いている途中は、終わってから描き直す（スクロールバーの出入りで幅が変わるため）
+    new ResizeObserver(() => {
+      if (el.clientWidth === this.w0) return;
+      this.w0 = el.clientWidth;
+      const wait = (this.animEnd || 0) - performance.now();
+      clearTimeout(this.rt); this.rt = setTimeout(() => this.render(), Math.max(0, wait));
+    }).observe(el);
     this.render();
   }
   bars() {
@@ -92,7 +98,12 @@ export class DistMap {
     return (C && [...C.steps.slice(0, C.idx + 1)].reverse().find(x => x.bars)?.bars) || this.L.bars;
   }
   pick(id) { this.sel = id; const b = this.bars().find(x => x.id === id); if (b?.node) this.onNode?.(b.node); this.render(); }
-  sync(ctx, sel) { this.ctx = ctx; this.render(); }
+  sync(ctx, sel) {
+    // 同じステップの再描画は飛ばす（動いている途中のアニメーションを消さないため）
+    const key = ctx ? ctx.steps[ctx.idx] : null;
+    if (this.ctx && ctx && this.key === key && this.ctx.steps === ctx.steps) return;
+    this.ctx = ctx; this.key = key; this.render();
+  }
   render() {
     const L = this.L, bars = this.bars(), C = this.ctx;
     const hi = new Set(C ? C.steps[C.idx]?.highlight || [] : []);
@@ -100,9 +111,11 @@ export class DistMap {
     const med = sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
     const top = Math.max(max, L.scaleMax || 0), H = 150, w = Math.max(320, this.el.clientWidth - 30), gap = 4;
     const bw = Math.max(10, (w - 40) / bars.length - gap), Y = v => H - (v / top) * (H - 16);
-    const unit = L.unit || '';
+    const unit = L.unit || '', geom = new Map();
     const g = bars.map((b, i) => {
-      const x = 36 + i * (bw + gap), h = H - Y(b.value), cls = [hi.has(b.id) ? 'hi' : '', b.value === max ? 'max' : '', this.sel === b.id ? 'sel' : ''].join(' ');
+      const x = 36 + i * (bw + gap), h = H - Y(b.value);
+      geom.set(b.id, { x, y: Y(b.value), w: bw, h: Math.max(1, h) });
+      const cls = [hi.has(b.id) ? 'hi' : '', b.value === max ? 'max' : '', this.sel === b.id ? 'sel' : ''].join(' ');
       return `<g class="dm-b ${cls}" data-bar="${esc(b.id)}" role="button" tabindex="0" aria-label="${esc(b.label)} ${b.value}${unit}">
         <rect x="${x}" y="${Y(b.value)}" width="${bw}" height="${Math.max(1, h)}" rx="2"/>
         <text class="dm-v" x="${x + bw / 2}" y="${Y(b.value) - 3}">${b.value}</text>
@@ -119,6 +132,90 @@ export class DistMap {
         ${L.summary === 'files' ? (L.target ? line(L.target, 'mx', `目標 ${L.target}${unit}`) : '') : line(med, 'med', `中央値 ${med}${unit}`) + line(max, 'mx', `最大 ${max}${unit}`)}${g}</svg>
       ${L.note ? `<div class="fm-note">${esc(L.note)}</div>` : ''}
       ${infoBox(sel && { ...sel, sub: `${sel.value}${unit}` }, '棒を選ぶと説明を表示します。シナリオを再生すると、注目する棒が強調され、対処後の分布に切り替わります。')}`;
+    const prev = this.prev; this.prev = { bars, geom };
+    if (prev && prev.bars !== bars) this.animate(prev, bars, geom);
+  }
+
+  /* 分布が切り替わったときの動き：
+     - 同じ ID の棒は新しい位置へ滑らせる
+     - from に複数の棒を持つ新しい棒（結合）は、元の棒が飛んできて下から積み重なり、1 本にまとまる
+     - from に 1 本を持つ新しい棒（分割）は、元の棒の位置から切り出されて新しい位置へ移る
+     - 逆向き（結合した棒が元に戻る）も同じ対応関係から割り出す */
+  animate(prev, bars, geom) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const svg = this.el.querySelector('svg.dm'); if (!svg) return;
+    const NS = 'http://www.w3.org/2000/svg', D = 900;
+    this.animEnd = performance.now() + D * 1.6;
+    const EASE = 'cubic-bezier(.45,0,.2,1)';
+    const P = prev.geom, prevBars = new Map(prev.bars.map(b => [b.id, b]));
+    const el = id => svg.querySelector(`[data-bar="${CSS.escape(id)}"]`);
+    const tf = (from, to) => `translate(${from.x - to.x}px, ${from.y - to.y}px) scale(${from.w / to.w}, ${from.h / to.h})`;
+    const fadeIn = (node, delay) => node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, delay, fill: 'backwards' });
+    // 元の 1 本から切り出した部分の位置：元の棒の底から順に積む
+    const portion = (src, list, id) => {
+      let cum = 0;
+      for (const x of list) { const gx = geom.get(x.id) || P.get(x.id); if (x.id === id) return { x: src.x, w: src.w, h: gx.h, y: src.y + src.h - cum - gx.h }; cum += gx.h; }
+      return src;
+    };
+    let busy = 0;
+    bars.forEach(b => {
+      const g = el(b.id), fin = geom.get(b.id); if (!g || !fin) return;
+      const rect = g.querySelector('rect'), texts = g.querySelectorAll('text');
+      const from = (b.from || []).filter(id => P.has(id));
+      if (P.has(b.id)) {                                   // 同じ棒：横へ滑らせる
+        const o = P.get(b.id);
+        rect.animate([{ transform: tf(o, fin) }, { transform: 'none' }], { duration: D, easing: EASE });
+        texts.forEach(t => t.animate([{ transform: `translateX(${o.x - fin.x}px)` }, { transform: 'none' }], { duration: D, easing: EASE }));
+        return;
+      }
+      if (from.length > 1) {                               // 結合：元の棒が飛んできて積み重なる
+        busy = Math.max(busy, D + from.length * 40);
+        let cum = 0;
+        from.forEach((id, k) => {
+          const o = P.get(id), gh = document.createElementNS(NS, 'rect');
+          const to = { x: fin.x, w: fin.w, h: o.h, y: fin.y + fin.h - cum - o.h }; cum += o.h;
+          for (const [a, v] of Object.entries({ x: o.x, y: o.y, width: o.w, height: o.h, rx: 2 })) gh.setAttribute(a, v);
+          gh.setAttribute('class', 'dm-ghost'); svg.append(gh);
+          const delay = k * 40;
+          gh.animate([{ transform: 'none' }, { transform: `translate(${to.x - o.x}px, ${to.y - o.y}px) scale(${to.w / o.w}, 1)` }],
+            { duration: D, delay, easing: EASE, fill: 'forwards' }).finished.then(() => gh.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' }).finished.then(() => gh.remove()));
+        });
+        g.animate([{ opacity: 0 }, { opacity: 0, offset: 0.99 }, { opacity: 1 }], { duration: busy, fill: 'backwards' });
+        return;
+      }
+      if (from.length === 1) {                             // 分割：元の 1 本から切り出して移動
+        const sib = bars.filter(x => x.from?.length === 1 && x.from[0] === from[0]);
+        const start = portion(P.get(from[0]), sib, b.id);
+        rect.animate([{ transform: tf(start, fin) }, { transform: 'none' }], { duration: D, easing: EASE });
+        texts.forEach(t => fadeIn(t, D));
+        return;
+      }
+      if ([...prevBars.values()].some(x => x.from?.length === 1 && x.from[0] === b.id)) return; // 分割を戻す：下のループで扱う
+      const parent = [...prevBars.values()].find(x => x.from?.length > 1 && x.from.includes(b.id));
+      if (parent && P.has(parent.id)) {                    // 逆向きの結合：まとめた棒から元の棒へばらす
+        const sib = parent.from.map(id => bars.find(x => x.id === id)).filter(Boolean);
+        const start = portion(P.get(parent.id), sib, b.id);
+        rect.animate([{ transform: tf(start, fin) }, { transform: 'none' }], { duration: D, delay: sib.indexOf(b) * 25, easing: EASE, fill: 'backwards' });
+        texts.forEach(t => fadeIn(t, D));
+        return;
+      }
+      rect.animate([{ transform: `translateY(${fin.h}px) scale(1, 0)` }, { transform: 'none' }], { duration: D * 0.6, easing: EASE });
+    });
+    // 結合・分割で消える元の棒が、逆向き（分割した棒が戻る）でまとまるとき
+    for (const [id, ob] of prevBars) {
+      if (geom.has(id)) continue;
+      const target = bars.find(x => (x.from || []).includes(id)); if (target) continue;
+      const back = ob.from?.length === 1 && bars.find(x => x.id === ob.from[0]);
+      if (!back) continue;
+      const fin = geom.get(back.id), o = P.get(id), gh = document.createElementNS(NS, 'rect');
+      for (const [a, v] of Object.entries({ x: o.x, y: o.y, width: o.w, height: o.h, rx: 2 })) gh.setAttribute(a, v);
+      gh.setAttribute('class', 'dm-ghost'); svg.append(gh);
+      const sib = [...prevBars.values()].filter(x => x.from?.length === 1 && x.from[0] === back.id);
+      const to = portion(fin, sib, id);
+      gh.animate([{ transform: 'none' }, { transform: `translate(${to.x - o.x}px, ${to.y - o.y}px) scale(${to.w / o.w}, 1)` }], { duration: D, easing: EASE, fill: 'forwards' })
+        .finished.then(() => gh.remove());
+      el(back.id)?.animate([{ opacity: 0 }, { opacity: 0, offset: 0.99 }, { opacity: 1 }], { duration: D, fill: 'backwards' });
+    }
   }
 }
 
