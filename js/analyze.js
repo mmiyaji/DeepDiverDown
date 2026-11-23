@@ -6,7 +6,7 @@
   const RULES = [
     { id: 'SPOF', sev: 'high', title: '単一障害点',
       run: m => Object.entries(m.nodes)
-        .filter(([, n]) => !INFRA.includes(n.kind) && (n.replicas ?? 1) < 2)
+        .filter(([, n]) => !INFRA.includes(n.kind) && !n.parallel && (n.replicas ?? 1) < 2)
         .map(([id, n]) => ({ nodes: [id], msg: n.replicas == null
           ? `${n.label} の台数が書かれていない（1 台とみなす。冗長化の方針を確認）`
           : `${n.label} が ${n.replicas} 台構成（${(n.evidence || [])[0]?.ref?.split('#')[1] || (n.evidence || [])[0]?.at || '根拠なし'}）` })) },

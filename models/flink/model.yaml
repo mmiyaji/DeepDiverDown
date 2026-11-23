@@ -16,9 +16,9 @@ tiers:
 nodes:
   source: {label: Kafka Source, kind: queue, tier: flow, x: 0, y: 1.5, description: Kafka からイベントと読み取り位置を取得する。, evidence: [{type: doc, ref: "docs/reference-flink.md#§2"}]}
   watermark: {label: Watermark Generator, kind: service, tier: flow, x: 3, y: 1.5, description: イベント時刻の進行をウォーターマークで示す。, evidence: [{type: doc, ref: "docs/reference-flink.md#§3"}]}
-  operator: {label: Window Operator, kind: worker, tier: flow, x: 7, y: 1.5, description: キーごとの窓状態を更新し、窓を閉じて結果を作る。, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}]}
+  operator: {parallel: N, label: Window Operator, kind: worker, tier: flow, x: 7, y: 1.5, description: キーごとの窓状態を更新し、窓を閉じて結果を作る。, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}]}
   sink: {label: Sink, kind: db, tier: flow, x: 11, y: 1.5, description: 窓集計の結果を下流システムへ書く。, evidence: [{type: doc, ref: "docs/reference-flink.md#§6"}]}
-  state: {label: Keyed State, kind: db, tier: fault, x: 7, y: 1.5, description: キー付き演算子の集計状態をスナップショット対象として保持する。Operator State とは区別する。, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}, {type: doc, ref: "docs/reference-flink.md#§5"}]}
+  state: {partitions: 4, label: Keyed State, kind: db, tier: fault, x: 7, y: 1.5, description: キー付き演算子の集計状態をスナップショット対象として保持する。Operator State とは区別する。, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}, {type: doc, ref: "docs/reference-flink.md#§5"}]}
   checkpoint: {label: Checkpoint, kind: db, tier: fault, x: 11, y: 1.5, description: 入力位置と演算子状態の一貫したスナップショット。, evidence: [{type: doc, ref: "docs/reference-flink.md#§5"}]}
 links:
   - {id: ingest, from: source, to: watermark, label: イベントを取り込む, evidence: [{type: doc, ref: "docs/reference-flink.md#§2"}]}

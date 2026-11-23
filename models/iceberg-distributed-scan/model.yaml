@@ -1,0 +1,92 @@
+name: "Iceberg の分散スキャン：データ分散とファイル取得"
+description: 隠しパーティションと 3 段階のメタデータ・プルーニングで読むファイルを減らし、Split に分けて Worker が並列に範囲 GET する流れを追います。
+reference:
+  objectives:
+    - 隠しパーティション（day・bucket 変換）がデータをどう分散し、どの述語で効くかを説明する。
+    - Manifest List・Manifest・ファイル内統計の 3 段階で読まないファイルを決める流れを追う。
+    - Split への分割、Worker への割り当て、範囲 GET による列単位のファイル取得を理解する。
+    - 小さなファイル・Delete ファイル・偏りが性能を壊す理由を説明する。
+    - metadata／data の物理配置、Avro・Parquet の使い分け、エンコーディングと圧縮が読み取りに与える影響を理解する。
+  sources:
+    - {title: Apache Iceberg Specification, url: "https://iceberg.apache.org/spec/"}
+    - {title: Iceberg Partitioning, url: "https://iceberg.apache.org/docs/latest/partitioning/"}
+    - {title: Iceberg Performance, url: "https://iceberg.apache.org/docs/latest/performance/"}
+    - {title: Iceberg Configuration, url: "https://iceberg.apache.org/docs/latest/configuration/"}
+    - {title: Trino Iceberg connector, url: "https://trino.io/docs/current/connector/iceberg.html"}
+    - {title: Apache Parquet File Format, url: "https://parquet.apache.org/docs/file-format/"}
+    - {title: Apache Avro Specification, url: "https://avro.apache.org/docs/current/specification/"}
+    - {title: Iceberg AWS - Object Store File Layout, url: "https://iceberg.apache.org/docs/latest/aws/#object-store-file-layout"}
+sources: [docs/reference-iceberg-distributed-scan.md]
+evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§1"}]
+tiers:
+  - {id: plan, label: コーディネーター（読み取り計画）, z: 2, size: [14, 3]}
+  - {id: exec, label: Worker（並列実行）, z: 1, size: [14, 3]}
+  - {id: storage, label: オブジェクトストレージ, z: 0, size: [14, 3]}
+groups:
+  - {kind: parallel, label: Split ごとに Worker が並列に取得, tier: exec, nodes: [worker, reader]}
+nodes:
+  analyst: {label: Analyst / SQL, kind: actor, tier: plan, x: 0, y: 1.5, description: "events を event_ts と user_id で検索する。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§1"}]}
+  planner: {label: Coordinator / Planner, kind: service, tier: plan, x: 4, y: 1.5, description: 述語からパーティション述語を導出し、メタデータだけで読むファイルを決めて Split を作る。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§2"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
+  splits: {label: Split Queue, kind: queue, tier: plan, x: 10, y: 1.5, partitions: 6, description: "split_offsets で分けた・まとめたスキャンタスク。target-size と open-file-cost で大きさが決まる。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
+  worker: {label: Worker, kind: worker, tier: exec, x: 4, y: 1.5, parallel: N, slots: 4, description: 空きに応じて Split を受け取り、Delete ファイルを適用しながら読む。局所性ではなく負荷で割り当てる。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
+  reader: {label: Parquet Reader, kind: worker, tier: exec, x: 9, y: 1.5, parallel: N, description: フッターを読み、残った Row Group の必要な列チャンクだけを範囲 GET し、ページを解凍（zstd など）してデコード（辞書・RLE・差分）する。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}]}
+  mlist: {label: Manifest List, kind: db, tier: storage, x: 1, y: 0.5, description: "metadata/snap-*.avro。Manifest ごとのパーティション要約（下限・上限・null）を持つ Avro ファイル。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
+  manifest: {label: Manifests, kind: db, tier: storage, x: 4, y: 0.5, description: "metadata/*-m0.avro。データファイルの完全パス・パーティション値・列統計・ファイルサイズ・split_offsets を持つ Avro ファイル。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
+  deletes: {label: Delete Files, kind: db, tier: storage, x: 7, y: 0.5, description: 位置削除・等値削除・削除ベクトル。計画時にデータファイルへ対応づける。, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}]}
+  metajson: {label: metadata.json, kind: db, tier: storage, x: 1, y: 2.5, description: "テーブルメタデータ（JSON）。コミットごとに新しく書き、カタログのポインタを差し替える。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§9"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§10"}]}
+  data: {label: "Data Files (Parquet)", kind: db, shape3D: crate, tier: storage, x: 11, y: 1.5, partitions: 6, description: "data/ 以下の Parquet（Row Group → 列チャンク → zstd 圧縮のページ、末尾にフッター）。day(event_ts) × bucket(16, user_id) で分散。完全パスは Manifest に記録され、LIST しない。", evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§2"}]}
+links:
+  - {id: submit, from: analyst, to: planner, label: SQL と述語, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§2"}]}
+  - {id: resolve, from: planner, to: metajson, label: 現在の metadata.json, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§9"}]}
+  - {id: prune-mlist, from: planner, to: mlist, label: ① Manifest を丸ごと除外, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
+  - {id: prune-manifest, from: planner, to: manifest, label: ② 列統計でファイル除外, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
+  - {id: attach-deletes, from: planner, to: deletes, label: Delete ファイルを対応づけ, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}]}
+  - {id: plan-splits, from: planner, to: splits, label: Split に分割・結合, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
+  - {id: assign, from: splits, to: worker, label: 空いた Worker へ配る, sync: false, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
+  - {id: open, from: worker, to: reader, label: Split を読む, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}]}
+  - {id: footer, from: reader, to: data, label: ③ フッターを範囲 GET, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}]}
+  - {id: chunks, from: reader, to: data, label: 必要な列チャンクだけ GET, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§10"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§11"}]}
+  - {id: decode, from: reader, to: worker, label: 解凍・デコードした列, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§11"}]}
+  - {id: apply-deletes, from: worker, to: deletes, label: 削除行を除く, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}]}
+  - {id: result, from: worker, to: analyst, label: 部分結果を返す, evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}]}
+scenarios:
+  - id: pruned-scan
+    label: 日付とユーザーで絞って検索する
+    evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§8"}]
+    steps:
+      - {links: [submit, prune-mlist], note: "event_ts の範囲から day 変換のパーティション述語を導出し、範囲外の Manifest を開かずに除外する。"}
+      - {links: [prune-manifest], note: "user_id の bucket と列の下限・上限で、読むファイルを決める。LIST は使わない。"}
+      - {links: [plan-splits, assign], note: "大きいファイルは split_offsets で分け、小さいファイルはまとめて Split にし、空いた Worker へ順次配る。"}
+      - {links: [open, footer, chunks], note: "各 Worker が並列に、フッター、続いて残った Row Group の必要な列だけを範囲 GET する。"}
+      - {links: [result], note: 部分結果を集約して返す。}
+  - id: delete-merge
+    label: Delete ファイルがあるテーブルを読む
+    evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§4"}]
+    steps:
+      - {links: [prune-manifest, attach-deletes], note: 読むデータファイルごとに、適用すべき Delete ファイルを計画時に対応づける。}
+      - {links: [assign, open, chunks], note: Split にはデータファイルと Delete ファイルの組が入る。}
+      - {links: [apply-deletes], note: 読みながら削除行を除く。Delete ファイルが多いほど突き合わせが重くなる。}
+  - id: small-files
+    label: 小さなファイルが多い場合
+    evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§7"}]
+    steps:
+      - {links: [prune-mlist, prune-manifest], note: Manifest とファイルの数が増え、計画時に読むメタデータが膨らむ。}
+      - {links: [plan-splits], note: open-file-cost で小さいファイルをまとめても、ファイルごとのオープンは残る。}
+      - {links: [footer], note: ファイルごとにフッターの範囲 GET が必要になり、往復待ちが積み上がる。コンパクションで解消する。}
+  - id: physical-read
+    label: 物理ファイルを読む（Avro と Parquet）
+    evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§12"}]
+    steps:
+      - {links: [resolve], note: "カタログが指す最新の metadata.json（JSON）から現在のスナップショットを得る。"}
+      - {links: [prune-mlist, prune-manifest], note: "Avro の Manifest List・Manifest を読み、データファイルの完全パスとサイズを得る。ディレクトリは LIST しない。"}
+      - {links: [footer], note: "Parquet 末尾のフッターを範囲 GET し、Row Group と列チャンクの位置・統計を得る。"}
+      - {links: [chunks], note: "残った Row Group の必要な列チャンクだけを取る。圧縮はページ単位なので範囲取得が成り立つ。"}
+      - {links: [decode], note: "zstd などを解凍し、辞書・RLE・差分エンコーディングをデコードして列の値に戻す。"}
+requirements:
+  - {id: IS-01, kind: usecase, title: メタデータだけで読む範囲を決める, text: "Manifest List・Manifest の統計で読むファイルを決め、ストレージの LIST に頼らない。", links: [prune-mlist, prune-manifest], evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§3"}]}
+  - {id: IS-02, kind: usecase, title: 並列な範囲取得, text: Split を Worker に配り、必要な列チャンクだけを範囲 GET で並列に取得する。, links: [assign, footer, chunks], evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§5"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§6"}]}
+  - {id: IS-03, kind: nfr, title: ファイル数と Delete の管理, text: 小さなファイル・Manifest・Delete ファイルの蓄積をコンパクションで抑える。, links: [plan-splits, apply-deletes], evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§7"}]}
+  - {id: IS-04, kind: rule, title: 分割できる形式と圧縮, text: "データは Row Group／ページ単位で圧縮された Parquet（または ORC・Avro）で書き、ファイル全体の圧縮で分割と範囲取得を妨げない。", links: [chunks, decode], evidence: [{type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§10"}, {type: doc, ref: "docs/reference-iceberg-distributed-scan.md#§11"}]}
+unknowns:
+  - {id: UNK-01, text: 実際のエンジン、Worker 数、Split サイズ設定、統計の有無とソート順、圧縮コーデックと Row Group サイズは未確定。, refs: [planner, worker, splits]}
+gates: {maxDrift: 0, maxHigh: 0}

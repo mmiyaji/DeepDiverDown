@@ -264,8 +264,11 @@ function nodeSpec(id, n, s) {
   return {
     id, shape, shape3D: n.shape3D, kind: n.kind, flat, flatStyle, solidStyle, color, cardTint: s.fill || s.heat != null ? color.getStyle() : null, opacity, dashed, outline: !!s.outline, h: s.h || (n.kind === 'client' ? 0.7 : 1), pos: W(n.x, n.y, n.tier),
     icon: S.officialIcons ? svc?.iconUrl : null,
-    label: n.label, selected: VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', badge: s.badge, abbr: svc && { text: svc.abbr, color: svc.color },
-    sub: svc && { text: serviceLabel(svc), color: svc.providerColor },
+    label: n.label, selected: VW().from[id].includes(st.sel), labelAccent: s.fill === 'down', abbr: svc && { text: svc.abbr, color: svc.color },
+    // 並列表現：parallel（同じ実行単位が N 個）・slots（同時に走る Task 数）・partitions（データの分割数）
+    parallel: n.parallel, slots: n.slots, partitions: n.partitions,
+    badge: s.badge || (n.parallel ? { text: `×${n.parallel} 並列`, tone: 'par' } : null),
+    sub: svc ? { text: serviceLabel(svc), color: svc.providerColor } : (n.slots || n.partitions) ? { text: [n.slots && `同時 ${n.slots} Task`, n.partitions && `${n.partitions} 分割`].filter(Boolean).join('・'), color: 'var(--par)' } : undefined,
   };
 }
 
@@ -362,7 +365,10 @@ function modelLink(entry) {
     ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
 }
 
+/* 開いている分類・スクロール位置・絞り込みは再描画しても保つ（切り替えのたびに畳まない） */
+const LIB_OPEN = new Set((() => { try { return JSON.parse(localStorage.getItem('ddd.libOpen') || '[]'); } catch { return []; } })());
 function renderLibrary() {
+  const aside = $('library').closest('aside'), top = aside?.scrollTop;
   $('mlist').innerHTML = REGISTRY.filter(entry => !entry.reference).map(modelLink).join('') +
     '<button class="b small" data-act="open">＋ YAML を開く</button>';
 
@@ -374,11 +380,18 @@ function renderLibrary() {
   }
   $('reference-section').hidden = !groups.size;
   $('reference-list').innerHTML = [...groups].map(([category, entries]) =>
-    `<details class="reference-category"${entries.some(entry => entry.id === KEY) ? ' open' : ''}>
+    `<details class="reference-category" data-cat="${esc(category)}"${LIB_OPEN.has(category) || entries.some(entry => entry.id === KEY) ? ' open' : ''}>
       <summary>${esc(category)} <small>${entries.length}</small></summary><div class="mlist">${entries
         .sort((a, b) => (a.reference.order ?? Number.MAX_SAFE_INTEGER) - (b.reference.order ?? Number.MAX_SAFE_INTEGER))
         .map(modelLink).join('')}</div></details>`).join('');
+  if (entryIsRef()) $('library').open = true;
+  const q = $('model-filter').value; if (q) filterLibrary(q);
+  if (aside) aside.scrollTop = top;
+  const cur = $('library').querySelector('.mitem.on');
+  if (cur && aside) { const r = cur.getBoundingClientRect(), a = aside.getBoundingClientRect(); if (r.top < a.top || r.bottom > a.bottom) cur.scrollIntoView({ block: 'nearest' }); }
 }
+function entryIsRef() { return REGISTRY.some(r => r.reference && r.id === KEY); }
+function saveLibOpen() { try { localStorage.setItem('ddd.libOpen', JSON.stringify([...LIB_OPEN])); localStorage.setItem('ddd.libMain', $('library').open ? '1' : ''); } catch {} }
 
 /* モデル一覧の絞り込み：一致したモデルのある分類だけ開く */
 function filterLibrary(q) {
@@ -414,7 +427,7 @@ function renderSidebar() {
 function contextLegend() {
   const provs = [...new Set(Object.values(M.nodes).map(n => Catalog.providerOf(n)).filter(Boolean))];
   const kinds = [...new Set((M.groups || []).map(g => g.kind))];
-  const KIND = { cloud: 'クラウド', region: 'リージョン', vpc: 'VPC', vnet: 'VNet', vcn: 'VCN', az: 'AZ', subnet: 'サブネット', cluster: 'クラスタ', namespace: 'Namespace', datacenter: 'データセンター' };
+  const KIND = { cloud: 'クラウド', region: 'リージョン', vpc: 'VPC', vnet: 'VNet', vcn: 'VCN', az: 'AZ', subnet: 'サブネット', cluster: 'クラスタ', namespace: 'Namespace', datacenter: 'データセンター', parallel: '並列に実行' };
   return (provs.length ? '<span class="lg-sep"></span>' + provs.map(p => `<span><b class="sw" style="background:${Catalog.PROVIDERS[p].color}"></b>${esc(Catalog.PROVIDERS[p].label)}</span>`).join('') : '') +
     (kinds.length ? '<span class="lg-sep"></span>' + kinds.map(k => `<span><b class="fr fr-${k}"></b>${KIND[k] || k}</span>`).join('') : '');
 }
@@ -478,7 +491,7 @@ function nodeDetail(id) {
     ${n.description ? `<p>${esc(n.description)}</p>` : ''}
     <div class="row"><button class="b small" data-focus="${id}">この部品に寄る（F）</button><button class="b small ${st.nbr ? 'on' : ''}" data-nbr>周辺だけ表示（N）</button><button class="b small" data-sel="">選択を解除</button></div>
     ${c ? `<div class="row">${tag(c.status)}<span class="sub m0">${esc(c.why)}</span></div>` : ''}
-    <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
+    <table class="kv"><tr><td>台数</td><td>${n.replicas ?? '—'}</td></tr>${n.parallel ? `<tr><td>並列数</td><td>${esc(n.parallel)}（同じ実行単位が並列に動く）</td></tr>` : ''}${n.slots ? `<tr><td>同時 Task</td><td>${esc(n.slots)}（例）</td></tr>` : ''}${n.partitions ? `<tr><td>分割数</td><td>${esc(n.partitions)}（例）</td></tr>` : ''}${Object.entries(n.metrics || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmt(k, v)}</td></tr>`).join('')}</table>
     <h4>根拠</h4>${evList(n.evidence)}
     <h4>呼び出し元</h4>${ins.map(l => `<div class="item" data-sel="${l.from}">${ln(l)}</div>`).join('') || none}
     <h4>呼び出し先</h4>${outs.map(l => `<div class="item" data-sel="${l.to}">${ln(l)}</div>`).join('') || none}
@@ -951,6 +964,12 @@ addEventListener('keydown', e => {
 document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
 setDimension(st.dimension, false);
+try { if (localStorage.getItem('ddd.libMain')) $('library').open = true; } catch {}
+$('library').addEventListener('toggle', e => {
+  const d = e.target;
+  if (d.dataset?.cat && !$('model-filter').value.trim()) { d.open ? LIB_OPEN.add(d.dataset.cat) : LIB_OPEN.delete(d.dataset.cat); }
+  saveLibOpen();
+}, true);
 renderLibrary();
 scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();

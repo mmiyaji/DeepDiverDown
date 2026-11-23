@@ -18,12 +18,14 @@ tiers:
   - {id: edge, label: クライアントと利用者, z: 2, size: [12, 3]}
   - {id: cluster, label: Redshift クラスター, z: 1, origin: [1, 0], size: [10, 3]}
   - {id: storage, label: データ保持, z: 0, size: [8, 3]}
+groups:
+  - {kind: parallel, label: コンピュートノードとスライスで並列実行, tier: cluster, nodes: [compute, slice]}
 nodes:
   client: {label: SQL client, kind: external, tier: edge, x: 0, y: 1.5, description: SQLやBIツールからクエリを送る外部クライアント。, evidence: [{type: doc, ref: docs/reference-redshift.md#§1}]}
   bi: {label: BI user, kind: actor, tier: edge, x: 10, y: 1.5, description: 集約された分析結果を利用する利用者。, evidence: [{type: doc, ref: docs/reference-redshift.md#§6}]}
   leader: {label: Leader node, kind: worker, tier: cluster, x: 1, y: 1.5, description: SQLを解析・計画し、コンピュートノードを調整して結果を集約する。, evidence: [{type: doc, ref: docs/reference-redshift.md#§2}, {type: doc, ref: docs/reference-redshift.md#§3}]}
-  compute: {label: Compute node, kind: worker, tier: cluster, x: 5, y: 1.5, description: リーダーから配布された計画を実行し、中間結果を返す。, evidence: [{type: doc, ref: docs/reference-redshift.md#§2}, {type: doc, ref: docs/reference-redshift.md#§4}]}
-  slice: {label: Node slices, kind: worker, tier: cluster, x: 9, y: 1.5, description: コンピュートノード内でデータと処理を分担する並列実行単位。, evidence: [{type: doc, ref: docs/reference-redshift.md#§4}]}
+  compute: {parallel: N, label: Compute node, kind: worker, tier: cluster, x: 5, y: 1.5, description: リーダーから配布された計画を実行し、中間結果を返す。, evidence: [{type: doc, ref: docs/reference-redshift.md#§2}, {type: doc, ref: docs/reference-redshift.md#§4}]}
+  slice: {slots: 4, label: Node slices, kind: worker, tier: cluster, x: 9, y: 1.5, description: コンピュートノード内でデータと処理を分担する並列実行単位。, evidence: [{type: doc, ref: docs/reference-redshift.md#§4}]}
   database: {label: Redshift database, kind: db, tier: storage, x: 1, y: 1.5, description: クラスター内のデータベース論理境界。, evidence: [{type: doc, ref: docs/reference-redshift.md#§2}, {type: doc, ref: docs/reference-redshift.md#§6}]}
   rms: {label: Redshift Managed Storage, kind: db, tier: storage, x: 6, y: 1.5, description: コンピュートから分離してデータを保持し、S3を使って拡張する管理ストレージ。, evidence: [{type: doc, ref: docs/reference-redshift.md#§5}]}
 links:

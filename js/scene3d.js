@@ -154,7 +154,7 @@ export class Scene3D {
     const labels = Array.from(layer.children).filter(el => el.style.display !== 'none').map(el => ({
       el,
       rect: el.getBoundingClientRect(),
-      priority: (this.hoverId && el.dataset.node === this.hoverId) ? -2 : el.dataset.selected ? -1 : el.dataset.icon ? -0.5 : LABEL_PRIORITY.get(el.classList[0]),
+      priority: (this.hoverId && el.dataset.node === this.hoverId) ? -2 : el.dataset.selected ? -1 : el.classList.contains('g-parallel') ? -0.8 : el.dataset.icon ? -0.5 : LABEL_PRIORITY.get(el.classList[0]),
     }));
     labels.sort((a, b) => a.priority - b.priority);
     const occupied = [];
@@ -468,13 +468,13 @@ export class Scene3D {
     const vpc = ['--ink', 'dash'];
     const [fallback, style, fill] = {
       vpc, vnet: vpc, vcn: vpc, az: ['--mute', 'dot'], subnet: ['--line', null, '--grid'],
-      cloud: ['--mute'], region: ['--mute', 'dash'], cluster: ['#326CE5', 'dashdot'],
+      cloud: ['--mute'], region: ['--mute', 'dash'], cluster: ['#326CE5', 'dashdot'], parallel: ['--par', 'dash'],
       namespace: ['--mute', 'dot'], datacenter: ['#6d6a63'],
     }[kind] || ['--mute', 'dash'];
-    const ink = ['cluster', 'datacenter'].includes(kind) ? fallback : color || fallback;
+    const ink = ['cluster', 'datacenter', 'parallel'].includes(kind) ? fallback : color || fallback;
     this.loop(pts, y, ink, style, fill);
     // クラウド・データセンター・クラスタは、枠の内側を淡く塗って入れ子が分かるようにする
-    const tint = { cloud: 0.07, datacenter: 0.07, cluster: 0.05, region: 0.03 }[kind];
+    const tint = { cloud: 0.07, datacenter: 0.07, cluster: 0.05, region: 0.03, parallel: 0.08 }[kind];
     if (tint) {
       const [a, , c] = pts, w = Math.abs(c[0] - a[0]), d = Math.abs(c[1] - a[1]);
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: this.color(ink), transparent: true, opacity: tint, depthWrite: false }));
@@ -528,8 +528,9 @@ export class Scene3D {
       }
       top = s.h * 0.81;
     } else if (s.solidStyle === 'components' && s.shape === 'cyl') {
-      for (let level = 0; level < 3; level++) {
-        const height = s.h / 3;
+      const levels = s.partitions ? Math.min(8, Number(s.partitions) || 3) : 3; // 分割数があればその数だけ段にする
+      for (let level = 0; level < levels; level++) {
+        const height = s.h / levels;
         add(new THREE.CylinderGeometry(0.43, 0.43, height * 0.9, 28), height * (level + 0.5));
       }
     } else if (s.solidStyle === 'components' && s.kind === 'worker' && s.shape === 'box') {
@@ -547,6 +548,40 @@ export class Scene3D {
       add(new THREE.CylinderGeometry(0.16, 0.28, 0.62, 20), 0.31);
       add(new THREE.SphereGeometry(0.17, 20, 14), 0.84); top = 1.02;
     } else add(new THREE.BoxGeometry(s.w || 0.86, s.h, s.w || 0.86), s.h / 2);
+    /* ---- 並列表現 ---- */
+    const par = this.color('--par');
+    // parallel：同じ実行単位が複数あることを、後ろに重ねた写しで示す（最大 3 枚）
+    if (s.parallel && !s.flat) {
+      const copies = Math.min(3, (Number(s.parallel) || 3) - 1);
+      for (let i = 1; i <= copies; i++) {
+        const geo = s.shape === 'cyl' ? new THREE.CylinderGeometry(0.42, 0.42, s.h, 28) : new THREE.BoxGeometry(0.86, s.h, 0.86);
+        const ghost = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: s.color, transparent: true, opacity: s.opacity * (0.55 - i * 0.12), depthWrite: false }));
+        ghost.position.set(-0.2 * i, s.h / 2, -0.2 * i); g.add(ghost);
+        const e = this.edges(geo, par, s.opacity * (0.7 - i * 0.15)); e.position.copy(ghost.position); g.add(e);
+      }
+    }
+    // slots：同時に走る Task を、上面に並べた小さな立方体で示す
+    if (s.slots && !s.flat) {
+      const n = Math.min(8, Number(s.slots) || 4), cols = Math.min(4, n), size = 0.15, gap = 0.05;
+      for (let i = 0; i < n; i++) {
+        const cx = (i % cols - (cols - 1) / 2) * (size + gap), cz = (Math.floor(i / cols) - (Math.ceil(n / cols) - 1) / 2) * (size + gap);
+        const geo = new THREE.BoxGeometry(size, size, size), cube = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: par, transparent: s.opacity < 1, opacity: s.opacity }));
+        cube.position.set(cx, top + size / 2 + 0.01, cz); g.add(cube);
+        const e = this.edges(geo, this.color('--ink'), s.opacity * 0.6); e.position.copy(cube.position); g.add(e);
+      }
+      top += 0.2;
+    }
+    // partitions：分割されたデータを、側面の帯（区切り線）で示す
+    if (s.partitions && !s.flat && !(s.solidStyle === 'components' && s.shape === 'cyl')) {
+      const n = Math.min(8, Number(s.partitions) || 4), r = s.shape === 'cyl' ? 0.425 : 0.44;
+      for (let i = 1; i < n; i++) {
+        const ring = s.shape === 'cyl'
+          ? new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.035, 28, 1, true), new THREE.MeshBasicMaterial({ color: par, transparent: true, opacity: s.opacity * 0.9, side: THREE.DoubleSide }))
+          : new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.03, 0.88), new THREE.MeshBasicMaterial({ color: par, transparent: true, opacity: s.opacity * 0.9 }));
+        ring.position.y = (s.h / n) * i; g.add(ring);
+      }
+    }
+
     if (silhouette && s.shape === 'cyl' && customShape !== 'crate') {
       for (const radius of [0.31, 0.21]) {
         const ring = new THREE.Mesh(new THREE.RingGeometry(radius, radius + 0.018, 32),
