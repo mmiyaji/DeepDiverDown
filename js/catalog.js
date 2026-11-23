@@ -68,6 +68,7 @@
       apigw: S('APIGW', 'API Gateway', 'int', { infra: I, icon: ['API-Gateway'] }),
       ecs: S('ECS', 'Amazon ECS', 'compute', { icon: ['Elastic-Container-Service'] }),
       fargate: S('Fargate', 'AWS Fargate', 'compute', { icon: ['Arch_AWS-Fargate_'] }),
+      emr: S('EMR', 'Amazon EMR', 'compute', { icon: ['Arch_Amazon-EMR_'] }),
       eks: S('EKS', 'EKS', 'compute', { icon: ['Elastic-Kubernetes-Service'] }),
       ec2: S('EC2', 'EC2', 'compute', { icon: ['Arch_Amazon-EC2_'] }),
       autoscaling: S('ASG', 'EC2 Auto Scaling', 'compute', { icon: ['Arch_Amazon-EC2-Auto-Scaling_'] }),
