@@ -176,6 +176,8 @@ implementations:
           - 16
           - 3
     nodes:
+      ex-host: {label: Qdrant 実行ホスト, kind: host, tier: support, x: 1, y: 2, description: 利用者が Qdrant と永続ストレージを管理するホスト。, evidence: [{type: doc, ref: docs/reference-qdrant.md#§4}]}
+      ex-volume: {label: Qdrant 永続ディスク, kind: db, tier: support, x: 12, y: 2, description: データと索引を保存する利用者管理ストレージ。, evidence: [{type: doc, ref: docs/reference-qdrant.md#§4}]}
       ex-app:
         label: 検索アプリ
         kind: actor
@@ -242,3 +244,104 @@ implementations:
             ref: docs/reference-qdrant.md#§4
         realizes:
           - segment
+    links:
+      - {id: ex-run-qdrant, from: ex-host, to: ex-search, label: Qdrant を実行, evidence: [{type: doc, ref: docs/reference-qdrant.md#§4}]}
+      - {id: ex-save-volume, from: ex-segment, to: ex-volume, label: データと索引を保存, evidence: [{type: doc, ref: docs/reference-qdrant.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-collection: {tier: diagram, x: 4, y: 1}
+        ex-search: {tier: diagram, x: 7, y: 1}
+        ex-segment: {tier: diagram, x: 1, y: 4}
+        ex-volume: {tier: diagram, x: 4, y: 4}
+        ex-embed: {tier: diagram, x: 14, y: 1}
+        ex-app: {tier: diagram, x: -3, y: 1}
+        ex-result: {tier: diagram, x: 0, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者管理 Qdrant ホスト, tier: [diagram], x0: 0.5, y0: 0.5, x1: 10, y1: 10, nodes: [ex-host, ex-collection, ex-search, ex-segment, ex-volume]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: apps, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: external, label: 独立サービス・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-collection: {tier: apps, x: 4, y: 1}
+        ex-search: {tier: apps, x: 7, y: 1}
+        ex-segment: {tier: apps, x: 1, y: 4}
+        ex-volume: {tier: apps, x: 4, y: 4}
+        ex-embed: {tier: external, x: 1, y: 1}
+        ex-app: {tier: user, x: 1, y: 1}
+        ex-result: {tier: user, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者管理 Qdrant ホスト, tier: [host, apps], nodes: [ex-host, ex-collection, ex-search, ex-segment, ex-volume]}
+
+  - id: aws-eks-qdrant
+    label: "AWS：EKS・Qdrant・EBS"
+    description: "EKS の EC2 上で Qdrant Helm チャートと FastEmbed を使う検索アプリを運用し、EBS にデータを保持する例。"
+    sources:
+      - {title: "Qdrant installation and storage requirements", url: https://qdrant.tech/documentation/install/}
+      - {title: "Qdrant Helm chart", url: https://github.com/qdrant/qdrant-helm}
+      - {title: "FastEmbed model registry", url: https://qdrant.tech/documentation/embeddings/fastembed/}
+      - {title: "Qdrant license", url: https://github.com/qdrant/qdrant/blob/master/LICENSE}
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+      - {title: "Amazon EKS managed node groups", url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+      - {title: "Amazon EBS CSI driver", url: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html}
+    tiers:
+      - {id: access, label: "管理と利用", z: 2, size: [20, 4]}
+      - {id: compute, label: "EKS 上のアプリケーション", z: 1, size: [20, 4]}
+      - {id: storage, label: "永続ストレージ", z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: "AWS サービス領域（EKS 制御プレーンは AWS 管理 VPC）", provider: aws, tier: [access, compute, storage], nodes: [aws-qdrant-eks, aws-qdrant-ec2, aws-qdrant-app, aws-qdrant-embed, aws-qdrant-qdrant, aws-qdrant-csi, aws-qdrant-volume]}
+      - {kind: cluster, label: "EKS クラスタ", tier: [compute], nodes: [aws-qdrant-ec2, aws-qdrant-app, aws-qdrant-embed, aws-qdrant-qdrant, aws-qdrant-csi]}
+    nodes:
+      aws-qdrant-eks: {label: "Amazon EKS", svc: eks, kind: service, tier: access, x: 3, y: 1.5, description: "AWS 管理 VPC の制御プレーン。利用者は API と公開設定を操作するがサーバーへ直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      aws-qdrant-result: {label: "検索結果の利用者", kind: external, tier: access, x: 16, y: 1.5, realizes: [result], description: "検索アプリ経由で条件に合う候補を受け取る。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      aws-qdrant-ec2: {label: "Amazon EC2 / ノードグループ", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "Qdrant と検索アプリの Pod を実行する Kubernetes ノード。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      aws-qdrant-app: {label: "Python 検索アプリ", kind: service, tier: compute, x: 3, y: 1.5, realizes: [app], description: "Qdrant Client と同じ Python プロセス内で埋め込みモデルを実行する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      aws-qdrant-embed: {label: "FastEmbed / BGE small", kind: worker, tier: compute, x: 7, y: 1.5, realizes: [embed], description: "文書とクエリを同じモデルで 384 次元のベクトルに変換する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      aws-qdrant-qdrant: {label: "Qdrant StatefulSet", kind: db, tier: compute, x: 12, y: 1.5, realizes: [collection, search, segment], description: "クラスタ内の Service 経由でクエリを受け、コレクションとセグメントを管理する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      aws-qdrant-csi: {label: EBS CSI ドライバー, kind: worker, svc: k8s:deployment, tier: compute, x: 14, y: 3, description: EBS ボリュームの作成・接続を Kubernetes に提供する。, management: {type: shared, scope: AWS がドライバーを提供し、利用者が導入と権限・更新を管理する。}, evidence: [{type: doc, ref: docs/reference-qdrant.md#§5}]}
+      aws-qdrant-volume: {label: "Amazon EBS / 永続ボリューム", svc: ebs, kind: db, tier: storage, x: 12, y: 1.5, description: "EBS CSI で割り当てたブロックストレージのファイルシステムに、Qdrant のデータと索引を保存する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+    links:
+      - {id: aws-qdrant-manage, from: aws-qdrant-eks, to: aws-qdrant-ec2, label: "EC2 ノードグループを管理", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      - {id: aws-qdrant-schedule, from: aws-qdrant-eks, to: aws-qdrant-qdrant, label: "StatefulSet の Pod を配置", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      - {id: aws-qdrant-csi-provision, from: aws-qdrant-csi, to: aws-qdrant-volume, label: EBS ボリュームを作成・接続, evidence: [{type: doc, ref: docs/reference-qdrant.md#§5}]}
+      - {id: aws-qdrant-storage, from: aws-qdrant-qdrant, to: aws-qdrant-volume, label: "PVC 経由でデータと索引を保存", realizes: [index], replace: true, evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      - {id: aws-qdrant-respond, from: aws-qdrant-qdrant, to: aws-qdrant-app, label: "検索候補をアプリへ返す", realizes: [result], replace: true, evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      - {id: aws-qdrant-result, from: aws-qdrant-app, to: aws-qdrant-result, label: "検索候補を表示", realizes: [result], replace: true, evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        aws-qdrant-eks: {tier: diagram, x: 1, y: 1}
+        aws-qdrant-ec2: {tier: diagram, x: 4, y: 1}
+        aws-qdrant-app: {tier: diagram, x: 7, y: 1}
+        aws-qdrant-embed: {tier: diagram, x: 1, y: 4}
+        aws-qdrant-qdrant: {tier: diagram, x: 4, y: 4}
+        aws-qdrant-csi: {tier: diagram, x: 7, y: 4}
+        aws-qdrant-volume: {tier: diagram, x: 14, y: 1}
+        aws-qdrant-result: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: -1.5, y0: 0, x1: 23, y1: 11, nodes: [aws-qdrant-eks, aws-qdrant-ec2, aws-qdrant-app, aws-qdrant-embed, aws-qdrant-qdrant, aws-qdrant-csi, aws-qdrant-volume]}
+        - {kind: cluster, label: EKS 論理クラスタ, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 10, nodes: [aws-qdrant-eks, aws-qdrant-ec2, aws-qdrant-app, aws-qdrant-embed, aws-qdrant-qdrant, aws-qdrant-csi]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: apps, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: external, label: 独立サービス・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        aws-qdrant-eks: {tier: external, x: 1, y: 1}
+        aws-qdrant-ec2: {tier: host, x: 4, y: 1}
+        aws-qdrant-app: {tier: apps, x: 7, y: 1}
+        aws-qdrant-embed: {tier: apps, x: 1, y: 4}
+        aws-qdrant-qdrant: {tier: apps, x: 4, y: 4}
+        aws-qdrant-csi: {tier: apps, x: 7, y: 4}
+        aws-qdrant-volume: {tier: external, x: 1, y: 1}
+        aws-qdrant-result: {tier: user, x: 1, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [host, apps, external], nodes: [aws-qdrant-eks, aws-qdrant-ec2, aws-qdrant-app, aws-qdrant-embed, aws-qdrant-qdrant, aws-qdrant-csi, aws-qdrant-volume]}

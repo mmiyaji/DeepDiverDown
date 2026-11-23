@@ -48,3 +48,29 @@ Connection は自動スケジュールまたは手動で繰り返し実行でき
 - [Sync Modes](https://docs.airbyte.com/platform/using-airbyte/core-concepts/sync-modes)
 - [Incremental Sync](https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync)
 - [Airbyte Postgres Destination](https://docs.airbyte.com/integrations/destinations/postgres)
+
+## 7. 実装例：Amazon EKS 上の Airbyte・RDS・S3
+
+EC2 ノードを持つ EKS に Helm で Airbyte を自己管理展開する。カスタム Source で注文 API を増分取得し、分析用の RDS for PostgreSQL に格納する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| 同期の定義と投入 | Helm で導入した Airbyte の管理 Pod。接続でカーソルと頻度を設定する。 |
+| 増分入力と同期 | EKS の EC2 ノード上の同期 Pod。宣言型 Source が受注 API を取得する。 |
+| 増分の再開位置 | Airbyte プラットフォーム用の RDS PostgreSQL。 |
+| 出力とログ | Postgres Destination が分析専用の RDS PostgreSQL に書き、ワークロードのログ等は S3 に保持する。 |
+
+Airbyte のバージョンと Helm チャートの組み合わせを固定し、利用するエディションでカスタム Source と外部ストレージ設定を確認する。自己管理構成では利用者が EKS と Airbyte を運用する。受注 API の資格情報、2つの PostgreSQL のユーザーと TLS、EKS から S3 への IAM 権限を設定する。API へは HTTPS で到達でき、受注 API が更新日時による増分取得を提供する前提とする。
+
+公式資料
+
+- [Airbyte の Kubernetes への導入](https://docs.airbyte.com/platform/deploying-airbyte)
+- [Airbyte の状態・ログ用オブジェクトストレージ](https://docs.airbyte.com/platform/deploying-airbyte/integrations/storage)
+- [Airbyte 設定 DB の接続と同期 State](https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections)
+- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)
+- [Connector Builder](https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview)
+- [Postgres Destination](https://docs.airbyte.com/integrations/destinations/postgres)
+
+自前例は Linux Kubernetes ノードで Airbyte を自己管理し、分析先と別の PostgreSQL に接続設定と確定済み State を保存する。ログ用ストレージ、ネットワークとホストの具体的な構成は未指定である。AWS 例は公式資料の組み合わせによる代表構成であり、動作検証済み導入事例ではない。AWS が EKS 制御プレーンと EC2・RDS・S3 基盤を運用し、利用者は Kubernetes API、ノード、Airbyte、コネクター設定、DB・S3 のデータと権限を管理する。制御プレーンサーバーには直接アクセスしない。Airbyte のエディション、バージョンと Helm チャートの互換性は未検証。
+
+- [Deploying Airbyte](https://docs.airbyte.com/platform/deploying-airbyte)

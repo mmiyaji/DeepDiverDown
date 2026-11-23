@@ -46,7 +46,14 @@ REPLICA スケジューリングは指定した desired count のタスクを維
 
 Fargate と Auto Scaling group の capacity provider は、同一の capacity provider strategy に混在させない。例では経路を切り替えて両方式を比較する。
 
+共通タスク定義は Fargate と EC2 の両方に対応する `awsvpc` を使う。タスクごとに ENI が割り当てられ、ALB はそれぞれのサービスに対応する IP 型ターゲットグループを通じてタスクに転送する。EC2 側はコンテナインスタンスと、その上で実行される注文 API タスクを区別する。利用者はインスタンスの容量・OS 更新、タスク定義、アプリ、ネットワークと権限を管理する。Fargate のサーバー基盤は AWS が運用し、利用者はタスク定義やアプリを制御する。ECS のスケジューラーは AWS が運用し、利用者はサービスの desired count や容量戦略を設定する。ALB と ECR は独立したサービスであり、利用者がルール、イメージと権限を設定する。複数の公式資料を組み合わせた例であり、実在の導入例や動作検証済み構成ではない。
+
+Fargate の基盤ホストには利用者は接続できない。タスクの設定やアプリは利用者が管理する。
+
 公式資料
+- [ECS shared responsibility](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-shared-model.html)
+- [Fargate host access](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-security-considerations.html)
 - [Amazon ECS launch types and capacity providers](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/capacity-launch-type-comparison.html)
 - [Amazon ECS capacity providers for EC2 workloads](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/asg-capacity-providers.html)
 - [Use an Application Load Balancer for Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/alb.html)
+- [ECS タスクの awsvpc ネットワーク](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking-awsvpc.html)

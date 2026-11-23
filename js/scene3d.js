@@ -201,7 +201,13 @@ export class Scene3D {
   /* 2D では画面上のラベルを測り、優先順に重なりのないものを表示する */
   placeLabels(layer = this.labels.domElement, camera = this.camera) {
     const frame = layer.getBoundingClientRect();
-    const elements = Array.from(layer.children).filter(el => el.style.display !== 'none');
+    // Client rectangles are in screen pixels; CSS widths below are in the
+    // unscaled coordinate system when the 2D overview uses CSS zoom.
+    const labelZoom = frame.width / (layer.clientWidth || frame.width) || 1;
+    for (const el of layer.children) {
+      if (el.dataset.node) el.toggleAttribute('data-hovered', el.dataset.node === this.hoverId);
+    }
+    const elements = Array.from(layer.children).filter(el => getComputedStyle(el).display !== 'none');
     const cards = new Map(elements.filter(el => el.classList.contains('n-card')).map(el => [el.dataset.node, el]));
     const cardCenters = [...cards.values()].map(el => {
       const r = el.getBoundingClientRect();
@@ -210,12 +216,12 @@ export class Scene3D {
     for (const card of cardCenters) {
       const pixelsPerUnit = frame.height * camera.zoom / (camera.top - camera.bottom);
       const span = Number(card.el.dataset.floorSpan);
-      let space = Number.isFinite(span) ? Math.min(frame.width, span * pixelsPerUnit - 8) : frame.width;
+      let space = Number.isFinite(span) ? Math.min(frame.width, span * pixelsPerUnit - 8 * labelZoom) : frame.width;
       for (const other of cardCenters) {
-        if (other === card || Math.abs(card.y - other.y) > 26) continue;
-        space = Math.min(space, Math.abs(card.x - other.x) - 22);
+        if (other === card || Math.abs(card.y - other.y) > 26 * labelZoom) continue;
+        space = Math.min(space, Math.abs(card.x - other.x) - 22 * labelZoom);
       }
-      card.el.style.setProperty('--card-room', Math.max(38, space) + 'px');
+      card.el.style.setProperty('--card-room', Math.max(38, space / labelZoom) + 'px');
     }
     // Keep the card anchored to its ports. A solid's name may move a
     // short distance vertically, leaving room for a nearby name or plate.
@@ -670,7 +676,7 @@ export class Scene3D {
     const [x, y, z] = s.pos, g = new THREE.Group(); g.position.set(x, y, z); this.root.add(g);
     const mat = c => new THREE.MeshLambertMaterial({ color: c, transparent: s.opacity < 1, opacity: s.opacity, depthWrite: s.opacity >= 0.5 });
     const external = s.kind === 'external';
-    const edge = this.color(s.outline ? '--accent' : external ? '--diagram-external' : '--ink');
+    const edge = this.color(s.outline ? '--view-accent' : external ? '--diagram-external' : '--ink');
     const eo = Math.min(1, s.opacity + 0.25);
     const add = (geo, py, color = s.color, rx = 0) => {
       const m = new THREE.Mesh(geo, mat(color)); m.position.y = py; m.rotation.x = rx; m.userData.id = s.id; g.add(m); this.pick.push(m);
@@ -880,6 +886,7 @@ export class Scene3D {
       const sub = this.label(s.sub.text, [x, y, z + (s.solidStyle ? 0.68 : 0.5)], 'n-sub', [0.5, -0.3],
         { color: s.sub.color, opacity: s.opacity < 0.5 ? 0.35 : 1 });
       sub.dataset.node = s.id;
+      if (s.selected) sub.dataset.selected = 'true';
       sub.style.marginTop = s.flat ? `calc(19px * var(--lbl-scale) + ${s.icon ? 10 : 0}px)` : 'calc(20px * var(--lbl-scale))';
     }
     if (s.labelAccent) name.classList.add('acc');
@@ -944,7 +951,7 @@ export class Scene3D {
   nodeCard(s) {
     const [x, y, z] = s.pos;
     const external = s.kind === 'external';
-    const ink = s.outline ? '--accent' : external ? '--diagram-external' : '--ink';
+    const ink = s.outline ? '--view-accent' : external ? '--diagram-external' : '--ink';
     const footprint = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 0.24),
       new THREE.MeshBasicMaterial({ color: this.color(ink), opacity: s.opacity, transparent: s.opacity < 1 }));
     footprint.position.set(x, y + 0.08, z);
@@ -958,6 +965,7 @@ export class Scene3D {
     card.dataset.node = s.id;
     card.dataset.action = 'pick';
     card.title = s.sub ? s.label + ' · ' + s.sub.text : s.label;
+    card.setAttribute('aria-label', s.label);
     if (s.comparisonRole) {
       const [number, role, difference] = s.comparisonRole;
       card.setAttribute('aria-label', [s.label, number ? `共通の役割 ${number}・${role}` : role, difference].filter(Boolean).join('・'));

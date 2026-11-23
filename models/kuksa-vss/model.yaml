@@ -163,6 +163,8 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host: {label: 車載計算機（機種未選定）, kind: host, tier: flow, x: 5, y: 2, description: CAN Provider、Databroker とアプリを実行する車載ホスト。, evidence: [{type: doc, ref: docs/reference-kuksa-vss.md#§4}]}
+      ex-ecu: {label: 車両 ECU（機種未選定）, kind: external, tier: flow, x: 0, y: 2, description: 車両の CAN 信号を出す ECU。, evidence: [{type: doc, ref: docs/reference-kuksa-vss.md#§4}]}
       ex-bus:
         label: CAN バス
         kind: external
@@ -235,3 +237,114 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-kuksa-vss.md#§4
+    links:
+      - {id: ex-ecu-bus, from: ex-ecu, to: ex-bus, label: CAN 信号を送信, evidence: [{type: doc, ref: docs/reference-kuksa-vss.md#§4}]}
+      - {id: ex-host-provider, from: ex-host, to: ex-provider, label: CAN Provider を実行, evidence: [{type: doc, ref: docs/reference-kuksa-vss.md#§4}]}
+      - {id: ex-host-broker, from: ex-host, to: ex-broker, label: Databroker を実行, evidence: [{type: doc, ref: docs/reference-kuksa-vss.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ホストと接続, z: 0, size: [26, 14]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-provider: {tier: diagram, x: 4, y: 1}
+        ex-broker: {tier: diagram, x: 7, y: 1}
+        ex-app: {tier: diagram, x: 1, y: 4}
+        ex-mapping: {tier: diagram, x: 4, y: 4}
+        ex-vss: {tier: diagram, x: 7, y: 4}
+        ex-ecu: {tier: diagram, x: 14, y: 1}
+        ex-bus: {tier: diagram, x: 11, y: 1}
+      groups:
+        - {kind: datacenter, label: 車載計算機, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 12, nodes: [ex-host, ex-provider, ex-broker, ex-app, ex-mapping, ex-vss]}
+        - {kind: datacenter, label: 車両 ECU, tier: [diagram], x0: 12.5, y0: 0, x1: 23, y1: 8, nodes: [ex-ecu]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: net, label: 車両ネットワーク, z: 0, origin: [25, 0], size: [4, 4]}
+      nodes:
+        ex-host: {tier: hosta, x: 1, y: 1}
+        ex-provider: {tier: appsa, x: 4, y: 1}
+        ex-broker: {tier: appsa, x: 7, y: 1}
+        ex-app: {tier: appsa, x: 1, y: 4}
+        ex-mapping: {tier: appsa, x: 4, y: 4}
+        ex-vss: {tier: appsa, x: 7, y: 4}
+        ex-ecu: {tier: hostb, x: 1, y: 1}
+        ex-bus: {tier: net, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 車載計算機, tier: [hosta, appsa], nodes: [ex-host, ex-provider, ex-broker, ex-app, ex-mapping, ex-vss]}
+        - {kind: datacenter, label: 車両 ECU, tier: [hostb, appsb], nodes: [ex-ecu]}
+
+  - id: eclipse-ankaios-pi5
+    label: "Eclipse SDV ベンチ：Raspberry Pi 5・Ankaios・SocketCAN"
+    description: "公式 Eclipse SDV デモの CAN フィードバック経路を、Raspberry Pi 5 の Ankaios/Podman と Arduino LED ECU の間でたどる例。"
+    sources:
+      - {title: "Eclipse SDV E2E Demo architecture", url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/architecture/}
+      - {title: "Eclipse SDV hardware bill of materials", url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/hardware/}
+      - {title: "Eclipse SDV VSS and CAN signal mapping", url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/signal-mapping/}
+      - {title: "Eclipse SDV communication workflow", url: https://sdv-blueprints.eclipse.dev/docs/e2e-demo-blueprint/communication-workflow/}
+      - {title: "Kuksa Databroker user guide", url: https://github.com/eclipse-kuksa/kuksa-databroker/blob/main/doc/user_guide.md}
+    tiers:
+      - {id: bench, label: "物理ベンチと実行管理", z: 2, size: [20, 4]}
+      - {id: flow, label: "信号ワークロード", z: 1, size: [20, 4]}
+      - {id: data, label: "信号定義と対応表", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "Raspberry Pi 5 / Ubuntu 24.04", provider: onprem, tier: [bench, flow, data], nodes: [kuksa-ankaios-host, kuksa-ankaios-ankaios, kuksa-ankaios-can0, kuksa-ankaios-provider, kuksa-ankaios-broker, kuksa-ankaios-cli, kuksa-ankaios-mapping, kuksa-ankaios-vss]}
+    nodes:
+      kuksa-ankaios-ecu: {label: "Arduino / LED 制御 ECU", kind: external, tier: bench, x: 3, y: 1.5, description: "ベンチ上の Arduino が表示状態を BlinkerStatus にして CAN に送信する。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-bus: {label: "ベンチの物理 CAN バス", kind: service, tier: bench, x: 7, y: 1.5, realizes: [bus], description: "Arduino の MCP2515 と Pi の CAN HAT を接続するデモ用の配線。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-host: {label: "Raspberry Pi 5 / Ubuntu", kind: host, tier: bench, x: 12, y: 1.5, description: "CAN HAT を Linux の SocketCAN に公開するホスト。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-ankaios: {label: "Eclipse Ankaios / Podman", kind: scheduler, tier: bench, x: 17, y: 1.5, description: "Ankaios 0.7.0 が CAN Provider と Databroker をホストネットワークで稼働させる。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-can0: {label: "Linux SocketCAN / can0", kind: gateway, tier: flow, x: 3, y: 1.5, description: "CAN HAT から読み取ったフレームを提供する。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-provider: {label: "Kuksa CAN Provider 0.4.4", kind: worker, tier: flow, x: 8, y: 1.5, realizes: [provider], description: "DBC と VSS の対応を用いて現在値へ変換する。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-broker: {label: "Kuksa Databroker 0.6.0", kind: service, tier: flow, x: 13, y: 1.5, realizes: [broker], description: "VSS スキーマに沿って現在値を保持し、gRPC から提供する。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-cli: {label: "診断アプリ / databroker-cli", kind: client, tier: flow, x: 18, y: 1.5, realizes: [app], description: "同じホストで Databroker の信号を購読して表示する。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-mapping: {label: "デモの DBC・VSS 対応 JSON", kind: file, tier: data, x: 8, y: 1.5, realizes: [mapping], description: "CAN フレームのデコードと VSS パスへの変換を定義する。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      kuksa-ankaios-vss: {label: "COVESA VSS の信号定義", kind: file, tier: data, x: 13, y: 1.5, realizes: [vss], description: "Databroker が使う信号名と型のスキーマ。", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+    links:
+      - {id: kuksa-ankaios-led-report, from: kuksa-ankaios-ecu, to: kuksa-ankaios-bus, label: "LED の状態フレームを送る", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      - {id: kuksa-ankaios-hat, from: kuksa-ankaios-bus, to: kuksa-ankaios-can0, label: "CAN HAT でフレームを受信", realizes: [receive], replace: true, evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      - {id: kuksa-ankaios-read-can, from: kuksa-ankaios-can0, to: kuksa-ankaios-provider, label: "SocketCAN から状態を読む", realizes: [receive], replace: true, evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      - {id: kuksa-ankaios-run-provider, from: kuksa-ankaios-ankaios, to: kuksa-ankaios-provider, label: "Podman の Provider を稼働", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      - {id: kuksa-ankaios-run-broker, from: kuksa-ankaios-ankaios, to: kuksa-ankaios-broker, label: "Podman の Databroker を稼働", evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      - {id: kuksa-ankaios-update, from: kuksa-ankaios-provider, to: kuksa-ankaios-broker, label: "localhost の gRPC で現在値を更新", realizes: [publish], replace: true, evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+      - {id: kuksa-ankaios-subscribe, from: kuksa-ankaios-broker, to: kuksa-ankaios-cli, label: "購読した VSS 現在値を返す", realizes: [read], replace: true, evidence: [{type: doc, ref: "docs/reference-kuksa-vss.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ホストと接続, z: 0, size: [26, 14]}]
+      nodes:
+        kuksa-ankaios-host: {tier: diagram, x: 1, y: 1}
+        kuksa-ankaios-ankaios: {tier: diagram, x: 4, y: 1}
+        kuksa-ankaios-can0: {tier: diagram, x: 7, y: 1}
+        kuksa-ankaios-provider: {tier: diagram, x: 1, y: 4}
+        kuksa-ankaios-broker: {tier: diagram, x: 4, y: 4}
+        kuksa-ankaios-cli: {tier: diagram, x: 7, y: 4}
+        kuksa-ankaios-mapping: {tier: diagram, x: 1, y: 7}
+        kuksa-ankaios-vss: {tier: diagram, x: 4, y: 7}
+        kuksa-ankaios-ecu: {tier: diagram, x: 14, y: 1}
+        kuksa-ankaios-bus: {tier: diagram, x: 11, y: 1}
+      groups:
+        - {kind: datacenter, label: Raspberry Pi 5 ベンチ, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 12, nodes: [kuksa-ankaios-host, kuksa-ankaios-ankaios, kuksa-ankaios-can0, kuksa-ankaios-provider, kuksa-ankaios-broker, kuksa-ankaios-cli, kuksa-ankaios-mapping, kuksa-ankaios-vss]}
+        - {kind: datacenter, label: Arduino LED ECU, tier: [diagram], x0: 12.5, y0: 0, x1: 23, y1: 8, nodes: [kuksa-ankaios-ecu]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: net, label: 車両ネットワーク, z: 0, origin: [25, 0], size: [4, 4]}
+      nodes:
+        kuksa-ankaios-host: {tier: hosta, x: 1, y: 1}
+        kuksa-ankaios-ankaios: {tier: appsa, x: 4, y: 1}
+        kuksa-ankaios-can0: {tier: appsa, x: 7, y: 1}
+        kuksa-ankaios-provider: {tier: appsa, x: 1, y: 4}
+        kuksa-ankaios-broker: {tier: appsa, x: 4, y: 4}
+        kuksa-ankaios-cli: {tier: appsa, x: 7, y: 4}
+        kuksa-ankaios-mapping: {tier: appsa, x: 1, y: 7}
+        kuksa-ankaios-vss: {tier: appsa, x: 4, y: 7}
+        kuksa-ankaios-ecu: {tier: hostb, x: 1, y: 1}
+        kuksa-ankaios-bus: {tier: net, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: Raspberry Pi 5 ベンチ, tier: [hosta, appsa], nodes: [kuksa-ankaios-host, kuksa-ankaios-ankaios, kuksa-ankaios-can0, kuksa-ankaios-provider, kuksa-ankaios-broker, kuksa-ankaios-cli, kuksa-ankaios-mapping, kuksa-ankaios-vss]}
+        - {kind: datacenter, label: Arduino LED ECU, tier: [hostb, appsb], nodes: [kuksa-ankaios-ecu]}

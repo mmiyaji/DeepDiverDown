@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/settings-panel.css">
 <link rel="stylesheet" href="css/diagram-symbols.css?v=compare-layout3">
 <link rel="stylesheet" href="css/review-actions.css">
-<link rel="stylesheet" href="css/product-theme.css">
+<link rel="stylesheet" href="css/product-theme.css?v=brand2">
 <script type="importmap">
 { "imports": {
   "three": "./vendor/three/three.module.js",
@@ -23,8 +23,8 @@
 <body>
 <a class="skip" href="#panel">詳細パネルへ移動</a>
 <header class="top">
-  <button class="icon" data-act="nav" aria-label="サイドバーの開閉（[）" title="サイドバーの開閉（[）">☰</button>
-  <div class="brand">DeepDiverDown</div>
+  <button class="icon" data-act="nav" aria-controls="sidebar" aria-label="モデル一覧の開閉（[）" title="モデル一覧の開閉（[）">☰</button>
+  <a class="brand" href="home.html" aria-label="DeepDiverDown トップページ"><img class="brand-icon" src="brand-mark.svg" alt="">DeepDiverDown</a>
   <a class="crumb-up" id="mparent" hidden></a>
   <button class="crumb" id="mtitle" data-act="pick-model" title="モデルを切り替え（Ctrl+K）"></button>
   <div class="search" role="search">
@@ -59,9 +59,10 @@
 
 <div class="shell">
   <aside class="sidebar" id="sidebar" aria-label="モデル一覧">
+    <div class="sidebar-heading"><div><strong>モデル一覧</strong><span>構成図を選ぶ</span></div><button type="button" class="icon sidebar-close" data-act="nav" aria-label="モデル一覧を閉じる">×</button></div>
     <section class="library-section">
-      <details class="library" id="library">
-        <summary><h5>モデル一覧</h5><small>Ctrl+K</small></summary>
+      <details class="library" id="library" open>
+        <summary><h5>探す・絞り込む</h5><small>Ctrl+K</small></summary>
         <input id="model-filter" type="search" placeholder="名前・ラベルで絞り込む（例：OSS）" aria-label="モデルを絞り込む" autocomplete="off">
         <div id="tag-filter" class="tag-filter" aria-label="ラベルで絞り込む"></div>
         <div id="reference-section" hidden>
@@ -79,9 +80,8 @@
   <main class="main">
     <div class="stage">
       <div class="stage-head">
-        <div class="stats" id="stats" aria-live="polite"></div>
-        <a class="b small" id="graph-entry" hidden>関連グラフ</a>
-        <button type="button" class="b small compare-entry" id="compare-entry" data-act="reference-compare" aria-haspopup="dialog" hidden></button>
+        <div class="stage-context"><span>構成図</span><h1 id="viewer-title"></h1><div class="stats" id="stats" aria-live="polite"></div></div>
+        <div class="stage-actions"><a class="b small" id="graph-entry" hidden>関連グラフ</a><button type="button" class="b small compare-entry" id="compare-entry" data-act="reference-compare" aria-haspopup="dialog" hidden></button></div>
       </div>
         <div class="toolbar" role="toolbar" aria-label="構成図の操作">
           <div class="tb-disp" role="group" aria-label="図の表示">
@@ -118,6 +118,7 @@
           </div>
           <div class="tb-spacer"></div>
           <div class="tb-group" role="group" aria-label="表示領域">
+            <button data-act="readable-diagram" hidden aria-pressed="false" title="文字を大きく表示し、図をスクロールして見る">文字を拡大</button>
             <button data-act="maximize-view" aria-pressed="false" title="構成図を画面内で最大化">⛶<span>最大化</span></button>
             <button class="detail-toggle" id="detail-toggle" aria-controls="panel" aria-expanded="true" title="詳細パネルの開閉">詳細</button>
           </div>
@@ -125,13 +126,13 @@
       <div class="view" id="view" aria-label="構成図。部品や矢印を選択">
         <div class="hint" id="hint"></div>
       </div>
-      <div class="legend" id="legend" aria-live="polite" aria-atomic="true"></div>
+      <div class="legend" id="legend" role="group" aria-label="図の凡例と表示切替"></div>
       <section class="filemap" id="filemap" hidden aria-label="データの見取り図"></section>
     </div>
   </main>
 
   <aside class="panel" id="panel" tabindex="-1" aria-label="詳細">
-    <button class="icon detail-close" id="detail-close" aria-label="詳細パネルを閉じる" title="閉じる">×</button>
+    <div class="panel-heading"><div><strong>詳細</strong><span>選択した部品・接続の情報</span></div><button class="icon detail-close" id="detail-close" aria-label="詳細パネルを閉じる" title="閉じる">×</button></div>
     <div id="panel-body"></div>
   </aside>
 </div>
@@ -152,6 +153,6 @@
 <script src="js/analyze.js?v=routes1"></script>
 <script src="js/views.js?v=routes1"></script>
 <script src="js/view-controls.js?v=tbmenu1"></script>
-<script type="module" src="js/app.js?v=settings-layout1"></script>
+<script type="module" src="js/app.js?v=ai-local1"></script>
 </body>
 </html>

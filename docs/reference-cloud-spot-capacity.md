@@ -18,7 +18,14 @@ AWS EC2 は停止・終了に通常 2 分前の通知を出すがベストエフ
 |---|---|
 | 容量選択と補充 | EC2 Auto Scaling と混合インスタンスポリシー |
 | 実行容量 | EC2 Spot / On-Demand |
-| 通知 | EC2 のメタデータ・EventBridge |
+| 中断処理を開始する通知 | Spot インスタンスの EC2 IMDSv2 |
 | 進捗 | アプリが記録する S3 オブジェクト |
+
+Auto Scaling グループには複数 AZ と起動候補の機種を指定し、混合ポリシーで On-Demand の基礎容量と追加容量の割合を決める。Spot 上のアプリは IMDSv2 の `spot/instance-action` を確認して停止処理を始める。通知が来る前から S3 に定期保存し、代替インスタンスでアプリを起動するときに保存済みの進捗を読み戻す。起動テンプレートのインスタンスロールには、使用する S3 オブジェクトへの読み書きを許可する。EventBridge は外部からの観測にも利用できる。
+
+AWS は Auto Scaling・EC2・S3・IAM のサービス基盤を運用する。利用者は Auto Scaling の API で混合ポリシーや容量リバランスを設定し、ゲスト OS、アプリ、チェックポイント、S3 の権限と IAM ロールを管理する。AWS が運用するサービス内部への直接アクセスを前提にしない。Spot の通知はベストエフォートで、容量リバランスによる代替の起動も保証されない。この図は公式資料を組み合わせた代表構成であり、実環境での動作は未検証。
+
+- [EC2 Auto Scaling の混合インスタンスポリシー](https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-mixed-instances-groups.html)
+- [EC2 Spot の進捗保存](https://docs.aws.amazon.com/pdfs/whitepapers/latest/cost-optimization-leveraging-ec2-spot-instances/cost-optimization-leveraging-ec2-spot-instances.pdf)
 
 [AWS 中断通知](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html)、[AWS リバランス推奨](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/rebalance-recommendations.html)、[Azure Spot 退避](https://learn.microsoft.com/en-us/azure/architecture/guide/spot/spot-eviction)、[Google Cloud Spot VM](https://docs.cloud.google.com/compute/docs/instances/spot)、[OCI Preemptible](https://docs.oracle.com/en-us/iaas/Content/Compute/Concepts/preemptible.htm)。

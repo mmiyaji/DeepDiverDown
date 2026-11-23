@@ -45,10 +45,119 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      core-postgres-host: {label: Self-hosted CI runner machine, kind: host, tier: processing, x: 8, y: 1, evidence: [{type: doc, ref: "docs/reference-dbt.md#§7"}]}
+      core-postgres-dbhost: {label: PostgreSQL server host, kind: host, tier: processing, x: 8, y: 4, evidence: [{type: doc, ref: "docs/reference-dbt.md#§7"}]}
       core-postgres-runner: {label: CI 上の dbt Core と dbt-postgres, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [project, dag, tests], description: source と ref から依存順を決め、dbt build でモデル作成とデータテストを実行する。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
       core-postgres-pg: {label: PostgreSQL の SQL と三つのスキーマ, kind: db, tier: processing, x: 1, y: 3.65, realizes: [raw, compute, staging, mart], description: raw.orders を読み、staging と mart の関係を定義した SQL で作る。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
       core-postgres-profile: {label: profiles.yml の接続プロファイル, kind: file, tier: setup, x: 1, y: 1.5, description: アダプターの接続先と出力スキーマなどの実行先を指定する。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
       core-postgres-manifest: {label: manifest.json, kind: file, tier: setup, x: 5, y: 1.5, description: モデル、検査、依存関係を含む解析成果物として保持する。, evidence: [{type: doc, ref: docs/reference-dbt.md#§7}]}
     links:
+      - {id: core-postgres-runner-host, from: core-postgres-host, to: core-postgres-runner, label: "Run dbt build", evidence: [{type: doc, ref: "docs/reference-dbt.md#§7"}]}
+      - {id: core-postgres-database-host, from: core-postgres-dbhost, to: core-postgres-pg, label: "Run PostgreSQL", evidence: [{type: doc, ref: "docs/reference-dbt.md#§7"}]}
       - {id: core-postgres-profile-connection, from: core-postgres-profile, to: core-postgres-runner, label: PostgreSQL の接続先を設定}
       - {id: core-postgres-manifest-connection, from: core-postgres-manifest, to: core-postgres-runner, label: 依存関係を検査}
+
+    layout2d:
+      tiers: [{id: diagram, label: Self-managed environment, z: 0, size: [18, 8]}]
+      nodes:
+        core-postgres-host: {tier: diagram, x: 2, y: 1}
+        core-postgres-runner: {tier: diagram, x: 2, y: 4}
+        core-postgres-profile: {tier: diagram, x: 6, y: 1}
+        core-postgres-manifest: {tier: diagram, x: 6, y: 4}
+        core-postgres-dbhost: {tier: diagram, x: 13, y: 1}
+        core-postgres-pg: {tier: diagram, x: 13, y: 4}
+      groups:
+        - {kind: datacenter, label: CI runner, tier: diagram, nodes: [core-postgres-host, core-postgres-runner, core-postgres-profile, core-postgres-manifest]}
+        - {kind: datacenter, label: PostgreSQL server, tier: diagram, nodes: [core-postgres-dbhost, core-postgres-pg]}
+    layout3d:
+      tiers:
+        - {id: apps, label: Applications, z: 1, size: [16, 3]}
+        - {id: hosts, label: Self-managed hosts, z: 0, size: [16, 3]}
+      nodes:
+        core-postgres-host: {tier: hosts, x: 2, y: 1.5}
+        core-postgres-runner: {tier: apps, x: 2, y: 1.5}
+        core-postgres-profile: {tier: hosts, x: 6, y: 1.5}
+        core-postgres-manifest: {tier: hosts, x: 9, y: 1.5}
+        core-postgres-dbhost: {tier: hosts, x: 13, y: 1.5}
+        core-postgres-pg: {tier: apps, x: 13, y: 1.5}
+      groups:
+        - {kind: datacenter, label: CI runner, tier: [apps, hosts], nodes: [core-postgres-host, core-postgres-runner, core-postgres-profile, core-postgres-manifest]}
+        - {kind: datacenter, label: PostgreSQL server, tier: [apps, hosts], nodes: [core-postgres-dbhost, core-postgres-pg]}
+
+  - id: aws-ecs-redshift
+    label: "ECS on Fargate の dbt Core と Amazon Redshift"
+    description: "EventBridge Scheduler で ECS タスクを定期起動し、Fargate コンテナ上の dbt Core から Redshift の注文テーブルを変換する。"
+    sources:
+      - {title: "EventBridge Scheduler による ECS タスクの定期実行", url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/tasks-scheduled-eventbridge-scheduler.html}
+      - {title: "dbt Core の Redshift 接続", url: https://docs.getdbt.com/docs/local/connect-data-platform/redshift-setup}
+      - {title: "ECS タスクへの Secrets Manager の値の注入", url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html}
+      - {title: "dbt build コマンド", url: https://docs.getdbt.com/reference/commands/build}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-ecs-redshift-fargate-host, aws-ecs-redshift-schedule, aws-ecs-redshift-ecs, aws-ecs-redshift-image, aws-ecs-redshift-runner, aws-ecs-redshift-secret, aws-ecs-redshift-raw, aws-ecs-redshift-compute, aws-ecs-redshift-staging, aws-ecs-redshift-mart]}
+      - {kind: vpc, label: "ECS タスクと Redshift の VPC", provider: aws, tier: [runtime, data], nodes: [aws-ecs-redshift-runner, aws-ecs-redshift-raw, aws-ecs-redshift-compute, aws-ecs-redshift-staging, aws-ecs-redshift-mart]}
+      - {kind: cluster, label: "Amazon Redshift データベース", provider: aws, tier: [data], nodes: [aws-ecs-redshift-raw, aws-ecs-redshift-compute, aws-ecs-redshift-staging, aws-ecs-redshift-mart]}
+    nodes:
+      aws-ecs-redshift-fargate-host: {label: AWS Fargate task, svc: fargate, kind: host, tier: runtime, x: 12, y: 3, management: {type: shared, scope: "AWS operates task infrastructure; customer configures task, image and permissions."}, evidence: [{type: doc, ref: "docs/reference-dbt.md#§8"}]}
+      aws-ecs-redshift-author: {label: "データ開発者", kind: client, tier: entry, x: 1, y: 1.5, description: "検証した dbt プロジェクトをコンテナイメージとして配布する。", evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-schedule: {label: "EventBridge Scheduler", kind: scheduler, tier: runtime, x: 1, y: 1.5, svc: eventbridge, description: "定期スケジュールから ECS RunTask を呼び出す。", management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-ecs: {label: "Amazon ECS RunTask", kind: service, tier: runtime, x: 5, y: 1.5, svc: ecs, description: "タスク定義のイメージを使って Fargate タスクを起動する。", management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-image: {label: "ECR の dbt イメージ", kind: file, tier: runtime, x: 8, y: 4.8, svc: ecr, realizes: [project], description: "dbt Core、dbt-redshift、SQL モデルとテスト定義を格納する。", management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-runner: {label: "Fargate の dbt Core", kind: worker, tier: runtime, x: 11, y: 1.5, realizes: [dag, tests], description: "dbt build で依存関係順に SQL を発行し、データテスト結果を判定する。", management: {type: customer, scope: "Customer manages workload, configuration, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-secret: {label: "Secrets Manager", kind: policy, tier: runtime, x: 15.5, y: 4.8, svc: secrets, description: "Redshift の専用ユーザーの資格情報を保持する。", management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-raw: {label: "Redshift の raw", kind: db, tier: data, x: 2, y: 1.5, realizes: [raw], description: "ロード済みの受注を保持するスキーマ。", management: {type: customer, scope: "Customer manages workload, configuration, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-compute: {label: "Redshift の SQL 実行", kind: service, tier: data, x: 7, y: 1.5, svc: redshift, realizes: [compute], description: "dbt が生成した SQL を実行し、集計とテストの結果を返す。", management: {type: shared, scope: "AWS operates the service infrastructure; customer manages settings, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-staging: {label: "Redshift の staging", kind: db, tier: data, x: 12, y: 1.5, realizes: [staging], description: "整形済みの中間モデル。", management: {type: customer, scope: "Customer manages workload, configuration, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      aws-ecs-redshift-mart: {label: "Redshift の mart", kind: db, tier: data, x: 16, y: 1.5, realizes: [mart], description: "下流分析用に公開するモデル。", management: {type: customer, scope: "Customer manages workload, configuration, data and access."}, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+    links:
+      - {id: aws-ecs-redshift-host-run, from: aws-ecs-redshift-fargate-host, to: aws-ecs-redshift-runner, label: "Run dbt container", evidence: [{type: doc, ref: "docs/reference-dbt.md#§8"}]}
+      - {id: aws-ecs-redshift-publish, from: aws-ecs-redshift-author, to: aws-ecs-redshift-image, label: "dbt イメージを登録", evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      - {id: aws-ecs-redshift-invoke, from: aws-ecs-redshift-schedule, to: aws-ecs-redshift-ecs, label: "RunTask を呼び出す", evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      - {id: aws-ecs-redshift-run, from: aws-ecs-redshift-ecs, to: aws-ecs-redshift-runner, label: "定期タスクを起動する", evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      - {id: aws-ecs-redshift-pull, from: aws-ecs-redshift-image, to: aws-ecs-redshift-runner, label: "イメージからモデル定義を読み込む", realizes: [graph], replace: true, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      - {id: aws-ecs-redshift-inject, from: aws-ecs-redshift-secret, to: aws-ecs-redshift-runner, label: "起動時に接続資格情報を渡す", evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      - {id: aws-ecs-redshift-scan, from: aws-ecs-redshift-raw, to: aws-ecs-redshift-compute, label: "受注データを参照", realizes: [input], replace: true, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      - {id: aws-ecs-redshift-test-query, from: aws-ecs-redshift-runner, to: aws-ecs-redshift-compute, label: "データテスト SQL を実行", realizes: [check], replace: true, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+      - {id: aws-ecs-redshift-test-result, from: aws-ecs-redshift-compute, to: aws-ecs-redshift-runner, label: "検査結果を返す", realizes: [check], replace: true, evidence: [{type: doc, ref: docs/reference-dbt.md#§8}]}
+    layout2d:
+      tiers: [{id: diagram, label: AWS implementation, z: 0, size: [32, 15]}]
+      nodes:
+        aws-ecs-redshift-author: {tier: diagram, x: 1, y: 1}
+        aws-ecs-redshift-schedule: {tier: diagram, x: 6, y: 1}
+        aws-ecs-redshift-ecs: {tier: diagram, x: 11, y: 1}
+        aws-ecs-redshift-image: {tier: diagram, x: 16, y: 1}
+        aws-ecs-redshift-fargate-host: {tier: diagram, x: 21, y: 1}
+        aws-ecs-redshift-runner: {tier: diagram, x: 26, y: 1}
+        aws-ecs-redshift-secret: {tier: diagram, x: 1, y: 5}
+        aws-ecs-redshift-raw: {tier: diagram, x: 6, y: 5}
+        aws-ecs-redshift-compute: {tier: diagram, x: 11, y: 5}
+        aws-ecs-redshift-staging: {tier: diagram, x: 16, y: 5}
+        aws-ecs-redshift-mart: {tier: diagram, x: 21, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-ecs-redshift-schedule, aws-ecs-redshift-ecs, aws-ecs-redshift-image, aws-ecs-redshift-fargate-host, aws-ecs-redshift-runner, aws-ecs-redshift-secret, aws-ecs-redshift-raw, aws-ecs-redshift-compute, aws-ecs-redshift-staging, aws-ecs-redshift-mart]}
+        - {kind: cluster, label: Fargate task, tier: diagram, nodes: [aws-ecs-redshift-fargate-host, aws-ecs-redshift-runner]}
+    layout3d:
+      tiers:
+        - {id: task, label: dbt container, z: 1, size: [5, 3]}
+        - {id: host, label: Fargate, z: 0, size: [5, 3]}
+        - {id: services, label: AWS managed services, z: 0, origin: [8, 0], size: [24, 8]}
+        - {id: outside, label: External user, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-ecs-redshift-author: {tier: outside, x: 0, y: 1.5}
+        aws-ecs-redshift-schedule: {tier: services, x: 6, y: 1}
+        aws-ecs-redshift-ecs: {tier: services, x: 10, y: 1}
+        aws-ecs-redshift-image: {tier: services, x: 14, y: 1}
+        aws-ecs-redshift-fargate-host: {tier: host, x: 2, y: 1.5}
+        aws-ecs-redshift-runner: {tier: task, x: 2, y: 1.5}
+        aws-ecs-redshift-secret: {tier: services, x: 6, y: 4}
+        aws-ecs-redshift-raw: {tier: services, x: 10, y: 4}
+        aws-ecs-redshift-compute: {tier: services, x: 14, y: 4}
+        aws-ecs-redshift-staging: {tier: services, x: 18, y: 4}
+        aws-ecs-redshift-mart: {tier: services, x: 2, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [task, host, services], nodes: [aws-ecs-redshift-schedule, aws-ecs-redshift-ecs, aws-ecs-redshift-image, aws-ecs-redshift-fargate-host, aws-ecs-redshift-runner, aws-ecs-redshift-secret, aws-ecs-redshift-raw, aws-ecs-redshift-compute, aws-ecs-redshift-staging, aws-ecs-redshift-mart]}
+        - {kind: cluster, label: Fargate task, tier: [task, host], nodes: [aws-ecs-redshift-fargate-host, aws-ecs-redshift-runner]}

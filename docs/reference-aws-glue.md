@@ -41,6 +41,10 @@ S3 の raw プレフィックスにある注文 CSV をクロールし、登録�
 
 - Glue の IAM 実行ロール。Crawler とジョブに必要な S3・Data Catalog へのアクセスを用途に応じて付与する。
 
+Spark スクリプトは S3 に置き、ジョブにスクリプトのパスと Glue ワーカーの設定を指定する。Crawler は raw の CSV を検出する。Workflow の依存 Trigger が Crawler の成功後にジョブを開始すると、ジョブは Glue Data Catalog の入力定義を使い、変換した Parquet を別の curated パスへ書き込む。
+
+- [Glue Spark ジョブのスクリプトの場所](https://docs.aws.amazon.com/glue/latest/webapi/API_JobCommand.html)
+
 公式資料
 
 - [AWS Glue concepts](https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html)
@@ -49,3 +53,5 @@ S3 の raw プレフィックスにある注文 CSV をクロールし、登録�
 - [AWS Glue workflows](https://docs.aws.amazon.com/glue/latest/dg/workflows_overview.html)
 - [Crawler prerequisites](https://docs.aws.amazon.com/glue/latest/dg/crawler-prereqs.html)
 - [Logging and monitoring in AWS Glue](https://docs.aws.amazon.com/glue/latest/dg/logging-and-monitoring.html)
+
+Glue は Spark ジョブの実行リソースを AWS のサービスアカウントで確保・管理する。利用者はジョブスクリプト、ワーカー設定、Crawler、Workflow、データ、権限を設定し、Glue の API・コンソールで操作できる。内部の仮想リソースを直接操作する構成ではない。公式資料を組み合わせた注文データの例で、実動作は未検証。[AWS 共有責任](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

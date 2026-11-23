@@ -2,8 +2,8 @@
   "model": "compaction",
   "name": "小ファイルの整理：コンパクション",
   "coverage": {
-    "covered": 9,
-    "total": 9
+    "covered": 10,
+    "total": 10
   },
   "byId": {
     "stream_writer": {
@@ -112,6 +112,24 @@
       "type": "unknown",
       "label": "実際の target file size、閾値、保持日数、実行スケジュールは利用環境ごとに決める。"
     },
+    "iceberg-spark-host": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "自前 Linux Spark クラスター",
+      "realizes": []
+    },
+    "iceberg-spark-source": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "自前 Kafka 注文トピック",
+      "realizes": []
+    },
+    "iceberg-spark-hdfs": {
+      "type": "implementation",
+      "impl": "iceberg-spark",
+      "label": "自前 HDFS と Hadoop カタログ",
+      "realizes": []
+    },
     "iceberg-spark-write": {
       "type": "implementation",
       "impl": "iceberg-spark",
@@ -160,6 +178,68 @@
       "impl": "iceberg-spark",
       "label": "コンパクションと保持の設定",
       "realizes": []
+    },
+    "aws-input": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "Amazon MSK（注文トピック）",
+      "realizes": []
+    },
+    "aws-checkpoint": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "S3 Streaming チェックポイント",
+      "realizes": []
+    },
+    "aws-writer": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "AWS Glue Streaming ジョブ",
+      "realizes": [
+        "stream_writer"
+      ]
+    },
+    "aws-compact": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "AWS Glue（コンパクション）",
+      "realizes": [
+        "planner",
+        "rewrite"
+      ]
+    },
+    "aws-retention": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "AWS Glue（スナップショット保持）",
+      "realizes": [
+        "cleanup"
+      ]
+    },
+    "aws-query": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "Amazon Athena（エンジン 3）",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "aws-catalog": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "AWS Glue Data Catalog",
+      "realizes": [
+        "metadata"
+      ]
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-glue",
+      "label": "Amazon S3（Iceberg のデータとスナップショット）",
+      "realizes": [
+        "orders",
+        "snapshot"
+      ]
     }
   },
   "byRef": {
@@ -192,12 +272,23 @@
       "BR-01",
       "BR-02",
       "NFR-01",
+      "iceberg-spark-host",
+      "iceberg-spark-source",
+      "iceberg-spark-hdfs",
       "iceberg-spark-write",
       "iceberg-spark-action",
       "iceberg-spark-iceberg",
       "iceberg-spark-query",
       "iceberg-spark-expire",
-      "iceberg-spark-policy"
+      "iceberg-spark-policy",
+      "aws-input",
+      "aws-checkpoint",
+      "aws-writer",
+      "aws-compact",
+      "aws-retention",
+      "aws-query",
+      "aws-catalog",
+      "aws-s3"
     ],
     "docs/reference-compaction.md#§3": [
       "planner",
@@ -235,12 +326,25 @@
       "NFR-01"
     ],
     "docs/reference-compaction.md#§9": [
+      "iceberg-spark-host",
+      "iceberg-spark-source",
+      "iceberg-spark-hdfs",
       "iceberg-spark-write",
       "iceberg-spark-action",
       "iceberg-spark-iceberg",
       "iceberg-spark-query",
       "iceberg-spark-expire",
       "iceberg-spark-policy"
+    ],
+    "docs/reference-compaction.md#§10": [
+      "aws-input",
+      "aws-checkpoint",
+      "aws-writer",
+      "aws-compact",
+      "aws-retention",
+      "aws-query",
+      "aws-catalog",
+      "aws-s3"
     ]
   },
   "reference": {

@@ -73,9 +73,11 @@ test('実装例：機能をサービスに写し、同じサービスに収ま�
   const m = M.debezium, v = V.project(base(m), m, 'impl:aws');
   assert.deepEqual([...v.from['aws-rds']].sort(), ['database', 'logical'], 'DB と論理レプリケーションを RDS が担う');
   assert.ok(!v.nodes.database && !v.nodes.topic, '機能の部品は実装の部品に置き換わる');
-  assert.ok(has(v, 'aws-rds', 'aws-connector'));
+  assert.ok(has(v, 'aws-rds', 'aws-connect-eni') && has(v, 'aws-connect-eni', 'aws-connector'));
   assert.ok(!v.links.some(l => l.from === l.to), 'DB → 論理レプリケーションは RDS の中に収まる');
-  assert.ok(v.linkFrom['I:aws-rds>aws-connector'].includes('snapshot') && v.linkFrom['I:aws-rds>aws-connector'].includes('capture'), 'シナリオの接続を引き継ぐ');
+  for (const id of ['aws-snapshot-eni', 'aws-snapshot-task', 'aws-capture-eni', 'aws-capture-task']) {
+    assert.ok(v.linkFrom[id]?.includes(id.includes('snapshot') ? 'snapshot' : 'capture'), 'ENI を経由する各区間にシナリオの接続を引き継ぐ');
+  }
   assert.deepEqual([...v.from['aws-plugin']], [], 'S3 は実装で加わる部品');
   assert.ok(has(v, 'aws-plugin', 'aws-worker'));
 });

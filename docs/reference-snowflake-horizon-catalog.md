@@ -37,11 +37,15 @@ ACCESS_HISTORY で直接・間接に参照されたオブジェクトや列な�
 | データ管理者 | 分類設定用ロール | 分類プロファイルと結果を管理する。 |
 | 機微データ分類 | Sensitive Data Classification | 機微情報候補の分類結果を確認する。 |
 | 列の分類ラベル・列の値を保護するポリシー | 分類タグとマスキングポリシー | 文字列用ポリシーをタグに関連付ける。 |
-| 分析担当ロール | SALES_READER ロール | 許可された分析ビューだけを参照する。 |
+| 分析担当ロール | SALES_READER ロール | 分析用 Warehouse の使用と、公開ビューの参照を許可する。 |
 | 注文のメールアドレス列 | ORDERS.CUSTOMER_EMAIL | メール列に分類タグを設定する。 |
 | 注文分析ビュー | SALES.ORDERS_ANALYSIS | 注文分析に必要な列を公開する。 |
-| 列アクセスの監査履歴 | ACCOUNT_USAGE.ACCESS_HISTORY | アクセスした資産と列を、対応するクエリで確認する。 |
+| 列アクセスの監査履歴 | ACCOUNT_USAGE.ACCESS_HISTORY | `SNOWFLAKE.GOVERNANCE_VIEWER` を付与した監査用アカウントロールで参照する。 |
 
-タグに関連付けるポリシーと列の型をそろえ、分析ロールと監査ロールの権限を個別に付与する。分類、タグベースのマスキング、アクセス履歴を使えるエディションと権限はそれぞれ公式資料を確認する。
+この例は Snowflake Enterprise Edition 以上を前提とする。タグに関連付けるポリシーと列の型をそろえる。分析用と監査用にクエリを実行する Warehouse を用意し、利用者のロールには担当するデータへの権限と対応する Warehouse の使用権限を付与する。
+
+- [Account Usage のデータベースロール](https://docs.snowflake.com/en/sql-reference/account-usage)
 
 出典 [Snowflake Horizon Catalog](https://docs.snowflake.com/en/user-guide/snowflake-horizon)、[データガバナンス](https://docs.snowflake.com/en/guides-overview-govern)、[タグベースのマスキング](https://docs.snowflake.com/en/user-guide/tag-based-masking-policies)、[アクセス履歴](https://docs.snowflake.com/en/user-guide/access-history)、[Snowflake アクセス制御](https://docs.snowflake.com/en/user-guide/security-access-control-overview)
+
+Snowflake が計算・保存・カタログの基盤を運用する。利用者は必要な権限を持つロールで分類設定、タグ、マスキングポリシー、Warehouse と監査権限を設定し、SQL や画面から結果を確認する。ロールはアカウント内の権限設定であり、利用者本人とは区別する。内部基盤への直接操作を意味しない。資料を組み合わせた例で、この設定と権限の実動作は未検証。[Snowflake architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)

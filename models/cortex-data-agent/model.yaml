@@ -209,12 +209,20 @@ scenarios:
 implementations:
   - id: example
     label: Snowflake の実装例
-    description: 各機能の担い手と接続を示す構成例。
+    description: Snowsight で Cortex Agent を使い、Cortex Analyst が売上 SQL を、Cortex Search が公開範囲を限定した文書検索を担う例。
     sources:
-      - title: 公式資料 1
+      - title: Cortex Agents
         url: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents
-      - title: 公式資料 2
+      - title: Cortex Search のエージェント連携
         url: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/cortex-search-agents
+      - title: Cortex Agent のツール設定
+        url: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-manage
+      - title: Cortex Agent の認証と権限
+        url: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-setup
+      - title: Cortex Search の所有者権限
+        url: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/query-cortex-search-service
+      - title: Cortex Agent のリクエスト監視
+        url: https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-monitor
     tiers:
       - id: access
         label: 利用と調整
@@ -226,8 +234,8 @@ implementations:
         label: 指標と文書
         z: 1
         size:
-          - 14
-          - 3
+          - 17
+          - 6
       - id: ops
         label: 運用と評価
         z: 0
@@ -236,7 +244,7 @@ implementations:
           - 3
     nodes:
       ex-question:
-        label: 利用者
+        label: Snowsight の分析利用者
         kind: actor
         tier: access
         x: 0
@@ -253,17 +261,19 @@ implementations:
         tier: access
         x: 4
         'y': 1
+        description: Snowflake が管理するモデル実行で、指標と文書検索のツールを調整する。
         evidence:
           - type: doc
             ref: docs/reference-cortex-data-agent.md#§3
         realizes:
           - agent
       ex-identity:
-        label: 利用者の権限
+        label: Snowflake のセッションロール
         kind: service
         tier: access
         x: 8
         'y': 1
+        description: Agent と Analyst のデータベースロール、対象ツールへの権限を分けて付与する。
         evidence:
           - type: doc
             ref: docs/reference-cortex-data-agent.md#§3
@@ -282,7 +292,7 @@ implementations:
         realizes:
           - metrics
       ex-warehouse:
-        svc: snowflake:platform
+        svc: snowflake:database
         label: Snowflake の分析テーブル
         kind: db
         tier: data
@@ -306,8 +316,8 @@ implementations:
         realizes:
           - search
       ex-documents:
-        svc: snowflake:platform
-        label: 検索対象の文書
+        svc: snowflake:database
+        label: 検索公開範囲の文書テーブル
         kind: db
         tier: data
         x: 12
@@ -318,11 +328,12 @@ implementations:
         realizes:
           - documents
       ex-trace:
-        label: 実行の観測
-        kind: service
+        label: AI_OBSERVABILITY_EVENTS
+        kind: db
         tier: ops
         x: 4
         'y': 1
+        description: Snowflake の Agent 監視イベント。閲覧ロールと、マスキング前のイベント閲覧権限を個別に設定する。
         evidence:
           - type: doc
             ref: docs/reference-cortex-data-agent.md#§3
@@ -348,7 +359,14 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-cortex-data-agent.md#§3
+      ex-semantic-view: {label: 売上指標の Semantic View, kind: table, tier: data, x: 0, y: 4.5, description: Cortex Analyst が参照する指標・次元の定義を保持する。, evidence: [{type: doc, ref: docs/reference-cortex-data-agent.md#§3}]}
+      ex-sql-compute: {label: Analyst SQL 用 Warehouse, kind: worker, svc: 'snowflake:warehouse', tier: data, x: 4, y: 4.5, description: 生成した SQL を設定された Warehouse で実行する。, evidence: [{type: doc, ref: docs/reference-cortex-data-agent.md#§3}]}
+      ex-index-compute: {label: Search 索引更新用 Warehouse, kind: worker, svc: 'snowflake:warehouse', tier: data, x: 12, y: 4.5, description: Cortex Search の索引構築に使うソースクエリを実行する。, evidence: [{type: doc, ref: docs/reference-cortex-data-agent.md#§3}]}
     links:
+      - {id: ex-metric-definition, from: ex-semantic-view, to: ex-metrics, label: 売上指標の定義を読む, evidence: [{type: doc, ref: docs/reference-cortex-data-agent.md#§3}]}
+      - {id: ex-submit-sql, from: ex-metrics, to: ex-sql-compute, label: 生成した SQL を実行, realizes: [read], replace: true, evidence: [{type: doc, ref: docs/reference-cortex-data-agent.md#§3}]}
+      - {id: ex-select, from: ex-sql-compute, to: ex-warehouse, label: セッションロールの権限で分析テーブルを読む, realizes: [read], replace: true, evidence: [{type: doc, ref: docs/reference-cortex-data-agent.md#§3}]}
+      - {id: ex-build-index, from: ex-index-compute, to: ex-search, label: 対象文書から索引を更新, evidence: [{type: doc, ref: docs/reference-cortex-data-agent.md#§3}]}
       - id: ex-record-policy
         from: ex-logpolicy
         to: ex-trace
@@ -361,6 +379,7 @@ implementations:
           - access
         nodes:
           - ex-agent
+          - ex-identity
       - kind: cloud
         provider: snowflake
         label: Snowflake
@@ -371,3 +390,48 @@ implementations:
           - ex-warehouse
           - ex-search
           - ex-documents
+          - ex-semantic-view
+          - ex-sql-compute
+          - ex-index-compute
+      - {kind: cloud, provider: snowflake, label: Snowflake, tier: [ops], nodes: [ex-trace]}
+
+    layout2d:
+      tiers: [{id: diagram, label: エージェントとデータ, z: 0, origin: [-4, 0], size: [30, 15]}]
+      nodes:
+        ex-agent: {tier: diagram, x: 1, y: 1}
+        ex-identity: {tier: diagram, x: 4, y: 1}
+        ex-metrics: {tier: diagram, x: 7, y: 1}
+        ex-warehouse: {tier: diagram, x: 1, y: 4}
+        ex-search: {tier: diagram, x: 4, y: 4}
+        ex-documents: {tier: diagram, x: 7, y: 4}
+        ex-trace: {tier: diagram, x: 1, y: 7}
+        ex-semantic-view: {tier: diagram, x: 4, y: 7}
+        ex-sql-compute: {tier: diagram, x: 7, y: 7}
+        ex-index-compute: {tier: diagram, x: 1, y: 10}
+        ex-question: {tier: diagram, x: -3, y: 1}
+        ex-review: {tier: diagram, x: -1, y: 1}
+        ex-logpolicy: {tier: diagram, x: 3, y: 1}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake アカウント, tier: [diagram], x0: 0, y0: 0, x1: 12, y1: 13, nodes: [ex-agent, ex-identity, ex-metrics, ex-warehouse, ex-search, ex-documents, ex-trace, ex-semantic-view, ex-sql-compute, ex-index-compute]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行基盤・公開サービス, z: 0, size: [12, 12]}
+        - {id: apps, label: ホスト上の処理, z: 1, size: [12, 12]}
+        - {id: other, label: 独立したツール・データ, z: 0, origin: [15, 0], size: [10, 10]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 9]}
+      nodes:
+        ex-agent: {tier: host, x: 1, y: 1}
+        ex-identity: {tier: host, x: 4, y: 1}
+        ex-metrics: {tier: host, x: 7, y: 1}
+        ex-warehouse: {tier: host, x: 1, y: 4}
+        ex-search: {tier: host, x: 4, y: 4}
+        ex-documents: {tier: host, x: 7, y: 4}
+        ex-trace: {tier: host, x: 1, y: 7}
+        ex-semantic-view: {tier: host, x: 4, y: 7}
+        ex-sql-compute: {tier: host, x: 7, y: 7}
+        ex-index-compute: {tier: host, x: 1, y: 10}
+        ex-question: {tier: user, x: 1, y: 1}
+        ex-review: {tier: user, x: 4, y: 1}
+        ex-logpolicy: {tier: user, x: 7, y: 1}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake アカウント, tier: [host, apps], nodes: [ex-agent, ex-identity, ex-metrics, ex-warehouse, ex-search, ex-documents, ex-trace, ex-semantic-view, ex-sql-compute, ex-index-compute]}

@@ -39,78 +39,117 @@ scenarios:
       - {links: [run], note: client が新 Allocation を実行し、Deployment が健全性を確認する。}
 implementations:
   - id: vm
-    label: Nomad の Docker ドライバーと Consul
-    description: 自己管理の Nomad server と複数の client VM に、注文 API を Docker コンテナとして段階展開する例。
+    label: AWS（Nomad と Consul on EC2）
+    description: EC2 の自主管理 Nomad が ECR の注文 API を Docker タスクとして配置し、Consul のヘルスチェックで段階展開する例。
     sources:
+      - {title: Security in Amazon EC2, url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security.html}
       - title: Nomad rolling updates
         url: https://developer.hashicorp.com/nomad/docs/job-declare/strategy/rolling
       - title: Nomad scheduling
         url: https://developer.hashicorp.com/nomad/docs/concepts/scheduling/how-scheduling-works
       - title: Docker task driver
         url: https://developer.hashicorp.com/nomad/docs/drivers/docker
+      - {title: Nomad の本番リファレンス構成, url: https://developer.hashicorp.com/nomad/docs/deploy/production/reference-architecture}
+      - {title: Nomad のディスク要件, url: https://developer.hashicorp.com/nomad/docs/deploy/production/requirements}
+      - {title: Nomad と Consul の統合, url: https://developer.hashicorp.com/nomad/docs/networking/consul}
+      - {title: Amazon ECR の認証, url: https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry_auth.html}
+      - {title: Amazon EBS ボリュームのアタッチ, url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html}
     tiers:
       - id: control
         label: Nomad 制御
         z: 1
+        size: [18, 4]
       - id: runtime
         label: ノード実行
         z: 0
+        size: [18, 4]
+      - {id: assets, label: データとコンテナイメージ, z: 2, size: [18, 4]}
     groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [control, runtime, assets]}
       - kind: datacenter
-        label: 自己管理データセンター
-        provider: onprem
+        label: AWS VPC の自主管理 Nomad データセンター
         tier:
           - control
           - runtime
         nodes:
           - vm-scheduler
           - vm-client
+          - vm-task
           - vm-consul
+          - vm-consul-servers
     nodes:
       vm-job:
         label: 注文 API の Nomad jobspec
         kind: file
         tier: control
+        x: 2
+        y: 1.5
         realizes:
           - job
         description: Docker イメージとタスクグループの台数、update 設定を記述する。
+        management: {type: customer, scope: 利用者が jobspec と更新方針を設定する。}
         evidence:
           - type: doc
             ref: docs/reference-nomad.md#§6
       vm-scheduler:
-        label: Nomad server VM 群
+        label: EC2（Nomad server 3台・3 AZ）
         kind: worker
         tier: control
-        svc: onprem:vm
+        svc: ec2
+        x: 8
+        y: 1.5
         realizes:
           - evaluation
           - scheduler
           - allocation
           - deployment
         description: Evaluation を処理して Allocation を作り、Deployment の進行も管理する。
+        management: {type: customer, scope: 利用者が EC2 上の Nomad server、OS と状態を運用する。}
         evidence:
           - type: doc
             ref: docs/reference-nomad.md#§6
       vm-client:
-        label: Nomad client VM 群の Docker driver
+        label: EC2（Nomad client 群・Docker）
         kind: host
         tier: runtime
-        svc: onprem:vm
+        svc: ec2
+        x: 3
+        y: 1.5
         realizes:
           - client
         description: 割り当てが決まると注文 API のコンテナを起動する。
+        management: {type: customer, scope: 利用者が EC2、OS、Nomad client と Docker を運用する。}
         evidence:
           - type: doc
             ref: docs/reference-nomad.md#§6
+      vm-task:
+        label: 注文 API Docker タスク
+        kind: service
+        tier: runtime
+        x: 5
+        y: 1.5
+        description: Nomad client 上の Docker driver で実行する Allocation のタスク。
+        management: {type: customer, scope: 利用者がアプリと jobspec を管理する。}
+        evidence: [{type: doc, ref: docs/reference-nomad.md#§6}]
       vm-consul:
-        label: Consul サービス登録とヘルスチェック
+        label: 各 EC2 上の Consul エージェント
         kind: monitor
         tier: runtime
-        description: HTTP ヘルスチェックの判定をローリング更新に使う。
+        x: 9
+        y: 1.5
+        description: 同じホストの Nomad client からサービス登録を受け、HTTP チェックを行う。
+        management: {type: customer, scope: 利用者が Consul agent とチェック設定を運用する。}
         evidence:
           - type: doc
             ref: docs/reference-nomad.md#§6
+      vm-consul-servers: {label: EC2（Consul server 群）, svc: ec2, kind: host, tier: runtime, x: 15, y: 1.5, description: ローカルの Consul エージェントからサービスカタログの更新を受ける。, evidence: [{type: doc, ref: docs/reference-nomad.md#§6}]}
+      vm-ebs: {label: Amazon EBS（Nomad server ごとのデータ）, svc: ebs, kind: db, tier: assets, x: 8, y: 1.5, description: 各 Nomad server に同じ AZ の専用ボリュームを割り当て、Raft のログと状態を保存する。, management: {type: shared, scope: AWS がストレージ基盤を運用し、利用者がボリュームとデータを管理する。}, evidence: [{type: doc, ref: docs/reference-nomad.md#§6}]}
+      vm-ecr: {label: Amazon ECR（注文 API イメージ）, svc: ecr, kind: db, tier: assets, x: 14, y: 1.5, description: client 上の Docker が認証して取得する注文 API イメージを保持する。, management: {type: shared, scope: AWS が基盤を運用し、利用者がイメージと権限を管理する。}, evidence: [{type: doc, ref: docs/reference-nomad.md#§6}]}
     links:
+      - {id: vm-run, from: vm-client, to: vm-task, label: Docker タスクを起動, evidence: [{type: doc, ref: docs/reference-nomad.md#§6}]}
+      - {id: vm-persist, from: vm-scheduler, to: vm-ebs, label: server ごとの Raft 状態を永続化}
+      - {id: vm-image, from: vm-client, to: vm-ecr, label: 認証して注文 API イメージを取得}
+      - {id: vm-consul-update, from: vm-consul, to: vm-consul-servers, label: 登録とチェックの状態を同期}
       - id: vm-register-health
         from: vm-client
         to: vm-consul
@@ -120,8 +159,42 @@ implementations:
             ref: docs/reference-nomad.md#§6
       - id: vm-report-health
         from: vm-consul
-        to: vm-scheduler
-        label: ヘルスチェックで次の更新を判定
+        to: vm-client
+        label: ローカルのサービスチェック結果を返す
         evidence:
           - type: doc
             ref: docs/reference-nomad.md#§6
+      - {id: vm-report-allocation, from: vm-client, to: vm-scheduler, label: Allocation の健全性を報告}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実装構成, z: 0, origin: [-4, 0], size: [22, 11]}]
+      nodes:
+        vm-job: {tier: diagram, x: 2, y: 1}
+        vm-scheduler: {tier: diagram, x: 6, y: 1}
+        vm-ebs: {tier: diagram, x: 10, y: 1}
+        vm-client: {tier: diagram, x: 6, y: 5}
+        vm-task: {tier: diagram, x: 6, y: 8}
+        vm-consul: {tier: diagram, x: 10, y: 6}
+        vm-consul-servers: {tier: diagram, x: 13, y: 8}
+        vm-ecr: {tier: diagram, x: 16, y: 2}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 0, y0: -1, x1: 18, y1: 10, nodes: [vm-job, vm-scheduler, vm-ebs, vm-client, vm-task, vm-consul, vm-consul-servers, vm-ecr]}
+        - {kind: vpc, label: 顧客 VPC（自主管理 Nomad / Consul）, tier: [diagram], x0: 4, y0: -0.5, x1: 14.5, y1: 9.5, nodes: [vm-scheduler, vm-client, vm-task, vm-consul, vm-consul-servers]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: 実行ノード, z: 0, size: [11, 4]}
+        - {id: apps, label: ノード上の処理・データ, z: 1, size: [11, 4]}
+        - {id: external, label: 独立サービス・設定, z: 0, origin: [13, 0], size: [9, 4]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        vm-scheduler: {tier: nodes, x: 2, y: 2}
+        vm-ebs: {tier: apps, x: 2, y: 2}
+        vm-client: {tier: nodes, x: 6, y: 2}
+        vm-task: {tier: apps, x: 6, y: 2}
+        vm-consul: {tier: apps, x: 6, y: 3.5}
+        vm-consul-servers: {tier: nodes, x: 9, y: 2}
+        vm-job: {tier: external, x: 1, y: 1}
+        vm-ecr: {tier: external, x: 5, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [nodes, apps, external], nodes: [vm-job, vm-scheduler, vm-ebs, vm-client, vm-task, vm-consul, vm-consul-servers, vm-ecr]}
+        - {kind: vpc, label: 顧客 VPC（自主管理 Nomad / Consul）, tier: [nodes, apps], nodes: [vm-scheduler, vm-client, vm-task, vm-consul, vm-consul-servers]}

@@ -2,8 +2,8 @@
   "model": "openlineage",
   "name": "OpenLineage の基本アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "raw": {
@@ -70,6 +70,24 @@
       "type": "scenario",
       "label": "原本から日次売上までの lineage"
     },
+    "spark-marquez-host": {
+      "type": "implementation",
+      "impl": "spark-marquez",
+      "label": "自前 Linux ホスト（Spark local）",
+      "realizes": []
+    },
+    "spark-marquez-docker": {
+      "type": "implementation",
+      "impl": "spark-marquez",
+      "label": "自前 Linux ホストの Docker Compose",
+      "realizes": []
+    },
+    "spark-marquez-db": {
+      "type": "implementation",
+      "impl": "spark-marquez",
+      "label": "Marquez PostgreSQL",
+      "realizes": []
+    },
     "spark-marquez-raw": {
       "type": "implementation",
       "impl": "spark-marquez",
@@ -122,6 +140,66 @@
       "impl": "spark-marquez",
       "label": "Marquez Web UI",
       "realizes": []
+    },
+    "aws-glue-datazone-agent": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "データ運用者",
+      "realizes": []
+    },
+    "aws-glue-datazone-control": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "AWS Glue ジョブ管理",
+      "realizes": []
+    },
+    "aws-glue-datazone-normalize": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "Glue Spark 受注整形ジョブ",
+      "realizes": [
+        "normalize"
+      ]
+    },
+    "aws-glue-datazone-aggregate": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "Glue Spark 日次集計ジョブ",
+      "realizes": [
+        "aggregate"
+      ]
+    },
+    "aws-glue-datazone-collector": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "DataZone ドメイン",
+      "realizes": [
+        "events"
+      ]
+    },
+    "aws-glue-datazone-raw": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "S3 受注原本",
+      "realizes": [
+        "raw"
+      ]
+    },
+    "aws-glue-datazone-detail": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "S3 受注明細",
+      "realizes": [
+        "detail"
+      ]
+    },
+    "aws-glue-datazone-sales": {
+      "type": "implementation",
+      "impl": "aws-glue-datazone",
+      "label": "S3 日次売上",
+      "realizes": [
+        "sales"
+      ]
     }
   },
   "byRef": {
@@ -144,13 +222,24 @@
       "normalize-events",
       "aggregate-events",
       "order-lineage",
+      "spark-marquez-host",
+      "spark-marquez-docker",
+      "spark-marquez-db",
       "spark-marquez-raw",
       "spark-marquez-spark",
       "spark-marquez-detail",
       "spark-marquez-result",
       "spark-marquez-api",
       "spark-marquez-listener",
-      "spark-marquez-ui"
+      "spark-marquez-ui",
+      "aws-glue-datazone-agent",
+      "aws-glue-datazone-control",
+      "aws-glue-datazone-normalize",
+      "aws-glue-datazone-aggregate",
+      "aws-glue-datazone-collector",
+      "aws-glue-datazone-raw",
+      "aws-glue-datazone-detail",
+      "aws-glue-datazone-sales"
     ],
     "docs/reference-openlineage.md#§2": [
       "raw",
@@ -177,6 +266,9 @@
       "order-lineage"
     ],
     "docs/reference-openlineage.md#§7": [
+      "spark-marquez-host",
+      "spark-marquez-docker",
+      "spark-marquez-db",
       "spark-marquez-raw",
       "spark-marquez-spark",
       "spark-marquez-detail",
@@ -184,6 +276,16 @@
       "spark-marquez-api",
       "spark-marquez-listener",
       "spark-marquez-ui"
+    ],
+    "docs/reference-openlineage.md#§8": [
+      "aws-glue-datazone-agent",
+      "aws-glue-datazone-control",
+      "aws-glue-datazone-normalize",
+      "aws-glue-datazone-aggregate",
+      "aws-glue-datazone-collector",
+      "aws-glue-datazone-raw",
+      "aws-glue-datazone-detail",
+      "aws-glue-datazone-sales"
     ]
   },
   "reference": {

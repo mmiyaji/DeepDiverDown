@@ -50,26 +50,101 @@ scenarios:
 
 implementations:
   - id: postgres-cif
-    label: "PostgreSQL の統合 EDW と公開スキーマ"
-    description: "PostgreSQL に入力、統合 EDW、業務別の公開スキーマを用意し、段階的に統合と配信を試す実装例。"
+    label: "統合 EDW と依存型マート（Amazon RDS for PostgreSQL）"
+    description: "Amazon RDS for PostgreSQL に入力、統合 EDW、依存型マートを置き、ECS の定期タスクから統合 SQL とマート更新を順に実行する。"
     sources:
+      - {title: ECS Secrets Manager injection, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
       - {title: "Bill Inmon: Data Warehousing 2.0", url: "https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf"}
       - {title: "Bill Inmon: A Tale of Two Architectures", url: "https://williaminmon.substack.com/p/a-tale-of-two-architectures-kimball"}
       - {title: "Kimball Group: Enterprise Data Warehouse Bus Architecture", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/kimball-data-warehouse-bus-architecture/"}
       - {title: "PostgreSQL CREATE TABLE", url: "https://www.postgresql.org/docs/current/sql-createtable.html"}
       - {title: "PostgreSQL CREATE MATERIALIZED VIEW", url: "https://www.postgresql.org/docs/current/sql-creatematerializedview.html"}
+      - {title: "RDS for PostgreSQL への接続", url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ConnectToPostgreSQLInstance.html}
+      - {title: "EventBridge Scheduler で ECS タスクを実行", url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/tasks-scheduled-eventbridge-scheduler.html}
+      - {title: "ECS の Fargate タスク定義", url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html}
+      - {title: "PostgreSQL 16 の REFRESH MATERIALIZED VIEW", url: https://www.postgresql.org/docs/16/sql-refreshmaterializedview.html}
     tiers:
-      - {id: "inputs", label: "業務システム", z: 2, size: [17,4], kind: "origin"}
+      - {id: "inputs", label: "業務システムからの入力表", z: 2, size: [17,4]}
       - {id: "edw", label: "統合処理と EDW", z: 1, size: [17,5]}
       - {id: "marts", label: "依存型データマート", z: 0, size: [17,4]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 3, size: [8,3]}
+      - {id: "implementation-setup", label: "AWS の実行環境と運用", z: 3, size: [22,3]}
+    groups:
+      - {kind: cloud, provider: aws, label: AWS account, tier: [inputs, edw, marts, implementation-setup], nodes: [aws-schedule, aws-ecs, aws-fargate, aws-job, aws-secret, aws-rds, aws-ecr, example-orders, example-integrate, example-core, example-serve, example-sales, example-finance, example-keymap]}
+      - {kind: cluster, label: RDS PostgreSQL database, tier: [inputs, edw, marts], nodes: [example-orders, example-integrate, example-core, example-serve, example-sales, example-finance, example-keymap]}
+
     nodes:
+      aws-ecs: {label: ECS RunTask, svc: ecs, kind: service, tier: implementation-setup, x: 4, y: 2, management: {type: shared, scope: "AWS operates ECS; customer configures tasks and permissions."}, evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      aws-fargate: {label: Fargate task, svc: fargate, kind: host, tier: implementation-setup, x: 8, y: 2, management: {type: shared, scope: "AWS operates compute; customer configures task and image."}, evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      aws-secret: {label: Secrets Manager DB credential, svc: secrets, kind: service, tier: implementation-setup, x: 22, y: 2, management: {type: shared, scope: "AWS operates service; customer manages secret and access."}, evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      aws-source: {label: Upstream order, customer and refund systems, kind: external, tier: inputs, x: -4, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      aws-schedule: {label: "Amazon EventBridge Scheduler", svc: eventbridge, kind: scheduler, tier: implementation-setup, x: 1, y: 1.5, description: "ECS RunTask により定期的に処理を開始する。", management: {type: shared, scope: "AWS operates Scheduler; customer configures schedule and role."}, evidence: [{type: doc, ref: docs/reference-dwh-inmon-cif.md#§6}]}
+      aws-job: {label: "SQL loader container", kind: worker, tier: implementation-setup, x: 7, y: 1.5, description: "入力をロードし、EDW のコミットを確認してからマート更新を実行する。", management: {type: customer, scope: "Customer manages loader image and SQL."}, evidence: [{type: doc, ref: docs/reference-dwh-inmon-cif.md#§6}]}
+      aws-rds: {label: "Amazon RDS for PostgreSQL 16", svc: rds, kind: db, tier: implementation-setup, x: 13, y: 1.5, description: "プライベートな RDS インスタンスがテーブルを保存し、ジョブから依頼された SQL を実行する。", management: {type: shared, scope: "AWS operates RDS; customer manages database data and access."}, evidence: [{type: doc, ref: docs/reference-dwh-inmon-cif.md#§6}]}
+      aws-ecr: {label: "Amazon ECR（SQL ジョブのイメージ）", svc: ecr, kind: db, tier: implementation-setup, x: 19, y: 1.5, description: "データベース接続クライアントと SQL 実行スクリプトを含むイメージを保持する。", management: {type: shared, scope: "AWS operates ECR; customer manages images and access."}, evidence: [{type: doc, ref: docs/reference-dwh-inmon-cif.md#§6}]}
       example-orders: {label: "landing スキーマの 3 ソース表", kind: "table", tier: "inputs", x: 1, y: 1.5, realizes: ["orders","customers","refunds"], description: "注文・顧客・返金のエクスポートを、元のキーのまま別テーブルで受け取る。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
       example-integrate: {label: "統合 ETL の SQL", kind: "workflow", tier: "edw", x: 2, y: 2, realizes: ["integrate"], description: "顧客キーを対応表で引き、注文・明細・返金を反映する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
       example-core: {label: "edw スキーマの正規化表", kind: "table", tier: "edw", x: 7, y: 2, realizes: ["core"], description: "顧客、注文、明細、返金に主キーと外部キーを設定する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
       example-serve: {label: "マート用の SQL リフレッシュ処理", kind: "workflow", tier: "edw", x: 12, y: 2, realizes: ["serve"], description: "統合 EDW を読み、用途別の粒度を再生成する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
       example-sales: {label: "sales.order_line マテリアライズドビュー", kind: "table", tier: "marts", x: 4, y: 1.5, realizes: ["sales"], description: "注文明細の粒度で地域と受注金額を提供する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
       example-finance: {label: "finance.daily_amount マテリアライズドビュー", kind: "table", tier: "marts", x: 11, y: 1.5, realizes: ["finance"], description: "日別・通貨別に注文金額と返金額を提供する。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
-      example-keymap: {label: "EDW の顧客キー対応表", kind: "table", tier: "implementation-setup", x: 1, y: 1.5, description: "ソース名とソース顧客キーの組を企業顧客キーに関連付ける。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+      example-keymap: {label: "EDW の顧客キー対応表", kind: "table", tier: "edw", x: 7, y: 4.3, description: "ソース名とソース顧客キーの組を企業顧客キーに関連付ける。", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
     links:
+      - {id: aws-task-launch, from: aws-ecs, to: aws-fargate, label: "Start task", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      - {id: aws-container-run, from: aws-fargate, to: aws-job, label: "Run loader", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      - {id: aws-secret-inject, from: aws-secret, to: aws-job, label: "Supply DB credential", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      - {id: aws-source-land, from: aws-source, to: example-orders, label: "Load source exports", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§6"}]}
+      - {id: aws-invoke, from: aws-schedule, to: aws-ecs, label: ECS RunTask を呼び出す}
+      - {id: aws-pull, from: aws-job, to: aws-ecr, label: 起動時にジョブイメージを取得}
+      - {id: aws-connect, from: aws-job, to: aws-rds, label: 処理用ロールで PostgreSQL に接続}
+      - {id: aws-integrate, from: aws-job, to: example-integrate, label: 統合 SQL を実行}
+      - {id: aws-refresh, from: aws-job, to: example-serve, label: EDW のコミット後に公開ビューを更新}
       - {id: "example-keymap-connection", from: "example-keymap", to: "example-integrate", label: "入力ごとの顧客 ID を統合", evidence: [{"type":"doc","ref":"docs/reference-dwh-inmon-cif.md#§6"}]}
+    layout2d:
+      tiers: [{id: diagram, label: CIF on AWS, z: 0, size: [34, 15]}]
+      nodes:
+        aws-source: {tier: diagram, x: 0, y: 2}
+        aws-schedule: {tier: diagram, x: 4, y: 1}
+        aws-ecs: {tier: diagram, x: 8, y: 1}
+        aws-fargate: {tier: diagram, x: 12, y: 1}
+        aws-job: {tier: diagram, x: 16, y: 1}
+        aws-secret: {tier: diagram, x: 20, y: 1}
+        aws-rds: {tier: diagram, x: 24, y: 1}
+        aws-ecr: {tier: diagram, x: 28, y: 1}
+        example-orders: {tier: diagram, x: 4, y: 5}
+        example-integrate: {tier: diagram, x: 8, y: 5}
+        example-core: {tier: diagram, x: 12, y: 5}
+        example-serve: {tier: diagram, x: 16, y: 5}
+        example-sales: {tier: diagram, x: 20, y: 5}
+        example-finance: {tier: diagram, x: 24, y: 5}
+        example-keymap: {tier: diagram, x: 28, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-schedule, aws-ecs, aws-fargate, aws-job, aws-secret, aws-rds, aws-ecr, example-orders, example-integrate, example-core, example-serve, example-sales, example-finance, example-keymap]}
+        - {kind: cluster, label: Fargate task, tier: diagram, nodes: [aws-fargate, aws-job]}
+        - {kind: cluster, label: RDS PostgreSQL database, tier: diagram, nodes: [aws-rds, example-orders, example-integrate, example-core, example-serve, example-sales, example-finance, example-keymap]}
+    layout3d:
+      tiers:
+        - {id: task, label: SQL loader, z: 1, size: [5, 3]}
+        - {id: host, label: Fargate task, z: 0, size: [5, 3]}
+        - {id: services, label: AWS services and PostgreSQL data, z: 0, origin: [8, 0], size: [28, 6]}
+        - {id: source, label: Upstream, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-source: {tier: source, x: 0, y: 1.5}
+        aws-schedule: {tier: services, x: 6, y: 1}
+        aws-ecs: {tier: services, x: 10, y: 1}
+        aws-fargate: {tier: host, x: 2, y: 1.5}
+        aws-job: {tier: task, x: 2, y: 1.5}
+        aws-secret: {tier: services, x: 22, y: 1}
+        aws-rds: {tier: services, x: 26, y: 1}
+        aws-ecr: {tier: services, x: 2, y: 4}
+        example-orders: {tier: services, x: 6, y: 4}
+        example-integrate: {tier: services, x: 10, y: 4}
+        example-core: {tier: services, x: 14, y: 4}
+        example-serve: {tier: services, x: 18, y: 4}
+        example-sales: {tier: services, x: 22, y: 4}
+        example-finance: {tier: services, x: 26, y: 4}
+        example-keymap: {tier: services, x: 2, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [task, host, services], nodes: [aws-schedule, aws-ecs, aws-fargate, aws-job, aws-secret, aws-rds, aws-ecr, example-orders, example-integrate, example-core, example-serve, example-sales, example-finance, example-keymap]}
+        - {kind: cluster, label: Fargate task, tier: [task, host], nodes: [aws-fargate, aws-job]}
+        - {kind: cluster, label: RDS PostgreSQL database, tier: services, nodes: [aws-rds, example-orders, example-integrate, example-core, example-serve, example-sales, example-finance, example-keymap]}

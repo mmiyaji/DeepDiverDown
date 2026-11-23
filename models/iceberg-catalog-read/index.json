@@ -2,8 +2,8 @@
   "model": "iceberg-catalog-read",
   "name": "Iceberg カタログ経由の読み取り：カタログからページまで",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "coordinator": {
@@ -134,28 +134,47 @@
       "type": "unknown",
       "label": "実際のカタログ実装、認証方式、資格情報の委任とサーバー側スキャン計画への対応は未確定。"
     },
-    "trino-rest-coord": {
+    "trino-rest-engine-host": {
       "type": "implementation",
       "impl": "trino-rest",
-      "label": "Trino Coordinator",
+      "label": "自前 Linux Trino ホスト群",
+      "realizes": []
+    },
+    "trino-rest-polaris-host": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "自前 Polaris ホスト",
+      "realizes": []
+    },
+    "trino-rest-postgres": {
+      "type": "implementation",
+      "impl": "trino-rest",
+      "label": "自前 PostgreSQL（Polaris JDBC）",
+      "realizes": []
+    },
+    "trino-rest-coord": {
+      "type": "implementation",
+      "impl": "eks-polaris-s3",
+      "label": "Trino Coordinator Pod",
       "realizes": [
         "coordinator"
       ]
     },
     "trino-rest-workers": {
       "type": "implementation",
-      "impl": "trino-rest",
-      "label": "Trino Workers",
+      "impl": "eks-polaris-s3",
+      "label": "Trino Worker Pods",
       "realizes": [
         "worker"
       ]
     },
     "trino-rest-rest": {
       "type": "implementation",
-      "impl": "trino-rest",
-      "label": "Polaris Iceberg REST API",
+      "impl": "eks-polaris-s3",
+      "label": "Polaris REST API Pod",
       "realizes": [
-        "rest"
+        "rest",
+        "creds"
       ]
     },
     "trino-rest-sts": {
@@ -168,16 +187,20 @@
     },
     "trino-rest-aws-sts": {
       "type": "implementation",
-      "impl": "trino-rest",
+      "impl": "eks-polaris-s3",
       "label": "AWS STS",
       "realizes": []
     },
     "trino-rest-meta": {
       "type": "implementation",
-      "impl": "trino-rest",
-      "label": "S3 の metadata.json",
+      "impl": "eks-polaris-s3",
+      "label": "S3 / Iceberg テーブルファイル",
       "realizes": [
-        "metajson"
+        "metajson",
+        "mlist",
+        "manifest",
+        "data",
+        "deletes"
       ]
     },
     "trino-rest-list": {
@@ -217,6 +240,24 @@
       "impl": "trino-rest",
       "label": "etc/catalog/iceberg.properties",
       "realizes": []
+    },
+    "trino-rest-eks": {
+      "type": "implementation",
+      "impl": "eks-polaris-s3",
+      "label": "Amazon EKS",
+      "realizes": []
+    },
+    "trino-rest-ec2": {
+      "type": "implementation",
+      "impl": "eks-polaris-s3",
+      "label": "EC2 / EKS ノード",
+      "realizes": []
+    },
+    "trino-rest-rds": {
+      "type": "implementation",
+      "impl": "eks-polaris-s3",
+      "label": "RDS for PostgreSQL",
+      "realizes": []
     }
   },
   "byRef": {
@@ -250,6 +291,9 @@
       "concurrent-commit",
       "CR-01",
       "CR-02",
+      "trino-rest-engine-host",
+      "trino-rest-polaris-host",
+      "trino-rest-postgres",
       "trino-rest-coord",
       "trino-rest-workers",
       "trino-rest-rest",
@@ -260,7 +304,10 @@
       "trino-rest-manifest",
       "trino-rest-parquet",
       "trino-rest-delete",
-      "trino-rest-config"
+      "trino-rest-config",
+      "trino-rest-eks",
+      "trino-rest-ec2",
+      "trino-rest-rds"
     ],
     "docs/reference-iceberg-catalog-read.md#§4": [
       "model"
@@ -299,6 +346,9 @@
       "catalog-to-page"
     ],
     "docs/reference-iceberg-catalog-read.md#§7": [
+      "trino-rest-engine-host",
+      "trino-rest-polaris-host",
+      "trino-rest-postgres",
       "trino-rest-coord",
       "trino-rest-workers",
       "trino-rest-rest",
@@ -310,6 +360,16 @@
       "trino-rest-parquet",
       "trino-rest-delete",
       "trino-rest-config"
+    ],
+    "docs/reference-iceberg-catalog-read.md#§8": [
+      "trino-rest-coord",
+      "trino-rest-workers",
+      "trino-rest-rest",
+      "trino-rest-aws-sts",
+      "trino-rest-meta",
+      "trino-rest-eks",
+      "trino-rest-ec2",
+      "trino-rest-rds"
     ]
   },
   "reference": {

@@ -2,8 +2,8 @@
   "model": "airbyte",
   "name": "Airbyte の基本アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "source": {
@@ -100,6 +100,20 @@
       "type": "unknown",
       "label": "具体的な実行間隔と内部サービス配置は確定していない。"
     },
+    "builder-postgres-host": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "自前 Linux Kubernetes ノード群",
+      "realizes": []
+    },
+    "builder-postgres-platform-db": {
+      "type": "implementation",
+      "impl": "builder-postgres",
+      "label": "Airbyte 設定・State 用 PostgreSQL",
+      "realizes": [
+        "state"
+      ]
+    },
     "builder-postgres-api": {
       "type": "implementation",
       "impl": "builder-postgres",
@@ -122,8 +136,7 @@
       "label": "Airbyte の Connection・同期ジョブ・状態",
       "realizes": [
         "connection",
-        "syncJob",
-        "state"
+        "syncJob"
       ]
     },
     "builder-postgres-adapter": {
@@ -147,6 +160,80 @@
       "impl": "builder-postgres",
       "label": "カスタム Source の宣言ファイル",
       "realizes": []
+    },
+    "aws-eks-airbyte-source": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "外部の受注 API",
+      "realizes": [
+        "source"
+      ]
+    },
+    "aws-eks-airbyte-eks": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "EKS Kubernetes API",
+      "realizes": []
+    },
+    "aws-eks-airbyte-ec2": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "EKS の EC2 ノード",
+      "realizes": []
+    },
+    "aws-eks-airbyte-server": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "Airbyte Server と接続設定",
+      "realizes": [
+        "connection"
+      ]
+    },
+    "aws-eks-airbyte-source-pod": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "Source Connector",
+      "realizes": [
+        "sourceConnector"
+      ]
+    },
+    "aws-eks-airbyte-worker": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "Airbyte 同期ワークロード",
+      "realizes": [
+        "syncJob"
+      ]
+    },
+    "aws-eks-airbyte-destination": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "Postgres Destination",
+      "realizes": [
+        "destinationConnector"
+      ]
+    },
+    "aws-eks-airbyte-metadata": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "Airbyte 用 RDS PostgreSQL",
+      "realizes": [
+        "state"
+      ]
+    },
+    "aws-eks-airbyte-s3": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "S3 ログ・ワークロード出力",
+      "realizes": []
+    },
+    "aws-eks-airbyte-warehouse": {
+      "type": "implementation",
+      "impl": "aws-eks-airbyte",
+      "label": "分析用 RDS PostgreSQL",
+      "realizes": [
+        "warehouse"
+      ]
     }
   },
   "byRef": {
@@ -177,12 +264,24 @@
       "failure-resume",
       "BR-01",
       "NFR-01",
+      "builder-postgres-host",
+      "builder-postgres-platform-db",
       "builder-postgres-api",
       "builder-postgres-builder",
       "builder-postgres-airbyte",
       "builder-postgres-adapter",
       "builder-postgres-db",
-      "builder-postgres-manifest"
+      "builder-postgres-manifest",
+      "aws-eks-airbyte-source",
+      "aws-eks-airbyte-eks",
+      "aws-eks-airbyte-ec2",
+      "aws-eks-airbyte-server",
+      "aws-eks-airbyte-source-pod",
+      "aws-eks-airbyte-worker",
+      "aws-eks-airbyte-destination",
+      "aws-eks-airbyte-metadata",
+      "aws-eks-airbyte-s3",
+      "aws-eks-airbyte-warehouse"
     ],
     "docs/reference-airbyte.md#§2": [
       "source",
@@ -217,12 +316,26 @@
       "NFR-01"
     ],
     "docs/reference-airbyte.md#§6": [
+      "builder-postgres-host",
+      "builder-postgres-platform-db",
       "builder-postgres-api",
       "builder-postgres-builder",
       "builder-postgres-airbyte",
       "builder-postgres-adapter",
       "builder-postgres-db",
       "builder-postgres-manifest"
+    ],
+    "docs/reference-airbyte.md#§7": [
+      "aws-eks-airbyte-source",
+      "aws-eks-airbyte-eks",
+      "aws-eks-airbyte-ec2",
+      "aws-eks-airbyte-server",
+      "aws-eks-airbyte-source-pod",
+      "aws-eks-airbyte-worker",
+      "aws-eks-airbyte-destination",
+      "aws-eks-airbyte-metadata",
+      "aws-eks-airbyte-s3",
+      "aws-eks-airbyte-warehouse"
     ]
   },
   "reference": {

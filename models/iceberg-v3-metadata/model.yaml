@@ -304,6 +304,8 @@ implementations:
         url: https://iceberg.apache.org/blog/variant-in-apache-iceberg/
       - title: Spark quickstart
         url: https://iceberg.apache.org/spark-quickstart/
+      - title: Apache Iceberg REST fixture
+        url: https://apache.googlesource.com/iceberg/+/refs/heads/main/docker/iceberg-rest-fixture/README.md
     tiers:
       - id: schema
         label: 表の定義と参照
@@ -324,6 +326,14 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host:
+        label: 自前 Linux の Docker ホスト
+        kind: host
+        tier: schema
+        x: 2
+        y: 0
+        description: REST fixture と MinIO を動かす試行用ホスト。v3 の生成・読み取りに対応するクライアントは別途必要。
+        evidence: [{type: doc, ref: docs/reference-iceberg-v3-metadata.md#§5}]
       ex-catalog:
         label: Iceberg REST Catalog
         kind: service
@@ -472,3 +482,129 @@ implementations:
             ref: docs/reference-iceberg-v3-metadata.md#§5
         realizes:
           - lineage
+      ex-catalog-store: {label: REST fixture の SQLite, kind: db, tier: schema, x: 0.7, y: 3, description: JdbcCatalog が試行用の表名とメタデータ位置をコンテナ内の SQLite に格納する。, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§5"}]}
+    links:
+      - {id: ex-host-catalog, from: ex-host, to: ex-catalog, label: REST fixture を実行}
+      - {id: ex-host-storage, from: ex-host, to: ex-data, label: MinIO のデータを提供}
+      - {id: ex-catalog-state, from: ex-catalog, to: ex-catalog-store, label: 表名とメタデータ位置を保存, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§5"}]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 19]}
+      nodes:
+        ex-host: {tier: diagram, x: 2, y: 2}
+        ex-catalog: {tier: diagram, x: 2, y: 5}
+        ex-catalog-store: {tier: diagram, x: 2, y: 8}
+        ex-reader: {tier: diagram, x: 2, y: 11}
+        ex-metadata: {tier: diagram, x: 8, y: 2}
+        ex-schema: {tier: diagram, x: 8, y: 5}
+        ex-snapshot: {tier: diagram, x: 8, y: 8}
+        ex-list: {tier: diagram, x: 8, y: 11}
+        ex-data-manifest: {tier: diagram, x: 14, y: 2}
+        ex-data: {tier: diagram, x: 14, y: 5}
+        ex-dictionary: {tier: diagram, x: 14, y: 8}
+        ex-delete-manifest: {tier: diagram, x: 20, y: 2}
+        ex-dv: {tier: diagram, x: 20, y: 5}
+        ex-lineage: {tier: diagram, x: 20, y: 8}
+      groups:
+        - {kind: nodegroup, label: "Docker ホストと REST", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 15, nodes: [ex-host, ex-catalog, ex-catalog-store, ex-reader]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Docker ホストと REST", z: 0, origin: [0, 0], size: [5, 12]}
+        - {id: zone1, label: "MinIO 表メタデータ", z: 0, origin: [7, 0], size: [5, 12]}
+        - {id: zone2, label: "MinIO データ", z: 0, origin: [14, 0], size: [5, 9]}
+        - {id: zone3, label: "MinIO 削除と行系譜", z: 0, origin: [21, 0], size: [5, 9]}
+      nodes:
+        ex-host: {tier: zone0, x: 2, y: 1}
+        ex-catalog: {tier: zone0, x: 2, y: 4}
+        ex-catalog-store: {tier: zone0, x: 2, y: 7}
+        ex-reader: {tier: zone0, x: 2, y: 10}
+        ex-metadata: {tier: zone1, x: 2, y: 1}
+        ex-schema: {tier: zone1, x: 2, y: 4}
+        ex-snapshot: {tier: zone1, x: 2, y: 7}
+        ex-list: {tier: zone1, x: 2, y: 10}
+        ex-data-manifest: {tier: zone2, x: 2, y: 1}
+        ex-data: {tier: zone2, x: 2, y: 4}
+        ex-dictionary: {tier: zone2, x: 2, y: 7}
+        ex-delete-manifest: {tier: zone3, x: 2, y: 1}
+        ex-dv: {tier: zone3, x: 2, y: 4}
+        ex-lineage: {tier: zone3, x: 2, y: 7}
+      groups:
+        - {kind: nodegroup, label: "Docker ホストと REST", tier: [zone0], nodes: [ex-host, ex-catalog, ex-catalog-store, ex-reader]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Spark 4.1・Iceberg v3"
+    description: "EMR Spark 8.1.0 の Spark 4.1.1 / Iceberg 1.11.0 で、Glue Data Catalog と S3 に置いた Iceberg v3 テーブルの Variant・行の系譜・削除ベクトルを読む例。"
+    sources:
+      - {title: "Amazon EMR Spark 8.1.0", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark810-release.html}
+      - {title: "Iceberg v3 compatibility", url: https://docs.aws.amazon.com/prescriptive-guidance/latest/apache-iceberg-on-aws/table-spec-v3.html}
+      - {title: "EMR Spark Glue Catalog", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-iceberg-use-spark-cluster.html}
+      - {title: "Iceberg specification", url: https://iceberg.apache.org/spec/}
+    tiers:
+      - {id: management, label: クラスタ管理とテーブル登録, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルの永続ストレージ, z: 0, size: [20, 4]}
+      - {id: files, label: データ・削除ファイル, z: -1, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage, files], nodes: [aws-emr-control, aws-emr-host, aws-emr-glue, aws-emr-spark, aws-emr-meta, aws-emr-list, aws-emr-data-manifest, aws-emr-delete-manifest, aws-emr-s3, aws-emr-variant, aws-emr-lineage, aws-emr-dv]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-emr-host, aws-emr-spark]}
+    nodes:
+      aws-emr-control: {label: "Amazon EMR", svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: "EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。", management: {type: shared, scope: "AWS が EMR サービス基盤を運用し、利用者がクラスターとジョブを設定する。"}, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-host: {label: "Amazon EC2 / YARN", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "EMR の EC2 ノードで YARN がアプリケーションの実行リソースを割り当てる。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノード構成とジョブを管理する。"}, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-glue: {label: "AWS Glue Data Catalog", svc: glue, kind: catalog, tier: management, x: 11, y: 1.5, realizes: [catalog], drill: iceberg-catalog-read, description: "GlueCatalog が表名から現行 metadata.json の場所を解決する。", management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-spark: {label: "Spark 4.1.1 / Iceberg 1.11.0", kind: worker, tier: compute, x: 8, y: 1.5, realizes: [reader], description: "Driver が対象 Snapshot を選んで計画し、Executor が DV を適用して Parquet を読む。", management: {type: customer, scope: "利用者が Spark ジョブと設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-meta: {label: "metadata.json / Schema・Snapshot", kind: file, tier: storage, x: 3, y: 1.5, realizes: [metadata, schema, snapshot], description: "S3 上に v3 の表定義・列 ID・スナップショット情報を保持する。", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-list: {label: "Manifest List", kind: file, tier: storage, x: 8, y: 1.5, realizes: [list], description: "選択したスナップショットの Manifest を列挙する。", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-data-manifest: {label: "Data Manifest", kind: file, tier: storage, x: 12, y: 1.5, realizes: [data-manifest], description: "S3 上の Parquet ファイル位置・パーティション・統計を記録する。", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-delete-manifest: {label: "Delete Manifest", kind: file, tier: storage, x: 17, y: 1.5, realizes: [delete-manifest], description: "参照するデータファイルごとに Puffin の DV の位置を記録する。", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-s3: {label: "Amazon S3 / Parquet", svc: s3, kind: db, tier: files, x: 6, y: 1.5, realizes: [data], description: "Iceberg のメタデータ・データを保持する共用バケット。データ本体は Parquet。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-variant: {label: "Parquet の Variant metadata", kind: file, tier: files, x: 11, y: 1.5, realizes: [dictionary], drill: iceberg-v3-variant, description: "Variant 値内の名前辞書。", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-lineage: {label: "行 ID / 最終更新シーケンス", kind: file, tier: files, x: 2, y: 1.5, realizes: [lineage], description: "行の系譜はファイル内の値やメタデータから継承する値で決まる。", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      aws-emr-dv: {label: "Puffin / Deletion Vector", kind: file, tier: files, x: 17, y: 1.5, realizes: [dv], description: "テーブル上で削除と扱う行位置を Puffin 内のビットマップで示す。", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+    links:
+      - {id: aws-emr-host-job, from: aws-emr-host, to: aws-emr-spark, label: Spark Driver と Executor を実行}
+      - {id: aws-emr-provision, from: aws-emr-control, to: aws-emr-host, label: "クラスタを作成・管理", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      - {id: aws-emr-submit, from: aws-emr-control, to: aws-emr-spark, label: "Iceberg を使う Spark step を実行", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+      - {id: aws-emr-lookup, from: aws-emr-spark, to: aws-emr-glue, label: "GlueCatalog で表の位置を取得", evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§6"}]}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [30, 19]}
+      nodes:
+        aws-emr-control: {tier: diagram, x: 2, y: 2}
+        aws-emr-glue: {tier: diagram, x: 2, y: 5}
+        aws-emr-host: {tier: diagram, x: 8, y: 2}
+        aws-emr-spark: {tier: diagram, x: 8, y: 5}
+        aws-emr-meta: {tier: diagram, x: 14, y: 2}
+        aws-emr-list: {tier: diagram, x: 14, y: 5}
+        aws-emr-data-manifest: {tier: diagram, x: 14, y: 8}
+        aws-emr-delete-manifest: {tier: diagram, x: 14, y: 11}
+        aws-emr-s3: {tier: diagram, x: 20, y: 2}
+        aws-emr-variant: {tier: diagram, x: 20, y: 5}
+        aws-emr-lineage: {tier: diagram, x: 20, y: 8}
+        aws-emr-dv: {tier: diagram, x: 20, y: 11}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-emr-control, aws-emr-glue, aws-emr-host, aws-emr-spark, aws-emr-meta, aws-emr-list, aws-emr-data-manifest, aws-emr-delete-manifest, aws-emr-s3, aws-emr-variant, aws-emr-lineage, aws-emr-dv]}
+        - {kind: vpc, provider: aws, label: 実行ノードの利用者 VPC, tier: [diagram], nodes: [aws-emr-host, aws-emr-spark]}
+        - {kind: cluster, label: "EMR 実行ノード", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 9, nodes: [aws-emr-host, aws-emr-spark]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "EMR と Glue", z: 0, origin: [0, 0], size: [5, 6]}
+        - {id: zone1, label: "EMR 実行ノード", z: 0, origin: [7, 0], size: [5, 6]}
+        - {id: zone2, label: "S3 メタデータ", z: 0, origin: [14, 0], size: [5, 12]}
+        - {id: zone3, label: "S3 データ", z: 0, origin: [21, 0], size: [5, 12]}
+      nodes:
+        aws-emr-control: {tier: zone0, x: 2, y: 1}
+        aws-emr-glue: {tier: zone0, x: 2, y: 4}
+        aws-emr-host: {tier: zone1, x: 2, y: 1}
+        aws-emr-spark: {tier: zone1, x: 2, y: 4}
+        aws-emr-meta: {tier: zone2, x: 2, y: 1}
+        aws-emr-list: {tier: zone2, x: 2, y: 4}
+        aws-emr-data-manifest: {tier: zone2, x: 2, y: 7}
+        aws-emr-delete-manifest: {tier: zone2, x: 2, y: 10}
+        aws-emr-s3: {tier: zone3, x: 2, y: 1}
+        aws-emr-variant: {tier: zone3, x: 2, y: 4}
+        aws-emr-lineage: {tier: zone3, x: 2, y: 7}
+        aws-emr-dv: {tier: zone3, x: 2, y: 10}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [aws-emr-control, aws-emr-glue, aws-emr-host, aws-emr-spark, aws-emr-meta, aws-emr-list, aws-emr-data-manifest, aws-emr-delete-manifest, aws-emr-s3, aws-emr-variant, aws-emr-lineage, aws-emr-dv]}
+        - {kind: vpc, provider: aws, label: 実行ノードの利用者 VPC, tier: [zone0, zone1, zone2, zone3], nodes: [aws-emr-host, aws-emr-spark]}
+        - {kind: cluster, label: "EMR 実行ノード", tier: [zone1], nodes: [aws-emr-host, aws-emr-spark]}

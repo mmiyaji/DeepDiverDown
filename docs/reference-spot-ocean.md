@@ -14,9 +14,19 @@ Spot Ocean の外部サービスと、AWS アカウントの EKS クラスタ内
 
 | 機能 | 担い手 |
 |---|---|
-| クラスタの観測と drain | EKS 内の Ocean Controller |
+| クラスタの観測と drain | 顧客 VPC の EKS 内に配備した Ocean Controller v2 |
 | 容量の判断と VNG 設定 | 外部の Spot Ocean サービス |
 | 実行・再配置 | EKS と EC2 ワーカーノード上の Pod |
 | 容量の起動 | AWS EC2 と Ocean の連携 |
+| ワーカーノードのルートディスク | VNG の起動設定に従って EC2 に割り当てる Amazon EBS |
 
-[Spot Ocean Kubernetes ガイド](https://spot.io/wp-content/uploads/2024/09/Guide_Automating_Kubernetes_infrastructure.pdf)、[AWS の VNG ワークショップ](https://labs.spot.io/ocean/ocean_workshop/vng_workshop/vng_workshop_instructions.html)、[Headroom](https://labs.spot.io/ocean/ocean_workshop/headroom/headroom_overview.html)、[EKS ノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)。
+Ocean SaaS は連携した AWS アカウントの IAM ロールを使って EC2 容量を取得する。VNG で候補の機種、サブネット、ラベル、必要に応じてルートボリュームのブロックデバイス設定を管理する。Pod の割り当ては AWS 管理の EKS コントロールプレーン、コンテナの実行は顧客 VPC の EC2 ワーカー上で行う。ルートボリュームはノードの OS と作業領域に使い、置換後に必要なアプリデータは別の永続ストレージに保存する。
+
+EKS コントロールプレーンは AWS 管理 VPC にあり、顧客アカウント内の VPC にはワーカーノードがある。利用者は Kubernetes API やクラスタ設定を操作できるが、AWS 管理の制御プレーンサーバーに直接アクセスしない。利用者は Ocean の設定と連携ロール、Controller の配備と権限、ノードやアプリの設定を管理する。図の AWS サービス領域は論理的な提供元を示し、制御プレーンが顧客 VPC 内にあるという意味ではない。この図は複数の公式資料を組み合わせた代表構成で、実環境での動作は未検証。
+
+- [Spot Ocean Controller v2](https://docs.flexera.com/spot/ocean/tutorials/spot-kubernetes-controller/ocean-controller-two-intro)
+- [Spot と AWS アカウントの IAM 接続](https://docs.flexera.com/spot/connect-your-cloud-provider/first-account/aws-manually)
+- [VNG とルートボリューム設定](https://docs.flexera.com/spot/ocean/features/vngs/attributes-and-actions-per-vng)
+- [Amazon EKS の管理 VPC と顧客 VPC](https://docs.aws.amazon.com/eks/latest/best-practices/subnets.html)
+
+[Spot Ocean Kubernetes ガイド](https://spot.io/wp-content/uploads/2024/09/Guide_Automating_Kubernetes_infrastructure.pdf)、[AWS の VNG ワークショップ](https://labs.spot.io/ocean/ocean_workshop/vng_workshop/vng_workshop_instructions.html)、[Headroom](https://labs.spot.io/ocean/ocean_workshop/headroom/headroom_overview.html)。

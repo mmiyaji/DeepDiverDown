@@ -167,6 +167,7 @@ implementations:
           - 16
           - 3
     nodes:
+      ex-host: {label: HydraDB 実行ホスト, kind: host, tier: support, x: 1, y: 2, description: 利用者が graph-node と graph-indexer を実行する。, evidence: [{type: doc, ref: docs/reference-hydradb.md#§4}]}
       ex-client:
         label: Bolt / HTTPS クライアント
         kind: actor
@@ -222,3 +223,101 @@ implementations:
             ref: docs/reference-hydradb.md#§4
         realizes:
           - indices
+    links:
+      - {id: ex-host-query, from: ex-host, to: ex-query, label: graph-node を実行, evidence: [{type: doc, ref: docs/reference-hydradb.md#§4}]}
+      - {id: ex-host-index, from: ex-host, to: ex-index, label: graph-indexer を実行, evidence: [{type: doc, ref: docs/reference-hydradb.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-query: {tier: diagram, x: 4, y: 1}
+        ex-index: {tier: diagram, x: 7, y: 1}
+        ex-storage: {tier: diagram, x: 14, y: 1}
+        ex-indices: {tier: diagram, x: 17, y: 1}
+        ex-client: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: datacenter, label: HydraDB 実行ホスト, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 10, nodes: [ex-host, ex-query, ex-index]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ノード, z: 0, size: [10, 10]}
+        - {id: apps, label: ノード上の処理, z: 1, size: [10, 10]}
+        - {id: storage, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-query: {tier: apps, x: 4, y: 1}
+        ex-index: {tier: apps, x: 7, y: 1}
+        ex-storage: {tier: storage, x: 1, y: 1}
+        ex-indices: {tier: storage, x: 4, y: 1}
+        ex-client: {tier: outside, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: HydraDB 実行ホスト, tier: [host, apps], nodes: [ex-host, ex-query, ex-index]}
+
+  - id: aws-eks-s3
+    label: "AWS：EKS・HydraDB Helm・S3"
+    description: "公開 Helm チャートの AWS IRSA 対応に沿い、EKS 上の graph-node と graph-indexer が Amazon S3 を共有する構成例。"
+    sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+      - {title: "HydraDB Helm chart and AWS networking", url: https://github.com/hydra-db/hydradb/blob/main/charts/hydradb/README.md}
+      - {title: "HydraDB architecture", url: https://github.com/hydra-db/hydradb/blob/main/architecture.md}
+      - {title: "HydraDB AGPL-3.0 license", url: https://github.com/hydra-db/hydradb/blob/main/LICENSE}
+      - {title: "Amazon EKS managed node groups", url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+      - {title: "IAM roles for service accounts", url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html}
+    tiers:
+      - {id: access, label: "外部クライアントと基盤管理", z: 2, size: [20, 4]}
+      - {id: compute, label: "Kubernetes 上のグラフ処理", z: 1, size: [20, 4]}
+      - {id: storage, label: "共有の永続ストレージ", z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: "AWS サービス領域（EKS 制御プレーンは AWS 管理 VPC）", provider: aws, tier: [access, compute, storage], nodes: [aws-hydradb-eks, aws-hydradb-ec2, aws-hydradb-query, aws-hydradb-indexer, aws-hydradb-s3, aws-hydradb-indices, aws-hydradb-sts]}
+      - {kind: cluster, label: "EKS クラスタ", tier: [compute], nodes: [aws-hydradb-ec2, aws-hydradb-query, aws-hydradb-indexer]}
+    nodes:
+      aws-hydradb-client: {label: "Bolt / HTTPS クライアント", kind: client, tier: access, x: 3, y: 1.5, realizes: [client], description: "到達可能な HydraDB のクライアント用エンドポイントに接続する。", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      aws-hydradb-eks: {label: "Amazon EKS", svc: eks, kind: service, tier: access, x: 10, y: 1.5, description: "AWS 管理 VPC の制御プレーン。利用者は API と公開設定を操作するが、サーバーへ直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と設定を操作する。}, evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      aws-hydradb-sts: {label: "AWS STS", svc: sts, kind: service, tier: access, x: 16, y: 1.5, description: "サービスアカウントに関連づけた IAM ロールの短期資格情報を発行する。", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      aws-hydradb-query: {label: "HydraDB graph-node", kind: service, tier: compute, x: 4, y: 1.5, realizes: [query], description: "Bolt / HTTPS の問い合わせと更新を受け、キャッシュを元にクエリを処理する。", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      aws-hydradb-indexer: {label: "HydraDB graph-indexer", kind: worker, tier: compute, x: 10, y: 1.5, realizes: [index], description: "永続状態を読み、探索用の不変 CSC インデックスを構築する。", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      aws-hydradb-ec2: {label: "Amazon EC2 / ノードグループ", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "graph-node と graph-indexer の Pod を実行する。", management: {type: shared, scope: EKS がノード作成・更新を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      aws-hydradb-s3: {label: "Amazon S3 / SlateDB", svc: s3, kind: db, tier: storage, x: 4, y: 1.5, realizes: [storage], description: "グラフの正本である SlateDB の WAL、マニフェストと SST を保持する。", management: {type: shared, scope: AWS が基盤を運用し、利用者がデータとアクセスを管理する。}, evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      aws-hydradb-indices: {label: "公開済み CSC インデックス", kind: file, tier: storage, x: 11, y: 1.5, realizes: [indices], description: "同じ S3 バケットに公開した探索用インデックス世代。", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+    links:
+      - {id: aws-hydradb-deploy, from: aws-hydradb-eks, to: aws-hydradb-ec2, label: "EC2 ノードグループを管理", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      - {id: aws-hydradb-run-query, from: aws-hydradb-eks, to: aws-hydradb-query, label: "Helm の問い合わせ Pod を配置", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      - {id: aws-hydradb-run-indexer, from: aws-hydradb-eks, to: aws-hydradb-indexer, label: "Helm のインデクサー Pod を配置", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      - {id: aws-hydradb-creds-node, from: aws-hydradb-query, to: aws-hydradb-sts, label: "S3 接続用の資格情報を取得", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      - {id: aws-hydradb-creds-index, from: aws-hydradb-indexer, to: aws-hydradb-sts, label: "S3 接続用の資格情報を取得", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      - {id: aws-hydradb-open, from: aws-hydradb-indexer, to: aws-hydradb-s3, label: "SlateDB の確定状態を読む", realizes: [read], replace: true, evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      - {id: aws-hydradb-publish, from: aws-hydradb-indexer, to: aws-hydradb-indices, label: "CSC 世代を書き込み、現在の世代を更新", realizes: [build, publish], replace: true, evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+      - {id: aws-hydradb-hydrate, from: aws-hydradb-query, to: aws-hydradb-indices, label: "現在のインデックス世代を取得", evidence: [{type: doc, ref: "docs/reference-hydradb.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        aws-hydradb-eks: {tier: diagram, x: 1, y: 1}
+        aws-hydradb-ec2: {tier: diagram, x: 4, y: 1}
+        aws-hydradb-query: {tier: diagram, x: 7, y: 1}
+        aws-hydradb-indexer: {tier: diagram, x: 1, y: 4}
+        aws-hydradb-s3: {tier: diagram, x: 14, y: 1}
+        aws-hydradb-indices: {tier: diagram, x: 17, y: 1}
+        aws-hydradb-sts: {tier: diagram, x: 20, y: 1}
+        aws-hydradb-client: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: -1.5, y0: 0, x1: 23, y1: 11, nodes: [aws-hydradb-eks, aws-hydradb-ec2, aws-hydradb-query, aws-hydradb-indexer, aws-hydradb-s3, aws-hydradb-indices, aws-hydradb-sts]}
+        - {kind: cluster, label: EKS 論理クラスタ, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 10, nodes: [aws-hydradb-eks, aws-hydradb-ec2, aws-hydradb-query, aws-hydradb-indexer]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ノード, z: 0, size: [10, 10]}
+        - {id: apps, label: ノード上の処理, z: 1, size: [10, 10]}
+        - {id: storage, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        aws-hydradb-eks: {tier: storage, x: 1, y: 1}
+        aws-hydradb-ec2: {tier: host, x: 4, y: 1}
+        aws-hydradb-query: {tier: apps, x: 7, y: 1}
+        aws-hydradb-indexer: {tier: apps, x: 1, y: 4}
+        aws-hydradb-s3: {tier: storage, x: 1, y: 1}
+        aws-hydradb-indices: {tier: storage, x: 4, y: 1}
+        aws-hydradb-sts: {tier: storage, x: 7, y: 1}
+        aws-hydradb-client: {tier: outside, x: 1, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [host, apps, storage], nodes: [aws-hydradb-eks, aws-hydradb-ec2, aws-hydradb-query, aws-hydradb-indexer, aws-hydradb-s3, aws-hydradb-indices, aws-hydradb-sts]}

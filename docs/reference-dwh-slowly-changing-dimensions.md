@@ -39,7 +39,20 @@
 | 遅れて届いた注文明細 | landing.order_line_updates | 注文明細の注文日と顧客業務キーを保持する。 |
 | 明細ファクト | fact_order_line | 注文発生時刻の有効期間を照合し、該当する顧客の代理キーを外部キーに持つ。 |
 | 地域別売上 | 地域別売上 SQL ビュー | 現在地区の見方と注文時点の地区の見方を別々に用意する。 |
+| ローダーの起動と実行 | Amazon EventBridge Scheduler、Amazon ECS on AWS Fargate、Amazon ECR | 定期起動したタスクが ECR のイメージを使って RDS のローダーを呼び出す。 |
 
 区間は開始を含み終了を含まない形で統一する。後着の顧客履歴が過去を変更する場合は、その有効期間に入るファクトの参照キーも再確認する。
 
+Amazon RDS for PostgreSQL 16 に入力表、顧客表、明細ファクト、集計ビューを置く。Amazon EventBridge Scheduler が Amazon ECS の Fargate タスクを定期起動し、タスクが同じ VPC の RDS に TLS で接続してローダーを実行する。タスクは履歴更新と明細反映を実行する権限を持つ専用の DB ロールを使う。
+
+顧客変更イベントには一意の取り込み ID を持たせ、顧客単位で更新を直列化する。Type 2 の旧行を閉じて新行を追加する操作は同じトランザクションで行う。この例では `btree_gist` と範囲型を使い、顧客キーが同じ場合の有効期間の重複を排他制約で防ぐ。遅れて届いた明細は注文発生時刻で履歴を引き、該当する履歴が未到着の場合は再処理できる状態で残す。
+
+- [RDS for PostgreSQL への接続](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ConnectToPostgreSQLInstance.html)
+- [EventBridge Scheduler で ECS タスクを実行](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/tasks-scheduled-eventbridge-scheduler.html)
+- [ECS の Fargate タスク定義と ECR からのイメージ取得](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html)
+- [PostgreSQL 16 の範囲型と排他制約](https://www.postgresql.org/docs/16/rangetypes.html)
+- [RDS for PostgreSQL の拡張機能](https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-extensions.html)
+
 出典 [Kimball Group の Slowly Changing Dimension 技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[Power BI の SCD ガイダンス](https://learn.microsoft.com/en-us/power-bi/guidance/star-schema)、[PostgreSQL CREATE TABLE](https://www.postgresql.org/docs/current/sql-createtable.html)
+
+Scheduler が ECS RunTask を呼び、Fargate 上のローダーが Secrets Manager から渡された DB 資格情報で RDS に接続する。上流から入力表へのロード方式は特定していない。AWS はサービス基盤を運用し、利用者はタスク、SQL、データ、資格情報とアクセス権を設定する。Fargate や RDS の内部ホストは直接操作しない。公式資料を組み合わせた例で、SQL とバージョン・認証の実動作は未検証。[Secrets Manager と ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/secrets-envvar-secrets-manager.html)、[AWS shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

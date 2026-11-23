@@ -29,7 +29,7 @@ test('invalid or partial 3D layout safely falls back to original view',()=>{
 test('management labels distinguish AWS-operated services from application operations',()=>{
  for(const [id,prefix] of [['aws-eks-spark','eks'],['aws-emr-ec2','emr']]){
   const i=m.implementations.find(x=>x.id===id);
-  for(const name of ['msk','output','checkpoint'])assert.equal(i.nodes[`${prefix}-${name}`].management.type,'aws');
+  for(const name of ['msk','output','checkpoint'])assert.equal(i.nodes[`${prefix}-${name}`].management.type,'shared');
   for(const name of ['driver','executor'])assert.equal(i.nodes[`${prefix}-${name}`].management.type,'customer');
   assert.ok(Object.values(i.nodes).every(n=>n.management?.scope));
  }

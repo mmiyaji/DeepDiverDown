@@ -166,6 +166,10 @@ implementations:
     sources:
       - title: Spark Streaming Programming Guide
         url: https://spark.apache.org/docs/latest/streaming-programming-guide.html
+      - title: Spark Standalone Mode
+        url: https://spark.apache.org/docs/latest/spark-standalone.html
+      - title: HDFS Architecture
+        url: https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html
     tiers:
       - id: processing
         label: データの処理と保存
@@ -180,6 +184,30 @@ implementations:
           - 14
           - 3
     nodes:
+      dstream-files-master:
+        label: Spark Standalone Master
+        kind: service
+        tier: processing
+        x: 1
+        y: 0
+        description: Worker を登録し Executor の資源を割り当てる。
+        evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]
+      dstream-files-host:
+        label: 自前 Linux Worker ホスト群
+        kind: host
+        tier: processing
+        x: 5
+        y: 0
+        description: Worker と cluster モードの Driver・Executor JVM を稼働する。
+        evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]
+      dstream-files-hdfs-host:
+        label: 自前 HDFS クラスター
+        kind: host
+        tier: processing
+        x: 9
+        y: 0
+        description: NameNode と DataNode を運用し入出力と復旧用パスを提供する。
+        evidence: [{type: doc, ref: docs/reference-spark-streaming.md#§8}]
       dstream-files-input:
         label: HDFS 入力ディレクトリー
         kind: db
@@ -241,10 +269,47 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§8
     links:
+      - {id: dstream-files-master-worker, from: dstream-files-master, to: dstream-files-host, label: Worker の資源を割り当て}
+      - {id: dstream-files-host-driver, from: dstream-files-host, to: dstream-files-driver, label: Driver を実行}
+      - {id: dstream-files-host-executor, from: dstream-files-host, to: dstream-files-executors, label: Executor を実行}
+      - {id: dstream-files-hdfs-input, from: dstream-files-hdfs-host, to: dstream-files-input, label: 入力パスを提供}
+      - {id: dstream-files-hdfs-output, from: dstream-files-hdfs-host, to: dstream-files-hdfs, label: 出力と復旧パスを提供}
       - id: dstream-files-batch-connection
         from: dstream-files-batch
         to: dstream-files-driver
         label: 処理間隔を設定
+    layout2d:
+      tiers:
+        - {id: diagram, label: 自前運用の DStreams 構成, z: 0, size: [23, 12]}
+      nodes:
+        dstream-files-master: {tier: diagram, x: 7, y: 2}
+        dstream-files-host: {tier: diagram, x: 12, y: 2}
+        dstream-files-driver: {tier: diagram, x: 7, y: 6}
+        dstream-files-executors: {tier: diagram, x: 12, y: 6}
+        dstream-files-batch: {tier: diagram, x: 7, y: 10}
+        dstream-files-hdfs-host: {tier: diagram, x: 19, y: 2}
+        dstream-files-input: {tier: diagram, x: 17, y: 6}
+        dstream-files-hdfs: {tier: diagram, x: 21, y: 6}
+      groups:
+        - {kind: cluster, label: Spark Standalone クラスター, tier: [diagram], x0: 4.5, y0: -0.5, x1: 14.5, y1: 11.6, nodes: [dstream-files-master, dstream-files-host, dstream-files-driver, dstream-files-executors, dstream-files-batch]}
+        - {kind: cluster, label: HDFS クラスター, tier: [diagram], x0: 14.5, y0: -0.5, x1: 23.5, y1: 8.5, nodes: [dstream-files-hdfs-host, dstream-files-input, dstream-files-hdfs]}
+    layout3d:
+      tiers:
+        - {id: hosts, label: 自前 Linux ホスト, z: 0, size: [12, 5]}
+        - {id: apps, label: Spark の JVM, z: 1, size: [12, 5]}
+        - {id: hdfs, label: HDFS, z: 0, origin: [16, 0], size: [11, 5]}
+      nodes:
+        dstream-files-master: {tier: hosts, x: 2, y: 2}
+        dstream-files-host: {tier: hosts, x: 7, y: 2}
+        dstream-files-driver: {tier: apps, x: 2, y: 2}
+        dstream-files-executors: {tier: apps, x: 7, y: 2}
+        dstream-files-batch: {tier: apps, x: 11, y: 2}
+        dstream-files-hdfs-host: {tier: hdfs, x: 1, y: 2}
+        dstream-files-input: {tier: hdfs, x: 5, y: 2}
+        dstream-files-hdfs: {tier: hdfs, x: 9, y: 2}
+      groups:
+        - {kind: cluster, label: Spark Standalone クラスター, tier: [hosts, apps], nodes: [dstream-files-master, dstream-files-host, dstream-files-driver, dstream-files-executors, dstream-files-batch]}
+        - {kind: cluster, label: HDFS クラスター, tier: [hdfs], nodes: [dstream-files-hdfs-host, dstream-files-input, dstream-files-hdfs]}
   - id: aws-emr-ec2
     label: AWS：EMR on EC2 / YARN
     description: Amazon MSK の Kafka を DStreams の Direct API で読み、Amazon EMR の EC2 クラスタ上で集計し、S3 に出力とチェックポイントを保存する構成例。
@@ -319,7 +384,7 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§9
         management:
-          type: aws
+          type: shared
           scope: AWS が MSK のブローカー基盤を管理する。クラスター設定、アクセスとデータは利用者が管理する。
       emr-service:
         label: Amazon EMR
@@ -394,7 +459,7 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§9
         management:
-          type: aws
+          type: shared
           scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
       emr-checkpoint:
         label: S3 / チェックポイント
@@ -410,7 +475,7 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§9
         management:
-          type: aws
+          type: shared
           scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
     links:
       - id: emr-read
@@ -496,6 +561,7 @@ implementations:
             - emr-msk
             - emr-checkpoint
             - emr-output
+        - {kind: vpc, label: 利用者 VPC（ノードと MSK）, provider: aws, tier: [workloads, platform, services], nodes: [emr-driver, emr-executor, emr-ec2, emr-msk]}
         - kind: cluster
           label: EMR クラスタ
           tier:
@@ -528,8 +594,8 @@ implementations:
           'y': 5
         emr-msk:
           tier: diagram
-          x: 13
-          'y': 4
+          x: 10
+          'y': 5
         emr-checkpoint:
           tier: diagram
           x: 13
@@ -560,6 +626,7 @@ implementations:
             - emr-checkpoint
             - emr-output
             - emr-service
+        - {kind: vpc, label: 利用者 VPC（ノードと MSK）, provider: aws, tier: [diagram], x0: 0, y0: 3, x1: 11.5, y1: 10, nodes: [emr-driver, emr-executor, emr-ec2, emr-msk]}
         - kind: cluster
           label: EMR クラスタ
           tier:
@@ -576,7 +643,7 @@ implementations:
           label: EC2 / YARN
           tier:
             - diagram
-          x0: 0.8
+          x0: 0.1
           y0: 3.5
           x1: 7.5
           y1: 9.6
@@ -658,7 +725,7 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§10
         management:
-          type: aws
+          type: shared
           scope: AWS が MSK のブローカー基盤を管理する。クラスター設定、アクセスとデータは利用者が管理する。
       eks-control:
         label: Amazon EKS / Kubernetes API
@@ -672,8 +739,8 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§10
         management:
-          type: aws
-          scope: AWS が EKS の Kubernetes 制御プレーンを管理する。クラスター設定とアクセス権は利用者が管理する。
+          type: shared
+          scope: AWS が EKS 制御プレーンサーバーを運用する。利用者は Kubernetes API とクラスター設定・アクセス権を操作できるが、サーバーには直接アクセスしない。
       eks-driver:
         label: Spark Driver Pod
         kind: worker
@@ -733,7 +800,7 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§10
         management:
-          type: aws
+          type: shared
           scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
       eks-checkpoint:
         label: S3 / チェックポイント
@@ -749,7 +816,7 @@ implementations:
           - type: doc
             ref: docs/reference-spark-streaming.md#§10
         management:
-          type: aws
+          type: shared
           scope: AWS が S3 のストレージサービスを運用する。バケット設定、アクセス権と格納データは利用者が管理する。
     links:
       - id: eks-read
@@ -835,6 +902,7 @@ implementations:
             - eks-msk
             - eks-checkpoint
             - eks-output
+        - {kind: vpc, label: 利用者 VPC（ノードと MSK）, provider: aws, tier: [workloads, platform, services], nodes: [eks-driver, eks-executor, eks-ec2, eks-msk]}
         - kind: cluster
           label: EKS クラスタ
           tier:
@@ -867,8 +935,8 @@ implementations:
           'y': 5
         eks-msk:
           tier: diagram
-          x: 13
-          'y': 2
+          x: 10
+          'y': 5
         eks-checkpoint:
           tier: diagram
           x: 13
@@ -899,6 +967,7 @@ implementations:
             - eks-checkpoint
             - eks-output
             - eks-control
+        - {kind: vpc, label: 利用者 VPC（ノードと MSK）, provider: aws, tier: [diagram], x0: 0, y0: 3, x1: 11.5, y1: 10, nodes: [eks-driver, eks-executor, eks-ec2, eks-msk]}
         - kind: cluster
           label: EKS クラスタ
           tier:
@@ -916,7 +985,7 @@ implementations:
           label: EC2 ノードグループ
           tier:
             - diagram
-          x0: 0.8
+          x0: 0.1
           y0: 3.5
           x1: 7.5
           y1: 9.6

@@ -179,6 +179,10 @@ implementations:
       - title: Understand Files
         url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/
     nodes:
+      flink-paimon-host: {label: "Local machine", kind: host, tier: processing, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      flink-paimon-jobmanager: {label: "Flink JobManager", kind: scheduler, tier: processing, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      flink-paimon-taskmanager: {label: "Flink TaskManager", kind: host, tier: processing, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      flink-paimon-warehouse: {label: "Local filesystem warehouse", kind: service, tier: processing, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
       flink-paimon-source:
         label: Flink SQL Client の試験用 INSERT
         kind: external
@@ -286,6 +290,12 @@ implementations:
           - type: doc
             ref: docs/reference-apache-paimon.md#§7
     links:
+      - {id: flink-paimon-schedule, from: flink-paimon-jobmanager, to: flink-paimon-taskmanager, label: "Schedule tasks", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      - {id: flink-paimon-run-sink, from: flink-paimon-taskmanager, to: flink-paimon-sink, label: "Run sink", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      - {id: flink-paimon-run-read, from: flink-paimon-taskmanager, to: flink-paimon-reader, label: "Run batch reader", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      - {id: flink-paimon-run-stream, from: flink-paimon-taskmanager, to: flink-paimon-consumer, label: "Run streaming reader", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      - {id: flink-paimon-warehouse-write, from: flink-paimon-sink, to: flink-paimon-warehouse, label: "Write warehouse", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
+      - {id: flink-paimon-warehouse-read, from: flink-paimon-reader, to: flink-paimon-warehouse, label: "Read warehouse", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§7"}]}
       - id: flink-paimon-select-warehouse
         from: flink-paimon-config
         to: flink-paimon-sink
@@ -300,6 +310,124 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-apache-paimon.md#§7
+    layout2d:
+      tiers: [{id: local, label: Local execution, z: 0, size: [24, 14]}]
+      nodes:
+        flink-paimon-host: {tier: local, x: 2, y: 1}
+        flink-paimon-jobmanager: {tier: local, x: 6, y: 1}
+        flink-paimon-taskmanager: {tier: local, x: 10, y: 1}
+        flink-paimon-warehouse: {tier: local, x: 14, y: 1}
+        flink-paimon-source: {tier: local, x: 18, y: 1}
+        flink-paimon-sink: {tier: local, x: 2, y: 5}
+        flink-paimon-reader: {tier: local, x: 6, y: 5}
+        flink-paimon-consumer: {tier: local, x: 10, y: 5}
+        flink-paimon-runs: {tier: local, x: 14, y: 5}
+        flink-paimon-compact: {tier: local, x: 18, y: 5}
+        flink-paimon-snapshot: {tier: local, x: 2, y: 9}
+        flink-paimon-changes: {tier: local, x: 6, y: 9}
+        flink-paimon-config: {tier: local, x: 10, y: 9}
+      groups:
+        - {kind: datacenter, label: Local host, tier: local, nodes: [flink-paimon-host, flink-paimon-jobmanager, flink-paimon-taskmanager, flink-paimon-warehouse, flink-paimon-source, flink-paimon-sink, flink-paimon-reader, flink-paimon-consumer, flink-paimon-runs, flink-paimon-compact, flink-paimon-snapshot, flink-paimon-changes, flink-paimon-config]}
+    layout3d:
+      tiers:
+        - {id: processes, label: Processes and jobs, z: 1, size: [24, 6]}
+        - {id: host, label: Local host and files, z: 0, size: [24, 6]}
+      nodes:
+        flink-paimon-host: {tier: host, x: 2, y: 1}
+        flink-paimon-jobmanager: {tier: processes, x: 6, y: 1}
+        flink-paimon-taskmanager: {tier: processes, x: 10, y: 1}
+        flink-paimon-warehouse: {tier: host, x: 14, y: 1}
+        flink-paimon-source: {tier: processes, x: 18, y: 1}
+        flink-paimon-sink: {tier: processes, x: 2, y: 4}
+        flink-paimon-reader: {tier: processes, x: 6, y: 4}
+        flink-paimon-consumer: {tier: processes, x: 10, y: 4}
+        flink-paimon-runs: {tier: host, x: 14, y: 4}
+        flink-paimon-compact: {tier: processes, x: 18, y: 4}
+        flink-paimon-snapshot: {tier: host, x: 2, y: 7}
+        flink-paimon-changes: {tier: processes, x: 6, y: 7}
+        flink-paimon-config: {tier: processes, x: 10, y: 7}
+      groups:
+        - {kind: datacenter, label: Local host, tier: [processes, host], nodes: [flink-paimon-host, flink-paimon-jobmanager, flink-paimon-taskmanager, flink-paimon-warehouse, flink-paimon-source, flink-paimon-sink, flink-paimon-reader, flink-paimon-consumer, flink-paimon-runs, flink-paimon-compact, flink-paimon-snapshot, flink-paimon-changes, flink-paimon-config]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Flink・Paimon"
+    description: "EMR on EC2 の Flink/YARN に Paimon コネクタを導入し、S3 のファイルカタログで主キーテーブルを運用する例。"
+    sources:
+      - {title: "Apache Flink on Amazon EMR", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-flink.html}
+      - {title: "Working with Flink jobs in Amazon EMR", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/flink-jobs.html}
+      - {title: "Paimon 2.1 Flink Installation", url: https://paimon.apache.org/docs/2.1/flink/installation/}
+      - {title: "Paimon 2.1 Filesystems", url: https://paimon.apache.org/docs/2.1/maintenance/filesystems/}
+      - {title: "Paimon 2.1 Compaction", url: https://paimon.apache.org/docs/2.1/primary-key-table/compaction/}
+      - {title: "Flink 1.20 Amazon S3", url: https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/filesystems/s3/}
+      - {title: "AWS shared responsibility", url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理とテーブル登録, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルの永続ストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-emr-control, aws-emr-host, aws-emr-jobmanager, aws-emr-writer, aws-emr-reader, aws-emr-warehouse, aws-emr-runs, aws-emr-snapshot, aws-emr-changes, aws-emr-checkpoint]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-emr-host, aws-emr-jobmanager, aws-emr-writer, aws-emr-reader]}
+    nodes:
+      aws-emr-control: {label: "Amazon EMR", svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: "EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。", management: {type: shared, scope: "AWS は EMR サービスを運用し、利用者はクラスタとステップを設定する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-host: {label: "Amazon EC2 / YARN", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "EMR の EC2 ノードで YARN がアプリケーションの実行リソースを割り当てる。", management: {type: shared, scope: "AWS は EC2 基盤を運用し、利用者はクラスタ、ゲスト OS とソフトウェアを管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-source: {label: "注文更新の試験入力", kind: external, tier: management, x: 13, y: 1.5, realizes: [source], description: "注文キーと更新行を持つ上流からの試験入力。", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-jobmanager: {label: "Flink JobManager", kind: scheduler, tier: compute, x: 3, y: 1.5, description: "YARN 上で Flink のジョブを調整し、TaskManager にタスクを割り当てる。", management: {type: customer, scope: "利用者がジョブと Flink の実行設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-writer: {label: "Flink / Paimon Sink", kind: worker, tier: compute, x: 8, y: 1, realizes: [writer, compact], description: "TaskManager 上で主キー別に書き込み、Sink のコンパクション処理で sorted run をマージする。", management: {type: customer, scope: "利用者がジョブと Paimon コネクタ設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-reader: {label: "Flink / Paimon Source", kind: worker, tier: compute, x: 13, y: 1, realizes: [reader, consumer], description: "TaskManager 上で、バッチのスナップショット読み取りとストリーミングの増分読み取りをそれぞれ実行する。", management: {type: customer, scope: "利用者がジョブと Paimon コネクタ設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-warehouse: {label: "Amazon S3 / warehouse", svc: s3, kind: db, tier: storage, x: 2, y: 1.5, description: "Paimon のファイルカタログとテーブルの共用ストレージ。", management: {type: shared, scope: "AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-runs: {label: "バケット内の sorted run", kind: file, tier: storage, x: 6, y: 1.5, realizes: [runs], description: "S3 のテーブル内でキーでソートしたファイルを保持する。", management: {type: customer, scope: "利用者がテーブルデータと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-snapshot: {label: "Paimon Snapshot", kind: file, tier: storage, x: 10, y: 1.5, realizes: [snapshots], description: "コミット済みの Manifest とファイル集合を示すメタデータを S3 に保持する。", management: {type: customer, scope: "利用者がメタデータと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-changes: {label: "lookup Changelog", kind: file, tier: storage, x: 14, y: 1.5, realizes: [changelog], description: "Sink の lookup コンパクションが作った変更ファイルを S3 に保持する。", management: {type: customer, scope: "利用者が変更ファイルと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      aws-emr-checkpoint: {label: "Amazon S3 / Flink チェックポイント", svc: s3, kind: db, tier: storage, x: 19, y: 1.5, description: "Flink のジョブ状態のチェックポイントは Paimon warehouse と別の S3 プレフィックスに保存する。", management: {type: shared, scope: "AWS は S3 基盤を運用し、利用者はチェックポイントとアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+    links:
+      - {id: aws-emr-provision, from: aws-emr-control, to: aws-emr-host, label: "クラスタを作成・管理", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-start-yarn, from: aws-emr-control, to: aws-emr-jobmanager, label: "Flink YARN セッションを起動", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-assign-writer, from: aws-emr-jobmanager, to: aws-emr-writer, label: "Sink タスクを割り当てる", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-assign-reader, from: aws-emr-jobmanager, to: aws-emr-reader, label: "Source タスクを割り当てる", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-read-catalog, from: aws-emr-reader, to: aws-emr-warehouse, label: "ファイルカタログでテーブルを解決", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-write-catalog, from: aws-emr-writer, to: aws-emr-warehouse, label: "ファイルカタログの warehouse を参照", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-save-state, from: aws-emr-jobmanager, to: aws-emr-checkpoint, label: "チェックポイントを調整・確定", evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-write-snapshot, from: aws-emr-writer, to: aws-emr-snapshot, label: "チェックポイントに対応する版をコミット", realizes: [commit], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+      - {id: aws-emr-lookup, from: aws-emr-writer, to: aws-emr-changes, label: "旧値を参照して変更ファイルを書く", realizes: [lookup], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon.md#§8"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [12, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [12, 3]}
+        - {id: services, label: AWS 管理サービスとデータ, z: 0, origin: [15, 0], size: [24, 3]}
+        - {id: outside, label: 外部, kind: origin, z: 0, origin: [-5, 0], size: [2, 3]}
+      nodes:
+        aws-emr-host: {tier: cluster, x: 5, y: 1.5}
+        aws-emr-jobmanager: {tier: apps, x: 1, y: 1.5}
+        aws-emr-writer: {tier: apps, x: 5, y: 1.5}
+        aws-emr-reader: {tier: apps, x: 9, y: 1.5}
+        aws-emr-control: {tier: services, x: 2, y: 1.5}
+        aws-emr-warehouse: {tier: services, x: 6, y: 1.5}
+        aws-emr-runs: {tier: services, x: 10, y: 1.5}
+        aws-emr-snapshot: {tier: services, x: 14, y: 1.5}
+        aws-emr-changes: {tier: services, x: 18, y: 1.5}
+        aws-emr-checkpoint: {tier: services, x: 22, y: 1.5}
+        aws-emr-source: {tier: outside, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, cluster, services], nodes: [aws-emr-host, aws-emr-jobmanager, aws-emr-writer, aws-emr-reader, aws-emr-control, aws-emr-warehouse, aws-emr-runs, aws-emr-snapshot, aws-emr-changes, aws-emr-checkpoint]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-emr-host, aws-emr-jobmanager, aws-emr-writer, aws-emr-reader]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 14]}
+      nodes:
+        aws-emr-host: {tier: diagram, x: 7, y: 4}
+        aws-emr-jobmanager: {tier: diagram, x: 3, y: 7}
+        aws-emr-writer: {tier: diagram, x: 7, y: 7}
+        aws-emr-reader: {tier: diagram, x: 11, y: 7}
+        aws-emr-control: {tier: diagram, x: 16, y: 1}
+        aws-emr-warehouse: {tier: diagram, x: 20, y: 1}
+        aws-emr-runs: {tier: diagram, x: 24, y: 1}
+        aws-emr-snapshot: {tier: diagram, x: 16, y: 5}
+        aws-emr-changes: {tier: diagram, x: 20, y: 5}
+        aws-emr-checkpoint: {tier: diagram, x: 24, y: 5}
+        aws-emr-source: {tier: diagram, x: -1, y: 7}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 1, y0: -1, x1: 26, y1: 11, nodes: [aws-emr-host, aws-emr-jobmanager, aws-emr-writer, aws-emr-reader, aws-emr-control, aws-emr-warehouse, aws-emr-runs, aws-emr-snapshot, aws-emr-changes, aws-emr-checkpoint]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 1.4, y0: 3, x1: 13, y1: 9, nodes: [aws-emr-host, aws-emr-jobmanager, aws-emr-writer, aws-emr-reader]}
+
 gates: {maxDrift: 0, maxHigh: 0}
 blocks:
   - id: lsm

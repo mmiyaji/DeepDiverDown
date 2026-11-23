@@ -202,6 +202,8 @@ implementations:
         url: https://docs.databricks.com/aws/en/optimizations/predictive-optimization
       - title: Query history system table
         url: https://docs.databricks.com/aws/en/admin/system-tables/query-history
+      - {title: Databricks deployment architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -216,12 +218,16 @@ implementations:
           - 8
           - 3
     nodes:
+      example-user: {label: SQL analyst, kind: client, tier: flow, x: -2, y: 9, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
+      example-serverless: {label: Databricks serverless compute plane, kind: host, tier: flow, x: 11, y: 5, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
+      example-s3: {label: Customer S3 managed storage, svc: s3, kind: db, tier: flow, x: 22, y: 1, management: {type: shared, scope: "AWS operates S3; customer manages storage and access."}, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
+      example-iam: {label: IAM storage role, svc: iam, kind: policy, tier: flow, x: 22, y: 5, management: {type: customer, scope: "Customer manages permissions and trust."}, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
       example-bi:
         label: Databricks SQL Editor
         kind: client
         tier: flow
-        x: 0
-        'y': 2
+        x: 3
+        y: 1
         realizes:
           - bi
         description: 条件と集計が明示された注文クエリを実行する。
@@ -233,8 +239,8 @@ implementations:
         label: Serverless SQL Warehouse と Photon
         kind: service
         tier: flow
-        x: 3
-        'y': 2
+        x: 7
+        y: 1
         realizes:
           - warehouse
           - engine
@@ -248,8 +254,8 @@ implementations:
         label: Unity Catalog 管理 Delta テーブル
         kind: db
         tier: flow
-        x: 10
-        'y': 0
+        x: 11
+        y: 1
         realizes:
           - scan
         description: 注文日の絞り込みに利用できる統計とファイルを持つ。
@@ -261,8 +267,8 @@ implementations:
         label: Databricks Query Profile
         kind: service
         tier: flow
-        x: 14
-        'y': 2
+        x: 15
+        y: 1
         realizes:
           - profile
         description: 時間や読み取り行数などの演算子指標を確認する。
@@ -274,8 +280,8 @@ implementations:
         label: Liquid Clustering のテーブル設定
         kind: worker
         tier: flow
-        x: 14
-        'y': 0
+        x: 3
+        y: 5
         realizes:
           - optimizer
         description: 注文日などのアクセス条件を踏まえてクラスタリング方法を選ぶ。
@@ -286,14 +292,18 @@ implementations:
       example-history:
         label: system.query.history
         kind: service
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
+        tier: flow
+        x: 7
+        y: 5
         description: 比較対象のクエリ識別子や実行指標を SQL で調べる。
         evidence:
           - type: doc
             ref: docs/reference-databricks-sql-performance.md#§5
     links:
+      - {id: example-user-editor, from: example-user, to: example-bi, label: "Run SQL in editor", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
+      - {id: example-serverless-run, from: example-serverless, to: example-warehouse, label: "Run SQL warehouse", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
+      - {id: example-managed-files, from: example-scan, to: example-s3, label: "Store Delta table files", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
+      - {id: example-role-access, from: example-iam, to: example-s3, label: "Authorize storage access", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
       - id: example-history-connection
         from: example-history
         to: example-profile
@@ -302,14 +312,41 @@ implementations:
           - type: doc
             ref: docs/reference-databricks-sql-performance.md#§5
     groups:
-      - kind: cloud
-        provider: databricks
-        label: Databricks
-        tier:
-          - flow
-        nodes:
-          - example-bi
-          - example-warehouse
-          - example-scan
-          - example-profile
-          - example-optimizer
+      - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: flow, nodes: [example-bi, example-warehouse, example-scan, example-profile, example-optimizer, example-history, example-serverless]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: flow, nodes: [example-s3, example-iam]}
+    layout2d:
+      tiers: [{id: diagram, label: SQL and storage, z: 0, size: [27, 12]}]
+      nodes:
+        example-bi: {tier: diagram, x: 3, y: 1}
+        example-warehouse: {tier: diagram, x: 7, y: 1}
+        example-scan: {tier: diagram, x: 11, y: 1}
+        example-profile: {tier: diagram, x: 15, y: 1}
+        example-optimizer: {tier: diagram, x: 3, y: 5}
+        example-history: {tier: diagram, x: 7, y: 5}
+        example-serverless: {tier: diagram, x: 11, y: 5}
+        example-s3: {tier: diagram, x: 22, y: 1}
+        example-iam: {tier: diagram, x: 22, y: 5}
+        example-user: {tier: diagram, x: 0, y: 9}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: diagram, nodes: [example-bi, example-warehouse, example-scan, example-profile, example-optimizer, example-history, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-s3, example-iam]}
+    layout3d:
+      tiers:
+        - {id: workspace, label: SQL and workspace, z: 1, size: [16, 6]}
+        - {id: compute, label: Serverless compute plane, z: 0, size: [16, 6]}
+        - {id: customer, label: Customer AWS account, z: 0, origin: [19, 0], size: [8, 3]}
+        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-bi: {tier: workspace, x: 2, y: 1}
+        example-warehouse: {tier: workspace, x: 6, y: 1}
+        example-scan: {tier: workspace, x: 10, y: 1}
+        example-profile: {tier: workspace, x: 14, y: 1}
+        example-optimizer: {tier: workspace, x: 2, y: 4}
+        example-history: {tier: workspace, x: 6, y: 4}
+        example-serverless: {tier: compute, x: 6, y: 1.5}
+        example-s3: {tier: customer, x: 2, y: 1.5}
+        example-iam: {tier: customer, x: 6, y: 1.5}
+        example-user: {tier: user, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: [workspace, compute], nodes: [example-bi, example-warehouse, example-scan, example-profile, example-optimizer, example-history, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: customer, nodes: [example-s3, example-iam]}

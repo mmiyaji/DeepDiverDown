@@ -164,8 +164,8 @@ scenarios:
         note: 保存データを伸長して復号し、読み取り結果を得る。
 implementations:
   - id: parquet-zstd
-    label: PyArrow Parquet と Zstd
-    description: Parquet のページを Zstd で圧縮し、必要なページを読み取る例。
+    label: EC2 上の PyArrow Parquet と Zstd
+    description: Parquet のページを Zstd で圧縮し、必要なページを読み取る例。 単一 EC2 インスタンス上で処理し、ファイルは EBS ボリュームに保存する例。
     sources:
       - title: Parquet compression
         url: https://parquet.apache.org/docs/file-format/data-pages/compression/
@@ -179,7 +179,17 @@ implementations:
         url: https://www.rfc-editor.org/rfc/rfc1952
       - title: GNU gzip
         url: https://www.gnu.org/s/gzip/manual/html_node/Advanced-usage.html
+      - title: Amazon EC2 instances
+        url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Instances.html
+      - title: Amazon EBS volumes
+        url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html
     tiers:
+      - id: host
+        label: AWS の実行と保存
+        z: 2
+        size:
+          - 16
+          - 3
       - id: write
         label: 書き込み
         z: 1
@@ -270,9 +280,120 @@ implementations:
             ref: docs/reference-file-compression.md#§4
         realizes:
           - consumer
+      ex-ec2:
+        label: Amazon EC2 / Linux
+        kind: host
+        svc: ec2
+        tier: host
+        x: 4
+        'y': 1.5
+        description: 利用者が Linux と Python の処理を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS と Python アプリを管理する。"}
+      ex-ebs:
+        label: Amazon EBS ボリューム
+        kind: db
+        svc: ebs
+        tier: host
+        x: 12
+        'y': 1.5
+        description: 処理対象ファイルを保存する EC2 にアタッチされたボリューム。
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がファイル、ボリュームとバックアップを管理する。"}
+    links:
+      - id: parquet-zstd-host-write
+        from: ex-ec2
+        to: ex-encode
+        label: 書き込み処理を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+      - id: parquet-zstd-host-read
+        from: ex-ec2
+        to: ex-decompress
+        label: 読み取り処理を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+      - id: parquet-zstd-ebs-file
+        from: ex-stored
+        to: ex-ebs
+        label: 圧縮ファイルを保存
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+    groups:
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - host
+          - write
+          - read
+        nodes:
+          - ex-source
+          - ex-encode
+          - ex-compress
+          - ex-stored
+          - ex-decompress
+          - ex-decode
+          - ex-consumer
+          - ex-ec2
+          - ex-ebs
+      - kind: cluster
+        label: EC2 上の Python プロセス
+        tier:
+          - write
+          - read
+        nodes:
+          - ex-source
+          - ex-encode
+          - ex-compress
+          - ex-decompress
+          - ex-decode
+          - ex-consumer
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        ex-ec2: {tier: diagram, x: 2, y: 2}
+        ex-source: {tier: diagram, x: 2, y: 5}
+        ex-encode: {tier: diagram, x: 2, y: 8}
+        ex-compress: {tier: diagram, x: 2, y: 11}
+        ex-decompress: {tier: diagram, x: 2, y: 14}
+        ex-decode: {tier: diagram, x: 2, y: 17}
+        ex-consumer: {tier: diagram, x: 2, y: 20}
+        ex-ebs: {tier: diagram, x: 8, y: 2}
+        ex-stored: {tier: diagram, x: 8, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer, ex-ebs, ex-stored]}
+        - {kind: vpc, provider: aws, label: EC2 の利用者 VPC, tier: [diagram], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}
+        - {kind: nodegroup, label: "EC2 Python プロセス", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 24, nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "EC2 Python プロセス", z: 0, origin: [0, 0], size: [5, 21]}
+        - {id: zone1, label: "EBS ファイル", z: 0, origin: [7, 0], size: [5, 6]}
+      nodes:
+        ex-ec2: {tier: zone0, x: 2, y: 1}
+        ex-source: {tier: zone0, x: 2, y: 4}
+        ex-encode: {tier: zone0, x: 2, y: 7}
+        ex-compress: {tier: zone0, x: 2, y: 10}
+        ex-decompress: {tier: zone0, x: 2, y: 13}
+        ex-decode: {tier: zone0, x: 2, y: 16}
+        ex-consumer: {tier: zone0, x: 2, y: 19}
+        ex-ebs: {tier: zone1, x: 2, y: 1}
+        ex-stored: {tier: zone1, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer, ex-ebs, ex-stored]}
+        - {kind: vpc, provider: aws, label: EC2 の利用者 VPC, tier: [zone0, zone1], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}
+        - {kind: nodegroup, label: "EC2 Python プロセス", tier: [zone0], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}
   - id: csv-gzip
-    label: CSV と gzip
-    description: CSV ストリーム全体を gzip で圧縮し、伸長後に CSV として解析する例。
+    label: EC2 上の CSV と gzip
+    description: CSV ストリーム全体を gzip で圧縮し、伸長後に CSV として解析する例。 単一 EC2 インスタンス上で処理し、ファイルは EBS ボリュームに保存する例。
     sources:
       - title: Parquet compression
         url: https://parquet.apache.org/docs/file-format/data-pages/compression/
@@ -286,7 +407,17 @@ implementations:
         url: https://www.rfc-editor.org/rfc/rfc1952
       - title: GNU gzip
         url: https://www.gnu.org/s/gzip/manual/html_node/Advanced-usage.html
+      - title: Amazon EC2 instances
+        url: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Instances.html
+      - title: Amazon EBS volumes
+        url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html
     tiers:
+      - id: host
+        label: AWS の実行と保存
+        z: 2
+        size:
+          - 16
+          - 3
       - id: write
         label: 書き込み
         z: 1
@@ -377,3 +508,115 @@ implementations:
             ref: docs/reference-file-compression.md#§4
         realizes:
           - consumer
+      ex-ec2:
+        label: Amazon EC2 / Linux
+        kind: host
+        svc: ec2
+        tier: host
+        x: 4
+        'y': 1.5
+        description: 利用者が Linux と Python の処理を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS と Python アプリを管理する。"}
+      ex-ebs:
+        label: Amazon EBS ボリューム
+        kind: db
+        svc: ebs
+        tier: host
+        x: 12
+        'y': 1.5
+        description: 処理対象ファイルを保存する EC2 にアタッチされたボリューム。
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+        management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がファイル、ボリュームとバックアップを管理する。"}
+    links:
+      - id: csv-gzip-host-write
+        from: ex-ec2
+        to: ex-encode
+        label: 書き込み処理を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+      - id: csv-gzip-host-read
+        from: ex-ec2
+        to: ex-decompress
+        label: 読み取り処理を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+      - id: csv-gzip-ebs-file
+        from: ex-stored
+        to: ex-ebs
+        label: 圧縮ファイルを保存
+        evidence:
+          - type: doc
+            ref: docs/reference-file-compression.md#§4
+    groups:
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - host
+          - write
+          - read
+        nodes:
+          - ex-source
+          - ex-encode
+          - ex-compress
+          - ex-stored
+          - ex-decompress
+          - ex-decode
+          - ex-consumer
+          - ex-ec2
+          - ex-ebs
+      - kind: cluster
+        label: EC2 上の Python プロセス
+        tier:
+          - write
+          - read
+        nodes:
+          - ex-source
+          - ex-encode
+          - ex-compress
+          - ex-decompress
+          - ex-decode
+          - ex-consumer
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        ex-ec2: {tier: diagram, x: 2, y: 2}
+        ex-source: {tier: diagram, x: 2, y: 5}
+        ex-encode: {tier: diagram, x: 2, y: 8}
+        ex-compress: {tier: diagram, x: 2, y: 11}
+        ex-decompress: {tier: diagram, x: 2, y: 14}
+        ex-decode: {tier: diagram, x: 2, y: 17}
+        ex-consumer: {tier: diagram, x: 2, y: 20}
+        ex-ebs: {tier: diagram, x: 8, y: 2}
+        ex-stored: {tier: diagram, x: 8, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer, ex-ebs, ex-stored]}
+        - {kind: vpc, provider: aws, label: EC2 の利用者 VPC, tier: [diagram], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}
+        - {kind: nodegroup, label: "EC2 Python プロセス", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 24, nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "EC2 Python プロセス", z: 0, origin: [0, 0], size: [5, 21]}
+        - {id: zone1, label: "EBS ファイル", z: 0, origin: [7, 0], size: [5, 6]}
+      nodes:
+        ex-ec2: {tier: zone0, x: 2, y: 1}
+        ex-source: {tier: zone0, x: 2, y: 4}
+        ex-encode: {tier: zone0, x: 2, y: 7}
+        ex-compress: {tier: zone0, x: 2, y: 10}
+        ex-decompress: {tier: zone0, x: 2, y: 13}
+        ex-decode: {tier: zone0, x: 2, y: 16}
+        ex-consumer: {tier: zone0, x: 2, y: 19}
+        ex-ebs: {tier: zone1, x: 2, y: 1}
+        ex-stored: {tier: zone1, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer, ex-ebs, ex-stored]}
+        - {kind: vpc, provider: aws, label: EC2 の利用者 VPC, tier: [zone0, zone1], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}
+        - {kind: nodegroup, label: "EC2 Python プロセス", tier: [zone0], nodes: [ex-ec2, ex-source, ex-encode, ex-compress, ex-decompress, ex-decode, ex-consumer]}

@@ -222,7 +222,7 @@ blocks:
 implementations:
   - id: bigquery-wide-orders
     label: BigQuery での注文行と明細行
-    description: 合成の注文データを二つの分析テーブルに生成し、明細の後着訂正を同じ取込単位から反映する例。
+    description: Cloud Storage の合成 CSV を BigQuery にロードし、同じ訂正を平坦表とネスト表に反映する例。
     sources:
       - title: 'BigQuery: Use nested and repeated fields'
         url: https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested
@@ -232,6 +232,14 @@ implementations:
         url: https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax
       - title: BigQuery 論理ビュー
         url: https://docs.cloud.google.com/bigquery/docs/views-intro
+      - title: Cloud Storage からの CSV ロード
+        url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv
+      - title: BigQuery のスケジュールされたクエリ
+        url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries
+      - title: BigQuery の複数ステートメント トランザクション
+        url: https://docs.cloud.google.com/bigquery/docs/transactions
+      - title: BigQuery の JOBS ビュー
+        url: https://docs.cloud.google.com/bigquery/docs/information-schema-jobs
     tiers:
       - id: sources
         label: 注文と注文明細の入力
@@ -239,7 +247,6 @@ implementations:
         size:
           - 16
           - 4
-        kind: origin
       - id: tables
         label: 公開テーブル
         z: 1
@@ -253,12 +260,56 @@ implementations:
           - 16
           - 4
       - id: implementation-setup
-        label: 実装時の設定・観測
+        label: Cloud Storage と BigQuery ジョブ
         z: 3
         size:
-          - 8
-          - 3
+          - 26
+          - 6
     nodes:
+      example-files:
+        label: Cloud Storage（注文ヘッダー・明細・訂正の CSV）
+        svc: gcp:gcs
+        kind: file
+        tier: implementation-setup
+        x: 1
+        'y': 1.5
+        description: 業務システムまたは検証用のバッチ CSV を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+      example-load-job:
+        label: BigQuery（CSV ロードジョブ）
+        svc: gcp:bigquery
+        kind: worker
+        tier: implementation-setup
+        x: 6
+        'y': 1.5
+        description: 同じロケーションの Cloud Storage から BigQuery の入力表へロードする。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+      example-scheduler:
+        label: BigQuery（スケジュールされたクエリ）
+        svc: gcp:bigquery
+        kind: scheduler
+        tier: implementation-setup
+        x: 11
+        'y': 1.5
+        description: Data Transfer Service でサービスアカウントの GoogleSQL ジョブを起動する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
+      example-studio:
+        label: BigQuery Studio（SQL 問い合わせ）
+        svc: gcp:bigquery
+        kind: client
+        tier: implementation-setup
+        x: 17
+        'y': 1.5
+        description: 平坦表とネスト表から注文・明細の結果を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-dwh-wide-table.md#§5
       example-orders:
         label: landing.orders と landing.order_items
         kind: table
@@ -274,7 +325,7 @@ implementations:
             ref: docs/reference-dwh-wide-table.md#§5
         svc: gcp:bigquery
       example-transform:
-        label: BigQuery の注文単位の再生成 SQL
+        label: BigQuery（注文単位の再生成ジョブ）
         kind: workflow
         tier: sources
         x: 9
@@ -330,13 +381,29 @@ implementations:
         kind: table
         tier: implementation-setup
         x: 1
-        'y': 1.5
+        'y': 4.3
         description: 変更時刻を照合し、注文総額などの親属性も含めて再生成する注文を特定する。
         evidence:
           - type: doc
             ref: docs/reference-dwh-wide-table.md#§5
         svc: gcp:bigquery
     links:
+      - id: example-bq-files
+        from: example-files
+        to: example-load-job
+        label: CSV ファイルを読み込む
+      - id: example-bq-load
+        from: example-load-job
+        to: example-orders
+        label: BigQuery の入力表に書き込む
+      - id: example-bq-run
+        from: example-scheduler
+        to: example-transform
+        label: スケジュールから GoogleSQL ジョブを起動
+      - id: example-bq-query
+        from: example-studio
+        to: example-report
+        label: 公開ビューをクエリする
       - id: example-affected-connection
         from: example-affected
         to: example-transform
@@ -344,34 +411,45 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-dwh-wide-table.md#§5
+      - {id: example-affected-input, from: example-orders, to: example-affected, label: 入力の変更時刻を照合}
     groups:
       - kind: cloud
         provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - sources
-        nodes:
-          - example-orders
-          - example-transform
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - tables
-        nodes:
-          - example-flat
-          - example-nested
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - reports
-        nodes:
-          - example-report
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
+        label: Google Cloud プロジェクト（論理的所属）
         tier:
           - implementation-setup
-        nodes:
-          - example-affected
+          - sources
+          - tables
+          - reports
+    layout2d:
+      tiers:
+        - {id: platform, label: Google Cloud プロジェクト, z: 0, size: [26, 13]}
+      nodes:
+        example-files: {tier: platform, x: 2, y: 2}
+        example-load-job: {tier: platform, x: 8, y: 2}
+        example-orders: {tier: platform, x: 14, y: 2}
+        example-affected: {tier: platform, x: 20, y: 2}
+        example-scheduler: {tier: platform, x: 2, y: 6}
+        example-transform: {tier: platform, x: 8, y: 6}
+        example-flat: {tier: platform, x: 14, y: 6}
+        example-nested: {tier: platform, x: 20, y: 6}
+        example-report: {tier: platform, x: 2, y: 10}
+        example-studio: {tier: platform, x: 8, y: 10}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud プロジェクト（サービスの論理的所属）, tier: [platform], nodes: [example-files, example-load-job, example-orders, example-affected, example-scheduler, example-transform, example-flat, example-nested, example-report, example-studio]}
+    layout3d:
+      tiers:
+        - {id: platform, label: Google Cloud のサービスとデータ, z: 0, size: [26, 13]}
+      nodes:
+        example-files: {tier: platform, x: 2, y: 2}
+        example-load-job: {tier: platform, x: 8, y: 2}
+        example-orders: {tier: platform, x: 14, y: 2}
+        example-affected: {tier: platform, x: 20, y: 2}
+        example-scheduler: {tier: platform, x: 2, y: 6}
+        example-transform: {tier: platform, x: 8, y: 6}
+        example-flat: {tier: platform, x: 14, y: 6}
+        example-nested: {tier: platform, x: 20, y: 6}
+        example-report: {tier: platform, x: 2, y: 10}
+        example-studio: {tier: platform, x: 8, y: 10}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud プロジェクト（サービスの論理的所属）, tier: [platform], nodes: [example-files, example-load-job, example-orders, example-affected, example-scheduler, example-transform, example-flat, example-nested, example-report, example-studio]}

@@ -182,6 +182,8 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-sim-host: {label: CARLA サーバーホスト, kind: host, tier: flow, x: 1, y: 2, description: CARLA Server と仮想センサーを実行する利用者管理ホスト。, evidence: [{type: doc, ref: docs/reference-carla-simulation.md#§4}]}
+      ex-client-host: {label: 運転クライアントホスト, kind: host, tier: flow, x: 10, y: 2, description: API と運転・評価クライアントを実行する別ホスト。, evidence: [{type: doc, ref: docs/reference-carla-simulation.md#§4}]}
       ex-world:
         label: CARLA Server
         kind: service
@@ -254,3 +256,110 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-carla-simulation.md#§4
+    links:
+      - {id: ex-run-world, from: ex-sim-host, to: ex-world, label: CARLA Server を実行, evidence: [{type: doc, ref: docs/reference-carla-simulation.md#§4}]}
+      - {id: ex-run-stack, from: ex-client-host, to: ex-stack, label: 運転クライアントを実行, evidence: [{type: doc, ref: docs/reference-carla-simulation.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ホストと接続, z: 0, size: [26, 14]}]
+      nodes:
+        ex-sim-host: {tier: diagram, x: 1, y: 1}
+        ex-world: {tier: diagram, x: 4, y: 1}
+        ex-sensor: {tier: diagram, x: 7, y: 1}
+        ex-scenario: {tier: diagram, x: 1, y: 4}
+        ex-client-host: {tier: diagram, x: 14, y: 1}
+        ex-api: {tier: diagram, x: 17, y: 1}
+        ex-stack: {tier: diagram, x: 20, y: 1}
+        ex-results: {tier: diagram, x: 14, y: 4}
+      groups:
+        - {kind: datacenter, label: CARLA サーバーホスト, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 12, nodes: [ex-sim-host, ex-world, ex-sensor, ex-scenario]}
+        - {kind: datacenter, label: 運転クライアントホスト, tier: [diagram], x0: 12, y0: 0, x1: 23, y1: 8, nodes: [ex-client-host, ex-api, ex-stack, ex-results]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: net, label: 車両ネットワーク, z: 0, origin: [25, 0], size: [4, 4]}
+      nodes:
+        ex-sim-host: {tier: hosta, x: 1, y: 1}
+        ex-world: {tier: appsa, x: 4, y: 1}
+        ex-sensor: {tier: appsa, x: 7, y: 1}
+        ex-scenario: {tier: appsa, x: 1, y: 4}
+        ex-client-host: {tier: hostb, x: 1, y: 1}
+        ex-api: {tier: appsb, x: 4, y: 1}
+        ex-stack: {tier: appsb, x: 7, y: 1}
+        ex-results: {tier: appsb, x: 1, y: 4}
+      groups:
+        - {kind: datacenter, label: CARLA サーバーホスト, tier: [hosta, appsa], nodes: [ex-sim-host, ex-world, ex-sensor, ex-scenario]}
+        - {kind: datacenter, label: 運転クライアントホスト, tier: [hostb, appsb], nodes: [ex-client-host, ex-api, ex-stack, ex-results]}
+
+  - id: linux-docker-synchronous
+    label: "Linux GPU ホスト：CARLA 0.9.15・同期 Python クライアント"
+    description: "NVIDIA GPU 付き Linux の CARLA コンテナに別ホストの Python クライアントを接続し、同期ステップで仮想車両を試験する例。"
+    sources:
+      - {title: "CARLA 0.9.15 Docker guide", url: https://carla.readthedocs.io/en/0.9.15/build_docker/}
+      - {title: "CARLA 0.9.15 quick start", url: https://carla.readthedocs.io/en/0.9.15/start_quickstart/}
+      - {title: "CARLA synchrony and time-step", url: https://carla.readthedocs.io/en/0.9.15/adv_synchrony_timestep/}
+      - {title: "CARLA sensors", url: https://carla.readthedocs.io/en/0.9.15/ref_sensors/}
+      - {title: "CARLA recorder", url: https://carla.readthedocs.io/en/0.9.15/adv_recorder/}
+    tiers:
+      - {id: sim, label: "仮想環境の実行", z: 2, size: [20, 4]}
+      - {id: client, label: "試験クライアント", z: 1, size: [20, 4]}
+      - {id: data, label: "サーバー側の評価記録", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "Linux / NVIDIA GPU ホスト", provider: onprem, tier: [sim, data], nodes: [carla-lab-gpu, carla-lab-server, carla-lab-sensor, carla-lab-recorder]}
+      - {kind: datacenter, label: "Linux / Python クライアントホスト", provider: onprem, tier: [client], nodes: [carla-lab-client-host, carla-lab-scenario, carla-lab-controller, carla-lab-api]}
+    nodes:
+      carla-lab-gpu: {label: "Linux / NVIDIA Container Toolkit", kind: host, tier: sim, x: 2, y: 1.5, description: "Docker コンテナの CARLA に NVIDIA GPU を渡し、オフスクリーンで描画する。", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      carla-lab-server: {label: "CARLA Server / 仮想世界と車両", kind: service, tier: sim, x: 8, y: 1.5, realizes: [world], description: "CARLA 0.9.15 のコンテナが仮想世界の物理と車両を更新する。", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      carla-lab-sensor: {label: "CARLA 仮想カメラ・LiDAR", kind: worker, tier: sim, x: 15, y: 1.5, realizes: [sensor], description: "仮想ワールドの観測を生成し、API に配信する。", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      carla-lab-client-host: {label: Linux 試験クライアントホスト, kind: host, tier: client, x: 1, y: 3, description: Python API と試験処理を実行する別ホスト。, evidence: [{type: doc, ref: docs/reference-carla-simulation.md#§5}]}
+      carla-lab-scenario: {label: "マップ・車両・センサー設定", kind: file, tier: client, x: 2, y: 1.5, realizes: [scenario], description: "試験で使うマップ、アクター、センサーおよび同期実行条件を選ぶ。", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      carla-lab-controller: {label: "試験用の Python 運転処理", kind: worker, tier: client, x: 8, y: 1.5, realizes: [stack], description: "仮想センサーを購読し、試験の制御と tick を進める独立プロセス。", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      carla-lab-api: {label: "CARLA Python API 0.9.15", kind: gateway, tier: client, x: 15, y: 1.5, realizes: [api], description: "隔離された LAN で CARLA Server の既定 TCP 2000・2001 に接続する。", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      carla-lab-recorder: {label: "CARLA Recorder / ホスト上のログ", kind: file, tier: data, x: 8, y: 1.5, realizes: [results], description: "サーバー側の Recorder のバイナリ記録をコンテナ外のファイル領域に保管する。", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+    links:
+      - {id: carla-lab-client-run, from: carla-lab-client-host, to: carla-lab-controller, label: Python 試験処理を実行, evidence: [{type: doc, ref: docs/reference-carla-simulation.md#§5}]}
+      - {id: carla-lab-gpu-runtime, from: carla-lab-gpu, to: carla-lab-server, label: "GPU を渡して CARLA を起動", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      - {id: carla-lab-scenario-script, from: carla-lab-scenario, to: carla-lab-controller, label: "テスト条件を読み込む", realizes: [configure], replace: true, evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      - {id: carla-lab-scenario-setup, from: carla-lab-controller, to: carla-lab-api, label: "ワールドの設定を要求", realizes: [configure], replace: true, evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      - {id: carla-lab-activate, from: carla-lab-api, to: carla-lab-server, label: "マップと同期設定を適用", realizes: [configure], replace: true, evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      - {id: carla-lab-tick, from: carla-lab-api, to: carla-lab-server, label: "試験用クライアントから tick を送る", evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      - {id: carla-lab-log-request, from: carla-lab-controller, to: carla-lab-api, label: "Recorder を開始・停止", realizes: [review], replace: true, evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      - {id: carla-lab-record, from: carla-lab-api, to: carla-lab-server, label: "ログ収集を要求", realizes: [review], replace: true, evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+      - {id: carla-lab-save, from: carla-lab-server, to: carla-lab-recorder, label: "サーバー側でアクター状態を保存", realizes: [review], replace: true, evidence: [{type: doc, ref: "docs/reference-carla-simulation.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ホストと接続, z: 0, size: [26, 14]}]
+      nodes:
+        carla-lab-gpu: {tier: diagram, x: 1, y: 1}
+        carla-lab-server: {tier: diagram, x: 4, y: 1}
+        carla-lab-sensor: {tier: diagram, x: 7, y: 1}
+        carla-lab-recorder: {tier: diagram, x: 1, y: 4}
+        carla-lab-client-host: {tier: diagram, x: 14, y: 1}
+        carla-lab-api: {tier: diagram, x: 17, y: 1}
+        carla-lab-controller: {tier: diagram, x: 20, y: 1}
+        carla-lab-scenario: {tier: diagram, x: 14, y: 4}
+      groups:
+        - {kind: datacenter, label: Linux GPU サーバーホスト, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 12, nodes: [carla-lab-gpu, carla-lab-server, carla-lab-sensor, carla-lab-recorder]}
+        - {kind: datacenter, label: Linux クライアントホスト, tier: [diagram], x0: 12, y0: 0, x1: 23, y1: 8, nodes: [carla-lab-client-host, carla-lab-api, carla-lab-controller, carla-lab-scenario]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: net, label: 車両ネットワーク, z: 0, origin: [25, 0], size: [4, 4]}
+      nodes:
+        carla-lab-gpu: {tier: hosta, x: 1, y: 1}
+        carla-lab-server: {tier: appsa, x: 4, y: 1}
+        carla-lab-sensor: {tier: appsa, x: 7, y: 1}
+        carla-lab-recorder: {tier: appsa, x: 1, y: 4}
+        carla-lab-client-host: {tier: hostb, x: 1, y: 1}
+        carla-lab-api: {tier: appsb, x: 4, y: 1}
+        carla-lab-controller: {tier: appsb, x: 7, y: 1}
+        carla-lab-scenario: {tier: appsb, x: 1, y: 4}
+      groups:
+        - {kind: datacenter, label: Linux GPU サーバーホスト, tier: [hosta, appsa], nodes: [carla-lab-gpu, carla-lab-server, carla-lab-sensor, carla-lab-recorder]}
+        - {kind: datacenter, label: Linux クライアントホスト, tier: [hostb, appsb], nodes: [carla-lab-client-host, carla-lab-api, carla-lab-controller, carla-lab-scenario]}

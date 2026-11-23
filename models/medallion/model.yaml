@@ -629,7 +629,7 @@ blocks:
 implementations:
   - id: databricks-ldp
     label: Lakeflow・Delta Lake・Databricks SQL
-    description: Spark Declarative Pipelines を使い、受注イベントを Delta のストリーミングテーブルへ保管し、集計を SQL で提供する例。
+    description: S3 の受注変更ファイルを Auto Loader で取り込み、Databricks のサーバーレス Lakeflow パイプラインで整形して SQL Warehouse から提供する例。
     sources:
       - title: Databricks · Medallion lakehouse architecture
         url: https://docs.databricks.com/aws/en/lakehouse/medallion
@@ -639,16 +639,41 @@ implementations:
         url: https://docs.databricks.com/aws/en/ldp/best-practices
       - title: Expectations and event log
         url: https://docs.databricks.com/aws/en/ldp/expectations
+      - title: Auto Loader による Amazon S3 の増分取り込み
+        url: https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/onboard-data
+      - title: Unity Catalog 管理ストレージ
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+      - title: AUTO CDC による変更適用
+        url: https://docs.databricks.com/aws/en/ldp/cdc
+      - {title: Databricks deployment architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - id: flow
+        label: Databricks の取り込み・変換・提供
+        z: 1
+        size:
+          - 18
+          - 7
+      - id: storage
+        label: AWS の入力と保存
+        z: 0
+        size:
+          - 18
+          - 4
     nodes:
+      databricks-ldp-serverless: {label: Databricks serverless compute plane, kind: host, tier: flow, x: 8, y: 6, description: "Databricks-managed execution environment for the pipeline and serverless SQL warehouse.", evidence: [{type: doc, ref: "docs/reference-medallion.md#§5"}]}
+      databricks-ldp-role: {label: AWS IAM storage role, svc: iam, kind: policy, tier: storage, x: 16, y: 2, management: {type: customer, scope: "Customer manages trust policy and S3 permissions."}, evidence: [{type: doc, ref: "docs/reference-medallion.md#§5"}]}
       databricks-ldp-events:
-        label: 注文 CDC フィード
-        kind: queue
-        tier: flow
-        x: 0
+        label: S3 の注文 CDC ファイル
+        kind: db
+        svc: s3
+        tier: storage
+        x: 4
         'y': 2
-        description: 主キー、変更種別、並び順を含むイベントを渡す。
+        description: 業務側で書き出した主キー、変更種別、変更順序を含む JSON ファイルを保持する。
         realizes:
           - events
+        management: {type: shared, scope: "AWS operates S3; customer manages data and access."}
         evidence:
           - type: doc
             ref: docs/reference-medallion.md#§5
@@ -718,18 +743,18 @@ implementations:
             ref: docs/reference-medallion.md#§5
         svc: databricks:delta
       databricks-ldp-dashboard:
-        label: Databricks SQL ダッシュボード
-        kind: client
+        label: Databricks AI/BI ダッシュボード
+        kind: service
         tier: flow
         x: 16
-        'y': 5
+        'y': 6
         description: 日次売上を表示する。
         realizes:
           - bi
         evidence:
           - type: doc
             ref: docs/reference-medallion.md#§5
-        svc: databricks:sql
+        svc: databricks:platform
       databricks-ldp-log:
         label: Lakeflow パイプラインイベントログ
         kind: monitor
@@ -741,7 +766,110 @@ implementations:
           - type: doc
             ref: docs/reference-medallion.md#§5
         svc: databricks:lakeflow
+      databricks-ldp-autoloader:
+        label: Lakeflow の Auto Loader
+        svc: databricks:lakeflow
+        kind: worker
+        tier: flow
+        x: 0
+        'y': 2
+        description: Unity Catalog 外部ロケーション上の JSON を増分取り込みする。
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      databricks-ldp-unity:
+        label: Unity Catalog
+        svc: databricks:unity
+        kind: catalog
+        tier: flow
+        x: 4
+        'y': 5
+        description: 外部ロケーションと管理テーブルのアクセス許可を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      databricks-ldp-managed:
+        label: Unity Catalog 管理用の Amazon S3
+        svc: s3
+        kind: db
+        tier: storage
+        x: 12
+        'y': 2
+        description: 入力用とは別のストレージ領域に管理テーブルの実体を保持する。
+        management: {type: shared, scope: "AWS operates S3; customer manages data and access."}
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      databricks-ldp-warehouse:
+        label: Databricks SQL Warehouse
+        svc: databricks:sql
+        kind: worker
+        tier: flow
+        x: 11
+        'y': 6
+        description: Gold を読み取るダッシュボードの SQL を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
     links:
+      - {id: databricks-ldp-compute-pipeline, from: databricks-ldp-serverless, to: databricks-ldp-pipeline, label: "Run pipeline", evidence: [{type: doc, ref: "docs/reference-medallion.md#§5"}]}
+      - {id: databricks-ldp-compute-sql, from: databricks-ldp-serverless, to: databricks-ldp-warehouse, label: "Run SQL warehouse", evidence: [{type: doc, ref: "docs/reference-medallion.md#§5"}]}
+      - {id: databricks-ldp-storage-role, from: databricks-ldp-unity, to: databricks-ldp-role, label: "Use storage credential", evidence: [{type: doc, ref: "docs/reference-medallion.md#§5"}]}
+      - {id: databricks-ldp-role-access, from: databricks-ldp-role, to: databricks-ldp-events, label: "Authorize input access", evidence: [{type: doc, ref: "docs/reference-medallion.md#§5"}]}
+      - id: databricks-ldp-load
+        from: databricks-ldp-events
+        to: databricks-ldp-autoloader
+        label: CDC ファイルを増分で読む
+        realizes:
+          - land
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      - id: databricks-ldp-land
+        from: databricks-ldp-autoloader
+        to: databricks-ldp-bronze
+        label: Bronze に原本を追記
+        realizes:
+          - land
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      - id: databricks-ldp-source-access
+        from: databricks-ldp-unity
+        to: databricks-ldp-autoloader
+        label: S3 入力への権限を適用
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      - id: databricks-ldp-storage
+        from: databricks-ldp-pipeline
+        to: databricks-ldp-managed
+        label: Delta テーブルの実体を保存
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      - id: databricks-ldp-query
+        from: databricks-ldp-gold
+        to: databricks-ldp-warehouse
+        label: Gold の売上を集計・参照
+        realizes:
+          - serve
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
+      - id: databricks-ldp-serve
+        from: databricks-ldp-warehouse
+        to: databricks-ldp-dashboard
+        label: 可視化用の結果を返す
+        realizes:
+          - serve
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-medallion.md#§5
       - id: databricks-ldp-record-metrics
         from: databricks-ldp-pipeline
         to: databricks-ldp-log
@@ -750,23 +878,48 @@ implementations:
           - type: doc
             ref: docs/reference-medallion.md#§5
     groups:
-      - kind: cloud
-        provider: databricks
-        label: Databricks
-        tier:
-          - flow
-        nodes:
-          - databricks-ldp-bronze
-          - databricks-ldp-pipeline
-          - databricks-ldp-quarantine
-          - databricks-ldp-silver
-          - databricks-ldp-gold
-          - databricks-ldp-dashboard
-          - databricks-ldp-log
-      - kind: cloud
-        provider: databricks
-        label: Databricks サービス
-        tier:
-          - flow
-        nodes:
-          - databricks-ldp-log
+      - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: flow, nodes: [databricks-ldp-serverless, databricks-ldp-autoloader, databricks-ldp-bronze, databricks-ldp-pipeline, databricks-ldp-quarantine, databricks-ldp-silver, databricks-ldp-gold, databricks-ldp-dashboard, databricks-ldp-log, databricks-ldp-unity, databricks-ldp-warehouse]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: storage, nodes: [databricks-ldp-events, databricks-ldp-managed, databricks-ldp-role]}
+    layout2d:
+      tiers: [{id: diagram, label: Databricks and AWS, z: 0, size: [31, 14]}]
+      nodes:
+        databricks-ldp-serverless: {tier: diagram, x: 2, y: 1}
+        databricks-ldp-autoloader: {tier: diagram, x: 6, y: 1}
+        databricks-ldp-bronze: {tier: diagram, x: 10, y: 1}
+        databricks-ldp-pipeline: {tier: diagram, x: 14, y: 1}
+        databricks-ldp-quarantine: {tier: diagram, x: 2, y: 5}
+        databricks-ldp-silver: {tier: diagram, x: 6, y: 5}
+        databricks-ldp-gold: {tier: diagram, x: 10, y: 5}
+        databricks-ldp-dashboard: {tier: diagram, x: 14, y: 5}
+        databricks-ldp-log: {tier: diagram, x: 2, y: 9}
+        databricks-ldp-unity: {tier: diagram, x: 6, y: 9}
+        databricks-ldp-warehouse: {tier: diagram, x: 10, y: 9}
+        databricks-ldp-events: {tier: diagram, x: 23, y: 1}
+        databricks-ldp-managed: {tier: diagram, x: 23, y: 5}
+        databricks-ldp-role: {tier: diagram, x: 23, y: 9}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: diagram, nodes: [databricks-ldp-serverless, databricks-ldp-autoloader, databricks-ldp-bronze, databricks-ldp-pipeline, databricks-ldp-quarantine, databricks-ldp-silver, databricks-ldp-gold, databricks-ldp-dashboard, databricks-ldp-log, databricks-ldp-unity, databricks-ldp-warehouse]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [databricks-ldp-events, databricks-ldp-managed, databricks-ldp-role]}
+    layout3d:
+      tiers:
+        - {id: workspace, label: Workspace and jobs, z: 1, size: [20, 6]}
+        - {id: compute, label: Serverless compute plane, z: 0, size: [20, 6]}
+        - {id: storage, label: Customer AWS account, z: 0, origin: [23, 0], size: [12, 3]}
+      nodes:
+        databricks-ldp-serverless: {tier: compute, x: 7, y: 1.5}
+        databricks-ldp-autoloader: {tier: workspace, x: 2, y: 1}
+        databricks-ldp-bronze: {tier: workspace, x: 6, y: 1}
+        databricks-ldp-pipeline: {tier: workspace, x: 10, y: 1}
+        databricks-ldp-quarantine: {tier: workspace, x: 14, y: 1}
+        databricks-ldp-silver: {tier: workspace, x: 18, y: 1}
+        databricks-ldp-gold: {tier: workspace, x: 2, y: 4}
+        databricks-ldp-dashboard: {tier: workspace, x: 6, y: 4}
+        databricks-ldp-log: {tier: workspace, x: 10, y: 4}
+        databricks-ldp-unity: {tier: workspace, x: 14, y: 4}
+        databricks-ldp-warehouse: {tier: workspace, x: 18, y: 4}
+        databricks-ldp-events: {tier: storage, x: 2, y: 1.5}
+        databricks-ldp-managed: {tier: storage, x: 6, y: 1.5}
+        databricks-ldp-role: {tier: storage, x: 10, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: [workspace, compute], nodes: [databricks-ldp-serverless, databricks-ldp-autoloader, databricks-ldp-bronze, databricks-ldp-pipeline, databricks-ldp-quarantine, databricks-ldp-silver, databricks-ldp-gold, databricks-ldp-dashboard, databricks-ldp-log, databricks-ldp-unity, databricks-ldp-warehouse]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: storage, nodes: [databricks-ldp-events, databricks-ldp-managed, databricks-ldp-role]}

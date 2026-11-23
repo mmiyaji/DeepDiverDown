@@ -44,10 +44,14 @@ implementations:
       - {title: Airflow Celery Executor, url: https://airflow.apache.org/docs/apache-airflow-providers-celery/stable/celery_executor.html}
       - {title: DAG Serialization, url: https://airflow.apache.org/docs/apache-airflow/stable/dag-serialization.html}
       - {title: Airflow Security Model, url: https://airflow.apache.org/docs/apache-airflow/stable/security/security_model.html}
+      - {title: Airflow Docker Compose quickstart, url: https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html}
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      celery-redis-host: {label: Docker Compose host, kind: host, tier: processing, x: 12, y: 1, evidence: [{type: doc, ref: "docs/reference-apache-airflow.md#§7"}]}
+      celery-redis-input: {label: Input files on local volume, kind: file, tier: processing, x: 12, y: 3, evidence: [{type: doc, ref: "docs/reference-apache-airflow.md#§7"}]}
+      celery-redis-output: {label: Output files on local volume, kind: file, tier: processing, x: 14, y: 3, evidence: [{type: doc, ref: "docs/reference-apache-airflow.md#§7"}]}
       celery-redis-dag: {label: Python の DAG ファイル, kind: file, tier: processing, x: 1, y: 1.15, realizes: [dag], description: 取込・変換・検査のタスクと依存関係を定義する。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
       celery-redis-scheduler: {label: Airflow Scheduler と CeleryExecutor, kind: service, tier: processing, x: 1, y: 3.65, realizes: [scheduler, executor], description: 依存関係を見て実行可能なタスクを Redis に送る。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
       celery-redis-worker: {label: Airflow Celery Worker と三つの業務タスク, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [worker, ingest, transform, quality], description: キューからタスクを受け取り、必要な依存ライブラリーと接続で処理する。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
@@ -56,9 +60,126 @@ implementations:
       celery-redis-processor: {label: Airflow DAG Processor, kind: worker, tier: setup, x: 5, y: 1.5, description: Python の DAG を解析し、シリアライズした定義をメタデータ DB に渡す。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
       celery-redis-redis: {label: Redis Celery ブローカー, kind: queue, tier: setup, x: 1, y: 1.5, description: CeleryExecutor から受け取った実行依頼をキューで保持する。Airflow の実行履歴はメタデータ DB に保存する。, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§7}]}
     links:
+      - {id: celery-redis-read-input, from: celery-redis-input, to: celery-redis-worker, label: "Read input", evidence: [{type: doc, ref: "docs/reference-apache-airflow.md#§7"}]}
+      - {id: celery-redis-write-output, from: celery-redis-worker, to: celery-redis-output, label: "Write and check output", evidence: [{type: doc, ref: "docs/reference-apache-airflow.md#§7"}]}
       - {id: celery-redis-redis-connection, from: celery-redis-redis, to: celery-redis-worker, label: キューからタスクを取得, realizes: [dispatch], replace: true}
       - {id: celery-redis-queue-task, from: celery-redis-scheduler, to: celery-redis-redis, label: 実行可能なタスクをキューへ送る, realizes: [dispatch], replace: true}
       - {id: celery-redis-read-definition, from: celery-redis-dag, to: celery-redis-processor, label: DAG 定義を渡す, realizes: [schedule], replace: true}
       - {id: celery-redis-serialize-definition, from: celery-redis-processor, to: celery-redis-db, label: シリアライズした DAG を保存, realizes: [schedule], replace: true}
       - {id: celery-redis-load-definition, from: celery-redis-db, to: celery-redis-scheduler, label: スケジューリング用の DAG を参照, realizes: [schedule], replace: true}
       - {id: celery-redis-save-task-state, from: celery-redis-api, to: celery-redis-db, label: タスクの状態を永続化, realizes: [state]}
+
+    layout2d:
+      tiers: [{id: local, label: Docker Compose, z: 0, size: [24, 12]}]
+      nodes:
+        celery-redis-host: {tier: local, x: 2, y: 2}
+        celery-redis-dag: {tier: local, x: 6, y: 2}
+        celery-redis-scheduler: {tier: local, x: 10, y: 2}
+        celery-redis-worker: {tier: local, x: 14, y: 2}
+        celery-redis-api: {tier: local, x: 18, y: 2}
+        celery-redis-db: {tier: local, x: 2, y: 6}
+        celery-redis-processor: {tier: local, x: 6, y: 6}
+        celery-redis-redis: {tier: local, x: 10, y: 6}
+        celery-redis-input: {tier: local, x: 14, y: 6}
+        celery-redis-output: {tier: local, x: 18, y: 6}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: local, nodes: [celery-redis-host, celery-redis-dag, celery-redis-scheduler, celery-redis-worker, celery-redis-api, celery-redis-db, celery-redis-processor, celery-redis-redis, celery-redis-input, celery-redis-output]}
+    layout3d:
+      tiers:
+        - {id: app, label: Containers, z: 1, size: [22, 6]}
+        - {id: host, label: Host and volumes, z: 0, size: [22, 6]}
+      nodes:
+        celery-redis-host: {tier: host, x: 2, y: 1}
+        celery-redis-dag: {tier: host, x: 6, y: 1}
+        celery-redis-scheduler: {tier: app, x: 10, y: 1}
+        celery-redis-worker: {tier: app, x: 14, y: 1}
+        celery-redis-api: {tier: app, x: 18, y: 1}
+        celery-redis-db: {tier: app, x: 2, y: 4}
+        celery-redis-processor: {tier: app, x: 6, y: 4}
+        celery-redis-redis: {tier: app, x: 10, y: 4}
+        celery-redis-input: {tier: host, x: 14, y: 4}
+        celery-redis-output: {tier: host, x: 18, y: 4}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: [app, host], nodes: [celery-redis-host, celery-redis-dag, celery-redis-scheduler, celery-redis-worker, celery-redis-api, celery-redis-db, celery-redis-processor, celery-redis-redis, celery-redis-input, celery-redis-output]}
+
+  - id: aws-mwaa
+    label: "Amazon MWAA・Fargate・S3"
+    description: "Amazon MWAA の Airflow 2 系 CeleryExecutor 環境で、S3 の受注データを取り込み、変換と品質検査を実行する例。"
+    sources:
+      - {title: "Amazon MWAA のネットワークとコンポーネント", url: https://docs.aws.amazon.com/mwaa/latest/migrationguide/mwaa-architecture.html}
+      - {title: "Amazon MWAA の概要", url: https://docs.aws.amazon.com/mwaa/latest/userguide/what-is-mwaa.html}
+      - {title: "Amazon MWAA の実行ロール", url: https://docs.aws.amazon.com/mwaa/latest/userguide/mwaa-create-role.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "利用者の AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-mwaa-environment, aws-mwaa-dag, aws-mwaa-dataset, aws-mwaa-logs, aws-mwaa-role]}
+      - {kind: cloud, label: "AWS の MWAA 管理領域", provider: aws, tier: [runtime, data], nodes: [aws-mwaa-scheduler, aws-mwaa-worker, aws-mwaa-queue, aws-mwaa-metadata, aws-mwaa-ingest, aws-mwaa-transform, aws-mwaa-quality]}
+    nodes:
+      aws-mwaa-role: {label: MWAA execution IAM role, svc: iam, kind: policy, tier: data, x: 14, y: 3, management: {type: customer, scope: "Customer manages permissions and trust."}, evidence: [{type: doc, ref: "docs/reference-apache-airflow.md#§8"}]}
+      aws-mwaa-operator: {label: "DAG の運用担当", kind: client, tier: entry, x: 1, y: 1.5, description: "DAG ファイルを S3 に配置し、環境へアクセスする。", evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-environment: {label: "Amazon MWAA 環境", kind: service, tier: runtime, x: 1, y: 1.3, svc: mwaa, description: "Airflow の環境、コンポーネントとワーカーのスケーリングを管理する。", management: {type: shared, scope: "AWS operates MWAA infrastructure; customer configures environment and access."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-scheduler: {label: "Fargate 上の Scheduler", kind: scheduler, tier: runtime, x: 6, y: 1.3, realizes: [scheduler, executor], description: "Scheduler プロセス内の CeleryExecutor が実行可能なタスクをキューへ送る。", management: {type: aws, scope: "AWS manages internal Fargate scheduler; customer configures environment."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-queue: {label: "MWAA 管理の SQS", kind: queue, tier: runtime, x: 10.5, y: 0.7, svc: sqs, description: "Celery ワーカーが取得するタスクの待ち行列。", management: {type: aws, scope: "AWS manages the internal task queue."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-worker: {label: "Fargate 上の Celery Worker", kind: worker, tier: runtime, x: 14.5, y: 1.3, realizes: [worker], parallel: N, description: "SQS からタスクを取得し、DAG に従って実行する。", management: {type: aws, scope: "AWS manages internal Fargate workers; customer sets scaling and DAGs."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-ingest: {label: "取り込みタスク", kind: worker, tier: runtime, x: 5, y: 5.5, realizes: [ingest], description: "S3 の原本を読み、処理対象を準備する。", management: {type: customer, scope: "Customer manages task code and permissions."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-transform: {label: "変換タスク", kind: worker, tier: runtime, x: 9, y: 5.5, realizes: [transform], description: "受注データを整形して S3 に書く。", management: {type: customer, scope: "Customer manages task code and permissions."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-quality: {label: "品質検査タスク", kind: worker, tier: runtime, x: 13, y: 5.5, realizes: [quality], description: "変換結果に対して件数や必須列を検査する。", management: {type: customer, scope: "Customer manages task code and permissions."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-dag: {label: "S3 の DAG・依存ファイル", kind: file, tier: data, x: 2, y: 1.5, svc: s3, realizes: [dag], description: "環境用のバケットに DAG と対応した依存ファイルを置く。", management: {type: customer, scope: "Customer manages DAGs and dependencies in S3."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-metadata: {label: "管理用 Aurora PostgreSQL", kind: db, tier: data, x: 16, y: 1.5, svc: aurora, realizes: [metadata], description: "DAG ランやタスク状態を保持する AWS 管理のデータベース。", management: {type: aws, scope: "AWS manages the metadata database; customer does not directly operate it."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-dataset: {label: "S3 の受注データ", kind: db, tier: data, x: 6, y: 1.5, svc: s3, description: "原本と整形後の成果物を異なるプレフィックスに保存する。", management: {type: shared, scope: "AWS operates S3; customer manages data and permissions."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      aws-mwaa-logs: {label: "CloudWatch Logs", kind: monitor, tier: data, x: 10, y: 1.5, svc: cloudwatch, description: "タスクと Scheduler の有効にしたログを受け取る。", management: {type: shared, scope: "AWS operates CloudWatch; customer configures logging and access."}, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+    links:
+      - {id: aws-mwaa-role-permissions, from: aws-mwaa-role, to: aws-mwaa-worker, label: "Authorize task access", evidence: [{type: doc, ref: "docs/reference-apache-airflow.md#§8"}]}
+      - {id: aws-mwaa-deploy, from: aws-mwaa-operator, to: aws-mwaa-dag, label: "DAG と依存ファイルを配置", evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      - {id: aws-mwaa-manage, from: aws-mwaa-environment, to: aws-mwaa-scheduler, label: "Scheduler を管理", evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      - {id: aws-mwaa-scale, from: aws-mwaa-environment, to: aws-mwaa-worker, label: "Worker を管理", evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      - {id: aws-mwaa-enqueue, from: aws-mwaa-scheduler, to: aws-mwaa-queue, label: "Celery タスクを送信", realizes: [submit], replace: true, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      - {id: aws-mwaa-dispatch, from: aws-mwaa-queue, to: aws-mwaa-worker, label: "実行可能なタスクを取得", realizes: [dispatch], replace: true, evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      - {id: aws-mwaa-logging, from: aws-mwaa-worker, to: aws-mwaa-logs, label: "タスクログを送信", evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      - {id: aws-mwaa-data-input, from: aws-mwaa-dataset, to: aws-mwaa-ingest, label: "受注原本を読み込む", evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+      - {id: aws-mwaa-data-output, from: aws-mwaa-transform, to: aws-mwaa-dataset, label: "整形したデータを保存", evidence: [{type: doc, ref: docs/reference-apache-airflow.md#§8}]}
+    layout2d:
+      tiers: [{id: diagram, label: MWAA and customer account, z: 0, size: [31, 15]}]
+      nodes:
+        aws-mwaa-operator: {tier: diagram, x: 1, y: 1}
+        aws-mwaa-environment: {tier: diagram, x: 6, y: 1}
+        aws-mwaa-dag: {tier: diagram, x: 11, y: 1}
+        aws-mwaa-dataset: {tier: diagram, x: 16, y: 1}
+        aws-mwaa-logs: {tier: diagram, x: 21, y: 1}
+        aws-mwaa-role: {tier: diagram, x: 26, y: 1}
+        aws-mwaa-scheduler: {tier: diagram, x: 1, y: 5}
+        aws-mwaa-worker: {tier: diagram, x: 6, y: 5}
+        aws-mwaa-queue: {tier: diagram, x: 11, y: 5}
+        aws-mwaa-metadata: {tier: diagram, x: 16, y: 5}
+        aws-mwaa-ingest: {tier: diagram, x: 21, y: 5}
+        aws-mwaa-transform: {tier: diagram, x: 26, y: 5}
+        aws-mwaa-quality: {tier: diagram, x: 1, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [aws-mwaa-environment, aws-mwaa-dag, aws-mwaa-dataset, aws-mwaa-logs, aws-mwaa-role]}
+        - {kind: cloud, provider: aws, label: AWS-managed MWAA environment, tier: diagram, nodes: [aws-mwaa-scheduler, aws-mwaa-worker, aws-mwaa-queue, aws-mwaa-metadata, aws-mwaa-ingest, aws-mwaa-transform, aws-mwaa-quality]}
+    layout3d:
+      tiers:
+        - {id: tasks, label: Airflow tasks, z: 1, size: [16, 3]}
+        - {id: runtime, label: MWAA managed components, z: 0, size: [16, 3]}
+        - {id: customer, label: Customer AWS account, z: 0, origin: [19, 0], size: [20, 3]}
+        - {id: outside, label: Operator, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-mwaa-operator: {tier: outside, x: 0, y: 1.5}
+        aws-mwaa-environment: {tier: customer, x: 2, y: 1.5}
+        aws-mwaa-dag: {tier: customer, x: 6, y: 1.5}
+        aws-mwaa-dataset: {tier: customer, x: 10, y: 1.5}
+        aws-mwaa-logs: {tier: customer, x: 14, y: 1.5}
+        aws-mwaa-role: {tier: customer, x: 18, y: 1.5}
+        aws-mwaa-scheduler: {tier: runtime, x: 2, y: 1.5}
+        aws-mwaa-worker: {tier: runtime, x: 6, y: 1.5}
+        aws-mwaa-queue: {tier: runtime, x: 10, y: 1.5}
+        aws-mwaa-metadata: {tier: runtime, x: 14, y: 1.5}
+        aws-mwaa-ingest: {tier: tasks, x: 2, y: 1.5}
+        aws-mwaa-transform: {tier: tasks, x: 6, y: 1.5}
+        aws-mwaa-quality: {tier: tasks, x: 10, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: customer, nodes: [aws-mwaa-environment, aws-mwaa-dag, aws-mwaa-dataset, aws-mwaa-logs, aws-mwaa-role]}
+        - {kind: cloud, provider: aws, label: AWS-managed MWAA environment, tier: [tasks, runtime], nodes: [aws-mwaa-scheduler, aws-mwaa-worker, aws-mwaa-queue, aws-mwaa-metadata, aws-mwaa-ingest, aws-mwaa-transform, aws-mwaa-quality]}

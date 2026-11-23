@@ -3,7 +3,7 @@
 # 実環境は samples/online-boutique/kubernetes-manifests.yaml を tools/import-k8s.mjs で取り込んだ actual.yaml
 name: Online Boutique（公開デモ）
 sources: [docs/sample-online-boutique.md]
-description: 公開デモアプリの README だけから起こしたモデルを、Kubernetes マニフェストの実態と突き合わせる題材。
+description: 公開デモアプリの README だけから起こしたモデルを、Kubernetes マニフェストの実態と突き合わせる題材。実行先と適用 namespace、LoadBalancer の提供元は未指定。
 evidence:
   - { type: doc, ref: "docs/sample-online-boutique.md#§1" }
 failPresets: [currencyservice, productcatalogservice, cartservice, redis-cart]
@@ -13,14 +13,13 @@ tiers:
   - { id: app, label: アプリケーション, z: 1 }
   - { id: data, label: データ, z: 0 }
 groups:
-  - { kind: cloud, provider: gcp, label: "Google Cloud（プロジェクト）", tier: [edge, app, data] }
-  - { kind: cluster, provider: gcp, label: "GKE クラスタ", tier: [app, data] }
-  - { kind: namespace, label: "namespace: default", tier: [app, data] }
+  - { kind: cluster, label: "Kubernetes クラスタ（実行先未指定）", tier: [app, data] }
+  - { kind: namespace, label: "適用先 namespace（未指定）", tier: [app, data] }
 nodes:
   frontend-external:
     label: frontend-external
     kind: lb
-    svc: gcp:clb
+    svc: k8s:service
     tier: edge
     evidence: [{ type: doc, ref: "docs/sample-online-boutique.md#§2.2" }, { type: iac, ref: service/frontend-external }]
   user:

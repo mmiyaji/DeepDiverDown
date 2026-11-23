@@ -188,8 +188,10 @@ implementations:
         url: https://labs.spot.io/ocean/ocean_workshop/vng_workshop/vng_workshop_instructions.html
       - title: Ocean headroom
         url: https://labs.spot.io/ocean/ocean_workshop/headroom/headroom_overview.html
-      - title: Amazon EKS managed nodes
-        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - {title: Amazon EKS の管理 VPC と顧客 VPC, url: https://docs.aws.amazon.com/eks/latest/best-practices/subnets.html}
+      - {title: Spot Ocean Controller v2, url: https://docs.flexera.com/spot/ocean/tutorials/spot-kubernetes-controller/ocean-controller-two-intro}
+      - {title: Spot と AWS アカウントの IAM 接続, url: https://docs.flexera.com/spot/connect-your-cloud-provider/first-account/aws-manually}
+      - {title: VNG とルートボリューム設定, url: https://docs.flexera.com/spot/ocean/features/vngs/attributes-and-actions-per-vng}
     tiers:
       - id: compute
         label: ワークロードと容量
@@ -210,41 +212,48 @@ implementations:
         tier: compute
         x: 0
         'y': 1.5
+        management: {type: customer, scope: "利用者がアプリのコンテナ、要求リソースと Pod の設定を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-spot-ocean.md#§4
         realizes:
           - pods
       ex-cluster:
-        label: Amazon EKS
+        label: Amazon EKS（管理コントロールプレーン）
         kind: service
         tier: compute
         x: 4
         'y': 1.5
         svc: eks
+        description: AWS 管理 VPC のコントロールプレーンが Pod を割り当てる。利用者は Kubernetes API とクラスタ設定を操作できるが、制御プレーンサーバーに直接アクセスしない。
+        management: {type: aws, scope: "AWS が制御プレーンのサーバーを運用する。利用者は公開された Kubernetes API と EKS の設定・権限を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-spot-ocean.md#§4
         realizes:
           - cluster
       ex-nodes:
-        label: EC2 ワーカーノード
+        label: EC2（Ocean が起動するノード）
         kind: service
         tier: compute
         x: 8
         'y': 1.5
         svc: ec2
+        description: EC2 インスタンスで kubelet が動き、EKS に参加してアプリの Pod を実行する。
+        management: {type: shared, scope: "AWS が EC2 の物理基盤を運用し、Ocean が設定に従い容量の起動を行う。利用者はノード設定とワークロードを管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-spot-ocean.md#§4
         realizes:
           - nodes
       ex-controller:
-        label: Ocean Controller
+        label: Ocean Controller v2（EKS 内の Pod）
         kind: service
         tier: control
         x: 0
         'y': 1.5
+        description: 顧客 VPC の EKS ワーカー上で動き、メトリクスとイベントを外部 SaaS に報告する。
+        management: {type: customer, scope: "利用者がクラスタへの Controller の配備、設定と権限を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-spot-ocean.md#§4
@@ -279,11 +288,17 @@ implementations:
         x: 12
         'y': 1.5
         svc: ec2
+        management: {type: shared, scope: "AWS が EC2 API を提供し、利用者は IAM とクラウドリソースの設定を管理する。"}
         evidence:
           - type: doc
             ref: docs/reference-spot-ocean.md#§4
         realizes:
           - cloud
+      ex-root: {label: "Amazon EBS（ノードのルートボリューム）", svc: ebs, kind: db, tier: compute, x: 15, y: 1.5, description: "EC2 起動時のブロックデバイス設定により OS とノードの作業領域を保持する。", management: {type: shared, scope: "AWS が EBS を提供し、利用者がボリューム設定とデータを管理する。"}, evidence: [{type: doc, ref: docs/reference-spot-ocean.md#§4}]}
+      ex-role: {label: "IAM（Spot SaaS と連携するロール）", svc: iam, kind: policy, tier: control, x: 17, y: 1.5, description: "顧客アカウントが Ocean の利用に必要な権限を持つロールを用意する。", management: {type: shared, scope: "AWS が IAM を提供し、利用者がロールの信頼関係と権限を設定する。"}, evidence: [{type: doc, ref: docs/reference-spot-ocean.md#§4}]}
+    links:
+      - {id: ex-assume, from: ex-autoscaler, to: ex-role, label: AWS アカウントの連携ロールを使う}
+      - {id: ex-root-storage, from: ex-nodes, to: ex-root, label: ノードごとにルートディスクを使用}
     groups:
       - kind: cloud
         provider: aws
@@ -294,6 +309,7 @@ implementations:
           - ex-pods
           - ex-cluster
           - ex-nodes
+          - ex-root
       - kind: cloud
         provider: aws
         label: AWS アカウント / EKS
@@ -316,3 +332,40 @@ implementations:
           - control
         nodes:
           - ex-cloud
+          - ex-role
+      - {kind: vpc, label: 顧客 VPC の EKS データプレーン, tier: [compute, control], nodes: [ex-pods, ex-nodes, ex-controller]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: Ocean と EKS の実装構成, z: 0, size: [23, 11]}
+      nodes:
+        ex-autoscaler: {tier: diagram, x: 2, y: 2}
+        ex-vng: {tier: diagram, x: 2, y: 6}
+        ex-cluster: {tier: diagram, x: 9, y: 1}
+        ex-role: {tier: diagram, x: 17, y: 1}
+        ex-cloud: {tier: diagram, x: 21, y: 1}
+        ex-controller: {tier: diagram, x: 10, y: 5}
+        ex-pods: {tier: diagram, x: 15, y: 5}
+        ex-nodes: {tier: diagram, x: 10, y: 9}
+        ex-root: {tier: diagram, x: 20, y: 9}
+      groups:
+        - {kind: cloud, provider: spotnetapp, label: Spot Ocean サービス, tier: [diagram], nodes: [ex-autoscaler, ex-vng]}
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], nodes: [ex-cluster, ex-role, ex-cloud, ex-controller, ex-pods, ex-nodes, ex-root]}
+        - {kind: vpc, label: 顧客 VPC の EKS ワーカー, tier: [diagram], nodes: [ex-controller, ex-pods, ex-nodes]}
+    layout3d:
+      tiers:
+        - {id: infrastructure, label: AWS と Ocean のサービス・実行基盤, z: 0, size: [23, 10]}
+        - {id: workloads, label: EC2 ワーカー上の Pod, z: 1, size: [23, 10]}
+      nodes:
+        ex-autoscaler: {tier: infrastructure, x: 2, y: 2}
+        ex-vng: {tier: infrastructure, x: 2, y: 6}
+        ex-cluster: {tier: infrastructure, x: 9, y: 1}
+        ex-role: {tier: infrastructure, x: 17, y: 1}
+        ex-cloud: {tier: infrastructure, x: 21, y: 1}
+        ex-nodes: {tier: infrastructure, x: 12, y: 6}
+        ex-root: {tier: infrastructure, x: 17, y: 8}
+        ex-controller: {tier: workloads, x: 10, y: 6}
+        ex-pods: {tier: workloads, x: 14, y: 6}
+      groups:
+        - {kind: cloud, provider: spotnetapp, label: Spot Ocean サービス, tier: [infrastructure], nodes: [ex-autoscaler, ex-vng]}
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [infrastructure, workloads], nodes: [ex-cluster, ex-role, ex-cloud, ex-controller, ex-pods, ex-nodes, ex-root]}
+        - {kind: vpc, label: 顧客 VPC の EKS ワーカー, tier: [infrastructure, workloads], nodes: [ex-controller, ex-pods, ex-nodes]}

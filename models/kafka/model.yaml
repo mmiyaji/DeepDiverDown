@@ -114,6 +114,8 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [16, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      kraft-broker-hosts: {label: 利用者管理 Linux ブローカーホスト群, kind: host, tier: setup, x: 5, y: 1.5, description: 3 台の Linux ホスト上で各 Kafka Broker プロセスを運用しログ用ディスクを管理する。}
+      kraft-controller-hosts: {label: 利用者管理 Linux コントローラーホスト群, kind: host, tier: setup, x: 10, y: 1.5, description: ブローカーと分離したホストで KRaft コントローラープロセスを運用する。}
       kraft-producer: {label: KafkaProducer, kind: client, tier: processing, x: 1, y: 1.15, realizes: [producer], description: 注文キーに基づく対象パーティションへレコードを送る。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
       kraft-controllers: {label: KRaft コントローラー群, kind: service, tier: processing, x: 1, y: 3.65, realizes: [controller], description: 専用プロセスでメタデータログのクォーラムを構成する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
       kraft-b1: {label: Kafka Broker 1, kind: db, tier: processing, x: 5, y: 1.15, realizes: [broker-1], description: P0 の最初のリーダーを担当する。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
@@ -123,4 +125,111 @@ implementations:
       kraft-c2: {label: KafkaConsumer 2, kind: client, tier: processing, x: 13, y: 1.15, realizes: [consumer-2], description: グループ内で割り当てられた分割を読む。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
       kraft-topic: {label: orders のトピック設定, kind: file, tier: setup, x: 1, y: 1.5, description: この例では 3 パーティション・複製係数 3 とし、書き込み時の確認は acks と min.insync.replicas の組み合わせで決まる。, evidence: [{type: doc, ref: docs/reference-kafka.md#§9}]}
     links:
+      - {id: kraft-run-controllers, from: kraft-controller-hosts, to: kraft-controllers, label: コントローラー群を実行}
+      - {id: kraft-run-b1, from: kraft-broker-hosts, to: kraft-b1, label: Broker 1 を実行}
+      - {id: kraft-run-b2, from: kraft-broker-hosts, to: kraft-b2, label: Broker 2 を実行}
+      - {id: kraft-run-b3, from: kraft-broker-hosts, to: kraft-b3, label: Broker 3 を実行}
       - {id: kraft-topic-connection, from: kraft-topic, to: kraft-controllers, label: トピック設定を管理}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 自前 Kafka 構成, z: 0, size: [33, 13]}
+      nodes:
+        kraft-producer: {tier: diagram, x: 1, y: 1}
+        kraft-c1: {tier: diagram, x: 29, y: 5}
+        kraft-c2: {tier: diagram, x: 29, y: 9}
+        kraft-topic: {tier: diagram, x: 7, y: 1}
+        kraft-controller-hosts: {tier: diagram, x: 13, y: 1}
+        kraft-controllers: {tier: diagram, x: 19, y: 1}
+        kraft-broker-hosts: {tier: diagram, x: 7, y: 5}
+        kraft-b1: {tier: diagram, x: 13, y: 5}
+        kraft-b2: {tier: diagram, x: 19, y: 5}
+        kraft-b3: {tier: diagram, x: 19, y: 9}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理の Kafka 実行環境, tier: [diagram], nodes: [kraft-topic, kraft-controller-hosts, kraft-controllers, kraft-broker-hosts, kraft-b1, kraft-b2, kraft-b3]}
+        - {kind: cluster, label: 分離 KRaft コントローラー群, tier: [diagram], nodes: [kraft-controller-hosts, kraft-controllers]}
+        - {kind: cluster, label: Broker ホスト群, tier: [diagram], nodes: [kraft-broker-hosts, kraft-b1, kraft-b2, kraft-b3]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: 自前 Kafka 構成, z: 0, size: [25, 13]}
+      nodes:
+        kraft-producer: {tier: diagram, x: 1, y: 1}
+        kraft-c1: {tier: diagram, x: 1, y: 5}
+        kraft-c2: {tier: diagram, x: 1, y: 9}
+        kraft-topic: {tier: diagram, x: 7, y: 1}
+        kraft-controller-hosts: {tier: diagram, x: 13, y: 1}
+        kraft-controllers: {tier: diagram, x: 19, y: 1}
+        kraft-broker-hosts: {tier: diagram, x: 7, y: 5}
+        kraft-b1: {tier: diagram, x: 13, y: 5}
+        kraft-b2: {tier: diagram, x: 19, y: 5}
+        kraft-b3: {tier: diagram, x: 19, y: 9}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理の Kafka 実行環境, tier: [diagram], nodes: [kraft-topic, kraft-controller-hosts, kraft-controllers, kraft-broker-hosts, kraft-b1, kraft-b2, kraft-b3]}
+        - {kind: cluster, label: 分離 KRaft コントローラー群, tier: [diagram], nodes: [kraft-controller-hosts, kraft-controllers]}
+        - {kind: cluster, label: Broker ホスト群, tier: [diagram], nodes: [kraft-broker-hosts, kraft-b1, kraft-b2, kraft-b3]}
+  - id: aws-msk-ecs
+    label: AWS（Amazon MSK と ECS on Fargate）
+    description: MSK Provisioned の Standard ブローカーを使い、送信・購読アプリを ECS サービスとして Fargate で実行する例。
+    sources:
+      - {title: MSK Provisioned クラスターの作成, url: https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html}
+      - {title: Amazon MSK と KRaft, url: https://docs.aws.amazon.com/msk/latest/developerguide/metadata-management.html}
+      - {title: Amazon MSK の IAM アクセス制御, url: https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html}
+      - {title: Amazon ECS のサービス定義, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html}
+      - {title: Amazon ECS の IAM ロール, url: https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/security-iam-roles.html}
+    tiers:
+      - {id: runtime, label: イベントの送信・複製・購読, z: 0, size: [19, 9]}
+      - {id: operations, label: メタデータ管理とアプリの配置, z: 1, size: [19, 3]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [runtime, operations]}
+      - {kind: vpc, label: アプリとブローカーの VPC, tier: runtime, nodes: [aws-producer, aws-b1, aws-b2, aws-b3, aws-consumer-1, aws-consumer-2]}
+      - {kind: cluster, label: MSK Provisioned（論理的な所属）, tier: [runtime, operations], nodes: [aws-b1, aws-b2, aws-b3, aws-controller]}
+    nodes:
+      aws-producer: {label: Fargate タスク（Producer）, svc: fargate, kind: worker, tier: runtime, x: 1, y: 1.6, realizes: [producer], description: Java Producer が IAM 認証でブローカーに接続し、注文イベントを送る。, management: {type: shared, scope: "AWS が Fargate 基盤を運用し、利用者がアプリ、タスク設定と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-b1: {label: MSK Standard ブローカー 1, svc: msk, kind: db, tier: runtime, x: 7, y: 1.6, realizes: [broker-1], description: 例では P0 のリーダー。P0 への追記に応答する。, management: {type: shared, scope: "AWS が Kafka 基盤を運用し、利用者がトピック、アクセス権と設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-b2: {label: MSK Standard ブローカー 2, svc: msk, kind: db, tier: runtime, x: 7, y: 4.5, realizes: [broker-2], description: 例では P1 のリーダーで、P0 リーダーの切り替え先。, management: {type: shared, scope: "AWS が Kafka 基盤を運用し、利用者がトピック、アクセス権と設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-b3: {label: MSK Standard ブローカー 3, svc: msk, kind: db, tier: runtime, x: 7, y: 7.4, realizes: [broker-3], description: 例では P2 のリーダー。P0 の複製も保持する。, management: {type: shared, scope: "AWS が Kafka 基盤を運用し、利用者がトピック、アクセス権と設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-consumer-1: {label: Fargate タスク（Consumer 1）, svc: fargate, kind: worker, tier: runtime, x: 14, y: 2.6, realizes: [consumer-1], description: 同じ購読サービスのタスクとして起動し、割り当てられたパーティションを読む。, management: {type: shared, scope: "AWS が Fargate 基盤を運用し、利用者がアプリ、タスク設定と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-consumer-2: {label: Fargate タスク（Consumer 2）, svc: fargate, kind: worker, tier: runtime, x: 14, y: 7.4, realizes: [consumer-2], description: Consumer 1 と同じ group.id で、別のパーティションを担当する。, management: {type: shared, scope: "AWS が Fargate 基盤を運用し、利用者がアプリ、タスク設定と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-controller: {label: MSK 管理の KRaft コントローラー群, svc: msk, kind: service, tier: operations, x: 7, y: 1.5, realizes: [controller], description: クラスターのメタデータを管理する。配置は模式図。, management: {type: shared, scope: "AWS が Kafka 基盤を運用し、利用者がトピック、アクセス権と設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-ecs: {label: Amazon ECS（送信・購読サービス）, svc: ecs, kind: service, tier: operations, x: 12, y: 1.5, description: 別々のサービスで Producer と Consumer の Fargate タスクを起動し、指定数を維持する。, management: {type: shared, scope: "AWS がサービス基盤を運用し、利用者が設定と保存内容を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+      aws-ecr: {label: Amazon ECR（アプリイメージ）, svc: ecr, kind: db, tier: operations, x: 17, y: 1.5, description: Producer と Consumer のコンテナイメージを保持する。Fargate がタスク起動時に取得する。, management: {type: shared, scope: "AWS がサービス基盤を運用し、利用者が設定と保存内容を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka.md#§10}]}
+    links:
+      - {id: aws-start-producer, from: aws-ecs, to: aws-producer, label: 送信タスクを起動}
+      - {id: aws-start-consumer-1, from: aws-ecs, to: aws-consumer-1, label: 購読タスクを起動}
+      - {id: aws-start-consumer-2, from: aws-ecs, to: aws-consumer-2, label: 購読タスクを起動}
+      - {id: aws-task-image, from: aws-ecs, to: aws-ecr, label: タスク定義でイメージを参照}
+      - {id: aws-pull-producer, from: aws-producer, to: aws-ecr, label: 実行ロールでイメージ取得}
+      - {id: aws-pull-consumer-1, from: aws-consumer-1, to: aws-ecr, label: 実行ロールでイメージ取得}
+    layout2d:
+      tiers:
+        - {id: diagram, label: AWS の実装構成, z: 0, size: [27, 15]}
+      nodes:
+        aws-ecs: {tier: diagram, x: 2, y: 1}
+        aws-ecr: {tier: diagram, x: 8, y: 1}
+        aws-producer: {tier: diagram, x: 2, y: 5}
+        aws-consumer-1: {tier: diagram, x: 2, y: 10}
+        aws-consumer-2: {tier: diagram, x: 8, y: 10}
+        aws-controller: {tier: diagram, x: 18, y: 2}
+        aws-b1: {tier: diagram, x: 15, y: 7}
+        aws-b2: {tier: diagram, x: 21, y: 7}
+        aws-b3: {tier: diagram, x: 18, y: 12}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: -1, y0: -1, x1: 25, y1: 14, nodes: [aws-ecs, aws-ecr, aws-producer, aws-consumer-1, aws-consumer-2, aws-controller, aws-b1, aws-b2, aws-b3]}
+        - {kind: cluster, label: ECS クラスター（Fargate タスク）, tier: [diagram], x0: -0.5, y0: 3, x1: 10.5, y1: 12, nodes: [aws-producer, aws-consumer-1, aws-consumer-2]}
+        - {kind: cluster, label: MSK Provisioned（論理的な所属）, tier: [diagram], x0: 12, y0: 0, x1: 24, y1: 14, nodes: [aws-controller, aws-b1, aws-b2, aws-b3]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: AWS の実装構成, z: 0, size: [18, 12]}
+      nodes:
+        aws-ecs: {tier: diagram, x: 2, y: 1}
+        aws-ecr: {tier: diagram, x: 7, y: 1}
+        aws-producer: {tier: diagram, x: 2, y: 5}
+        aws-consumer-1: {tier: diagram, x: 2, y: 8}
+        aws-consumer-2: {tier: diagram, x: 6, y: 8}
+        aws-controller: {tier: diagram, x: 12, y: 3}
+        aws-b1: {tier: diagram, x: 10, y: 6}
+        aws-b2: {tier: diagram, x: 14, y: 6}
+        aws-b3: {tier: diagram, x: 12, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: -1, y0: -1, x1: 17, y1: 11, nodes: [aws-ecs, aws-ecr, aws-producer, aws-consumer-1, aws-consumer-2, aws-controller, aws-b1, aws-b2, aws-b3]}
+        - {kind: cluster, label: ECS クラスター（Fargate タスク）, tier: [diagram], x0: 0, y0: 3.5, x1: 8, y1: 10, nodes: [aws-producer, aws-consumer-1, aws-consumer-2]}
+        - {kind: cluster, label: MSK Provisioned（論理的な所属）, tier: [diagram], x0: 8.5, y0: 1.5, x1: 16, y1: 10, nodes: [aws-controller, aws-b1, aws-b2, aws-b3]}

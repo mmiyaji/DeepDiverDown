@@ -2,8 +2,8 @@
   "model": "iceberg-rest-catalog",
   "name": "Iceberg REST Catalog の基本アーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "engine": {
@@ -75,6 +75,24 @@
       "type": "scenario",
       "label": "カタログ経由で読み書き"
     },
+    "trino-polaris-host": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "Docker Compose host",
+      "realizes": []
+    },
+    "trino-polaris-setup": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "Polaris setup container",
+      "realizes": []
+    },
+    "trino-polaris-store": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "RustFS container",
+      "realizes": []
+    },
     "trino-polaris-trino": {
       "type": "implementation",
       "impl": "trino-polaris",
@@ -114,6 +132,58 @@
       "impl": "trino-polaris",
       "label": "polaris.properties",
       "realizes": []
+    },
+    "trino-polaris-metastore": {
+      "type": "implementation",
+      "impl": "trino-polaris",
+      "label": "Polaris のインメモリ metastore",
+      "realizes": []
+    },
+    "aws-emr-control": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "aws-emr-host": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "aws-emr-spark": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark / Iceberg REST クライアント",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "aws-emr-glue": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "AWS Glue Data Catalog / REST",
+      "realizes": [
+        "api",
+        "catalog",
+        "commit"
+      ]
+    },
+    "aws-emr-metadata": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "metadata.json",
+      "realizes": [
+        "metadata"
+      ]
+    },
+    "aws-emr-s3": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3 / Manifest・データ",
+      "realizes": [
+        "data"
+      ]
     }
   },
   "byRef": {
@@ -139,11 +209,21 @@
       "commit-request",
       "commit-server",
       "catalog-read-commit",
+      "trino-polaris-host",
+      "trino-polaris-setup",
+      "trino-polaris-store",
       "trino-polaris-trino",
       "trino-polaris-polaris",
       "trino-polaris-metadata",
       "trino-polaris-data",
-      "trino-polaris-config"
+      "trino-polaris-config",
+      "trino-polaris-metastore",
+      "aws-emr-control",
+      "aws-emr-host",
+      "aws-emr-spark",
+      "aws-emr-glue",
+      "aws-emr-metadata",
+      "aws-emr-s3"
     ],
     "docs/reference-iceberg-rest-catalog.md#§2": [
       "catalog",
@@ -168,11 +248,23 @@
       "catalog-read-commit"
     ],
     "docs/reference-iceberg-rest-catalog.md#§7": [
+      "trino-polaris-host",
+      "trino-polaris-setup",
+      "trino-polaris-store",
       "trino-polaris-trino",
       "trino-polaris-polaris",
       "trino-polaris-metadata",
       "trino-polaris-data",
-      "trino-polaris-config"
+      "trino-polaris-config",
+      "trino-polaris-metastore"
+    ],
+    "docs/reference-iceberg-rest-catalog.md#§8": [
+      "aws-emr-control",
+      "aws-emr-host",
+      "aws-emr-spark",
+      "aws-emr-glue",
+      "aws-emr-metadata",
+      "aws-emr-s3"
     ]
   },
   "reference": {

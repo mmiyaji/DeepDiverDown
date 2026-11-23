@@ -401,8 +401,9 @@ timeline:
 implementations:
   - id: bq-shipping-facts
     label: BigQuery の出荷工程ファクト
-    description: 出荷の工程イベントから、異なる粒度でトランザクション・日次・進捗・発生有無の表を作る実装例。
+    description: 出荷 CSV を BigQuery にロードし、GoogleSQL で異なる粒度の4種類のファクトを作る例。
     sources:
+      - {title: BigQuery overview, url: https://docs.cloud.google.com/bigquery/docs/introduction}
       - title: Kimball Group Transaction Fact Tables
         url: >-
           https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/transaction-fact-table/
@@ -424,6 +425,8 @@ implementations:
         url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries
       - title: BigQuery DML
         url: https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax
+      - {title: "Cloud Storage からの CSV ロード", url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv}
+      - {title: "BigQuery の JOBS ビュー", url: https://docs.cloud.google.com/bigquery/docs/information-schema-jobs}
     tiers:
       - id: input
         label: 出荷業務と日次締め
@@ -444,12 +447,19 @@ implementations:
           - 16
           - 3
       - id: implementation-setup
-        label: 実装時の設定・観測
+        label: Cloud Storage と BigQuery ジョブ
         z: 2
         size:
-          - 8
-          - 3
+          - 26
+          - 6
     nodes:
+      example-engine: {label: BigQuery managed compute, svc: "gcp:bigquery", kind: service, tier: implementation-setup, x: 22, y: 2, evidence: [{type: doc, ref: "docs/reference-dwh-fact-table-types.md#§8"}]}
+      example-service-account: {label: Scheduled query service account, kind: policy, tier: implementation-setup, x: 25, y: 3, evidence: [{type: doc, ref: "docs/reference-dwh-fact-table-types.md#§8"}]}
+      example-user: {label: Analyst, kind: actor, tier: input, x: -3, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-fact-table-types.md#§8"}]}
+      example-files: {label: "Cloud Storage（出荷工程イベントの CSV）", svc: gcp:gcs, kind: file, tier: implementation-setup, x: 1, y: 1.5, description: "業務システムまたは検証用のバッチ CSV を保持する。", evidence: [{type: doc, ref: docs/reference-dwh-fact-table-types.md#§8}]}
+      example-load-job: {label: "BigQuery（CSV ロードジョブ）", svc: gcp:bigquery, kind: worker, tier: implementation-setup, x: 6, y: 1.5, description: "同じロケーションの Cloud Storage から BigQuery の入力表へロードする。", evidence: [{type: doc, ref: docs/reference-dwh-fact-table-types.md#§8}]}
+      example-scheduler: {label: "BigQuery（スケジュールされたクエリ）", svc: gcp:bigquery, kind: scheduler, tier: implementation-setup, x: 11, y: 1.5, description: "Data Transfer Service でサービスアカウントの GoogleSQL ジョブを起動する。", evidence: [{type: doc, ref: docs/reference-dwh-fact-table-types.md#§8}]}
+      example-studio: {label: "BigQuery Studio（SQL 問い合わせ）", svc: gcp:bigquery, kind: client, tier: implementation-setup, x: 17, y: 1.5, description: "対象の粒度のビューで出荷量と残数を確認する。", evidence: [{type: doc, ref: docs/reference-dwh-fact-table-types.md#§8}]}
       example-events:
         label: landing.shipping_events
         kind: table
@@ -464,7 +474,7 @@ implementations:
             ref: docs/reference-dwh-fact-table-types.md#§8
         svc: gcp:bigquery
       example-load:
-        label: BigQuery の増分ロード SQL
+        label: BigQuery（出荷ファクト更新ジョブ）
         kind: workflow
         tier: input
         x: 4.4
@@ -477,7 +487,7 @@ implementations:
             ref: docs/reference-dwh-fact-table-types.md#§8
         svc: gcp:bigquery
       example-day-close:
-        label: スケジュールされた日次締め SQL
+        label: BigQuery（日次締めの SQL 処理）
         kind: workflow
         tier: input
         svc: gcp:bigquery
@@ -559,13 +569,21 @@ implementations:
         kind: table
         tier: implementation-setup
         x: 1
-        'y': 1.5
+        'y': 4.3
         description: 出荷がない営業日にも日次行を用意する。
         evidence:
           - type: doc
             ref: docs/reference-dwh-fact-table-types.md#§8
         svc: gcp:bigquery
     links:
+      - {id: example-run-compute, from: example-engine, to: example-load, label: "Run transformation SQL", evidence: [{type: doc, ref: "docs/reference-dwh-fact-table-types.md#§8"}]}
+      - {id: example-run-identity, from: example-service-account, to: example-scheduler, label: "Authorize scheduled query", evidence: [{type: doc, ref: "docs/reference-dwh-fact-table-types.md#§8"}]}
+      - {id: example-user-studio, from: example-user, to: example-studio, label: "Inspect query results", evidence: [{type: doc, ref: "docs/reference-dwh-fact-table-types.md#§8"}]}
+      - {id: example-bq-files, from: example-files, to: example-load-job, label: CSV ファイルを読み込む}
+      - {id: example-bq-load, from: example-load-job, to: example-events, label: BigQuery の入力表に書き込む}
+      - {id: example-bq-run, from: example-scheduler, to: example-load, label: スケジュールから GoogleSQL ジョブを起動}
+      - {id: example-bq-query, from: example-studio, to: example-analyst, label: 公開ビューをクエリする}
+      - {id: example-bq-close, from: example-load, to: example-day-close, label: 工程イベントの反映後に日次締めを実行}
       - id: example-calendar-connection
         from: example-calendar
         to: example-day-close
@@ -574,30 +592,48 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-fact-table-types.md#§8
     groups:
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - input
-        nodes:
-          - example-events
-          - example-load
-          - example-day-close
-          - example-analyst
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - warehouse
-        nodes:
-          - example-transactions
-          - example-periodic
-          - example-accumulating
-          - example-factless
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - implementation-setup
-        nodes:
-          - example-calendar
+      - {kind: cloud, provider: gcp, label: Google Cloud project, tier: [input, warehouse, implementation-setup], nodes: [example-files, example-load-job, example-scheduler, example-studio, example-events, example-load, example-day-close, example-analyst, example-transactions, example-periodic, example-accumulating, example-factless, example-calendar, example-engine, example-service-account]}
+    layout2d:
+      tiers: [{id: diagram, label: Shipping facts on BigQuery, z: 0, size: [34, 15]}]
+      nodes:
+        example-files: {tier: diagram, x: 4, y: 1}
+        example-load-job: {tier: diagram, x: 8, y: 1}
+        example-scheduler: {tier: diagram, x: 12, y: 1}
+        example-studio: {tier: diagram, x: 16, y: 1}
+        example-events: {tier: diagram, x: 20, y: 1}
+        example-load: {tier: diagram, x: 24, y: 1}
+        example-day-close: {tier: diagram, x: 28, y: 1}
+        example-analyst: {tier: diagram, x: 4, y: 5}
+        example-transactions: {tier: diagram, x: 8, y: 5}
+        example-periodic: {tier: diagram, x: 12, y: 5}
+        example-accumulating: {tier: diagram, x: 16, y: 5}
+        example-factless: {tier: diagram, x: 20, y: 5}
+        example-calendar: {tier: diagram, x: 24, y: 5}
+        example-engine: {tier: diagram, x: 28, y: 5}
+        example-service-account: {tier: diagram, x: 4, y: 9}
+        example-user: {tier: diagram, x: 0, y: 2}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: diagram, nodes: [example-files, example-load-job, example-scheduler, example-studio, example-events, example-load, example-day-close, example-analyst, example-transactions, example-periodic, example-accumulating, example-factless, example-calendar, example-engine, example-service-account]}
+    layout3d:
+      tiers:
+        - {id: services, label: BigQuery and Cloud Storage, z: 0, size: [28, 9]}
+        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-files: {tier: services, x: 2, y: 1}
+        example-load-job: {tier: services, x: 6, y: 1}
+        example-scheduler: {tier: services, x: 10, y: 1}
+        example-studio: {tier: services, x: 14, y: 1}
+        example-events: {tier: services, x: 18, y: 1}
+        example-load: {tier: services, x: 22, y: 1}
+        example-day-close: {tier: services, x: 26, y: 1}
+        example-analyst: {tier: services, x: 2, y: 4}
+        example-transactions: {tier: services, x: 6, y: 4}
+        example-periodic: {tier: services, x: 10, y: 4}
+        example-accumulating: {tier: services, x: 14, y: 4}
+        example-factless: {tier: services, x: 18, y: 4}
+        example-calendar: {tier: services, x: 22, y: 4}
+        example-engine: {tier: services, x: 26, y: 4}
+        example-service-account: {tier: services, x: 2, y: 7}
+        example-user: {tier: user, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: services, nodes: [example-files, example-load-job, example-scheduler, example-studio, example-events, example-load, example-day-close, example-analyst, example-transactions, example-periodic, example-accumulating, example-factless, example-calendar, example-engine, example-service-account]}

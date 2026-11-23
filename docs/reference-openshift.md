@@ -37,22 +37,29 @@ Deployment の更新では新しい ReplicaSet を作り、ロールアウトの
 出典 [OpenShift Container Platform 4.21 Building applications](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index)・[Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 
 ## 7. 実装例：OpenShift と Ingress Controller
-自前の OpenShift Container Platform クラスタで、注文 API を標準の Ingress Controller から公開する例。
+利用者が VMware vSphere に用意した RHCOS の制御 VM と worker VM 上で OpenShift を稼働させ、注文 API を標準の Ingress Controller から公開する例。
 
 | 機能配置 | この例での担い手 |
 |---|---|
 | 構成の投入クライアント | oc CLI |
-| クラスタ管理 API | OpenShift コントロールプレーン |
+| クラスタ管理 API | API 用 L4 ロードバランサーと RHCOS の制御 VM |
 | レプリカ調整・配置先の決定 | OpenShift コントロールプレーン |
 | ノード実行エージェント | RHCOS worker の kubelet / CRI-O |
 | 注文 API の実行単位 | 注文 API Deployment / Pod |
 | 注文 API の内部公開 | 注文 API の ClusterIP Service |
-| 外部公開ルート | TLS Route と HAProxy Router |
+| 外部公開ルート | アプリ用 L4 ロードバランサー、TLS Route、HAProxy Router |
 
-- **apps ドメインのワイルドカード DNS**。ルートのホスト名を Ingress Controller の到達先で解決する。
+- **apps ドメインのワイルドカード DNS**。Route のホスト名をアプリ用ロードバランサーに解決する。
 
 TLS の終端方式は Route で選択する。エッジ終端を使う場合、Router からバックエンドまでの暗号化要件を別途決める。
+
+API ロードバランサーは TCP 6443 を制御 VM に、アプリ用は TCP 80・443 を Router が稼働するノードに転送する。Router が Route に対する Service のエンドポイントを選び、対象 Pod へ送る。各制御 VM で稼働する etcd が永続ディスクにクラスタ状態を保持する。
+
+この例では Router Pod は worker 上で動作し、API とアプリの L4 ロードバランサーおよび DNS はクラスタ外に配置する。利用者は vSphere の VM、ネットワーク、DNS とロードバランサーを用意・運用し、OpenShift の API とサポートされる設定を通じてクラスタやワークロードを管理する。RHCOS や OpenShift の管理対象コンポーネントを任意に直接変更できるとは仮定しない。
+
+複数の公式資料を組み合わせた代表構成であり、実在の導入例や動作検証済み構成ではない。VM 容量、冗長化、ロードバランサー製品、TLS 終端方式は未確定。
 
 公式資料
 - [OpenShift Ingress and load balancing](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/ingress_and_load_balancing/index)
 - [OpenShift Networking Operators](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/networking_operators/index)
+- [OpenShift の vSphere ユーザー管理インフラ](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/installing_on_vmware_vsphere/user-provisioned-infrastructure)

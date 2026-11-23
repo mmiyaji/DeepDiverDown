@@ -57,6 +57,10 @@ AWS の EKS クラスタで、プライベートサブネットの Managed Node 
 
 - **AWS Load Balancer Controller**。Ingress を監視し、ALB とターゲット登録を調整する。
 
+制御プレーンは AWS 管理 VPC で稼働し、顧客 VPC や顧客アカウント内の EC2 ノードとは別の運用境界にある。利用者は権限に応じて Kubernetes API とクラスタ設定を操作し、公開・プライベート API エンドポイントを設定できるが、制御プレーンのサーバー自体には直接アクセスしない。図の外枠は両者を含む AWS のサービス領域を表し、単一の顧客アカウントや VPC を意味しない。[EKS Control Plane](https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html)
+
+この例は複数の公式資料を組み合わせた代表構成であり、実在の導入例や動作検証済みの構成ではない。EKS は Managed Node Group のノード作成と更新を支援し、利用者が設定、修正済み AMI の適用開始、アプリとコントローラーを管理する。
+
 ALB の IP ターゲット方式を選ぶ。公開ステップではコントローラーによるターゲットの調整と、ALB から Pod IP への HTTP 転送を示す。コントローラーの IAM 権限とサブネットの選択を確認する。
 
 公式資料

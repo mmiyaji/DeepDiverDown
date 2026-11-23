@@ -59,7 +59,15 @@ AKS のシステムプールとユーザープールを分け、ユーザープ�
 
 ユーザープールへの配置はマニフェストで指定する。システムプールへのアプリ配置を厳格に防ぐ場合は taint と toleration の設計も必要。
 
+公開 Standard Load Balancer はノードをバックエンドとし、ノード側の Kubernetes Service のルールで Pod に転送する。この例は `externalTrafficPolicy: Local` を使い、正常な注文 API の Pod があるノードで外部トラフィックを受ける。
+
+Microsoft は制御プレーンの内部コンポーネントを運用し、利用者はそれらを変更できない。利用者は権限に応じて Kubernetes API と公開されたクラスタ設定を操作できる。Standard のノードプールは Microsoft と利用者が運用を分担し、利用者は VM サイズ、台数、ラベル、taint などを設定する。外枠は Azure のサービス領域、クラスタ枠は論理的な所属であり、制御プレーンが顧客 VNet 内にあることを示さない。Entra テナントはサブスクリプションと別の境界として示す。
+
+この構成は複数の公式資料を組み合わせた例であり、実在の導入例や動作検証済み構成ではない。具体的な権限、ネットワークとバージョンは導入時に確認する。
+
 公式資料
+- [AKS support policies](https://learn.microsoft.com/en-us/azure/aks/support-policies)
+- [AKS cluster authentication](https://learn.microsoft.com/en-us/azure/aks/concepts-cluster-authentication)
 - [AKS core concepts](https://learn.microsoft.com/azure/aks/core-aks-concepts)
 - [AKS baseline architecture](https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/containers/aks/baseline-aks)
 - [Use a Standard Load Balancer in AKS](https://learn.microsoft.com/en-us/azure/aks/load-balancer-standard)

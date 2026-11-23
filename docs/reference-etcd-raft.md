@@ -30,23 +30,29 @@ A と B・C の間が切れると A は書き込みをコミットできず、�
 
 出典 [etcd Failure modes](https://etcd.io/docs/v3.6/op-guide/failures/)、[etcd API guarantees](https://etcd.io/docs/v3.6/learning/api_guarantees/)
 
-## 6. 実装例：3 台の VM で運用する etcd
+## 6. 実装例：AWS（3 AZ の EC2 で運用する etcd）
 受付上限のキーを 3 台の etcd メンバーに保持し、書き込み後の状態を etcdctl で確認する例。
 
 | 機能配置 | この例での担い手 |
 |---|---|
 | 運用者 | 設定変更を行う運用者 |
 | 状態更新のクライアント | etcdctl put |
-| メンバー A | etcd member A の VM |
-| メンバー B | etcd member B の VM |
-| メンバー C | etcd member C の VM |
+| メンバー A | AZ A の EC2 上の etcd と専用 EBS ボリューム |
+| メンバー B | AZ B の EC2 上の etcd と専用 EBS ボリューム |
+| メンバー C | AZ C の EC2 上の etcd と専用 EBS ボリューム |
 | 確定した設定値 | etcd MVCC の受付上限キー |
 
 - **etcdctl endpoint status**。リーダーの識別と各エンドポイントの状態確認に使う。
 
 クライアント通信とメンバー間通信にはそれぞれ TLS を構成する。B が選ばれるのはシナリオの一例。メンバーを単一の障害ドメインに集めると VM 台数だけでは耐障害性を確保できない。
 
+1 リージョン・1 VPC の別々の可用性ゾーンに EC2 を1台ずつ置き、同じ AZ の EBS SSD ボリュームを各メンバーの `--data-dir` に使う。Raft の WAL とバックエンドはメンバーごとのディレクトリに保存する。メンバー間の往復遅延と EBS の書き込み同期遅延を測定し、過半数を維持する構成を確認する。
+
 公式資料
 - [etcd Clustering Guide](https://etcd.io/docs/v3.6/op-guide/clustering/)
 - [etcd Cluster Status](https://etcd.io/docs/v3.6/tasks/operator/how-to-check-cluster-status/)
 - [etcd API guarantees](https://etcd.io/docs/v3.6/learning/api_guarantees/)
+- [etcd のハードウェア要件](https://etcd.io/docs/v3.6/op-guide/hardware/)
+- [Amazon EBS ボリュームのアタッチ](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html)
+
+AWS は EC2・EBS の基盤を運用し、利用者は各ホストの OS、etcd プロセス、TLS、メンバー、ディスクとバックアップ・復旧を管理する。これは公式資料を組み合わせた代表例で、各 AZ のサブネットやセキュリティグループ、ディスク性能と実際の耐障害性は未検証である。

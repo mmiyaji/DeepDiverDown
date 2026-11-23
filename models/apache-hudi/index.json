@@ -2,8 +2,8 @@
   "model": "apache-hudi",
   "name": "Apache Hudi の基本アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "cdc": {
@@ -84,6 +84,30 @@
       "type": "scenario",
       "label": "1 件の更新を CoW と MoR で書く"
     },
+    "hudi-spark-host": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Docker Compose host",
+      "realizes": []
+    },
+    "hudi-spark-master": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark master",
+      "realizes": []
+    },
+    "hudi-spark-worker": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark worker",
+      "realizes": []
+    },
+    "hudi-spark-hdfs": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS NameNode / DataNode",
+      "realizes": []
+    },
     "hudi-spark-kafka": {
       "type": "implementation",
       "impl": "hudi-spark",
@@ -145,6 +169,86 @@
       "impl": "hudi-spark",
       "label": "Hudi Streamer（Spark）",
       "realizes": []
+    },
+    "aws-emr-control": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "aws-emr-host": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "aws-emr-msk": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon MSK / 更新トピック",
+      "realizes": [
+        "cdc"
+      ]
+    },
+    "aws-emr-glue": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "AWS Glue Data Catalog",
+      "realizes": []
+    },
+    "aws-emr-streamer": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark / Hudi Streamer",
+      "realizes": []
+    },
+    "aws-emr-compact": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Hudi Compactor",
+      "realizes": [
+        "compact"
+      ]
+    },
+    "aws-emr-query": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark SQL / Hudi",
+      "realizes": [
+        "query"
+      ]
+    },
+    "aws-emr-output": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "下流の分析利用者",
+      "realizes": [
+        "output"
+      ]
+    },
+    "aws-emr-s3": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3 / .hoodie",
+      "realizes": [
+        "timeline"
+      ]
+    },
+    "aws-emr-cow": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "CoW / ベースファイル",
+      "realizes": [
+        "cow"
+      ]
+    },
+    "aws-emr-mor": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "MoR / ベースと更新ログ",
+      "realizes": [
+        "mor"
+      ]
     }
   },
   "byRef": {
@@ -172,6 +276,10 @@
       "deliver",
       "upsert-cdc",
       "update-cow-mor",
+      "hudi-spark-host",
+      "hudi-spark-master",
+      "hudi-spark-worker",
+      "hudi-spark-hdfs",
       "hudi-spark-kafka",
       "hudi-spark-timeline",
       "hudi-spark-cow",
@@ -179,7 +287,18 @@
       "hudi-spark-compact",
       "hudi-spark-spark",
       "hudi-spark-output",
-      "hudi-spark-ingestion"
+      "hudi-spark-ingestion",
+      "aws-emr-control",
+      "aws-emr-host",
+      "aws-emr-msk",
+      "aws-emr-glue",
+      "aws-emr-streamer",
+      "aws-emr-compact",
+      "aws-emr-query",
+      "aws-emr-output",
+      "aws-emr-s3",
+      "aws-emr-cow",
+      "aws-emr-mor"
     ],
     "docs/reference-apache-hudi.md#§2": [
       "cow",
@@ -204,6 +323,10 @@
       "upsert-cdc"
     ],
     "docs/reference-apache-hudi.md#§6": [
+      "hudi-spark-host",
+      "hudi-spark-master",
+      "hudi-spark-worker",
+      "hudi-spark-hdfs",
       "hudi-spark-kafka",
       "hudi-spark-timeline",
       "hudi-spark-cow",
@@ -212,6 +335,19 @@
       "hudi-spark-spark",
       "hudi-spark-output",
       "hudi-spark-ingestion"
+    ],
+    "docs/reference-apache-hudi.md#§7": [
+      "aws-emr-control",
+      "aws-emr-host",
+      "aws-emr-msk",
+      "aws-emr-glue",
+      "aws-emr-streamer",
+      "aws-emr-compact",
+      "aws-emr-query",
+      "aws-emr-output",
+      "aws-emr-s3",
+      "aws-emr-cow",
+      "aws-emr-mor"
     ]
   },
   "reference": {

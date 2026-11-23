@@ -184,6 +184,7 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-ecu: {label: Adaptive ECU（機種未選定）, kind: host, tier: support, x: 1, y: 2, description: POSIX OS と Adaptive ソフトウェアを実行する ECU。, evidence: [{type: doc, ref: docs/reference-autosar-adaptive.md#§4}]}
       ex-app:
         label: Adaptive Application
         kind: service
@@ -268,3 +269,121 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-autosar-adaptive.md#§4
+    links:
+      - {id: ex-ecu-os, from: ex-ecu, to: ex-os, label: POSIX OS を実行, evidence: [{type: doc, ref: docs/reference-autosar-adaptive.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ECU と接続, z: 0, size: [25, 14]}]
+      nodes:
+        ex-ecu: {tier: diagram, x: 1, y: 1}
+        ex-os: {tier: diagram, x: 4, y: 1}
+        ex-execution: {tier: diagram, x: 7, y: 1}
+        ex-storage: {tier: diagram, x: 1, y: 4}
+        ex-communication: {tier: diagram, x: 4, y: 4}
+        ex-runtime: {tier: diagram, x: 7, y: 4}
+        ex-app: {tier: diagram, x: 1, y: 7}
+        ex-classic: {tier: diagram, x: 14, y: 1}
+      groups:
+        - {kind: datacenter, label: Adaptive ECU, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 11, nodes: [ex-ecu, ex-os, ex-execution, ex-storage, ex-communication, ex-runtime, ex-app]}
+        - {kind: datacenter, label: Classic ECU, tier: [diagram], x0: 12, y0: 0, x1: 23, y1: 9, nodes: [ex-classic]}
+    layout3d:
+      tiers:
+        - {id: hw, label: ECU ハードウェア, z: 0, size: [10, 9]}
+        - {id: runtime, label: OS・基盤ソフトウェア, z: 1, size: [10, 9]}
+        - {id: app, label: アプリケーション, z: 2, size: [10, 9]}
+        - {id: peer, label: 対向 ECU・開発ホスト, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: peerapp, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: network, label: 通信・配備設定, z: 0, origin: [25, 0], size: [8, 4]}
+      nodes:
+        ex-ecu: {tier: hw, x: 1, y: 1}
+        ex-os: {tier: runtime, x: 4, y: 1}
+        ex-execution: {tier: runtime, x: 7, y: 1}
+        ex-storage: {tier: runtime, x: 1, y: 4}
+        ex-communication: {tier: runtime, x: 4, y: 4}
+        ex-runtime: {tier: runtime, x: 7, y: 4}
+        ex-app: {tier: app, x: 1, y: 7}
+        ex-classic: {tier: peer, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: Adaptive ECU, tier: [hw, runtime, app], nodes: [ex-ecu, ex-os, ex-execution, ex-storage, ex-communication, ex-runtime, ex-app]}
+        - {kind: datacenter, label: Classic ECU, tier: [peer, peerapp], nodes: [ex-classic]}
+
+  - id: adaptive-classic-someip
+    label: "AUTOSAR R24-11：POSIX ECU・Classic ECU 間の SOME/IP"
+    description: "R24-11 仕様に基づき、Adaptive の POSIX 実行環境と別の Classic ECU に置く信号変換 SWC を分けて示す例。"
+    sources:
+      - {title: "AUTOSAR Adaptive R24-11 Platform Design", url: https://www.autosar.org/fileadmin/standards/R24-11/AP/AUTOSAR_AP_EXP_PlatformDesign.pdf}
+      - {title: "AUTOSAR Adaptive R24-11 Software Architecture", url: https://www.autosar.org/fileadmin/standards/R24-11/AP/AUTOSAR_AP_EXP_SWArchitecture.pdf}
+      - {title: "AUTOSAR Classic R24-11 Layered Software Architecture", url: https://www.autosar.org/fileadmin/standards/R24-11/CP/AUTOSAR_CP_EXP_LayeredSoftwareArchitecture.pdf}
+      - {title: "AUTOSAR Adaptive R24-11 Release Overview", url: https://www.autosar.org/fileadmin/standards/R24-11/AP/AUTOSAR_AP_TR_ReleaseOverview.pdf}
+    tiers:
+      - {id: config, label: "配備設定", z: 2, size: [20, 4]}
+      - {id: adaptive, label: "Adaptive ECU", z: 1, size: [20, 4]}
+      - {id: classic, label: "車載 Ethernet と Classic ECU", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "Adaptive ECU / POSIX マシン", provider: onprem, tier: [adaptive], nodes: [adaptive-link-ecu, adaptive-link-app, adaptive-link-ara, adaptive-link-com, adaptive-link-exec, adaptive-link-os, adaptive-link-persist]}
+      - {kind: datacenter, label: "Classic ECU", provider: onprem, tier: [classic], nodes: [adaptive-link-classic-ecu, adaptive-link-bridge, adaptive-link-signal]}
+    nodes:
+      adaptive-link-ecu: {label: Adaptive ECU ハードウェア, kind: host, tier: adaptive, x: 1, y: 3, description: POSIX 対応 OS と Adaptive ソフトウェアを実行する。具体機種は未選定。, evidence: [{type: doc, ref: docs/reference-autosar-adaptive.md#§5}]}
+      adaptive-link-classic-ecu: {label: Classic ECU ハードウェア, kind: host, tier: classic, x: 16, y: 3, description: Classic の通信とアプリを実行する対向 ECU。具体機種は未選定。, evidence: [{type: doc, ref: docs/reference-autosar-adaptive.md#§5}]}
+      adaptive-link-manifest: {label: "Machine・Execution・Service Instance Manifest", kind: file, tier: config, x: 8, y: 1.5, description: "実行ファイルと起動条件、ネットワークとサービス通信の設定を定義する。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-app: {label: "Adaptive Application プロセス", kind: worker, tier: adaptive, x: 3, y: 1.1, realizes: [app], description: "POSIX マシン上で実行し、ARA の標準 API を利用する。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-ara: {label: "AUTOSAR Runtime for Adaptive Applications", kind: service, tier: adaptive, x: 8, y: 1.1, realizes: [runtime], description: "アプリから通信や永続化へアクセスする API。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-com: {label: "Communication Management / ara::com", kind: gateway, tier: adaptive, x: 14, y: 1.1, realizes: [communication], description: "配備設定に基づき SOME/IP のサービスを利用する。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-exec: {label: "Execution Management", kind: scheduler, tier: adaptive, x: 4, y: 3.1, realizes: [execution], description: "Execution Manifest の設定に従ってプロセスを起動・停止する。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-os: {label: "POSIX 対応 OS", kind: host, tier: adaptive, x: 9, y: 3.1, realizes: [os], description: "Adaptive ECU のプロセスと OS 資源を管理する。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-persist: {label: "Persistency / ara::per", kind: db, tier: adaptive, x: 14, y: 3.1, realizes: [storage], description: "アプリの永続データに標準 API を提供する。保存媒体は実装で選ぶ。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-ethernet: {label: "車載 Ethernet / SOME/IP", kind: service, tier: classic, x: 6, y: 1.5, description: "両 ECU 間でサービス指向のメッセージを運ぶ。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-bridge: {label: "Classic Translation SWC", kind: gateway, tier: classic, x: 12, y: 1.5, realizes: [classic], description: "Classic 側で SOME/IP のサービスイベントと信号を変換する。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      adaptive-link-signal: {label: "Classic Application SWC", kind: worker, tier: classic, x: 18, y: 1.5, description: "Classic の Sender/Receiver インターフェースで信号を扱う。", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+    links:
+      - {id: adaptive-link-boot, from: adaptive-link-ecu, to: adaptive-link-os, label: POSIX OS を実行, evidence: [{type: doc, ref: docs/reference-autosar-adaptive.md#§5}]}
+      - {id: adaptive-link-classic-run, from: adaptive-link-classic-ecu, to: adaptive-link-bridge, label: 変換 SWC を実行, evidence: [{type: doc, ref: docs/reference-autosar-adaptive.md#§5}]}
+      - {id: adaptive-link-execution-manifest, from: adaptive-link-manifest, to: adaptive-link-exec, label: "プロセスと起動条件を設定", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      - {id: adaptive-link-service-inst, from: adaptive-link-manifest, to: adaptive-link-com, label: "ネットワークとサービスを設定", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      - {id: adaptive-link-start, from: adaptive-link-exec, to: adaptive-link-app, label: "アプリプロセスを起動・停止", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      - {id: adaptive-link-send, from: adaptive-link-com, to: adaptive-link-ethernet, label: "SOME/IP のサービスイベントを交換", realizes: [translate], replace: true, evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      - {id: adaptive-link-map, from: adaptive-link-ethernet, to: adaptive-link-bridge, label: "サービスを Classic の信号に変換", realizes: [translate], replace: true, evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+      - {id: adaptive-link-signal, from: adaptive-link-bridge, to: adaptive-link-signal, label: "Sender/Receiver で信号を受け渡す", evidence: [{type: doc, ref: "docs/reference-autosar-adaptive.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: ECU と接続, z: 0, size: [27, 15]}]
+      nodes:
+        adaptive-link-ecu: {tier: diagram, x: 1, y: 1}
+        adaptive-link-os: {tier: diagram, x: 4, y: 1}
+        adaptive-link-exec: {tier: diagram, x: 7, y: 1}
+        adaptive-link-persist: {tier: diagram, x: 1, y: 4}
+        adaptive-link-com: {tier: diagram, x: 4, y: 4}
+        adaptive-link-ara: {tier: diagram, x: 7, y: 4}
+        adaptive-link-app: {tier: diagram, x: 1, y: 7}
+        adaptive-link-classic-ecu: {tier: diagram, x: 14, y: 1}
+        adaptive-link-bridge: {tier: diagram, x: 17, y: 1}
+        adaptive-link-signal: {tier: diagram, x: 20, y: 1}
+        adaptive-link-ethernet: {tier: diagram, x: 10.5, y: 1}
+        adaptive-link-manifest: {tier: diagram, x: 10.5, y: 9}
+      groups:
+        - {kind: datacenter, label: Adaptive ECU, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 12, nodes: [adaptive-link-ecu, adaptive-link-os, adaptive-link-exec, adaptive-link-persist, adaptive-link-com, adaptive-link-ara, adaptive-link-app]}
+        - {kind: datacenter, label: Classic ECU, tier: [diagram], x0: 12, y0: 0, x1: 23, y1: 12, nodes: [adaptive-link-classic-ecu, adaptive-link-bridge, adaptive-link-signal]}
+    layout3d:
+      tiers:
+        - {id: hw, label: ECU ハードウェア, z: 0, size: [10, 9]}
+        - {id: runtime, label: OS・基盤ソフトウェア, z: 1, size: [10, 9]}
+        - {id: app, label: アプリケーション, z: 2, size: [10, 9]}
+        - {id: peer, label: 対向 ECU・開発ホスト, z: 0, origin: [13, 0], size: [10, 9]}
+        - {id: peerapp, label: 対向ホストの処理, z: 1, origin: [13, 0], size: [10, 9]}
+        - {id: network, label: 通信・配備設定, z: 0, origin: [25, 0], size: [8, 4]}
+      nodes:
+        adaptive-link-ecu: {tier: hw, x: 1, y: 1}
+        adaptive-link-os: {tier: runtime, x: 4, y: 1}
+        adaptive-link-exec: {tier: runtime, x: 7, y: 1}
+        adaptive-link-persist: {tier: runtime, x: 1, y: 4}
+        adaptive-link-com: {tier: runtime, x: 4, y: 4}
+        adaptive-link-ara: {tier: runtime, x: 7, y: 4}
+        adaptive-link-app: {tier: app, x: 1, y: 7}
+        adaptive-link-classic-ecu: {tier: peer, x: 1, y: 1}
+        adaptive-link-bridge: {tier: peerapp, x: 4, y: 1}
+        adaptive-link-signal: {tier: peerapp, x: 7, y: 1}
+        adaptive-link-ethernet: {tier: network, x: 1, y: 1}
+        adaptive-link-manifest: {tier: network, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: Adaptive ECU, tier: [hw, runtime, app], nodes: [adaptive-link-ecu, adaptive-link-os, adaptive-link-exec, adaptive-link-persist, adaptive-link-com, adaptive-link-ara, adaptive-link-app]}
+        - {kind: datacenter, label: Classic ECU, tier: [peer, peerapp], nodes: [adaptive-link-classic-ecu, adaptive-link-bridge, adaptive-link-signal]}

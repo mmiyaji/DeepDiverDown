@@ -51,3 +51,24 @@ OpenLineage の Spark Listener から、Docker で起動した Marquez へ HTTP 
 公式のローカル試行構成では Spark と Jupyter、および Marquez の受信 API を用意する。`spark.extraListeners` と HTTP transport を設定し、ジョブの namespace とデータセットの識別子を揃える。
 
 [OpenLineage Object Model](https://openlineage.io/docs/1.47.0/spec/object-model/)、[OpenLineage Getting Started](https://openlineage.io/getting-started/)、[Using OpenLineage with Spark](https://openlineage.io/docs/1.54.0/guides/spark/)
+
+## 8. 実装例：AWS Glue Spark と Amazon DataZone
+
+AWS Glue のマネージド Spark ジョブで S3 上の受注データを変換し、OpenLineage の RunEvent を Amazon DataZone に送る。
+
+| 機能 | 担い手 |
+| --- | --- |
+| Dataset | Amazon S3 の原本、明細、日次売上のプレフィックス。 |
+| 変換 Job | AWS Glue 5.0 以降の Spark ETL ジョブ。ジョブの分散実行基盤を AWS Glue が管理する。 |
+| RunEvent 収集 | Glue の OpenLineage Spark リスナーから DataZone ドメインの `PostLineageEvent` API に送る。 |
+
+Glue Studio のジョブ詳細でリネージイベント生成を有効にし、送信先の DataZone ドメイン ID を指定する。各実行ロールに、スクリプトとデータの S3 アクセスおよび `datazone:PostLineageEvent` を付与する。2本のジョブは受注明細を同じ Dataset 名と名前空間で報告し、DataZone で上下流をつなげる。DataZone が履歴として保持するのは RunEvent から得たメタデータで、受注データ自体は S3 に保持する。
+
+公式資料
+
+- [Amazon DataZone のデータリネージ](https://docs.aws.amazon.com/datazone/latest/userguide/datazone-data-lineage.html)
+- [AWS Glue の ETL ジョブ管理](https://docs.aws.amazon.com/glue/latest/dg/managing-jobs-chapter.html)
+- [AWS Glue の ETL ジョブ実行権限](https://docs.aws.amazon.com/glue/latest/dg/getting-started-min-privs-job.html)
+- [Amazon DataZone PostLineageEvent API](https://docs.aws.amazon.com/datazone/latest/APIReference/API_PostLineageEvent.html)
+
+自前例は Linux 上の Spark local モードと、Docker Compose 上の Marquez API・UI・PostgreSQL を想定する。入力・中間・出力ファイルは Spark ホストからアクセス可能なパスとする。ホスト間接続やストレージの冗長化は未指定。AWS 例は Glue 5.0 の OpenLineage リスナーで `amazon_datazone_api` transport を設定する公式資料の組み合わせで、動作検証済みの導入事例ではない。AWS は Glue・DataZone・S3 の基盤を運用し、利用者はジョブコード、IAM 権限、ドメイン設定とデータを管理する。内部実行ホストは直接操作しない。各ジョブが同じ Dataset 識別子を報告するかは未検証。

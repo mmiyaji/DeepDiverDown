@@ -39,3 +39,26 @@ SELECT id, variant_get(payload, '$.event', 'string') AS event FROM events;
 | ファイルと任意の統計 | Iceberg Manifest |
 
 [Iceberg Variant 解説](https://iceberg.apache.org/blog/variant-in-apache-iceberg/)、[Iceberg 仕様](https://iceberg.apache.org/spec/)、[Iceberg 書き込み設定](https://iceberg.apache.org/docs/latest/configuration/)。
+
+## 6. 実装例：AWS（EMR Serverless・Glue・S3）
+
+EMR Serverless の `emr-spark-8.2.0` を使う。このリリースの Spark は `4.1.3-amzn-0`、Iceberg は `1.11.0-amzn-0`。AWS の対応表では、shredding 付きの Variant は Amazon EMR 8.1.0 以降でサポートされる。
+
+| 機能 | 担い手 |
+| --- | --- |
+| Spark ジョブとワーカーの管理 | Amazon EMR Serverless |
+| SQL、表の定義、スキャン計画 | EMR Serverless の Spark Driver |
+| Parquet の Variant の書き込みと読み取り | EMR Serverless の Spark Executor |
+| 現在の Iceberg メタデータ位置 | AWS Glue Data Catalog |
+| スキーマ・マニフェスト・Variant の Parquet | Amazon S3 |
+
+ジョブの `spark.jars` に `/usr/share/aws/iceberg/lib/iceberg-spark4-runtime.jar` を指定し、Spark セッションには `type=glue` の Iceberg カタログを設定する。表は `format-version=3` を指定し、この例では `write.parquet.shred-variants=true` を使う。Parquet の `typed_value` の配置と使用できる統計は、実際のファイルに依存する。
+
+- [EMR Serverless emr-spark-8.2.0](https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/release-version-emr-spark-8.2.0.html)
+- [Amazon EMR Spark の Iceberg 対応](https://docs.aws.amazon.com/prescriptive-guidance/latest/apache-iceberg-on-aws/working-with-iceberg-in-amazon-emr-spark.html)
+- [Apache Iceberg の Variant](https://iceberg.apache.org/blog/variant-in-apache-iceberg/)
+
+自前例は Linux の Spark Standalone と HDFS の Hadoop カタログを仮定する。AWS 例の emr-spark-8.2.0 の公式掲載値は Spark 4.1.3-amzn-0 と Iceberg 1.11.0-amzn-0。AWS が Serverless、Glue、S3 の基盤を運用し、利用者がジョブ、SQL、カタログ、データと権限を管理する。ワーカー内部ホストは直接操作しない。両例は資料を組み合わせた代表構成で、Variant の shred・統計・パス述語の詳細な対応と実際の書き読みは未検証。
+
+- [Spark Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)
+- [Iceberg Spark Configuration](https://iceberg.apache.org/docs/latest/spark-configuration/)

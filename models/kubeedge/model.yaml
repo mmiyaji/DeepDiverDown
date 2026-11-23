@@ -6,9 +6,9 @@ reference:
     - Kubernetes からエッジへの配置経路を追う。
   sources:
     - title: CloudHub
-      url: https://release-1-17.docs.kubeedge.io/docs/architecture/cloud/cloudhub/
+      url: https://kubeedge.io/docs/architecture/cloud/cloudhub/
     - title: EdgeHub
-      url: https://release-1-18.docs.kubeedge.io/docs/architecture/edge/edgehub/
+      url: https://kubeedge.io/docs/architecture/edge/edgehub/
 sources:
   - docs/reference-kubeedge.md
 evidence:
@@ -138,9 +138,9 @@ implementations:
     description: 管理側 Kubernetes と現場端末を接続する例。クラウド事業者は固定しない。
     sources:
       - title: CloudHub
-        url: https://release-1-17.docs.kubeedge.io/docs/architecture/cloud/cloudhub/
+        url: https://kubeedge.io/docs/architecture/cloud/cloudhub/
       - title: EdgeHub
-        url: https://release-1-18.docs.kubeedge.io/docs/architecture/edge/edgehub/
+        url: https://kubeedge.io/docs/architecture/edge/edgehub/
     tiers:
       - id: flow
         label: 管理とエッジ実行
@@ -155,6 +155,8 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-control-host: {label: 管理側 Kubernetes ホスト, kind: host, tier: flow, x: 1, y: 2, description: 管理側 Kubernetes API と CloudCore を実行する利用者管理のホスト群。, evidence: [{type: doc, ref: docs/reference-kubeedge.md#§4}]}
+      ex-edge-host: {label: 現場エッジホスト, kind: host, tier: flow, x: 9, y: 2, description: EdgeCore とワークロードを実行する利用者管理の端末。, evidence: [{type: doc, ref: docs/reference-kubeedge.md#§4}]}
       ex-api:
         label: Kubernetes API
         kind: service
@@ -215,3 +217,108 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-kubeedge.md#§4
+    links:
+      - {id: ex-control-hosts-api, from: ex-control-host, to: ex-api, label: Kubernetes API を実行, evidence: [{type: doc, ref: docs/reference-kubeedge.md#§4}]}
+      - {id: ex-control-hosts-core, from: ex-control-host, to: ex-cloudcore, label: CloudCore を実行, evidence: [{type: doc, ref: docs/reference-kubeedge.md#§4}]}
+      - {id: ex-edge-hosts-core, from: ex-edge-host, to: ex-edgecore, label: EdgeCore を実行, evidence: [{type: doc, ref: docs/reference-kubeedge.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 現場と管理区画, z: 0, origin: [-4, 0], size: [23, 11]}]
+      nodes:
+        ex-control-host: {tier: diagram, x: 2, y: 2}
+        ex-api: {tier: diagram, x: 2, y: 5}
+        ex-cloudcore: {tier: diagram, x: 5, y: 5}
+        ex-edge-host: {tier: diagram, x: 9, y: 2}
+        ex-edgecore: {tier: diagram, x: 9, y: 5}
+        ex-workload: {tier: diagram, x: 10, y: 8}
+        ex-device: {tier: diagram, x: 15, y: 7}
+      groups:
+        - {kind: datacenter, label: 管理区画, tier: [diagram], x0: 0, y0: 0, x1: 6.5, y1: 9, nodes: [ex-control-host, ex-api, ex-cloudcore]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [diagram], x0: 7, y0: 0, x1: 13, y1: 9, nodes: [ex-edge-host, ex-edgecore, ex-workload]}
+    layout3d:
+      tiers:
+        - {id: left, label: 管理側ホスト, z: 0, size: [6, 5]}
+        - {id: leftapps, label: 管理側コンポーネント, z: 1, size: [6, 5]}
+        - {id: right, label: 現場端末, z: 0, origin: [9, 0], size: [6, 5]}
+        - {id: rightapps, label: 現場の処理, z: 1, origin: [9, 0], size: [6, 5]}
+        - {id: external, label: 運用端末・現場機器, z: 0, origin: [18, 0], size: [5, 5]}
+      nodes:
+        ex-control-host: {tier: left, x: 1, y: 1}
+        ex-api: {tier: leftapps, x: 3, y: 1}
+        ex-cloudcore: {tier: leftapps, x: 1, y: 3}
+        ex-edge-host: {tier: right, x: 1, y: 1}
+        ex-edgecore: {tier: rightapps, x: 3, y: 1}
+        ex-workload: {tier: rightapps, x: 1, y: 3}
+        ex-device: {tier: external, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 管理区画, tier: [left, leftapps], nodes: [ex-control-host, ex-api, ex-cloudcore]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [right, rightapps], nodes: [ex-edge-host, ex-edgecore, ex-workload]}
+
+  - id: ubuntu-keadm-websocket
+    label: "自主管理 Kubernetes：CloudCore / Ubuntu EdgeCore"
+    description: "管理区画の Ubuntu Kubernetes と現場の Ubuntu 端末を Keadm で結び、CloudHub と EdgeHub が WebSocket で同期する構成例。"
+    sources:
+      - {title: "Installing KubeEdge with Keadm", url: https://kubeedge.io/docs/setup/install-with-keadm/}
+      - {title: "KubeEdge container runtime", url: https://kubeedge.io/docs/setup/prerequisites/runtime/}
+      - {title: "KubeEdge EdgeHub", url: https://kubeedge.io/docs/architecture/edge/edgehub/}
+      - {title: "KubeEdge MetaManager", url: https://kubeedge.io/docs/architecture/edge/metamanager/}
+      - {title: "KubeEdge Edged", url: https://kubeedge.io/docs/architecture/edge/edged/}
+      - {title: "Kubernetes control plane and etcd", url: https://kubernetes.io/docs/concepts/architecture/}
+    tiers:
+      - {id: admin, label: "管理区画の Kubernetes クラスタ", z: 2, size: [20, 4]}
+      - {id: edge, label: "現場 Ubuntu エッジ端末", z: 1, size: [20, 4]}
+      - {id: field, label: "現場 LAN のデバイス", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "Ubuntu 管理ホスト群", provider: onprem, tier: [admin], nodes: [site-kubeedge-api, site-kubeedge-cloudcore, site-kubeedge-etcd]}
+      - {kind: datacenter, label: "Ubuntu / systemd の現場端末", provider: onprem, tier: [edge], nodes: [site-kubeedge-edgecore, site-kubeedge-sqlite, site-kubeedge-pod, site-kubeedge-containerd]}
+    nodes:
+      site-kubeedge-api: {label: "Kubernetes API Server", kind: service, tier: admin, x: 3, y: 1.5, realizes: [api], description: "自主管理 Kubernetes の API。Pod やエッジノードの状態を管理する。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      site-kubeedge-cloudcore: {label: "KubeEdge CloudCore Pod / CloudHub", kind: gateway, tier: admin, x: 10, y: 1.5, realizes: [cloudcore], description: "Keadm で管理クラスタに配置し、端末の EdgeHub セッションを受け付ける。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      site-kubeedge-etcd: {label: "etcd / 管理ホストの永続ディスク", kind: db, tier: admin, x: 17, y: 1.5, description: "Kubernetes API のクラスタ状態を保持する。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      site-kubeedge-edgecore: {label: "KubeEdge EdgeCore / EdgeHub・edged", kind: host, tier: edge, x: 4, y: 1.5, realizes: [edgecore], description: "Keadm で端末に入れた systemd サービス。管理側へ接続し、Pod を調整する。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      site-kubeedge-sqlite: {label: "MetaManager / ローカル SQLite", kind: db, tier: edge, x: 10, y: 3.1, description: "同期済み Pod 等のメタデータを端末ディスクに保持する。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      site-kubeedge-containerd: {label: "containerd / CRI", kind: service, tier: edge, x: 10, y: 1.5, description: "edged が CRI 経由で使う Ubuntu 端末のコンテナ実行環境。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      site-kubeedge-pod: {label: "現場データ処理 Pod", kind: worker, tier: edge, x: 16, y: 1.5, realizes: [workload], description: "現場 LAN のデバイスからデータを読み取るアプリを実行する。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      site-kubeedge-sensor: {label: "現場 LAN の機器", kind: external, tier: field, x: 16, y: 1.5, realizes: [device], description: "アプリケーション固有の接続で観測値を提供する。", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+    links:
+      - {id: site-kubeedge-datastore, from: site-kubeedge-api, to: site-kubeedge-etcd, label: "クラスタ状態を読み書き", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      - {id: site-kubeedge-ws, from: site-kubeedge-edgecore, to: site-kubeedge-cloudcore, label: "TLS WebSocket を確立し端末状態を送る", realizes: [status], replace: true, evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      - {id: site-kubeedge-sync, from: site-kubeedge-cloudcore, to: site-kubeedge-edgecore, label: "確立済み接続で Pod メタデータを同期", realizes: [sync], replace: true, evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      - {id: site-kubeedge-cache, from: site-kubeedge-edgecore, to: site-kubeedge-sqlite, label: "受け取ったメタデータを端末に記録", evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      - {id: site-kubeedge-cri, from: site-kubeedge-edgecore, to: site-kubeedge-containerd, label: "CRI でワークロードの起動を要求", realizes: [run], replace: true, evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      - {id: site-kubeedge-start, from: site-kubeedge-containerd, to: site-kubeedge-pod, label: "エッジ Pod を実行", realizes: [run], replace: true, evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+      - {id: site-kubeedge-sensor, from: site-kubeedge-sensor, to: site-kubeedge-pod, label: "現場 LAN で観測値を渡す", realizes: [observe], replace: true, evidence: [{type: doc, ref: "docs/reference-kubeedge.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 現場と管理区画, z: 0, origin: [-4, 0], size: [23, 11]}]
+      nodes:
+        site-kubeedge-api: {tier: diagram, x: 2, y: 2}
+        site-kubeedge-etcd: {tier: diagram, x: 2, y: 6}
+        site-kubeedge-cloudcore: {tier: diagram, x: 5, y: 4}
+        site-kubeedge-edgecore: {tier: diagram, x: 9, y: 2}
+        site-kubeedge-sqlite: {tier: diagram, x: 9, y: 5}
+        site-kubeedge-containerd: {tier: diagram, x: 12, y: 2}
+        site-kubeedge-pod: {tier: diagram, x: 12, y: 6}
+        site-kubeedge-sensor: {tier: diagram, x: 16, y: 7}
+      groups:
+        - {kind: datacenter, label: 管理区画, tier: [diagram], x0: 0, y0: 0, x1: 6.5, y1: 9, nodes: [site-kubeedge-api, site-kubeedge-etcd, site-kubeedge-cloudcore]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [diagram], x0: 7, y0: 0, x1: 13.5, y1: 9, nodes: [site-kubeedge-edgecore, site-kubeedge-sqlite, site-kubeedge-containerd, site-kubeedge-pod]}
+    layout3d:
+      tiers:
+        - {id: left, label: 管理側ホスト, z: 0, size: [6, 5]}
+        - {id: leftapps, label: 管理側コンポーネント, z: 1, size: [6, 5]}
+        - {id: right, label: 現場端末, z: 0, origin: [9, 0], size: [6, 5]}
+        - {id: rightapps, label: 現場の処理, z: 1, origin: [9, 0], size: [6, 5]}
+        - {id: external, label: 運用端末・現場機器, z: 0, origin: [18, 0], size: [5, 5]}
+      nodes:
+        site-kubeedge-api: {tier: left, x: 1, y: 1}
+        site-kubeedge-etcd: {tier: leftapps, x: 3, y: 1}
+        site-kubeedge-cloudcore: {tier: leftapps, x: 1, y: 3}
+        site-kubeedge-edgecore: {tier: right, x: 1, y: 1}
+        site-kubeedge-sqlite: {tier: rightapps, x: 3, y: 1}
+        site-kubeedge-containerd: {tier: rightapps, x: 1, y: 3}
+        site-kubeedge-pod: {tier: rightapps, x: 3, y: 3}
+        site-kubeedge-sensor: {tier: external, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 管理区画, tier: [left, leftapps], nodes: [site-kubeedge-api, site-kubeedge-etcd, site-kubeedge-cloudcore]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [right, rightapps], nodes: [site-kubeedge-edgecore, site-kubeedge-sqlite, site-kubeedge-containerd, site-kubeedge-pod]}

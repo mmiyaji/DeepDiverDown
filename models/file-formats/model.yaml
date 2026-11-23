@@ -77,6 +77,8 @@ implementations:
     label: "Apache Spark のファイル変換と PyArrow IPC"
     description: "注文データの取り込み、分析ファイルへの変換、Python への受け渡しを Apache Spark と PyArrow で試す例。各形式は別用途のサンプルで、全データを毎回すべての形式に複製する必要はない。"
     sources:
+      - {title: Spark Standalone Mode, url: https://spark.apache.org/docs/latest/spark-standalone.html}
+      - {title: HDFS Architecture, url: https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html}
       - {title: Apache Parquet File Format, url: https://parquet.apache.org/docs/file-format/}
       - {title: Apache ORC Specification v1, url: https://orc.apache.org/specification/ORCv1/}
       - {title: Apache Avro Specification, url: https://avro.apache.org/docs/current/specification/}
@@ -88,6 +90,9 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      spark-pyarrow-master: {label: Spark Standalone Master, kind: service, tier: processing, x: 1, y: 0, description: 自前クラスターの Worker を登録し実行資源を割り当てる。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-host: {label: 自前 Linux Worker ホスト群, kind: host, tier: processing, x: 4, y: 0, description: Driver と Executor の JVM を実行する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
+      spark-pyarrow-hdfs: {label: 自前 HDFS クラスター, kind: host, tier: processing, x: 9, y: 0, description: 入力と分析ファイルを保存する共有ファイルシステム。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
       spark-pyarrow-source: {label: 注文アプリの入力イベント, kind: external, tier: processing, x: 1, y: 1.15, realizes: [source], description: CSV・JSON Lines または Avro で例示用のイベントを用意する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
       spark-pyarrow-landing: {label: 共有保存先の CSV・JSON Lines・Avro, kind: file, tier: processing, x: 1, y: 3.65, realizes: [csv, avro], description: 交換用のテキストまたはスキーマ付きの Avro コンテナを保持する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
       spark-pyarrow-spark: {label: Spark SQL のデータソースと照会, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [converter, engine], description: 型を解決し、Parquet に書いて、Parquet と ORC のサンプルを別々に SQL で読む。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
@@ -96,4 +101,119 @@ implementations:
       spark-pyarrow-ipc: {label: Arrow IPC / Feather の受け渡しファイル, kind: file, tier: processing, x: 9, y: 3.65, realizes: [arrow], description: PyArrow で書き出し、対応する読み手が受け取る。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
       spark-pyarrow-avro: {label: Spark Avro データソースのモジュール, kind: file, tier: setup, x: 1, y: 1.5, description: Avro 入力を使う環境では Spark と Scala に対応するモジュールを用意する。, evidence: [{type: doc, ref: docs/reference-file-formats.md#§11}]}
     links:
+      - {id: spark-pyarrow-master-host, from: spark-pyarrow-master, to: spark-pyarrow-host, label: Worker の資源を割り当て}
+      - {id: spark-pyarrow-host-spark, from: spark-pyarrow-host, to: spark-pyarrow-spark, label: Spark を実行}
+      - {id: spark-pyarrow-host-python, from: spark-pyarrow-host, to: spark-pyarrow-python, label: Driver と PyArrow を実行}
+      - {id: spark-pyarrow-hdfs-landing, from: spark-pyarrow-hdfs, to: spark-pyarrow-landing, label: 入力パスを提供}
+      - {id: spark-pyarrow-hdfs-columnar, from: spark-pyarrow-hdfs, to: spark-pyarrow-columnar, label: 分析パスを提供}
       - {id: spark-pyarrow-avro-connection, from: spark-pyarrow-avro, to: spark-pyarrow-spark, label: Avro データソースを利用}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [33, 18]}
+      nodes:
+        spark-pyarrow-source: {tier: diagram, x: 2, y: 2}
+        spark-pyarrow-master: {tier: diagram, x: 8, y: 2}
+        spark-pyarrow-host: {tier: diagram, x: 8, y: 5}
+        spark-pyarrow-spark: {tier: diagram, x: 8, y: 8}
+        spark-pyarrow-python: {tier: diagram, x: 8, y: 11}
+        spark-pyarrow-avro: {tier: diagram, x: 8, y: 14}
+        spark-pyarrow-hdfs: {tier: diagram, x: 14, y: 2}
+        spark-pyarrow-landing: {tier: diagram, x: 14, y: 5}
+        spark-pyarrow-columnar: {tier: diagram, x: 14, y: 8}
+        spark-pyarrow-ipc: {tier: diagram, x: 20, y: 2}
+      groups:
+        - {kind: cluster, label: "Spark 自前クラスター", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 18, nodes: [spark-pyarrow-master, spark-pyarrow-host, spark-pyarrow-spark, spark-pyarrow-python, spark-pyarrow-avro]}
+        - {kind: cluster, label: "共有 HDFS", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 12, nodes: [spark-pyarrow-hdfs, spark-pyarrow-landing, spark-pyarrow-columnar]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "注文アプリ", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "Spark 自前クラスター", z: 0, origin: [7, 0], size: [5, 15]}
+        - {id: zone2, label: "共有 HDFS", z: 0, origin: [14, 0], size: [5, 9]}
+        - {id: zone3, label: "Driver IPC", z: 0, origin: [21, 0], size: [5, 5]}
+      nodes:
+        spark-pyarrow-source: {tier: zone0, x: 2, y: 1}
+        spark-pyarrow-master: {tier: zone1, x: 2, y: 1}
+        spark-pyarrow-host: {tier: zone1, x: 2, y: 4}
+        spark-pyarrow-spark: {tier: zone1, x: 2, y: 7}
+        spark-pyarrow-python: {tier: zone1, x: 2, y: 10}
+        spark-pyarrow-avro: {tier: zone1, x: 2, y: 13}
+        spark-pyarrow-hdfs: {tier: zone2, x: 2, y: 1}
+        spark-pyarrow-landing: {tier: zone2, x: 2, y: 4}
+        spark-pyarrow-columnar: {tier: zone2, x: 2, y: 7}
+        spark-pyarrow-ipc: {tier: zone3, x: 2, y: 1}
+      groups:
+        - {kind: cluster, label: "Spark 自前クラスター", tier: [zone1], nodes: [spark-pyarrow-master, spark-pyarrow-host, spark-pyarrow-spark, spark-pyarrow-python, spark-pyarrow-avro]}
+        - {kind: cluster, label: "共有 HDFS", tier: [zone2], nodes: [spark-pyarrow-hdfs, spark-pyarrow-landing, spark-pyarrow-columnar]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Spark 4.1・PyArrow"
+    description: "Amazon EMR on EC2 の Spark で S3 上の注文ファイルを変換・照会し、小さい結果を PyArrow で受け取る例。"
+    sources:
+      - {title: "Amazon EMR Spark 8.1.0", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark810-release.html}
+      - {title: "Using columnar formats in AWS Glue and Amazon EMR", url: https://docs.aws.amazon.com/prescriptive-guidance/latest/spark-tuning-glue-emr/using-columnar-formats.html}
+      - {title: "Spark Avro Data Source", url: https://spark.apache.org/docs/4.1.1/sql-data-sources-avro.html}
+      - {title: "PySpark DataFrame.toArrow", url: https://spark.apache.org/docs/4.1.1/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toArrow.html}
+      - {title: "PyArrow streaming, serialization and IPC", url: https://arrow.apache.org/docs/python/ipc.html}
+    tiers:
+      - {id: management, label: クラスタ管理とテーブル登録, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルの永続ストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-emr-control, aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow, aws-emr-landing, aws-emr-parquet, aws-emr-orc]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow]}
+    nodes:
+      aws-emr-control: {label: "Amazon EMR", svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: "EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。", management: {type: shared, scope: "AWS が EMR サービス基盤を運用し、利用者がクラスターとジョブを設定する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-host: {label: "Amazon EC2 / YARN", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "EMR の EC2 ノードで YARN がアプリケーションの実行リソースを割り当てる。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がクラスター構成とジョブを管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-source: {label: "注文アプリ", kind: external, tier: management, x: 13, y: 1.5, realizes: [source], description: "CSV・JSON Lines または Avro で例示用の注文イベントを生成する。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-converter: {label: "Spark / 取り込みと変換", kind: worker, tier: compute, x: 3, y: 1.5, realizes: [converter], description: "Spark のデータソースで着地データを読み、Parquet に変換する。", management: {type: customer, scope: "利用者が Spark ジョブと変換設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-query: {label: "Spark SQL / 分析スキャン", kind: worker, tier: compute, x: 8, y: 1.5, realizes: [engine], description: "述語や列の絞り込みを行い、必要な Parquet または ORC ファイルを読む。", management: {type: customer, scope: "利用者が Spark クエリと設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-python: {label: "PySpark Driver / PyArrow", kind: worker, tier: compute, x: 12, y: 1.5, realizes: [dataframe], description: "収まるサイズの結果を toArrow で Driver に集め、Table として Python から使う。", management: {type: customer, scope: "利用者が Driver と PyArrow のコードを管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-arrow: {label: "Arrow バッファと IPC", kind: file, tier: compute, x: 12, y: 3.5, realizes: [arrow], description: "Driver 側の PyArrow Table と、プロセス間で必要に応じて書き出す IPC ファイル。", management: {type: customer, scope: "利用者がメモリ上のデータと IPC 出力を管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-landing: {label: "Amazon S3 / 着地ファイル", svc: s3, kind: db, tier: storage, x: 3, y: 1.5, realizes: [csv, avro], description: "業務データの CSV・JSON Lines・Avro を別プレフィックスに置く。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が入力データと権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-parquet: {label: "Amazon S3 / Parquet", svc: s3, kind: db, tier: storage, x: 8, y: 1.5, realizes: [parquet], drill: parquet-internals, description: "変換した Parquet データセットを保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      aws-emr-orc: {label: "Amazon S3 / ORC", svc: s3, kind: db, tier: storage, x: 13, y: 1.5, realizes: [orc], drill: orc-internals, description: "比較用に別途作った ORC データセットを保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+    links:
+      - {id: aws-emr-provision, from: aws-emr-control, to: aws-emr-host, label: "クラスタを作成・管理", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      - {id: aws-emr-submit-convert, from: aws-emr-control, to: aws-emr-converter, label: "変換用 Spark step を実行", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      - {id: aws-emr-submit-query, from: aws-emr-control, to: aws-emr-query, label: "照会用 Spark step を実行", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      - {id: aws-emr-collect-arrow, from: aws-emr-query, to: aws-emr-python, label: "小さい結果を Arrow Table に集める", realizes: [to-arrow], replace: true, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+      - {id: aws-emr-write-ipc, from: aws-emr-python, to: aws-emr-arrow, label: "Arrow バッファから IPC に書き出す", realizes: [to-arrow], replace: true, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§12"}]}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [33, 18]}
+      nodes:
+        aws-emr-source: {tier: diagram, x: 2, y: 2}
+        aws-emr-control: {tier: diagram, x: 8, y: 2}
+        aws-emr-host: {tier: diagram, x: 14, y: 2}
+        aws-emr-converter: {tier: diagram, x: 14, y: 5}
+        aws-emr-query: {tier: diagram, x: 14, y: 8}
+        aws-emr-python: {tier: diagram, x: 14, y: 11}
+        aws-emr-arrow: {tier: diagram, x: 14, y: 14}
+        aws-emr-landing: {tier: diagram, x: 20, y: 2}
+        aws-emr-parquet: {tier: diagram, x: 20, y: 5}
+        aws-emr-orc: {tier: diagram, x: 20, y: 8}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-emr-control, aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow, aws-emr-landing, aws-emr-parquet, aws-emr-orc]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC のワーカー, tier: [diagram], nodes: [aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow]}
+        - {kind: cluster, label: "EMR クラスター", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 18, nodes: [aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "注文アプリ", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "EMR サービス", z: 0, origin: [7, 0], size: [5, 5]}
+        - {id: zone2, label: "EMR クラスター", z: 0, origin: [14, 0], size: [5, 15]}
+        - {id: zone3, label: "S3 入力・出力", z: 0, origin: [21, 0], size: [5, 9]}
+      nodes:
+        aws-emr-source: {tier: zone0, x: 2, y: 1}
+        aws-emr-control: {tier: zone1, x: 2, y: 1}
+        aws-emr-host: {tier: zone2, x: 2, y: 1}
+        aws-emr-converter: {tier: zone2, x: 2, y: 4}
+        aws-emr-query: {tier: zone2, x: 2, y: 7}
+        aws-emr-python: {tier: zone2, x: 2, y: 10}
+        aws-emr-arrow: {tier: zone2, x: 2, y: 13}
+        aws-emr-landing: {tier: zone3, x: 2, y: 1}
+        aws-emr-parquet: {tier: zone3, x: 2, y: 4}
+        aws-emr-orc: {tier: zone3, x: 2, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [aws-emr-control, aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow, aws-emr-landing, aws-emr-parquet, aws-emr-orc]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC のワーカー, tier: [zone0, zone1, zone2, zone3], nodes: [aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow]}
+        - {kind: cluster, label: "EMR クラスター", tier: [zone2], nodes: [aws-emr-host, aws-emr-converter, aws-emr-query, aws-emr-python, aws-emr-arrow]}

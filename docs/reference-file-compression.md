@@ -29,3 +29,17 @@
 | 復元 | Parquet reader が伸長しデコード | gzip 伸長後に CSV を解析 |
 
 [Parquet compression](https://parquet.apache.org/docs/file-format/data-pages/compression/)、[Parquet column chunks](https://parquet.apache.org/docs/file-format/data-pages/columnchunks/)、[PyArrow write_table](https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html)、[Snappy](https://github.com/google/snappy/blob/main/README.md)、[Zstd manual](https://github.com/facebook/zstd/blob/dev/doc/zstd_manual.html)、[RFC 1952](https://www.rfc-editor.org/rfc/rfc1952)、[GNU gzip](https://www.gnu.org/s/gzip/manual/html_node/Advanced-usage.html)。
+
+
+### 実行環境の例
+
+両例とも、Linux の Amazon EC2 インスタンス上に Python と必要な PyArrow または gzip ライブラリーを用意し、入力と圧縮済みファイルをアタッチした EBS ボリュームに保存する構成とする。EC2 と EBS は処理・保存基盤であり、Zstd や gzip の処理は Python ライブラリーが実行する。単一インスタンスのため冗長性やバックアップは別途設計する。
+
+| 実行・保存 | 担い手 |
+| --- | --- |
+| エンコード、圧縮、伸長とデコード | EC2 上の Python / PyArrow または gzip |
+| 保存されたファイル | EC2 に接続した EBS ボリューム |
+
+[Amazon EC2 instances](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Instances.html)、[Amazon EBS volumes](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html)。
+
+AWS が EC2・EBS 基盤を運用し、利用者が OS、Python、入力・出力ファイル、アクセス権とバックアップを管理する。両例は公式資料を組み合わせた代表構成であり、コーデックのバージョン、圧縮率や実動作は未検証。

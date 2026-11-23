@@ -365,7 +365,7 @@ blocks:
 implementations:
   - id: aws-athena
     label: Amazon Athena・Glue・S3 の Iceberg
-    description: Amazon Athena エンジン v3 が AWS Glue で Iceberg テーブルを解決し、S3 を読み書きする例。
+    description: Athena エンジン v3 のワークグループで、S3 の入力を Iceberg に書き込み、Glue Data Catalog で解決して検索する例。
     sources:
       - title: Apache Iceberg Terms
         url: https://iceberg.apache.org/terms/
@@ -373,12 +373,22 @@ implementations:
         url: https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg.html
       - title: Create Iceberg tables
         url: https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-creating-tables.html
+      - title: Athena のワークグループ
+        url: https://docs.aws.amazon.com/athena/latest/ug/creating-workgroups.html
+      - title: Athena の Iceberg 更新
+        url: https://docs.aws.amazon.com/athena/latest/ug/querying-iceberg-updating-iceberg-table-data.html
       - title: S3 Lifecycle transition considerations
         url: >-
           https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-transition-general-considerations.html
+      - {title: Athena serverless resilience, url: https://docs.aws.amazon.com/athena/latest/ug/security-resilience.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: lakehouse, label: Athena と Iceberg テーブル, z: 0, size: [18, 4]}
+      - {id: access, label: SQL の投入・アクセス管理・結果, z: 1, size: [18, 4]}
     nodes:
+      aws-athena-bucket: {label: Amazon S3 table bucket, svc: s3, kind: db, tier: lakehouse, x: 18, y: 1.5, management: {type: shared, scope: "AWS operates S3; customer manages data and permissions."}, evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§8"}]}
       aws-athena-athena:
-        label: Amazon Athena エンジン v3
+        label: Athena ワークグループ（v3）
         kind: service
         tier: lakehouse
         x: 0
@@ -387,6 +397,7 @@ implementations:
         svc: athena
         realizes:
           - engine
+        management: {type: shared, scope: "AWS operates serverless query infrastructure; customer manages queries and workgroup settings."}
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
@@ -400,6 +411,7 @@ implementations:
         svc: glue
         realizes:
           - catalog
+        management: {type: shared, scope: "AWS operates Glue; customer manages catalog content and access."}
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
@@ -413,6 +425,7 @@ implementations:
         realizes:
           - snapshot
           - metadata
+        management: {type: customer, scope: "Customer manages table metadata and retention."}
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
@@ -426,6 +439,7 @@ implementations:
         description: 対象スナップショットのファイルと統計を格納する。
         realizes:
           - manifests
+        management: {type: customer, scope: "Customer manages table metadata and retention."}
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
@@ -439,6 +453,7 @@ implementations:
         description: テーブルの行データを保存する。
         realizes:
           - data
+        management: {type: customer, scope: "Customer manages table data and retention."}
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
@@ -447,14 +462,24 @@ implementations:
         label: S3 Lifecycle ルール
         kind: policy
         tier: lakehouse
-        svc: aws:s3
         x: 14
         'y': 0.15
         description: データの利用頻度に応じて対象オブジェクトの保存クラスを変える。
+        management: {type: customer, scope: "Customer configures lifecycle policy."}
         evidence:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
+      aws-athena-client: {label: Athena の SQL 利用者, kind: actor, tier: access, x: 1, y: 1.5, description: Athena のコンソールから取り込みや検索の SQL を送る。, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
+      aws-athena-input: {label: S3 の入力 Parquet, kind: db, svc: s3, tier: access, x: 6, y: 1.5, description: Glue に登録した入力テーブルの元ファイルを保持する。, management: {type: shared, scope: "AWS operates S3; customer manages input data and access."}, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
+      aws-athena-permissions: {label: IAM の利用権限, kind: policy, svc: iam, tier: access, x: 11, y: 1.5, description: 操作ごとにワークグループと Glue・S3 への権限を設定する。, management: {type: customer, scope: "Customer configures IAM permissions."}, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
+      aws-athena-results: {label: S3 のクエリ結果, kind: db, svc: s3, tier: access, x: 16, y: 1.5, description: ワークグループで指定した結果保存先。Iceberg テーブルの LOCATION とは異なる。, management: {type: shared, scope: "AWS operates S3; customer manages results and access."}, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
     links:
+      - {id: aws-athena-bucket-files, from: aws-athena-bucket, to: aws-athena-data, label: "Store table files", evidence: [{type: doc, ref: "docs/reference-data-lakehouse.md#§8"}]}
+      - {id: aws-athena-submit, from: aws-athena-client, to: aws-athena-athena, label: INSERT または SELECT を実行, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
+      - {id: aws-athena-input-scan, from: aws-athena-input, to: aws-athena-athena, label: 取り込み元の Parquet を読む, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
+      - {id: aws-athena-authorize, from: aws-athena-permissions, to: aws-athena-athena, label: クエリとテーブル操作を許可, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
+      - {id: aws-athena-save-result, from: aws-athena-athena, to: aws-athena-results, label: SELECT の結果を書き出す, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
+      - {id: aws-athena-read-result, from: aws-athena-results, to: aws-athena-client, label: 許可された結果を取得, evidence: [{type: doc, ref: docs/reference-data-lakehouse.md#§8}]}
       - id: aws-athena-locate
         from: aws-athena-glue
         to: aws-athena-metadata
@@ -470,30 +495,38 @@ implementations:
           - type: doc
             ref: docs/reference-data-lakehouse.md#§8
     groups:
-      - label: AWS レイクハウス
-        kind: cloud
-        provider: aws
-        nodes:
-          - aws-athena-athena
-          - aws-athena-glue
-          - aws-athena-metadata
-          - aws-athena-manifest
-          - aws-athena-data
-          - aws-athena-lifecycle
-      - kind: cloud
-        label: AWS サービス
-        provider: aws
-        tier:
-          - lakehouse
-        nodes:
-          - aws-athena-metadata
-          - aws-athena-manifest
-          - aws-athena-data
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
-        tier:
-          - lakehouse
-        nodes:
-          - aws-athena-athena
-          - aws-athena-glue
+      - {kind: cloud, provider: aws, label: AWS account, tier: [lakehouse, access], nodes: [aws-athena-athena, aws-athena-glue, aws-athena-input, aws-athena-bucket, aws-athena-metadata, aws-athena-manifest, aws-athena-data, aws-athena-lifecycle, aws-athena-permissions, aws-athena-results]}
+    layout2d:
+      tiers: [{id: diagram, label: Athena and storage, z: 0, size: [26, 12]}]
+      nodes:
+        aws-athena-client: {tier: diagram, x: 2, y: 1}
+        aws-athena-athena: {tier: diagram, x: 6, y: 1}
+        aws-athena-glue: {tier: diagram, x: 10, y: 1}
+        aws-athena-input: {tier: diagram, x: 14, y: 1}
+        aws-athena-bucket: {tier: diagram, x: 18, y: 1}
+        aws-athena-metadata: {tier: diagram, x: 22, y: 1}
+        aws-athena-manifest: {tier: diagram, x: 2, y: 5}
+        aws-athena-data: {tier: diagram, x: 6, y: 5}
+        aws-athena-lifecycle: {tier: diagram, x: 10, y: 5}
+        aws-athena-permissions: {tier: diagram, x: 14, y: 5}
+        aws-athena-results: {tier: diagram, x: 18, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-athena-athena, aws-athena-glue, aws-athena-input, aws-athena-bucket, aws-athena-metadata, aws-athena-manifest, aws-athena-data, aws-athena-lifecycle, aws-athena-permissions, aws-athena-results]}
+    layout3d:
+      tiers:
+        - {id: services, label: AWS managed services and data, z: 0, size: [24, 6]}
+        - {id: outside, label: SQL user, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-athena-client: {tier: outside, x: 0, y: 1.5}
+        aws-athena-athena: {tier: services, x: 2, y: 1}
+        aws-athena-glue: {tier: services, x: 6, y: 1}
+        aws-athena-input: {tier: services, x: 10, y: 1}
+        aws-athena-bucket: {tier: services, x: 14, y: 1}
+        aws-athena-metadata: {tier: services, x: 18, y: 1}
+        aws-athena-manifest: {tier: services, x: 2, y: 4}
+        aws-athena-data: {tier: services, x: 6, y: 4}
+        aws-athena-lifecycle: {tier: services, x: 10, y: 4}
+        aws-athena-permissions: {tier: services, x: 14, y: 4}
+        aws-athena-results: {tier: services, x: 18, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: services, nodes: [aws-athena-athena, aws-athena-glue, aws-athena-input, aws-athena-bucket, aws-athena-metadata, aws-athena-manifest, aws-athena-data, aws-athena-lifecycle, aws-athena-permissions, aws-athena-results]}

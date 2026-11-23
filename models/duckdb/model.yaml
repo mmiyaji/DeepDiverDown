@@ -164,9 +164,101 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      python-parquet-host: {label: 自前 Python 実行ホスト, kind: host, tier: processing, x: 3, y: 0, description: 利用者が Python プロセスとローカルファイルシステムを管理する。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
       python-parquet-client: {label: Python の DuckDB 接続, kind: client, tier: processing, x: 1, y: 1.15, realizes: [query], description: duckdb.connect で作った接続から SQL を実行する。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
       python-parquet-engine: {label: 同じプロセスの DuckDB エンジン, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [optimizer, scan, project, profile], description: read_parquet へ述語と列要求を渡し、EXPLAIN ANALYZE で実行を観測する。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
       python-parquet-parquet: {label: ローカルの orders.parquet, kind: file, tier: processing, x: 5, y: 1.15, realizes: [footer, groups, columns], description: フッターと列チャンクを持ち、直接読み取れる。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
       python-parquet-metadata: {label: parquet_metadata の診断用 SQL, kind: file, tier: setup, x: 1, y: 1.5, description: 日付と顧客 ID の min/max を確認して候補グループの説明に使う。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§7}]}
     links:
+      - {id: python-parquet-host-python, from: python-parquet-host, to: python-parquet-client, label: Python を実行}
+      - {id: python-parquet-host-files, from: python-parquet-host, to: python-parquet-parquet, label: ローカルファイルを提供}
       - {id: python-parquet-metadata-connection, from: python-parquet-metadata, to: python-parquet-client, label: ファイル内統計を調べる}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+      nodes:
+        python-parquet-host: {tier: diagram, x: 2, y: 2}
+        python-parquet-client: {tier: diagram, x: 2, y: 5}
+        python-parquet-engine: {tier: diagram, x: 2, y: 8}
+        python-parquet-parquet: {tier: diagram, x: 2, y: 11}
+        python-parquet-metadata: {tier: diagram, x: 2, y: 14}
+      groups:
+        - {kind: nodegroup, label: "自前ホスト", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 18, nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "自前ホスト", z: 0, origin: [0, 0], size: [5, 15]}
+      nodes:
+        python-parquet-host: {tier: zone0, x: 2, y: 1}
+        python-parquet-client: {tier: zone0, x: 2, y: 4}
+        python-parquet-engine: {tier: zone0, x: 2, y: 7}
+        python-parquet-parquet: {tier: zone0, x: 2, y: 10}
+        python-parquet-metadata: {tier: zone0, x: 2, y: 13}
+      groups:
+        - {kind: nodegroup, label: "自前ホスト", tier: [zone0], nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}
+  - id: aws-fargate-duckdb
+    label: AWS（DuckDB on Fargate・Amazon S3）
+    description: ECS の Fargate タスク内で Python と DuckDB を実行し、S3 の Parquet を httpfs で部分的に読む例。
+    sources:
+      - {title: DuckDB S3 API Support, url: https://duckdb.org/docs/1.5/core_extensions/httpfs/s3api}
+      - {title: DuckDB AWS extension, url: https://duckdb.org/docs/extensions/aws}
+      - {title: AWS SDK のコンテナ認証プロバイダー, url: https://docs.aws.amazon.com/sdkref/latest/guide/feature-container-credentials.html}
+      - {title: ECS タスク IAM ロール, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html}
+      - {title: ECS の Fargate タスク定義, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html}
+    tiers:
+      - {id: runtime, label: ECS タスクの実行, z: 1, size: [23, 4]}
+      - {id: storage, label: 入力ファイルと実行イメージ, z: 0, size: [23, 4]}
+    groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [runtime, storage], nodes: [aws-ecs, aws-fargate, aws-python, aws-engine, aws-ecr, aws-s3, aws-task-role]}
+      - {kind: cluster, label: 単一 Fargate タスク内の Python プロセス, tier: runtime, nodes: [aws-python, aws-engine]}
+    nodes:
+      aws-operator: {label: タスク実行者, kind: client, tier: runtime, x: 0, y: 3, description: タスク定義と実行ネットワークを指定して ECS の RunTask を呼び出す。, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+      aws-task-role: {label: ECS タスク IAM ロール, svc: iam, kind: policy, tier: storage, x: 14, y: 3, description: DuckDB の credential_chain が使用する S3 読み取り権限を設定する。, management: {type: customer, scope: "利用者が IAM ロールと S3 権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+      aws-ecs: {label: "Amazon ECS（スタンドアロンタスク）", svc: ecs, kind: service, tier: runtime, x: 2, y: 1.5, description: "指定したタスク定義を AWS Fargate 上で起動する。", management: {type: shared, scope: "AWS が ECS 基盤を運用し、利用者がタスク定義を指定する。"}, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+      aws-fargate: {label: "AWS Fargate（実行環境）", svc: fargate, kind: host, tier: runtime, x: 8, y: 1.5, description: "分析用コンテナを起動する。", management: {type: shared, scope: "AWS が Fargate 基盤を運用し、利用者がタスクとネットワークを設定する。"}, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+      aws-python: {label: "Python スクリプト", kind: client, tier: runtime, x: 14, y: 1.5, realizes: [query], description: "DuckDB 接続に分析 SQL と EXPLAIN ANALYZE を渡す。", management: {type: customer, scope: "利用者が Python アプリと SQL を管理する。"}, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+      aws-engine: {label: "DuckDB（Python と同じプロセス）", kind: worker, tier: runtime, x: 20, y: 1.5, realizes: [optimizer, scan, project, profile], description: "httpfs で Parquet を読み、絞り込み・投影・計測を実行する。", management: {type: customer, scope: "利用者が DuckDB と拡張、アプリ設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+      aws-ecr: {label: "Amazon ECR（Python と DuckDB のイメージ）", svc: ecr, kind: db, tier: storage, x: 8, y: 1.5, description: "固定した DuckDB と拡張を含むコンテナイメージを保持する。", management: {type: shared, scope: "AWS が ECR 基盤を運用し、利用者がイメージと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+      aws-s3: {label: "Amazon S3（orders.parquet）", svc: s3, kind: db, tier: storage, x: 20, y: 1.5, realizes: [footer, groups, columns], description: "列チャンクとフッターを持つ Parquet オブジェクトを保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がオブジェクトと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-duckdb.md#§8}]}
+    links:
+      - {id: aws-submit, from: aws-operator, to: aws-ecs, label: RunTask を呼び出す}
+      - {id: aws-role, from: aws-task-role, to: aws-engine, label: S3 読み取り権限を付与}
+      - {id: aws-start, from: aws-ecs, to: aws-fargate, label: ECS タスクを起動}
+      - {id: aws-run, from: aws-fargate, to: aws-python, label: 分析用コンテナを実行}
+      - {id: aws-image, from: aws-fargate, to: aws-ecr, label: 起動時にイメージを取得}
+      - {id: aws-read-range, from: aws-engine, to: aws-s3, label: 必要な範囲を HTTP Range GET で読む, realizes: [metadata, skip, read], replace: true}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+      nodes:
+        aws-operator: {tier: diagram, x: 2, y: 2}
+        aws-fargate: {tier: diagram, x: 8, y: 2}
+        aws-python: {tier: diagram, x: 8, y: 5}
+        aws-engine: {tier: diagram, x: 8, y: 8}
+        aws-ecs: {tier: diagram, x: 14, y: 2}
+        aws-task-role: {tier: diagram, x: 14, y: 5}
+        aws-ecr: {tier: diagram, x: 20, y: 2}
+        aws-s3: {tier: diagram, x: 20, y: 5}
+      groups:
+        - {kind: vpc, provider: aws, label: Fargate タスクの利用者 VPC, tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 12, nodes: [aws-fargate, aws-python, aws-engine]}
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 6, y0: 0, x1: 26, y1: 15, nodes: [aws-fargate, aws-python, aws-engine, aws-ecs, aws-task-role, aws-ecr, aws-s3]}
+        - {kind: nodegroup, label: "Fargate タスク", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 12, nodes: [aws-fargate, aws-python, aws-engine]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "運用者", z: 0, origin: [0, 0], size: [5, 4]}
+        - {id: zone1, label: "Fargate タスク", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "ECS と IAM", z: 0, origin: [14, 0], size: [5, 6]}
+        - {id: zone3, label: "ECR と S3", z: 0, origin: [21, 0], size: [5, 6]}
+      nodes:
+        aws-operator: {tier: zone0, x: 2, y: 1}
+        aws-fargate: {tier: zone1, x: 2, y: 1}
+        aws-python: {tier: zone1, x: 2, y: 4}
+        aws-engine: {tier: zone1, x: 2, y: 7}
+        aws-ecs: {tier: zone2, x: 2, y: 1}
+        aws-task-role: {tier: zone2, x: 2, y: 4}
+        aws-ecr: {tier: zone3, x: 2, y: 1}
+        aws-s3: {tier: zone3, x: 2, y: 4}
+      groups:
+        - {kind: vpc, provider: aws, label: Fargate タスクの利用者 VPC, tier: [zone1], nodes: [aws-fargate, aws-python, aws-engine]}
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [zone1, zone2, zone3], nodes: [aws-fargate, aws-python, aws-engine, aws-ecs, aws-task-role, aws-ecr, aws-s3]}
+        - {kind: nodegroup, label: "Fargate タスク", tier: [zone1], nodes: [aws-fargate, aws-python, aws-engine]}

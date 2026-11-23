@@ -331,13 +331,16 @@ implementations:
         url: https://docs.cloud.google.com/knowledge-catalog/docs/manage-data-products
       - title: Use data products
         url: https://docs.cloud.google.com/knowledge-catalog/docs/use-data-products
+      - title: Run a query in BigQuery
+        url: https://docs.cloud.google.com/bigquery/docs/running-queries
     nodes:
+      gcp-bigquery-service: {label: BigQuery managed service, svc: "gcp:bigquery", kind: service, tier: sources, x: 8, y: 5, evidence: [{type: doc, ref: "docs/reference-google-cloud-knowledge-catalog.md#§7"}]}
       gcp-bigquery-owner:
         label: データ製品の担当者
         kind: actor
-        tier: people
-        x: 5
-        'y': 1
+        tier: sources
+        x: 0
+        y: 2
         description: Google Cloud コンソールでアクセスグループとメタデータを管理する。
         realizes:
           - owner
@@ -347,9 +350,9 @@ implementations:
       gcp-bigquery-user:
         label: BigQuery の利用者
         kind: actor
-        tier: people
-        x: 11
-        'y': 1
+        tier: sources
+        x: 0
+        y: 6
         description: 個人 ID でデータ製品の申請を行う。
         realizes:
           - consumer
@@ -360,9 +363,9 @@ implementations:
         svc: gcp:knowledgecatalog
         label: Knowledge Catalog（Entry・Aspect）
         kind: catalog
-        tier: catalog
-        x: 3
-        'y': 1
+        tier: sources
+        x: 4
+        y: 1
         description: BigQuery テーブルの自動 Entry とカスタム Aspect を管理する。
         realizes:
           - entries
@@ -371,12 +374,11 @@ implementations:
           - type: doc
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
       gcp-bigquery-lineage:
-        svc: gcp:knowledgecatalog
         label: Google Cloud Data Lineage API
         kind: service
-        tier: catalog
+        tier: sources
         x: 8
-        'y': 1
+        y: 1
         description: 対応する BigQuery ジョブの入出力を記録する。
         realizes:
           - lineage
@@ -385,12 +387,11 @@ implementations:
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
         drill: openlineage
       gcp-bigquery-products:
-        svc: gcp:knowledgecatalog
         label: Knowledge Catalog データ製品
         kind: catalog
-        tier: catalog
+        tier: sources
         x: 12
-        'y': 1
+        y: 1
         description: 関連資産とアクセス要求を管理する。
         realizes:
           - products
@@ -401,10 +402,9 @@ implementations:
         label: BigQuery テーブル
         kind: table
         tier: sources
-        x: 3
-        'y': 1
-        description: スキーマを公開し、クエリ時に資産の IAM を評価する。
-        svc: gcp:bigquery
+        x: 4
+        y: 5
+        description: 提供側の BigQuery 管理ストレージに注文データを保持し、クエリ時に資産 IAM を評価する。
         realizes:
           - bigquery
         evidence:
@@ -415,8 +415,8 @@ implementations:
         label: Google グループと IAM ロール
         kind: external
         tier: sources
-        x: 12
-        'y': 1
+        x: 26
+        y: 2
         description: アクセスグループから利用者と資産権限を対応付ける。
         realizes:
           - group
@@ -424,16 +424,19 @@ implementations:
           - type: doc
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
       gcp-bigquery-job-project:
-        label: BigQuery ジョブ実行プロジェクト
+        label: BigQuery クエリジョブ
+        svc: gcp:bigquery
         kind: service
         tier: sources
-        x: 7
-        'y': 1
-        description: BigQuery Job User などクエリを実行するための権限を持つ。
+        x: 20
+        y: 2
+        description: 利用側プロジェクトで実行する。利用者には当該プロジェクトのジョブ作成権限が要る。
         evidence:
           - type: doc
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
     links:
+      - {id: gcp-bigquery-store-table, from: gcp-bigquery-service, to: gcp-bigquery-bigquery, label: "Store and query table", evidence: [{type: doc, ref: "docs/reference-google-cloud-knowledge-catalog.md#§7"}]}
+      - {id: gcp-bigquery-run-job, from: gcp-bigquery-service, to: gcp-bigquery-job-project, label: "Execute query job", evidence: [{type: doc, ref: "docs/reference-google-cloud-knowledge-catalog.md#§7"}]}
       - id: gcp-bigquery-query-job
         from: gcp-bigquery-job-project
         to: gcp-bigquery-bigquery
@@ -442,19 +445,38 @@ implementations:
           - type: doc
             ref: docs/reference-google-cloud-knowledge-catalog.md#§7
     groups:
-      - label: Google Cloud プロジェクト
-        kind: cloud
-        provider: gcp
-        nodes:
-          - gcp-bigquery-metadata
-          - gcp-bigquery-lineage
-          - gcp-bigquery-products
-          - gcp-bigquery-bigquery
-          - gcp-bigquery-job-project
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud サービス
-        tier:
-          - sources
-        nodes:
-          - gcp-bigquery-bigquery
+      - {kind: cloud, provider: gcp, label: Provider Google Cloud project, tier: sources, nodes: [gcp-bigquery-metadata, gcp-bigquery-lineage, gcp-bigquery-products, gcp-bigquery-bigquery, gcp-bigquery-service]}
+      - {kind: cloud, provider: gcp, label: Consumer Google Cloud project, tier: sources, nodes: [gcp-bigquery-job-project]}
+    layout2d:
+      tiers: [{id: diagram, label: Knowledge Catalog and BigQuery, z: 0, size: [30, 13]}]
+      nodes:
+        gcp-bigquery-metadata: {tier: diagram, x: 4, y: 1}
+        gcp-bigquery-lineage: {tier: diagram, x: 8, y: 1}
+        gcp-bigquery-products: {tier: diagram, x: 12, y: 1}
+        gcp-bigquery-bigquery: {tier: diagram, x: 4, y: 5}
+        gcp-bigquery-service: {tier: diagram, x: 8, y: 5}
+        gcp-bigquery-job-project: {tier: diagram, x: 20, y: 2}
+        gcp-bigquery-owner: {tier: diagram, x: 0, y: 2}
+        gcp-bigquery-user: {tier: diagram, x: 0, y: 6}
+        gcp-bigquery-google-group: {tier: diagram, x: 26, y: 2}
+      groups:
+        - {kind: cloud, provider: gcp, label: Provider Google Cloud project, tier: diagram, nodes: [gcp-bigquery-metadata, gcp-bigquery-lineage, gcp-bigquery-products, gcp-bigquery-bigquery, gcp-bigquery-service]}
+        - {kind: cloud, provider: gcp, label: Consumer Google Cloud project, tier: diagram, nodes: [gcp-bigquery-job-project]}
+    layout3d:
+      tiers:
+        - {id: provider, label: Provider Google Cloud project, z: 0, size: [16, 6]}
+        - {id: consumer, label: Consumer Google Cloud project, z: 0, origin: [19, 0], size: [5, 3]}
+        - {id: identity, label: Users and Google Group, kind: origin, z: 0, origin: [-5, 0], size: [4, 3]}
+      nodes:
+        gcp-bigquery-metadata: {tier: provider, x: 2, y: 1}
+        gcp-bigquery-lineage: {tier: provider, x: 6, y: 1}
+        gcp-bigquery-products: {tier: provider, x: 10, y: 1}
+        gcp-bigquery-bigquery: {tier: provider, x: 14, y: 1}
+        gcp-bigquery-service: {tier: provider, x: 2, y: 4}
+        gcp-bigquery-job-project: {tier: consumer, x: 2, y: 1.5}
+        gcp-bigquery-owner: {tier: identity, x: 0, y: 1.5}
+        gcp-bigquery-user: {tier: identity, x: 1, y: 1.5}
+        gcp-bigquery-google-group: {tier: identity, x: 2, y: 1.5}
+      groups:
+        - {kind: cloud, provider: gcp, label: Provider Google Cloud project, tier: provider, nodes: [gcp-bigquery-metadata, gcp-bigquery-lineage, gcp-bigquery-products, gcp-bigquery-bigquery, gcp-bigquery-service]}
+        - {kind: cloud, provider: gcp, label: Consumer Google Cloud project, tier: consumer, nodes: [gcp-bigquery-job-project]}

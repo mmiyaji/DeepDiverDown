@@ -151,7 +151,7 @@ scenarios:
 implementations:
   - id: example
     label: Apache Jena SHACL コマンド
-    description: Turtle の形状とデータを Jena SHACL コマンドで検証する例。
+    description: 利用者管理 Linux ホスト上の Jena SHACL コマンドでローカルの Turtle データと形状を検証する例。
     sources:
       - title: W3C SHACL
         url: https://www.w3.org/TR/shacl/
@@ -171,6 +171,7 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host: {label: 利用者管理 Linux ホスト, kind: host, tier: definition, x: 14, y: 1.5, description: 利用者が Java と Jena を導入し実行する。}
       ex-data:
         label: RDF データ TTL
         kind: file
@@ -237,3 +238,84 @@ implementations:
             ref: docs/reference-semantic-shacl.md#§4
         realizes:
           - shapes
+    links:
+      - {id: ex-run, from: ex-host, to: ex-validator, label: 検証コマンドを実行}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        ex-designer: {tier: diagram, x: 2, y: 2}
+        ex-steward: {tier: diagram, x: 8, y: 2}
+        ex-data: {tier: diagram, x: 14, y: 2}
+        ex-shapes: {tier: diagram, x: 20, y: 2}
+        ex-host: {tier: diagram, x: 2, y: 6}
+        ex-validator: {tier: diagram, x: 8, y: 6}
+        ex-report: {tier: diagram, x: 14, y: 6}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理環境, tier: [diagram], nodes: [ex-data, ex-shapes, ex-host, ex-validator, ex-report]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [ex-host, ex-validator]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        ex-designer: {tier: diagram, x: 2, y: 2}
+        ex-steward: {tier: diagram, x: 8, y: 2}
+        ex-data: {tier: diagram, x: 14, y: 2}
+        ex-shapes: {tier: diagram, x: 20, y: 2}
+        ex-host: {tier: diagram, x: 2, y: 6}
+        ex-validator: {tier: diagram, x: 8, y: 6}
+        ex-report: {tier: diagram, x: 14, y: 6}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理環境, tier: [diagram], nodes: [ex-data, ex-shapes, ex-host, ex-validator, ex-report]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [ex-host, ex-validator]}
+  - id: aws-codebuild-shacl
+    label: AWS（CodeBuild で SHACL バッチ検証）
+    description: S3 のデータと SHACL shapes を CodeBuild 上の Jena で検証し、結果を S3 に保存する例。
+    sources:
+      - {title: Apache Jena SHACL CLI, url: https://jena.apache.org/documentation/shacl/}
+      - {title: AWS CodeBuild buildspec, url: https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html}
+      - {title: AWS CodeBuild プロジェクト, url: https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html}
+    tiers:
+      - {id: people, label: 形状の設計と結果のレビュー, z: 1, size: [17, 3]}
+      - {id: flow, label: 入力・検証・報告, z: 0, size: [19, 5]}
+    groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: flow, nodes: [aws-data, aws-shapes, aws-codebuild, aws-validator, aws-report]}
+      - {kind: cluster, label: CodeBuild のビルド環境, tier: flow, nodes: [aws-codebuild, aws-validator]}
+    nodes:
+      aws-designer: {label: "形状の設計担当者", kind: actor, tier: people, x: 3, y: 1.5, realizes: [designer], description: "更新した shapes をビルド入力に用意する。", evidence: [{type: doc, ref: docs/reference-semantic-shacl.md#§5}]}
+      aws-steward: {label: "データ管理担当者", kind: actor, tier: people, x: 14, y: 1.5, realizes: [steward], description: "保存した SHACL 報告を確認し、入力を修正する。", evidence: [{type: doc, ref: docs/reference-semantic-shacl.md#§5}]}
+      aws-data: {management: {type: shared, scope: "AWS が S3 基盤を運用、利用者が RDF と権限を管理。"}, label: "Amazon S3（検証対象 RDF）", svc: s3, kind: file, tier: flow, x: 1, y: 1.3, realizes: [data], description: "検証対象の Turtle を保持する。", evidence: [{type: doc, ref: docs/reference-semantic-shacl.md#§5}]}
+      aws-shapes: {management: {type: shared, scope: "AWS が S3 基盤を運用、利用者が shapes と権限を管理。"}, label: "Amazon S3（SHACL shapes）", svc: s3, kind: file, tier: flow, x: 1, y: 3.8, realizes: [shapes], description: "バージョンを固定した shapes の Turtle を保持する。", evidence: [{type: doc, ref: docs/reference-semantic-shacl.md#§5}]}
+      aws-codebuild: {management: {type: shared, scope: "AWS がビルド基盤を運用、利用者がプロジェクト、buildspec と IAM を設定。"}, label: "AWS CodeBuild（検証プロジェクト）", svc: codebuild, kind: service, tier: flow, x: 6, y: 3.8, description: "ビルド環境を起動し、buildspec のコマンドを実行する。", evidence: [{type: doc, ref: docs/reference-semantic-shacl.md#§5}]}
+      aws-validator: {management: {type: customer, scope: "利用者が Jena と検証コマンドを管理。"}, label: "Apache Jena SHACL CLI", kind: worker, tier: flow, x: 10.5, y: 1.3, realizes: [validator], description: "ダウンロード済みのデータと shapes について SHACL 検証を実行する。", evidence: [{type: doc, ref: docs/reference-semantic-shacl.md#§5}]}
+      aws-report: {management: {type: shared, scope: "AWS が S3 基盤を運用、利用者がレポートと権限を管理。"}, label: "Amazon S3（検証報告）", svc: s3, kind: file, tier: flow, x: 17, y: 1.3, realizes: [report], description: "結果の Turtle をビルド成果物として保持する。", evidence: [{type: doc, ref: docs/reference-semantic-shacl.md#§5}]}
+    links:
+      - {id: aws-start, from: aws-codebuild, to: aws-validator, label: buildspec から SHACL CLI を実行}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        aws-designer: {tier: diagram, x: 2, y: 2}
+        aws-steward: {tier: diagram, x: 8, y: 2}
+        aws-data: {tier: diagram, x: 14, y: 2}
+        aws-shapes: {tier: diagram, x: 20, y: 2}
+        aws-codebuild: {tier: diagram, x: 2, y: 6}
+        aws-validator: {tier: diagram, x: 8, y: 6}
+        aws-report: {tier: diagram, x: 14, y: 6}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], nodes: [aws-data, aws-shapes, aws-codebuild, aws-validator, aws-report]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [aws-codebuild, aws-validator]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: 配置, z: 0, size: [26, 12]}
+      nodes:
+        aws-designer: {tier: diagram, x: 2, y: 2}
+        aws-steward: {tier: diagram, x: 8, y: 2}
+        aws-data: {tier: diagram, x: 14, y: 2}
+        aws-shapes: {tier: diagram, x: 20, y: 2}
+        aws-codebuild: {tier: diagram, x: 2, y: 6}
+        aws-validator: {tier: diagram, x: 8, y: 6}
+        aws-report: {tier: diagram, x: 14, y: 6}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], nodes: [aws-data, aws-shapes, aws-codebuild, aws-validator, aws-report]}
+        - {kind: cluster, label: 実行環境, tier: [diagram], nodes: [aws-codebuild, aws-validator]}

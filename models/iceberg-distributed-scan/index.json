@@ -2,8 +2,8 @@
   "model": "iceberg-distributed-scan",
   "name": "Iceberg の分散スキャン：データ分散とファイル取得",
   "coverage": {
-    "covered": 13,
-    "total": 13
+    "covered": 14,
+    "total": 14
   },
   "byId": {
     "analyst": {
@@ -165,6 +165,18 @@
       "type": "unknown",
       "label": "実際のエンジン、Worker 数、Split サイズ設定、統計の有無とソート順、圧縮コーデックと Row Group サイズは未確定。"
     },
+    "trino-rest-s3-host": {
+      "type": "implementation",
+      "impl": "trino-rest-s3",
+      "label": "自前 Linux Trino ホスト群",
+      "realizes": []
+    },
+    "trino-rest-s3-catalog-host": {
+      "type": "implementation",
+      "impl": "trino-rest-s3",
+      "label": "自前 REST カタログホスト",
+      "realizes": []
+    },
     "trino-rest-s3-client": {
       "type": "implementation",
       "impl": "trino-rest-s3",
@@ -208,6 +220,62 @@
       "impl": "trino-rest-s3",
       "label": "Iceberg REST カタログ",
       "realizes": []
+    },
+    "aws-client": {
+      "type": "implementation",
+      "impl": "aws-eks-trino",
+      "label": "Trino CLI",
+      "realizes": [
+        "analyst"
+      ]
+    },
+    "aws-eks": {
+      "type": "implementation",
+      "impl": "aws-eks-trino",
+      "label": "Amazon EKS（コントロールプレーン）",
+      "realizes": []
+    },
+    "aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-eks-trino",
+      "label": "Amazon EC2（EKS マネージドノード）",
+      "realizes": []
+    },
+    "aws-coordinator": {
+      "type": "implementation",
+      "impl": "aws-eks-trino",
+      "label": "Trino Coordinator Pod",
+      "realizes": [
+        "planner",
+        "splits"
+      ]
+    },
+    "aws-workers": {
+      "type": "implementation",
+      "impl": "aws-eks-trino",
+      "label": "Trino Worker Pods",
+      "realizes": [
+        "worker",
+        "reader"
+      ]
+    },
+    "aws-glue": {
+      "type": "implementation",
+      "impl": "aws-eks-trino",
+      "label": "AWS Glue Data Catalog",
+      "realizes": []
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-eks-trino",
+      "label": "Amazon S3（Iceberg メタデータ・データ）",
+      "realizes": [
+        "metajson",
+        "mlist",
+        "manifest",
+        "data",
+        "deletes"
+      ]
     }
   },
   "byRef": {
@@ -248,11 +316,20 @@
       "IS-02",
       "IS-03",
       "IS-04",
+      "trino-rest-s3-host",
+      "trino-rest-s3-catalog-host",
       "trino-rest-s3-client",
       "trino-rest-s3-coord",
       "trino-rest-s3-storage",
       "trino-rest-s3-workers",
-      "trino-rest-s3-rest"
+      "trino-rest-s3-rest",
+      "aws-client",
+      "aws-eks",
+      "aws-ec2",
+      "aws-coordinator",
+      "aws-workers",
+      "aws-glue",
+      "aws-s3"
     ],
     "docs/reference-iceberg-distributed-scan.md#§2": [
       "planner",
@@ -314,11 +391,22 @@
       "physical-read"
     ],
     "docs/reference-iceberg-distributed-scan.md#§13": [
+      "trino-rest-s3-host",
+      "trino-rest-s3-catalog-host",
       "trino-rest-s3-client",
       "trino-rest-s3-coord",
       "trino-rest-s3-storage",
       "trino-rest-s3-workers",
       "trino-rest-s3-rest"
+    ],
+    "docs/reference-iceberg-distributed-scan.md#§14": [
+      "aws-client",
+      "aws-eks",
+      "aws-ec2",
+      "aws-coordinator",
+      "aws-workers",
+      "aws-glue",
+      "aws-s3"
     ]
   },
   "reference": {

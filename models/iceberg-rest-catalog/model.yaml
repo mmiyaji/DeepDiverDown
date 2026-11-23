@@ -40,9 +40,14 @@ implementations:
         url: https://iceberg.apache.org/rest-catalog-spec/
       - title: Getting Started with Apache Polaris and Trino
         url: https://polaris.apache.org/guides/trino/
+      - title: Configuring Polaris for Production
+        url: https://polaris.apache.org/releases/1.8.0/configuration/configuring-polaris-for-production/
       - title: Trino Iceberg connector
         url: https://trino.io/docs/current/connector/iceberg.html
     nodes:
+      trino-polaris-host: {label: Docker Compose host, kind: host, tier: client, x: 3, y: 0, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§7"}]}
+      trino-polaris-setup: {label: Polaris setup container, kind: worker, tier: service, x: 4, y: 0, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§7"}]}
+      trino-polaris-store: {label: RustFS container, kind: service, tier: storage, x: 16, y: 1, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§7"}]}
       trino-polaris-trino:
         label: Trino Iceberg コネクタ
         kind: service
@@ -103,7 +108,11 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-iceberg-rest-catalog.md#§7
+      trino-polaris-metastore: {label: Polaris のインメモリ metastore, kind: db, tier: service, x: 10, y: 2.5, description: 試行用のカタログ状態をサーバープロセス内に保持する。, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§7"}]}
     links:
+      - {id: trino-polaris-setup-catalog, from: trino-polaris-setup, to: trino-polaris-polaris, label: "Bootstrap catalog and grants", evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§7"}]}
+      - {id: trino-polaris-read-store, from: trino-polaris-trino, to: trino-polaris-store, label: "Read and write files", evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§7"}]}
+      - {id: trino-polaris-catalog-state, from: trino-polaris-polaris, to: trino-polaris-metastore, label: カタログ状態をメモリーに保存, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§7"}]}
       - id: trino-polaris-client-config
         from: trino-polaris-config
         to: trino-polaris-trino
@@ -111,3 +120,92 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-iceberg-rest-catalog.md#§7
+    layout2d:
+      tiers: [{id: local, label: Docker Compose, z: 0, size: [22, 12]}]
+      nodes:
+        trino-polaris-host: {tier: local, x: 2, y: 2}
+        trino-polaris-setup: {tier: local, x: 6, y: 2}
+        trino-polaris-store: {tier: local, x: 10, y: 2}
+        trino-polaris-trino: {tier: local, x: 14, y: 2}
+        trino-polaris-polaris: {tier: local, x: 18, y: 2}
+        trino-polaris-metadata: {tier: local, x: 2, y: 6}
+        trino-polaris-data: {tier: local, x: 6, y: 6}
+        trino-polaris-config: {tier: local, x: 10, y: 6}
+        trino-polaris-metastore: {tier: local, x: 14, y: 6}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: local, nodes: [trino-polaris-host, trino-polaris-setup, trino-polaris-store, trino-polaris-trino, trino-polaris-polaris, trino-polaris-metadata, trino-polaris-data, trino-polaris-config, trino-polaris-metastore]}
+    layout3d:
+      tiers:
+        - {id: containers, label: Docker containers, z: 1, size: [22, 6]}
+        - {id: host, label: Host and files, z: 0, size: [22, 6]}
+      nodes:
+        trino-polaris-host: {tier: host, x: 2, y: 1}
+        trino-polaris-setup: {tier: containers, x: 6, y: 1}
+        trino-polaris-store: {tier: containers, x: 10, y: 1}
+        trino-polaris-trino: {tier: containers, x: 14, y: 1}
+        trino-polaris-polaris: {tier: containers, x: 18, y: 1}
+        trino-polaris-metadata: {tier: host, x: 2, y: 4}
+        trino-polaris-data: {tier: host, x: 6, y: 4}
+        trino-polaris-config: {tier: host, x: 10, y: 4}
+        trino-polaris-metastore: {tier: containers, x: 14, y: 4}
+      groups:
+        - {kind: datacenter, label: Docker Compose host, tier: [containers, host], nodes: [trino-polaris-host, trino-polaris-setup, trino-polaris-store, trino-polaris-trino, trino-polaris-polaris, trino-polaris-metadata, trino-polaris-data, trino-polaris-config, trino-polaris-metastore]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Spark・Glue Iceberg REST"
+    description: "EMR on EC2 の Spark から AWS Glue の Iceberg REST エンドポイントでテーブルを解決・更新し、S3 の Manifest とデータを読み書きする例。"
+    sources:
+      - {title: "Use AWS Glue Data Catalog with Spark on Amazon EMR", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-glue.html}
+      - {title: "Use an Iceberg cluster with Spark", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-iceberg-use-spark-cluster.html}
+      - {title: "AWS Glue Iceberg REST endpoint", url: https://docs.aws.amazon.com/glue/latest/dg/connect-glu-iceberg-rest.html}
+      - {title: "Apache Iceberg REST Catalog Spec", url: https://iceberg.apache.org/rest-catalog-spec/}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理とテーブル登録, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルの永続ストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-emr-control, aws-emr-host, aws-emr-spark, aws-emr-glue, aws-emr-metadata, aws-emr-s3]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-emr-host, aws-emr-spark]}
+    nodes:
+      aws-emr-control: {label: "Amazon EMR", svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: "EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。", management: {type: shared, scope: "AWS operates EMR; customer configures clusters and steps."}, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      aws-emr-host: {label: "Amazon EC2 / YARN", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "EMR の EC2 ノードで YARN がアプリケーションの実行リソースを割り当てる。", management: {type: shared, scope: "AWS operates EC2 infrastructure; customer manages guest OS and cluster configuration."}, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      aws-emr-spark: {label: "Spark / Iceberg REST クライアント", kind: worker, tier: compute, x: 8, y: 1.5, realizes: [engine], description: "Glue へのテーブル要求・コミットに SigV4 を使い、S3 の Manifest とデータファイルを直接扱う。", management: {type: customer, scope: "Customer manages Spark jobs and catalog configuration."}, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      aws-emr-glue: {label: "AWS Glue Data Catalog / REST", svc: glue, kind: catalog, tier: management, x: 11, y: 1.5, realizes: [api, catalog, commit], description: "Iceberg REST の LoadTable と UpdateTable を処理し、テーブル要件を検証して更新を公開する。", management: {type: shared, scope: "AWS operates Glue; customer manages catalog contents and access."}, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      aws-emr-metadata: {label: "metadata.json", kind: file, tier: storage, x: 5, y: 1.5, realizes: [metadata], description: "テーブル定義、状態、各スナップショットを S3 に保持する。", management: {type: customer, scope: "Customer manages table metadata and retention."}, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      aws-emr-s3: {label: "Amazon S3 / Manifest・データ", svc: s3, kind: db, tier: storage, x: 13, y: 1.5, realizes: [data], description: "同じテーブルの Manifest とデータファイルを置く。", management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+    links:
+      - {id: aws-emr-provision, from: aws-emr-control, to: aws-emr-host, label: "クラスタを作成・管理", evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      - {id: aws-emr-submit, from: aws-emr-control, to: aws-emr-spark, label: "Iceberg を使う Spark step を実行", evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      - {id: aws-emr-load, from: aws-emr-spark, to: aws-emr-glue, label: "SigV4 で LoadTable を呼ぶ", realizes: [request], replace: true, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      - {id: aws-emr-return-meta, from: aws-emr-glue, to: aws-emr-spark, label: "テーブルメタデータと位置を返す", realizes: [read-meta], replace: true, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      - {id: aws-emr-locate, from: aws-emr-glue, to: aws-emr-metadata, label: "現行メタデータを取得", realizes: [location], replace: true, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      - {id: aws-emr-scan, from: aws-emr-spark, to: aws-emr-s3, label: "Manifest とデータを読み取る", realizes: [read-data], replace: true, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      - {id: aws-emr-commit, from: aws-emr-spark, to: aws-emr-glue, label: "更新内容と事前条件を送る", realizes: [commit-request], replace: true, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+      - {id: aws-emr-publish, from: aws-emr-glue, to: aws-emr-metadata, label: "検証した更新のメタデータを保存", realizes: [commit-server], replace: true, evidence: [{type: doc, ref: "docs/reference-iceberg-rest-catalog.md#§8"}]}
+    layout2d:
+      tiers: [{id: diagram, label: AWS account, z: 0, size: [19, 10]}]
+      nodes:
+        aws-emr-control: {tier: diagram, x: 12, y: 1}
+        aws-emr-host: {tier: diagram, x: 4, y: 3}
+        aws-emr-spark: {tier: diagram, x: 4, y: 6}
+        aws-emr-glue: {tier: diagram, x: 12, y: 4}
+        aws-emr-metadata: {tier: diagram, x: 12, y: 7}
+        aws-emr-s3: {tier: diagram, x: 16, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-emr-control, aws-emr-host, aws-emr-spark, aws-emr-glue, aws-emr-metadata, aws-emr-s3]}
+        - {kind: cluster, label: EMR on EC2, tier: diagram, nodes: [aws-emr-host, aws-emr-spark]}
+    layout3d:
+      tiers:
+        - {id: job, label: Spark, z: 1, size: [6, 3]}
+        - {id: host, label: EC2 / YARN, z: 0, size: [6, 3]}
+        - {id: services, label: AWS services, z: 0, origin: [9, 0], size: [16, 3]}
+      nodes:
+        aws-emr-control: {tier: services, x: 2, y: 1.5}
+        aws-emr-host: {tier: host, x: 3, y: 1.5}
+        aws-emr-spark: {tier: job, x: 3, y: 1.5}
+        aws-emr-glue: {tier: services, x: 6, y: 1.5}
+        aws-emr-metadata: {tier: services, x: 10, y: 1.5}
+        aws-emr-s3: {tier: services, x: 14, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [job, host, services], nodes: [aws-emr-control, aws-emr-host, aws-emr-spark, aws-emr-glue, aws-emr-metadata, aws-emr-s3]}
+        - {kind: cluster, label: EMR on EC2, tier: [job, host], nodes: [aws-emr-host, aws-emr-spark]}

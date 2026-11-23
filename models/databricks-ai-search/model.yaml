@@ -247,8 +247,8 @@ scenarios:
         note: 取得した文書と出典を回答に使う。
 implementations:
   - id: delta-sync
-    label: Databricks on AWS・Delta Sync
-    description: Amazon S3 の文書を Delta テーブルに取り込み、Databricks AI Search と AI Bridge で検索する例。
+    label: AWS 上のエージェントと Databricks Delta Sync
+    description: ECS/Fargate の Python エージェントと Databricks AI Search を組み合わせ、S3 文書を Auto Loader から索引化する例。
     sources:
       - title: Databricks AI Search
         url: https://docs.databricks.com/aws/en/ai-search/ai-search
@@ -260,6 +260,13 @@ implementations:
         url: https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools
       - title: Databricks S3 data
         url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3
+      - title: Databricks Auto Loader
+        url: https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader
+      - title: ECS on AWS Fargate
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html
+      - {title: Databricks architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
     tiers:
       - id: client
         label: 利用者・アプリケーション
@@ -280,6 +287,9 @@ implementations:
           - 10
           - 3
     nodes:
+      db-serverless: {label: Databricks serverless compute plane, kind: host, tier: databricks, x: 12, y: 2, evidence: [{type: doc, ref: "docs/reference-databricks-ai-search.md#§4"}]}
+      db-managed-s3: {label: S3 managed Delta storage, svc: s3, kind: db, tier: aws, x: 12, y: 1, management: {type: shared, scope: "AWS operates S3; customer manages storage and access."}, evidence: [{type: doc, ref: "docs/reference-databricks-ai-search.md#§4"}]}
+      db-role: {label: IAM storage role, svc: iam, kind: policy, tier: aws, x: 16, y: 1, management: {type: customer, scope: "Customer manages trust and permissions."}, evidence: [{type: doc, ref: "docs/reference-databricks-ai-search.md#§4"}]}
       db-user:
         label: 利用者
         kind: actor
@@ -297,22 +307,26 @@ implementations:
         tier: client
         x: 4
         'y': 1
+        management: {type: customer, scope: "Customer manages application code and authentication."}
         evidence:
           - type: doc
             ref: docs/reference-databricks-ai-search.md#§4
         realizes:
           - agent
+        description: Fargate タスク内の Python アプリが AI Bridge の retriever を呼び出す。
       db-retriever:
         label: AI Bridge Retriever Tool
         kind: service
         tier: client
         x: 8
         'y': 1
+        management: {type: customer, scope: "Customer manages retrieval tool configuration."}
         evidence:
           - type: doc
             ref: docs/reference-databricks-ai-search.md#§4
         realizes:
           - retriever
+        description: Python アプリに組み込む AI Bridge の検索ツール。
       db-endpoint:
         label: AI Search Endpoint
         kind: service
@@ -336,7 +350,6 @@ implementations:
             ref: docs/reference-databricks-ai-search.md#§4
         realizes:
           - source
-        svc: databricks:delta
       db-sync:
         label: Delta Sync パイプライン
         kind: worker
@@ -412,35 +425,136 @@ implementations:
         tier: aws
         x: 4
         'y': 1
+        management: {type: shared, scope: "AWS operates S3; customer manages input data and access."}
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+      db-auto-loader:
+        label: Auto Loader の取込処理
+        kind: worker
+        svc: databricks:lakeflow
+        tier: databricks
+        x: 0
+        'y': 4.4
+        description: S3 に届いた文書を処理し Delta テーブルへ取り込む。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+      db-ecs:
+        label: Amazon ECS
+        kind: service
+        svc: ecs
+        tier: aws
+        x: 0
+        'y': 1.5
+        description: エージェントのコンテナーサービスを管理する。
+        management: {type: shared, scope: "AWS operates ECS; customer configures service and permissions."}
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+      db-fargate:
+        label: AWS Fargate タスク
+        kind: service
+        svc: fargate
+        tier: aws
+        x: 8
+        'y': 1.5
+        description: Python エージェントのコンテナーを実行する。
+        management: {type: shared, scope: "AWS operates Fargate infrastructure; customer configures task and image."}
         evidence:
           - type: doc
             ref: docs/reference-databricks-ai-search.md#§4
     links:
+      - {id: db-serverless-loader, from: db-serverless, to: db-auto-loader, label: "Run ingestion pipeline", evidence: [{type: doc, ref: "docs/reference-databricks-ai-search.md#§4"}]}
+      - {id: db-managed-table, from: db-source, to: db-managed-s3, label: "Store Delta table files", evidence: [{type: doc, ref: "docs/reference-databricks-ai-search.md#§4"}]}
+      - {id: db-role-input, from: db-role, to: db-s3, label: "Authorize input access", evidence: [{type: doc, ref: "docs/reference-databricks-ai-search.md#§4"}]}
+      - {id: db-role-managed, from: db-role, to: db-managed-s3, label: "Authorize managed storage", evidence: [{type: doc, ref: "docs/reference-databricks-ai-search.md#§4"}]}
       - id: db-mode
         from: db-sync-mode
         to: db-sync
         label: 同期方式を設定
-      - id: db-s3-ingest
+      - id: db-s3-to-loader
         from: db-s3
+        to: db-auto-loader
+        label: 原本文書を読み込む
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+      - id: db-loader-to-table
+        from: db-auto-loader
         to: db-source
-        label: 文書を取り込み
+        label: Delta テーブルへ保存
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+      - id: db-ecs-task
+        from: db-ecs
+        to: db-fargate
+        label: タスクを起動
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
+      - id: db-fargate-agent
+        from: db-fargate
+        to: db-agent
+        label: エージェントを実行
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-ai-search.md#§4
     groups:
-      - kind: cloud
-        label: Databricks
-        provider: databricks
-        tier:
-          - databricks
-        nodes:
-          - db-endpoint
-          - db-source
-          - db-sync
-          - db-embedding
-          - db-index
-          - db-catalog
-      - kind: cloud
-        label: AWS アカウント
-        provider: aws
-        tier:
-          - aws
-        nodes:
-          - db-s3
+      - {kind: cloud, provider: databricks, label: Databricks workspace and services, tier: [databricks, client], nodes: [db-endpoint, db-source, db-sync, db-embedding, db-index, db-catalog, db-auto-loader, db-sync-mode, db-serverless]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: [client, aws], nodes: [db-s3, db-ecs, db-fargate, db-agent, db-retriever, db-managed-s3, db-role]}
+    layout2d:
+      tiers: [{id: diagram, label: AI Search and AWS, z: 0, size: [37, 16]}]
+      nodes:
+        db-endpoint: {tier: diagram, x: 3, y: 1}
+        db-source: {tier: diagram, x: 7, y: 1}
+        db-sync: {tier: diagram, x: 11, y: 1}
+        db-embedding: {tier: diagram, x: 15, y: 1}
+        db-index: {tier: diagram, x: 3, y: 5}
+        db-catalog: {tier: diagram, x: 7, y: 5}
+        db-auto-loader: {tier: diagram, x: 11, y: 5}
+        db-sync-mode: {tier: diagram, x: 15, y: 5}
+        db-serverless: {tier: diagram, x: 3, y: 9}
+        db-s3: {tier: diagram, x: 21, y: 1}
+        db-ecs: {tier: diagram, x: 25, y: 1}
+        db-fargate: {tier: diagram, x: 29, y: 1}
+        db-agent: {tier: diagram, x: 21, y: 5}
+        db-retriever: {tier: diagram, x: 25, y: 5}
+        db-managed-s3: {tier: diagram, x: 29, y: 5}
+        db-role: {tier: diagram, x: 21, y: 9}
+        db-user: {tier: diagram, x: 0, y: 1}
+        db-operator: {tier: diagram, x: 0, y: 5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and services, tier: diagram, nodes: [db-endpoint, db-source, db-sync, db-embedding, db-index, db-catalog, db-auto-loader, db-sync-mode, db-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [db-s3, db-ecs, db-fargate, db-agent, db-retriever, db-managed-s3, db-role]}
+        - {kind: cluster, label: Fargate task, tier: diagram, nodes: [db-fargate, db-agent, db-retriever]}
+    layout3d:
+      tiers:
+        - {id: db, label: Databricks services, z: 0, size: [20, 6]}
+        - {id: task, label: Agent container, z: 1, origin: [23, 0], size: [16, 6]}
+        - {id: aws, label: Customer AWS account, z: 0, origin: [23, 0], size: [16, 6]}
+        - {id: users, label: Users, kind: origin, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        db-endpoint: {tier: db, x: 2, y: 1}
+        db-source: {tier: db, x: 6, y: 1}
+        db-sync: {tier: db, x: 10, y: 1}
+        db-embedding: {tier: db, x: 14, y: 1}
+        db-index: {tier: db, x: 18, y: 1}
+        db-catalog: {tier: db, x: 2, y: 4}
+        db-auto-loader: {tier: db, x: 6, y: 4}
+        db-sync-mode: {tier: db, x: 10, y: 4}
+        db-serverless: {tier: db, x: 14, y: 4}
+        db-s3: {tier: aws, x: 2, y: 1}
+        db-ecs: {tier: aws, x: 6, y: 1}
+        db-fargate: {tier: aws, x: 10, y: 1}
+        db-agent: {tier: task, x: 14, y: 1}
+        db-retriever: {tier: task, x: 2, y: 4}
+        db-managed-s3: {tier: aws, x: 6, y: 4}
+        db-role: {tier: aws, x: 10, y: 4}
+        db-user: {tier: users, x: 0, y: 1.5}
+        db-operator: {tier: users, x: 2, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and services, tier: db, nodes: [db-endpoint, db-source, db-sync, db-embedding, db-index, db-catalog, db-auto-loader, db-sync-mode, db-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: [task, aws], nodes: [db-s3, db-ecs, db-fargate, db-agent, db-retriever, db-managed-s3, db-role]}
+        - {kind: cluster, label: Fargate task, tier: [task, aws], nodes: [db-fargate, db-agent, db-retriever]}

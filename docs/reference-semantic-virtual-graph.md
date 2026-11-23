@@ -20,3 +20,24 @@ Ontop は R2RML 対応定義と軽量オントロジーを利用して仮想グ�
 | 利用 | SPARQL クライアント |
 
 [W3C R2RML](https://www.w3.org/TR/r2rml/)、[Ontop Introduction](https://ontop-vkg.org/guide/)。
+
+## 5. 実装例：AWS（Ontop on ECS・RDS for PostgreSQL）
+
+Ontop と PostgreSQL JDBC ドライバー、R2RML マッピング、OWL 定義を含むコンテナイメージを Amazon ECR に登録する。Amazon ECS サービスが AWS Fargate 上のタスクの指定数を維持する。Ontop は同じ VPC にあるプライベートな RDS for PostgreSQL に接続する。
+
+| 機能 | 担い手 |
+|---|---|
+| 設計と配布 | 設計者が管理する R2RML と OWL を含む Amazon ECR のイメージ |
+| SPARQL 受付と SQL 変換 | Fargate タスク上の Ontop |
+| 元の表と SQL 実行 | Amazon RDS for PostgreSQL |
+| 問い合わせ | SPARQL クライアントと内部 Application Load Balancer |
+
+内部ロードバランサーは IP 型のターゲットグループで Fargate タスクへ転送する。タスクのセキュリティグループから RDS の PostgreSQL ポートへのアクセスを許可する。DB の資格情報はイメージに含めず、起動時に設定する。この例では対象の表またはビューを参照する読み取り専用の DB ユーザーを使用する。Ontop がリクエストごとに SQL を発行して、結果を SPARQL の応答として返す。
+
+- [Ontop コンテナの構成](https://ontop-vkg.org/tutorial/endpoint/endpoint-docker.html)
+- [Ontop の PostgreSQL 接続](https://ontop-vkg.org/guide/databases/postgres)
+- [ECS の Fargate タスク定義](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html)
+- [ECS の Fargate ネットワーキング](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html)
+- [RDS for PostgreSQL の接続](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ConnectToPostgreSQLInstance.html)
+
+上記は公式機能を組み合わせた構成例であり、実機での接続、認証、セキュリティ設定、障害復旧は未検証。利用者がアプリ、設定、データと権限を管理し、AWS がマネージドサービスの基盤を運用する。内部ホストへの直接操作を前提としない。

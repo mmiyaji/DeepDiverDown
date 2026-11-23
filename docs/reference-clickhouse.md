@@ -46,6 +46,24 @@ SELECT の先頭に `EXPLAIN indexes = 1` を付け、`ReadFromMergeTree` の索
 - [ClickHouse EXPLAIN](https://clickhouse.com/docs/reference/statements/explain)
 - [ClickHouse system.parts](https://clickhouse.com/docs/operations/system-tables/parts)
 
+## 8. 実装例：AWS（ClickHouse on EC2・Amazon EBS）
+
+Linux の Amazon EC2 インスタンス1台に OSS の ClickHouse Server を導入する。同じ可用性ゾーンの Amazon EBS ボリュームをマウントし、ClickHouse のデータディレクトリをそのファイルシステム上に置く。表定義とクエリは §7 と同じものを使う。
+
+| 機能 | 担い手 |
+|---|---|
+| 入力と結果表示 | 許可した接続元の `clickhouse-client` |
+| SQL 計画と列スキャン | EC2 上の ClickHouse Server |
+| バックグラウンドマージ | ClickHouse Server の MergeTree エンジン |
+| パート、索引、マークの保存 | EBS 上のデータディレクトリ |
+| プルーニングとパートの観測 | ClickHouse の `EXPLAIN indexes = 1` と `system.parts` |
+
+OS と ClickHouse の更新、バックアップ、復旧は運用者が管理する。EBS はローカルファイルシステムのブロックストレージを提供する。月別パートの選択とマージは ClickHouse が実行する。
+
+- [ClickHouse の Debian・Ubuntu 導入](https://clickhouse.com/docs/get-started/setup/self-managed/debian-ubuntu)
+- [ClickHouse MergeTree](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
+- [Amazon EBS ボリュームのアタッチ](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html)
+
 ## 7. 実装例：単一 ClickHouse サーバーの MergeTree
 
 架空の注文を `PARTITION BY toYYYYMM(order_date)` と `ORDER BY (customer_id, order_date)` の MergeTree に格納する例。クライアントとサーバー、およびディスク上の物理部品を分けて示す。
@@ -67,3 +85,5 @@ SELECT の先頭に `EXPLAIN indexes = 1` を付け、`ReadFromMergeTree` の索
 - [ClickHouse MergeTree table engine](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
 - [ClickHouse EXPLAIN](https://clickhouse.com/docs/reference/statements/explain)
 - [ClickHouse system.parts](https://clickhouse.com/docs/operations/system-tables/parts)
+
+自前例は利用者が Linux サーバーとローカルファイルシステムを管理する。AWS 例では AWS が EC2・EBS の基盤を運用し、利用者が OS、ClickHouse、データ、アクセス権、バックアップと復旧を管理する。単一サーバー構成にレプリカや可用性を仮定しない。各例は公式資料を組み合わせた代表構成で、接続経路・実機動作は未検証。

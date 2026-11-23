@@ -62,12 +62,13 @@ scenarios:
 implementations:
   - id: ocp
     label: OpenShift と Ingress Controller
-    description: 自前の OpenShift Container Platform クラスタで、注文 API を標準の Ingress Controller から公開する例。
+    description: vSphere に用意した RHCOS VM で OpenShift を自主管理し、入口を TCP ロードバランサーに分ける例。
     sources:
       - title: OpenShift Ingress and load balancing
         url: https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/ingress_and_load_balancing/index
       - title: OpenShift Networking Operators
         url: https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/networking_operators/index
+      - {title: "OpenShift の vSphere ユーザー管理インフラ", url: https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/installing_on_vmware_vsphere/user-provisioned-infrastructure}
     tiers:
       - id: client
         label: 利用者
@@ -114,25 +115,27 @@ implementations:
           - type: doc
             ref: docs/reference-openshift.md#§7
       ocp-api:
-        label: OpenShift コントロールプレーン
+        label: vSphere 上の RHCOS 制御 VM
         kind: worker
         tier: control
         svc: onprem:vm
         realizes:
           - api
           - controller
-        description: API と調整・スケジューリングのプロセスを配置する。
+        description: API・調整・スケジューリングと etcd を実行し、etcd のクラスタ状態は各制御 VM の永続ディスクに保持する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-openshift.md#§7
       ocp-kubelet:
-        label: RHCOS worker の kubelet / CRI-O
+        label: vSphere 上の RHCOS worker（kubelet・CRI-O）
         kind: worker
         tier: worker
         svc: onprem:vm
         realizes:
           - kubelet
         description: Pod の割り当てを取得しコンテナを動かす。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-openshift.md#§7
@@ -144,6 +147,7 @@ implementations:
         realizes:
           - order-api
         description: 同一の注文 API を複数レプリカで実行する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-openshift.md#§7
@@ -155,6 +159,7 @@ implementations:
         realizes:
           - service
         description: Route の参照先を定義する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-openshift.md#§7
@@ -164,7 +169,8 @@ implementations:
         tier: edge
         realizes:
           - route
-        description: Route のホスト名を受け、選択された Service のエンドポイントへ送る。
+        description: worker 上の HAProxy Router が Route のホスト名を受け、Service の Pod エンドポイントへ送る。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-openshift.md#§7
@@ -172,15 +178,58 @@ implementations:
         label: apps ドメインのワイルドカード DNS
         kind: service
         tier: edge
-        description: ルートのホスト名を Ingress Controller の到達先で解決する。
+        description: apps ワイルドカードを Ingress 用ロードバランサーに解決する。
+        management: {type: customer, scope: 利用者がこの例の設定と運用を担う。}
         evidence:
           - type: doc
             ref: docs/reference-openshift.md#§7
+      ocp-api-lb: {label: "API 用 L4 ロードバランサー", kind: lb, tier: client, svc: onprem:lb, description: "6443 を正常な OpenShift API サーバーに転送する。", evidence: [{type: doc, ref: docs/reference-openshift.md#§7}]}
+      ocp-ingress-lb: {label: "アプリ用 L4 ロードバランサー", kind: lb, tier: edge, svc: onprem:lb, description: "80 と 443 を Ingress Router が動くノードへ転送する。", evidence: [{type: doc, ref: docs/reference-openshift.md#§7}]}
     links:
+      - {id: ocp-submit, from: ocp-oc, to: ocp-api-lb, label: クラスタ API に接続, realizes: [apply], replace: true}
+      - {id: ocp-api-forward, from: ocp-api-lb, to: ocp-api, label: 正常な API サーバーへ転送, realizes: [apply], replace: true}
+      - {id: ocp-run-router, from: ocp-kubelet, to: ocp-route, label: Router Pod を実行, evidence: [{type: doc, ref: docs/reference-openshift.md#§7}]}
+      - {id: ocp-external, from: ocp-ingress-lb, to: ocp-route, label: HTTP と HTTPS を Router に中継, realizes: [route-pod], replace: true}
+      - {id: ocp-router-pod, from: ocp-route, to: ocp-order-api, label: Service が選んだ Pod エンドポイントへ転送, realizes: [route-pod], replace: true}
       - id: ocp-resolve-router
         from: ocp-dns
-        to: ocp-route
+        to: ocp-ingress-lb
         label: 公開ホスト名を解決
         evidence:
           - type: doc
             ref: docs/reference-openshift.md#§7
+
+    layout2d:
+      tiers: [{id: diagram, label: 自主管理環境, z: 0, origin: [-4, 0], size: [22, 11]}]
+      nodes:
+        ocp-oc: {tier: diagram, x: -3, y: 1}
+        ocp-api-lb: {tier: diagram, x: 2, y: 1}
+        ocp-api: {tier: diagram, x: 6, y: 1}
+        ocp-kubelet: {tier: diagram, x: 6, y: 5}
+        ocp-order-api: {tier: diagram, x: 6, y: 8}
+        ocp-service: {tier: diagram, x: 10, y: 8}
+        ocp-route: {tier: diagram, x: 10, y: 5}
+        ocp-ingress-lb: {tier: diagram, x: 14, y: 5}
+        ocp-dns: {tier: diagram, x: 14, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [diagram], x0: 0, y0: -1, x1: 16, y1: 10, nodes: [ocp-api, ocp-kubelet, ocp-order-api, ocp-service, ocp-route, ocp-api-lb, ocp-ingress-lb, ocp-dns]}
+        - {kind: cluster, provider: k8s, label: OpenShift クラスタ, tier: [diagram], x0: 4, y0: -0.5, x1: 12, y1: 9.5, nodes: [ocp-api, ocp-kubelet, ocp-order-api, ocp-service, ocp-route]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: 制御・実行ノード, z: 0, size: [10, 4]}
+        - {id: apps, label: ノード上のアプリ・データ, z: 1, size: [10, 4]}
+        - {id: external, label: クラスタ外のサービス, z: 0, origin: [12, 0], size: [8, 7]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        ocp-oc: {tier: outside, x: 1, y: 1}
+        ocp-api: {tier: nodes, x: 2, y: 2}
+        ocp-kubelet: {tier: nodes, x: 6, y: 2}
+        ocp-order-api: {tier: apps, x: 6, y: 2}
+        ocp-route: {tier: apps, x: 6, y: 3.5}
+        ocp-service: {tier: apps, x: 9, y: 2}
+        ocp-api-lb: {tier: external, x: 1, y: 1}
+        ocp-ingress-lb: {tier: external, x: 5, y: 1}
+        ocp-dns: {tier: external, x: 1, y: 5}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [nodes, apps, external], nodes: [ocp-api, ocp-kubelet, ocp-order-api, ocp-service, ocp-route, ocp-api-lb, ocp-ingress-lb, ocp-dns]}
+        - {kind: cluster, provider: k8s, label: OpenShift クラスタ, tier: [nodes, apps], nodes: [ocp-api, ocp-kubelet, ocp-order-api, ocp-service, ocp-route]}

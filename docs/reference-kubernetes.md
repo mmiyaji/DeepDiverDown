@@ -45,7 +45,7 @@ Deployment の更新では新しい ReplicaSet を作り、古い Pod を段階�
 | API サーバー | コントロールプレーンVM × 3 |
 | レプリカ調整 | コントロールプレーンVM × 3 |
 | 配置先の決定 | コントロールプレーンVM × 3 |
-| クラスタ状態ストア | コントロールプレーンVM × 3 |
+| クラスタ状態ストア | 各制御 VM の static Pod の etcd とローカル永続ディスク |
 | ノード実行エージェント | worker VM の kubelet と containerd |
 | 注文 API の実行単位 | 注文 API Deployment / Pod |
 | 注文 API の内部公開 | ClusterIP Service |
@@ -54,7 +54,15 @@ Deployment の更新では新しい ReplicaSet を作り、古い Pod を段階�
 
 コントロールプレーン間の通信と Pod ネットワークを開通させ、CNI を別途選定する。etcd を別の VM 群へ置く external etcd 構成も選べる。
 
+kubeadm の既定のローカル etcd は各制御 VM の `/var/lib/etcd` に状態を保持する。この例では永続ディスク上に置く。API 用 TCP ロードバランサーの共有アドレスを `ControlPlaneEndpoint` に使い、運用端末と worker から到達できるようにする。
+
+利用者は VM、kubeadm と Kubernetes の設定・更新、CNI、ロードバランサー、証明書、etcd のバックアップを運用する。kubectl から認証・認可に応じて Kubernetes API のリソースを操作する。CNI の実装はこの例では未選定で、導入時に選択してクラスタ全体に設定する。API 用ロードバランサーはクラスタ外にある。
+
+複数の公式資料を組み合わせた代表構成で、実在の導入例や動作検証済み構成ではない。VM 数、ネットワーク実装、イメージ供給元、バックアップ先は導入時に決定する。
+
 公式資料
+- [Cluster Networking](https://kubernetes.io/docs/concepts/cluster-administration/networking/)
 - [Creating Highly Available Clusters with kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/)
 - [Kubernetes Components](https://kubernetes.io/docs/concepts/overview/components/)
 - [Service](https://kubernetes.io/docs/concepts/services-networking/service/)
+- [kubeadm の LocalEtcd 設定](https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta4/)

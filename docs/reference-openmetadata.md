@@ -54,3 +54,28 @@ OpenMetadata Server、取り込み用 Airflow、PostgreSQL、Elasticsearch を�
 BigQuery のリネージ収集範囲はクエリログとコネクタ権限に依存する。Looker から元テーブルをたどる例では、GitHub から LookML を読み、`sql_table_name` またはプレーン SQL の `derived_table` で参照を記述する。LookML の Liquid 変数はこのリネージの対象外。レポートまで個々の列を追えるかは、収集された関係の粒度に依存する。サーバーと取り込みコンテナのバージョンを揃える。
 
 [Docker Deployment Architecture](https://docs.open-metadata.org/v1.12.x/deployment/docker)、[Data Contracts API](https://docs.open-metadata.org/v1.12.x/api-reference/data-contracts)、[OpenMetadata Docker Quickstart](https://docs.open-metadata.org/v1.12.x/quick-start/local-docker-deployment)、[BigQuery コネクタ](https://docs.open-metadata.org/v2.0.x/connectors/database/bigquery)、[Looker コネクタ](https://docs.open-metadata.org/v2.0.x/connectors/dashboard/looker)、[OpenMetadata のリネージ取り込み](https://docs.open-metadata.org/v2.0.x/connectors/ingestion/lineage)
+
+
+Docker Compose ホストで OpenMetadata、Airflow、PostgreSQL と Elasticsearch を実行する。BigQuery、Looker、GitHub は別の接続先であり、それぞれ認証と到達性が必要。公式資料を組み合わせた例で、コネクタとサーバーのバージョンや外部接続は動作未検証。
+
+## 8. 実装例：Amazon EKS 上の OpenMetadata・RDS・OpenSearch
+
+Helm で OpenMetadata と OMJob Operator を EKS に展開する。取り込みは Kubernetes ジョブで動き、RDS と OpenSearch をクラスター外の依存先として使う。
+
+| 機能 | 担い手 |
+| --- | --- |
+| 取り込み | EKS の OMJob Operator と、コネクターを実行する Kubernetes Job。 |
+| API・UI・データ契約 | OpenMetadata Server。品質チェックの結果を問い合わせ、契約の条件を評価する。 |
+| 永続化・検索 | RDS for MySQL にメタデータを保存し、OpenSearch は検索索引を持つ。 |
+
+OpenMetadata を利用者の EKS で運用し、RDS と OpenSearch は AWS のマネージドサービスを使う。サーバー、Operator、取り込みイメージの版と AWS EKS ガイドの対応エンジンを揃える。専用の DB ユーザーと OpenSearch ユーザーを用意し、TLS と Kubernetes Secret で接続を構成する。OpenMetadata 側のログイン、担当者ロールと収集 Bot の API トークンは、保存先の認証と別に設定する。契約の結果はカタログに記録する。元データのアクセス制御は各データ基盤が担う。
+
+公式資料
+
+- [OpenMetadata の AWS EKS デプロイ](https://docs.open-metadata.org/v2.1.x/deployment/kubernetes/eks)
+- [OpenMetadata の Kubernetes Orchestrator](https://docs.open-metadata.org/v1.12.x/deployment/ingestion/kubernetes)
+- [OpenMetadata のデータ契約 API](https://docs.open-metadata.org/v1.12.x/api-reference/data-contracts)
+- [OpenMetadata の Kubernetes アップグレード](https://docs.open-metadata.org/v1.12.x/deployment/upgrade/kubernetes)
+- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)
+
+AWS は EKS 制御プレーン、RDS、OpenSearch の基盤を運用し、利用者は Kubernetes API、ノード、OpenMetadata のデプロイ、データとアクセス権を設定する。制御プレーンサーバーやマネージドサービスの内部ホストを直接操作しない。EKS ガイドの参照 URL は今回取得できず、OpenMetadata・Operator・OpenSearch の対応バージョンと本構成の実動作は未検証。[AWS shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

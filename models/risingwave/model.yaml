@@ -147,6 +147,8 @@ implementations:
           - 16
           - 3
     nodes:
+      ex-host: {label: RisingWave 実行ホスト群, kind: host, tier: support, x: 1, y: 2, description: 利用者が RisingWave の処理コンポーネントを実行する。, evidence: [{type: doc, ref: docs/reference-risingwave.md#§4}]}
+      ex-meta: {label: PostgreSQL メタストア, kind: db, tier: support, x: 11, y: 2, description: RisingWave のメタデータを保持する。配置先は未選定。, evidence: [{type: doc, ref: docs/reference-risingwave.md#§4}]}
       ex-source:
         label: Kafka トピック
         kind: service
@@ -202,3 +204,115 @@ implementations:
             ref: docs/reference-risingwave.md#§4
         realizes:
           - state
+    links:
+      - {id: ex-run, from: ex-host, to: ex-engine, label: RisingWave を実行, evidence: [{type: doc, ref: docs/reference-risingwave.md#§4}]}
+      - {id: ex-metadata, from: ex-engine, to: ex-meta, label: クラスタメタデータを管理, evidence: [{type: doc, ref: docs/reference-risingwave.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-engine: {tier: diagram, x: 4, y: 1}
+        ex-view: {tier: diagram, x: 7, y: 1}
+        ex-state: {tier: diagram, x: 14, y: 1}
+        ex-meta: {tier: diagram, x: 17, y: 1}
+        ex-source: {tier: diagram, x: 20, y: 1}
+        ex-consumer: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: datacenter, label: RisingWave 実行ホスト, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 10, nodes: [ex-host, ex-engine, ex-view]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: apps, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: external, label: 独立サービス・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-engine: {tier: apps, x: 4, y: 1}
+        ex-view: {tier: apps, x: 7, y: 1}
+        ex-state: {tier: external, x: 1, y: 1}
+        ex-meta: {tier: external, x: 4, y: 1}
+        ex-source: {tier: external, x: 7, y: 1}
+        ex-consumer: {tier: user, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: RisingWave 実行ホスト, tier: [host, apps], nodes: [ex-host, ex-engine, ex-view]}
+
+  - id: aws-eks-msk
+    label: "AWS：EKS・Amazon MSK・S3・RDS"
+    description: "EKS 上の RisingWave が Amazon MSK を取り込み、RDS にメタデータ、S3 に Hummock の処理状態とビューを保持する例。"
+    sources:
+      - {title: "RisingWave Helm deployment guide", url: https://risingwave.com/blog/streaming-database-kubernetes-deployment-guide/}
+      - {title: "RisingWave Helm chart values", url: https://raw.githubusercontent.com/risingwavelabs/helm-charts/main/charts/risingwave/values.yaml}
+      - {title: "RisingWave architecture design", url: https://risingwavelabs.github.io/risingwave/design/architecture-design.html}
+      - {title: "RisingWave Kafka source and MSK", url: https://github.com/risingwavelabs/risingwave-docs/blob/main/integrations/sources/kafka.mdx}
+      - {title: "RisingWave license", url: https://github.com/risingwavelabs/risingwave/blob/main/LICENSE}
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+      - {title: "EKS managed node groups", url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+    tiers:
+      - {id: access, label: "イベント入力・SQL 利用・管理", z: 2, size: [20, 4]}
+      - {id: compute, label: "RisingWave クラスタ", z: 1, size: [22, 4]}
+      - {id: storage, label: "データと制御情報の永続化", z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: "AWS サービス領域（EKS 制御プレーンは AWS 管理 VPC）", provider: aws, tier: [access, compute, storage], nodes: [aws-risingwave-msk, aws-risingwave-eks, aws-risingwave-ec2, aws-risingwave-frontend, aws-risingwave-compute, aws-risingwave-meta, aws-risingwave-compactor, aws-risingwave-rds, aws-risingwave-s3, aws-risingwave-view]}
+      - {kind: cluster, label: "EKS クラスタ", tier: [compute], nodes: [aws-risingwave-ec2, aws-risingwave-frontend, aws-risingwave-compute, aws-risingwave-meta, aws-risingwave-compactor]}
+    nodes:
+      aws-risingwave-msk: {label: "Amazon MSK / Kafka トピック", svc: msk, kind: queue, tier: access, x: 3, y: 1.5, realizes: [source], description: "ストリーム処理に渡す入力イベントを保持する。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-eks: {label: "Amazon EKS", svc: eks, kind: service, tier: access, x: 10, y: 1.5, description: "AWS 管理 VPC の制御プレーン。利用者は API と公開設定を操作するがサーバーへ直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-consumer: {label: "PostgreSQL 互換 SQL クライアント", kind: client, tier: access, x: 17, y: 1.5, realizes: [consumer], description: "RisingWave Frontend に PostgreSQL プロトコルで接続する。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-compute: {label: "RisingWave Compute", kind: worker, tier: compute, x: 4, y: 1.5, realizes: [engine], description: "Kafka を読み、連続的なストリーム計算とクエリ実行を担う。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-frontend: {label: "RisingWave Frontend", kind: service, tier: compute, x: 8.5, y: 1.5, description: "クライアントの SQL を受け、計画と実行を調整する。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-meta: {label: "RisingWave Meta", kind: scheduler, tier: compute, x: 13, y: 1.5, description: "DDL・分散実行とチェックポイント、Hummock のバージョン管理を調整する。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-compactor: {label: "RisingWave Compactor", kind: worker, tier: compute, x: 17, y: 1.5, description: "Hummock の SST をバックグラウンドでコンパクションする。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-ec2: {label: "Amazon EC2 / ノードグループ", svc: ec2, kind: host, tier: compute, x: 21, y: 1.5, description: "RisingWave の各コンポーネントを Pod として実行する。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-s3: {label: "Amazon S3 / Hummock state store", svc: s3, kind: db, tier: storage, x: 4, y: 1.5, realizes: [state], description: "処理状態と実体化ビューを構成するデータファイルを保持する。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-view: {label: "実体化ビューの永続データ", kind: table, tier: storage, x: 9, y: 1.5, realizes: [view], description: "同じ Hummock state store 内に維持されるクエリ結果。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      aws-risingwave-rds: {label: "Amazon RDS for PostgreSQL", svc: rds, kind: db, tier: storage, x: 15, y: 1.5, description: "RisingWave Meta が使うシステムカタログと状態ストアの制御メタデータを保存する。", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+    links:
+      - {id: aws-risingwave-node-group, from: aws-risingwave-eks, to: aws-risingwave-ec2, label: "EC2 ノードグループを管理", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-deploy, from: aws-risingwave-eks, to: aws-risingwave-meta, label: "RisingWave の Helm ワークロードを配置", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-sql, from: aws-risingwave-consumer, to: aws-risingwave-frontend, label: "ビューを SQL で照会", realizes: [query], replace: true, evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-dispatch, from: aws-risingwave-frontend, to: aws-risingwave-compute, label: "照会の計画を実行", realizes: [query], replace: true, evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-read, from: aws-risingwave-compute, to: aws-risingwave-view, label: "実体化ビューの行を取得", realizes: [query], replace: true, evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-ddl, from: aws-risingwave-frontend, to: aws-risingwave-meta, label: "ビュー定義などの DDL を渡す", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-catalog, from: aws-risingwave-meta, to: aws-risingwave-rds, label: "メタストアを読み書き", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-barrier, from: aws-risingwave-meta, to: aws-risingwave-compute, label: "バリアとチェックポイントを調整", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-schedule, from: aws-risingwave-meta, to: aws-risingwave-compactor, label: "コンパクションを割り当て", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+      - {id: aws-risingwave-compact, from: aws-risingwave-compactor, to: aws-risingwave-s3, label: "SST を読み、統合した SST を書く", evidence: [{type: doc, ref: "docs/reference-risingwave.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        aws-risingwave-eks: {tier: diagram, x: 1, y: 1}
+        aws-risingwave-ec2: {tier: diagram, x: 4, y: 1}
+        aws-risingwave-compute: {tier: diagram, x: 7, y: 1}
+        aws-risingwave-frontend: {tier: diagram, x: 1, y: 4}
+        aws-risingwave-meta: {tier: diagram, x: 4, y: 4}
+        aws-risingwave-compactor: {tier: diagram, x: 7, y: 4}
+        aws-risingwave-msk: {tier: diagram, x: 14, y: 1}
+        aws-risingwave-s3: {tier: diagram, x: 17, y: 1}
+        aws-risingwave-view: {tier: diagram, x: 20, y: 1}
+        aws-risingwave-rds: {tier: diagram, x: 14, y: 4}
+        aws-risingwave-consumer: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: -1.5, y0: 0, x1: 23, y1: 11, nodes: [aws-risingwave-eks, aws-risingwave-ec2, aws-risingwave-compute, aws-risingwave-frontend, aws-risingwave-meta, aws-risingwave-compactor, aws-risingwave-msk, aws-risingwave-s3, aws-risingwave-view, aws-risingwave-rds]}
+        - {kind: cluster, label: EKS 論理クラスタ, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 10, nodes: [aws-risingwave-eks, aws-risingwave-ec2, aws-risingwave-compute, aws-risingwave-frontend, aws-risingwave-meta, aws-risingwave-compactor]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ホスト, z: 0, size: [10, 10]}
+        - {id: apps, label: ホスト上の処理, z: 1, size: [10, 10]}
+        - {id: external, label: 独立サービス・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: user, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        aws-risingwave-eks: {tier: external, x: 1, y: 1}
+        aws-risingwave-ec2: {tier: host, x: 4, y: 1}
+        aws-risingwave-compute: {tier: apps, x: 7, y: 1}
+        aws-risingwave-frontend: {tier: apps, x: 1, y: 4}
+        aws-risingwave-meta: {tier: apps, x: 4, y: 4}
+        aws-risingwave-compactor: {tier: apps, x: 7, y: 4}
+        aws-risingwave-msk: {tier: external, x: 1, y: 1}
+        aws-risingwave-s3: {tier: external, x: 4, y: 1}
+        aws-risingwave-view: {tier: external, x: 7, y: 1}
+        aws-risingwave-rds: {tier: external, x: 1, y: 4}
+        aws-risingwave-consumer: {tier: user, x: 1, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [host, apps, external], nodes: [aws-risingwave-eks, aws-risingwave-ec2, aws-risingwave-compute, aws-risingwave-frontend, aws-risingwave-meta, aws-risingwave-compactor, aws-risingwave-msk, aws-risingwave-s3, aws-risingwave-view, aws-risingwave-rds]}

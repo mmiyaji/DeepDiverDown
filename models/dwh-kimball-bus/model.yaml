@@ -212,6 +212,8 @@ implementations:
     label: BigQuery の受注・返品横断集計
     description: 受注と返品をそれぞれ別ファクトに持ち、日付と商品を両方から参照する BigQuery での実装例。
     sources:
+      - {title: BigQuery scheduled queries, url: https://docs.cloud.google.com/bigquery/docs/scheduling-queries}
+      - {title: BigQuery CSV load, url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv}
       - title: Kimball Group の Conformed Dimensions／Drilling Across／Bus Matrix
         url: >-
           https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
@@ -233,6 +235,11 @@ implementations:
           - 8
           - 3
     nodes:
+      example-input: {label: Cloud Storage input CSV, svc: "gcp:gcs", kind: db, tier: flow, x: 0, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-engine: {label: BigQuery managed compute, svc: "gcp:bigquery", kind: service, tier: flow, x: 10, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-schedule: {label: Scheduled query and load job, svc: "gcp:bigquery", kind: scheduler, tier: flow, x: 5, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-identity: {label: Scheduled query service account, kind: policy, tier: flow, x: 14, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      example-user: {label: Data analyst, kind: actor, tier: flow, x: -3, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
       example-date:
         label: common.dim_calendar
         kind: table
@@ -323,6 +330,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-kimball-bus.md#§5
     links:
+      - {id: example-load-orders, from: example-input, to: example-orders, label: "Load order data", evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      - {id: example-load-returns, from: example-input, to: example-returns, label: "Load return data", evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      - {id: example-run-sql, from: example-schedule, to: example-engine, label: "Run GoogleSQL", evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      - {id: example-schedule-identity, from: example-identity, to: example-schedule, label: "Authorize scheduled query", evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
+      - {id: example-user-query, from: example-user, to: example-bi, label: "Query comparison view", evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§5"}]}
       - id: example-check-connection
         from: example-check
         to: example-product
@@ -331,15 +343,121 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-kimball-bus.md#§5
     groups:
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud・BigQuery
-        tier:
-          - flow
-        nodes:
-          - example-date
-          - example-product
-          - example-orders
-          - example-returns
-          - example-sales
-          - example-bi
+      - {kind: cloud, provider: gcp, label: Google Cloud project, tier: [flow, implementation-setup], nodes: [example-input, example-engine, example-schedule, example-identity, example-date, example-product, example-orders, example-returns, example-sales, example-bi, example-check]}
+    layout2d:
+      tiers: [{id: diagram, label: BigQuery bus schema, z: 0, size: [30, 13]}]
+      nodes:
+        example-input: {tier: diagram, x: 4, y: 1}
+        example-engine: {tier: diagram, x: 8, y: 1}
+        example-schedule: {tier: diagram, x: 12, y: 1}
+        example-identity: {tier: diagram, x: 16, y: 1}
+        example-date: {tier: diagram, x: 20, y: 1}
+        example-product: {tier: diagram, x: 24, y: 1}
+        example-orders: {tier: diagram, x: 4, y: 5}
+        example-returns: {tier: diagram, x: 8, y: 5}
+        example-sales: {tier: diagram, x: 12, y: 5}
+        example-bi: {tier: diagram, x: 16, y: 5}
+        example-check: {tier: diagram, x: 20, y: 5}
+        example-user: {tier: diagram, x: 0, y: 2}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: diagram, nodes: [example-input, example-engine, example-schedule, example-identity, example-date, example-product, example-orders, example-returns, example-sales, example-bi, example-check]}
+    layout3d:
+      tiers:
+        - {id: services, label: BigQuery and Cloud Storage, z: 0, size: [24, 6]}
+        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-input: {tier: services, x: 2, y: 1}
+        example-engine: {tier: services, x: 6, y: 1}
+        example-schedule: {tier: services, x: 10, y: 1}
+        example-identity: {tier: services, x: 14, y: 1}
+        example-date: {tier: services, x: 18, y: 1}
+        example-product: {tier: services, x: 22, y: 1}
+        example-orders: {tier: services, x: 2, y: 4}
+        example-returns: {tier: services, x: 6, y: 4}
+        example-sales: {tier: services, x: 10, y: 4}
+        example-bi: {tier: services, x: 14, y: 4}
+        example-check: {tier: services, x: 18, y: 4}
+        example-user: {tier: user, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project, tier: services, nodes: [example-input, example-engine, example-schedule, example-identity, example-date, example-product, example-orders, example-returns, example-sales, example-bi, example-check]}
+
+  - id: aws-redshift-bus
+    label: "Amazon Redshift の受注・返品横断集計"
+    description: "S3 に届く受注・返品・商品マスターを Amazon Redshift に定期ロードし、共通のディメンションで別集計した二つのファクトを比較する。"
+    sources:
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+      - {title: "Kimball Group のバス・マトリクスとドリルアクロス", url: https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/}
+      - {title: "Redshift の S3 ロード", url: https://docs.aws.amazon.com/redshift/latest/dg/t_Loading-data-from-S3.html}
+      - {title: "EventBridge からの Redshift Data API 呼び出し", url: https://docs.aws.amazon.com/redshift/latest/mgmt/data-api-calling-event-bridge.html}
+      - {title: "Redshift の CREATE VIEW", url: https://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_VIEW.html}
+      - {title: "Redshift のテーブル制約", url: https://docs.aws.amazon.com/redshift/latest/dg/t_Defining_constraints.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-redshift-bus-cluster, aws-redshift-bus-role, aws-redshift-bus-scheduler, aws-redshift-bus-landing, aws-redshift-bus-load, aws-redshift-bus-date, aws-redshift-bus-product, aws-redshift-bus-orders, aws-redshift-bus-returns, aws-redshift-bus-sales, aws-redshift-bus-refunds, aws-redshift-bus-compare]}
+      - {kind: cluster, label: "Amazon Redshift データベース", provider: aws, tier: [runtime, data], nodes: [aws-redshift-bus-load, aws-redshift-bus-date, aws-redshift-bus-product, aws-redshift-bus-orders, aws-redshift-bus-returns, aws-redshift-bus-sales, aws-redshift-bus-refunds, aws-redshift-bus-compare]}
+    nodes:
+      aws-redshift-bus-cluster: {label: Redshift provisioned cluster, svc: redshift, kind: service, tier: runtime, x: 14, y: 2, management: {type: shared, scope: "AWS operates Redshift; customer manages cluster, data and access."}, evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§6"}]}
+      aws-redshift-bus-role: {label: Redshift S3 access IAM role, svc: iam, kind: policy, tier: runtime, x: 16, y: 1, management: {type: customer, scope: "Customer manages role trust and permissions."}, evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§6"}]}
+      aws-redshift-bus-source: {label: "受注・返品の業務システム", kind: external, tier: entry, x: 1, y: 1.5, description: "受注、返品と商品マスターを独立したファイルとして出力する。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-scheduler: {label: "EventBridge の定期ルール", kind: scheduler, tier: runtime, x: 2, y: 0.8, svc: eventbridge, description: "Redshift Data API のロード処理を起動する。", management: {type: shared, scope: "AWS operates service infrastructure; customer configures workload and permissions."}, evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-landing: {label: "S3 の取り込み領域", kind: db, tier: runtime, x: 2, y: 4.6, svc: s3, description: "受注、返品、商品マスターのファイルをプレフィックスで分けて保持する。", management: {type: shared, scope: "AWS operates service infrastructure; customer configures workload and permissions."}, evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-load: {label: "Redshift SQL ロード処理", kind: worker, tier: runtime, x: 7, y: 0.8, svc: redshift, description: "COPY でステージングへ読み、照合後にディメンションと独立したファクトを更新する。", management: {type: shared, scope: "AWS operates service infrastructure; customer configures workload and permissions."}, evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-date: {label: "共通の日付ディメンション", kind: table, tier: runtime, x: 7, y: 4.6, realizes: [date], description: "注文日と返品受付日が同じ日付キーを使う。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-product: {label: "共通の商品ディメンション", kind: table, tier: runtime, x: 12, y: 4.6, realizes: [product], description: "商品キーとカテゴリの定義を共用する。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-orders: {label: "受注明細ファクト", kind: table, tier: data, x: 2, y: 0.6, realizes: [orders], description: "1受注明細ごとに売上金額を記録する。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-returns: {label: "返品明細ファクト", kind: table, tier: data, x: 2, y: 3.5, realizes: [returns], description: "1返品明細ごとに返金金額を記録する。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-sales: {label: "日・カテゴリ・通貨別 売上", kind: table, tier: data, x: 8, y: 0.6, realizes: [sales], description: "受注を比較に使う粒度で集計する SQL ビュー。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-refunds: {label: "日・カテゴリ・通貨別 返品", kind: table, tier: data, x: 8, y: 3.5, realizes: [refunds], description: "返品を比較に使う粒度で集計する SQL ビュー。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      aws-redshift-bus-compare: {label: "受注・返品の比較ビュー", kind: table, tier: data, x: 14, y: 2, realizes: [bi], description: "比較キーで二つの集計を横並びにする。", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+    links:
+      - {id: aws-redshift-bus-run-sql, from: aws-redshift-bus-cluster, to: aws-redshift-bus-load, label: "Execute load SQL", evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§6"}]}
+      - {id: aws-redshift-bus-role-s3, from: aws-redshift-bus-role, to: aws-redshift-bus-landing, label: "Authorize COPY", evidence: [{type: doc, ref: "docs/reference-dwh-kimball-bus.md#§6"}]}
+      - {id: aws-redshift-bus-export, from: aws-redshift-bus-source, to: aws-redshift-bus-landing, label: "別々の入力ファイルを出力", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      - {id: aws-redshift-bus-trigger, from: aws-redshift-bus-scheduler, to: aws-redshift-bus-load, label: "Data API でロード処理を起動", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      - {id: aws-redshift-bus-copy, from: aws-redshift-bus-landing, to: aws-redshift-bus-load, label: "COPY でファイルを取り込む", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      - {id: aws-redshift-bus-load-products, from: aws-redshift-bus-load, to: aws-redshift-bus-product, label: "共通商品キーで商品を更新", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      - {id: aws-redshift-bus-load-orders, from: aws-redshift-bus-load, to: aws-redshift-bus-orders, label: "受注明細をロード", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+      - {id: aws-redshift-bus-load-returns, from: aws-redshift-bus-load, to: aws-redshift-bus-returns, label: "返品明細をロード", evidence: [{type: doc, ref: docs/reference-dwh-kimball-bus.md#§6}]}
+    layout2d:
+      tiers: [{id: diagram, label: Redshift bus schema, z: 0, size: [32, 15]}]
+      nodes:
+        aws-redshift-bus-source: {tier: diagram, x: 0, y: 2}
+        aws-redshift-bus-scheduler: {tier: diagram, x: 4, y: 1}
+        aws-redshift-bus-landing: {tier: diagram, x: 8, y: 1}
+        aws-redshift-bus-load: {tier: diagram, x: 12, y: 1}
+        aws-redshift-bus-date: {tier: diagram, x: 16, y: 1}
+        aws-redshift-bus-product: {tier: diagram, x: 20, y: 1}
+        aws-redshift-bus-orders: {tier: diagram, x: 24, y: 1}
+        aws-redshift-bus-returns: {tier: diagram, x: 4, y: 5}
+        aws-redshift-bus-sales: {tier: diagram, x: 8, y: 5}
+        aws-redshift-bus-refunds: {tier: diagram, x: 12, y: 5}
+        aws-redshift-bus-compare: {tier: diagram, x: 16, y: 5}
+        aws-redshift-bus-cluster: {tier: diagram, x: 20, y: 5}
+        aws-redshift-bus-role: {tier: diagram, x: 24, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-redshift-bus-scheduler, aws-redshift-bus-landing, aws-redshift-bus-load, aws-redshift-bus-date, aws-redshift-bus-product, aws-redshift-bus-orders, aws-redshift-bus-returns, aws-redshift-bus-sales, aws-redshift-bus-refunds, aws-redshift-bus-compare, aws-redshift-bus-cluster, aws-redshift-bus-role]}
+        - {kind: cluster, label: Redshift database, tier: diagram, nodes: [aws-redshift-bus-cluster, aws-redshift-bus-load, aws-redshift-bus-date, aws-redshift-bus-product, aws-redshift-bus-orders, aws-redshift-bus-returns, aws-redshift-bus-sales, aws-redshift-bus-refunds, aws-redshift-bus-compare]}
+    layout3d:
+      tiers:
+        - {id: services, label: AWS services and Redshift data, z: 0, size: [28, 9]}
+        - {id: source, label: Upstream, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-redshift-bus-source: {tier: source, x: 0, y: 1.5}
+        aws-redshift-bus-scheduler: {tier: services, x: 2, y: 1}
+        aws-redshift-bus-landing: {tier: services, x: 6, y: 1}
+        aws-redshift-bus-load: {tier: services, x: 10, y: 1}
+        aws-redshift-bus-date: {tier: services, x: 14, y: 1}
+        aws-redshift-bus-product: {tier: services, x: 18, y: 1}
+        aws-redshift-bus-orders: {tier: services, x: 22, y: 1}
+        aws-redshift-bus-returns: {tier: services, x: 26, y: 1}
+        aws-redshift-bus-sales: {tier: services, x: 2, y: 4}
+        aws-redshift-bus-refunds: {tier: services, x: 6, y: 4}
+        aws-redshift-bus-compare: {tier: services, x: 10, y: 4}
+        aws-redshift-bus-cluster: {tier: services, x: 14, y: 4}
+        aws-redshift-bus-role: {tier: services, x: 18, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: services, nodes: [aws-redshift-bus-scheduler, aws-redshift-bus-landing, aws-redshift-bus-load, aws-redshift-bus-date, aws-redshift-bus-product, aws-redshift-bus-orders, aws-redshift-bus-returns, aws-redshift-bus-sales, aws-redshift-bus-refunds, aws-redshift-bus-compare, aws-redshift-bus-cluster, aws-redshift-bus-role]}
+        - {kind: cluster, label: Redshift database, tier: services, nodes: [aws-redshift-bus-cluster, aws-redshift-bus-load, aws-redshift-bus-date, aws-redshift-bus-product, aws-redshift-bus-orders, aws-redshift-bus-returns, aws-redshift-bus-sales, aws-redshift-bus-refunds, aws-redshift-bus-compare]}

@@ -48,6 +48,7 @@ implementations:
         url: https://docs.docker.com/engine/swarm/ingress/
       - title: Rolling updates
         url: https://docs.docker.com/engine/swarm/swarm-tutorial/rolling-update/
+      - {title: "Docker Swarm manager の運用とバックアップ", url: https://docs.docker.com/engine/swarm/admin_guide/}
     tiers:
       - id: control
         label: Swarm 制御
@@ -64,7 +65,9 @@ implementations:
           - runtime
         nodes:
           - vm-manager
+          - vm-raft
           - vm-worker
+          - vm-task
           - vm-ingress
     nodes:
       vm-service:
@@ -74,18 +77,20 @@ implementations:
         realizes:
           - service
         description: 注文 API のイメージ、レプリカ数、公開ポートを宣言する。
+        management: {type: customer, scope: 利用者がサービス仕様を設定する。}
         evidence:
           - type: doc
             ref: docs/reference-docker-swarm.md#§6
       vm-manager:
-        label: Swarm manager VM 群
+        label: Docker Swarm manager VM × 3
         kind: worker
         tier: control
         svc: onprem:vm
         realizes:
           - manager
           - scheduler
-        description: Docker Engine の manager が状態を管理し、タスクの配置を決める。
+        description: 各 manager が Raft の状態を保持し、リーダーがタスクの配置を決める。
+        management: {type: customer, scope: 利用者がmanager、Docker Engine と状態を運用する。}
         evidence:
           - type: doc
             ref: docs/reference-docker-swarm.md#§6
@@ -95,12 +100,20 @@ implementations:
         tier: runtime
         svc: onprem:vm
         realizes:
-          - task
           - worker
         description: 割り当てられた Service タスクをコンテナとして実行する。
+        management: {type: customer, scope: 利用者がworker、Docker Engine とホスト OS を運用する。}
         evidence:
           - type: doc
             ref: docs/reference-docker-swarm.md#§6
+      vm-task:
+        label: 注文 API の Service タスク
+        kind: service
+        tier: runtime
+        realizes: [task]
+        description: worker の Docker Engine 上で動く注文 API コンテナ。
+        management: {type: customer, scope: 利用者がアプリとイメージを管理する。}
+        evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§6}]
       vm-update:
         label: Service の UpdateConfig
         kind: policy
@@ -108,6 +121,7 @@ implementations:
         realizes:
           - update
         description: 同時に更新するタスク数や失敗時の扱いを設定する。
+        management: {type: customer, scope: 利用者が更新設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-docker-swarm.md#§6
@@ -116,6 +130,7 @@ implementations:
         kind: lb
         tier: runtime
         description: タスクの有無に関係なく到達したノードから、実行中のサービスのタスクへ接続を転送する。
+        management: {type: customer, scope: 利用者が公開ポートと Swarm ネットワークを設定する。}
         evidence:
           - type: doc
             ref: docs/reference-docker-swarm.md#§6
@@ -124,13 +139,17 @@ implementations:
         kind: catalog
         tier: runtime
         description: 配備するイメージをノードから取得可能にする。
+        management: {type: customer, scope: 利用者がレジストリの提供先とアクセス権を決める。}
         evidence:
           - type: doc
             ref: docs/reference-docker-swarm.md#§6
+      vm-raft: {label: "manager VM ごとの Raft データ", kind: db, tier: control, description: "Docker データディレクトリの swarm 以下に状態を永続化する。", evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§6}]}
     links:
+      - {id: vm-run, from: vm-worker, to: vm-task, label: 注文 API コンテナを実行, evidence: [{type: doc, ref: docs/reference-docker-swarm.md#§6}]}
+      - {id: vm-persist, from: vm-manager, to: vm-raft, label: Swarm の状態を永続ディスクに保存}
       - id: vm-route
         from: vm-ingress
-        to: vm-worker
+        to: vm-task
         label: 稼働中のタスクに転送
         evidence:
           - type: doc
@@ -142,3 +161,37 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-docker-swarm.md#§6
+
+    layout2d:
+      tiers: [{id: diagram, label: 自主管理構成, z: 0, origin: [-4, 0], size: [22, 11]}]
+      nodes:
+        vm-service: {tier: diagram, x: 2, y: 1}
+        vm-manager: {tier: diagram, x: 6, y: 1}
+        vm-raft: {tier: diagram, x: 10, y: 1}
+        vm-worker: {tier: diagram, x: 6, y: 5}
+        vm-task: {tier: diagram, x: 6, y: 8}
+        vm-ingress: {tier: diagram, x: 10, y: 6}
+        vm-update: {tier: diagram, x: 2, y: 7}
+        vm-registry: {tier: diagram, x: 14, y: 3}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [diagram], x0: 0, y0: -1, x1: 12, y1: 10, nodes: [vm-service, vm-manager, vm-raft, vm-worker, vm-task, vm-ingress, vm-update]}
+        - {kind: cluster, label: Docker Swarm, tier: [diagram], x0: 4, y0: -0.5, x1: 11.8, y1: 9.5, nodes: [vm-manager, vm-raft, vm-worker, vm-task, vm-ingress]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: 実行ノード, z: 0, size: [10, 4]}
+        - {id: apps, label: ノード上の処理・データ, z: 1, size: [10, 4]}
+        - {id: external, label: クラスタ外の設定・サービス, z: 0, origin: [12, 0], size: [4, 5]}
+        - {id: registry, label: レジストリ（提供先未指定）, z: 0, origin: [18, 0], size: [3, 3]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        vm-service: {tier: external, x: 1, y: 1}
+        vm-manager: {tier: nodes, x: 2, y: 2}
+        vm-raft: {tier: apps, x: 2, y: 2}
+        vm-worker: {tier: nodes, x: 6, y: 2}
+        vm-task: {tier: apps, x: 6, y: 2}
+        vm-ingress: {tier: apps, x: 6, y: 3.5}
+        vm-update: {tier: external, x: 1, y: 3}
+        vm-registry: {tier: registry, x: 1, y: 1}
+      groups:
+        - {kind: datacenter, label: 利用者の環境, tier: [nodes, apps, external], nodes: [vm-service, vm-manager, vm-raft, vm-worker, vm-task, vm-ingress, vm-update]}
+        - {kind: cluster, label: Docker Swarm, tier: [nodes, apps], nodes: [vm-manager, vm-raft, vm-worker, vm-task, vm-ingress]}

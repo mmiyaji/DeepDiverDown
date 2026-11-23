@@ -253,8 +253,8 @@ scenarios:
         note: 正しい行を反映し、除外の件数を確認して訂正の範囲を決める。
 implementations:
   - id: lakeflow-postgres
-    label: Lakeflow Connect での PostgreSQL 取込
-    description: PostgreSQL の変更を Lakeflow Connect で取り込み、ファイル由来データは別の入力表に置いてから注文データを整備する例。
+    label: RDS PostgreSQL と Lakeflow Connect
+    description: Amazon RDS for PostgreSQL の CDC と S3 ファイルを Databricks Lakeflow で取り込み、注文状態を整備する構成例。
     sources:
       - title: Lakeflow Connect DB コネクタ
         url: https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview
@@ -266,6 +266,10 @@ implementations:
         url: https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines
       - title: Databricks の PostgreSQL ソース設定
         url: https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-source-setup
+      - title: PostgreSQL connector FAQs
+        url: https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/postgresql-faq
+      - {title: Databricks deployment architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -280,24 +284,29 @@ implementations:
           - 8
           - 3
     nodes:
+      example-classic: {label: Classic compute on customer EC2, svc: ec2, kind: host, tier: flow, x: 20, y: 5, management: {type: shared, scope: "AWS operates EC2; customer configures classic compute."}, evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      example-serverless: {label: Databricks serverless compute plane, kind: host, tier: flow, x: 14, y: 5, evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      example-managed-s3: {label: S3 managed storage, svc: s3, kind: db, tier: flow, x: 28, y: 5, management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      example-storage-role: {label: AWS IAM storage role, svc: iam, kind: policy, tier: flow, x: 20, y: 9, management: {type: customer, scope: "Customer manages IAM trust and permissions."}, evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
       example-db:
-        label: PostgreSQL の ORDERS
+        label: Amazon RDS for PostgreSQL
         kind: external
         tier: flow
-        x: 0
-        'y': 0
+        x: 20
+        y: 1
         realizes:
           - db
-        description: 対象テーブルの初回取込と CDC を提供する。
+        description: RDS PostgreSQL の注文表から初回取込と論理レプリケーションを行う。
         evidence:
           - type: doc
             ref: docs/reference-databricks-lakeflow.md#§6
+        svc: rds
       example-gateway:
         label: Lakeflow Connect 取り込みゲートウェイ
         kind: service
         tier: flow
-        x: 3
-        'y': 0
+        x: 24
+        y: 5
         realizes:
           - gateway
         description: データベースの変更を取得する。
@@ -310,7 +319,7 @@ implementations:
         kind: db
         tier: flow
         x: 6
-        'y': 0
+        y: 1
         realizes:
           - stage
         description: ゲートウェイが取得した変更を一時保存する。
@@ -322,8 +331,8 @@ implementations:
         label: Lakeflow Connect 取り込みパイプライン
         kind: worker
         tier: flow
-        x: 9
-        'y': 0
+        x: 2
+        y: 1
         realizes:
           - connector
         description: 接続したソースから宛先テーブルを更新する。
@@ -335,8 +344,8 @@ implementations:
         label: Amazon S3 の到着ファイル
         kind: db
         tier: flow
-        x: 0
-        'y': 4
+        x: 24
+        y: 1
         svc: s3
         realizes:
           - files
@@ -349,8 +358,8 @@ implementations:
         kind: service
         tier: flow
         svc: databricks:lakeflow
-        x: 5
-        'y': 4
+        x: 10
+        y: 1
         realizes:
           - auto-loader
         description: 新着ファイルを別の受入表に増分取り込みする。
@@ -361,8 +370,8 @@ implementations:
         label: ソース別 RAW Delta テーブル群
         kind: db
         tier: flow
-        x: 10
-        'y': 4
+        x: 14
+        y: 1
         realizes:
           - raw
         description: DB 接続の宛先表とファイルの受入表を個別に管理する。
@@ -374,8 +383,8 @@ implementations:
         label: Lakeflow パイプラインの宣言と出力表
         kind: worker
         tier: flow
-        x: 14
-        'y': 4
+        x: 2
+        y: 5
         realizes:
           - sdp
           - clean
@@ -388,8 +397,8 @@ implementations:
         label: Lakeflow Jobs
         kind: service
         tier: flow
-        x: 13
-        'y': 0
+        x: 6
+        y: 5
         realizes:
           - jobs
         description: 後段の変換パイプラインを定期実行する。
@@ -401,8 +410,8 @@ implementations:
         label: Lakeflow パイプラインイベントログ
         kind: db
         tier: flow
-        x: 18
-        'y': 0
+        x: 10
+        y: 5
         realizes:
           - event-log
         description: 進捗と品質違反件数を調べる。
@@ -413,14 +422,20 @@ implementations:
       example-publication:
         label: PostgreSQL の論理レプリケーション設定
         kind: service
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
+        tier: flow
+        x: 28
+        y: 1
         description: 対象表の publication とソース接続に必要な権限を設定する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-lakeflow.md#§6
     links:
+      - {id: example-classic-gateway, from: example-classic, to: example-gateway, label: "Run ingestion gateway", evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      - {id: example-serverless-ingest, from: example-serverless, to: example-connector, label: "Run ingestion pipeline", evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      - {id: example-serverless-transform, from: example-serverless, to: example-sdp, label: "Run transformation pipeline", evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      - {id: example-stage-storage, from: example-stage, to: example-managed-s3, label: "Store staged changes", evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      - {id: example-table-storage, from: example-raw, to: example-managed-s3, label: "Store managed table files", evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
+      - {id: example-role-storage, from: example-storage-role, to: example-managed-s3, label: "Authorize storage access", evidence: [{type: doc, ref: "docs/reference-databricks-lakeflow.md#§6"}]}
       - id: example-publication-connection
         from: example-publication
         to: example-gateway
@@ -429,24 +444,53 @@ implementations:
           - type: doc
             ref: docs/reference-databricks-lakeflow.md#§6
     groups:
-      - kind: cloud
-        label: AWS・Amazon S3
-        provider: aws
-        tier:
-          - flow
-        nodes:
-          - example-files
-      - kind: cloud
-        provider: databricks
-        label: Databricks
-        tier:
-          - flow
-        nodes:
-          - example-gateway
-          - example-stage
-          - example-connector
-          - example-auto-loader
-          - example-raw
-          - example-sdp
-          - example-jobs
-          - example-event-log
+      - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: flow, nodes: [example-connector, example-stage, example-auto-loader, example-raw, example-sdp, example-jobs, example-event-log, example-serverless]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: flow, nodes: [example-db, example-files, example-publication, example-classic, example-gateway, example-managed-s3, example-storage-role]}
+    layout2d:
+      tiers: [{id: diagram, label: Lakeflow and AWS, z: 0, size: [34, 15]}]
+      nodes:
+        example-connector: {tier: diagram, x: 2, y: 1}
+        example-stage: {tier: diagram, x: 6, y: 1}
+        example-auto-loader: {tier: diagram, x: 10, y: 1}
+        example-raw: {tier: diagram, x: 14, y: 1}
+        example-sdp: {tier: diagram, x: 2, y: 5}
+        example-jobs: {tier: diagram, x: 6, y: 5}
+        example-event-log: {tier: diagram, x: 10, y: 5}
+        example-serverless: {tier: diagram, x: 14, y: 5}
+        example-db: {tier: diagram, x: 20, y: 1}
+        example-files: {tier: diagram, x: 24, y: 1}
+        example-publication: {tier: diagram, x: 28, y: 1}
+        example-classic: {tier: diagram, x: 20, y: 5}
+        example-gateway: {tier: diagram, x: 24, y: 5}
+        example-managed-s3: {tier: diagram, x: 28, y: 5}
+        example-storage-role: {tier: diagram, x: 20, y: 9}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: diagram, nodes: [example-connector, example-stage, example-auto-loader, example-raw, example-sdp, example-jobs, example-event-log, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-db, example-files, example-publication, example-classic, example-gateway, example-managed-s3, example-storage-role]}
+        - {kind: cluster, label: Classic compute gateway, tier: diagram, nodes: [example-classic, example-gateway]}
+    layout3d:
+      tiers:
+        - {id: jobs, label: Lakeflow pipelines, z: 1, size: [16, 6]}
+        - {id: serverless, label: Databricks serverless compute, z: 0, size: [16, 6]}
+        - {id: gateway, label: Ingestion gateway, z: 1, origin: [19, 0], size: [5, 3]}
+        - {id: aws, label: Customer AWS account, z: 0, origin: [19, 0], size: [24, 6]}
+      nodes:
+        example-connector: {tier: jobs, x: 2, y: 1}
+        example-stage: {tier: jobs, x: 6, y: 1}
+        example-auto-loader: {tier: jobs, x: 10, y: 1}
+        example-raw: {tier: jobs, x: 14, y: 1}
+        example-sdp: {tier: jobs, x: 2, y: 4}
+        example-jobs: {tier: jobs, x: 6, y: 4}
+        example-event-log: {tier: jobs, x: 10, y: 4}
+        example-serverless: {tier: serverless, x: 6, y: 1.5}
+        example-db: {tier: aws, x: 18, y: -2}
+        example-files: {tier: aws, x: 6, y: 1}
+        example-publication: {tier: aws, x: 10, y: 1}
+        example-classic: {tier: aws, x: 2, y: 1.5}
+        example-gateway: {tier: gateway, x: 2, y: 1.5}
+        example-managed-s3: {tier: aws, x: 6, y: 4}
+        example-storage-role: {tier: aws, x: 10, y: 4}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: [jobs, serverless], nodes: [example-connector, example-stage, example-auto-loader, example-raw, example-sdp, example-jobs, example-event-log, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: [gateway, aws], nodes: [example-db, example-files, example-publication, example-classic, example-gateway, example-managed-s3, example-storage-role]}
+        - {kind: cluster, label: Classic compute gateway, tier: [gateway, aws], nodes: [example-classic, example-gateway]}

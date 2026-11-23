@@ -59,3 +59,25 @@ Kafka Streams を組み込んだ JVM アプリケーションを複数起動す�
 
 - [Kafka Streams Architecture](https://kafka.apache.org/44/streams/architecture/)
 - [Configuring a Streams Application](https://kafka.apache.org/44/streams/developer-guide/config-streams/)
+
+## 9. 実装例：Amazon ECS on Fargate と Amazon MSK
+
+Kafka Streams を組み込んだ Java コンテナを Amazon ECS のサービスとして Fargate で実行する例。Amazon MSK が入力、出力、状態変更ログを保持する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| 入力・出力・状態変更ログ | 同じ MSK クラスター上の入力、出力、内部 changelog の各 Kafka トピック。 |
+| 実行単位と処理グラフ | Fargate で動く JVM 内の Kafka Streams Task と Topology。 |
+| ローカル状態ストア | Fargate の一時ストレージ上の RocksDB。 |
+
+ECS サービスで実行個体数を管理し、個体間で同じ `application.id` を指定する。Kafka Streams がパーティション単位で処理を割り当てる。置き換えで新しい ECS タスクになった場合は、changelog を再生してローカル状態を復元する。タスクと MSK の到達性、Kafka クライアントの認証、入力と出力に加えて内部トピックへ必要なアクセスを設定する。
+
+公式資料
+
+- [ECS on Fargate のタスク定義](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html)
+- [Fargate タスクの一時ストレージ](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-storage.html)
+- [Fargate サービスタスクの置き換え](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-maintenance.html)
+- [MSK クライアントのアクセス](https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html)
+- [Kafka Streams Architecture](https://kafka.apache.org/44/streams/architecture/)
+
+自前例は利用者管理の Linux ホスト群で JVM アプリを起動し、別の自前 Kafka ブローカーホスト群を用いる。具体的なホスト数とネットワークは未指定である。AWS 例は公式資料を組み合わせた代表構成であり、動作検証済み事例ではない。AWS は Fargate・ECS・MSK の基盤を運用し、利用者はタスク定義、コンテナ、必要な一時ストレージ容量、Kafka 認証・権限とトピックを管理する。Fargate の基盤ホストには直接アクセスしない。Linux Fargate プラットフォーム 1.4.0 以降を想定し、イメージも一時ストレージを使用する。Kafka Streams と MSK のバージョン互換性は未検証。

@@ -254,9 +254,117 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      pg-connect-db-host: {label: 自前 Linux PostgreSQL ホスト, kind: host, tier: processing, x: 0, y: 0, description: 利用者が PostgreSQL 18 と WAL のディスクを運用する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
+      pg-connect-connect-host: {label: 自前 Linux Connect ワーカー群, kind: host, tier: processing, x: 4, y: 0, description: 利用者が分散 Connect JVM と Debezium を運用する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
+      pg-connect-kafka-host: {label: 自前 Kafka ブローカー群, kind: host, tier: processing, x: 8, y: 0, description: 利用者が Kafka ブローカーと内部トピックを管理する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
       pg-connect-postgres: {label: PostgreSQL 18 Primary と pgoutput, kind: db, tier: processing, x: 1, y: 1.15, realizes: [orders, wal, slot, publication, decoder], description: 注文テーブル、WAL、論理スロット、Publication、組み込みプラグインは同じ PostgreSQL インスタンスが担う。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
       pg-connect-connect: {label: 分散 Kafka Connect の Debezium Source Task, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [connector], description: 確認済みの進捗を保持し、変更イベントを Kafka へ発行する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
       pg-connect-kafka: {label: Kafka の CDC トピックと Connect 内部トピック, kind: queue, tier: processing, x: 5, y: 1.15, realizes: [offset, kafka], description: 業務イベントと、分散 Connect のソースオフセットを別のトピックに保持する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
       pg-connect-health: {label: pg_replication_slots の監視, kind: monitor, tier: setup, x: 1, y: 1.5, description: restart_lsn と confirmed_flush_lsn、wal_status を監視し、停止中の保持と消失の兆候を区別する。, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§7}]}
     links:
+      - {id: pg-connect-db-run, from: pg-connect-db-host, to: pg-connect-postgres, label: PostgreSQL を実行}
+      - {id: pg-connect-worker-run, from: pg-connect-connect-host, to: pg-connect-connect, label: Connect JVM を実行}
+      - {id: pg-connect-broker-run, from: pg-connect-kafka-host, to: pg-connect-kafka, label: Kafka トピックを提供}
       - {id: pg-connect-health-connection, from: pg-connect-health, to: pg-connect-postgres, label: スロットの保持状態を確認}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+      nodes:
+        pg-connect-db-host: {tier: diagram, x: 2, y: 2}
+        pg-connect-postgres: {tier: diagram, x: 2, y: 5}
+        pg-connect-health: {tier: diagram, x: 2, y: 8}
+        pg-connect-connect-host: {tier: diagram, x: 8, y: 2}
+        pg-connect-connect: {tier: diagram, x: 8, y: 5}
+        pg-connect-kafka-host: {tier: diagram, x: 14, y: 2}
+        pg-connect-kafka: {tier: diagram, x: 14, y: 5}
+      groups:
+        - {kind: nodegroup, label: "PostgreSQL ホスト", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 12, nodes: [pg-connect-db-host, pg-connect-postgres, pg-connect-health]}
+        - {kind: nodegroup, label: "Connect ホスト群", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 9, nodes: [pg-connect-connect-host, pg-connect-connect]}
+        - {kind: nodegroup, label: "Kafka ホスト群", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 9, nodes: [pg-connect-kafka-host, pg-connect-kafka]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "PostgreSQL ホスト", z: 0, origin: [0, 0], size: [5, 9]}
+        - {id: zone1, label: "Connect ホスト群", z: 0, origin: [7, 0], size: [5, 6]}
+        - {id: zone2, label: "Kafka ホスト群", z: 0, origin: [14, 0], size: [5, 6]}
+      nodes:
+        pg-connect-db-host: {tier: zone0, x: 2, y: 1}
+        pg-connect-postgres: {tier: zone0, x: 2, y: 4}
+        pg-connect-health: {tier: zone0, x: 2, y: 7}
+        pg-connect-connect-host: {tier: zone1, x: 2, y: 1}
+        pg-connect-connect: {tier: zone1, x: 2, y: 4}
+        pg-connect-kafka-host: {tier: zone2, x: 2, y: 1}
+        pg-connect-kafka: {tier: zone2, x: 2, y: 4}
+      groups:
+        - {kind: nodegroup, label: "PostgreSQL ホスト", tier: [zone0], nodes: [pg-connect-db-host, pg-connect-postgres, pg-connect-health]}
+        - {kind: nodegroup, label: "Connect ホスト群", tier: [zone1], nodes: [pg-connect-connect-host, pg-connect-connect]}
+        - {kind: nodegroup, label: "Kafka ホスト群", tier: [zone2], nodes: [pg-connect-kafka-host, pg-connect-kafka]}
+  - id: aws-rds-msk
+    label: AWS（Amazon RDS と MSK Connect）
+    description: RDS for PostgreSQL の論理スロットから MSK Connect の Debezium が変更を読み、Amazon MSK に発行する例。
+    sources:
+      - {title: RDS for PostgreSQL の論理レプリケーション, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html}
+      - {title: Debezium PostgreSQL Connector, url: https://debezium.io/documentation/reference/stable/connectors/postgresql.html}
+      - {title: AWS の PostgreSQL CDC 構成例, url: https://aws.amazon.com/blogs/database/implementing-real-time-change-data-capture-with-debezium-for-amazon-aurora-postgresql-and-amazon-rds-for-postgresql/}
+      - {title: MSK Connect のプラグイン, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html}
+      - {title: MSK Connect のワーカー, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-workers.html}
+      - {title: MSK Connect のソースオフセット, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-set-offset-storage-topic.html}
+      - {title: Amazon RDS の CloudWatch メトリクス, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html}
+    tiers:
+      - {id: processing, label: 論理デコードと変更の配信, z: 0, size: [19, 4]}
+      - {id: operations, label: ストレージ監視とコネクター管理, z: 1, size: [19, 3]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [processing, operations]}
+      - {kind: vpc, label: VPC（MSK Connect は接続用 ENI）, tier: processing, nodes: [aws-rds, aws-eni, aws-msk]}
+    nodes:
+      aws-eni: {label: MSK Connect 接続用 ENI, kind: gateway, tier: processing, x: 6, y: 3, description: MSK Connect ワーカーを利用者サブネットに接続する。, management: {type: aws, scope: "AWS が ENI を作成し、利用者がサブネットとセキュリティグループを指定する。"}, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§8}]}
+      aws-plugin: {label: S3 の Debezium プラグイン ZIP, svc: s3, kind: file, tier: operations, x: 15, y: 1.5, description: MSK Connect カスタムプラグイン登録時にコピーする。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が ZIP と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§8}]}
+      aws-rds: {label: RDS for PostgreSQL（pgoutput）, svc: rds, kind: db, tier: processing, x: 2, y: 1.5, realizes: [orders, wal, slot, publication, decoder], description: 注文テーブル・WAL・論理スロット・Publication を保持し、pgoutput で出力する。, management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者が DB と論理スロット・権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§8}]}
+      aws-task: {label: MSK Connect（Debezium タスク）, svc: mskconnect, kind: worker, tier: processing, x: 9, y: 1.5, realizes: [connector], description: 論理レプリケーション接続で行変更を購読し、イベントを発行して進捗を保存する。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者がプラグインと接続を設定する。"}, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§8}]}
+      aws-msk: {label: Amazon MSK（CDC とソースオフセット）, svc: msk, kind: queue, tier: processing, x: 16, y: 1.5, realizes: [kafka, offset], description: CDC イベントと読み取り位置を別トピックに保持する。, management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§8}]}
+      aws-monitor: {label: CloudWatch（RDS の WAL 使用量）, svc: cloudwatch, kind: monitor, tier: operations, x: 2, y: 1.5, description: TransactionLogsDiskUsage と FreeStorageSpace を監視する。, management: {type: shared, scope: "AWS が監視基盤を運用し、利用者がメトリクスとアラームを設定する。"}, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§8}]}
+      aws-worker: {label: MSK Connect（ワーカー管理）, svc: mskconnect, kind: service, tier: operations, x: 9, y: 1.5, description: カスタムプラグインとして登録した Debezium をワーカー上で動かす。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者が容量・設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-postgresql-logical-decoding.md#§8}]}
+    links:
+      - {id: aws-plugin-register, from: aws-plugin, to: aws-worker, label: プラグインを登録}
+      - {id: aws-stream-eni, from: aws-rds, to: aws-eni, label: 行変更を返す, realizes: [stream], replace: true}
+      - {id: aws-stream-task, from: aws-eni, to: aws-task, label: 行変更を受信, realizes: [stream], replace: true}
+      - {id: aws-publish-eni, from: aws-task, to: aws-eni, label: イベントを送る, realizes: [publish], replace: true}
+      - {id: aws-publish-msk, from: aws-eni, to: aws-msk, label: イベントを発行, realizes: [publish], replace: true}
+      - {id: aws-persist-eni, from: aws-task, to: aws-eni, label: 進捗を送る, realizes: [persist], replace: true}
+      - {id: aws-persist-msk, from: aws-eni, to: aws-msk, label: 進捗を保存, realizes: [persist], replace: true}
+      - {id: aws-resume-eni, from: aws-msk, to: aws-eni, label: 進捗を返す, realizes: [resume], replace: true}
+      - {id: aws-resume-task, from: aws-eni, to: aws-task, label: 進捗を読み戻す, realizes: [resume], replace: true}
+      - {id: aws-feedback-eni, from: aws-task, to: aws-eni, label: 受信位置を送る, realizes: [feedback], replace: true}
+      - {id: aws-feedback-rds, from: aws-eni, to: aws-rds, label: スロットに受信位置を通知, realizes: [feedback], replace: true}
+      - {id: aws-rds-metrics, from: aws-rds, to: aws-monitor, label: WAL 使用量と空き容量を測定}
+      - {id: aws-start-task, from: aws-worker, to: aws-task, label: Debezium タスクを起動}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+      nodes:
+        aws-task: {tier: diagram, x: 2, y: 2}
+        aws-worker: {tier: diagram, x: 2, y: 5}
+        aws-rds: {tier: diagram, x: 8, y: 2}
+        aws-eni: {tier: diagram, x: 8, y: 5}
+        aws-msk: {tier: diagram, x: 8, y: 8}
+        aws-plugin: {tier: diagram, x: 14, y: 2}
+        aws-monitor: {tier: diagram, x: 14, y: 5}
+      groups:
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 12, nodes: [aws-rds, aws-eni, aws-msk]}
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], x0: 0, y0: 0, x1: 18, y1: 15, nodes: [aws-task, aws-worker, aws-rds, aws-eni, aws-msk, aws-plugin, aws-monitor]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "MSK Connect", z: 0, origin: [0, 0], size: [5, 6]}
+        - {id: zone1, label: "利用者 VPC", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "S3 と監視", z: 0, origin: [14, 0], size: [5, 6]}
+      nodes:
+        aws-task: {tier: zone0, x: 2, y: 1}
+        aws-worker: {tier: zone0, x: 2, y: 4}
+        aws-rds: {tier: zone1, x: 2, y: 1}
+        aws-eni: {tier: zone1, x: 2, y: 4}
+        aws-msk: {tier: zone1, x: 2, y: 7}
+        aws-plugin: {tier: zone2, x: 2, y: 1}
+        aws-monitor: {tier: zone2, x: 2, y: 4}
+      groups:
+        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [zone1], nodes: [aws-rds, aws-eni, aws-msk]}
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2], nodes: [aws-task, aws-worker, aws-rds, aws-eni, aws-msk, aws-plugin, aws-monitor]}

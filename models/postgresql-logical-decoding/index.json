@@ -2,8 +2,8 @@
   "model": "postgresql-logical-decoding",
   "name": "PostgreSQL の論理デコーディング：WAL・スロット・再開",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "orders": {
@@ -115,6 +115,24 @@
       "type": "unknown",
       "label": "実環境のレプリカアイデンティティ、スロット保持設定、オフセット保存周期、下流の重複処理は未確認。"
     },
+    "pg-connect-db-host": {
+      "type": "implementation",
+      "impl": "pg-connect",
+      "label": "自前 Linux PostgreSQL ホスト",
+      "realizes": []
+    },
+    "pg-connect-connect-host": {
+      "type": "implementation",
+      "impl": "pg-connect",
+      "label": "自前 Linux Connect ワーカー群",
+      "realizes": []
+    },
+    "pg-connect-kafka-host": {
+      "type": "implementation",
+      "impl": "pg-connect",
+      "label": "自前 Kafka ブローカー群",
+      "realizes": []
+    },
     "pg-connect-postgres": {
       "type": "implementation",
       "impl": "pg-connect",
@@ -149,6 +167,59 @@
       "impl": "pg-connect",
       "label": "pg_replication_slots の監視",
       "realizes": []
+    },
+    "aws-eni": {
+      "type": "implementation",
+      "impl": "aws-rds-msk",
+      "label": "MSK Connect 接続用 ENI",
+      "realizes": []
+    },
+    "aws-plugin": {
+      "type": "implementation",
+      "impl": "aws-rds-msk",
+      "label": "S3 の Debezium プラグイン ZIP",
+      "realizes": []
+    },
+    "aws-rds": {
+      "type": "implementation",
+      "impl": "aws-rds-msk",
+      "label": "RDS for PostgreSQL（pgoutput）",
+      "realizes": [
+        "orders",
+        "wal",
+        "slot",
+        "publication",
+        "decoder"
+      ]
+    },
+    "aws-task": {
+      "type": "implementation",
+      "impl": "aws-rds-msk",
+      "label": "MSK Connect（Debezium タスク）",
+      "realizes": [
+        "connector"
+      ]
+    },
+    "aws-msk": {
+      "type": "implementation",
+      "impl": "aws-rds-msk",
+      "label": "Amazon MSK（CDC とソースオフセット）",
+      "realizes": [
+        "kafka",
+        "offset"
+      ]
+    },
+    "aws-monitor": {
+      "type": "implementation",
+      "impl": "aws-rds-msk",
+      "label": "CloudWatch（RDS の WAL 使用量）",
+      "realizes": []
+    },
+    "aws-worker": {
+      "type": "implementation",
+      "impl": "aws-rds-msk",
+      "label": "MSK Connect（ワーカー管理）",
+      "realizes": []
     }
   },
   "byRef": {
@@ -178,10 +249,20 @@
       "restart",
       "BR-01",
       "BR-02",
+      "pg-connect-db-host",
+      "pg-connect-connect-host",
+      "pg-connect-kafka-host",
       "pg-connect-postgres",
       "pg-connect-connect",
       "pg-connect-kafka",
-      "pg-connect-health"
+      "pg-connect-health",
+      "aws-eni",
+      "aws-plugin",
+      "aws-rds",
+      "aws-task",
+      "aws-msk",
+      "aws-monitor",
+      "aws-worker"
     ],
     "docs/reference-postgresql-logical-decoding.md#§2": [
       "model",
@@ -220,10 +301,22 @@
       "model"
     ],
     "docs/reference-postgresql-logical-decoding.md#§7": [
+      "pg-connect-db-host",
+      "pg-connect-connect-host",
+      "pg-connect-kafka-host",
       "pg-connect-postgres",
       "pg-connect-connect",
       "pg-connect-kafka",
       "pg-connect-health"
+    ],
+    "docs/reference-postgresql-logical-decoding.md#§8": [
+      "aws-eni",
+      "aws-plugin",
+      "aws-rds",
+      "aws-task",
+      "aws-msk",
+      "aws-monitor",
+      "aws-worker"
     ]
   },
   "reference": {

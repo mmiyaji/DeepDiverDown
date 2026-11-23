@@ -35,6 +35,30 @@ Hudi の Docker デモをもとに、Kafka の変更を Spark 上の Hudi Stream
 | 分析結果 | Spark SQL の集計結果 | 読み取り後のデータを利用者へ返す。 |
 | 実装で追加 | Hudi Streamer（Spark） | Kafka から取り込み、キーで更新を適用する。 |
 
-Copy-on-Write と Merge-on-Read は別のテーブルで試す。Merge-on-Read では Hudi Streamer の連続モードで非同期コンパクションを選べる。順序付けとレコードキーはデータ契約に合わせて設定する。
+Docker デモの Spark master / worker、Kafka broker、HDFS NameNode / DataNode をローカルホスト上のコンテナで動かす。Streamer は Kafka を読み HDFS にテーブルを書き、Spark SQL が読む。図の注文データと連続モードはデモを基にした説明用の変更であり、公式デモそのものは株価データを使う。公式デモでは MoR の取り込み時にコンパクションを無効にして別に実行する。構成を組み合わせた例であり、この注文データの構成は動作未検証。Copy-on-Write と Merge-on-Read は別のテーブルで試す。Merge-on-Read では Hudi Streamer の連続モードで非同期コンパクションを選べる。順序付けとレコードキーはデータ契約に合わせて設定する。
 
-[Apache Hudi Concepts](https://hudi.apache.org/docs/concepts/)、[Hudi Streamer Deployment](https://hudi.apache.org/docs/deployment/)、[Hudi Compaction](https://hudi.apache.org/docs/compaction/)
+[Hudi Docker Demo](https://hudi.apache.org/docs/docker_demo/)、[Apache Hudi Concepts](https://hudi.apache.org/docs/concepts/)、[Hudi Streamer Deployment](https://hudi.apache.org/docs/deployment/)、[Hudi Compaction](https://hudi.apache.org/docs/compaction/)
+
+## 7. 実装例：AWS の EMR on EC2・MSK・Glue Data Catalog・S3
+
+同一 AWS アカウントで EMR が EC2 クラスタを管理する。YARN 上の Spark に Hudi Streamer を投入し、Amazon MSK の Kafka トピックから、上流が注文キーと更新内容を付けて配信したイベントを読む。CoW と MoR の比較には S3 の別々のテーブルプレフィックスを用いる。
+
+| 機能配置 | AWS での担い手 |
+|---|---|
+| 更新イベントと取り込み | Amazon MSK の Kafka トピックと EMR の Hudi Streamer |
+| タイムライン | 各テーブルの S3 プレフィックス内の `.hoodie` |
+| CoW ベースファイル・MoR ベースとログ | 各テーブルの S3 プレフィックス |
+| コンパクション | MoR を書く Streamer の Spark アプリケーション内で動く非同期コンパクション |
+| クエリと分析結果 | EMR の Spark SQL と Hudi 読み取り、下流の分析利用者 |
+
+Hudi の Hive 同期を有効にして Glue Data Catalog を metastore に設定すると、テーブルのスキーマと場所を同期できる。クエリ方式によって Hudi のタイムライン・ベースファイル・ログを使い分ける処理は Spark 側にある。MSK までのネットワーク到達性と Kafka クライアント認証を設定し、クラスタの IAM ロールに必要な S3 と Glue の操作を許可する。
+
+- [Amazon EMR Release Guide — How Hudi works](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-hudi-how-it-works.html)
+- [Apache Hudi — Streamer deployment](https://hudi.apache.org/docs/deployment/)
+- [Apache Hudi — Compaction](https://hudi.apache.org/docs/compaction/)
+- [Amazon MSK Developer Guide](https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html)
+- [Amazon EMR Management Guide — Understanding Amazon EMR clusters](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html)
+
+EMR のリリースごとに同梱 Hudi・Spark と Streamer の対応、Kafka 接続および Glue 同期設定を確認する必要がある。この資料の組み合わせは動作検証していない。 AWS は EMR、EC2、ストレージなどのサービス基盤を運用し、利用者はクラスタ、ゲスト OS、ジョブ、データおよび権限を管理する。EC2 上のソフトウェアには SSH やアプリケーションのインターフェースから操作できるが、マネージドサービスの内部基盤に直接アクセスすることを意味しない。
+
+- [AWS — Shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

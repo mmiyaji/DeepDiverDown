@@ -41,3 +41,26 @@
 BigQuery の主キーと外部キーを定義する場合は、データの整合性をロード処理や照合クエリで確かめる。横断の比較ビューでは受注と返品を先に集計し、明細同士の多対多結合を避ける。
 
 出典 [Kimball Group の Conformed Dimensions／Drilling Across／Bus Matrix](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)、[BigQuery の主キーと外部キー](https://docs.cloud.google.com/bigquery/docs/primary-foreign-keys)
+
+
+## 6. 実装例：Amazon Redshift の受注・返品横断集計
+
+S3 に届く受注・返品・商品マスターを Amazon Redshift に定期ロードし、共通のディメンションで別集計した二つのファクトを比較する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| 入力と実行 | S3 の取り込み領域、EventBridge のルール、Redshift Data API とロード SQL。 |
+| 共通ディメンションとファクト | Redshift の日付・商品ディメンション、受注明細、返品明細。 |
+| ドリルアクロス | Redshift の2つの日次集計ビューを日付・カテゴリ・通貨の共通キーで比較するビュー。 |
+
+ロード担当には S3 の対象プレフィックスと必要な書き込み権限を付与し、分析用の DB ロールには公開した比較ビューを参照させる。Redshift の主キー・外部キーは情報目的の制約なので、ロード時にキーの重複や参照先の欠落を検査する。比較では各ファクトを先に集計し、業務上の意味が異なる注文日と返品受付日を明示する。
+
+公式資料
+
+- [Kimball Group のバス・マトリクスとドリルアクロス](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)
+- [Redshift の S3 ロード](https://docs.aws.amazon.com/redshift/latest/dg/t_Loading-data-from-S3.html)
+- [EventBridge からの Redshift Data API 呼び出し](https://docs.aws.amazon.com/redshift/latest/mgmt/data-api-calling-event-bridge.html)
+- [Redshift の CREATE VIEW](https://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_VIEW.html)
+- [Redshift のテーブル制約](https://docs.aws.amazon.com/redshift/latest/dg/t_Defining_constraints.html)
+
+BigQuery 側は Cloud Storage 入力、ロード、スケジュールされた SQL とサービスアカウントを組み合わせる比較例。Google が基盤を運用し、利用者はデータ、スケジュール、SQL と権限を設定する。Redshift 側は S3 入力と EventBridge から Data API を介してプロビジョンドクラスタで SQL を実行し、利用者は IAM・スケジュール・データ・DB 権限を管理する。各ファクト・ビューはサービスではなく論理データ。いずれも公式資料を組み合わせた例で、SQL と権限の実動作は未検証。[BigQuery schedules](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)、[AWS shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

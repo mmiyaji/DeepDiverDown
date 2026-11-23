@@ -42,12 +42,15 @@ implementations:
     label: ECS の Fargate サービスと EC2 サービス
     description: 同じ ECS クラスタの中で注文 API のタスク定義を共有し、Fargate と EC2 を別のサービスとして比較する例。
     sources:
+      - {title: ECS shared responsibility, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-shared-model.html}
+      - {title: Fargate host access, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-security-considerations.html}
       - title: Amazon ECS launch types and capacity providers
         url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/capacity-launch-type-comparison.html
       - title: Amazon ECS capacity providers for EC2 workloads
         url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/asg-capacity-providers.html
       - title: Use an Application Load Balancer for Amazon ECS
         url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/alb.html
+      - {title: "ECS タスクの awsvpc ネットワーク", url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking-awsvpc.html}
     tiers:
       - id: control
         label: ECS 制御
@@ -67,8 +70,10 @@ implementations:
           - ecs-scheduler
           - ecs-fargate
           - ecs-ec2
+          - ecs-ec2-task
           - ecs-alb
           - ecs-image
+      - {kind: vpc, label: タスクと ALB を配置する VPC, tier: [runtime], nodes: [ecs-fargate, ecs-ec2, ecs-ec2-task, ecs-alb]}
     nodes:
       ecs-service:
         label: ECS Service の設定 × 2
@@ -77,7 +82,8 @@ implementations:
         svc: aws:ecs
         realizes:
           - service
-        description: 同じタスク定義から Fargate と EC2 を別の ECS サービスとして定義する。
+        description: 両起動タイプに対応した awsvpc の共通タスク定義で Fargate と EC2 を別サービスにする。
+        management: {type: customer, scope: 利用者がサービス、タスク定義、台数とネットワークを設定する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-ecs.md#§6
@@ -90,6 +96,7 @@ implementations:
           - scheduler
           - placement
         description: 必要なタスク数と、各サービスの capacity provider strategy を適用する。
+        management: {type: aws, scope: AWS がスケジューラー基盤を運用し、利用者がサービスと容量戦略を設定する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-ecs.md#§6
@@ -100,7 +107,8 @@ implementations:
         svc: aws:fargate
         realizes:
           - fargate
-        description: インフラの EC2 インスタンスを利用者が管理しない実行先。
+        description: AWS が基盤を管理する実行先。利用者は基盤ホストへ接続できず、タスク設定とアプリを管理する。
+        management: {type: shared, scope: AWS が実行基盤を運用し、利用者がタスク定義とアプリを管理する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-ecs.md#§6
@@ -112,9 +120,19 @@ implementations:
         realizes:
           - ec2
         description: EC2 capacity provider と関連付け、タスクをコンテナインスタンスへ配備する。
+        management: {type: customer, scope: 利用者がインスタンスの容量、OS と更新を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-ecs.md#§6
+      ecs-ec2-task:
+        label: EC2 上の注文 API タスク
+        kind: service
+        tier: runtime
+        x: 8
+        y: 1.5
+        description: EC2 コンテナインスタンス上で動き、awsvpc のタスク ENI を持つ。
+        management: {type: customer, scope: 利用者がイメージとタスク定義を管理する。}
+        evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§6}]
       ecs-alb:
         label: Application Load Balancer と別ターゲットグループ
         kind: gateway
@@ -122,7 +140,8 @@ implementations:
         svc: alb
         realizes:
           - alb
-        description: リスナールールで 2 つの ECS サービスを比較できるようにする。
+        description: リスナールールで 2 つの IP 型ターゲットグループを使い分け、個々のタスク ENI へ転送する。
+        management: {type: shared, scope: AWS が基盤を運用し、利用者がリスナーとターゲットグループを設定する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-ecs.md#§6
@@ -132,10 +151,14 @@ implementations:
         tier: runtime
         svc: ecr
         description: 両方のサービスが同じバージョンの注文 API イメージを参照する。
+        management: {type: shared, scope: AWS が基盤を運用し、利用者がイメージと権限を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-ecs.md#§6
     links:
+      - {id: ecs-alb-fargate, from: ecs-alb, to: ecs-fargate, label: Fargate タスクの ENI へ転送, realizes: [route], replace: true}
+      - {id: ecs-alb-ec2, from: ecs-alb, to: ecs-ec2-task, label: EC2 上のタスク ENI へ転送, realizes: [route], replace: true}
+      - {id: ecs-run-ec2, from: ecs-ec2, to: ecs-ec2-task, label: 注文 API タスクを実行, evidence: [{type: doc, ref: docs/reference-amazon-ecs.md#§6}]}
       - id: ecs-pull-fargate
         from: ecs-fargate
         to: ecs-image
@@ -150,3 +173,33 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-amazon-ecs.md#§6
+
+    layout2d:
+      tiers: [{id: diagram, label: 実装構成, z: 0, origin: [-4, 0], size: [21, 11]}]
+      nodes:
+        ecs-service: {tier: diagram, x: 2, y: 1}
+        ecs-scheduler: {tier: diagram, x: 6, y: 1}
+        ecs-fargate: {tier: diagram, x: 3, y: 5}
+        ecs-ec2: {tier: diagram, x: 7, y: 5}
+        ecs-ec2-task: {tier: diagram, x: 7, y: 8}
+        ecs-alb: {tier: diagram, x: 11, y: 6}
+        ecs-image: {tier: diagram, x: 14, y: 2}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 0, y0: -1, x1: 16, y1: 10, nodes: [ecs-service, ecs-scheduler, ecs-fargate, ecs-ec2, ecs-ec2-task, ecs-alb, ecs-image]}
+        - {kind: vpc, provider: aws, label: タスクと ALB の VPC, tier: [diagram], x0: 1, y0: 3, x1: 13, y1: 9, nodes: [ecs-fargate, ecs-ec2, ecs-ec2-task, ecs-alb]}
+    layout3d:
+      tiers:
+        - {id: runtime, label: 実行基盤, z: 0, size: [10, 5]}
+        - {id: apps, label: アプリ, z: 1, size: [10, 5]}
+        - {id: services, label: 独立サービス・制御, z: 0, origin: [12, 0], size: [12, 7]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        ecs-service: {tier: services, x: 1, y: 1}
+        ecs-scheduler: {tier: services, x: 5, y: 1}
+        ecs-fargate: {tier: runtime, x: 2, y: 2}
+        ecs-ec2: {tier: runtime, x: 6, y: 2}
+        ecs-ec2-task: {tier: apps, x: 6, y: 2}
+        ecs-alb: {tier: services, x: 1, y: 5}
+        ecs-image: {tier: services, x: 5, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [runtime, apps, services], nodes: [ecs-service, ecs-scheduler, ecs-fargate, ecs-ec2, ecs-ec2-task, ecs-alb, ecs-image]}

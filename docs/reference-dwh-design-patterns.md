@@ -61,4 +61,11 @@
 
 比較候補ごとに別データセットで用意し、同じ入力と注文日で事実の粒度や金額を確認する。個別の候補で出荷履歴や事前集約が必要ならその設計を追加する。この比較で使う BigQuery 固有の設定は、各パターンの論理構造と区別する。
 
+Google Cloud プロジェクト内の同じロケーションに Cloud Storage のバケットと BigQuery データセットを作る。合成 CSV をロードジョブで `lab_input` のネイティブテーブルに取り込み、BigQuery の GoogleSQL ジョブで比較用の表、ビュー、照合結果を作る。繰り返し実行には BigQuery Data Transfer Service のスケジュールされたクエリを用い、共通入力を読み、比較用データセットに書き込めるサービスアカウントを指定する。比較結果は BigQuery Studio で確認する。
+
+- [Cloud Storage から BigQuery に CSV をロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
+- [BigQuery でスケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)
+
 出典 [Kimball Group の次元モデリング技法](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[Databricks のメダリオン](https://docs.databricks.com/aws/en/lakehouse/medallion)、[Bill Inmon の CIF と Data Warehousing 2.0](https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf)、[Data Vault Alliance](https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/)、[BigQuery のネストと繰り返し列](https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested)、[dbt Semantic Layer](https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture)、[BigQuery データセットの作成](https://docs.cloud.google.com/bigquery/docs/datasets)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)
+
+BigQuery と Cloud Storage は Google が基盤を運用するマネージドサービスで、利用者はプロジェクト、データセット、SQL、スケジュール、サービスアカウントと IAM 権限を設定する。SQL ジョブの内部実行ノードを利用者が直接操作するものではない。各データセットは比較のための論理データで、個別の BigQuery サービスではない。公式資料を組み合わせた例であり、比較 SQL と結果の実動作は未検証。[BigQuery overview](https://docs.cloud.google.com/bigquery/docs/introduction)

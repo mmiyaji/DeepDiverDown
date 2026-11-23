@@ -53,9 +53,94 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      rocksdb-level-host: {label: 自前 Linux 実行ホスト, kind: host, tier: processing, x: 3, y: 0, description: 利用者がアプリプロセスとローカルファイルシステムを管理する。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
       rocksdb-level-app: {label: RocksDB を組み込むアプリプロセス, kind: client, tier: processing, x: 1, y: 1.15, realizes: [client], description: Get と Put によりキー・値を読み書きする。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
       rocksdb-level-memory: {label: RocksDB の共有 WAL と列ファミリーの MemTable, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [wal, memtable], description: 書き込みのログをディスクへ残し、読み取り可能な作業状態を MemTable に持つ。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
       rocksdb-level-sst: {label: RocksDB DB パスの SST ファイル群, kind: file, tier: processing, x: 5, y: 1.15, realizes: [l0, l1, l2], description: L0 はキー範囲が重なり得る。上位レベルでは同じレベルのファイルを重ならないキー範囲に整理する。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
       rocksdb-level-manifest: {label: RocksDB MANIFEST, kind: file, tier: setup, x: 1, y: 1.5, description: 各レベルを構成するファイルの変更を記録し、復旧時に現在の版を組み立てる。, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§7}]}
     links:
+      - {id: rocksdb-level-host-run, from: rocksdb-level-host, to: rocksdb-level-app, label: アプリを実行}
+      - {id: rocksdb-level-host-disk, from: rocksdb-level-host, to: rocksdb-level-sst, label: DB ディレクトリを提供}
       - {id: rocksdb-level-manifest-connection, from: rocksdb-level-manifest, to: rocksdb-level-sst, label: レベル内のファイル構成を記録}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        rocksdb-level-host: {tier: diagram, x: 2, y: 2}
+        rocksdb-level-app: {tier: diagram, x: 2, y: 5}
+        rocksdb-level-memory: {tier: diagram, x: 2, y: 8}
+        rocksdb-level-sst: {tier: diagram, x: 2, y: 11}
+        rocksdb-level-manifest: {tier: diagram, x: 2, y: 14}
+      groups:
+        - {kind: nodegroup, label: "自前 Linux ホスト", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 18, nodes: [rocksdb-level-host, rocksdb-level-app, rocksdb-level-memory, rocksdb-level-sst, rocksdb-level-manifest]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "自前 Linux ホスト", z: 0, origin: [0, 0], size: [5, 15]}
+      nodes:
+        rocksdb-level-host: {tier: zone0, x: 2, y: 1}
+        rocksdb-level-app: {tier: zone0, x: 2, y: 4}
+        rocksdb-level-memory: {tier: zone0, x: 2, y: 7}
+        rocksdb-level-sst: {tier: zone0, x: 2, y: 10}
+        rocksdb-level-manifest: {tier: zone0, x: 2, y: 13}
+      groups:
+        - {kind: nodegroup, label: "自前 Linux ホスト", tier: [zone0], nodes: [rocksdb-level-host, rocksdb-level-app, rocksdb-level-memory, rocksdb-level-sst, rocksdb-level-manifest]}
+  - id: aws-ec2-rocksdb
+    label: AWS（RocksDB on EC2・Amazon EBS）
+    description: EC2 のアプリに組み込んだ RocksDB がメモリ上の MemTable と EBS 上のファイルを使う例。
+    sources:
+      - {title: RocksDB Leveled Compaction, url: https://github.com/facebook/rocksdb/wiki/Leveled-Compaction}
+      - {title: RocksDB Write Ahead Log, url: https://github.com/facebook/rocksdb/wiki/Write-Ahead-Log-%28WAL%29}
+      - {title: Amazon EBS ボリュームのアタッチ, url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html}
+    tiers:
+      - {id: process, label: EC2 上のプロセスとメモリ, z: 1, size: [20, 4]}
+      - {id: storage, label: 同一 AZ の EBS ボリューム, z: 0, size: [22, 5]}
+    groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [process, storage], nodes: [aws-ec2, aws-app, aws-mem, aws-ebs, aws-wal, aws-l0, aws-l1, aws-l2]}
+      - {kind: cluster, label: 単一 EC2 インスタンス, tier: process, nodes: [aws-ec2, aws-app, aws-mem]}
+      - {kind: cluster, label: EBS 上の RocksDB データディレクトリ, tier: storage, nodes: [aws-wal, aws-l0, aws-l1, aws-l2]}
+    nodes:
+      aws-ec2: {label: "Amazon EC2（Linux）", svc: ec2, kind: host, tier: process, x: 2, y: 1.5, description: "アプリのプロセスとアドレス空間を持つ。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が OS とアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+      aws-app: {label: "RocksDB を組み込んだアプリ", kind: service, tier: process, x: 8, y: 1.5, realizes: [client], description: "プロセス内で RocksDB API を呼び、レベル型コンパクションを使う。", management: {type: customer, scope: "利用者がアプリと RocksDB 設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+      aws-mem: {label: "RocksDB MemTable（プロセスメモリ）", kind: cache, tier: process, x: 15, y: 1.5, realizes: [memtable], description: "アクティブおよびフラッシュ待ちの MemTable をメモリに持つ。", management: {type: customer, scope: "利用者がアプリのメモリと DB 設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+      aws-ebs: {label: "Amazon EBS（データボリューム）", svc: ebs, kind: db, tier: storage, x: 2, y: 1.5, description: "Linux のファイルシステムを置くブロックデバイス。", management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がボリュームとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+      aws-wal: {label: "共有 WAL と MANIFEST のファイル", kind: file, tier: storage, x: 7, y: 1.5, realizes: [wal], description: "DB の更新を WAL に追記し、MANIFEST で SST の構成を記録する。", management: {type: customer, scope: "利用者が WAL と復旧方針を管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+      aws-l0: {label: "L0 の SST ファイル", kind: file, tier: storage, x: 11, y: 3.5, realizes: [l0], description: "MemTable のフラッシュで作る。", management: {type: customer, scope: "利用者が DB データとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+      aws-l1: {label: "L1 の SST ファイル", kind: file, tier: storage, x: 15, y: 3.5, realizes: [l1], description: "L0 と重なる範囲をまとめる。", management: {type: customer, scope: "利用者が DB データとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+      aws-l2: {label: "L2 の SST ファイル", kind: file, tier: storage, x: 19, y: 3.5, realizes: [l2], description: "L1 と重なる範囲をまとめる。", management: {type: customer, scope: "利用者が DB データとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-lsm-compaction.md#§8}]}
+    links:
+      - {id: aws-run, from: aws-ec2, to: aws-app, label: アプリを起動}
+      - {id: aws-attach, from: aws-ec2, to: aws-ebs, label: EBS をマウント}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 19]}
+      nodes:
+        aws-ec2: {tier: diagram, x: 2, y: 2}
+        aws-app: {tier: diagram, x: 2, y: 5}
+        aws-mem: {tier: diagram, x: 2, y: 8}
+        aws-ebs: {tier: diagram, x: 8, y: 2}
+        aws-wal: {tier: diagram, x: 8, y: 5}
+        aws-l0: {tier: diagram, x: 8, y: 8}
+        aws-l1: {tier: diagram, x: 8, y: 11}
+        aws-l2: {tier: diagram, x: 8, y: 14}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-ec2, aws-app, aws-mem, aws-ebs, aws-wal, aws-l0, aws-l1, aws-l2]}
+        - {kind: vpc, provider: aws, label: EC2 の利用者 VPC, tier: [diagram], nodes: [aws-ec2, aws-app, aws-mem]}
+        - {kind: nodegroup, label: "EC2 プロセス", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 12, nodes: [aws-ec2, aws-app, aws-mem]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "EC2 プロセス", z: 0, origin: [0, 0], size: [5, 9]}
+        - {id: zone1, label: "EBS データ", z: 0, origin: [7, 0], size: [5, 15]}
+      nodes:
+        aws-ec2: {tier: zone0, x: 2, y: 1}
+        aws-app: {tier: zone0, x: 2, y: 4}
+        aws-mem: {tier: zone0, x: 2, y: 7}
+        aws-ebs: {tier: zone1, x: 2, y: 1}
+        aws-wal: {tier: zone1, x: 2, y: 4}
+        aws-l0: {tier: zone1, x: 2, y: 7}
+        aws-l1: {tier: zone1, x: 2, y: 10}
+        aws-l2: {tier: zone1, x: 2, y: 13}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1], nodes: [aws-ec2, aws-app, aws-mem, aws-ebs, aws-wal, aws-l0, aws-l1, aws-l2]}
+        - {kind: vpc, provider: aws, label: EC2 の利用者 VPC, tier: [zone0, zone1], nodes: [aws-ec2, aws-app, aws-mem]}
+        - {kind: nodegroup, label: "EC2 プロセス", tier: [zone0], nodes: [aws-ec2, aws-app, aws-mem]}

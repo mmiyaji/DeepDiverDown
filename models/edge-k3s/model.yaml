@@ -166,6 +166,8 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-server-host: {label: 現場 Server ホスト, kind: host, tier: flow, x: 3, y: 2, description: K3s Server と SQLite が稼働する利用者管理のホスト。, evidence: [{type: doc, ref: docs/reference-edge-k3s.md#§4}]}
+      ex-agent-host: {label: 現場 Agent ホスト, kind: host, tier: flow, x: 9, y: 2, description: K3s Agent と Pod が稼働する利用者管理のホスト。, evidence: [{type: doc, ref: docs/reference-edge-k3s.md#§4}]}
       ex-admin:
         label: 運用者
         kind: actor
@@ -239,3 +241,98 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-edge-k3s.md#§4
+    links:
+      - {id: ex-server-hosts, from: ex-server-host, to: ex-server, label: K3s Server を実行, evidence: [{type: doc, ref: docs/reference-edge-k3s.md#§4}]}
+      - {id: ex-agent-hosts, from: ex-agent-host, to: ex-agent, label: K3s Agent を実行, evidence: [{type: doc, ref: docs/reference-edge-k3s.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 現場と管理区画, z: 0, origin: [-4, 0], size: [23, 11]}]
+      nodes:
+        ex-admin: {tier: diagram, x: -3, y: 1}
+        ex-server-host: {tier: diagram, x: 2, y: 2}
+        ex-server: {tier: diagram, x: 3, y: 4}
+        ex-state: {tier: diagram, x: 3, y: 7}
+        ex-agent-host: {tier: diagram, x: 8, y: 2}
+        ex-agent: {tier: diagram, x: 9, y: 4}
+        ex-workload: {tier: diagram, x: 9, y: 7}
+        ex-sensor: {tier: diagram, x: 14, y: 6}
+      groups:
+        - {kind: datacenter, label: 現場 Server ホスト, tier: [diagram], x0: 0, y0: 0, x1: 6, y1: 9, nodes: [ex-server-host, ex-server, ex-state]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [diagram], x0: 6.5, y0: 0, x1: 13, y1: 9, nodes: [ex-agent-host, ex-agent, ex-workload]}
+    layout3d:
+      tiers:
+        - {id: left, label: 管理側ホスト, z: 0, size: [6, 5]}
+        - {id: leftapps, label: 管理側コンポーネント, z: 1, size: [6, 5]}
+        - {id: right, label: 現場端末, z: 0, origin: [9, 0], size: [6, 5]}
+        - {id: rightapps, label: 現場の処理, z: 1, origin: [9, 0], size: [6, 5]}
+        - {id: external, label: 運用端末・現場機器, z: 0, origin: [18, 0], size: [5, 5]}
+      nodes:
+        ex-server-host: {tier: left, x: 1, y: 1}
+        ex-server: {tier: leftapps, x: 3, y: 1}
+        ex-state: {tier: leftapps, x: 1, y: 3}
+        ex-agent-host: {tier: right, x: 1, y: 1}
+        ex-agent: {tier: rightapps, x: 3, y: 1}
+        ex-workload: {tier: rightapps, x: 1, y: 3}
+        ex-admin: {tier: external, x: 1, y: 1}
+        ex-sensor: {tier: external, x: 3, y: 1}
+      groups:
+        - {kind: datacenter, label: 現場 Server ホスト, tier: [left, leftapps], nodes: [ex-server-host, ex-server, ex-state]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [right, rightapps], nodes: [ex-agent-host, ex-agent, ex-workload]}
+
+  - id: site-ubuntu-sqlite
+    label: "現場 LAN：Ubuntu・K3s Server / Raspberry Pi Agent"
+    description: "現場 LAN の Ubuntu サーバーで K3s API と SQLite を稼働させ、Ubuntu の Raspberry Pi Agent でセンサーデータ処理を行う構成例。"
+    sources:
+      - {title: "K3s architecture", url: https://docs.k3s.io/architecture}
+      - {title: "K3s requirements and ports", url: https://docs.k3s.io/installation/requirements}
+      - {title: "K3s Flannel network options", url: https://docs.k3s.io/installation/network-options}
+      - {title: "K3s datastore backup and restore", url: https://docs.k3s.io/datastore/backup-restore}
+    tiers:
+      - {id: admin, label: "運用端末", z: 2, size: [20, 4]}
+      - {id: server, label: "現場サーバー", z: 1, size: [20, 4]}
+      - {id: edge, label: "現場エッジノードとセンサー", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "Ubuntu 24.04 Server / x86-64・SSD", provider: onprem, tier: [server], nodes: [site-k3s-server, site-k3s-data]}
+      - {kind: datacenter, label: "Raspberry Pi / Ubuntu 24.04 arm64", provider: onprem, tier: [edge], nodes: [site-k3s-agent, site-k3s-pod]}
+    nodes:
+      site-k3s-admin: {label: "運用 PC / kubectl", kind: actor, tier: admin, x: 4, y: 1.5, realizes: [admin], description: "現場 LAN から K3s API に接続し、Kubernetes リソースを管理する。", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      site-k3s-server: {label: "Ubuntu サーバー上の K3s Server / systemd", kind: service, tier: server, x: 5, y: 1.5, realizes: [server], description: "単一の Ubuntu ホストで Kubernetes API、スケジューラーと supervisor を動かす。", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      site-k3s-data: {label: "内蔵 SQLite / サーバー SSD", kind: db, tier: server, x: 14, y: 1.5, realizes: [state], description: "K3s のクラスタ状態をホストのデータディレクトリに保存する。", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      site-k3s-agent: {label: "Raspberry Pi 上の K3s Agent / kubelet・containerd", kind: host, tier: edge, x: 4, y: 1.5, realizes: [agent], description: "Raspberry Pi でエージェントを実行し、管理サーバーへ TLS で接続する。", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      site-k3s-pod: {label: "センサーデータ処理 Pod", kind: worker, tier: edge, x: 10, y: 1.5, realizes: [workload], description: "arm64 対応イメージを使い、センサーの LAN インターフェースからデータを読む。", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      site-k3s-sensor: {label: "LAN 接続の現場センサー", kind: external, tier: edge, x: 17, y: 1.5, realizes: [sensor], description: "センサー固有のプロトコルで観測値を提供する。", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+    links:
+      - {id: site-k3s-connect, from: site-k3s-agent, to: site-k3s-server, label: "TCP 6443 へ接続し登録・状態を送る", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      - {id: site-k3s-assign, from: site-k3s-server, to: site-k3s-agent, label: "接続済み Agent へ Pod の設定を通知", realizes: [schedule], replace: true, evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      - {id: site-k3s-pod-net, from: site-k3s-agent, to: site-k3s-server, label: "Flannel VXLAN のノード間通信", evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+      - {id: site-k3s-observe, from: site-k3s-sensor, to: site-k3s-pod, label: "現場 LAN で観測値を渡す", realizes: [observe], replace: true, evidence: [{type: doc, ref: "docs/reference-edge-k3s.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 現場と管理区画, z: 0, origin: [-4, 0], size: [23, 11]}]
+      nodes:
+        site-k3s-admin: {tier: diagram, x: -3, y: 1}
+        site-k3s-server: {tier: diagram, x: 3, y: 3}
+        site-k3s-data: {tier: diagram, x: 3, y: 7}
+        site-k3s-agent: {tier: diagram, x: 9, y: 3}
+        site-k3s-pod: {tier: diagram, x: 9, y: 7}
+        site-k3s-sensor: {tier: diagram, x: 15.5, y: 6}
+      groups:
+        - {kind: datacenter, label: 現場 Server ホスト, tier: [diagram], x0: 0, y0: 0, x1: 6, y1: 9, nodes: [site-k3s-server, site-k3s-data]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [diagram], x0: 6.5, y0: 0, x1: 13, y1: 9, nodes: [site-k3s-agent, site-k3s-pod]}
+    layout3d:
+      tiers:
+        - {id: left, label: 管理側ホスト, z: 0, size: [6, 5]}
+        - {id: leftapps, label: 管理側コンポーネント, z: 1, size: [6, 5]}
+        - {id: right, label: 現場端末, z: 0, origin: [9, 0], size: [6, 5]}
+        - {id: rightapps, label: 現場の処理, z: 1, origin: [9, 0], size: [6, 5]}
+        - {id: external, label: 運用端末・現場機器, z: 0, origin: [18, 0], size: [5, 5]}
+      nodes:
+        site-k3s-server: {tier: left, x: 1, y: 1}
+        site-k3s-data: {tier: leftapps, x: 3, y: 1}
+        site-k3s-agent: {tier: right, x: 1, y: 1}
+        site-k3s-pod: {tier: rightapps, x: 3, y: 1}
+        site-k3s-admin: {tier: external, x: 1, y: 1}
+        site-k3s-sensor: {tier: external, x: 3, y: 1}
+      groups:
+        - {kind: datacenter, label: 現場 Server ホスト, tier: [left, leftapps], nodes: [site-k3s-server, site-k3s-data]}
+        - {kind: datacenter, label: 現場エッジ端末, tier: [right, rightapps], nodes: [site-k3s-agent, site-k3s-pod]}

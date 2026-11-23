@@ -41,4 +41,8 @@ BI 専用のマルチクラスターウェアハウスで、待ち時間、区�
 
 調査では `QUEUED_OVERLOAD_TIME` と `PARTITIONS_SCANNED` を別々に比較する。マルチクラスターは主に並行クエリの需要に対応する構成である。永続化結果を使える条件も確認する。
 
+BI の Snowflake ロールに `BI_WH` の使用と注文データの参照を許可する。永続化済みの SELECT 結果を再利用する際も、ロールにはクエリが参照したすべてのテーブルへのアクセス権が必要になる。データ更新やマイクロパーティションの変更も再利用条件に影響する。
+
 出典 [マイクロパーティション](https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions)、[マルチクラスターウェアハウス](https://docs.snowflake.com/en/user-guide/warehouses-multicluster)、[永続化されたクエリ結果](https://docs.snowflake.com/en/user-guide/querying-persisted-results)、[QUERY_HISTORY ビュー](https://docs.snowflake.com/en/sql-reference/account-usage/query_history)
+
+Snowflake が計算・ストレージ・Cloud Services の基盤を運用する。利用者は BI_WH のサイズ、最小・最大クラスター数やスケーリング方針を設定し、権限に応じて Query History を参照できる。パーティションや保存済み結果はサービスが管理し、内部ノードを利用者が直接操作するものではない。結果再利用は公式資料の条件に依存し、同一 SQL だけで保証されない。この調査手順・数値は例示であり実環境での性能検証は行っていない。[Snowflake architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)

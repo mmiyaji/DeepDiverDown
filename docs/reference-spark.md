@@ -66,3 +66,26 @@ Spark Standalone のクラスターに売上集計を投入し、HDFS を入力�
 - [RDD Programming Guide](https://spark.apache.org/docs/latest/rdd-programming-guide.html)
 - [Job Scheduling](https://spark.apache.org/docs/latest/job-scheduling.html)
 - [Spark Standalone Mode](https://spark.apache.org/docs/latest/spark-standalone.html)
+
+## 9. 実装例：Amazon EMR on EKS と S3
+
+Amazon EMR の StartJobRun で EKS 上の Spark バッチ処理を動かし、S3 の注文データを集計する例。
+
+| 機能 | 担い手 |
+| --- | --- |
+| アプリケーション投入 | AWS CLI で EMR の `StartJobRun` を呼ぶ。ジョブ投入用 Pod が Driver を起動する。 |
+| クラスター資源管理 | EKS のスケジューラーが Pod をノードに割り当てる。 |
+| ジョブの調整と分散実行 | 同じ名前空間内の Spark Driver Pod と Executor Pod。 |
+| 入力と出力 | S3 の別々のプレフィックス。 |
+
+EMR の仮想クラスターには EKS の名前空間を登録する。この例は EKS の EC2 ノードグループで Pod を実行する。アプリケーションが必要とする S3 のアクセスはジョブ実行ロールに付与する。
+
+公式資料
+
+- [EMR on EKS のジョブ投入](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/getting-started.html)
+- [仮想クラスターと Pod のスケジューリング](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/emr-eks-how.html)
+- [ジョブ投入用 Pod](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/emr-eks-job-submitter.html)
+
+この構成は公式の各手順を組み合わせた代表例であり、実際の導入事例や動作検証済み構成ではない。AWS は EKS 制御プレーンと EC2・S3 の基盤を運用し、利用者は Kubernetes API やクラスタ設定、ノードグループ、ジョブ、S3 データと権限を管理する。制御プレーンのサーバーには直接アクセスしない。Spark Standalone の例は自前 Linux ホストで Master と Worker を実行し、Worker A に Driver と Executor、Worker B に Executor を置く想定である。HDFS は別の自前クラスターとし、NameNode と複数 DataNode の個別の配置、可用性とネットワークは設計時に決める。
+
+- [HDFS Architecture](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)

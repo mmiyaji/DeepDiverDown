@@ -37,12 +37,15 @@ OneLake catalog を使い、Fabric の Lakehouse と関連レポートを検索�
 | データ利用者 | レポートを探す分析担当者 | 認定、上流、利用条件を確認する。 |
 | 管理者・所有者 | Fabric ワークスペース管理者 | 資産の認定とユーザーの権限を設定する。 |
 | 資産の発見・ガバナンス状態の管理・アクセス権限の管理 | OneLake catalog（Explore・Govern・Secure） | 発見、運用状況、ロール管理を統合した入口。 |
-| 分析アセット | Power BI レポートと Lakehouse | 探す対象のレポートと、基になるテーブルを持つ。 |
+| 分析アセット | Power BI レポート | カタログから探す分析アイテム。 |
+| データの実体 | OneLake の Lakehouse Delta テーブル | ワークスペースの Lakehouse に属し、OneLake にデータファイルと Delta ログを保存する。 |
 | ドメイン・ワークスペース | Fabric ドメイン・ワークスペース | アイテムの整理とワークスペースロールの範囲。 |
 | データアクセスロール | OneLake Security | テーブルの行・列のアクセスを Entra ID に結び付ける。 |
 | 対応クエリエンジン | SQL 分析エンドポイント | ユーザー ID の実効権限でクエリを実行する。 |
 | 実装で追加 | Microsoft Entra ID | 利用者・グループの ID を認証する。 |
 
-SQL 分析エンドポイントはユーザー ID アクセスモードにする。行・列のアクセス制御を適用したテーブルは、エンジンの対応範囲や認証モードを確認する。サードパーティーの認可済みエンジン経由は公開プレビュー。
+Fabric ワークスペースの SQL 分析エンドポイントはユーザー ID アクセスモードで、サインインした利用者に適用される OneLake のロールを使って Lakehouse のテーブルを読み取る。接続には Fabric アイテムの権限も必要で、テーブルのデータ操作は読み取り専用。 [SQL 分析エンドポイント](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)、[SQL 分析エンドポイントの OneLake セキュリティ](https://learn.microsoft.com/en-us/fabric/onelake/security/sql-analytics-endpoint-onelake-security)。行・列のアクセス制御を適用したテーブルは、エンジンの対応範囲や認証モードを確認する。サードパーティーの認可済みエンジン経由は公開プレビュー。
 
 [OneLake Catalog Overview](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)、[OneLake Catalog Item Details](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-item-details)、[Secure Your Fabric Data](https://learn.microsoft.com/en-us/fabric/governance/secure-your-data)、[Read Data Secured with OneLake Security](https://learn.microsoft.com/en-us/fabric/onelake/security/read-secured-data)、[OneLake security overview](https://learn.microsoft.com/en-us/fabric/onelake/security/fabric-onelake-security)
+
+Fabric はテナントの capacity で SQL 計算を提供し、OneLake が Lakehouse のファイルを保持する。利用者はワークスペース、capacity、アイテム、OneLake Security ロールとアクセスモードを設定できるが、サービス内部の計算・保存ノードを直接操作しない。Entra の ID と Fabric ワークスペースは別の管理対象として示す。SQL エンドポイントの利用にはアイテムの Read 権限も必要。この構成と権限設定は資料を組み合わせた例で実動作未検証。[Fabric capacity](https://learn.microsoft.com/en-us/fabric/enterprise/licenses)、[OneLake SQL セキュリティ](https://learn.microsoft.com/en-us/fabric/onelake/security/sql-analytics-endpoint-onelake-security)

@@ -55,6 +55,8 @@ implementations:
     label: AKS Standard・ACR・Load Balancer
     description: AKS のシステムプールとユーザープールを分け、ユーザープール上の注文 API を LoadBalancer Service で公開する例。
     sources:
+      - {title: AKS support policies, url: https://learn.microsoft.com/en-us/azure/aks/support-policies}
+      - {title: AKS cluster authentication, url: https://learn.microsoft.com/en-us/azure/aks/concepts-cluster-authentication}
       - title: AKS core concepts
         url: https://learn.microsoft.com/azure/aks/core-aks-concepts
       - title: AKS baseline architecture
@@ -95,7 +97,7 @@ implementations:
         nodes:
           - azure-identity
       - kind: cloud
-        label: Azure サブスクリプション
+        label: Azure サービス領域（制御プレーンは Microsoft 管理）
         provider: azure
         tier:
           - control
@@ -149,7 +151,7 @@ implementations:
         svc: azure:aks
         realizes:
           - api
-        description: API と制御プロセスを管理サービスとして提供する。
+        description: Microsoft が制御プレーンの内部コンポーネントを運用する。利用者は権限に応じて Kubernetes API と公開されたクラスタ設定を操作できるが、管理対象コンポーネントを変更できない。
         evidence:
           - type: doc
             ref: docs/reference-azure-aks.md#§9
@@ -160,7 +162,7 @@ implementations:
         svc: azure:vm
         realizes:
           - system
-        description: システム用 Pod を優先して動かす。
+        description: システム用 Pod を優先して動かす。Microsoft と利用者がノードの運用を分担し、利用者はプールを設定する。
         evidence:
           - type: doc
             ref: docs/reference-azure-aks.md#§9
@@ -171,7 +173,7 @@ implementations:
         svc: azure:vm
         realizes:
           - user
-        description: 注文 API の Pod を動かす。
+        description: 注文 API の Pod を動かす。Microsoft と利用者がノードの運用を分担し、利用者はプールを設定する。
         evidence:
           - type: doc
             ref: docs/reference-azure-aks.md#§9
@@ -218,6 +220,8 @@ implementations:
           - type: doc
             ref: docs/reference-azure-aks.md#§9
     links:
+      - {id: azure-lb-backend, from: azure-lb, to: azure-user, label: 正常なノードの Service ポートへ転送, realizes: [expose], replace: true}
+      - {id: azure-node-forward, from: azure-user, to: azure-workload, label: Service のルールで Pod へ転送, realizes: [expose], replace: true}
       - id: azure-authenticate
         from: azure-operator
         to: azure-identity
@@ -239,3 +243,41 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-azure-aks.md#§9
+
+    layout2d:
+      tiers: [{id: diagram, label: AKS 実装構成, z: 0, origin: [-4, 0], size: [22, 13]}]
+      nodes:
+        azure-operator: {tier: diagram, x: -3, y: 1}
+        azure-identity: {tier: diagram, x: 1, y: 1}
+        azure-api: {tier: diagram, x: 5, y: 1}
+        azure-system: {tier: diagram, x: 4.5, y: 6}
+        azure-user: {tier: diagram, x: 7, y: 6}
+        azure-workload: {tier: diagram, x: 7, y: 9}
+        azure-svc: {tier: diagram, x: 10.5, y: 9}
+        azure-lb: {tier: diagram, x: 14.5, y: 6}
+        azure-registry: {tier: diagram, x: 14.5, y: 2}
+      groups:
+        - {kind: cloud, provider: azure, label: Microsoft Entra テナント, tier: [diagram], x0: -0.5, y0: 0, x1: 2.3, y1: 2.5, nodes: [azure-identity]}
+        - {kind: cloud, provider: azure, label: Azure サービス領域, tier: [diagram], x0: 2.5, y0: -1, x1: 17, y1: 12, nodes: [azure-api, azure-system, azure-user, azure-workload, azure-svc, azure-lb, azure-registry]}
+        - {kind: cluster, provider: azure, label: AKS（論理クラスタ）, tier: [diagram], x0: 2.8, y0: 0, x1: 12, y1: 11, nodes: [azure-api, azure-system, azure-user, azure-workload, azure-svc]}
+        - {kind: vnet, provider: azure, label: 顧客 VNet のノード, tier: [diagram], x0: 3.2, y0: 4, x1: 9, y1: 10, nodes: [azure-system, azure-user, azure-workload]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: AKS ノード, z: 0, size: [10, 4]}
+        - {id: apps, label: Kubernetes ワークロード, z: 1, size: [10, 4]}
+        - {id: services, label: 制御プレーンと独立サービス, z: 0, origin: [12, 0], size: [10, 7]}
+        - {id: identity, label: Microsoft Entra テナント, z: 0, origin: [-5, 4], size: [3, 3]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        azure-operator: {tier: outside, x: 1, y: 1}
+        azure-identity: {tier: identity, x: 1, y: 1}
+        azure-system: {tier: nodes, x: 2, y: 2}
+        azure-user: {tier: nodes, x: 6, y: 2}
+        azure-workload: {tier: apps, x: 6, y: 2}
+        azure-svc: {tier: apps, x: 9, y: 2}
+        azure-api: {tier: services, x: 1, y: 1}
+        azure-lb: {tier: services, x: 5, y: 1}
+        azure-registry: {tier: services, x: 1, y: 5}
+      groups:
+        - {kind: cloud, provider: azure, label: Azure サービス領域, tier: [nodes, apps, services], nodes: [azure-api, azure-system, azure-user, azure-workload, azure-svc, azure-lb, azure-registry]}
+        - {kind: cloud, provider: azure, label: Microsoft Entra テナント, tier: [identity], nodes: [azure-identity]}

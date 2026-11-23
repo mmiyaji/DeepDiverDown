@@ -193,6 +193,14 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host:
+        label: 利用者が運用する実行ホスト
+        kind: host
+        tier: flow
+        x: 2
+        y: 1.5
+        description: GraphRAG と Python の導入・実行・更新は利用者が行う。
+        evidence: [{type: doc, ref: docs/reference-trend-graphrag.md#§4}]
       ex-user:
         label: 質問者
         kind: actor
@@ -270,3 +278,267 @@ implementations:
             ref: docs/reference-trend-graphrag.md#§4
         realizes:
           - model
+    links:
+      - {id: ex-run-index, from: ex-host, to: ex-indexer, label: 索引処理を実行}
+      - {id: ex-run-query, from: ex-host, to: ex-search, label: Local Search を実行}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行環境と外部サービス, z: 0, origin: [-4, 0], size: [26, 18]}]
+      nodes:
+        ex-host: {tier: diagram, x: 6, y: 1}
+        ex-user: {tier: diagram, x: 1, y: 1}
+        ex-search: {tier: diagram, x: 16, y: 1}
+        ex-answer: {tier: diagram, x: 21, y: 1}
+        ex-documents: {tier: diagram, x: 1, y: 5}
+        ex-indexer: {tier: diagram, x: 11, y: 1}
+        ex-index: {tier: diagram, x: 6, y: 5}
+        ex-model: {tier: diagram, x: 11, y: 5}
+      groups:
+        - {kind: datacenter, label: 利用者の実行ホスト, tier: [diagram], nodes: [ex-host, ex-indexer, ex-search, ex-answer]}
+    layout3d:
+      tiers:
+        - {id: base, label: 実行基盤と独立サービス, z: 0, size: [26, 18]}
+        - {id: app, label: ホスト上の処理, z: 1, size: [26, 18]}
+      nodes:
+        ex-host: {tier: base, x: 6, y: 1}
+        ex-user: {tier: base, x: 1, y: 1}
+        ex-search: {tier: app, x: 16, y: 1}
+        ex-answer: {tier: app, x: 21, y: 1}
+        ex-documents: {tier: base, x: 1, y: 5}
+        ex-indexer: {tier: app, x: 11, y: 1}
+        ex-index: {tier: base, x: 6, y: 5}
+        ex-model: {tier: base, x: 11, y: 5}
+      groups:
+        - {kind: datacenter, label: 利用者の実行ホスト, tier: [base, app], nodes: [ex-host, ex-indexer, ex-search, ex-answer]}
+
+  - id: azure-vm-graphrag
+    label: Azure（GraphRAG on VM・Blob・Cosmos DB）
+    description: Azure Linux VM の GraphRAG が Blob Storage と Cosmos DB を使い、Azure OpenAI で索引と回答を生成する例。
+    sources:
+      - title: GraphRAG 詳細設定
+        url: https://microsoft.github.io/graphrag/config/yaml/
+      - title: GraphRAG を始める
+        url: https://microsoft.github.io/graphrag/get_started/
+      - title: GraphRAG Local Search
+        url: https://microsoft.github.io/graphrag/query/local_search/
+      - title: Azure 仮想マシン
+        url: https://learn.microsoft.com/azure/virtual-machines/overview
+      - title: Azure Cosmos DB for NoSQL のベクトル検索
+        url: https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search
+    tiers:
+      - id: entry
+        label: 質問者
+        z: 0
+        size:
+          - 4
+          - 4
+      - id: compute
+        label: GraphRAG 実行
+        z: 1
+        size:
+          - 18
+          - 5
+      - id: storage
+        label: 入力・索引・モデル API
+        z: 0
+        size:
+          - 23
+          - 4
+    groups:
+      - kind: cloud
+        provider: azure
+        label: Azure サブスクリプション
+        tier:
+          - compute
+          - storage
+        nodes:
+          - azure-vm
+          - azure-indexer
+          - azure-query
+          - azure-documents
+          - azure-artifacts
+          - azure-cosmos
+          - azure-model
+      - kind: cluster
+        label: GraphRAG を実行する Linux VM
+        tier: compute
+        nodes:
+          - azure-vm
+          - azure-indexer
+          - azure-query
+    nodes:
+      azure-user:
+        label: 質問者（GraphRAG CLI）
+        kind: actor
+        tier: entry
+        x: 1
+        'y': 1.5
+        realizes:
+          - user
+        description: 許可された VM セッションから Local Search を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+      azure-vm:
+        label: Azure Virtual Machines（Linux）
+        svc: azure:vm
+        kind: host
+        tier: compute
+        x: 2
+        'y': 2.6
+        description: 運用者が GraphRAG と Python の依存関係を導入・保守する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+      azure-indexer:
+        label: Microsoft GraphRAG（index）
+        kind: worker
+        tier: compute
+        x: 8
+        'y': 1.3
+        realizes:
+          - indexer
+        description: 文書を分割し、モデルで抽出した実体と関係や埋め込みを保存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+      azure-query:
+        label: Microsoft GraphRAG（Local Search）
+        kind: service
+        tier: compute
+        x: 14
+        'y': 3.8
+        realizes:
+          - search
+          - answer
+        description: 質問の関連情報を集め、モデルで根拠を付き合わせた回答を生成する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+      azure-documents:
+        label: Azure Blob Storage（原本文書）
+        svc: azure:storage
+        kind: db
+        tier: storage
+        x: 2
+        'y': 1.5
+        realizes:
+          - documents
+        description: 索引入力用コンテナーに文書を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+      azure-artifacts:
+        label: Azure Blob Storage（Parquet 索引）
+        svc: azure:storage
+        kind: db
+        tier: storage
+        x: 8
+        'y': 1.5
+        realizes:
+          - index
+        description: 実体・関係・コミュニティ要約などの索引成果物を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+      azure-cosmos:
+        label: Azure Cosmos DB（ベクトル索引）
+        svc: azure:cosmos
+        kind: db
+        tier: storage
+        x: 14
+        'y': 1.5
+        realizes:
+          - index
+        description: GraphRAG が検索する埋め込みを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+      azure-model:
+        label: Azure OpenAI（チャット・埋め込み）
+        kind: service
+        tier: storage
+        x: 20
+        'y': 1.5
+        realizes:
+          - model
+        description: 抽出と回答生成に使うチャットモデル、および埋め込みモデルを提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-graphrag.md#§5
+        svc: azure:openai
+    links:
+      - id: azure-run-index
+        from: azure-vm
+        to: azure-indexer
+        label: 索引コマンドを実行
+      - id: azure-run-query
+        from: azure-vm
+        to: azure-query
+        label: 検索コマンドを実行
+      - id: azure-extract
+        from: azure-indexer
+        to: azure-model
+        label: 実体抽出と埋め込みを要求
+      - id: azure-embed
+        from: azure-query
+        to: azure-model
+        label: 質問の埋め込みを要求
+      - id: azure-index-parquet
+        from: azure-indexer
+        to: azure-artifacts
+        label: 実体・関係などを Parquet に保存
+        realizes:
+          - index
+        replace: true
+      - id: azure-index-vectors
+        from: azure-indexer
+        to: azure-cosmos
+        label: 埋め込みをベクトル索引に保存
+        realizes:
+          - index
+        replace: true
+      - id: azure-read-parquet
+        from: azure-artifacts
+        to: azure-query
+        label: 関連するグラフ文脈を読む
+        realizes:
+          - lookup
+        replace: true
+      - id: azure-read-vectors
+        from: azure-cosmos
+        to: azure-query
+        label: 類似の実体を検索
+        realizes:
+          - lookup
+        replace: true
+    layout2d:
+      tiers: [{id: diagram, label: 実行環境と外部サービス, z: 0, origin: [-4, 0], size: [26, 18]}]
+      nodes:
+        azure-user: {tier: diagram, x: 1, y: 1}
+        azure-vm: {tier: diagram, x: 6, y: 1}
+        azure-indexer: {tier: diagram, x: 11, y: 1}
+        azure-query: {tier: diagram, x: 16, y: 1}
+        azure-documents: {tier: diagram, x: 21, y: 1}
+        azure-artifacts: {tier: diagram, x: 1, y: 5}
+        azure-cosmos: {tier: diagram, x: 6, y: 5}
+        azure-model: {tier: diagram, x: 11, y: 5}
+      groups:
+        - {kind: cloud, provider: azure, label: Azure サブスクリプション, tier: [diagram], nodes: [azure-vm, azure-indexer, azure-query, azure-documents, azure-artifacts, azure-cosmos, azure-model]}
+        - {kind: datacenter, label: GraphRAG Linux VM, tier: [diagram], nodes: [azure-vm, azure-indexer, azure-query]}
+    layout3d:
+      tiers:
+        - {id: base, label: 実行基盤と独立サービス, z: 0, size: [26, 18]}
+        - {id: app, label: ホスト上の処理, z: 1, size: [26, 18]}
+      nodes:
+        azure-user: {tier: base, x: 1, y: 1}
+        azure-vm: {tier: base, x: 6, y: 1}
+        azure-indexer: {tier: app, x: 11, y: 1}
+        azure-query: {tier: app, x: 16, y: 1}
+        azure-documents: {tier: base, x: 21, y: 1}
+        azure-artifacts: {tier: base, x: 1, y: 5}
+        azure-cosmos: {tier: base, x: 6, y: 5}
+        azure-model: {tier: base, x: 11, y: 5}
+      groups:
+        - {kind: cloud, provider: azure, label: Azure サブスクリプション, tier: [base, app], nodes: [azure-vm, azure-indexer, azure-query, azure-documents, azure-artifacts, azure-cosmos, azure-model]}
+        - {kind: datacenter, label: GraphRAG Linux VM, tier: [base, app], nodes: [azure-vm, azure-indexer, azure-query]}

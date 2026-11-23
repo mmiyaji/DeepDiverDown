@@ -87,7 +87,7 @@ nodes:
     tier: support
     x: 0
     'y': 1.5
-    description: センサーは実車またはシミュレーターから入力される。
+    description: この例では実車のセンサーとし、接続方式は未選定。
     evidence:
       - type: doc
         ref: docs/reference-autoware-autonomous-driving.md#§2
@@ -238,6 +238,7 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host: {label: 車載計算機（具体機種未選定）, kind: host, tier: flow, x: 2, y: 2, description: Autoware を実行する車載計算機。具体的な機器と接続は未選定。, evidence: [{type: doc, ref: docs/reference-autoware-autonomous-driving.md#§4}]}
       ex-sense:
         label: Autoware Sensing
         kind: service
@@ -346,3 +347,111 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-autoware-autonomous-driving.md#§4
+    links:
+      - {id: ex-host-sense, from: ex-host, to: ex-sense, label: Autoware を実行, evidence: [{type: doc, ref: docs/reference-autoware-autonomous-driving.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実装構成, z: 0, size: [25, 16]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-sense: {tier: diagram, x: 4, y: 1}
+        ex-perception: {tier: diagram, x: 7, y: 1}
+        ex-localization: {tier: diagram, x: 1, y: 4}
+        ex-planning: {tier: diagram, x: 4, y: 4}
+        ex-control: {tier: diagram, x: 7, y: 4}
+        ex-interface: {tier: diagram, x: 1, y: 7}
+        ex-map: {tier: diagram, x: 4, y: 7}
+        ex-sensors: {tier: diagram, x: 13, y: 1}
+        ex-vehicle: {tier: diagram, x: 16, y: 1}
+      groups:
+        - {kind: datacenter, label: 車載計算機, tier: [diagram], x0: -1, y0: 0, x1: 10, y1: 14, nodes: [ex-host, ex-sense, ex-perception, ex-localization, ex-planning, ex-control, ex-interface, ex-map]}
+        - {kind: datacenter, label: 車両センサー・制御対象, tier: [diagram], x0: 11, y0: 0, x1: 22, y1: 8, nodes: [ex-sensors, ex-vehicle]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 12]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 12]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホスト上の処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: network, label: 論理通信・設定, z: 0, origin: [26, 0], size: [8, 4]}
+      nodes:
+        ex-host: {tier: hosta, x: 1, y: 1}
+        ex-sense: {tier: appsa, x: 4, y: 1}
+        ex-perception: {tier: appsa, x: 7, y: 1}
+        ex-localization: {tier: appsa, x: 1, y: 4}
+        ex-planning: {tier: appsa, x: 4, y: 4}
+        ex-control: {tier: appsa, x: 7, y: 4}
+        ex-interface: {tier: appsa, x: 1, y: 7}
+        ex-map: {tier: appsa, x: 4, y: 7}
+        ex-sensors: {tier: hostb, x: 1, y: 1}
+        ex-vehicle: {tier: hostb, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: 車載計算機, tier: [hosta, appsa], nodes: [ex-host, ex-sense, ex-perception, ex-localization, ex-planning, ex-control, ex-interface, ex-map]}
+        - {kind: datacenter, label: 車両センサー・制御対象, tier: [hostb, appsb], nodes: [ex-sensors, ex-vehicle]}
+
+  - id: awsim-labs-e2e
+    label: "Ubuntu ワークステーション：Autoware・AWSIM Labs"
+    description: "同一 GPU ワークステーションで AWSIM Labs と Autoware を別プロセスで実行し、ROS 2 Humble のループバック通信で仮想車両を制御する例。"
+    sources:
+      - {title: "AWSIM Labs Quick Start Demo", url: https://autowarefoundation.github.io/AWSIM-Labs/main/GettingStarted/QuickStartDemo/}
+      - {title: "AWSIM Labs architecture", url: https://autowarefoundation.github.io/AWSIM-Labs/main/Introduction/AWSIM/}
+      - {title: "Autoware module overview", url: https://autowarefoundation.github.io/AWSIM-Labs/main/Introduction/Autoware/}
+    tiers:
+      - {id: sim, label: "AWSIM Labs シミュレーター", z: 2, size: [20, 4]}
+      - {id: auto, label: "Autoware / ROS 2 Humble", z: 1, size: [20, 4]}
+      - {id: data, label: "実行環境と地図", z: 0, size: [20, 4]}
+    groups:
+      - {kind: datacenter, label: "Ubuntu 22.04 / NVIDIA GPU ワークステーション", provider: onprem, tier: [sim, auto, data], nodes: [awsim-demo-sensors, awsim-demo-vehicle, awsim-demo-sense, awsim-demo-perception, awsim-demo-localization, awsim-demo-planning, awsim-demo-control, awsim-demo-interface, awsim-demo-map, awsim-demo-dds, awsim-demo-host]}
+    nodes:
+      awsim-demo-sensors: {label: "AWSIM 仮想センサー", kind: external, tier: sim, x: 4, y: 1.5, realizes: [sensors], description: "仮想の GNSS・IMU、LiDAR と信号機カメラのセンサーデータを生成する。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-vehicle: {label: "AWSIM 仮想 Lexus RX 450h", kind: external, tier: sim, x: 16, y: 1.5, realizes: [vehicle], description: "シミュレーター内の車両モデルが指令を受け、物理状態を更新する。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-sense: {label: "Autoware Sensing", kind: worker, tier: auto, x: 2, y: 1.5, realizes: [sense], description: "AWSIM Labs のセンサーキット用トピックから仮想観測値を受け取る。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-perception: {label: "Autoware Perception", kind: worker, tier: auto, x: 5.5, y: 0.8, realizes: [perception], description: "仮想環境を観測したセンサーデータから対象物を認識する。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-localization: {label: "Autoware Localization", kind: worker, tier: auto, x: 5.5, y: 2.7, realizes: [localization], description: "仮想センサーとデモの地図で自己位置を推定する。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-planning: {label: "Autoware Planning", kind: worker, tier: auto, x: 9.5, y: 1.5, realizes: [planning], description: "経路・周辺物体・自己位置から軌道を生成する。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-control: {label: "Autoware Control", kind: worker, tier: auto, x: 13, y: 1.5, realizes: [control], description: "仮想車両が軌道を追従するための制御指令を計算する。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-interface: {label: "AWSIM 用 Vehicle Interface", kind: gateway, tier: auto, x: 17, y: 1.5, realizes: [interface], description: "AWSIM Labs 用の車両モデルに合わせた ROS 2 インターフェースで制御指令を届ける。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-map: {label: "西新宿デモ地図 / PCD・OSM", kind: file, tier: data, x: 4, y: 1.5, realizes: [map], description: "シミュレーションに合わせた点群地図と Lanelet2 地図。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-dds: {label: "Cyclone DDS / ループバック", kind: service, tier: data, x: 10, y: 1.5, description: "ROS 2 アプリ同士の通信を同一ホストの lo に限定する設定。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      awsim-demo-host: {label: "Ubuntu / NVIDIA GPU・Vulkan", kind: host, tier: data, x: 16, y: 1.5, description: "AWSIM のレンダリングと Autoware の実行に使うデモ用ホスト。", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+    links:
+      - {id: awsim-demo-setup-dds, from: awsim-demo-dds, to: awsim-demo-sense, label: "観測値の受信にループバックを選択", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      - {id: awsim-demo-control-dds, from: awsim-demo-dds, to: awsim-demo-interface, label: "制御指令の送信にループバックを選択", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+      - {id: awsim-demo-host-sim, from: awsim-demo-host, to: awsim-demo-vehicle, label: "GPU 上でシミュレーターを実行", evidence: [{type: doc, ref: "docs/reference-autoware-autonomous-driving.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実装構成, z: 0, size: [25, 16]}]
+      nodes:
+        awsim-demo-host: {tier: diagram, x: 1, y: 1}
+        awsim-demo-sensors: {tier: diagram, x: 4, y: 1}
+        awsim-demo-vehicle: {tier: diagram, x: 7, y: 1}
+        awsim-demo-sense: {tier: diagram, x: 1, y: 4}
+        awsim-demo-perception: {tier: diagram, x: 4, y: 4}
+        awsim-demo-localization: {tier: diagram, x: 7, y: 4}
+        awsim-demo-planning: {tier: diagram, x: 1, y: 7}
+        awsim-demo-control: {tier: diagram, x: 4, y: 7}
+        awsim-demo-interface: {tier: diagram, x: 7, y: 7}
+        awsim-demo-map: {tier: diagram, x: 1, y: 10}
+        awsim-demo-dds: {tier: diagram, x: 4, y: 10}
+      groups:
+        - {kind: datacenter, label: Ubuntu GPU ワークステーション, tier: [diagram], x0: -1, y0: 0, x1: 10, y1: 14, nodes: [awsim-demo-host, awsim-demo-sensors, awsim-demo-vehicle, awsim-demo-sense, awsim-demo-perception, awsim-demo-localization, awsim-demo-planning, awsim-demo-control, awsim-demo-interface, awsim-demo-map, awsim-demo-dds]}
+    layout3d:
+      tiers:
+        - {id: hosta, label: 実行ホスト, z: 0, size: [10, 12]}
+        - {id: appsa, label: ホスト上の処理, z: 1, size: [10, 12]}
+        - {id: hostb, label: 対向ホスト・機器, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: appsb, label: 対向ホスト上の処理, z: 1, origin: [13, 0], size: [10, 8]}
+        - {id: network, label: 論理通信・設定, z: 0, origin: [26, 0], size: [8, 4]}
+      nodes:
+        awsim-demo-host: {tier: hosta, x: 1, y: 1}
+        awsim-demo-sensors: {tier: appsa, x: 4, y: 1}
+        awsim-demo-vehicle: {tier: appsa, x: 7, y: 1}
+        awsim-demo-sense: {tier: appsa, x: 1, y: 4}
+        awsim-demo-perception: {tier: appsa, x: 4, y: 4}
+        awsim-demo-localization: {tier: appsa, x: 7, y: 4}
+        awsim-demo-planning: {tier: appsa, x: 1, y: 7}
+        awsim-demo-control: {tier: appsa, x: 4, y: 7}
+        awsim-demo-interface: {tier: appsa, x: 7, y: 7}
+        awsim-demo-map: {tier: appsa, x: 1, y: 10}
+        awsim-demo-dds: {tier: appsa, x: 4, y: 10}
+      groups:
+        - {kind: datacenter, label: Ubuntu GPU ワークステーション, tier: [hosta, appsa], nodes: [awsim-demo-host, awsim-demo-sensors, awsim-demo-vehicle, awsim-demo-sense, awsim-demo-perception, awsim-demo-localization, awsim-demo-planning, awsim-demo-control, awsim-demo-interface, awsim-demo-map, awsim-demo-dds]}

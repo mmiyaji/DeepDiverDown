@@ -564,8 +564,8 @@ fileLayout:
           sample: 50 41 52 31    |PAR1|
 implementations:
   - id: trino-hive
-    label: S3 上の Parquet を Trino Hive で読む
-    description: Trino Hive カタログから S3 の Parquet ファイルを読む例。索引の動作はファイルの書き手、利用できる統計、述語、読取側の設定に依存する。
+    label: EKS の Trino で S3 の Parquet を読む
+    description: EKS 上の Trino と Glue Data Catalog を使い、S3 に置いた Parquet ファイルを読む構成例。
     sources:
       - title: Parquet File Format
         url: https://parquet.apache.org/docs/file-format/
@@ -579,26 +579,46 @@ implementations:
         url: https://trino.io/docs/current/object-storage/file-formats.html
       - title: Trino Hive connector
         url: https://trino.io/docs/current/connector/hive.html
+      - title: Trino on Kubernetes with Helm
+        url: https://trino.io/docs/current/installation/kubernetes.html
+      - title: Trino Hive connector
+        url: https://trino.io/docs/current/connector/hive.html
+      - title: EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
     tiers:
-      - id: processing
-        label: データの処理と保存
-        z: 0
+      - id: management
+        label: クラスタとカタログ
+        z: 2
         size:
-          - 14
-          - 5
-      - id: setup
-        label: 実行に必要な設定・成果物
+          - 16
+          - 3
+      - id: processing
+        label: EKS 上の読み取り
         z: 1
         size:
-          - 14
+          - 16
+          - 3
+      - id: storage
+        label: Parquet の保存
+        z: 0
+        size:
+          - 16
           - 3
     nodes:
+      trino-hive-client:
+        label: Trino CLI の SQL 利用者
+        kind: client
+        tier: management
+        x: 0
+        y: 1.5
+        description: Coordinator に SQL を送り結果を取得する。
+        evidence: [{type: doc, ref: docs/reference-parquet-internals.md#§9}]
       trino-hive-trino:
         label: Trino Worker の Parquet Reader
         kind: worker
         tier: processing
-        x: 1
-        'y': 1.15
+        x: 8
+        'y': 1.5
         realizes:
           - reader
           - decoder
@@ -606,12 +626,13 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-parquet-internals.md#§9
+        management: {type: customer, scope: "利用者が Trino Worker と読み取り設定を管理する。"}
       trino-hive-file:
         label: S3 上の Parquet オブジェクト
         kind: file
-        tier: processing
-        x: 1
-        'y': 3.65
+        tier: storage
+        x: 8
+        'y': 1.5
         svc: s3
         realizes:
           - magic
@@ -626,26 +647,159 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-parquet-internals.md#§9
+        management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がファイルと権限を管理する。"}
       trino-hive-catalog:
         label: Hive カタログの読取設定
         kind: catalog
-        tier: setup
-        x: 1
+        tier: processing
+        x: 2
         'y': 1.5
         description: Parquet の列索引やブルームフィルターを使用する設定を確認する。
         evidence:
           - type: doc
             ref: docs/reference-parquet-internals.md#§9
+        management: {type: customer, scope: "利用者が Hive Connector の設定を管理する。"}
+      trino-hive-eks:
+        label: Amazon EKS / Kubernetes API
+        svc: eks
+        kind: service
+        tier: management
+        x: 2
+        'y': 1.5
+        description: Trino の Coordinator と Worker の Pod を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+        management: {type: shared, scope: "AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}
+      trino-hive-glue:
+        label: AWS Glue Data Catalog
+        svc: glue
+        kind: catalog
+        tier: management
+        x: 8
+        'y': 1.5
+        description: Hive テーブルのメタデータとデータの格納先を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+        management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。"}
+      trino-hive-coordinator:
+        label: Trino Coordinator Pod
+        kind: service
+        tier: processing
+        x: 5
+        'y': 1.5
+        description: Hive Connector でテーブルを解決し Worker に読み取りを割り当てる。
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+        management: {type: customer, scope: "利用者が Trino Coordinator を管理する。"}
+      trino-hive-ec2:
+        label: EC2 / EKS ノード
+        svc: ec2
+        kind: host
+        tier: processing
+        x: 13
+        'y': 1.5
+        description: Trino の Pod を実行する EC2 ノード。
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループを管理する。"}
     links:
+      - {id: trino-hive-submit, from: trino-hive-client, to: trino-hive-coordinator, label: SQL を送る}
+      - {id: trino-hive-result, from: trino-hive-coordinator, to: trino-hive-client, label: 結果を返す}
+      - {id: trino-hive-host-coordinator, from: trino-hive-ec2, to: trino-hive-coordinator, label: Coordinator Pod を実行}
       - id: trino-hive-catalog-connection
         from: trino-hive-catalog
         to: trino-hive-trino
         label: 読み取りの設定を適用
+      - id: trino-hive-glue-resolve
+        from: trino-hive-coordinator
+        to: trino-hive-glue
+        label: テーブルの格納先を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+      - id: trino-hive-schedule
+        from: trino-hive-eks
+        to: trino-hive-coordinator
+        label: Coordinator Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+      - id: trino-hive-task
+        from: trino-hive-coordinator
+        to: trino-hive-trino
+        label: 読み取りを割り当てる
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
+      - id: trino-hive-host
+        from: trino-hive-ec2
+        to: trino-hive-trino
+        label: Worker Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-parquet-internals.md#§9
     groups:
       - kind: cloud
         provider: aws
-        label: AWS サービス
+        label: AWS アカウント
+        tier:
+          - management
+          - processing
+          - storage
+        nodes:
+          - trino-hive-trino
+          - trino-hive-file
+          - trino-hive-catalog
+          - trino-hive-eks
+          - trino-hive-glue
+          - trino-hive-coordinator
+          - trino-hive-ec2
+      - kind: cluster
+        label: EKS クラスタ / Trino
         tier:
           - processing
         nodes:
-          - trino-hive-file
+          - trino-hive-coordinator
+          - trino-hive-trino
+          - trino-hive-ec2
+          - trino-hive-catalog
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [33, 18]}
+      nodes:
+        trino-hive-client: {tier: diagram, x: 2, y: 2}
+        trino-hive-eks: {tier: diagram, x: 8, y: 2}
+        trino-hive-ec2: {tier: diagram, x: 14, y: 2}
+        trino-hive-coordinator: {tier: diagram, x: 14, y: 5}
+        trino-hive-trino: {tier: diagram, x: 14, y: 8}
+        trino-hive-catalog: {tier: diagram, x: 14, y: 11}
+        trino-hive-glue: {tier: diagram, x: 20, y: 2}
+        trino-hive-file: {tier: diagram, x: 20, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [trino-hive-eks, trino-hive-ec2, trino-hive-coordinator, trino-hive-trino, trino-hive-catalog, trino-hive-glue, trino-hive-file]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC のワーカー, tier: [diagram], nodes: [trino-hive-ec2, trino-hive-coordinator, trino-hive-trino, trino-hive-catalog]}
+        - {kind: cluster, label: "EKS の Trino", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 15, nodes: [trino-hive-ec2, trino-hive-coordinator, trino-hive-trino, trino-hive-catalog]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Trino CLI", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "EKS 制御プレーン", z: 0, origin: [7, 0], size: [5, 5]}
+        - {id: zone2, label: "EKS の Trino", z: 0, origin: [14, 0], size: [5, 12]}
+        - {id: zone3, label: "Glue と S3", z: 0, origin: [21, 0], size: [5, 6]}
+      nodes:
+        trino-hive-client: {tier: zone0, x: 2, y: 1}
+        trino-hive-eks: {tier: zone1, x: 2, y: 1}
+        trino-hive-ec2: {tier: zone2, x: 2, y: 1}
+        trino-hive-coordinator: {tier: zone2, x: 2, y: 4}
+        trino-hive-trino: {tier: zone2, x: 2, y: 7}
+        trino-hive-catalog: {tier: zone2, x: 2, y: 10}
+        trino-hive-glue: {tier: zone3, x: 2, y: 1}
+        trino-hive-file: {tier: zone3, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [trino-hive-eks, trino-hive-ec2, trino-hive-coordinator, trino-hive-trino, trino-hive-catalog, trino-hive-glue, trino-hive-file]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC のワーカー, tier: [zone0, zone1, zone2, zone3], nodes: [trino-hive-ec2, trino-hive-coordinator, trino-hive-trino, trino-hive-catalog]}
+        - {kind: cluster, label: "EKS の Trino", tier: [zone2], nodes: [trino-hive-ec2, trino-hive-coordinator, trino-hive-trino, trino-hive-catalog]}

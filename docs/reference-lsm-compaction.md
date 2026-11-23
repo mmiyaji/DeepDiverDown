@@ -45,3 +45,22 @@ MemTable が一定サイズに達すると、キー順に並んだ不変のフ�
 - [Apache Cassandra - Compaction](https://cassandra.apache.org/doc/latest/cassandra/managing/operating/compaction/index.html)
 - [RocksDB Leveled Compaction](https://github.com/meta/rocksdb/wiki/Leveled-Compaction)
 - [RocksDB MANIFEST](https://github.com/meta/rocksdb/wiki/MANIFEST)
+
+## 8. 実装例：AWS（RocksDB on EC2・Amazon EBS）
+
+Amazon EC2 の Linux インスタンス1台で RocksDB を組み込んだアプリを動かす。同じ可用性ゾーンにある Amazon EBS ボリュームのファイルシステムをマウントし、その上のディレクトリを RocksDB の DB パスに指定する。
+
+| 機能 | 担い手 |
+|---|---|
+| キー値のアクセス・フラッシュ・コンパクション | EC2 上のアプリに組み込まれた RocksDB |
+| 更新直後の MemTable | EC2 上のアプリプロセスのメモリ |
+| WAL、MANIFEST、レベルごとの SST ファイル | Amazon EBS 上の RocksDB データディレクトリ |
+| ブロックストレージ | EC2 に接続した Amazon EBS ボリューム |
+
+この例では WAL を有効にし、異常停止に備えて応答前に WAL を同期する書き込みには `WriteOptions::sync` を使う。レベル型コンパクションの入力選定、新しい SST の生成、MANIFEST 更新は RocksDB が行う。EBS の IOPS・スループットを選ぶ際はフラッシュとコンパクションの I/O を見込む。
+
+- [RocksDB Leveled Compaction](https://github.com/facebook/rocksdb/wiki/Leveled-Compaction)
+- [RocksDB Write Ahead Log](https://github.com/facebook/rocksdb/wiki/Write-Ahead-Log-%28WAL%29)
+- [Amazon EBS ボリュームのアタッチ](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html)
+
+自前例は Linux ホストのアプリプロセス内に RocksDB を組み込み、ローカルディスクに WAL・MANIFEST・SST を保存する。AWS 例では AWS が EC2・EBS 基盤を運用し、利用者が OS、アプリ、DB 設定、アクセス権、バックアップと復旧を管理する。単一ホストの代表例であり、冗長化や実動作は未検証。

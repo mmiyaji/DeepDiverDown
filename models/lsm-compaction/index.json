@@ -2,8 +2,8 @@
   "model": "lsm-compaction",
   "name": "LSM ツリーのフラッシュとコンパクション",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "client": {
@@ -94,6 +94,12 @@
       "type": "unknown",
       "label": "実際のエンジン、コンパクション方式（レベル型・サイズ階層型）、階層の数とサイズは未確定。"
     },
+    "rocksdb-level-host": {
+      "type": "implementation",
+      "impl": "rocksdb-level",
+      "label": "自前 Linux 実行ホスト",
+      "realizes": []
+    },
     "rocksdb-level-app": {
       "type": "implementation",
       "impl": "rocksdb-level",
@@ -126,6 +132,66 @@
       "impl": "rocksdb-level",
       "label": "RocksDB MANIFEST",
       "realizes": []
+    },
+    "aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "Amazon EC2（Linux）",
+      "realizes": []
+    },
+    "aws-app": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "RocksDB を組み込んだアプリ",
+      "realizes": [
+        "client"
+      ]
+    },
+    "aws-mem": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "RocksDB MemTable（プロセスメモリ）",
+      "realizes": [
+        "memtable"
+      ]
+    },
+    "aws-ebs": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "Amazon EBS（データボリューム）",
+      "realizes": []
+    },
+    "aws-wal": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "共有 WAL と MANIFEST のファイル",
+      "realizes": [
+        "wal"
+      ]
+    },
+    "aws-l0": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "L0 の SST ファイル",
+      "realizes": [
+        "l0"
+      ]
+    },
+    "aws-l1": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "L1 の SST ファイル",
+      "realizes": [
+        "l1"
+      ]
+    },
+    "aws-l2": {
+      "type": "implementation",
+      "impl": "aws-ec2-rocksdb",
+      "label": "L2 の SST ファイル",
+      "realizes": [
+        "l2"
+      ]
     }
   },
   "byRef": {
@@ -151,10 +217,19 @@
       "flush-compact",
       "lsm-read",
       "LSM-01",
+      "rocksdb-level-host",
       "rocksdb-level-app",
       "rocksdb-level-memory",
       "rocksdb-level-sst",
-      "rocksdb-level-manifest"
+      "rocksdb-level-manifest",
+      "aws-ec2",
+      "aws-app",
+      "aws-mem",
+      "aws-ebs",
+      "aws-wal",
+      "aws-l0",
+      "aws-l1",
+      "aws-l2"
     ],
     "docs/reference-lsm-compaction.md#§2": [
       "client",
@@ -184,10 +259,21 @@
       "flush-compact"
     ],
     "docs/reference-lsm-compaction.md#§7": [
+      "rocksdb-level-host",
       "rocksdb-level-app",
       "rocksdb-level-memory",
       "rocksdb-level-sst",
       "rocksdb-level-manifest"
+    ],
+    "docs/reference-lsm-compaction.md#§8": [
+      "aws-ec2",
+      "aws-app",
+      "aws-mem",
+      "aws-ebs",
+      "aws-wal",
+      "aws-l0",
+      "aws-l1",
+      "aws-l2"
     ]
   },
   "reference": {

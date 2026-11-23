@@ -57,7 +57,7 @@ Databricks on AWS で Iceberg テーブル用の REST 入口と、資産検索�
 | --- | --- | --- |
 | データ提供パイプライン・データ契約の検証 | Lakeflow Jobs | 検証タスクから公開タスクへ進む。検証ロジックは SQL などで実装する。 |
 | データ利用者 | Databricks ワークスペース利用者 | Catalog Explorer で資産を探し、必要な権限を申請する。 |
-| 処理エンジン | Databricks Runtime | 対象テーブルを読み書きし、対応する処理のリネージを登録する。 |
+| 処理エンジン | Databricks Jobs サーバーレス コンピュート | Databricks アカウントで検証・公開タスクを実行し、Iceberg テーブルを読み書きする。 |
 | 実装で追加 | 外部 Iceberg クライアント | Unity Catalog の Iceberg REST 入口を介して対象テーブルにアクセスする。 |
 | Iceberg REST Catalog・メタデータ・イベント収集・検索・リネージ・所有者・ポリシー・利用申請 | Databricks Unity Catalog | REST インターフェース、ワークスペース内のリネージ、検索、権限申請を提供する。 |
 | データ・メタデータファイル | Amazon S3（管理ストレージ） | 管理 Iceberg テーブルのファイルを保持する。 |
@@ -73,6 +73,10 @@ Databricks on AWS で Iceberg テーブル用の REST 入口と、資産検索�
 | 構造化メタデータと製品公開 | Knowledge Catalog（比較） | Google Cloud のメタデータ管理の参照例。 |
 | 分析資産の発見と権限確認 | Microsoft Fabric OneLake catalog（比較） | Fabric の発見とガバナンスの参照例。 |
 
+この例は Databricks アカウントの制御プレーンとサーバーレス計算を使い、利用組織の AWS アカウントの S3 バケットを Unity Catalog の管理ストレージとして設定する。管理 Iceberg テーブルにはサーバーレス対応ワークスペースと、計算環境から S3 への到達性が必要。Unity Catalog の申請は設定済みの窓口に届き、Catalog Explorer では権限を持つ審査担当者がグループへの追加または権限の付与を行う。[Databricks on AWS のアーキテクチャ](https://docs.databricks.com/aws/en/getting-started/high-level-architecture)。
+
 Lakeflow Jobs の検証タスクで候補データのスキーマと品質条件を確認し、成功時に公開タスクを実行する。結果を記録する表は設計例。下段の製品比較は独立した参照先であり、この構成でデプロイする製品は上段に示す。
 
 [Databricks Unity Catalog](https://docs.databricks.com/aws/en/data-governance/unity-catalog)、[Databricks の Iceberg](https://docs.databricks.com/aws/en/iceberg/)、[Unity Catalog のリネージ](https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage)、[Unity Catalog のアクセス申請](https://docs.databricks.com/aws/en/data-governance/unity-catalog/manage-privileges/access-requests)、[Lakeflow Jobs のタスク依存関係](https://docs.databricks.com/aws/en/jobs/run-if)、[Databricks AWS 参照アーキテクチャ](https://docs.databricks.com/aws/en/assets/files/reference-architecture-databricks-on-aws-037959ba92a5a1e33e244fbe2e19fd3f.pdf)
+
+Databricks が制御プレーンとサーバーレス計算を運用し、顧客は S3、IAM ロール、ジョブ、テーブル、カタログ権限と外部クライアントを設定する。管理 Iceberg テーブルのファイルはこの例では顧客 S3 に置き、内部計算ノードの直接操作は想定しない。下段の製品は比較参照であり相互接続の主張ではない。契約検証と REST クライアントの組み合わせは実動作未検証。[Databricks architecture](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[Managed storage](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)

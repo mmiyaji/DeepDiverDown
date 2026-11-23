@@ -52,3 +52,12 @@ Horizon Catalog の機能で社内利用者に対する分類やマスキング�
 外部ステージには S3 の許可パスを指定する。`LOAD_WH` と `BI_WH` は同じテーブルデータを使える。取込と BI の処理能力は別々に設定し、受領側クエリの計算資源は受領側が手配する。
 
 出典 [Snowflake key concepts and architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)、[Secure Data Sharing](https://docs.snowflake.com/en/user-guide/data-sharing-intro)、[Snowflake S3 ストレージ統合](https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration)
+
+
+### AWS と Snowflake の認証境界
+
+S3 入力バケットは利用者の AWS アカウントにあり、Snowflake 側のストレージ統合が、対象パスへの IAM ロールと信頼関係を使ってアクセスする。外部ステージは Snowflake 上の設定で、ロード処理は LOAD_WH の計算資源が実行する。Direct Share は提供側 Snowflake アカウントで定義し、受領側は別アカウントと自分の Warehouse を使う。IAM と Snowflake の権限、共有先の条件はそれぞれ明示的に構成する。
+
+[Snowflake S3 ストレージ統合](https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration)、[Snowflake Secure Data Sharing](https://docs.snowflake.com/en/user-guide/data-sharing-intro)。
+
+Snowflake は計算・保存・クラウドサービスの基盤を管理し、利用者は SQL、仮想ウェアハウスのサイズ、ステージ、ストレージ統合、ロールや共有先を設定する。内部テーブルの基盤は Snowflake が管理し、図の入力 S3 バケットとは別である。利用者が内部の計算ノードや保存基盤を直接操作する構成ではない。受領側は別アカウントのウェアハウスを使う。公式資料を組み合わせた例で、この構成の実動作は未検証。[Snowflake architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)

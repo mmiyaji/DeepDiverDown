@@ -57,3 +57,19 @@ S3 の着地先を登録し、取込から BI・共有・モデル配備まで�
 着地ファイルの外部ロケーションと、整備済み Delta 管理テーブルの保存領域を分ける。BI、共有、モデル配備には用途に応じたアクセス権を付与する。
 
 出典 [Databricks reference architectures](https://docs.databricks.com/aws/en/lakehouse-architecture/reference)、[OpenSharing](https://docs.databricks.com/aws/en/opensharing)、[Model Serving](https://docs.databricks.com/aws/en/machine-learning/model-serving/)、[Databricks の S3 外部ロケーション](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3)、[Auto Loader](https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/)
+
+
+### 認証とモデル配備の境界
+
+S3 への権限は AWS IAM ロールとして定義し、Databricks 側のストレージ認証情報と Unity Catalog 外部ロケーションに関連付ける。これらはそれぞれ別サービスの設定である。学習の記録は MLflow、モデル版の管理は Unity Catalog、推論の実行は Model Serving エンドポイントが担う。実験の記録だけでエンドポイントへの配備が行われるわけではない。
+
+| 追加する設定・実行 | 担い手 |
+| --- | --- |
+| ストレージ権限 | AWS IAM ロール |
+| S3 パスの登録 | Unity Catalog の外部ロケーションとストレージ認証情報 |
+| 学習の記録とモデル版 | MLflow と Unity Catalog |
+| 推論の実行 | Databricks Model Serving |
+
+[Unity Catalog 外部ロケーション](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3)、[Model Serving](https://docs.databricks.com/aws/en/machine-learning/model-serving/)。
+
+この例ではパイプラインと SQL Warehouse にサーバーレス計算を選び、学習ジョブは顧客 AWS アカウントの EC2 上の classic compute を使う。Databricks は制御プレーンとサーバーレス計算プレーンを管理し、利用者はワークスペース、パイプライン、SQL Warehouse、クラスタ、モデルと権限を設定する。サーバーレスの内部ホストを直接操作するものではない。Unity Catalog 管理テーブルは論理オブジェクトで、実データは顧客側に設定した S3 管理ストレージに置く。公式資料を組み合わせた例であり、この一連の構成・バージョンの実動作は未検証。[Databricks ネットワーク構成](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[管理ストレージ](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)

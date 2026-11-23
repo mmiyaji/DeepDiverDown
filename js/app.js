@@ -1,11 +1,12 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=minimap1';
-import { buildDiagramLayout } from './diagram-layout.js?v=compare-layout3';
-import { implementation3D } from './implementation-3d.js';
+import { Scene3D } from './scene3d.js?v=view-accent1';
+import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=compare-layout3';
+import { implementation3D, platformFootprint } from './implementation-3d.js';
+import { legendState, showGroup, showLink } from './legend-visibility.js';
 import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=compare-layout3';
 import { NODE_KINDS, nodeShape } from './node-kinds.js';
 import { loadServiceIcons } from './service-icons.js';
-import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
+import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=view-accent2';
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
@@ -35,6 +36,22 @@ const compareViewport = document.createElement('div');
 compareViewport.className = 'diagram-viewport';
 $('view').before(compareViewport);
 compareViewport.append($('view'));
+let readableDiagram = false;
+function updateDiagramScale() {
+  const view = $('view'), button = document.querySelector('[data-act="readable-diagram"]');
+  const applicable = !PREVIEW && st.dimension === '2' && compareViewport.classList.contains('compare-viewport');
+  button.hidden = !applicable;
+  button.setAttribute('aria-pressed', String(applicable && readableDiagram));
+  button.textContent = readableDiagram ? '全体を表示' : '文字を拡大';
+  let scale = 1;
+  if (applicable && !readableDiagram) {
+    const width = parseFloat(view.style.minWidth) || compareViewport.clientWidth;
+    const height = parseFloat(view.style.minHeight) || compareViewport.clientHeight;
+    scale = overviewScale(compareViewport.clientWidth, compareViewport.clientHeight, width, height);
+  }
+  const value = scale === 1 ? '' : String(scale);
+  if (view.style.zoom !== value) view.style.zoom = value;
+}
 const [REGISTRY, icons] = await Promise.all([L.loadRegistry(), loadServiceIcons()]);
 Catalog.setIcons(icons);
 const hasIcons = Object.keys(icons).length > 0;
@@ -98,6 +115,8 @@ const st = {
   scen: +ROUTE.q.sc || 0, step: +ROUTE.q.st || 0, down: (ROUTE.q.down || (['2', '3'].includes(ROUTE.q.d) ? '' : ROUTE.q.d) || '').split(',').filter(id => M.nodes[id]),
   issue: ROUTE.q.i != null ? +ROUTE.q.i : null, edge: null, req: ROUTE.q.r || null, metric: METRICS.some(x => x[0] === ROUTE.q.m) ? ROUTE.q.m : METRICS[0][0], play: null,
 };
+const legendVisibility = { '2': legendState(S.legendVisibility?.['2']), '3': legendState(S.legendVisibility?.['3']) };
+const legendCurrent = () => legendVisibility[st.dimension];
 if (!M.scenarios?.[st.scen]) st.scen = 0;
 if (!Number.isInteger(st.step) || !M.scenarios?.[st.scen]?.steps?.[st.step]) st.step = 0;
 
@@ -151,7 +170,7 @@ const style3D = () => st.dimension === '3' ? (S.nodeStyle3D === 'flow' ? 'flow' 
 let layoutView, layoutKey, layout;
 function diagramLayout() {
   const view = VW(), flat = st.dimension === '2';
-  const dense = flat && (PREVIEW || (st.view.startsWith('impl:') && Object.keys(view.nodes).length >= 5));
+  const dense = flat && (PREVIEW || Object.keys(view.nodes).length >= 5);
   compareViewport.classList.toggle('compare-viewport', dense);
   if (!dense) { $('view').style.minWidth = ''; $('view').style.minHeight = ''; }
   const viewport = dense ? compareViewport : $('view');
@@ -205,7 +224,7 @@ function decorate() {
   allLinks().forEach(l => ls[l.id] = {});
   const focus = (nodes = [], links = []) => {
     Object.keys(ns).forEach(id => nodes.includes(id) ? ns[id].outline = true : ns[id].dim = true);
-    allLinks().forEach(l => links.includes(l.id) ? Object.assign(ls[l.id], { on: true, color: '--accent' }) : ls[l.id].dim = true);
+    allLinks().forEach(l => links.includes(l.id) ? Object.assign(ls[l.id], { on: true, color: '--view-accent' }) : ls[l.id].dim = true);
   };
   Object.entries(N).forEach(([id, n]) => { if ((n.replicas ?? 1) > 1 && n.replicas < 99) ns[id].badge = { text: `${n.replicas}台`, tone: 'replicas' }; });
 
@@ -214,7 +233,7 @@ function decorate() {
     const active = new Set();
     for (const l of allLinks()) {
       if (current.has(l.id)) {
-        Object.assign(ls[l.id], { on: true, color: '--accent', packets: !REDUCED });
+        Object.assign(ls[l.id], { on: true, color: '--view-accent', packets: !REDUCED });
         active.add(l.from); active.add(l.to);
       } else ls[l.id].dim = true;
     }
@@ -278,7 +297,7 @@ function decorate() {
   if (st.sel && ns[st.sel]) ns[st.sel].outline = true;
   const edge = st.edge && allLinks().find(l => l.id === st.edge);
   if (edge) {
-    Object.assign(ls[edge.id], { on: true, dim: false, color: '--accent' });
+    Object.assign(ls[edge.id], { on: true, dim: false, color: '--view-accent' });
     for (const id of [edge.from, edge.to]) if (ns[id]) Object.assign(ns[id], { outline: true, dim: false });
   }
   return { ns, ls };
@@ -402,7 +421,7 @@ function projectState(ns, ls) {
   for (const l of P.links) {
     const s = lsV[l.id] = Views.mergeLink((P.linkFrom[l.id] || []).map(p => ls[p]));
     if (st.edge === l.id) {
-      Object.assign(s, { on: true, dim: false, color: '--accent' });
+      Object.assign(s, { on: true, dim: false, color: '--view-accent' });
       for (const id of [l.from, l.to]) if (nsV[id]) Object.assign(nsV[id], { outline: true, dim: false });
     }
     if (l.crossAz && !s.on && !s.dim) Object.assign(s, { on: true, color: '--warn' }); // AZ をまたぐ通信
@@ -447,6 +466,8 @@ function syncFileMap() {
 function drawScene() {
   const d = decorate(), { nsV: ns, lsV: ls } = projectState(d.ns, d.ls), P = VW(), N = P.nodes;
   const plan = diagramLayout();
+  $('view').classList.toggle('hide-node-labels', !legendCurrent().labels);
+  $('view').classList.toggle('hide-management', !legendCurrent().management);
   scene.comparisonScale = compareViewport.classList.contains('compare-viewport') ? plan.unitsPerPixel : null;
   scene.begin();
   for (const t of P.tiers) {
@@ -460,14 +481,14 @@ function drawScene() {
   // In the stack view the cloud is one shared footprint beneath the layers,
   // rather than a separate cloud rectangle on every floor.
   if (P.platformStack && st.dimension === '3') for (const gr of P.groups || []) {
-    if (gr.kind !== 'cloud') continue;
+    if (gr.kind !== 'cloud' || !showGroup(gr, legendCurrent())) continue;
     const members = Object.entries(N).filter(([id, n]) => visible(n) && (!gr.nodes || gr.nodes.includes(id)));
     if (!members.length) continue;
     const points = members.map(([, n]) => W(n.x, n.y, n.tier));
     const ys = points.map(p => p[1]);
     const floors = [...new Set(members.map(([, n]) => n.tier))].map(t => plan.floors.get(t)).filter(Boolean);
-    const [left, right] = [Math.min(...floors.map(f => f.x + f.left)) - 1.2, Math.max(...floors.map(f => f.x + f.right)) + 1.2];
-    const [back, front] = [Math.min(...floors.map(f => f.z + f.back)) - 1.2, Math.max(...floors.map(f => f.z + f.front)) + 1.2];
+    const multiplePlatforms = (P.groups || []).filter(g => g.kind === 'cloud').length > 1;
+    const [left, right, back, front] = platformFootprint(points, floors, multiplePlatforms);
     const bottom = Math.min(...ys) - 0.18, top = Math.max(...ys) + 2.1;
     const provider = Catalog.PROVIDERS[gr.provider];
     const pts = [[left, back], [right, back], [right, front], [left, front]];
@@ -476,6 +497,7 @@ function drawScene() {
     labeled.add(gr);
   }
   for (const gr of P.groups || []) for (const t of [].concat(gr.tier)) {
+    if (!showGroup(gr, legendCurrent())) continue;
     if (P.platformStack && st.dimension === '3' && gr.kind === 'cloud') continue;
     if (st.hidden.has(t) || !P.tiers.some(x => x.id === t)) continue;
     let { x0, y0, x1, y1 } = gr;
@@ -506,7 +528,7 @@ function drawScene() {
       pts: [[left, back], [right, back], [right, front], [left, front]] });
   }
   for (const l of P.links) {
-    if (!visible(N[l.from]) || !visible(N[l.to])) continue;
+    if (!visible(N[l.from]) || !visible(N[l.to]) || !showLink(linkTiming(l), legendCurrent())) continue;
     const s = ls[l.id] || {};
     const crossFloor = N[l.from].tier !== N[l.to].tier;
     const solid = !!style3D();
@@ -518,6 +540,7 @@ function drawScene() {
   }
   for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node({ ...nodeSpec(id, n, ns[id] || {}), tier: n.tier });
   scene.end(st.dimension === '2');
+  updateDiagramScale();
   renderSidebar(); renderStats(); renderPanel(); syncUrl();
 }
 
@@ -668,11 +691,33 @@ function renderSidebar() {
 /* 凡例：線の意味 + このモデルに登場するクラウド・枠の種類 */
 function contextLegend() {
   const { nodes, groups } = VW();
+  const state = legendCurrent();
   const provs = [...new Set([...Object.values(nodes).map(n => Catalog.providerOf(n)), ...groups.map(g => g.provider)].filter(p => Object.hasOwn(Catalog.PROVIDERS, p)))];
   const kinds = [...new Set(groups.map(g => g.kind))];
   const KIND = { cloud: 'クラウド', region: 'リージョン', vpc: 'VPC', vnet: 'VNet', vcn: 'VCN', az: 'AZ', subnet: 'サブネット', cluster: 'クラスタ', namespace: 'Namespace', nodegroup: '実行ノード', datacenter: 'データセンター', parallel: '並列に実行' };
-  return (provs.length ? '<span class="lg-sep"></span>' + provs.map(p => `<span><b class="sw" style="background:${Catalog.PROVIDERS[p].color}"></b>${esc(Catalog.PROVIDERS[p].label)}</span>`).join('') : '') +
-    (kinds.length ? '<span class="lg-sep"></span>' + kinds.map(k => `<span><b class="fr fr-${k}"></b>${KIND[k] || k}</span>`).join('') : '');
+  const providerButtons = provs.map(p => {
+    const label = esc(Catalog.PROVIDERS[p].label), marker = `<b class="sw" style="background:${Catalog.PROVIDERS[p].color}"></b>`;
+    if (!groups.some(g => ['cloud', 'datacenter'].includes(g.kind) && g.provider === p)) return `<span>${marker}${label}</span>`;
+    return `<button type="button" class="legend-toggle" data-legend-provider="${esc(p)}" aria-pressed="${state.clouds && !state.hiddenProviders.includes(p)}" aria-label="${label} の領域" title="${label} の領域を表示・非表示"${state.clouds ? '' : ' disabled'}>${marker}${label}</button>`;
+  }).join('');
+  return (provs.length ? '<span class="lg-sep" aria-hidden="true"></span>' + providerButtons : '') +
+    (kinds.length ? '<span class="lg-sep" aria-hidden="true"></span>' + kinds.map(k => {
+      const label = esc(KIND[k] || k), marker = `<b class="fr fr-${esc(k)}"></b>`;
+      if (k === 'cloud' || k === 'datacenter') return `<span>${marker}${label}</span>`;
+      return `<button type="button" class="legend-toggle" data-legend-kind="${esc(k)}" aria-pressed="${!state.hiddenKinds.includes(k)}" aria-label="${label} の境界" title="${label} の境界を表示・非表示">${marker}${label}</button>`;
+    }).join('') : '');
+}
+
+function visibilityLegend() {
+  const s = legendCurrent(), groups = VW().groups || [], timings = new Set(VW().links.map(linkTiming));
+  const button = (key, label, title) => `<button type="button" class="legend-toggle" data-legend-toggle="${key}" aria-pressed="${s[key]}" title="${title}">${label}</button>`;
+  return '<span class="lg-sep" aria-hidden="true"></span><span>表示：</span>' +
+    button('labels', '部品名', '部品名を表示・非表示。選択中やホバー中は表示します') +
+    ((st.dimension !== '2' || VW().platform2D) && Object.values(VW().nodes).some(n => n.management?.type) ? button('management', '管理区分', '管理区分バッジを表示・非表示') : '') +
+    (groups.some(g => ['cloud', 'datacenter'].includes(g.kind)) ? button('clouds', 'クラウド領域', 'クラウドとデータセンターの領域を表示・非表示') : '') +
+    (timings.has(true) ? button('sync', '<i></i>同期', '同期の接続を表示・非表示。種別未指定の接続は常に表示') : '') +
+    (timings.has(false) ? button('async', '<i class="dash"></i>非同期', '非同期の接続を表示・非表示。種別未指定の接続は常に表示') : '') +
+    '<button type="button" class="legend-toggle" data-legend-toggle="reset" title="表示設定を初期状態に戻す">すべて表示</button>';
 }
 
 /* ================= 統計・凡例 ================= */
@@ -700,18 +745,38 @@ function renderStats() {
   const leg = {
     evidence: '<span><i></i>事実（実装で確認）</span><span><i class="dash"></i>主張（設計書のみ）</span><span><i class="dot warn"></i>不明</span><span><i class="acc"></i>ずれ</span>',
     compare: '<span><i class="ok"></i>追加</span><span><i class="dash acc"></i>削除</span><span><i class="warn"></i>変更</span>',
-    fail: '<span><i></i>同期</span><span><i class="dash"></i>非同期</span><span><i class="acc"></i>失敗する呼び出し</span>',
+    fail: '<span><i class="acc"></i>失敗する呼び出し</span>',
   };
   const current = st.mode === 'scenario' ? M.scenarios?.[st.scen]?.steps[st.step]?.links || [] : [];
   const ids = new Set(st.edge ? [st.edge] : current);
   const projection = VW();
-  const active = ids.size ? projection.links.filter(l => visible(projection.nodes[l.from]) && visible(projection.nodes[l.to]) &&
+  const active = ids.size ? projection.links.filter(l => showLink(linkTiming(l), legendCurrent()) && visible(projection.nodes[l.from]) && visible(projection.nodes[l.to]) &&
     (ids.has(l.id) || projection.linkFrom[l.id]?.some(id => ids.has(id)))) : [];
   const first = active.find(l => l.id === st.edge) || active[0];
   const caption = first ? `<span class="route-caption"><strong>${esc(edgeAction(first))}</strong> · ${esc(projection.nodes[first.from].label)} → ${esc(projection.nodes[first.to].label)}${timingLabel(first) ? ' · ' + timingLabel(first) : ''}${active.length > 1 ? `（ほか${active.length - 1}接続）` : ''}</span>` : '';
   $('legend').classList.toggle('edge-selected', !!(st.edge && caption));
-  $('legend').innerHTML = caption + (ENTRY.reference ? (caption ? '' : '<span>矢印を選ぶと処理内容を表示します</span>') : leg[st.mode] || '<span><i></i>同期</span><span><i class="dash"></i>非同期</span>') + contextLegend();
+  $('legend').innerHTML = caption + (ENTRY.reference ? (caption ? '' : '<span>矢印を選ぶと処理内容を表示します</span>') : leg[st.mode] || '') + contextLegend() + visibilityLegend();
 }
+$('legend').addEventListener('click', event => {
+  const button = event.target.closest('[data-legend-toggle], [data-legend-provider], [data-legend-kind]');
+  if (!button) return;
+  const state = legendCurrent(), key = button.dataset.legendToggle, provider = button.dataset.legendProvider, kind = button.dataset.legendKind;
+  if (provider) {
+    state.hiddenProviders = state.hiddenProviders.includes(provider) ? state.hiddenProviders.filter(p => p !== provider) : [...state.hiddenProviders, provider];
+  } else if (kind) {
+    state.hiddenKinds = state.hiddenKinds.includes(kind) ? state.hiddenKinds.filter(k => k !== kind) : [...state.hiddenKinds, kind];
+  } else if (key === 'reset') legendVisibility[st.dimension] = legendState();
+  else if (['labels', 'management', 'clouds', 'sync', 'async'].includes(key)) state[key] = !state[key];
+  if (st.edge && (key === 'sync' || key === 'async')) {
+    const projection = VW(), selected = projection.links.filter(l => l.id === st.edge || projection.linkFrom[l.id]?.includes(st.edge));
+    if (selected.length && selected.every(l => !showLink(linkTiming(l), legendCurrent()))) st.edge = null;
+  }
+  S.legendVisibility = legendVisibility;
+  saveSettings(S);
+  draw();
+  const selector = provider ? '[data-legend-provider]' : kind ? '[data-legend-kind]' : '[data-legend-toggle]';
+  [...$('legend').querySelectorAll(selector)].find(b => provider ? b.dataset.legendProvider === provider : kind ? b.dataset.legendKind === kind : b.dataset.legendToggle === key)?.focus();
+});
 function syncP95(sc) {
   const ids = new Set(sc.steps.flatMap(s => s.links).map(linkById).filter(l => l?.sync).map(l => l.to));
   return [...ids].reduce((s, id) => s + (M.nodes[id].metrics?.p95 || 0), 0);
@@ -1038,6 +1103,7 @@ document.querySelectorAll('[data-dimension]').forEach(b => b.addEventListener('c
 const toggleDimension = () => setDimension(st.dimension === '2' ? '3' : '2');
 function setDimension(dimension, redraw = true) {
   st.dimension = dimension;
+  if (dimension !== '2') $('view').style.zoom = '';
   $('view').dataset.projection = dimension;
   const flat = dimension === '2';
   document.querySelector('[data-act="svg-full"]').hidden = !flat;
@@ -1293,6 +1359,8 @@ function openSettings() {
     <div class="settings-heading"><div><h3>表示</h3><p>色や図の見え方を変更します。</p></div><span>すぐに反映</span></div>
     <label class="chk"><input type="checkbox" name="officialIcons" ${S.officialIcons ? 'checked' : ''} ${hasIcons ? '' : 'disabled'}> 公式アイコンを使う</label>
     <label>テーマ <select name="theme">${[['auto', 'OS に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, n]) => `<option value="${v}" ${S.theme === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+    <label>図のアクセントカラー <select name="viewAccent"><option value="orange" ${S.viewAccent === 'orange' ? 'selected' : ''}>オレンジ</option><option value="blue" ${S.viewAccent !== 'orange' ? 'selected' : ''}>ブルー</option></select></label>
+    <p class="settings-help">処理の流れや選択中の部品・接続に適用します。</p>
     <label>ラベルの大きさ <input type="range" name="labelScale" min="0.8" max="1.5" step="0.05" value="${S.labelScale}"><output>${Math.round(S.labelScale * 100)}%</output></label>
     <label>パケットの速さ <input type="range" name="packetSpeed" min="0" max="3" step="0.25" value="${S.packetSpeed}"><output>${S.packetSpeed}×</output></label>
     <label>2D の部品デザイン <select name="nodeStyle2D"><option value="card" ${S.nodeStyle2D !== 'silhouette' ? 'selected' : ''}>ラベル一体型カード</option><option value="silhouette" ${S.nodeStyle2D === 'silhouette' ? 'selected' : ''}>種類別のシルエット</option></select></label>
@@ -1305,7 +1373,7 @@ function openSettings() {
     <label>左ドラッグの既定 <select name="dragMode"><option value="rotate" ${S.dragMode === 'rotate' ? 'selected' : ''}>回転</option><option value="pan" ${S.dragMode === 'pan' ? 'selected' : ''}>移動</option></select></label>
     </section>
     <section class="settings-section" id="settings-ai" tabindex="-1">
-    <div class="settings-heading"><div><h3>AI 支援</h3><p>AI 用ビューアでの対話・取り込み・指摘対応に適用します。</p></div></div>
+    <div class="settings-heading"><div><h3>AI 支援</h3><p>AI 支援はローカル起動時のみ利用できます。実行先は AI 用ビューアでの対話・取り込み・指摘対応に適用します。</p></div></div>
     <label>実行先 <select name="aiProvider">${Object.entries(AI_PROVIDERS).map(([id, label]) => `<option value="${id}" ${(S.aiProvider === 'codex' ? 'codex' : 'claude') === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
     </section>
     <section class="settings-section" id="settings-review" tabindex="-1">
@@ -1334,6 +1402,7 @@ function openSettings() {
     const fd = new FormData(f);
     Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dimension: fd.get('dimension'), dragMode: fd.get('dragMode') });
     S.nodeStyle3D = fd.get('nodeStyle3D') === 'flow' ? 'flow' : 'components';
+    S.viewAccent = fd.get('viewAccent') === 'blue' ? 'blue' : 'orange';
     S.nodeStyle2D = fd.get('nodeStyle2D') === 'silhouette' ? 'silhouette' : 'card';
     S.aiProvider = fd.get('aiProvider') === 'codex' ? 'codex' : 'claude';
     if (hasIcons) S.officialIcons = fd.has('officialIcons');
@@ -1349,7 +1418,7 @@ function openSettings() {
     if (e.target.name === 'defaultView') scene.initialView = S.defaultView;
     if (e.target.name === 'dimension') setDimension(S.dimension);
     if (e.target.name === 'dragMode') { drag3D = S.dragMode; setDrag(drag3D); }
-    if (['theme', 'officialIcons', 'nodeStyle2D', 'nodeStyle3D'].includes(e.target.name)) {
+    if (['theme', 'viewAccent', 'officialIcons', 'nodeStyle2D', 'nodeStyle3D'].includes(e.target.name)) {
       draw();
       if (e.target.name === 'nodeStyle3D' && style3D() && scene.fitView) scene.fit(scene.fitView);
     }
@@ -1366,6 +1435,7 @@ document.addEventListener('click', e => {
   if (d.hit != null) return openHit(qHits[+d.hit]);
   if (d.act) {
     const a = d.act;
+    if (a === 'readable-diagram') { readableDiagram = !readableDiagram; updateDiagramScale(); return; }
     if (a === 'review-start') return openReview('struct');
     if (a === 'review-scenario') return openReview('scenario');
     if (a === 'review-issues') return openReview('lint');
@@ -1404,7 +1474,12 @@ document.addEventListener('click', e => {
   if (d.cmpStep) return stepChange(+d.cmpStep);
   if (d.drag) return setDrag(d.drag);
   if (d.viewmode) return setView(d.viewmode);
-  if (d.view) return scene.fit(st.dimension === '2' ? 'top' : d.view === 'reset' ? S.defaultView : d.view);
+  if (d.view) {
+    if (st.dimension === '2' && d.view === 'reset') readableDiagram = false;
+    scene.fit(st.dimension === '2' ? 'top' : d.view === 'reset' ? S.defaultView : d.view);
+    updateDiagramScale();
+    return;
+  }
   if (d.mode) { document.body.classList.remove('nav-open'); return setMode(d.mode); }
   if (d.focus) return select(d.focus, { focus: true });
   if (d.nbr != null) { st.nbr = !st.nbr; return draw(); }
@@ -1508,6 +1583,7 @@ addEventListener('keydown', e => {
 /* ================= 起動 ================= */
 document.title = `${M.name} — DeepDiverDown`;
 $('mtitle').textContent = M.name;
+$('viewer-title').textContent = M.name;
 /* ドリルダウン：上位の図（parent）があればパンくずで戻れるようにする */
 {
   let back = M.parent; try { back = JSON.parse(sessionStorage.getItem('ddd.back.' + KEY) || 'null') || back; } catch {}

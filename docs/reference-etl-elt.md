@@ -35,11 +35,20 @@ S3 上の同じ注文入力を使い、Glue で先に変換してロードする
 | Curated Table | Redshift の ETL 整形済みテーブル | Glue で変換した結果を保持する。 |
 | Raw Landing | Redshift の raw スキーマ | COPY でロードした無変換の入力を保持する。 |
 | ロード後の SQL 変換 | Redshift 内の SQL 変換 | dbt モデルの SQL を Redshift 内で実行する。 |
-| 実装で追加 | dbt-redshift 実行環境 | dbt モデルをコンパイルし、変換 SQL を Redshift に送る。 |
+| 実装で追加 | ECS on Fargate の dbt Core と dbt-redshift | ECR のイメージを起動し、変換 SQL を Redshift に送る。 |
+| 実装で追加 | Step Functions Standard | Glue の ETL を起動する。ELT では Redshift Data API の COPY 完了後に ECS タスクを開始する。 |
 | Analytics Mart | Redshift の分析マート | 比較用に経路ごとにスキーマを分離する。 |
 | BI / Consumer | Redshift 対応の BI クライアント | 注文売上の集計を参照する。 |
 | 実装で追加 | Amazon S3 の Glue 一時領域 | Glue と Redshift の転送時に一時データを置く。 |
 
 ETL は Glue が変換結果を Redshift に書く際に一時 S3 領域を使う。ELT は Redshift の `COPY` で無変換の入力を `raw` スキーマにロードし、`dbt-redshift` が後から SQL を実行する。二経路のマートは別スキーマへ作り、同じマートに二重に投入しない。
 
+Step Functions は Glue と ECS の実行をサービス統合で開始し、Redshift Data API はステートメント ID で完了を確認する。Glue と Redshift の IAM ロールは対象の S3 領域に限定する。dbt コンテナの起動ロールと Redshift の変換用ログインを分け、BI の利用者には対象マートの参照だけを付与する。
+
+- [Step Functions の Glue ジョブ統合](https://docs.aws.amazon.com/step-functions/latest/dg/connect-glue.html)
+- [Step Functions の ECS タスク統合](https://docs.aws.amazon.com/step-functions/latest/dg/connect-ecs.html)
+- [Amazon Redshift Data API](https://docs.aws.amazon.com/redshift/latest/mgmt/data-api.html)
+
 [AWS Glue concepts](https://docs.aws.amazon.com/glue/latest/dg/components-key-concepts.html)、[AWS Glue Redshift connections](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-connect-redshift-home.html)、[Amazon Redshift COPY from S3](https://docs.aws.amazon.com/redshift/latest/dg/t_loading-tables-from-s3.html)、[dbt Redshift setup](https://docs.getdbt.com/docs/local/connect-data-platform/redshift-setup)
+
+Redshift はプロビジョンドクラスタ、dbt は ECS の Fargate タスク、Glue はマネージド Spark ジョブとして示す。AWS は各サービスの基盤を運用し、利用者はジョブ、タスク、クラスタ設定、データと権限を管理する。Fargate や Glue の内部ホストを直接操作する構成ではない。公式資料を組み合わせた例であり、実動作は未検証。[AWS 共有責任](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

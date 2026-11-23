@@ -265,7 +265,7 @@ gates:
 implementations:
   - id: redshift-ra3
     label: Amazon Redshift RA3 のプライベートクラスター
-    description: プライベートサブネットのプロビジョンド RA3 クラスターに接続し、Amazon S3 から受注をロードする構成。
+    description: 2 台以上のコンピュートノードを持つプライベート RA3 クラスターに接続し、Amazon S3 から受注をロードする構成。
     sources:
       - title: Amazon Redshift provisioned clusters overview
         url: https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html
@@ -278,6 +278,10 @@ implementations:
         url: https://docs.aws.amazon.com/redshift/latest/mgmt/managing-clusters-vpc.html
       - title: Enhanced VPC routing
         url: https://docs.aws.amazon.com/redshift/latest/mgmt/enhanced-vpc-enabling-cluster.html
+      - title: Redshift COPY と S3 VPC エンドポイント
+        url: https://docs.aws.amazon.com/redshift/latest/mgmt/enhanced-vpc-working-with-endpoints.html
+      - title: Redshift RSQL の接続
+        url: https://docs.aws.amazon.com/redshift/latest/mgmt/rsql-query-tool-starting-tool-connection.html
     tiers:
       - id: edge
         label: クライアントと利用者
@@ -304,20 +308,28 @@ implementations:
         label: 実装時の設定・観測
         z: 3
         size:
-          - 8
+          - 18
           - 3
     groups:
       - kind: cloud
         label: AWS 分析アカウント
         provider: aws
         tier:
-          - edge
           - cluster
           - storage
           - implementation-setup
+      - kind: vpc
+        label: プライベート RA3 と S3 ゲートウェイエンドポイント
+        tier:
+          - cluster
+          - implementation-setup
+        nodes:
+          - example-leader
+          - example-compute
+          - example-s3-endpoint
     nodes:
       example-client:
-        label: VPC 接続済みの SQL クライアント
+        label: VPC 接続済みの RSQL クライアント
         kind: external
         tier: edge
         x: 0
@@ -353,6 +365,7 @@ implementations:
           - type: doc
             ref: docs/reference-redshift.md#§8
         svc: redshift
+        management: {type: aws, scope: "AWS がリーダーノードを運用する。利用者は SQL とクラスター設定を操作し、ノードに直接ログインしない。"}
       example-compute:
         label: RA3 コンピュートノードとスライス
         kind: worker
@@ -367,6 +380,7 @@ implementations:
           - type: doc
             ref: docs/reference-redshift.md#§8
         svc: redshift
+        management: {type: aws, scope: "AWS がコンピュートノードを運用する。利用者はノード数やタイプと SQL の設定を指定する。"}
       example-database:
         label: Redshift データベースと Redshift Managed Storage
         kind: table
@@ -381,6 +395,7 @@ implementations:
           - type: doc
             ref: docs/reference-redshift.md#§8
         svc: redshift
+        management: {type: shared, scope: "AWS が管理ストレージを運用し、利用者がテーブル、データとアクセス権を管理する。"}
       example-s3:
         label: Amazon S3 の着地ファイル
         kind: file
@@ -392,11 +407,86 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-redshift.md#§8
-    links:
-      - id: example-s3-connection
-        from: example-s3
-        to: example-database
-        label: S3 から COPY でロード
+        management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がバケット、ファイルと権限を管理する。"}
+      example-s3-endpoint:
+        label: S3 ゲートウェイ VPC エンドポイント
+        kind: gateway
+        tier: implementation-setup
+        x: 7
+        'y': 1.5
+        description: 拡張 VPC ルーティングを有効にした RA3 から同じリージョンの S3 に接続する。
         evidence:
           - type: doc
             ref: docs/reference-redshift.md#§8
+        svc: vpcendpoint
+        management: {type: shared, scope: "AWS が VPC エンドポイント基盤を運用し、利用者がルートとポリシーを設定する。"}
+      example-copy-role:
+        label: IAM（Redshift COPY 実行ロール）
+        svc: iam
+        kind: policy
+        tier: implementation-setup
+        x: 14
+        'y': 1.5
+        description: RA3 クラスターに関連付け、対象バケットの読み取りを許可する。
+        evidence:
+          - type: doc
+            ref: docs/reference-redshift.md#§8
+        management: {type: customer, scope: "利用者が IAM ロールを作成し、S3 読み取り権限を設定する。"}
+    links:
+      - id: example-s3-connection
+        from: example-s3
+        to: example-s3-endpoint
+        label: COPY 対象のファイルを読み取る
+        evidence:
+          - type: doc
+            ref: docs/reference-redshift.md#§8
+      - id: example-copy
+        from: example-s3-endpoint
+        to: example-compute
+        label: VPC 内の COPY 経路で読み込む
+      - id: example-copy-store
+        from: example-compute
+        to: example-database
+        label: Redshift の管理テーブルを読み書き
+        realizes:
+          - read-db
+        replace: true
+      - id: example-copy-policy
+        from: example-copy-role
+        to: example-leader
+        label: COPY が使う S3 読取権限を付与
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: RA3 クラスターの構成, z: 0, size: [24, 13]}
+      nodes:
+        example-client: {tier: diagram, x: 1, y: 2}
+        example-bi: {tier: diagram, x: 1, y: 8}
+        example-leader: {tier: diagram, x: 7, y: 2}
+        example-compute: {tier: diagram, x: 11, y: 5}
+        example-s3-endpoint: {tier: diagram, x: 16, y: 2}
+        example-copy-role: {tier: diagram, x: 7, y: 10}
+        example-s3: {tier: diagram, x: 21, y: 2}
+        example-database: {tier: diagram, x: 21, y: 7}
+      groups:
+        - {kind: cloud, label: AWS 分析アカウント（サービスの論理的所属）, provider: aws, tier: [diagram], x0: 4, y0: -0.5, x1: 23.5, y1: 12, nodes: [example-leader, example-compute, example-s3-endpoint, example-copy-role, example-s3, example-database]}
+        - {kind: vpc, label: Redshift の利用者 VPC, provider: aws, tier: [diagram], x0: 4.5, y0: 0, x1: 18.5, y1: 8.5, nodes: [example-leader, example-compute, example-s3-endpoint]}
+        - {kind: cluster, label: RA3 クラスター, tier: [diagram], x0: 4.7, y0: 0.3, x1: 13.5, y1: 7.5, nodes: [example-leader, example-compute]}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, kind: origin, z: 0, origin: [-5, 0], size: [3, 7]}
+        - {id: cluster, label: RA3 と VPC エンドポイント, z: 0, size: [14, 7]}
+        - {id: services, label: 独立した保存と権限, z: 0, origin: [18, 0], size: [12, 7]}
+      nodes:
+        example-client: {tier: clients, x: 1, y: 1}
+        example-bi: {tier: clients, x: 1, y: 5}
+        example-leader: {tier: cluster, x: 2, y: 3}
+        example-compute: {tier: cluster, x: 6, y: 3}
+        example-s3-endpoint: {tier: cluster, x: 11, y: 3}
+        example-s3: {tier: services, x: 2, y: 3}
+        example-database: {tier: services, x: 6, y: 3}
+        example-copy-role: {tier: services, x: 10, y: 3}
+      groups:
+        - {kind: cloud, label: AWS 分析アカウント（サービスの論理的所属）, provider: aws, tier: [cluster, services], nodes: [example-leader, example-compute, example-s3-endpoint, example-copy-role, example-s3, example-database]}
+        - {kind: vpc, label: Redshift の利用者 VPC, provider: aws, tier: [cluster], nodes: [example-leader, example-compute, example-s3-endpoint]}
+        - {kind: cluster, label: RA3 クラスター, tier: [cluster], nodes: [example-leader, example-compute]}

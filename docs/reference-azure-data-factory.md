@@ -46,11 +46,16 @@ Azure Blob Storage の注文ファイルを Azure Integration Runtime でコピ�
 | 定期起動の条件、データ処理のワークフロー、ファイルのコピー処理 | ADF のスケジュール Trigger・Pipeline・Copy Activity | 定期的にコピーを始め、成功後に変換を依存実行する。 |
 | アクティビティの実行基盤、列と型の変換処理 | Azure Integration Runtime と Mapping Data Flow | コピーのデータ移動と、管理 Spark 上のマッピング変換を担う。 |
 | 一時配置された注文ファイル、整形済みデータの保存先 | ADLS Gen2 の raw と curated | 変換前の中間結果と整形データを別のパスに保存する。 |
-| 処理状態の監視 | Azure Monitor / ADF の監視画面 | パイプラインやアクティビティの実行状態を確認する。 |
+| 処理状態の監視 | Azure Monitor Logs（Log Analytics） | 診断設定で転送したパイプラインとアクティビティの実行ログを確認する。 |
 
 実装で加わる部品を以下に示す。
 
 - Linked Service と Dataset。入力・出力の接続とパスを宣言し、コピーと変換で参照する。
+
+同じ Azure サブスクリプションのストレージへの到達性を用意し、Linked Service に Blob と ADLS Gen2 への認証を設定する。Copy Activity は Azure IR で Blob から ADLS Gen2 の raw パスへ転送する。Copy が成功すると、Mapping Data Flow が Azure IR の管理 Spark 上で raw を読み、列と型を変換して curated に書き込む。ADF の診断設定で実行ログを Log Analytics ワークスペースへ送り、Azure Monitor Logs で確認する。
+
+- [Copy Activity の実行](https://learn.microsoft.com/en-us/azure/data-factory/copy-activity-overview)
+- [Azure Monitor に ADF のログを送る](https://learn.microsoft.com/en-us/azure/data-factory/monitor-configure-diagnostics)
 
 公式資料
 
@@ -59,3 +64,7 @@ Azure Blob Storage の注文ファイルを Azure Integration Runtime でコピ�
 - [Linked services](https://learn.microsoft.com/en-us/azure/data-factory/concepts-linked-services)
 - [Integration runtime](https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime)
 - [Monitor Azure Data Factory](https://learn.microsoft.com/en-us/azure/data-factory/monitor-data-factory)
+
+この構成は公式資料を組み合わせた代表例で、動作検証済みの導入事例ではない。Microsoft は Azure IR、Data Flow の Spark、Storage、Monitor のサービス基盤を運用し、利用者はパイプライン、IR・Data Flow の計算設定、接続・認証、ストレージのデータと権限、診断設定を管理する。管理 Spark の内部ホストへ直接アクセスする構成は想定しない。実際のネットワーク経路・認証方式と料金設定は未指定。Azure には AWS 用 management.type を流用しない。
+
+- [Mapping Data Flow の概要](https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-overview)

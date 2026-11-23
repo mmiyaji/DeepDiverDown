@@ -250,8 +250,10 @@ scenarios:
 implementations:
   - id: snowflake-vault
     label: Snowflake の Raw Vault と出荷状態マート
-    description: ステージング、Raw Vault、Business Vault、配信マートを Snowflake の別スキーマに置く実装例。
+    description: S3 の注文変更を Snowpipe で取り込み、Snowflake Task と Virtual Warehouse で Raw Vault と出荷状態マートを更新する例。
     sources:
+      - {title: Snowflake S3 storage integration, url: https://docs.snowflake.com/en/user-guide/data-load-s3-config-storage-integration}
+      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
       - title: Data Vault 2.0 Introduction
         url: https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/
       - title: 'Data Vault Alliance: Data Vault, Data Mesh, and Polysemes'
@@ -264,6 +266,8 @@ implementations:
         url: https://docs.snowflake.com/en/sql-reference/sql/merge
       - title: Snowflake task graph
         url: https://docs.snowflake.com/en/user-guide/tasks-graphs
+      - title: Snowpipe による Amazon S3 自動取り込み
+        url: https://docs.snowflake.com/en/user-guide/data-load-snowpipe-auto-s3
     tiers:
       - id: intake
         label: 業務システムと取込
@@ -288,16 +292,22 @@ implementations:
         label: 実装時の設定・観測
         z: 3
         size:
-          - 8
-          - 3
+          - 17
+          - 5
     nodes:
+      example-stage-config: {label: External stage and storage integration, kind: policy, tier: implementation-setup, x: 14, y: 1, evidence: [{type: doc, ref: "docs/reference-dwh-data-vault.md#§7"}]}
+      example-iam: {label: S3 access IAM role, svc: iam, kind: policy, tier: implementation-setup, x: 3, y: 5, management: {type: customer, scope: "Customer manages role trust and S3 permissions."}, evidence: [{type: doc, ref: "docs/reference-dwh-data-vault.md#§7"}]}
+      example-upstream: {label: Upstream order system, kind: external, tier: implementation-setup, x: -2, y: 8, evidence: [{type: doc, ref: "docs/reference-dwh-data-vault.md#§7"}]}
+      example-source-files: {label: S3 の注文変更ファイル, svc: s3, kind: db, tier: implementation-setup, x: 3, y: 1, description: 業務システムが書き出した注文変更を保持する。, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
+      example-notification: {label: Snowflake 管理の SQS, svc: sqs, kind: queue, tier: implementation-setup, x: 9, y: 1, description: S3 のファイル作成通知を受け取る。, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
+      example-snowpipe: {label: Snowpipe 自動取り込み, svc: 'snowflake:pipe', kind: worker, tier: implementation-setup, x: 18, y: 1, description: 外部ステージから注文変更をロードする。, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
+      example-warehouse: {label: Vault 用 Virtual Warehouse, svc: 'snowflake:warehouse', kind: worker, tier: implementation-setup, x: 22, y: 1, description: Task から呼び出す変換 SQL の計算資源を提供する。, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
       example-orders:
-        svc: snowflake:platform
         label: LANDING.ORDERS 入力行
         kind: table
-        tier: intake
-        x: 2
-        'y': 1.5
+        tier: implementation-setup
+        x: 26
+        y: 1
         realizes:
           - orders
         description: 取込可能になった注文変更を保持する。
@@ -305,12 +315,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
       example-stage:
-        svc: snowflake:platform
         label: STAGING.ORDERS_LOAD ビュー
         kind: table
-        tier: intake
-        x: 7
-        'y': 1.5
+        tier: implementation-setup
+        x: 30
+        y: 1
         realizes:
           - stage
         description: 業務キーを整形し、取込時刻と出所を付けて後段に渡す。
@@ -318,12 +327,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
       example-order-hub:
-        svc: snowflake:platform
         label: RAW.HUB_ORDER
         kind: table
-        tier: raw
-        x: 0
-        'y': 1.5
+        tier: implementation-setup
+        x: 14
+        y: 5
         realizes:
           - order-hub
         description: 注文業務キーを一意に登録する。
@@ -331,12 +339,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
       example-customer-hub:
-        svc: snowflake:platform
         label: RAW.HUB_CUSTOMER
         kind: table
-        tier: raw
-        x: 4
-        'y': 1.5
+        tier: implementation-setup
+        x: 18
+        y: 5
         realizes:
           - customer-hub
         description: 顧客業務キーを一意に登録する。
@@ -344,12 +351,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
       example-order-customer:
-        svc: snowflake:platform
         label: RAW.LINK_ORDER_CUSTOMER
         kind: table
-        tier: raw
-        x: 8
-        'y': 1.5
+        tier: implementation-setup
+        x: 22
+        y: 5
         realizes:
           - order-customer
         description: 注文と顧客のキーの組を保持する。
@@ -357,12 +363,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
       example-order-sat:
-        svc: snowflake:platform
         label: RAW.SAT_ORDER_STATE
         kind: table
-        tier: raw
-        x: 12
-        'y': 1.5
+        tier: implementation-setup
+        x: 26
+        y: 5
         realizes:
           - order-sat
         description: 状態が変わった行を履歴として追記する。
@@ -370,12 +375,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
       example-business:
-        svc: snowflake:platform
         label: BUSINESS.ORDER_SHIPMENT_STATUS ビュー
         kind: table
-        tier: delivery
-        x: 6
-        'y': 1.5
+        tier: implementation-setup
+        x: 30
+        y: 5
         realizes:
           - business
         description: 出荷処理済みを示す区分を計算する。
@@ -383,12 +387,11 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
       example-mart:
-        svc: snowflake:platform
         label: MART.ORDER_STATUS テーブル
         kind: table
-        tier: delivery
-        x: 12
-        'y': 1.5
+        tier: implementation-setup
+        x: 14
+        y: 9
         realizes:
           - mart
         description: 分析基準時点を決めて注文ごとに展開する。
@@ -400,13 +403,22 @@ implementations:
         kind: workflow
         tier: implementation-setup
         svc: snowflake:task
-        x: 1
-        'y': 1.5
+        x: 18
+        y: 9
         description: 入力に対する Hub・Link・Satellite のロードと下流マート更新を順序づける。
         evidence:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
     links:
+      - {id: example-export-input, from: example-upstream, to: example-source-files, label: "Export order changes", evidence: [{type: doc, ref: "docs/reference-dwh-data-vault.md#§7"}]}
+      - {id: example-pipe-stage, from: example-snowpipe, to: example-stage-config, label: "Read configured stage", evidence: [{type: doc, ref: "docs/reference-dwh-data-vault.md#§7"}]}
+      - {id: example-stage-role, from: example-stage-config, to: example-iam, label: "Assume S3 role", evidence: [{type: doc, ref: "docs/reference-dwh-data-vault.md#§7"}]}
+      - {id: example-role-bucket, from: example-iam, to: example-source-files, label: "Authorize input read", evidence: [{type: doc, ref: "docs/reference-dwh-data-vault.md#§7"}]}
+      - {id: example-notify, from: example-source-files, to: example-notification, label: ファイル作成通知を送る, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
+      - {id: example-trigger-pipe, from: example-notification, to: example-snowpipe, label: 通知されたファイルを特定, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
+      - {id: example-read-s3, from: example-source-files, to: example-snowpipe, label: 外部ステージで変更ファイルを読む, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
+      - {id: example-land-rows, from: example-snowpipe, to: example-orders, label: LANDING.ORDERS にロード, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
+      - {id: example-compute, from: example-task, to: example-warehouse, label: 指定した Warehouse で変換 SQL を実行, evidence: [{type: doc, ref: docs/reference-dwh-data-vault.md#§7}]}
       - id: example-task-connection
         from: example-task
         to: example-stage
@@ -415,36 +427,56 @@ implementations:
           - type: doc
             ref: docs/reference-dwh-data-vault.md#§7
     groups:
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - intake
-        nodes:
-          - example-orders
-          - example-stage
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - raw
-        nodes:
-          - example-order-hub
-          - example-customer-hub
-          - example-order-customer
-          - example-order-sat
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - delivery
-        nodes:
-          - example-business
-          - example-mart
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - implementation-setup
-        nodes:
-          - example-task
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: implementation-setup, nodes: [example-source-files, example-iam]}
+      - {kind: cloud, provider: aws, label: Snowflake managed notification queue, tier: implementation-setup, nodes: [example-notification]}
+      - {kind: cloud, provider: snowflake, label: Snowflake account, tier: implementation-setup, nodes: [example-stage-config, example-snowpipe, example-warehouse, example-orders, example-stage, example-order-hub, example-customer-hub, example-order-customer, example-order-sat, example-business, example-mart, example-task]}
+    layout2d:
+      tiers: [{id: diagram, label: Snowflake Vault and AWS input, z: 0, size: [36, 15]}]
+      nodes:
+        example-source-files: {tier: diagram, x: 3, y: 1}
+        example-iam: {tier: diagram, x: 3, y: 5}
+        example-notification: {tier: diagram, x: 9, y: 1}
+        example-stage-config: {tier: diagram, x: 14, y: 1}
+        example-snowpipe: {tier: diagram, x: 18, y: 1}
+        example-warehouse: {tier: diagram, x: 22, y: 1}
+        example-orders: {tier: diagram, x: 26, y: 1}
+        example-stage: {tier: diagram, x: 30, y: 1}
+        example-order-hub: {tier: diagram, x: 14, y: 5}
+        example-customer-hub: {tier: diagram, x: 18, y: 5}
+        example-order-customer: {tier: diagram, x: 22, y: 5}
+        example-order-sat: {tier: diagram, x: 26, y: 5}
+        example-business: {tier: diagram, x: 30, y: 5}
+        example-mart: {tier: diagram, x: 14, y: 9}
+        example-task: {tier: diagram, x: 18, y: 9}
+        example-upstream: {tier: diagram, x: 0, y: 8}
+      groups:
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-source-files, example-iam]}
+        - {kind: cloud, provider: aws, label: Snowflake managed notification queue, tier: diagram, nodes: [example-notification]}
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: diagram, nodes: [example-stage-config, example-snowpipe, example-warehouse, example-orders, example-stage, example-order-hub, example-customer-hub, example-order-customer, example-order-sat, example-business, example-mart, example-task]}
+    layout3d:
+      tiers:
+        - {id: aws, label: Customer AWS account, z: 0, size: [8, 3]}
+        - {id: queue, label: Snowflake managed AWS queue, z: 0, origin: [11, 0], size: [4, 3]}
+        - {id: snow, label: Snowflake account, z: 0, origin: [18, 0], size: [24, 9]}
+        - {id: source, label: Upstream, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-source-files: {tier: aws, x: 2, y: 1.5}
+        example-iam: {tier: aws, x: 6, y: 1.5}
+        example-notification: {tier: queue, x: 1, y: 1.5}
+        example-stage-config: {tier: snow, x: 2, y: 1}
+        example-snowpipe: {tier: snow, x: 6, y: 1}
+        example-warehouse: {tier: snow, x: 10, y: 1}
+        example-orders: {tier: snow, x: 14, y: 1}
+        example-stage: {tier: snow, x: 18, y: 1}
+        example-order-hub: {tier: snow, x: 22, y: 1}
+        example-customer-hub: {tier: snow, x: 2, y: 4}
+        example-order-customer: {tier: snow, x: 6, y: 4}
+        example-order-sat: {tier: snow, x: 10, y: 4}
+        example-business: {tier: snow, x: 14, y: 4}
+        example-mart: {tier: snow, x: 18, y: 4}
+        example-task: {tier: snow, x: 22, y: 4}
+        example-upstream: {tier: source, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: aws, nodes: [example-source-files, example-iam]}
+        - {kind: cloud, provider: aws, label: Snowflake managed notification queue, tier: queue, nodes: [example-notification]}
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: snow, nodes: [example-stage-config, example-snowpipe, example-warehouse, example-orders, example-stage, example-order-hub, example-customer-hub, example-order-customer, example-order-sat, example-business, example-mart, example-task]}

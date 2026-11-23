@@ -284,6 +284,8 @@ implementations:
         url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3
       - title: Auto Loader
         url: https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/
+      - {title: Databricks deployment architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
     tiers:
       - id: lakehouse
         label: Lakehouse
@@ -294,11 +296,8 @@ implementations:
       - id: governance
         label: Governance and serving
         z: 1
-        origin:
-          - 4
-          - 0
         size:
-          - 13
+          - 12
           - 6
       - id: implementation-setup
         label: 実装時の設定・観測
@@ -307,12 +306,15 @@ implementations:
           - 8
           - 3
     nodes:
+      example-managed-s3: {label: S3 managed table storage, svc: s3, kind: db, tier: lakehouse, x: 23, y: 5, management: {type: shared, scope: "AWS operates S3; customer configures storage and permissions."}, evidence: [{type: doc, ref: "docs/reference-databricks.md#§9"}]}
+      example-serverless: {label: Databricks serverless compute plane, kind: host, tier: lakehouse, x: 6, y: 9, evidence: [{type: doc, ref: "docs/reference-databricks.md#§9"}]}
+      example-training: {label: Databricks classic compute on EC2, svc: ec2, kind: host, tier: lakehouse, x: 27, y: 5, management: {type: shared, scope: "AWS operates EC2; customer configures compute and workloads."}, evidence: [{type: doc, ref: "docs/reference-databricks.md#§9"}]}
       example-source:
         label: Amazon S3 の到着ファイル
         kind: db
         tier: lakehouse
-        x: 0
-        'y': 1.5
+        x: 23
+        y: 1
         svc: s3
         realizes:
           - source
@@ -324,8 +326,8 @@ implementations:
         label: Lakeflow Spark Declarative Pipelines
         kind: service
         tier: lakehouse
-        x: 3
-        'y': 1.5
+        x: 2
+        y: 1
         realizes:
           - ingest
           - transform
@@ -335,24 +337,23 @@ implementations:
             ref: docs/reference-databricks.md#§9
         svc: databricks:lakeflow
       example-storage:
-        label: Delta テーブルのストレージ
+        label: Unity Catalog 管理 Delta テーブル
         kind: db
         tier: lakehouse
         x: 6
-        'y': 1.5
+        y: 1
         realizes:
           - storage
         description: 管理テーブルの保存領域はカタログの設定に従う。
         evidence:
           - type: doc
             ref: docs/reference-databricks.md#§9
-        svc: databricks:delta
       example-catalog:
         label: Unity Catalog
         kind: service
-        tier: governance
-        x: 5
-        'y': 1.5
+        tier: lakehouse
+        x: 10
+        y: 1
         realizes:
           - catalog
         description: アクセス許可、データの名前空間、リネージを管理する。
@@ -361,11 +362,11 @@ implementations:
             ref: docs/reference-databricks.md#§9
         svc: databricks:unity
       example-query:
-        label: Databricks SQL Warehouse
+        label: Databricks サーバーレス SQL Warehouse
         kind: worker
-        tier: governance
-        x: 9
-        'y': 1.5
+        tier: lakehouse
+        x: 14
+        y: 1
         realizes:
           - query
         description: 注文集計を提供する。
@@ -376,9 +377,9 @@ implementations:
       example-serving:
         label: Databricks ダッシュボード
         kind: service
-        tier: governance
-        x: 13
-        'y': 1.5
+        tier: lakehouse
+        x: 2
+        y: 5
         realizes:
           - serving
         description: SQL Warehouse の集計を表示する。
@@ -389,67 +390,130 @@ implementations:
       example-sharing:
         label: OpenSharing の Share と Recipient
         kind: service
-        tier: governance
-        x: 5
-        'y': 5
+        tier: lakehouse
+        x: 6
+        y: 5
         realizes:
           - sharing
-        description: 公開用資産と受領者を管理する。
+        description: Databricks が管理する OpenSharing の Share と Recipient を利用する。
         evidence:
           - type: doc
             ref: docs/reference-databricks.md#§9
+        svc: databricks:platform
       example-ml:
-        label: MLflow と Model Serving
+        label: MLflow / モデルの追跡
         kind: service
-        tier: governance
+        tier: lakehouse
         x: 10
-        'y': 5
+        y: 5
         realizes:
           - ml
-        description: モデル成果物を登録し承認済みの版を配備する。
+        description: 学習実験を追跡し、モデル版を Unity Catalog に登録する。
         evidence:
           - type: doc
             ref: docs/reference-databricks.md#§9
       example-iam:
-        label: IAM ロールと外部ロケーション
+        label: AWS IAM / ストレージ用ロール
         kind: service
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
-        description: S3 の到着先にアクセスする資格情報とパスを Unity Catalog に登録する。
+        tier: lakehouse
+        x: 27
+        y: 1
+        description: S3 の着地先にアクセスするための IAM ロール。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks.md#§9
+        svc: iam
+      example-location:
+        label: Unity Catalog / 外部ロケーション
+        kind: policy
+        svc: databricks:unity
+        tier: lakehouse
+        x: 14
+        y: 5
+        description: S3 の着地パスとストレージ認証情報を関連付ける設定。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks.md#§9
+      example-serving-model:
+        label: Databricks Model Serving
+        kind: service
+        svc: databricks:modelserving
+        tier: lakehouse
+        x: 2
+        y: 9
+        description: 明示的に選択したモデル版をエンドポイントに配備する。
         evidence:
           - type: doc
             ref: docs/reference-databricks.md#§9
     links:
-      - id: example-iam-connection
+      - {id: example-pipeline-runtime, from: example-serverless, to: example-ingest, label: "Run pipeline", evidence: [{type: doc, ref: "docs/reference-databricks.md#§9"}]}
+      - {id: example-query-runtime, from: example-serverless, to: example-query, label: "Run SQL warehouse", evidence: [{type: doc, ref: "docs/reference-databricks.md#§9"}]}
+      - {id: example-table-storage, from: example-storage, to: example-managed-s3, label: "Store managed table files", evidence: [{type: doc, ref: "docs/reference-databricks.md#§9"}]}
+      - {id: example-train-runtime, from: example-training, to: example-ml, label: "Run training and log model", evidence: [{type: doc, ref: "docs/reference-databricks.md#§9"}]}
+      - id: example-role-location
         from: example-iam
+        to: example-location
+        label: ストレージ認証情報にロールを設定
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks.md#§9
+      - id: example-location-access
+        from: example-location
         to: example-source
-        label: 着地パスへのアクセスを許可
+        label: S3 パスへのアクセスを管理
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks.md#§9
+      - id: example-model-deploy
+        from: example-ml
+        to: example-serving-model
+        label: 選択したモデル版を配備
         evidence:
           - type: doc
             ref: docs/reference-databricks.md#§9
     groups:
-      - kind: cloud
-        label: AWS・Amazon S3
-        provider: aws
-        tier:
-          - lakehouse
-        nodes:
-          - example-source
-      - kind: cloud
-        provider: databricks
-        label: Databricks
-        tier:
-          - lakehouse
-        nodes:
-          - example-ingest
-          - example-storage
-      - kind: cloud
-        provider: databricks
-        label: Databricks
-        tier:
-          - governance
-        nodes:
-          - example-catalog
-          - example-query
-          - example-serving
+      - {kind: cloud, provider: databricks, label: Databricks workspace, tier: lakehouse, nodes: [example-ingest, example-storage, example-catalog, example-query, example-serving, example-sharing, example-ml, example-location, example-serving-model, example-serverless]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: lakehouse, nodes: [example-source, example-iam, example-managed-s3, example-training]}
+    layout2d:
+      tiers: [{id: diagram, label: Databricks on AWS, z: 0, size: [32, 15]}]
+      nodes:
+        example-ingest: {tier: diagram, x: 2, y: 1}
+        example-storage: {tier: diagram, x: 6, y: 1}
+        example-catalog: {tier: diagram, x: 10, y: 1}
+        example-query: {tier: diagram, x: 14, y: 1}
+        example-serving: {tier: diagram, x: 2, y: 5}
+        example-sharing: {tier: diagram, x: 6, y: 5}
+        example-ml: {tier: diagram, x: 10, y: 5}
+        example-location: {tier: diagram, x: 14, y: 5}
+        example-serving-model: {tier: diagram, x: 2, y: 9}
+        example-serverless: {tier: diagram, x: 6, y: 9}
+        example-source: {tier: diagram, x: 23, y: 1}
+        example-iam: {tier: diagram, x: 27, y: 1}
+        example-managed-s3: {tier: diagram, x: 23, y: 5}
+        example-training: {tier: diagram, x: 27, y: 5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: diagram, nodes: [example-ingest, example-storage, example-catalog, example-query, example-serving, example-sharing, example-ml, example-location, example-serving-model, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-source, example-iam, example-managed-s3, example-training]}
+    layout3d:
+      tiers:
+        - {id: workspace, label: Workspace services, z: 1, size: [20, 6]}
+        - {id: serverless, label: Serverless compute plane, z: 0, size: [20, 6]}
+        - {id: customer, label: Customer AWS account, z: 0, origin: [23, 0], size: [16, 3]}
+      nodes:
+        example-ingest: {tier: workspace, x: 2, y: 1}
+        example-storage: {tier: workspace, x: 6, y: 1}
+        example-catalog: {tier: workspace, x: 10, y: 1}
+        example-query: {tier: workspace, x: 14, y: 1}
+        example-serving: {tier: workspace, x: 18, y: 1}
+        example-sharing: {tier: workspace, x: 2, y: 4}
+        example-ml: {tier: workspace, x: 6, y: 4}
+        example-location: {tier: workspace, x: 10, y: 4}
+        example-serving-model: {tier: workspace, x: 14, y: 4}
+        example-serverless: {tier: serverless, x: 8, y: 1.5}
+        example-source: {tier: customer, x: 2, y: 1.5}
+        example-iam: {tier: customer, x: 6, y: 1.5}
+        example-managed-s3: {tier: customer, x: 10, y: 1.5}
+        example-training: {tier: customer, x: 14, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: [workspace, serverless], nodes: [example-ingest, example-storage, example-catalog, example-query, example-serving, example-sharing, example-ml, example-location, example-serving-model, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: customer, nodes: [example-source, example-iam, example-managed-s3, example-training]}

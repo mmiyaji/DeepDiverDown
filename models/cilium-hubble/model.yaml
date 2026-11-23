@@ -48,14 +48,19 @@ scenarios:
 implementations:
   - id: cilium
     label: Kubernetes の Cilium Agent と Hubble Relay
-    description: Kubernetes に Cilium と Hubble Relay を配置し、注文 API への許可・拒否フローを確かめる例。
+    description: Amazon EKS の EC2 ノード上で AWS VPC CNI と Cilium を併用し、Hubble Relay からフローを確認する例。
     sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
       - title: Hubble Observability Setup
         url: https://docs.cilium.io/en/stable/observability/hubble/setup/index.html
       - title: Hubble Architecture
         url: https://docs.cilium.io/en/stable/observability/hubble/
       - title: Kubernetes Network Policies
         url: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+      - title: Cilium と AWS VPC CNI のチェイン
+        url: https://docs.cilium.io/en/stable/installation/cni-chaining-aws-cni/
+      - title: EKS のマネージドノードグループ
+        url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html
     tiers:
       - id: traffic
         label: Kubernetes ワークロード
@@ -63,13 +68,16 @@ implementations:
       - id: observe
         label: フローの観測
         z: 0
+      - {id: infra, label: Amazon EKS の制御とノード, z: 2, size: [16, 4]}
     groups:
+      - {kind: cloud, label: AWS サービス領域（制御プレーンは AWS 管理 VPC）, provider: aws, tier: [infra, traffic, observe], nodes: [cilium-eks, cilium-ec2, cilium-aws-cni, cilium-checkout, cilium-report, cilium-policy, cilium-datapath, cilium-order, cilium-relay]}
       - kind: cluster
         label: Cilium を使う Kubernetes クラスタ
         provider: k8s
         tier:
           - traffic
           - observe
+          - infra
         nodes:
           - cilium-checkout
           - cilium-report
@@ -77,6 +85,9 @@ implementations:
           - cilium-datapath
           - cilium-order
           - cilium-relay
+          - cilium-eks
+          - cilium-ec2
+          - cilium-aws-cni
     nodes:
       cilium-checkout:
         label: checkout Deployment の Pod
@@ -107,6 +118,7 @@ implementations:
         realizes:
           - policy
         description: 注文 API Pod を選び、許可する送信元と TCP 8080 を定義する。
+        management: {type: customer, scope: 利用者が NetworkPolicy を設定する。}
         evidence:
           - type: doc
             ref: docs/reference-cilium-hubble.md#§6
@@ -119,6 +131,7 @@ implementations:
           - datapath
           - hubble
         description: ノード上で eBPF を使って転送・判定し、Agent 内の Hubble がフローを公開する。
+        management: {type: customer, scope: 利用者が Cilium とポリシー設定を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-cilium-hubble.md#§6
@@ -141,6 +154,7 @@ implementations:
         realizes:
           - relay
         description: 各ノードの Hubble をまとめて読み出す。
+        management: {type: customer, scope: 利用者が Hubble Relay を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-cilium-hubble.md#§6
@@ -162,7 +176,12 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-cilium-hubble.md#§6
+      cilium-eks: {label: EKS Kubernetes API, svc: eks, kind: service, tier: infra, x: 1, y: 1.5, description: 利用者の NetworkPolicy とワークロードの定義を受け付ける。, management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§6}]}
+      cilium-ec2: {label: EKS の EC2 ノード, svc: ec2, kind: host, tier: infra, x: 6, y: 1.5, description: アプリの Pod・AWS VPC CNI・Cilium Agent を実行する。, management: {type: shared, scope: EKS がノード管理を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§6}]}
+      cilium-aws-cni: {label: AWS VPC CNI の aws-node, svc: 'k8s:daemonset', kind: worker, tier: infra, x: 12, y: 1.5, description: Pod の IP アドレスと基本ネットワークを管理する。, management: {type: shared, scope: AWS がアドオンを提供し、利用者が構成と更新を管理する。}, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§6}]}
     links:
+      - {id: cilium-schedule, from: cilium-eks, to: cilium-ec2, label: Pod を EC2 ノードへ配置, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§6}]}
+      - {id: cilium-chain, from: cilium-aws-cni, to: cilium-datapath, label: Pod のネットワークに Cilium の eBPF を適用, evidence: [{type: doc, ref: docs/reference-cilium-hubble.md#§6}]}
       - id: cilium-local-connection
         from: cilium-cli
         to: cilium-port-forward
@@ -177,3 +196,42 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-cilium-hubble.md#§6
+
+    layout2d:
+      tiers: [{id: diagram, label: クラスタと外部の接続, z: 0, origin: [-4, 0], size: [31, 14]}]
+      nodes:
+        cilium-cli: {tier: diagram, x: -3, y: 1}
+        cilium-port-forward: {tier: diagram, x: -3, y: 4}
+        cilium-eks: {tier: diagram, x: 2, y: 1}
+        cilium-ec2: {tier: diagram, x: 2, y: 4}
+        cilium-aws-cni: {tier: diagram, x: 2, y: 7}
+        cilium-datapath: {tier: diagram, x: 5, y: 4}
+        cilium-relay: {tier: diagram, x: 5, y: 7}
+        cilium-policy: {tier: diagram, x: 8, y: 1}
+        cilium-checkout: {tier: diagram, x: 8, y: 4}
+        cilium-report: {tier: diagram, x: 8, y: 7}
+        cilium-order: {tier: diagram, x: 8, y: 10}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: 0, y0: -1, x1: 11, y1: 12, nodes: [cilium-eks, cilium-ec2, cilium-aws-cni, cilium-datapath, cilium-relay, cilium-policy, cilium-checkout, cilium-report, cilium-order]}
+        - {kind: cluster, label: EKS クラスタ（論理）, tier: [diagram], x0: 0.5, y0: 0, x1: 10.5, y1: 11.5, nodes: [cilium-eks, cilium-ec2, cilium-aws-cni, cilium-datapath, cilium-relay, cilium-policy, cilium-checkout, cilium-report, cilium-order]}
+        - {kind: vpc, provider: aws, label: 顧客 VPC のノード, tier: [diagram], x0: 0.6, y0: 3, x1: 10, y1: 11, nodes: [cilium-ec2, cilium-aws-cni, cilium-datapath, cilium-relay, cilium-checkout, cilium-report, cilium-order]}
+    layout3d:
+      tiers:
+        - {id: nodes, label: 顧客 EC2 ノード, z: 0, size: [11, 10]}
+        - {id: pods, label: ノード上の Pod・設定, z: 1, size: [11, 10]}
+        - {id: control, label: AWS 管理制御プレーン, z: 0, origin: [14, 0], size: [8, 4]}
+        - {id: outside, label: 外部の利用者・サービス, z: 0, origin: [25, 0], size: [8, 4]}
+      nodes:
+        cilium-eks: {tier: control, x: 1, y: 1}
+        cilium-ec2: {tier: nodes, x: 1, y: 2}
+        cilium-aws-cni: {tier: pods, x: 1, y: 1}
+        cilium-datapath: {tier: pods, x: 4, y: 1}
+        cilium-relay: {tier: pods, x: 7, y: 1}
+        cilium-policy: {tier: pods, x: 1, y: 4}
+        cilium-checkout: {tier: pods, x: 4, y: 4}
+        cilium-report: {tier: pods, x: 7, y: 4}
+        cilium-order: {tier: pods, x: 1, y: 7}
+        cilium-cli: {tier: outside, x: 1, y: 1}
+        cilium-port-forward: {tier: outside, x: 4, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [nodes, pods, control], nodes: [cilium-eks, cilium-ec2, cilium-aws-cni, cilium-datapath, cilium-relay, cilium-policy, cilium-checkout, cilium-report, cilium-order]}

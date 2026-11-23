@@ -37,4 +37,15 @@
 
 日次・カテゴリ・通貨の集約表は加算できる指標に使う。ユニーク購入者数はカテゴリごとの部分集約を足さず、明細から計算する。スケジュールの時刻と対象となる注文日は別に扱う。
 
+注文イベントの補正 CSV は Cloud Storage から BigQuery のロードジョブで `landing.order_corrections` に投入する。バケットとデータセットは同じロケーションに置く。明細補正の GoogleSQL ジョブは、`sales.fact_order_line` の更新と影響する注文日の記録を同じトランザクションで行う。その後、BigQuery Data Transfer Service のスケジュールされたクエリが、コミット済みの対象日だけを読み直す。
+
+集約ジョブは対象日の行を置き換え、対象の注文日、明細の基準時刻、完了時刻を更新履歴に記録する。明細更新用と集約用のジョブには、それぞれ必要なテーブル権限を付与する。分析者は BigQuery Studio から公開ビューを問い、運用者はジョブ履歴と更新履歴を照合する。
+
+- [Cloud Storage からの CSV ロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
+- [BigQuery のスケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)
+- [BigQuery の複数ステートメント トランザクション](https://docs.cloud.google.com/bigquery/docs/transactions)
+- [BigQuery の JOBS ビュー](https://docs.cloud.google.com/bigquery/docs/information-schema-jobs)
+
 出典 [Kimball Group の集約ファクトと加法性](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/)、[dbt Semantic Layer の構成](https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture)、[BigQuery パーティション表](https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables)、[BigQuery スケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)、[BigQuery 論理ビュー](https://docs.cloud.google.com/bigquery/docs/views-intro)
+
+この構成は公式機能を組み合わせた例で、実環境での SQL、ジョブの順序制御、権限、重複排除、障害復旧は未検証。Google が BigQuery と Cloud Storage のサービス基盤を運用し、利用者はデータ、SQL、スケジュール、サービスアカウントと IAM 権限を設定する。内部の実行サーバーは利用者が直接操作する対象として描いていない。ジョブ間の完了順序はスケジュールだけで保証されないため、前段の成功確認や再実行方針を別途設計する。バケットとデータセットのロケーションの互換性を確認する。

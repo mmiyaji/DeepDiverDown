@@ -245,6 +245,7 @@ implementations:
         url: https://docs.snowflake.com/en/user-guide/querying-persisted-results
       - title: QUERY_HISTORY ビュー
         url: https://docs.snowflake.com/en/sql-reference/account-usage/query_history
+      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -299,7 +300,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-query-performance.md#§5
       example-metadata:
-        svc: snowflake:platform
         label: Snowflake ORDERS のマイクロパーティション
         kind: db
         tier: flow
@@ -313,7 +313,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-query-performance.md#§5
       example-result:
-        svc: snowflake:platform
         label: Snowflake の永続化クエリ結果
         kind: cache
         tier: flow
@@ -326,7 +325,6 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-query-performance.md#§5
       example-history:
-        svc: snowflake:platform
         label: ACCOUNT_USAGE.QUERY_HISTORY
         kind: service
         tier: implementation-setup
@@ -345,20 +343,28 @@ implementations:
           - type: doc
             ref: docs/reference-snowflake-query-performance.md#§5
     groups:
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - flow
-        nodes:
-          - example-control
-          - example-queue
-          - example-metadata
-          - example-result
-      - kind: cloud
-        provider: snowflake
-        label: Snowflake
-        tier:
-          - implementation-setup
-        nodes:
-          - example-history
+      - {kind: cloud, provider: snowflake, label: Snowflake account, tier: [flow, implementation-setup], nodes: [example-control, example-queue, example-metadata, example-result, example-history]}
+    layout2d:
+      tiers: [{id: diagram, label: Snowflake query analysis, z: 0, size: [23, 10]}]
+      nodes:
+        example-bi: {tier: diagram, x: 0, y: 4}
+        example-control: {tier: diagram, x: 5, y: 2}
+        example-queue: {tier: diagram, x: 10, y: 2}
+        example-metadata: {tier: diagram, x: 15, y: 2}
+        example-result: {tier: diagram, x: 10, y: 6}
+        example-history: {tier: diagram, x: 15, y: 6}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: diagram, nodes: [example-control, example-queue, example-metadata, example-result, example-history]}
+    layout3d:
+      tiers:
+        - {id: services, label: Snowflake managed services and data, z: 0, size: [20, 6]}
+        - {id: client, label: BI client, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-bi: {tier: client, x: 0, y: 1.5}
+        example-control: {tier: services, x: 2, y: 1}
+        example-queue: {tier: services, x: 6, y: 1}
+        example-metadata: {tier: services, x: 10, y: 1}
+        example-result: {tier: services, x: 6, y: 4}
+        example-history: {tier: services, x: 10, y: 4}
+      groups:
+        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: services, nodes: [example-control, example-queue, example-metadata, example-result, example-history]}

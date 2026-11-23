@@ -166,6 +166,7 @@ implementations:
           - 16
           - 3
     nodes:
+      ex-host: {label: 利用者の Kubernetes ノード群, kind: host, tier: support, x: 1, y: 2, description: RustFS の分散 Pod を実行する。配置先は未選定。, evidence: [{type: doc, ref: docs/reference-rustfs.md#§4}]}
       ex-client:
         label: S3 互換クライアント
         kind: actor
@@ -232,3 +233,101 @@ implementations:
             ref: docs/reference-rustfs.md#§4
         realizes:
           - settings
+    links:
+      - {id: ex-host-pods, from: ex-host, to: ex-nodes, label: RustFS Pod を実行, evidence: [{type: doc, ref: docs/reference-rustfs.md#§4}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        ex-host: {tier: diagram, x: 1, y: 1}
+        ex-api: {tier: diagram, x: 4, y: 1}
+        ex-nodes: {tier: diagram, x: 7, y: 1}
+        ex-settings: {tier: diagram, x: 1, y: 4}
+        ex-disk: {tier: diagram, x: 14, y: 1}
+        ex-client: {tier: diagram, x: -3, y: 1}
+        ex-operator: {tier: diagram, x: 0, y: 1}
+      groups:
+        - {kind: datacenter, label: Kubernetes 実行ノード, tier: [diagram], x0: 0.5, y0: 0.5, x1: 10, y1: 10, nodes: [ex-host, ex-api, ex-nodes, ex-settings]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ノード, z: 0, size: [10, 10]}
+        - {id: apps, label: ノード上の処理, z: 1, size: [10, 10]}
+        - {id: storage, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        ex-host: {tier: host, x: 1, y: 1}
+        ex-api: {tier: apps, x: 4, y: 1}
+        ex-nodes: {tier: apps, x: 7, y: 1}
+        ex-settings: {tier: apps, x: 1, y: 4}
+        ex-disk: {tier: storage, x: 1, y: 1}
+        ex-client: {tier: outside, x: 1, y: 1}
+        ex-operator: {tier: outside, x: 4, y: 1}
+      groups:
+        - {kind: datacenter, label: Kubernetes 実行ノード, tier: [host, apps], nodes: [ex-host, ex-api, ex-nodes, ex-settings]}
+
+  - id: aws-eks-ebs
+    label: "AWS：EKS・RustFS 分散 Helm・EBS"
+    description: "EKS の EC2 ノードに RustFS の分散 StatefulSet を置き、各 Pod のデータ PVC を EBS CSI で確保する例。"
+    sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
+      - {title: "RustFS Kubernetes Helm installation", url: https://docs.rustfs.com/en/installation/cloud-native}
+      - {title: "RustFS deployment and Apache-2.0", url: https://docs.rustfs.com/en/installation}
+      - {title: "RustFS S3 compatibility", url: https://docs.rustfs.com/en/reference/s3-compatibility}
+      - {title: "Amazon EKS managed node groups", url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+      - {title: "Amazon EKS EBS CSI driver", url: https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html}
+    tiers:
+      - {id: access, label: "基盤管理と運用者", z: 2, size: [20, 4]}
+      - {id: compute, label: "RustFS と利用アプリ", z: 1, size: [20, 4]}
+      - {id: storage, label: "永続ボリューム", z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: "AWS サービス領域（EKS 制御プレーンは AWS 管理 VPC）", provider: aws, tier: [access, compute, storage], nodes: [aws-rustfs-eks, aws-rustfs-ec2, aws-rustfs-client, aws-rustfs-entry, aws-rustfs-nodes, aws-rustfs-values, aws-rustfs-csi, aws-rustfs-ebs]}
+      - {kind: cluster, label: "EKS クラスタ", tier: [compute], nodes: [aws-rustfs-ec2, aws-rustfs-client, aws-rustfs-entry, aws-rustfs-nodes, aws-rustfs-csi]}
+    nodes:
+      aws-rustfs-eks: {label: "Amazon EKS", svc: eks, kind: service, tier: access, x: 4, y: 1.5, description: "AWS 管理 VPC の制御プレーン。利用者は API と公開設定を操作するが、サーバーへ直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と設定を操作する。}, evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      aws-rustfs-operator: {label: "RustFS 運用担当者", kind: actor, tier: access, x: 16, y: 1.5, realizes: [operator], description: "Helm 値と認証情報を設定し、分散クラスタの更新と復旧を運用する。", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      aws-rustfs-client: {label: "クラスタ内のオブジェクト利用アプリ", kind: client, tier: compute, x: 3, y: 1.5, realizes: [client], description: "RustFS のエンドポイントに S3 互換クライアントでアクセスする。", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      aws-rustfs-entry: {label: "RustFS Service / オブジェクト API", kind: gateway, tier: compute, x: 8, y: 1.5, realizes: [api], description: "ClusterIP の Service が準備済み Pod にリクエストを転送する。", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      aws-rustfs-nodes: {label: "RustFS 分散 StatefulSet", kind: service, tier: compute, x: 13, y: 1.5, realizes: [nodes], description: "4 Pod の例。RustFS が複数 PVC を使って消失訂正符号化を行う。", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      aws-rustfs-ec2: {label: "Amazon EC2 / ノードグループ", svc: ec2, kind: host, tier: compute, x: 18, y: 1.5, description: "RustFS と利用アプリの Pod を実行する Kubernetes ノード。", management: {type: shared, scope: EKS がノード作成・更新を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      aws-rustfs-csi: {label: EBS CSI ドライバー, kind: worker, svc: k8s:deployment, tier: compute, x: 15, y: 3, description: EBS ボリュームの作成・接続を Kubernetes に提供する。, management: {type: shared, scope: AWS がドライバーを提供し、利用者が導入と権限・更新を管理する。}, evidence: [{type: doc, ref: docs/reference-rustfs.md#§5}]}
+      aws-rustfs-values: {label: "Helm values / 既存 Secret", kind: file, tier: access, x: 10, y: 1.5, realizes: [settings], description: "分散モード、Pod・PVC 数とサイズ、StorageClass、認証設定を指定する。", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      aws-rustfs-ebs: {label: "Amazon EBS / RustFS のデータ PVC", svc: ebs, kind: db, tier: storage, x: 13, y: 1.5, realizes: [disk], description: "各 Pod のデータ PVC を EBS CSI が個別に提供する。既定構成ではデータ PVC は合計16個。", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+    links:
+      - {id: aws-rustfs-nodes, from: aws-rustfs-eks, to: aws-rustfs-ec2, label: "EC2 ノードグループを管理", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      - {id: aws-rustfs-schedule, from: aws-rustfs-eks, to: aws-rustfs-nodes, label: "RustFS Pod を配置", evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+      - {id: aws-rustfs-provision, from: aws-rustfs-csi, to: aws-rustfs-ebs, label: EBS ボリュームを作成・接続, evidence: [{type: doc, ref: docs/reference-rustfs.md#§5}]}
+      - {id: aws-rustfs-attach, from: aws-rustfs-nodes, to: aws-rustfs-ebs, label: "PVC をマウントしてオブジェクトを保存", realizes: [save], replace: true, evidence: [{type: doc, ref: "docs/reference-rustfs.md#§5"}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行と保存, z: 0, origin: [-4, 0], size: [27, 14]}]
+      nodes:
+        aws-rustfs-eks: {tier: diagram, x: 1, y: 1}
+        aws-rustfs-ec2: {tier: diagram, x: 4, y: 1}
+        aws-rustfs-client: {tier: diagram, x: 7, y: 1}
+        aws-rustfs-entry: {tier: diagram, x: 1, y: 4}
+        aws-rustfs-nodes: {tier: diagram, x: 4, y: 4}
+        aws-rustfs-values: {tier: diagram, x: 7, y: 4}
+        aws-rustfs-csi: {tier: diagram, x: 1, y: 7}
+        aws-rustfs-ebs: {tier: diagram, x: 14, y: 1}
+        aws-rustfs-operator: {tier: diagram, x: -3, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [diagram], x0: -1.5, y0: 0, x1: 23, y1: 11, nodes: [aws-rustfs-eks, aws-rustfs-ec2, aws-rustfs-client, aws-rustfs-entry, aws-rustfs-nodes, aws-rustfs-values, aws-rustfs-csi, aws-rustfs-ebs]}
+        - {kind: cluster, label: EKS 論理クラスタ, tier: [diagram], x0: -1, y0: 0.5, x1: 10, y1: 10, nodes: [aws-rustfs-eks, aws-rustfs-ec2, aws-rustfs-client, aws-rustfs-entry, aws-rustfs-nodes, aws-rustfs-values, aws-rustfs-csi]}
+    layout3d:
+      tiers:
+        - {id: host, label: 実行ノード, z: 0, size: [10, 10]}
+        - {id: apps, label: ノード上の処理, z: 1, size: [10, 10]}
+        - {id: storage, label: 独立した制御・保存, z: 0, origin: [13, 0], size: [10, 8]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [4, 6]}
+      nodes:
+        aws-rustfs-eks: {tier: storage, x: 1, y: 1}
+        aws-rustfs-ec2: {tier: host, x: 4, y: 1}
+        aws-rustfs-client: {tier: apps, x: 7, y: 1}
+        aws-rustfs-entry: {tier: apps, x: 1, y: 4}
+        aws-rustfs-nodes: {tier: apps, x: 4, y: 4}
+        aws-rustfs-values: {tier: apps, x: 7, y: 4}
+        aws-rustfs-csi: {tier: apps, x: 1, y: 7}
+        aws-rustfs-ebs: {tier: storage, x: 1, y: 1}
+        aws-rustfs-operator: {tier: outside, x: 1, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域, tier: [host, apps, storage], nodes: [aws-rustfs-eks, aws-rustfs-ec2, aws-rustfs-client, aws-rustfs-entry, aws-rustfs-nodes, aws-rustfs-values, aws-rustfs-csi, aws-rustfs-ebs]}

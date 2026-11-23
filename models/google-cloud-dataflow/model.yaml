@@ -6,62 +6,418 @@ reference:
     - Dataflow Runner と分散ワーカーの役割を区別する。
     - 出力とジョブ監視までの実行経路を追う。
   sources:
-    - {title: Dataflow documentation, url: https://cloud.google.com/dataflow/docs/overview}
-    - {title: Use Apache Beam to build pipelines, url: https://cloud.google.com/dataflow/docs/guides/use-beam}
-    - {title: Dataflow monitoring interface, url: https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf}
-    - {title: Dataflow product overview, url: https://cloud.google.com/products/dataflow}
-sources: [docs/reference-google-cloud-dataflow.md]
-evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§1}, {type: doc, ref: docs/reference-google-cloud-dataflow.md#§7}]
+    - title: Dataflow documentation
+      url: https://cloud.google.com/dataflow/docs/overview
+    - title: Use Apache Beam to build pipelines
+      url: https://cloud.google.com/dataflow/docs/guides/use-beam
+    - title: Dataflow monitoring interface
+      url: https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf
+    - title: Dataflow product overview
+      url: https://cloud.google.com/products/dataflow
+sources:
+  - docs/reference-google-cloud-dataflow.md
+evidence:
+  - type: doc
+    ref: docs/reference-google-cloud-dataflow.md#§1
+  - type: doc
+    ref: docs/reference-google-cloud-dataflow.md#§7
 tiers:
-  - {id: control, label: パイプライン制御, z: 1, size: [22, 3]}
-  - {id: data, label: イベント処理, z: 0, size: [22, 3]}
+  - id: control
+    label: パイプライン制御
+    z: 1
+    size:
+      - 22
+      - 3
+  - id: data
+    label: イベント処理
+    z: 0
+    size:
+      - 22
+      - 3
 nodes:
-  pubsub: {label: 注文イベントの入力, kind: queue, tier: data, x: 0, 'y': 1.5, description: 注文イベントを提供する入力ストリーム。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
-  beam: {label: 処理グラフの定義, kind: service, tier: control, x: 0, 'y': 1.5, description: 入力、変換、出力の処理グラフを定義する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§2}]}
-  collection: {label: 分散データの集合, kind: service, tier: data, x: 4, 'y': 1.5, description: パイプライン内で受け渡す論理的なデータ集合。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§2}]}
-  transform: {label: キー付けと時間窓の集計, kind: worker, tier: data, x: 8, 'y': 1.5, description: 検証・キー付け・ウィンドウ集計を適用する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
-  runner: {label: 処理グラフの実行調整, kind: service, tier: control, x: 5, y: 1.5, description: 処理グラフを実行可能な分散ジョブとして投入する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
-  workers: {parallel: 'N', label: 分散タスクの実行基盤, kind: worker, tier: data, x: 12, 'y': 1.5, description: パイプライン段階を分散実行するワーカー群。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
-  bigquery: {label: 分析用テーブル, kind: db, tier: data, x: 18, 'y': 1.5, description: 集計済み注文データを格納する出力先の例。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
-  monitoring: {label: ジョブの監視, kind: service, tier: control, x: 12, 'y': 1.5, description: ジョブ状態と段階ごとの指標を可視化する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
+  pubsub:
+    label: 注文イベントの入力
+    kind: queue
+    tier: data
+    x: 0
+    'y': 1.5
+    description: 注文イベントを提供する入力ストリーム。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§3
+  beam:
+    label: 処理グラフの定義
+    kind: service
+    tier: control
+    x: 0
+    'y': 1.5
+    description: 入力、変換、出力の処理グラフを定義する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§2
+  collection:
+    label: 分散データの集合
+    kind: service
+    tier: data
+    x: 4
+    'y': 1.5
+    description: パイプライン内で受け渡す論理的なデータ集合。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§2
+  transform:
+    label: キー付けと時間窓の集計
+    kind: worker
+    tier: data
+    x: 8
+    'y': 1.5
+    description: 検証・キー付け・ウィンドウ集計を適用する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§3
+  runner:
+    label: 処理グラフの実行調整
+    kind: service
+    tier: control
+    x: 5
+    'y': 1.5
+    description: 処理グラフを実行可能な分散ジョブとして投入する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§4
+  workers:
+    parallel: 'N'
+    label: 分散タスクの実行基盤
+    kind: worker
+    tier: data
+    x: 12
+    'y': 1.5
+    description: パイプライン段階を分散実行するワーカー群。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§4
+  bigquery:
+    label: 分析用テーブル
+    kind: db
+    tier: data
+    x: 18
+    'y': 1.5
+    description: 集計済み注文データを格納する出力先の例。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§5
+  monitoring:
+    label: ジョブの監視
+    kind: service
+    tier: control
+    x: 12
+    'y': 1.5
+    description: ジョブ状態と段階ごとの指標を可視化する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§5
 links:
-  - {id: define, from: beam, to: runner, label: ジョブを投入, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
-  - {id: ingest, from: pubsub, to: collection, label: イベントを読む, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
-  - {id: apply, from: collection, to: transform, label: 変換を適用, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§2}, {type: doc, ref: docs/reference-google-cloud-dataflow.md#§3}]}
-  - {id: dispatch, from: runner, to: workers, label: 分散実行, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
-  - {id: execute, from: transform, to: workers, label: ワーカーで処理, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§4}]}
-  - {id: write, from: workers, to: bigquery, label: 集計結果を書き込む, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
-  - {id: observe, from: runner, to: monitoring, label: ジョブを監視, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
+  - id: define
+    from: beam
+    to: runner
+    label: ジョブを投入
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§4
+  - id: ingest
+    from: pubsub
+    to: collection
+    label: イベントを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§3
+  - id: apply
+    from: collection
+    to: transform
+    label: 変換を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§2
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§3
+  - id: dispatch
+    from: runner
+    to: workers
+    label: 分散実行
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§4
+  - id: execute
+    from: transform
+    to: workers
+    label: ワーカーで処理
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§4
+  - id: write
+    from: workers
+    to: bigquery
+    label: 集計結果を書き込む
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§5
+  - id: observe
+    from: runner
+    to: monitoring
+    label: ジョブを監視
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§5
 scenarios:
-  - {id: stream-aggregation, label: 注文イベントの集計, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§6}], steps: [{links: [define], note: Beam Pipeline を定義し、Dataflow Runner にジョブとして投入する。}, {links: [ingest, apply], note: Pub/Sub から注文イベントを読み、PCollection に対して検証・キー付け・集計の変換を適用する。}, {links: [dispatch, execute], note: Runner が処理グラフを Dataflow Workers に分散して実行する。}, {links: [write, observe], note: 集計結果を BigQuery に書き込み、ジョブ状態と指標を Monitoring で確認する。}]}
+  - id: stream-aggregation
+    label: 注文イベントの集計
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§6
+    steps:
+      - links:
+          - define
+        note: Beam Pipeline を定義し、Dataflow Runner にジョブとして投入する。
+      - links:
+          - ingest
+          - apply
+        note: Pub/Sub から注文イベントを読み、PCollection に対して検証・キー付け・集計の変換を適用する。
+      - links:
+          - dispatch
+          - execute
+        note: Runner が処理グラフを Dataflow Workers に分散して実行する。
+      - links:
+          - write
+          - observe
+        note: 集計結果を BigQuery に書き込み、ジョブ状態と指標を Monitoring で確認する。
 requirements:
-  - {id: BR-01, kind: usecase, title: イベント集計, text: 注文イベントを読み、変換・集計して分析用テーブルへ出力する。, links: [ingest, apply, execute, write], evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§6}]}
-  - {id: NFR-01, kind: nfr, title: 実行可視化, text: 分散ジョブの状態と段階ごとの指標を確認できる。, links: [observe], evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§5}]}
-unknowns: [{id: UNK-01, text: 実際の Beam SDK 言語、ウィンドウ設定、ワーカー構成、BigQuery スキーマは未確定。, refs: [beam, transform, workers, bigquery]}]
-gates: {maxDrift: 0, maxHigh: 0}
-
+  - id: BR-01
+    kind: usecase
+    title: イベント集計
+    text: 注文イベントを読み、変換・集計して分析用テーブルへ出力する。
+    links:
+      - ingest
+      - apply
+      - execute
+      - write
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§6
+  - id: NFR-01
+    kind: nfr
+    title: 実行可視化
+    text: 分散ジョブの状態と段階ごとの指標を確認できる。
+    links:
+      - observe
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-dataflow.md#§5
+unknowns:
+  - id: UNK-01
+    text: 実際の Beam SDK 言語、ウィンドウ設定、ワーカー構成、BigQuery スキーマは未確定。
+    refs:
+      - beam
+      - transform
+      - workers
+      - bigquery
+gates:
+  maxDrift: 0
+  maxHigh: 0
 implementations:
   - id: gcp
-    label: "Pub/Sub → Beam SDK → BigQuery"
-    description: "Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例。Pub/Sub から読み、BigQuery に出力するパイプラインを専用ワーカーサービスアカウントで実行する。"
+    label: Pub/Sub → Dataflow（Beam）→ BigQuery
+    description: Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例。Pub/Sub から読み、BigQuery に出力するパイプラインを専用ワーカーサービスアカウントで実行する。
     sources:
-      - {title: Dataflow documentation, url: https://cloud.google.com/dataflow/docs/overview}
-      - {title: Use Apache Beam to build pipelines, url: https://cloud.google.com/dataflow/docs/guides/use-beam}
-      - {title: Dataflow monitoring interface, url: https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf}
-      - {title: Dataflow product overview, url: https://cloud.google.com/products/dataflow}
-      - {title: Dataflow security and permissions, url: https://docs.cloud.google.com/dataflow/docs/concepts/security-and-permissions}
-      - {title: Beam Programming Guide, url: https://beam.apache.org/documentation/programming-guide/}
+      - title: Dataflow documentation
+        url: https://cloud.google.com/dataflow/docs/overview
+      - title: Use Apache Beam to build pipelines
+        url: https://cloud.google.com/dataflow/docs/guides/use-beam
+      - title: Dataflow monitoring interface
+        url: https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf
+      - title: Dataflow product overview
+        url: https://cloud.google.com/products/dataflow
+      - title: Dataflow security and permissions
+        url: https://docs.cloud.google.com/dataflow/docs/concepts/security-and-permissions
+      - title: Beam Programming Guide
+        url: https://beam.apache.org/documentation/programming-guide/
+      - title: Dataflow Streaming Engine
+        url: https://docs.cloud.google.com/dataflow/docs/streaming-engine
+      - title: Dataflow のワーカーとステージング
+        url: https://docs.cloud.google.com/dataflow/docs/request-quotas
+      - title: Dataflow から BigQuery へのストリーミング書き込み
+        url: https://docs.cloud.google.com/dataflow/docs/guides/write-to-bigquery
     tiers:
-      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
-      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+      - id: processing
+        label: データの処理と保存
+        z: 0
+        size:
+          - 21
+          - 5
+      - id: setup
+        label: ジョブ投入と実行設定
+        z: 1
+        size:
+          - 21
+          - 3
+      - id: submission
+        label: ジョブの投入元
+        kind: origin
+        z: 1
+        size:
+          - 6
+          - 3
     groups:
-      - {kind: cloud, label: Google Cloud プロジェクト, provider: gcp, tier: [processing, setup]}
+      - kind: cloud
+        label: Google Cloud プロジェクト
+        provider: gcp
+        tier:
+          - processing
+          - setup
     nodes:
-      gcp-pubsub: {label: Pub/Sub サブスクリプション, kind: queue, tier: processing, x: 1, y: 1.15, svc: gcp:pubsub, realizes: [pubsub], description: 注文トピックから Dataflow ジョブへ配信する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§8}]}
-      gcp-pipeline: {label: Beam SDK の Pipeline・PCollection・Transform, kind: file, tier: processing, x: 1, y: 3.65, realizes: [beam, collection, transform], description: イベント検証、イベント時刻の窓、キーごとの集計を処理グラフとして記述する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§8}]}
-      gcp-dataflow: {label: Dataflow Runner と管理ワーカー, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [runner, workers], description: Beam グラフをストリーミングジョブとして分散実行する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§8}]}
-      gcp-bigquery: {label: BigQuery の集計テーブル, kind: table, tier: processing, x: 5, y: 3.65, svc: gcp:bigquery, realizes: [bigquery], description: BigQueryIO でスキーマに合わせて書き込む。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§8}]}
-      gcp-monitor: {label: Dataflow Monitoring, kind: monitor, tier: processing, x: 9, y: 1.15, realizes: [monitoring], description: ステージ指標とジョブの状態を確認する。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§8}]}
-      gcp-identity: {label: ワーカーサービスアカウント, kind: policy, tier: setup, x: 1, y: 1.5, description: Pub/Sub の読み取り、対象 BigQuery への書き込み、実行に必要な権限を割り当てる。, evidence: [{type: doc, ref: docs/reference-google-cloud-dataflow.md#§8}]}
+      gcp-pubsub:
+        label: Pub/Sub サブスクリプション
+        kind: queue
+        tier: processing
+        x: 1
+        'y': 1.15
+        svc: gcp:pubsub
+        realizes:
+          - pubsub
+        description: Google が配信基盤を運用し、利用者がトピック・サブスクリプションと権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
+      gcp-pipeline:
+        label: Java Beam SDK の実行環境
+        kind: client
+        tier: submission
+        x: 1
+        'y': 1.5
+        realizes:
+          - beam
+        description: 開発端末で注文処理を定義し Dataflow Runner で投入する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
+      gcp-dataflow:
+        label: Dataflow（ストリーミングジョブ管理）
+        kind: service
+        tier: setup
+        x: 7
+        'y': 1.5
+        realizes:
+          - runner
+        description: Google がジョブ実行基盤を運用する。利用者はジョブの投入・監視・停止などを API や画面から操作する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
+        svc: gcp:dataflow
+      gcp-workers:
+        label: Compute Engine（Dataflow 管理ワーカー）
+        svc: gcp:gce
+        kind: worker
+        tier: processing
+        x: 8
+        'y': 1.15
+        realizes:
+          - workers
+          - collection
+          - transform
+        description: Dataflow が管理する Compute Engine VM 上で処理を実行する。利用者はジョブ設定、サービスアカウントとネットワークを指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
+      gcp-bigquery:
+        label: BigQuery の集計テーブル
+        kind: table
+        tier: processing
+        x: 15
+        'y': 1.15
+        svc: gcp:bigquery
+        realizes:
+          - bigquery
+        description: Google がサービス基盤を運用し、利用者がテーブルと権限を管理する。BigQueryIO が Storage Write API で集計結果を書き込む。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
+      gcp-monitor:
+        label: Dataflow のジョブ監視画面
+        kind: monitor
+        tier: processing
+        x: 15
+        'y': 3.65
+        realizes:
+          - monitoring
+        description: ステージ指標とジョブの状態を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
+      gcp-identity:
+        label: ワーカーサービスアカウント
+        kind: policy
+        tier: setup
+        x: 18
+        'y': 1.5
+        description: Pub/Sub の読み取りと対象 BigQuery およびステージング領域への権限を割り当てる。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
+      gcp-stage:
+        label: Cloud Storage（ステージング・一時領域）
+        svc: gcp:gcs
+        kind: file
+        tier: setup
+        x: 13
+        'y': 1.5
+        description: ジョブの JAR と依存関係のステージングおよび一時領域に使う。
+        evidence:
+          - type: doc
+            ref: docs/reference-google-cloud-dataflow.md#§8
     links:
-      - {id: gcp-identity-connection, from: gcp-identity, to: gcp-dataflow, label: ワーカーに権限を付与}
+      - id: gcp-identity-connection
+        from: gcp-identity
+        to: gcp-workers
+        label: ワーカーに権限を付与
+      - id: gcp-stage-upload
+        from: gcp-pipeline
+        to: gcp-stage
+        label: 依存ファイルをステージング
+      - id: gcp-stage-read
+        from: gcp-workers
+        to: gcp-stage
+        label: 起動時に依存ファイルを取得
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: Google Cloud の実装構成, z: 0, size: [24, 12]}
+      nodes:
+        gcp-pipeline: {tier: diagram, x: 1, y: 2}
+        gcp-dataflow: {tier: diagram, x: 6, y: 2}
+        gcp-identity: {tier: diagram, x: 6, y: 6}
+        gcp-stage: {tier: diagram, x: 6, y: 10}
+        gcp-workers: {tier: diagram, x: 12, y: 6}
+        gcp-pubsub: {tier: diagram, x: 18, y: 2}
+        gcp-bigquery: {tier: diagram, x: 18, y: 6}
+        gcp-monitor: {tier: diagram, x: 18, y: 10}
+      groups:
+        - {kind: cloud, label: Google Cloud プロジェクト（サービスの論理的所属）, provider: gcp, tier: [diagram], x0: 3.6, y0: -0.5, x1: 21.5, y1: 12, nodes: [gcp-dataflow, gcp-identity, gcp-stage, gcp-workers, gcp-pubsub, gcp-bigquery, gcp-monitor]}
+        - {kind: vpc, label: ワーカーの利用者 VPC・サブネット, provider: gcp, tier: [diagram], x0: 9.3, y0: 3.7, x1: 14.7, y1: 8.3, nodes: [gcp-workers]}
+    layout3d:
+      tiers:
+        - {id: client, label: 開発端末, kind: origin, z: 0, origin: [-5, 0], size: [3, 4]}
+        - {id: service, label: Dataflow ジョブ管理, z: 0, size: [9, 5]}
+        - {id: worker, label: ワーカー VM, z: 0, origin: [12, 0], size: [4, 5]}
+        - {id: data, label: Pub/Sub と BigQuery, z: 0, origin: [20, 0], size: [9, 5]}
+        - {id: other, label: ステージングと監視, z: 0, origin: [32, 0], size: [9, 5]}
+      nodes:
+        gcp-pipeline: {tier: client, x: 1, y: 2}
+        gcp-dataflow: {tier: service, x: 2, y: 2}
+        gcp-identity: {tier: service, x: 7, y: 2}
+        gcp-workers: {tier: worker, x: 2, y: 2}
+        gcp-pubsub: {tier: data, x: 2, y: 2}
+        gcp-bigquery: {tier: data, x: 7, y: 2}
+        gcp-stage: {tier: other, x: 2, y: 2}
+        gcp-monitor: {tier: other, x: 7, y: 2}
+      groups:
+        - {kind: cloud, label: Google Cloud プロジェクト（サービスの論理的所属）, provider: gcp, tier: [service, worker, data, other], nodes: [gcp-dataflow, gcp-identity, gcp-stage, gcp-workers, gcp-pubsub, gcp-bigquery, gcp-monitor]}
+        - {kind: vpc, label: ワーカーの利用者 VPC・サブネット, provider: gcp, tier: [worker], nodes: [gcp-workers]}

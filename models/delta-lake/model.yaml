@@ -174,7 +174,16 @@ implementations:
         url: https://docs.delta.io/delta-storage/
       - title: Delta Lake Quick Start
         url: https://docs.delta.io/quick-start/
+      - {title: Spark Standalone Mode, url: https://spark.apache.org/docs/latest/spark-standalone.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
     nodes:
+      spark-s3-master-a: {label: "Standalone master A", kind: worker, tier: write, x: 0, y: 2.5, management: {type: customer, scope: "Customer operates hosts, Spark and job configuration."}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      spark-s3-worker-a: {label: "Standalone worker A", kind: worker, tier: write, x: 3, y: 2.5, management: {type: customer, scope: "Customer operates hosts, Spark and job configuration."}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      spark-s3-master-b: {label: "Standalone master B", kind: worker, tier: write, x: 6, y: 2.5, management: {type: customer, scope: "Customer operates hosts, Spark and job configuration."}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      spark-s3-worker-b: {label: "Standalone worker B", kind: worker, tier: write, x: 9, y: 2.5, management: {type: customer, scope: "Customer operates hosts, Spark and job configuration."}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      spark-s3-writer-b: {label: "Spark Delta writer B", kind: worker, tier: write, x: 12, y: 2.5, management: {type: customer, scope: "Customer operates hosts, Spark and job configuration."}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      spark-s3-service: {label: Amazon S3, svc: s3, kind: service, tier: table, x: 14, y: 2.5, management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      spark-s3-host: {label: Spark Standalone clusters, kind: host, tier: write, x: 5, y: 0, management: {type: customer, scope: "Customer operates hosts, Spark and job configuration."}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
       spark-s3-writer:
         label: Delta Lake を導入した Apache Spark
         kind: service
@@ -184,6 +193,7 @@ implementations:
         description: データファイルを生成し、LogStore でコミットを公開する。
         realizes:
           - writer
+        management: {type: customer, scope: "Customer operates Spark and job configuration."}
         evidence:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
@@ -196,10 +206,10 @@ implementations:
         description: Parquet のデータ本体を保持する。
         realizes:
           - data
+        management: {type: customer, scope: "Customer manages data and retention."}
         evidence:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
-        svc: s3
       spark-s3-log:
         label: S3 の `_delta_log`（コミット・チェックポイント）
         kind: file
@@ -210,10 +220,10 @@ implementations:
         realizes:
           - log
           - checkpoint
+        management: {type: customer, scope: "Customer manages data and retention."}
         evidence:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
-        svc: s3
       spark-s3-reader:
         label: Apache Spark（ログ再生と読み取り）
         kind: db
@@ -224,6 +234,7 @@ implementations:
         realizes:
           - snapshot
           - reader
+        management: {type: customer, scope: "Customer operates Spark and job configuration."}
         evidence:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
@@ -235,10 +246,19 @@ implementations:
         'y': 2.5
         description: 複数クラスター間で新規ログファイル作成を調停する。
         svc: dynamodb
+        management: {type: shared, scope: "AWS operates DynamoDB; customer manages the table and access."}
         evidence:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
     links:
+      - {id: spark-s3-assign-a, from: spark-s3-master-a, to: spark-s3-worker-a, label: "Allocate executors", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      - {id: spark-s3-assign-b, from: spark-s3-master-b, to: spark-s3-worker-b, label: "Allocate executors", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      - {id: spark-s3-execute-a, from: spark-s3-worker-a, to: spark-s3-writer, label: "Run writer A", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      - {id: spark-s3-execute-b, from: spark-s3-worker-b, to: spark-s3-writer-b, label: "Run writer B", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      - {id: spark-s3-coordinate-b, from: spark-s3-writer-b, to: spark-s3-ddb, label: "Coordinate commit", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      - {id: spark-s3-write-b, from: spark-s3-writer-b, to: spark-s3-data, label: "Write data files", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      - {id: spark-s3-commit-b, from: spark-s3-writer-b, to: spark-s3-log, label: "Commit transaction", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
+      - {id: spark-s3-store, from: spark-s3-service, to: spark-s3-data, label: "Store table files", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§7"}]}
       - id: spark-s3-coordinate
         from: spark-s3-writer
         to: spark-s3-ddb
@@ -247,25 +267,103 @@ implementations:
           - type: doc
             ref: docs/reference-delta-lake.md#§7
     groups:
-      - label: AWS の Delta ストレージ
-        kind: cloud
-        provider: aws
-        nodes:
-          - spark-s3-ddb
-          - spark-s3-log
-          - spark-s3-data
-      - kind: cloud
-        label: AWS サービス
-        provider: aws
-        tier:
-          - table
-        nodes:
-          - spark-s3-data
-          - spark-s3-log
-      - kind: cloud
-        provider: aws
-        label: AWS サービス
-        tier:
-          - table
-        nodes:
-          - spark-s3-ddb
+      - {kind: cloud, label: AWS account, provider: aws, tier: table, nodes: [spark-s3-service, spark-s3-data, spark-s3-log, spark-s3-ddb]}
+    layout2d:
+      tiers: [{id: diagram, label: Spark and AWS, z: 0, size: [21, 10]}]
+      nodes:
+        spark-s3-master-a: {tier: diagram, x: 2, y: 2}
+        spark-s3-worker-a: {tier: diagram, x: 2, y: 3}
+        spark-s3-master-b: {tier: diagram, x: 7, y: 2}
+        spark-s3-worker-b: {tier: diagram, x: 7, y: 3}
+        spark-s3-writer-b: {tier: diagram, x: 7, y: 5}
+        spark-s3-service: {tier: diagram, x: 14, y: 8}
+        spark-s3-host: {tier: diagram, x: 3, y: 1}
+        spark-s3-writer: {tier: diagram, x: 2, y: 4}
+        spark-s3-reader: {tier: diagram, x: 6, y: 4}
+        spark-s3-data: {tier: diagram, x: 13, y: 2}
+        spark-s3-log: {tier: diagram, x: 17, y: 2}
+        spark-s3-ddb: {tier: diagram, x: 15, y: 6}
+      groups:
+        - {kind: datacenter, label: Spark Standalone clusters, tier: diagram, nodes: [spark-s3-host, spark-s3-master-a, spark-s3-worker-a, spark-s3-master-b, spark-s3-worker-b, spark-s3-writer, spark-s3-writer-b, spark-s3-reader]}
+        - {kind: cloud, label: AWS account, provider: aws, tier: diagram, nodes: [spark-s3-service, spark-s3-data, spark-s3-log, spark-s3-ddb]}
+    layout3d:
+      tiers:
+        - {id: app, label: Spark jobs, z: 1, size: [8, 3]}
+        - {id: host, label: Spark Standalone, z: 0, size: [8, 3]}
+        - {id: storage, label: AWS storage, z: 0, origin: [11, 0], size: [12, 3]}
+      nodes:
+        spark-s3-master-a: {tier: host, x: 0, y: 0}
+        spark-s3-worker-a: {tier: host, x: 2, y: 1}
+        spark-s3-master-b: {tier: host, x: 5, y: 0}
+        spark-s3-worker-b: {tier: host, x: 7, y: 1}
+        spark-s3-writer-b: {tier: app, x: 7, y: 1.5}
+        spark-s3-service: {tier: storage, x: 0, y: 0}
+        spark-s3-host: {tier: host, x: 4, y: 1.5}
+        spark-s3-writer: {tier: app, x: 2, y: 1.5}
+        spark-s3-reader: {tier: app, x: 6, y: 1.5}
+        spark-s3-data: {tier: storage, x: 2, y: 1.5}
+        spark-s3-log: {tier: storage, x: 6, y: 1.5}
+        spark-s3-ddb: {tier: storage, x: 10, y: 1.5}
+      groups:
+        - {kind: datacenter, label: Spark Standalone clusters, tier: [app, host], nodes: [spark-s3-host, spark-s3-master-a, spark-s3-worker-a, spark-s3-master-b, spark-s3-worker-b, spark-s3-writer, spark-s3-writer-b, spark-s3-reader]}
+        - {kind: cloud, label: AWS account, provider: aws, tier: storage, nodes: [spark-s3-service, spark-s3-data, spark-s3-log, spark-s3-ddb]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Spark・Delta Lake"
+    description: "単一の EMR on EC2 クラスタ上の Spark で Delta テーブルを読み書きし、Glue Data Catalog に名前と S3 のテーブル位置を登録する例。"
+    sources:
+      - {title: "Use a Delta Lake cluster with Spark and AWS Glue", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltacluster-spark-glue.html}
+      - {title: "Use a Delta Lake cluster with Spark", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltausing-cluster-spark.html}
+      - {title: "Delta Lake Storage configuration", url: https://docs.delta.io/delta-storage/}
+      - {title: "Amazon EMR クラスタの構成", url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html}
+      - {title: "AWS shared responsibility", url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理とテーブル登録, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルの永続ストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-emr-control, aws-emr-host, aws-emr-glue, aws-emr-writer, aws-emr-reader, aws-emr-data, aws-emr-log]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-emr-host, aws-emr-writer, aws-emr-reader]}
+    nodes:
+      aws-emr-control: {label: "Amazon EMR", svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: "EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。", management: {type: shared, scope: "AWS は EMR サービスを運用し、利用者はクラスタ構成とステップを指定する。"}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      aws-emr-host: {label: "Amazon EC2 / YARN", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "EMR の EC2 ノードで YARN がアプリケーションの実行リソースを割り当てる。", management: {type: shared, scope: "AWS は EC2 基盤を運用し、利用者はクラスタの構成、ゲスト OS とソフトウェアを管理する。"}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      aws-emr-glue: {label: "AWS Glue Data Catalog", svc: glue, kind: catalog, tier: management, x: 11, y: 1.5, description: "Spark が名前でテーブルを参照できるよう、外部テーブルと S3 上の保存先を登録する。", management: {type: shared, scope: "AWS はカタログサービス基盤を運用し、利用者はカタログの内容とアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      aws-emr-writer: {label: "Spark / Delta 書き込みジョブ", kind: worker, tier: compute, x: 4, y: 1.5, realizes: [writer], description: "Parquet を書き、Delta LogStore でコミットを公開する。", management: {type: customer, scope: "利用者が Spark ジョブと Delta の設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      aws-emr-reader: {label: "Spark / Delta 読み取りジョブ", kind: worker, tier: compute, x: 11, y: 1.5, realizes: [reader, snapshot], description: "ログとチェックポイントから対象バージョンの有効ファイルを決め、Parquet をスキャンする。", management: {type: customer, scope: "利用者が Spark ジョブと Delta の設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      aws-emr-data: {label: "Amazon S3 / Delta テーブル", svc: s3, kind: db, tier: storage, x: 5, y: 1.5, realizes: [data], description: "Delta テーブルの S3 プレフィックス。Parquet データと同じテーブルの _delta_log を保持する。", management: {type: shared, scope: "AWS は S3 基盤を運用し、利用者はデータ、暗号化とアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      aws-emr-log: {label: "_delta_log", kind: file, tier: storage, x: 11, y: 1.5, realizes: [log, checkpoint], description: "同じプレフィックス内に JSON コミットと Parquet チェックポイントを保存する。", management: {type: customer, scope: "利用者が Delta テーブルのログと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+    links:
+      - {id: aws-emr-provision, from: aws-emr-control, to: aws-emr-host, label: "クラスタを作成・管理", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      - {id: aws-emr-submit-write, from: aws-emr-control, to: aws-emr-writer, label: "Spark 書き込みジョブを起動", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      - {id: aws-emr-submit-read, from: aws-emr-control, to: aws-emr-reader, label: "Spark 読み取りジョブを起動", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      - {id: aws-emr-register, from: aws-emr-writer, to: aws-emr-glue, label: "テーブル名と S3 の保存先を登録", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+      - {id: aws-emr-lookup, from: aws-emr-reader, to: aws-emr-glue, label: "テーブル名から保存先を取得", evidence: [{type: doc, ref: "docs/reference-delta-lake.md#§8"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: Spark ジョブ, z: 1, size: [8, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [8, 3]}
+        - {id: services, label: AWS 管理サービスとテーブル, z: 0, origin: [11, 0], size: [20, 3]}
+      nodes:
+        aws-emr-control: {tier: services, x: 2, y: 0.5}
+        aws-emr-host: {tier: cluster, x: 4, y: 1.5}
+        aws-emr-glue: {tier: services, x: 6, y: 0.5}
+        aws-emr-writer: {tier: apps, x: 2, y: 1.5}
+        aws-emr-reader: {tier: apps, x: 6, y: 1.5}
+        aws-emr-data: {tier: services, x: 2, y: 2}
+        aws-emr-log: {tier: services, x: 6, y: 2}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, cluster, services], nodes: [aws-emr-control, aws-emr-host, aws-emr-glue, aws-emr-writer, aws-emr-reader, aws-emr-data, aws-emr-log]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-emr-host, aws-emr-writer, aws-emr-reader]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: AWS の実装構成, z: 0, size: [22, 13]}
+      nodes:
+        aws-emr-control: {tier: diagram, x: 12, y: 1}
+        aws-emr-host: {tier: diagram, x: 4, y: 4}
+        aws-emr-glue: {tier: diagram, x: 12, y: 4}
+        aws-emr-writer: {tier: diagram, x: 2, y: 7}
+        aws-emr-reader: {tier: diagram, x: 6, y: 7}
+        aws-emr-data: {tier: diagram, x: 12, y: 7}
+        aws-emr-log: {tier: diagram, x: 16, y: 7}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: -1, y0: -1, x1: 21, y1: 12, nodes: [aws-emr-control, aws-emr-host, aws-emr-glue, aws-emr-writer, aws-emr-reader, aws-emr-data, aws-emr-log]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 0, y0: 3, x1: 8, y1: 9, nodes: [aws-emr-host, aws-emr-writer, aws-emr-reader]}

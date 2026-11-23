@@ -55,6 +55,7 @@ implementations:
     label: EKS Managed Node Group と ALB
     description: AWS の EKS クラスタで、プライベートサブネットの Managed Node Group に注文 API を置き、Ingress で公開する例。
     sources:
+      - {title: EKS Control Plane, url: https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html}
       - title: Amazon EKS managed node groups
         url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
       - title: Application Load Balancers on EKS
@@ -88,7 +89,7 @@ implementations:
           - 8
     groups:
       - kind: cloud
-        label: AWS アカウント
+        label: AWS のサービス領域（制御プレーンは AWS 管理 VPC）
         provider: aws
         tier:
           - control
@@ -132,7 +133,8 @@ implementations:
         svc: eks
         realizes:
           - api
-        description: Kubernetes の API と制御プロセスを AWS が管理する。
+        description: AWS 管理 VPC の制御プレーンを AWS が運用する。利用者は公開またはプライベートの Kubernetes API エンドポイントとクラスタ設定を操作するが、制御プレーンのサーバー自体には直接アクセスしない。
+        management: {type: aws, scope: 制御プレーンの基盤を AWS が運用。API とクラスタ設定は利用者が権限に応じて操作する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
@@ -143,7 +145,8 @@ implementations:
         svc: ec2
         realizes:
           - managed
-        description: アプリ用 EC2 を複数 AZ のプライベートサブネットに配置する。
+        description: アプリ用 EC2 を複数 AZ のプライベートサブネットに配置する。EKS がノードの作成と更新を支援し、利用者は設定と更新の開始を担う。
+        management: {type: shared, scope: EKS がノードを作成・更新し、利用者が設定と更新開始を担う。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
@@ -155,6 +158,7 @@ implementations:
         realizes:
           - workload
         description: ALB から Pod の IP をターゲットにできる。
+        management: {type: customer, scope: 利用者がアプリと Deployment を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
@@ -166,6 +170,7 @@ implementations:
         realizes:
           - lb
         description: Ingress が定義したルールで注文 API への到達経路を提供する。
+        management: {type: shared, scope: AWS が基盤を運用し、利用者がルールとネットワークを設定する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
@@ -177,6 +182,7 @@ implementations:
         realizes:
           - registry
         description: 注文 API のイメージを格納し、ノードが pull する。
+        management: {type: shared, scope: AWS が基盤を運用し、利用者がイメージと権限を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
@@ -188,6 +194,7 @@ implementations:
         realizes:
           - observer
         description: Observability アドオン経由で集める実行状態を表示する。
+        management: {type: shared, scope: AWS が基盤を運用し、利用者が収集設定と権限を管理する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
@@ -197,6 +204,7 @@ implementations:
         tier: data
         svc: k8s:deployment
         description: Ingress を監視し、ALB とターゲット登録を調整する。
+        management: {type: customer, scope: 利用者がコントローラーと IAM 権限を設定・更新する。}
         evidence:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
@@ -217,3 +225,35 @@ implementations:
           - type: doc
             ref: docs/reference-amazon-eks.md#§9
       - {id: aws-request, from: aws-lb, to: aws-workload, label: 登録された Pod IP へ HTTP を転送, realizes: [expose], replace: true, evidence: [{type: doc, ref: docs/reference-amazon-eks.md#§9}]}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実装構成, z: 0, origin: [-4, 0], size: [21, 11]}]
+      nodes:
+        aws-operator: {tier: diagram, x: -3, y: 1}
+        aws-api: {tier: diagram, x: 2, y: 1}
+        aws-managed: {tier: diagram, x: 3, y: 5}
+        aws-workload: {tier: diagram, x: 6, y: 7}
+        aws-controller: {tier: diagram, x: 6, y: 4}
+        aws-lb: {tier: diagram, x: 10, y: 5}
+        aws-registry: {tier: diagram, x: 13, y: 2}
+        aws-observer: {tier: diagram, x: 14, y: 8}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域（制御プレーンは AWS 管理 VPC）, tier: [diagram], x0: 0, y0: -1, x1: 16, y1: 10, nodes: [aws-api, aws-managed, aws-workload, aws-controller, aws-lb, aws-registry, aws-observer]}
+        - {kind: vpc, provider: aws, label: 顧客 VPC, tier: [diagram], x0: 1, y0: 3, x1: 12, y1: 9, nodes: [aws-managed, aws-workload, aws-controller, aws-lb]}
+    layout3d:
+      tiers:
+        - {id: runtime, label: 実行基盤, z: 0, size: [10, 5]}
+        - {id: apps, label: アプリ, z: 1, size: [10, 5]}
+        - {id: services, label: 独立サービス・制御, z: 0, origin: [12, 0], size: [12, 7]}
+        - {id: outside, label: 利用者, z: 0, origin: [-5, 0], size: [3, 3]}
+      nodes:
+        aws-operator: {tier: outside, x: 1, y: 1}
+        aws-managed: {tier: runtime, x: 2, y: 2}
+        aws-workload: {tier: apps, x: 2, y: 2}
+        aws-controller: {tier: apps, x: 6, y: 2}
+        aws-api: {tier: services, x: 1, y: 1}
+        aws-lb: {tier: services, x: 5, y: 1}
+        aws-registry: {tier: services, x: 1, y: 5}
+        aws-observer: {tier: services, x: 5, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS サービス領域（制御プレーンは AWS 管理 VPC）, tier: [runtime, apps, services], nodes: [aws-api, aws-managed, aws-workload, aws-controller, aws-lb, aws-registry, aws-observer]}

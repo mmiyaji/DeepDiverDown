@@ -2,8 +2,8 @@
   "model": "apache-airflow",
   "name": "Apache Airflow のワークフローアーキテクチャ",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "dag": {
@@ -101,6 +101,24 @@
       "type": "unknown",
       "label": "Executor種別、Worker台数、リトライ回数は未確定。"
     },
+    "celery-redis-host": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Docker Compose host",
+      "realizes": []
+    },
+    "celery-redis-input": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Input files on local volume",
+      "realizes": []
+    },
+    "celery-redis-output": {
+      "type": "implementation",
+      "impl": "celery-redis",
+      "label": "Output files on local volume",
+      "realizes": []
+    },
     "celery-redis-dag": {
       "type": "implementation",
       "impl": "celery-redis",
@@ -154,6 +172,99 @@
       "impl": "celery-redis",
       "label": "Redis Celery ブローカー",
       "realizes": []
+    },
+    "aws-mwaa-role": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "MWAA execution IAM role",
+      "realizes": []
+    },
+    "aws-mwaa-operator": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "DAG の運用担当",
+      "realizes": []
+    },
+    "aws-mwaa-environment": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "Amazon MWAA 環境",
+      "realizes": []
+    },
+    "aws-mwaa-scheduler": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "Fargate 上の Scheduler",
+      "realizes": [
+        "scheduler",
+        "executor"
+      ]
+    },
+    "aws-mwaa-queue": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "MWAA 管理の SQS",
+      "realizes": []
+    },
+    "aws-mwaa-worker": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "Fargate 上の Celery Worker",
+      "realizes": [
+        "worker"
+      ]
+    },
+    "aws-mwaa-ingest": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "取り込みタスク",
+      "realizes": [
+        "ingest"
+      ]
+    },
+    "aws-mwaa-transform": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "変換タスク",
+      "realizes": [
+        "transform"
+      ]
+    },
+    "aws-mwaa-quality": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "品質検査タスク",
+      "realizes": [
+        "quality"
+      ]
+    },
+    "aws-mwaa-dag": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "S3 の DAG・依存ファイル",
+      "realizes": [
+        "dag"
+      ]
+    },
+    "aws-mwaa-metadata": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "管理用 Aurora PostgreSQL",
+      "realizes": [
+        "metadata"
+      ]
+    },
+    "aws-mwaa-dataset": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "S3 の受注データ",
+      "realizes": []
+    },
+    "aws-mwaa-logs": {
+      "type": "implementation",
+      "impl": "aws-mwaa",
+      "label": "CloudWatch Logs",
+      "realizes": []
     }
   },
   "byRef": {
@@ -180,13 +291,29 @@
       "pipeline",
       "BR-01",
       "NFR-01",
+      "celery-redis-host",
+      "celery-redis-input",
+      "celery-redis-output",
       "celery-redis-dag",
       "celery-redis-scheduler",
       "celery-redis-worker",
       "celery-redis-api",
       "celery-redis-db",
       "celery-redis-processor",
-      "celery-redis-redis"
+      "celery-redis-redis",
+      "aws-mwaa-role",
+      "aws-mwaa-operator",
+      "aws-mwaa-environment",
+      "aws-mwaa-scheduler",
+      "aws-mwaa-queue",
+      "aws-mwaa-worker",
+      "aws-mwaa-ingest",
+      "aws-mwaa-transform",
+      "aws-mwaa-quality",
+      "aws-mwaa-dag",
+      "aws-mwaa-metadata",
+      "aws-mwaa-dataset",
+      "aws-mwaa-logs"
     ],
     "docs/reference-apache-airflow.md#§6": [
       "model"
@@ -218,6 +345,9 @@
       "pipeline"
     ],
     "docs/reference-apache-airflow.md#§7": [
+      "celery-redis-host",
+      "celery-redis-input",
+      "celery-redis-output",
       "celery-redis-dag",
       "celery-redis-scheduler",
       "celery-redis-worker",
@@ -225,6 +355,21 @@
       "celery-redis-db",
       "celery-redis-processor",
       "celery-redis-redis"
+    ],
+    "docs/reference-apache-airflow.md#§8": [
+      "aws-mwaa-role",
+      "aws-mwaa-operator",
+      "aws-mwaa-environment",
+      "aws-mwaa-scheduler",
+      "aws-mwaa-queue",
+      "aws-mwaa-worker",
+      "aws-mwaa-ingest",
+      "aws-mwaa-transform",
+      "aws-mwaa-quality",
+      "aws-mwaa-dag",
+      "aws-mwaa-metadata",
+      "aws-mwaa-dataset",
+      "aws-mwaa-logs"
     ]
   },
   "reference": {

@@ -14,7 +14,7 @@ Delta Sync Index は対応するソーステーブルの変更を同期する。
 
 検索は ANN、ハイブリッド、全文検索の方式があり、利用条件を確認する。索引の利用者には Unity Catalog のカタログとスキーマの使用権限および索引の SELECT 権限が必要で、埋め込みエンドポイントにも権限が必要な場合がある。[検索方法と権限](https://docs.databricks.com/aws/en/ai-search/query-ai-search)
 
-## 4. 実装例：Databricks on AWS・Delta Sync
+## 4. 実装例：AWS 上のエージェントと Databricks Delta Sync
 
 AWS 上の原本文書を S3 に保存し、Delta テーブルに取り込んだ後、Databricks 管理の埋め込み、Delta Sync Index、AI Search Endpoint を組み合わせる例。Python エージェントは AI Bridge の Retriever Tool を使う。利用者・アプリケーション、Databricks ワークスペース、AWS の文書ストレージ、運用を別のレイヤーに配置する。
 
@@ -29,6 +29,20 @@ AWS 上の原本文書を S3 に保存し、Delta テーブルに取り込んだ
 | 原本文書 | Amazon S3 |
 
 出典 [エージェントの検索ツール](https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools)・[AI Search の索引作成](https://docs.databricks.com/aws/en/ai-search/create-ai-search)・[S3 と Unity Catalog](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3)。
+
+### AWS 上のアプリ実行と文書取込
+
+この実装例では、Python エージェントと AI Bridge retriever を含むコンテナーを ECS/Fargate で実行し、Databricks AI Search に接続する。S3 の原本文書は Databricks の Auto Loader を使う取り込み処理で Delta テーブルに保存する。Auto Loader のチェックポイント、ファイルの解析・チャンク化、アクセス権、Databricks の認証情報とネットワークは別途構成する。モデルがエージェント内でどの LLM を使うかは固定しない。
+
+| 追加する役割 | 担い手 |
+| --- | --- |
+| エージェントの実行 | ECS/Fargate の Python コンテナー |
+| 文書の増分取込 | Databricks Auto Loader と Delta テーブル |
+| 原本文書 | Amazon S3 |
+
+[Databricks Auto Loader](https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader)、[ECS on Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/getting-started-fargate.html)。
+
+この例では Auto Loader をサーバーレスパイプラインで実行し、Delta 管理テーブルの実ファイルは顧客 AWS の S3 管理領域に置く。AI Search の索引・埋め込みエンドポイントは Databricks が管理するサービスであり、内部保存方式や配置は公開情報以上に仮定しない。利用者はエンドポイント、索引、同期方式、埋め込みモデル、権限を UI・API・SDK で設定し、内部ノードを直接操作しない。標準エンドポイントではソースの Change Data Feed が必要。資料を組み合わせた例で、認証・ネットワーク・モデルの組み合わせは動作未検証。[AI Search 作成要件](https://docs.databricks.com/aws/en/ai-search/create-ai-search)、[Databricks architecture](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[Managed storage](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)
 
 ## 5. 点検
 

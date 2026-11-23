@@ -249,8 +249,8 @@ requirements:
         ref: docs/reference-apache-polaris.md#§4
 implementations:
   - id: polaris-aws
-    label: Spark・Polaris・Amazon S3
-    description: Spark から Polaris に接続し、カタログ状態を JDBC で永続化して S3 を読み書きする例。
+    label: EKS の Polaris・EMR Spark・RDS・S3
+    description: EKS の Polaris と EMR 上の Spark を分離し、RDS でカタログを永続化、S3 への委任認証を利用する AWS 構成例。
     sources:
       - title: Role-Based Access Control
         url: https://polaris.apache.org/releases/1.9.0/managing-security/access-control/
@@ -259,13 +259,26 @@ implementations:
           https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
       - title: Polaris JDBC・PostgreSQL・Spark SQL
         url: https://polaris.apache.org/guides/jdbc/
+      - title: Polaris Helm persistence
+        url: https://polaris.apache.org/releases/1.9.0/helm-chart/persistence/
+      - title: Polaris production configuration
+        url: https://polaris.apache.org/releases/1.5.0/configuration/configuring-polaris-for-production/
+      - title: Amazon EMR Spark
+        url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark.html
+      - title: EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: Amazon RDS PostgreSQL
+        url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+      - {title: EKS control plane, url: https://docs.aws.amazon.com/eks/latest/userguide/eks-architecture.html}
     nodes:
+      polaris-aws-emr-host: {label: EMR EC2 / YARN, svc: ec2, kind: host, tier: engine, x: 15, y: 1.5, management: {type: shared, scope: "AWS operates EC2 infrastructure; customer manages cluster and guest software."}, evidence: [{type: doc, ref: "docs/reference-apache-polaris.md#§6"}]}
       polaris-aws-operator:
         label: 運用者の管理 CLI
         kind: actor
-        tier: client
-        x: 1
-        'y': 1
+        tier: engine
+        x: 0
+        'y': 1.5
         description: 管理 API でカタログとロールを作る。
         realizes:
           - admin
@@ -273,53 +286,58 @@ implementations:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
       polaris-aws-spark:
-        label: Apache Spark SQL
+        label: Spark SQL / EMR
         kind: client
-        tier: client
+        tier: engine
         x: 6
-        'y': 1
-        description: Iceberg REST に接続してファイルを読み書きする。
+        'y': 1.5
+        description: EMR の Spark SQL から Polaris の Iceberg REST に接続する。
         realizes:
           - engine
+        management: {type: customer, scope: "Customer manages Spark job and REST client configuration."}
         evidence:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
       polaris-aws-server:
-        label: Polaris Server
+        label: Polaris Server Pod
         kind: service
         tier: catalog
-        x: 5
-        'y': 1
-        description: 管理 API と Iceberg REST と権限判定を一つのサーバーで提供する。
+        x: 4
+        'y': 1.5
+        description: EKS 上で管理 API と Iceberg REST API、権限判定を提供する。
         realizes:
           - management
           - api
           - rbac
+        management: {type: customer, scope: "Customer manages Polaris deployment, API access and configuration."}
         evidence:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
       polaris-aws-postgres:
-        label: PostgreSQL（JDBC 永続化）
+        label: RDS for PostgreSQL
         kind: db
-        tier: catalog
-        x: 9
-        'y': 2.5
-        description: カタログ状態を永続化する。
+        tier: storage
+        x: 1
+        'y': 1.5
+        description: JDBC 永続化先としてカタログ状態を保存する。
         realizes:
           - catalog-db
+        management: {type: shared, scope: "AWS operates RDS infrastructure; customer manages database, data and access."}
         evidence:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
+        svc: rds
       polaris-aws-sts:
         label: AWS STS
         kind: external
         tier: storage
         svc: aws:sts
-        x: 4
-        'y': 1
+        x: 6
+        'y': 1.5
         description: IAM ロールの短期セッションを発行する。
         realizes:
           - sts
+        management: {type: shared, scope: "AWS operates STS; customer manages role permissions and trust."}
         evidence:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
@@ -327,12 +345,13 @@ implementations:
         label: Amazon S3
         kind: db
         tier: storage
-        x: 9
-        'y': 1
+        x: 10
+        'y': 1.5
         description: Iceberg メタデータとデータファイルを置く。
         svc: s3
         realizes:
           - bucket
+        management: {type: shared, scope: "AWS operates S3; customer manages data and permissions."}
         evidence:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
@@ -341,13 +360,52 @@ implementations:
         kind: policy
         tier: storage
         svc: aws:iam
-        x: 1
-        'y': 2.5
+        x: 14
+        'y': 1.5
         description: Polaris 実行元を信頼し、対象バケットへの権限を定義する。
+        management: {type: customer, scope: "Customer manages role permissions and trust policy."}
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-eks:
+        label: Amazon EKS
+        svc: eks
+        kind: service
+        tier: catalog
+        x: 9
+        'y': 1.5
+        description: Polaris Pod が動く Kubernetes の制御プレーン。
+        management: {type: shared, scope: "AWS operates the control plane; customer manages the Kubernetes API configuration and workloads."}
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-ec2:
+        label: EC2 / EKS ノード
+        svc: ec2
+        kind: host
+        tier: catalog
+        x: 14
+        'y': 1.5
+        description: EKS マネージドノードグループの EC2 が Polaris Pod を実行する。
+        management: {type: shared, scope: "AWS manages node group lifecycle; customer manages node configuration and workloads."}
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      polaris-aws-emr:
+        label: Amazon EMR / EC2
+        svc: emr
+        kind: service
+        tier: engine
+        x: 12
+        'y': 1.5
+        description: EMR クラスタ上で Spark を実行する。EC2 ノード構成と YARN の設定は別途必要。
+        management: {type: shared, scope: "AWS operates EMR; customer configures clusters and jobs."}
         evidence:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
     links:
+      - {id: polaris-emr-nodes, from: polaris-aws-emr, to: polaris-aws-emr-host, label: "Manage cluster nodes", evidence: [{type: doc, ref: "docs/reference-apache-polaris.md#§6"}]}
+      - {id: polaris-emr-execute, from: polaris-aws-emr-host, to: polaris-aws-spark, label: "Run Spark on YARN", evidence: [{type: doc, ref: "docs/reference-apache-polaris.md#§6"}]}
       - id: polaris-aws-assume
         from: polaris-aws-sts
         to: polaris-aws-iam
@@ -355,18 +413,111 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-apache-polaris.md#§6
+      - id: polaris-eks-pod
+        from: polaris-aws-eks
+        to: polaris-aws-server
+        label: Polaris Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      - id: polaris-ec2-pod
+        from: polaris-aws-ec2
+        to: polaris-aws-server
+        label: Polaris Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
+      - id: polaris-emr-job
+        from: polaris-aws-emr
+        to: polaris-aws-spark
+        label: Spark を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-apache-polaris.md#§6
     groups:
-      - label: AWS アカウント
-        kind: cloud
-        provider: aws
-        nodes:
-          - polaris-aws-iam
-          - polaris-aws-sts
-          - polaris-aws-s3
       - kind: cloud
         provider: aws
-        label: AWS サービス
+        label: AWS アカウント
         tier:
+          - engine
+          - catalog
           - storage
         nodes:
+          - polaris-aws-spark
+          - polaris-aws-server
+          - polaris-aws-postgres
+          - polaris-aws-sts
           - polaris-aws-s3
+          - polaris-aws-iam
+          - polaris-aws-eks
+          - polaris-aws-ec2
+          - polaris-aws-emr
+          - polaris-aws-emr-host
+      - kind: cluster
+        label: EKS / Polaris
+        tier:
+          - catalog
+        nodes:
+          - polaris-aws-server
+          - polaris-aws-ec2
+    tiers:
+      - id: engine
+        label: 運用者と EMR の Spark
+        z: 2
+        size:
+          - 16
+          - 3
+      - id: catalog
+        label: EKS の Polaris 実行
+        z: 1
+        size:
+          - 16
+          - 3
+      - id: storage
+        label: AWS の状態と認証
+        z: 0
+        size:
+          - 16
+          - 3
+    layout2d:
+      tiers: [{id: diagram, label: Polaris and AWS, z: 0, size: [28, 14]}]
+      nodes:
+        polaris-aws-operator: {tier: diagram, x: 0, y: 2}
+        polaris-aws-spark: {tier: diagram, x: 4, y: 6}
+        polaris-aws-emr-host: {tier: diagram, x: 4, y: 3}
+        polaris-aws-emr: {tier: diagram, x: 12, y: 1}
+        polaris-aws-server: {tier: diagram, x: 10, y: 6}
+        polaris-aws-ec2: {tier: diagram, x: 10, y: 3}
+        polaris-aws-eks: {tier: diagram, x: 16, y: 1}
+        polaris-aws-postgres: {tier: diagram, x: 16, y: 5}
+        polaris-aws-sts: {tier: diagram, x: 20, y: 5}
+        polaris-aws-s3: {tier: diagram, x: 16, y: 9}
+        polaris-aws-iam: {tier: diagram, x: 20, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [polaris-aws-spark, polaris-aws-emr-host, polaris-aws-emr, polaris-aws-server, polaris-aws-ec2, polaris-aws-eks, polaris-aws-postgres, polaris-aws-sts, polaris-aws-s3, polaris-aws-iam]}
+        - {kind: cluster, label: EMR on EC2, tier: diagram, nodes: [polaris-aws-spark, polaris-aws-emr-host]}
+        - {kind: cluster, label: EKS, tier: diagram, nodes: [polaris-aws-server, polaris-aws-ec2]}
+    layout3d:
+      tiers:
+        - {id: emr-job, label: Spark, z: 1, size: [5, 3]}
+        - {id: emr-host, label: EMR EC2 / YARN, z: 0, size: [5, 3]}
+        - {id: eks-app, label: Polaris Pod, z: 1, origin: [8, 0], size: [5, 3]}
+        - {id: eks-host, label: EKS nodes, z: 0, origin: [8, 0], size: [5, 3]}
+        - {id: services, label: AWS services, z: 0, origin: [16, 0], size: [24, 3]}
+        - {id: outside, label: Operator, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        polaris-aws-operator: {tier: outside, x: 0, y: 1.5}
+        polaris-aws-spark: {tier: emr-job, x: 2, y: 1.5}
+        polaris-aws-emr-host: {tier: emr-host, x: 2, y: 1.5}
+        polaris-aws-emr: {tier: services, x: 1, y: 1.5}
+        polaris-aws-server: {tier: eks-app, x: 2, y: 1.5}
+        polaris-aws-ec2: {tier: eks-host, x: 2, y: 1.5}
+        polaris-aws-eks: {tier: services, x: 5, y: 1.5}
+        polaris-aws-postgres: {tier: services, x: 9, y: 1.5}
+        polaris-aws-sts: {tier: services, x: 13, y: 1.5}
+        polaris-aws-s3: {tier: services, x: 17, y: 1.5}
+        polaris-aws-iam: {tier: services, x: 21, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [emr-job, emr-host, eks-app, eks-host, services], nodes: [polaris-aws-spark, polaris-aws-emr-host, polaris-aws-emr, polaris-aws-server, polaris-aws-ec2, polaris-aws-eks, polaris-aws-postgres, polaris-aws-sts, polaris-aws-s3, polaris-aws-iam]}
+        - {kind: cluster, label: EMR on EC2, tier: [emr-job, emr-host], nodes: [polaris-aws-spark, polaris-aws-emr-host]}
+        - {kind: cluster, label: EKS, tier: [eks-app, eks-host], nodes: [polaris-aws-server, polaris-aws-ec2]}

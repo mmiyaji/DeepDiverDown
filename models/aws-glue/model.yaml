@@ -194,12 +194,14 @@ implementations:
         url: https://docs.aws.amazon.com/glue/latest/dg/crawler-prereqs.html
       - title: Logging and monitoring in AWS Glue
         url: https://docs.aws.amazon.com/glue/latest/dg/logging-and-monitoring.html
+      - {title: Glue Spark ジョブのスクリプトの場所, url: https://docs.aws.amazon.com/glue/latest/webapi/API_JobCommand.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
     tiers:
       - id: processing
         label: データの処理と保存
         z: 0
         size:
-          - 14
+          - 19
           - 5
       - id: setup
         label: 実行に必要な設定・成果物
@@ -215,8 +217,9 @@ implementations:
           - processing
           - setup
     nodes:
+      aws-runtime: {label: Glue managed Spark runtime, kind: host, tier: processing, x: 13, y: 3, management: {type: aws, scope: "AWS provisions and manages serverless job infrastructure."}, evidence: [{type: doc, ref: "docs/reference-aws-glue.md#§7"}]}
       aws-s3:
-        label: Amazon S3 の raw・curated プレフィックス
+        label: Amazon S3（raw の注文 CSV）
         kind: db
         tier: processing
         x: 1
@@ -224,8 +227,8 @@ implementations:
         svc: s3
         realizes:
           - source
-          - target
-        description: raw へ CSV を置き、curated に Parquet を書く。
+        description: raw プレフィックスに投入した注文 CSV を保持する。
+        management: {type: shared, scope: "AWS operates S3; customer manages data and access."}
         evidence:
           - type: doc
             ref: docs/reference-aws-glue.md#§7
@@ -239,6 +242,7 @@ implementations:
         realizes:
           - crawler
         description: raw プレフィックスを分類し、テーブル定義を更新する。
+        management: {type: shared, scope: "AWS operates crawler infrastructure; customer configures crawler and access."}
         evidence:
           - type: doc
             ref: docs/reference-aws-glue.md#§7
@@ -252,6 +256,7 @@ implementations:
         realizes:
           - catalog
         description: クロール結果のスキーマと S3 上の位置を持つ。
+        management: {type: shared, scope: "AWS operates the catalog; customer manages definitions and permissions."}
         evidence:
           - type: doc
             ref: docs/reference-aws-glue.md#§7
@@ -265,6 +270,7 @@ implementations:
         realizes:
           - trigger
         description: Crawler の成功を条件にジョブを起動する。
+        management: {type: shared, scope: "AWS operates the service; customer configures workflow and triggers."}
         evidence:
           - type: doc
             ref: docs/reference-aws-glue.md#§7
@@ -277,7 +283,8 @@ implementations:
         svc: glue
         realizes:
           - job
-        description: カタログから入力を読み、必要列の型を整えて Parquet を保存する。
+        description: AWS 管理の Glue ワーカー上で Spark を実行し、Catalog の入力定義を使って Parquet に変換する。
+        management: {type: customer, scope: "Customer manages job code, runtime settings and permissions."}
         evidence:
           - type: doc
             ref: docs/reference-aws-glue.md#§7
@@ -291,6 +298,7 @@ implementations:
         realizes:
           - monitor
         description: ジョブ実行ログから処理結果とエラーを確認する。
+        management: {type: shared, scope: "AWS operates CloudWatch; customer manages logging and access."}
         evidence:
           - type: doc
             ref: docs/reference-aws-glue.md#§7
@@ -301,12 +309,55 @@ implementations:
         x: 1
         'y': 1.5
         description: Crawler とジョブに必要な S3・Data Catalog へのアクセスを用途に応じて付与する。
+        management: {type: customer, scope: "Customer manages IAM permissions and trust."}
         evidence:
           - type: doc
             ref: docs/reference-aws-glue.md#§7
         svc: iam
+      aws-curated: {label: Amazon S3（curated の Parquet）, svc: s3, kind: db, tier: processing, x: 15, y: 1.15, realizes: [target], description: Glue ジョブの Parquet 出力を保持する。, management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
+      aws-script: {label: Amazon S3（PySpark スクリプト）, svc: s3, kind: file, tier: setup, x: 6, y: 1.5, description: ジョブの ScriptLocation で指定した変換スクリプトを保持する。, management: {type: customer, scope: "Customer manages job script and access."}, evidence: [{type: doc, ref: docs/reference-aws-glue.md#§7}]}
     links:
+      - {id: aws-runtime-execute, from: aws-runtime, to: aws-spark, label: "Run Spark job", evidence: [{type: doc, ref: "docs/reference-aws-glue.md#§7"}]}
+      - {id: aws-crawler-role, from: aws-role, to: aws-crawler, label: 入力とカタログへの権限を付与}
+      - {id: aws-script-location, from: aws-spark, to: aws-script, label: 起動時に PySpark スクリプトを取得}
+      - {id: aws-crawler-complete, from: aws-crawler, to: aws-workflow, label: 成功後に依存トリガーを起動}
+      - {id: aws-input-schema, from: aws-catalog, to: aws-spark, label: 入力スキーマと S3 のパスを参照, realizes: [metadata], replace: true}
       - id: aws-role-connection
         from: aws-role
         to: aws-spark
         label: ジョブのアクセス権限を渡す
+    layout2d:
+      tiers: [{id: diagram, label: Glue and customer data, z: 0, size: [28, 12]}]
+      nodes:
+        aws-s3: {tier: diagram, x: 2, y: 2}
+        aws-crawler: {tier: diagram, x: 7, y: 2}
+        aws-catalog: {tier: diagram, x: 12, y: 2}
+        aws-workflow: {tier: diagram, x: 17, y: 2}
+        aws-logs: {tier: diagram, x: 22, y: 2}
+        aws-role: {tier: diagram, x: 2, y: 6}
+        aws-curated: {tier: diagram, x: 7, y: 6}
+        aws-script: {tier: diagram, x: 12, y: 6}
+        aws-runtime: {tier: diagram, x: 17, y: 6}
+        aws-spark: {tier: diagram, x: 22, y: 6}
+      groups:
+        - {kind: cloud, provider: aws, label: Customer AWS account and Glue service configuration, tier: diagram, nodes: [aws-s3, aws-crawler, aws-catalog, aws-workflow, aws-logs, aws-role, aws-curated, aws-script]}
+        - {kind: cloud, provider: aws, label: AWS Glue managed job runtime, tier: diagram, nodes: [aws-runtime, aws-spark]}
+    layout3d:
+      tiers:
+        - {id: job, label: Spark job, z: 1, size: [5, 3]}
+        - {id: runtime, label: Glue managed runtime, z: 0, size: [5, 3]}
+        - {id: account, label: Customer account and Glue APIs, z: 0, origin: [8, 0], size: [20, 6]}
+      nodes:
+        aws-s3: {tier: account, x: 2, y: 1}
+        aws-crawler: {tier: account, x: 6, y: 1}
+        aws-catalog: {tier: account, x: 10, y: 1}
+        aws-workflow: {tier: account, x: 14, y: 1}
+        aws-logs: {tier: account, x: 18, y: 1}
+        aws-role: {tier: account, x: 2, y: 4}
+        aws-curated: {tier: account, x: 6, y: 4}
+        aws-script: {tier: account, x: 10, y: 4}
+        aws-runtime: {tier: runtime, x: 2, y: 1.5}
+        aws-spark: {tier: job, x: 2, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: Customer AWS account and Glue service configuration, tier: account, nodes: [aws-s3, aws-crawler, aws-catalog, aws-workflow, aws-logs, aws-role, aws-curated, aws-script]}
+        - {kind: cloud, provider: aws, label: AWS Glue managed job runtime, tier: [job, runtime], nodes: [aws-runtime, aws-spark]}

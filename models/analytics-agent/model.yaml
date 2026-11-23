@@ -221,8 +221,8 @@ scenarios:
         note: 数値と出典を評価する。
 implementations:
   - id: example
-    label: dbt と Databricks の組み合わせ
-    description: 指標・文書検索・観測をそれぞれのサービスで組む概念例。認証連携は採用環境に合わせて実装する。
+    label: ECS 上の分析エージェント・dbt・Databricks
+    description: ECS/Fargate 上の自作エージェントが dbt Semantic Layer と Databricks SQL・AI Search を利用し、CloudWatch で観測する構成例。
     sources:
       - title: dbt Semantic Layer
         url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/dbt-sl
@@ -230,6 +230,15 @@ implementations:
         url: https://docs.databricks.com/gcp/en/agents/custom-agents/unstructured-retrieval-tools
       - title: OpenTelemetry AI agent observability
         url: https://opentelemetry.io/blog/2025/ai-agent-observability/
+      - title: dbt Semantic Layer quickstart
+        url: https://docs.getdbt.com/guides/sl-qs
+      - title: Amazon Cognito user pools
+        url: https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools.html
+      - title: CloudWatch OpenTelemetry
+        url: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/GettingSetup.html
+      - {title: Fargate security, url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-security-considerations.html}
+      - title: ECS Fargate
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
     tiers:
       - id: access
         label: 利用と調整
@@ -263,31 +272,31 @@ implementations:
         realizes:
           - question
       ex-agent:
-        label: エージェント実行アプリ
+        label: 分析エージェントアプリ
         kind: service
         tier: access
         x: 4
         'y': 1
-        description: 指標と文書の取得を調整し、根拠とともに回答する。
+        description: ECS タスク内の自作アプリが指標と文書の取得、認可と回答を組み立てる。
         evidence:
           - type: doc
             ref: docs/reference-analytics-agent.md#§4
         realizes:
           - agent
       ex-identity:
-        label: アプリの認証と権限
+        label: アプリの認可
         kind: service
         tier: access
         x: 8
         'y': 1
-        description: 利用者とツールのアクセス権を確認する。
+        description: Cognito のログイン結果を検証し、利用者とツールの権限をアプリで判定する。
         evidence:
           - type: doc
             ref: docs/reference-analytics-agent.md#§4
         realizes:
           - identity
       ex-metrics:
-        label: dbt Semantic Layer
+        label: dbt Semantic Layer / dbt platform
         kind: service
         tier: data
         x: 0
@@ -299,19 +308,20 @@ implementations:
         realizes:
           - metrics
       ex-warehouse:
-        label: 分析ウェアハウス
+        label: 注文・返品の Delta テーブル
         kind: db
         tier: data
         x: 4
         'y': 1
-        description: 整備済みの注文と返品を保持する。
+        description: Databricks 上に整備済みの注文と返品を保持する。
         evidence:
           - type: doc
             ref: docs/reference-analytics-agent.md#§4
         realizes:
           - warehouse
+        svc: databricks:delta
       ex-search:
-        label: Databricks AI Search ツール
+        label: Databricks AI Search Endpoint
         kind: service
         tier: data
         svc: databricks:aisearch
@@ -342,18 +352,18 @@ implementations:
         tier: data
         svc: databricks:aisearch
         x: 16
-        y: 1
+        'y': 1
         description: Delta テーブルの内容を検索できるよう索引付けする。
         evidence:
           - type: doc
             ref: docs/reference-analytics-agent.md#§4
       ex-trace:
-        label: OpenTelemetry Collector・追跡基盤
+        label: OpenTelemetry Collector
         kind: service
         tier: ops
         x: 4
         'y': 1
-        description: モデル・検索・ツールの呼び出しと結果を記録する。
+        description: エージェントと同じ ECS タスクのサイドカーとして、構成された観測データを収集する。
         evidence:
           - type: doc
             ref: docs/reference-analytics-agent.md#§4
@@ -363,7 +373,7 @@ implementations:
         label: 評価担当者
         kind: actor
         tier: ops
-        x: 8
+        x: 12
         'y': 1
         description: 回答の数値、出典、権限と失敗時の振る舞いを確認する。
         evidence:
@@ -375,9 +385,65 @@ implementations:
         label: ログの記録・保持方針
         kind: file
         tier: ops
-        x: 12
+        x: 16
         'y': 1
         description: 入力や検索結果を記録する範囲と保持期間を決める。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      ex-fargate:
+        label: ECS / Fargate タスク
+        kind: service
+        svc: fargate
+        tier: access
+        x: 12
+        'y': 1
+        description: AWS が基盤を管理するタスクでエージェントと Collector を実行する。利用者は基盤ホストに直接接続できない。
+        management: {type: shared, scope: AWS が基盤を運用し、利用者がタスク・アプリと設定を管理する。}
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      ex-ecs:
+        label: Amazon ECS
+        kind: service
+        svc: ecs
+        tier: ops
+        x: 0
+        'y': 1
+        description: タスクとサービスの起動・維持を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      ex-cognito:
+        label: Amazon Cognito
+        kind: service
+        svc: cognito
+        tier: access
+        x: 16
+        'y': 1
+        description: 利用者の OIDC サインインを提供する。下流サービスへの認可は別途設計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      ex-sql:
+        label: Databricks SQL Warehouse
+        kind: service
+        svc: databricks:sql
+        tier: data
+        x: 20
+        'y': 1
+        description: dbt Semantic Layer が生成した指標クエリを実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      ex-cloudwatch:
+        label: Amazon CloudWatch
+        kind: monitor
+        svc: cloudwatch
+        tier: ops
+        x: 8
+        'y': 1
+        description: Collector の設定に従いテレメトリーを受け取る。
         evidence:
           - type: doc
             ref: docs/reference-analytics-agent.md#§4
@@ -386,7 +452,8 @@ implementations:
         from: ex-search
         to: ex-index
         label: 関連する文書を検索
-        realizes: [lookup]
+        realizes:
+          - lookup
         replace: true
         evidence:
           - type: doc
@@ -402,13 +469,130 @@ implementations:
         from: ex-logpolicy
         to: ex-trace
         label: 記録方針を適用
+      - id: example-ecs-run
+        from: ex-ecs
+        to: ex-fargate
+        label: タスクを起動
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      - id: example-fargate-app
+        from: ex-fargate
+        to: ex-agent
+        label: アプリを実行
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      - id: example-cognito-login
+        from: ex-cognito
+        to: ex-identity
+        label: ログイン結果を提供
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+      - id: example-metrics-sql
+        from: ex-metrics
+        to: ex-sql
+        label: 指標クエリを実行
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - read
+        replace: true
+      - id: example-sql-delta
+        from: ex-sql
+        to: ex-warehouse
+        label: 注文・返品を読む
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
+        realizes:
+          - read
+        replace: true
+      - id: example-trace-cloudwatch
+        from: ex-trace
+        to: ex-cloudwatch
+        label: 観測データを送信
+        evidence:
+          - type: doc
+            ref: docs/reference-analytics-agent.md#§4
     groups:
+      - kind: cloud
+        provider: aws
+        label: AWS アカウント
+        tier:
+          - access
+          - ops
+        nodes:
+          - ex-agent
+          - ex-identity
+          - ex-fargate
+          - ex-ecs
+          - ex-cognito
+          - ex-trace
+          - ex-cloudwatch
       - kind: cloud
         provider: databricks
         label: Databricks
         tier:
           - data
         nodes:
+          - ex-warehouse
+          - ex-sql
           - ex-search
-          - ex-documents
           - ex-index
+          - ex-documents
+
+    layout2d:
+      tiers: [{id: diagram, label: 分析エージェントと外部基盤, z: 0, origin: [-4, 0], size: [34, 15]}]
+      nodes:
+        ex-fargate: {tier: diagram, x: 1, y: 1}
+        ex-agent: {tier: diagram, x: 4, y: 1}
+        ex-identity: {tier: diagram, x: 7, y: 1}
+        ex-trace: {tier: diagram, x: 1, y: 4}
+        ex-ecs: {tier: diagram, x: 4, y: 4}
+        ex-cognito: {tier: diagram, x: 7, y: 4}
+        ex-cloudwatch: {tier: diagram, x: 1, y: 7}
+        ex-metrics: {tier: diagram, x: 14, y: 1}
+        ex-sql: {tier: diagram, x: 19, y: 1}
+        ex-warehouse: {tier: diagram, x: 22, y: 1}
+        ex-search: {tier: diagram, x: 25, y: 1}
+        ex-index: {tier: diagram, x: 19, y: 4}
+        ex-documents: {tier: diagram, x: 22, y: 4}
+        ex-question: {tier: diagram, x: -3, y: 1}
+        ex-review: {tier: diagram, x: -1.2, y: 1}
+        ex-logpolicy: {tier: diagram, x: 3, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [diagram], x0: 0, y0: 0, x1: 10, y1: 11, nodes: [ex-fargate, ex-agent, ex-identity, ex-trace, ex-ecs, ex-cognito, ex-cloudwatch]}
+        - {kind: cloud, label: dbt platform, tier: [diagram], x0: 12, y0: 0, x1: 17, y1: 6, nodes: [ex-metrics]}
+        - {kind: cloud, provider: databricks, label: Databricks ワークスペース, tier: [diagram], x0: 18, y0: 0, x1: 29, y1: 9, nodes: [ex-sql, ex-warehouse, ex-search, ex-index, ex-documents]}
+    layout3d:
+      tiers:
+        - {id: runtime, label: Fargate 実行, z: 0, size: [9, 6]}
+        - {id: app, label: タスク内コンテナ, z: 1, size: [9, 6]}
+        - {id: aws, label: 独立 AWS サービス, z: 0, origin: [11, 0], size: [10, 5]}
+        - {id: dbt, label: dbt platform, z: 0, origin: [23, 0], size: [4, 4]}
+        - {id: dbx, label: Databricks, z: 0, origin: [29, 0], size: [10, 7]}
+        - {id: users, label: 利用者・設定, z: 0, origin: [-5, 0], size: [4, 8]}
+      nodes:
+        ex-fargate: {tier: runtime, x: 2, y: 2}
+        ex-agent: {tier: app, x: 2, y: 2}
+        ex-identity: {tier: app, x: 5, y: 2}
+        ex-trace: {tier: app, x: 2, y: 5}
+        ex-ecs: {tier: aws, x: 1, y: 1}
+        ex-cognito: {tier: aws, x: 4, y: 1}
+        ex-cloudwatch: {tier: aws, x: 7, y: 1}
+        ex-metrics: {tier: dbt, x: 1, y: 1}
+        ex-sql: {tier: dbx, x: 1, y: 1}
+        ex-warehouse: {tier: dbx, x: 4, y: 1}
+        ex-search: {tier: dbx, x: 7, y: 1}
+        ex-index: {tier: dbx, x: 1, y: 4}
+        ex-documents: {tier: dbx, x: 4, y: 4}
+        ex-question: {tier: users, x: 1, y: 1}
+        ex-review: {tier: users, x: 1, y: 4}
+        ex-logpolicy: {tier: users, x: 1, y: 7}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [runtime, app, aws], nodes: [ex-fargate, ex-agent, ex-identity, ex-trace, ex-ecs, ex-cognito, ex-cloudwatch]}
+        - {kind: cloud, label: dbt platform, tier: [dbt], nodes: [ex-metrics]}
+        - {kind: cloud, provider: databricks, label: Databricks ワークスペース, tier: [dbx], nodes: [ex-sql, ex-warehouse, ex-search, ex-index, ex-documents]}

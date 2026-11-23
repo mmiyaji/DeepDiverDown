@@ -22,19 +22,27 @@ Bronze、Silver、Gold はデータの整備段階を表す。受注 CDC が入�
 
 ## 5. 実装例：Lakeflow・Delta Lake・Databricks SQL
 
-Spark Declarative Pipelines を使い、受注イベントを Delta のストリーミングテーブルへ保管し、集計を SQL で提供する例。
+業務側が出力した注文変更の JSON ファイルを Amazon S3 から Auto Loader で増分取り込みする例。Databricks のサーバーレス Lakeflow Spark Declarative Pipelines で検証・整形し、Databricks SQL Warehouse で Gold を参照する。
 
 | 機能 | 具体的な担い手 | 配置・設定 |
 | --- | --- | --- |
-| 受注 CDC | 注文 CDC フィード | 主キー、変更種別、並び順を含むイベントを渡す。 |
+| 受注 CDC | Amazon S3 の変更ファイルと Auto Loader | 主キー、変更種別、並び順を含むイベントを増分で取り込む。 |
 | Bronze・原本 | Bronze の Delta ストリーミングテーブル | 元の受注イベントを追記する。 |
 | 検証・正規化 | Lakeflow Spark Declarative Pipelines | 検証条件で有効行と隔離行を分け、必要に応じて変更を適用する。 |
 | 隔離テーブル | 無効行を保持するストリーミングテーブル | 調査と再処理に必要な行を残す。 |
 | Silver・受注明細 | Silver の整形済み Delta テーブル | 検証後の正規化した注文の状態を保持する。 |
 | Gold・日次売上 | Gold の日次売上マテリアライズドビュー | 日付・通貨別の集計を提供する。 |
-| BI | Databricks SQL ダッシュボード | 日次売上を表示する。 |
+| BI | Databricks SQL Warehouse と AI/BI ダッシュボード | SQL Warehouse が Gold を読み取り、ダッシュボードに日次売上を表示する。 |
 | 実装で追加 | Lakeflow パイプラインイベントログ | 検証結果や更新状態を記録する。 |
 
-隔離は検証条件の正・逆を使う二つのフローで構成する。Delta の Bronze は後から再処理できるよう原本を保持する。Silver に変更イベントを取り込む際は、主キーに加えて更新順序の列と削除の扱いを決める。
+入力用 S3 には Unity Catalog の外部ロケーションを設定し、ストレージ資格情報の IAM ロールで対象領域へのアクセスを許可する。Bronze、隔離、Silver、Gold は別の S3 領域に設定した Unity Catalog の管理ストレージに保持する。パイプライン実行主体には入力の読み取りと管理テーブルの作成・更新、BI の実行主体には Gold の参照を許可する。
+
+隔離は検証条件の正・逆を使う二つのフローで構成する。Delta の Bronze は後から再処理できるよう原本を保持する。Silver の AUTO CDC には主キー、同一キー内の変更順序、削除条件を設定する。
+
+- [Auto Loader による Amazon S3 の増分取り込み](https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/onboard-data)
+- [Unity Catalog 管理ストレージ](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)
+- [AUTO CDC による変更適用](https://docs.databricks.com/aws/en/ldp/cdc)
 
 [Databricks · Medallion lakehouse architecture](https://docs.databricks.com/aws/en/lakehouse/medallion)、[How to use Spark Declarative Pipelines on Lakeflow](https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines)、[Lakeflow best practices: Quarantine](https://docs.databricks.com/aws/en/ldp/best-practices)、[Expectations and event log](https://docs.databricks.com/aws/en/ldp/expectations)
+
+この例ではサーバーレス SQL Warehouse を選ぶ。サーバーレス計算は Databricks が管理する計算プレーンで実行し、顧客 AWS アカウントの S3 とは境界を分ける。図中の Bronze 等は Unity Catalog 上の論理テーブルで、実ファイルは顧客側の管理ストレージに置く。利用者はパイプライン定義、データ、アクセス権限とストレージ資格情報を設定し、Databricks のサーバーレス内部ノードを直接操作しない。公式資料を組み合わせた例であり、受注 CDC の構成は動作未検証。[Databricks ネットワーク構成](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)

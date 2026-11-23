@@ -207,6 +207,12 @@ implementations:
         url: https://docs.databricks.com/aws/en/opensharing/create-recipient
       - title: OpenSharing Share の作成
         url: https://docs.databricks.com/aws/en/opensharing/create-share
+      - title: Databricks-to-Open の認証とデータ取得
+        url: https://docs.databricks.com/aws/en/opensharing/share-data-open
+      - title: Bearer トークン方式の受領者
+        url: https://docs.databricks.com/aws/en/opensharing/create-recipient-token
+      - {title: Databricks architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -221,12 +227,13 @@ implementations:
           - 8
           - 3
     nodes:
+      example-recipient-compute: {label: Recipient serverless compute plane, kind: host, tier: flow, x: 22, y: 5, evidence: [{type: doc, ref: "docs/reference-databricks-open-sharing.md#§5"}]}
       example-owner:
         label: 提供側 Unity Catalog 管理者
         kind: actor
         tier: flow
-        x: 0
-        'y': 0
+        x: -2
+        y: 1
         realizes:
           - owner
         description: 集計表と提供相手を決める。
@@ -237,8 +244,8 @@ implementations:
         label: sales.orders_summary
         kind: db
         tier: flow
-        x: 0
-        'y': 4
+        x: 4
+        y: 2
         realizes:
           - table
         description: 提供側で整備した集計テーブル。
@@ -248,11 +255,10 @@ implementations:
         svc: databricks:delta
       example-share:
         label: OpenSharing の SHARE・RECIPIENT・権限
-        kind: service
+        kind: policy
         tier: flow
-        svc: databricks:unity
-        x: 5
-        'y': 3
+        x: 8
+        y: 2
         realizes:
           - share
           - revoke
@@ -264,8 +270,8 @@ implementations:
         label: 受領者の Unity Catalog 共有カタログ
         kind: service
         tier: flow
-        x: 9
-        'y': 0
+        x: 18
+        y: 1
         realizes:
           - dbcatalog
         description: Databricks-to-Databricks の提供者と Share を指定して作る。
@@ -277,8 +283,8 @@ implementations:
         label: 受領者の Databricks SQL Warehouse
         kind: client
         tier: flow
-        x: 13
-        'y': 0
+        x: 22
+        y: 1
         realizes:
           - databricks
         description: 受領側で共有カタログを読む。
@@ -291,38 +297,43 @@ implementations:
         kind: service
         tier: flow
         svc: databricks:platform
-        x: 9
-        'y': 4
+        x: 12
+        y: 2
         realizes:
           - endpoint
-        description: 外部ツール向けの共有プロトコルを提供する。
+        description: 受領者の bearer トークンで共有参照を認証し、対象ファイルへの期限付きアクセスを返す。
         evidence:
           - type: doc
             ref: docs/reference-databricks-open-sharing.md#§5
       example-outside:
-        label: 外部 Delta Sharing 対応クライアント
+        label: 外部 Python Delta Sharing クライアント
         kind: client
         tier: flow
-        x: 13
-        'y': 4
+        x: 29
+        y: 5
         realizes:
           - outside
-        description: 許可された接続情報で集計を参照する。
+        description: 受領した資格情報ファイルで共有エンドポイントへ接続し、集計を取得する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-open-sharing.md#§5
       example-recipient-id:
         label: Databricks 受領側の共有 ID
-        kind: service
-        tier: implementation-setup
-        svc: databricks:unity
-        x: 1
-        'y': 1.5
+        kind: policy
+        tier: flow
+        x: 18
+        y: 5
         description: Databricks-to-Databricks 受領者の登録に使う共有識別子。
         evidence:
           - type: doc
             ref: docs/reference-databricks-open-sharing.md#§5
+      example-credential: {label: 外部受領者の資格情報ファイル, kind: file, tier: flow, x: 29, y: 9, description: 有効化リンクから取得した接続情報と bearer トークンを外部受領者が保管する。, evidence: [{type: doc, ref: docs/reference-databricks-open-sharing.md#§5}]}
+      example-provider-s3: {label: 提供者の S3：共有 Delta ファイル, kind: db, svc: s3, tier: flow, x: 9, y: 8, description: 提供側の注文集計表に対応するファイルを保持する。外部クライアントのアクセスには共有側が発行する期限付きアクセスを使う。, evidence: [{type: doc, ref: docs/reference-databricks-open-sharing.md#§5}]}
     links:
+      - {id: example-recipient-runtime, from: example-recipient-compute, to: example-databricks, label: "Run recipient SQL warehouse", evidence: [{type: doc, ref: "docs/reference-databricks-open-sharing.md#§5"}]}
+      - {id: example-token-use, from: example-credential, to: example-outside, label: 受領者用トークンで認証, evidence: [{type: doc, ref: docs/reference-databricks-open-sharing.md#§5}]}
+      - {id: example-table-files, from: example-table, to: example-provider-s3, label: 共有するテーブルの実体を保持, evidence: [{type: doc, ref: docs/reference-databricks-open-sharing.md#§5}]}
+      - {id: example-direct-read, from: example-provider-s3, to: example-outside, label: 期限付きアクセスで共有ファイルを読む, evidence: [{type: doc, ref: docs/reference-databricks-open-sharing.md#§5}]}
       - id: example-recipient-id-connection
         from: example-recipient-id
         to: example-share
@@ -331,25 +342,46 @@ implementations:
           - type: doc
             ref: docs/reference-databricks-open-sharing.md#§5
     groups:
-      - kind: cloud
-        provider: databricks
-        label: 受領側 Unity Catalog
-        tier: [implementation-setup]
-        nodes: [example-recipient-id]
-      - kind: cloud
-        provider: databricks
-        label: 提供側 Databricks
-        tier:
-          - flow
-        nodes:
-          - example-table
-          - example-share
-          - example-endpoint
-      - kind: cloud
-        provider: databricks
-        label: 受領側 Databricks
-        tier:
-          - flow
-        nodes:
-          - example-dbcatalog
-          - example-databricks
+      - {kind: cloud, provider: databricks, label: Provider Databricks account, tier: flow, nodes: [example-table, example-share, example-endpoint]}
+      - {kind: cloud, provider: databricks, label: Recipient Databricks account, tier: flow, nodes: [example-dbcatalog, example-databricks, example-recipient-id, example-recipient-compute]}
+      - {kind: cloud, provider: aws, label: Provider AWS account, tier: flow, nodes: [example-provider-s3]}
+    layout2d:
+      tiers: [{id: diagram, label: OpenSharing, z: 0, size: [35, 13]}]
+      nodes:
+        example-table: {tier: diagram, x: 4, y: 2}
+        example-share: {tier: diagram, x: 8, y: 2}
+        example-endpoint: {tier: diagram, x: 12, y: 2}
+        example-dbcatalog: {tier: diagram, x: 18, y: 1}
+        example-databricks: {tier: diagram, x: 22, y: 1}
+        example-recipient-id: {tier: diagram, x: 18, y: 5}
+        example-recipient-compute: {tier: diagram, x: 22, y: 5}
+        example-provider-s3: {tier: diagram, x: 9, y: 8}
+        example-owner: {tier: diagram, x: 0, y: 1}
+        example-outside: {tier: diagram, x: 29, y: 5}
+        example-credential: {tier: diagram, x: 29, y: 9}
+      groups:
+        - {kind: cloud, provider: databricks, label: Provider Databricks account, tier: diagram, nodes: [example-table, example-share, example-endpoint]}
+        - {kind: cloud, provider: databricks, label: Recipient Databricks account, tier: diagram, nodes: [example-dbcatalog, example-databricks, example-recipient-id, example-recipient-compute]}
+        - {kind: cloud, provider: aws, label: Provider AWS account, tier: diagram, nodes: [example-provider-s3]}
+    layout3d:
+      tiers:
+        - {id: provider, label: Provider Databricks account, z: 0, size: [14, 3]}
+        - {id: recipient, label: Recipient Databricks account, z: 0, origin: [17, 0], size: [16, 3]}
+        - {id: aws, label: Provider AWS account, z: 0, origin: [36, 0], size: [4, 3]}
+        - {id: users, label: Users and external client, kind: origin, z: 0, origin: [-5, 0], size: [8, 3]}
+      nodes:
+        example-table: {tier: provider, x: 2, y: 1.5}
+        example-share: {tier: provider, x: 6, y: 1.5}
+        example-endpoint: {tier: provider, x: 10, y: 1.5}
+        example-dbcatalog: {tier: recipient, x: 2, y: 1.5}
+        example-databricks: {tier: recipient, x: 6, y: 1.5}
+        example-recipient-id: {tier: recipient, x: 10, y: 1.5}
+        example-recipient-compute: {tier: recipient, x: 14, y: 1.5}
+        example-provider-s3: {tier: aws, x: 1, y: 1.5}
+        example-owner: {tier: users, x: 0, y: 1.5}
+        example-outside: {tier: users, x: 2, y: 1.5}
+        example-credential: {tier: users, x: 4, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Provider Databricks account, tier: provider, nodes: [example-table, example-share, example-endpoint]}
+        - {kind: cloud, provider: databricks, label: Recipient Databricks account, tier: recipient, nodes: [example-dbcatalog, example-databricks, example-recipient-id, example-recipient-compute]}
+        - {kind: cloud, provider: aws, label: Provider AWS account, tier: aws, nodes: [example-provider-s3]}

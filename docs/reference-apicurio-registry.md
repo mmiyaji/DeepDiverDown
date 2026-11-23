@@ -59,3 +59,27 @@ Kafka Java クライアント用の Avro SerDes と、PostgreSQL を使う Apicu
 メッセージを保存する Kafka と、スキーマを保持する PostgreSQL は別の永続化先。レジストリの 3.x コンテナで `APICURIO_STORAGE_KIND=sql` と PostgreSQL 接続を選び、SerDes には Registry の URL を設定する。
 
 [Apicurio Registry 3.4 Kafka SerDes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html)、[Apicurio Registry 3.4 Schema Compatibility Modes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html)、[Apicurio Registry Docker Deployment](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html)
+
+
+## 8. 実装例：Amazon EKS 上の Apicurio Registry・RDS・MSK
+
+EKS の EC2 ノードで Apicurio Registry Operator と Registry API を運用する。MSK は注文レコード、RDS PostgreSQL はスキーマの履歴を保持する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| 登録・互換性判定 | EKS の Apicurio Registry 3.1 系の API。Operator で展開を管理する。 |
+| 版、内容 ID とルールの保存 | RDS for PostgreSQL。 |
+| Avro の書込・読取 | EKS 上の Kafka Producer／Consumer 用 Java アプリケーションと Apicurio の SerDes。 |
+| 注文イベント保持 | Amazon MSK。 |
+
+API と SerDes の 3.1 系を合わせ、Avro の参照方式と互換性ルールを対象アーティファクトに設定する。登録 API は Keycloak の OIDC と Registry の権限を使い、書き込み権限を登録担当に限定する。アプリの SerDes にも読み取り用の資格情報を設定する。MSK のブローカー認証・トピック権限と、PostgreSQL の専用ユーザー・TLS 接続は別に設定する。
+
+公式資料
+
+- [Apicurio Registry Operator の PostgreSQL 構成](https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-deploying-registry-operator.html)
+- [Apicurio Registry の Java Kafka SerDes](https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-configuring-kafka-client-serdes.html)
+- [Apicurio Registry Operator の認証設定](https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-operator-config-reference.html)
+- [Amazon MSK への接続](https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html)
+- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)
+
+自前例は Linux 上の Java クライアント、自前 Kafka、Docker ホスト上の Registry と PostgreSQL を想定し、各データの永続化とバックアップは利用者が設計する。AWS 例は EKS ノード上の Registry とクライアント、MSK、RDS の組合せである。AWS が EKS 制御プレーンと EC2・MSK・RDS の基盤を運用し、利用者は Kubernetes API、ノード、Operator、Registry、認証、トピックと DB 設定を管理する。EKS 制御プレーンサーバーは直接操作しない。Keycloak のホスト、クライアント接続と認証の設定、および各バージョンの組合せは未検証で、公式資料を組み合わせた代表例である。

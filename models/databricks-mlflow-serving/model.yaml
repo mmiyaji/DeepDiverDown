@@ -197,6 +197,18 @@ implementations:
         url: https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints
       - title: Query serving endpoints for custom models
         url: https://docs.databricks.com/aws/en/machine-learning/model-serving/score-custom-model-endpoints
+      - title: Databricks Runtime ML
+        url: https://docs.databricks.com/aws/en/machine-learning/databricks-runtime-ml
+      - title: クラシック計算資源の配置
+        url: https://docs.databricks.com/aws/en/compute/use-compute
+      - title: MLflow Experiment の成果物と Volume
+        url: https://docs.databricks.com/aws/en/mlflow/experiments
+      - title: モデル配信エンドポイントの権限
+        url: https://docs.databricks.com/aws/en/machine-learning/model-serving/manage-serving-endpoints
+      - title: OAuth M2M
+        url: https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m
+      - {title: Databricks architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -208,15 +220,18 @@ implementations:
         label: 実装時の設定・観測
         z: 1
         size:
-          - 8
-          - 3
+          - 18
+          - 4
     nodes:
+      example-training-s3: {label: S3 managed training table storage, svc: s3, kind: db, tier: flow, x: 22, y: 5, management: {type: shared, scope: "AWS operates S3; customer manages storage and permissions."}, evidence: [{type: doc, ref: "docs/reference-databricks-mlflow-serving.md#§5"}]}
+      example-serving-compute: {label: Databricks Model Serving compute, kind: host, tier: flow, x: 11, y: 5, evidence: [{type: doc, ref: "docs/reference-databricks-mlflow-serving.md#§5"}]}
+      example-deploy-host: {label: Customer deployment runner, kind: host, tier: flow, x: 30, y: 5, evidence: [{type: doc, ref: "docs/reference-databricks-mlflow-serving.md#§5"}]}
       example-orders:
         label: Unity Catalog のモデル学習用テーブル
         kind: db
         tier: flow
-        x: 0
-        'y': 2
+        x: 3
+        y: 1
         realizes:
           - orders
         description: 注文時点の特徴量を読み取れるようにする。
@@ -225,16 +240,15 @@ implementations:
             ref: docs/reference-databricks-mlflow-serving.md#§5
         svc: databricks:delta
       example-train:
-        label: Databricks 学習ジョブと MLflow Experiment
+        label: Lakeflow Jobs の学習ジョブ
         kind: worker
         tier: flow
         svc: databricks:platform
-        x: 3
-        'y': 2
+        x: 11
+        y: 1
         realizes:
           - train
-          - tracking
-        description: モデルの学習、パラメータ、検証結果、成果物を同じ Run に記録する。
+        description: 利用者の AWS アカウントに配置するクラシック Jobs コンピュートで学習を起動する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-mlflow-serving.md#§5
@@ -242,8 +256,8 @@ implementations:
         label: Unity Catalog の登録モデル
         kind: db
         tier: flow
-        x: 9
-        'y': 2
+        x: 7
+        y: 1
         realizes:
           - registry
         description: 選んだ成果物を新しいモデル版として登録する。
@@ -255,9 +269,8 @@ implementations:
         label: モデル配備ジョブ
         kind: worker
         tier: flow
-        svc: databricks:platform
-        x: 12
-        'y': 0
+        x: 30
+        y: 9
         realizes:
           - deploy
         description: モデル名と承認済みバージョンをエンドポイント設定へ渡す。
@@ -269,11 +282,11 @@ implementations:
         kind: service
         tier: flow
         svc: databricks:modelserving
-        x: 15
-        'y': 2
+        x: 3
+        y: 5
         realizes:
           - endpoint
-        description: 設定した Unity Catalog モデルをオンラインで実行する。
+        description: Databricks 管理のサーバーレス計算資源で、設定した Unity Catalog モデルを実行する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-mlflow-serving.md#§5
@@ -281,8 +294,8 @@ implementations:
         label: 注文アプリのエンドポイントクライアント
         kind: client
         tier: flow
-        x: 18
-        'y': 2
+        x: 30
+        y: 1
         realizes:
           - app
         description: 推論 API を呼んでスコアを取得する。
@@ -291,15 +304,92 @@ implementations:
             ref: docs/reference-databricks-mlflow-serving.md#§5
       example-identity:
         label: 推論呼び出し用サービスプリンシパル
-        kind: service
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
-        description: OAuth に使うアプリの主体に必要なエンドポイント権限を付与する。
+        kind: policy
+        tier: flow
+        x: 7
+        y: 5
+        description: 注文アプリが OAuth M2M を使う主体。対象エンドポイントには CAN QUERY を付与する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-mlflow-serving.md#§5
+      example-runtime:
+        label: EC2 の Databricks Runtime ML
+        kind: worker
+        svc: ec2
+        tier: flow
+        x: 22
+        y: 1
+        description: クラシック Jobs コンピュートが学習用データを読みモデルを訓練する。
+        management: {type: shared, scope: "AWS operates EC2; customer configures training compute and code."}
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      example-artifacts:
+        label: 成果物の S3 管理ストレージ
+        kind: db
+        svc: s3
+        tier: flow
+        x: 26
+        y: 1
+        description: Unity Catalog Volume に指定した MLflow Run の成果物を保持する。
+        management: {type: shared, scope: "AWS operates S3; customer manages artifacts and access."}
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      example-tracking:
+        label: Databricks 管理の MLflow Tracking
+        kind: service
+        tier: flow
+        x: 15
+        y: 1
+        description: 実験パラメーターと検証結果を記録し、モデル成果物を紐付ける。
+        realizes:
+          - tracking
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+        svc: databricks:platform
     links:
+      - {id: example-training-storage, from: example-orders, to: example-training-s3, label: "Store training data", evidence: [{type: doc, ref: "docs/reference-databricks-mlflow-serving.md#§5"}]}
+      - {id: example-serving-runtime, from: example-serving-compute, to: example-endpoint, label: "Run serving endpoint", evidence: [{type: doc, ref: "docs/reference-databricks-mlflow-serving.md#§5"}]}
+      - {id: example-deployment-runtime, from: example-deploy-host, to: example-deploy, label: "Run deployment job", evidence: [{type: doc, ref: "docs/reference-databricks-mlflow-serving.md#§5"}]}
+      - id: example-start-training
+        from: example-train
+        to: example-runtime
+        label: クラシック計算資源で学習を起動
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      - id: example-load-training
+        from: example-orders
+        to: example-runtime
+        label: 注文の学習データを読む
+        realizes:
+          - train
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      - id: example-log-training
+        from: example-runtime
+        to: example-tracking
+        label: パラメーターと検証結果を記録
+        realizes:
+          - record
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
+      - id: example-save-artifacts
+        from: example-runtime
+        to: example-artifacts
+        label: 指定 Volume にモデル成果物を保存
+        realizes:
+          - record
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-mlflow-serving.md#§5
       - id: example-identity-connection
         from: example-identity
         to: example-app
@@ -308,14 +398,48 @@ implementations:
           - type: doc
             ref: docs/reference-databricks-mlflow-serving.md#§5
     groups:
-      - kind: cloud
-        provider: databricks
-        label: Databricks
-        tier:
-          - flow
-        nodes:
-          - example-orders
-          - example-registry
-          - example-train
-          - example-deploy
-          - example-endpoint
+      - {kind: cloud, provider: databricks, label: Databricks workspace and serving, tier: flow, nodes: [example-orders, example-registry, example-train, example-tracking, example-endpoint, example-identity, example-serving-compute]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: flow, nodes: [example-runtime, example-artifacts, example-training-s3]}
+    layout2d:
+      tiers: [{id: diagram, label: Model lifecycle, z: 0, size: [35, 15]}]
+      nodes:
+        example-orders: {tier: diagram, x: 3, y: 1}
+        example-registry: {tier: diagram, x: 7, y: 1}
+        example-train: {tier: diagram, x: 11, y: 1}
+        example-tracking: {tier: diagram, x: 15, y: 1}
+        example-endpoint: {tier: diagram, x: 3, y: 5}
+        example-identity: {tier: diagram, x: 7, y: 5}
+        example-serving-compute: {tier: diagram, x: 11, y: 5}
+        example-runtime: {tier: diagram, x: 22, y: 1}
+        example-artifacts: {tier: diagram, x: 26, y: 1}
+        example-training-s3: {tier: diagram, x: 22, y: 5}
+        example-app: {tier: diagram, x: 30, y: 1}
+        example-deploy-host: {tier: diagram, x: 30, y: 5}
+        example-deploy: {tier: diagram, x: 30, y: 9}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serving, tier: diagram, nodes: [example-orders, example-registry, example-train, example-tracking, example-endpoint, example-identity, example-serving-compute]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-runtime, example-artifacts, example-training-s3]}
+        - {kind: datacenter, label: Customer deployment runner, tier: diagram, nodes: [example-deploy-host, example-deploy]}
+    layout3d:
+      tiers:
+        - {id: workspace, label: Databricks services, z: 1, size: [16, 6]}
+        - {id: serving, label: Model Serving compute, z: 0, size: [16, 6]}
+        - {id: aws, label: Customer AWS account, z: 0, origin: [19, 0], size: [12, 3]}
+        - {id: external, label: Customer clients and runner, kind: origin, z: 0, origin: [-8, 0], size: [6, 3]}
+      nodes:
+        example-orders: {tier: workspace, x: 2, y: 1}
+        example-registry: {tier: workspace, x: 6, y: 1}
+        example-train: {tier: workspace, x: 10, y: 1}
+        example-tracking: {tier: workspace, x: 14, y: 1}
+        example-endpoint: {tier: workspace, x: 2, y: 4}
+        example-identity: {tier: workspace, x: 6, y: 4}
+        example-serving-compute: {tier: serving, x: 10, y: 1.5}
+        example-runtime: {tier: aws, x: 2, y: 1.5}
+        example-artifacts: {tier: aws, x: 6, y: 1.5}
+        example-training-s3: {tier: aws, x: 10, y: 1.5}
+        example-app: {tier: external, x: 0, y: 1.5}
+        example-deploy-host: {tier: external, x: 2, y: 1.5}
+        example-deploy: {tier: external, x: 4, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serving, tier: [workspace, serving], nodes: [example-orders, example-registry, example-train, example-tracking, example-endpoint, example-identity, example-serving-compute]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: aws, nodes: [example-runtime, example-artifacts, example-training-s3]}

@@ -2,8 +2,8 @@
   "model": "apache-iceberg",
   "name": "Apache Iceberg の基本アーキテクチャ",
   "coverage": {
-    "covered": 9,
-    "total": 9
+    "covered": 10,
+    "total": 10
   },
   "byId": {
     "engine": {
@@ -86,6 +86,24 @@
       "type": "scenario",
       "label": "孤立ファイルを掃除する"
     },
+    "spark-minio-init": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "create-bucket container",
+      "realizes": []
+    },
+    "spark-minio-host": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "Docker Compose host",
+      "realizes": []
+    },
+    "spark-minio-store": {
+      "type": "implementation",
+      "impl": "spark-minio",
+      "label": "RustFS container",
+      "realizes": []
+    },
     "spark-minio-spark": {
       "type": "implementation",
       "impl": "spark-minio",
@@ -97,7 +115,7 @@
     "spark-minio-meta": {
       "type": "implementation",
       "impl": "spark-minio",
-      "label": "MinIO の metadata.json と Snapshot",
+      "label": "RustFS の metadata.json と Snapshot",
       "realizes": [
         "metadata",
         "snapshot"
@@ -106,7 +124,7 @@
     "spark-minio-list": {
       "type": "implementation",
       "impl": "spark-minio",
-      "label": "MinIO の Manifest List",
+      "label": "RustFS の Manifest List",
       "realizes": [
         "list"
       ]
@@ -114,7 +132,7 @@
     "spark-minio-manifests": {
       "type": "implementation",
       "impl": "spark-minio",
-      "label": "MinIO の Manifest",
+      "label": "RustFS の Manifest",
       "realizes": [
         "manifest"
       ]
@@ -122,7 +140,7 @@
     "spark-minio-parquet": {
       "type": "implementation",
       "impl": "spark-minio",
-      "label": "MinIO の Parquet",
+      "label": "RustFS の Parquet",
       "realizes": [
         "data"
       ]
@@ -132,6 +150,71 @@
       "impl": "spark-minio",
       "label": "REST Catalog コンテナ",
       "realizes": []
+    },
+    "aws-emr-control": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "aws-emr-host": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "aws-emr-glue": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "AWS Glue Data Catalog",
+      "realizes": []
+    },
+    "aws-emr-spark": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark Driver / Iceberg SparkCatalog",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "aws-emr-executors": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark Executors",
+      "realizes": []
+    },
+    "aws-emr-meta": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "metadata.json / Snapshot",
+      "realizes": [
+        "metadata",
+        "snapshot"
+      ]
+    },
+    "aws-emr-list": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Manifest List",
+      "realizes": [
+        "list"
+      ]
+    },
+    "aws-emr-manifest": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Manifest",
+      "realizes": [
+        "manifest"
+      ]
+    },
+    "aws-emr-s3": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3 / Parquet",
+      "realizes": [
+        "data"
+      ]
     }
   },
   "byRef": {
@@ -159,12 +242,24 @@
       "snapshot-read",
       "partition-evolution",
       "remove-orphans",
+      "spark-minio-init",
+      "spark-minio-host",
+      "spark-minio-store",
       "spark-minio-spark",
       "spark-minio-meta",
       "spark-minio-list",
       "spark-minio-manifests",
       "spark-minio-parquet",
-      "spark-minio-rest"
+      "spark-minio-rest",
+      "aws-emr-control",
+      "aws-emr-host",
+      "aws-emr-glue",
+      "aws-emr-spark",
+      "aws-emr-executors",
+      "aws-emr-meta",
+      "aws-emr-list",
+      "aws-emr-manifest",
+      "aws-emr-s3"
     ],
     "docs/reference-apache-iceberg.md#§2": [
       "metadata",
@@ -196,12 +291,26 @@
       "remove-orphans"
     ],
     "docs/reference-apache-iceberg.md#§9": [
+      "spark-minio-init",
+      "spark-minio-host",
+      "spark-minio-store",
       "spark-minio-spark",
       "spark-minio-meta",
       "spark-minio-list",
       "spark-minio-manifests",
       "spark-minio-parquet",
       "spark-minio-rest"
+    ],
+    "docs/reference-apache-iceberg.md#§10": [
+      "aws-emr-control",
+      "aws-emr-host",
+      "aws-emr-glue",
+      "aws-emr-spark",
+      "aws-emr-executors",
+      "aws-emr-meta",
+      "aws-emr-list",
+      "aws-emr-manifest",
+      "aws-emr-s3"
     ]
   },
   "reference": {

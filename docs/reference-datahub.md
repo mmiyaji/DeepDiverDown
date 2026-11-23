@@ -53,3 +53,27 @@ DataHub を自己管理し、MySQL、Elasticsearch、イベントブローカー
 HTTP 取り込みと Kafka を使う変更処理は別の経路。本番の認証、永続ボリューム、冗長構成は導入環境に合わせる。dbt とウェアハウスで資産識別子の設定を揃える。
 
 [Metadata Ingestion Architecture](https://docs.datahub.com/docs/architecture/metadata-ingestion)、[The Metadata Model](https://docs.datahub.com/docs/metadata-modeling/metadata-model)、[Data Contract Metamodel](https://archive.docs.datahub.com/docs/1.8.0/generated/metamodel/entities/datacontract)、[DataHub Docker Container Architecture](https://archive.docs.datahub.com/docs/1.2.0/architecture/docker-containers)
+
+
+Docker Compose ホスト上で GMS、Frontend、MySQL、Kafka、Elasticsearch と変更イベントを消費する処理を動かす。Snowflake と dbt は別の収集対象であり、ホスト内には含めない。Docker の構成と外部ソースの接続・互換バージョンはこの組み合わせで動作未検証。
+
+## 8. 実装例：Amazon EKS 上の DataHub・RDS・MSK・OpenSearch
+
+DataHub を Helm で EKS の EC2 ノード上に展開する。RDS に Aspect を保持し、MSK の変更イベントを処理して OpenSearch の索引を更新する。
+
+| 機能 | 担い手 |
+| --- | --- |
+| メタデータ取り込みと検証結果 | ウェアハウス用コネクターと dbt アーティファクト取り込み。dbt Core が契約を評価する。 |
+| API と UI | EKS 上の DataHub GMS と Frontend。 |
+| 保存と検索 | RDS for MySQL を Aspect の保存先とし、MSK の変更ログから Amazon OpenSearch Service の索引を更新する。 |
+
+OSS の DataHub を利用者が運用し、RDS、MSK、OpenSearch は対応する AWS マネージドサービスを使う。DataHub の Helm チャートとデータストアの対応バージョンを揃える。MSK と Schema Registry の接続・資格情報を設定し、OpenSearch の IAM 認証を使う場合は対応する署名設定と Pod の IAM ロールを用意する。MySQL は専用アカウントで TLS 接続する。DataHub へのログインとメタデータ操作ポリシーは各バックエンドのアクセス権から独立して設定する。
+
+公式資料
+
+- [DataHub の AWS デプロイ](https://docs.datahub.com/docs/deploy/aws)
+- [DataHub の Kubernetes デプロイ](https://docs.datahub.com/docs/deploy/kubernetes)
+- [DataHub dbt コネクター](https://docs.datahub.com/docs/generated/ingestion/sources/dbt)
+- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)
+
+AWS は EKS 制御プレーン、RDS、MSK、OpenSearch の基盤を運用し、利用者は Kubernetes API を使ったデプロイ、ノード、DataHub、データとアクセス権を設定する。制御プレーンのサーバーやマネージドサービスの内部ホストを直接操作しない。公式資料を組み合わせた例で、DataHub・MSK・Schema Registry・OpenSearch のバージョンと認証の実動作は未検証。[AWS shared responsibility](https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html)

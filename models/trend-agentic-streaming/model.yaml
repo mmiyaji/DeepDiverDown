@@ -198,6 +198,14 @@ implementations:
           - 20
           - 3
     nodes:
+      ex-host:
+        label: 利用者が運用するアプリ実行ホスト
+        kind: host
+        tier: flow
+        x: 6
+        y: 1.5
+        description: コンシューマーと LangGraph アプリを導入・更新し接続設定を管理する。
+        evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§4}]
       ex-source:
         label: イベント発行アプリ
         kind: service
@@ -275,3 +283,128 @@ implementations:
             ref: docs/reference-trend-agentic-streaming.md#§4
         realizes:
           - state
+
+
+    links:
+      - {id: ex-run-consumer, from: ex-host, to: ex-consumer, label: コンシューマーを実行}
+      - {id: ex-run-agent, from: ex-host, to: ex-agent, label: LangGraph を実行}
+
+    layout2d:
+      tiers: [{id: diagram, label: 実行環境と外部サービス, z: 0, origin: [-4, 0], size: [26, 18]}]
+      nodes:
+        ex-host: {tier: diagram, x: 11, y: 1}
+        ex-source: {tier: diagram, x: 6, y: 1}
+        ex-log: {tier: diagram, x: 1, y: 5}
+        ex-consumer: {tier: diagram, x: 16, y: 1}
+        ex-agent: {tier: diagram, x: 21, y: 1}
+        ex-tool: {tier: diagram, x: 6, y: 5}
+        ex-reviewer: {tier: diagram, x: 1, y: 1}
+        ex-state: {tier: diagram, x: 11, y: 5}
+      groups:
+        - {kind: datacenter, label: 利用者の実行ホスト, tier: [diagram], nodes: [ex-host, ex-consumer, ex-agent]}
+    layout3d:
+      tiers:
+        - {id: base, label: 実行基盤と独立サービス, z: 0, size: [26, 18]}
+        - {id: app, label: ホスト上の処理, z: 1, size: [26, 18]}
+      nodes:
+        ex-host: {tier: base, x: 11, y: 1}
+        ex-source: {tier: base, x: 6, y: 1}
+        ex-log: {tier: base, x: 1, y: 5}
+        ex-consumer: {tier: app, x: 16, y: 1}
+        ex-agent: {tier: app, x: 21, y: 1}
+        ex-tool: {tier: base, x: 6, y: 5}
+        ex-reviewer: {tier: base, x: 1, y: 1}
+        ex-state: {tier: base, x: 11, y: 5}
+      groups:
+        - {kind: datacenter, label: 利用者の実行ホスト, tier: [base, app], nodes: [ex-host, ex-consumer, ex-agent]}
+
+  - id: aws-msk-langgraph
+    label: "Amazon MSK と ECS 上の LangGraph・RDS"
+    description: "Amazon MSK のデータ品質イベントを ECS on Fargate で受信する。LangGraph が確認案件を起案し、担当者の承認後に台帳へ登録する。"
+    sources:
+      - {title: "Amazon MSK への接続", url: https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html}
+      - {title: "Kafka Consumer のオフセット確定", url: https://kafka.apache.org/42/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html}
+      - {title: "LangGraph の割り込みと再開", url: https://docs.langchain.com/oss/python/langgraph/interrupts}
+      - {title: "LangGraph の永続化", url: https://docs.langchain.com/oss/python/langgraph/persistence}
+      - {title: "Amazon Bedrock Converse", url: https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html}
+      - {title: "API Gateway の JWT Authorizer", url: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html}
+      - {title: "API Gateway HTTP API のプライベート統合", url: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-private.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-msk-langgraph-ecs, aws-msk-langgraph-consumer, aws-msk-langgraph-agent, aws-msk-langgraph-tool, aws-msk-langgraph-model, aws-msk-langgraph-approval, aws-msk-langgraph-alb, aws-msk-langgraph-auth, aws-msk-langgraph-msk, aws-msk-langgraph-inbox, aws-msk-langgraph-state, aws-msk-langgraph-logs]}
+      - {kind: vpc, label: "MSK・Fargate・Lambda 接続・RDS の VPC", provider: aws, tier: [runtime, data], nodes: [aws-msk-langgraph-consumer, aws-msk-langgraph-agent, aws-msk-langgraph-tool, aws-msk-langgraph-alb, aws-msk-langgraph-msk, aws-msk-langgraph-inbox, aws-msk-langgraph-state]}
+    nodes:
+      aws-msk-langgraph-source: {label: "データ品質の監視アプリ", kind: external, tier: entry, x: 1, y: 1.2, realizes: [source], description: "検査で見つけた異常とイベント ID を発行する。", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-review: {label: "データ運用の承認者", kind: actor, tier: entry, x: 1, y: 3.2, realizes: [reviewer], description: "修正案件を登録する提案を確認し、承認または拒否する。", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-ecs: {label: "Amazon ECS サービス", kind: service, tier: runtime, x: 2, y: 0.4, svc: ecs, description: "コンシューマーと LangGraph アプリの Fargate タスクを管理する。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-consumer: {label: "Fargate の Kafka Consumer", kind: worker, tier: runtime, x: 2, y: 4.5, svc: fargate, realizes: [consumer], description: "受信イベントを先に RDS に確定し、その範囲の Kafka オフセットをコミットする。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-agent: {label: "Fargate 上の LangGraph", kind: worker, tier: runtime, x: 8, y: 4.5, svc: fargate, realizes: [agent], description: "保存されたイベントから提案を生成し、承認後に同じスレッドで再開する。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-tool: {label: "案件台帳更新 Lambda", kind: worker, tier: runtime, x: 14, y: 4.5, svc: lambda, realizes: [tool], description: "承認した提案の版を照合し、同じ操作の重複登録を防ぐ。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-model: {label: "Amazon Bedrock", kind: service, tier: runtime, x: 12, y: 0.4, svc: bedrock, description: "異常の要約と案件の候補を生成する。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-approval: {label: "API Gateway 承認 API", kind: gateway, tier: runtime, x: 7, y: 0.4, svc: apigw, description: "Cognito の JWT を検証し、承認 API に渡す。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-alb: {label: "内部 Application Load Balancer", kind: lb, svc: alb, tier: runtime, x: 8, y: 2.5, description: "VPC Link から受ける承認 API の通信をアプリへルーティングする。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-auth: {label: "Cognito ユーザープール", kind: service, tier: runtime, x: 4.8, y: 2.4, svc: cognito, description: "承認者のアクセス JWT を発行する。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-msk: {label: "Amazon MSK の品質イベント", kind: queue, tier: data, x: 2, y: 1.4, svc: msk, realizes: [log], description: "品質イベントのトピックと Consumer Group の位置を保持する。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-inbox: {label: "RDS のイベント受信テーブル", kind: db, tier: data, x: 6, y: 1.4, description: "イベント ID を一意キーとして処理待ちのデータを保持する。", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-state: {label: "RDS PostgreSQL", kind: db, tier: data, x: 10, y: 1.4, svc: rds, realizes: [state], description: "LangGraph のチェックポイント、案件台帳と操作記録を専用のテーブルに保存する。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      aws-msk-langgraph-logs: {label: "CloudWatch Logs", kind: monitor, tier: data, x: 15, y: 1.4, svc: cloudwatch, description: "イベント ID と判定・実行結果のコードを記録する。", management: {type: shared, scope: "AWS はサービス基盤を運用し、利用者は設定・権限・データとアプリを管理する。"}, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+    links:
+      - {id: aws-msk-langgraph-run-consumer, from: aws-msk-langgraph-ecs, to: aws-msk-langgraph-consumer, label: "Kafka コンシューマーを起動", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-run-agent, from: aws-msk-langgraph-ecs, to: aws-msk-langgraph-agent, label: "LangGraph アプリを起動", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-persist-event, from: aws-msk-langgraph-consumer, to: aws-msk-langgraph-inbox, label: "イベントを一意キーで永続化", realizes: [invoke], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-take-event, from: aws-msk-langgraph-inbox, to: aws-msk-langgraph-agent, label: "保存したイベントを処理", realizes: [invoke], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-assess, from: aws-msk-langgraph-agent, to: aws-msk-langgraph-model, label: "必要な指標で異常を要約", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-jwt, from: aws-msk-langgraph-approval, to: aws-msk-langgraph-auth, label: "署名検証用の公開鍵を取得", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-pending, from: aws-msk-langgraph-agent, to: aws-msk-langgraph-alb, label: "承認待ち提案を返す", realizes: [approval], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-read, from: aws-msk-langgraph-alb, to: aws-msk-langgraph-approval, label: "承認 API の応答を返す", realizes: [approval], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-present, from: aws-msk-langgraph-approval, to: aws-msk-langgraph-review, label: "承認画面に提案を表示する", realizes: [approval], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-decision, from: aws-msk-langgraph-review, to: aws-msk-langgraph-approval, label: "確認結果を送信", realizes: [approve], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-forward, from: aws-msk-langgraph-approval, to: aws-msk-langgraph-alb, label: "VPC Link で承認 API を呼び出す", realizes: [approve], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-resume, from: aws-msk-langgraph-alb, to: aws-msk-langgraph-agent, label: "案件の権限と承認を確認して再開", realizes: [approve], replace: true, evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-ledger, from: aws-msk-langgraph-tool, to: aws-msk-langgraph-state, label: "案件と操作 ID を同じ DB トランザクションで登録", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+      - {id: aws-msk-langgraph-log, from: aws-msk-langgraph-agent, to: aws-msk-langgraph-logs, label: "判定と実行結果を記録", evidence: [{type: doc, ref: docs/reference-trend-agentic-streaming.md#§5}]}
+    layout2d:
+      tiers: [{id: diagram, label: 実行環境と外部サービス, z: 0, origin: [-4, 0], size: [26, 18]}]
+      nodes:
+        aws-msk-langgraph-source: {tier: diagram, x: 6, y: 1}
+        aws-msk-langgraph-review: {tier: diagram, x: 1, y: 1}
+        aws-msk-langgraph-ecs: {tier: diagram, x: 11, y: 1}
+        aws-msk-langgraph-consumer: {tier: diagram, x: 16, y: 1}
+        aws-msk-langgraph-agent: {tier: diagram, x: 21, y: 1}
+        aws-msk-langgraph-tool: {tier: diagram, x: 1, y: 5}
+        aws-msk-langgraph-model: {tier: diagram, x: 6, y: 5}
+        aws-msk-langgraph-approval: {tier: diagram, x: 11, y: 5}
+        aws-msk-langgraph-alb: {tier: diagram, x: 16, y: 5}
+        aws-msk-langgraph-auth: {tier: diagram, x: 21, y: 5}
+        aws-msk-langgraph-msk: {tier: diagram, x: 1, y: 9}
+        aws-msk-langgraph-inbox: {tier: diagram, x: 6, y: 9}
+        aws-msk-langgraph-state: {tier: diagram, x: 11, y: 9}
+        aws-msk-langgraph-logs: {tier: diagram, x: 16, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], nodes: [aws-msk-langgraph-ecs, aws-msk-langgraph-consumer, aws-msk-langgraph-agent, aws-msk-langgraph-tool, aws-msk-langgraph-model, aws-msk-langgraph-approval, aws-msk-langgraph-alb, aws-msk-langgraph-auth, aws-msk-langgraph-msk, aws-msk-langgraph-inbox, aws-msk-langgraph-state, aws-msk-langgraph-logs]}
+        - {kind: vpc, provider: aws, label: 顧客 VPC と Lambda 接続, tier: [diagram], nodes: [aws-msk-langgraph-consumer, aws-msk-langgraph-agent, aws-msk-langgraph-tool, aws-msk-langgraph-alb, aws-msk-langgraph-msk, aws-msk-langgraph-inbox, aws-msk-langgraph-state]}
+    layout3d:
+      tiers:
+        - {id: base, label: 実行基盤と独立サービス, z: 0, size: [26, 18]}
+        - {id: app, label: ホスト上の処理, z: 1, size: [26, 18]}
+      nodes:
+        aws-msk-langgraph-source: {tier: base, x: 6, y: 1}
+        aws-msk-langgraph-review: {tier: base, x: 1, y: 1}
+        aws-msk-langgraph-ecs: {tier: base, x: 11, y: 1}
+        aws-msk-langgraph-consumer: {tier: base, x: 16, y: 1}
+        aws-msk-langgraph-agent: {tier: base, x: 21, y: 1}
+        aws-msk-langgraph-tool: {tier: base, x: 1, y: 5}
+        aws-msk-langgraph-model: {tier: base, x: 6, y: 5}
+        aws-msk-langgraph-approval: {tier: base, x: 11, y: 5}
+        aws-msk-langgraph-alb: {tier: base, x: 16, y: 5}
+        aws-msk-langgraph-auth: {tier: base, x: 21, y: 5}
+        aws-msk-langgraph-msk: {tier: base, x: 1, y: 9}
+        aws-msk-langgraph-inbox: {tier: base, x: 6, y: 9}
+        aws-msk-langgraph-state: {tier: base, x: 11, y: 9}
+        aws-msk-langgraph-logs: {tier: base, x: 16, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [base, app], nodes: [aws-msk-langgraph-ecs, aws-msk-langgraph-consumer, aws-msk-langgraph-agent, aws-msk-langgraph-tool, aws-msk-langgraph-model, aws-msk-langgraph-approval, aws-msk-langgraph-alb, aws-msk-langgraph-auth, aws-msk-langgraph-msk, aws-msk-langgraph-inbox, aws-msk-langgraph-state, aws-msk-langgraph-logs]}
+        - {kind: vpc, provider: aws, label: 顧客 VPC と Lambda 接続, tier: [base], nodes: [aws-msk-langgraph-consumer, aws-msk-langgraph-agent, aws-msk-langgraph-tool, aws-msk-langgraph-alb, aws-msk-langgraph-msk, aws-msk-langgraph-inbox, aws-msk-langgraph-state]}

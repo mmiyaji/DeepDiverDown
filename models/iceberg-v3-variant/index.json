@@ -2,8 +2,8 @@
   "model": "iceberg-v3-variant",
   "name": "Iceberg v3 Variant と Parquet shredding",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "engine": {
@@ -90,6 +90,18 @@
       "type": "scenario",
       "label": "Variant 列の読み取り"
     },
+    "ex-host": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "自前 Linux Spark クラスター",
+      "realizes": []
+    },
+    "ex-storage": {
+      "type": "implementation",
+      "impl": "example",
+      "label": "自前 HDFS と Hadoop カタログ",
+      "realizes": []
+    },
     "ex-engine": {
       "type": "implementation",
       "impl": "example",
@@ -161,6 +173,55 @@
       "realizes": [
         "manifest"
       ]
+    },
+    "aws-emr": {
+      "type": "implementation",
+      "impl": "aws-emr-serverless",
+      "label": "Amazon EMR Serverless",
+      "realizes": []
+    },
+    "aws-driver": {
+      "type": "implementation",
+      "impl": "aws-emr-serverless",
+      "label": "Spark 4.1（Driver）",
+      "realizes": [
+        "engine",
+        "plan"
+      ]
+    },
+    "aws-executor": {
+      "type": "implementation",
+      "impl": "aws-emr-serverless",
+      "label": "Spark 4.1（Executor）",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "aws-glue": {
+      "type": "implementation",
+      "impl": "aws-emr-serverless",
+      "label": "AWS Glue Data Catalog",
+      "realizes": []
+    },
+    "aws-metadata": {
+      "type": "implementation",
+      "impl": "aws-emr-serverless",
+      "label": "Amazon S3（Iceberg メタデータ）",
+      "realizes": [
+        "schema",
+        "manifest"
+      ]
+    },
+    "aws-parquet": {
+      "type": "implementation",
+      "impl": "aws-emr-serverless",
+      "label": "Amazon S3（Variant の Parquet）",
+      "realizes": [
+        "meta",
+        "value",
+        "typed",
+        "file"
+      ]
     }
   },
   "byRef": {
@@ -186,6 +247,8 @@
       "shred",
       "layout",
       "read",
+      "ex-host",
+      "ex-storage",
       "ex-engine",
       "ex-schema",
       "ex-plan",
@@ -194,7 +257,13 @@
       "ex-value",
       "ex-typed",
       "ex-file",
-      "ex-manifest"
+      "ex-manifest",
+      "aws-emr",
+      "aws-driver",
+      "aws-executor",
+      "aws-glue",
+      "aws-metadata",
+      "aws-parquet"
     ],
     "docs/reference-iceberg-v3-variant.md#§3": [
       "model"
@@ -222,6 +291,8 @@
       "read"
     ],
     "docs/reference-iceberg-v3-variant.md#§5": [
+      "ex-host",
+      "ex-storage",
       "ex-engine",
       "ex-schema",
       "ex-plan",
@@ -231,6 +302,14 @@
       "ex-typed",
       "ex-file",
       "ex-manifest"
+    ],
+    "docs/reference-iceberg-v3-variant.md#§6": [
+      "aws-emr",
+      "aws-driver",
+      "aws-executor",
+      "aws-glue",
+      "aws-metadata",
+      "aws-parquet"
     ]
   },
   "reference": {

@@ -298,6 +298,7 @@ implementations:
     label: Spark・Nessie・MinIO
     description: 公式のローカル Iceberg REST ガイドに沿って Spark と MinIO を接続し、作業ブランチを試す例。
     sources:
+      - {title: Nessie authenticated demo compose, url: https://github.com/projectnessie/nessie/blob/main/docker/catalog-auth-s3/docker-compose.yml}
       - title: Nessie Specification
         url: https://projectnessie.org/develop/spec/
       - title: Configure Nessie with Iceberg REST
@@ -305,6 +306,9 @@ implementations:
       - title: Getting Started with Nessie and Iceberg REST
         url: https://projectnessie.org/guides/try-nessie/
     nodes:
+      nessie-local-host: {label: Docker Compose host, kind: host, tier: clients, x: 12, y: 1, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§6"}]}
+      nessie-local-keycloak: {label: Keycloak OAuth server, kind: service, tier: catalog, x: 12, y: 1, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§6"}]}
+      nessie-local-init: {label: MinIO bucket initializer, kind: worker, tier: storage, x: 12, y: 1, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§6"}]}
       nessie-local-spark:
         label: Spark SQL
         kind: client
@@ -378,6 +382,10 @@ implementations:
           - type: doc
             ref: docs/reference-project-nessie.md#§6
     links:
+      - {id: nessie-local-auth, from: nessie-local-spark, to: nessie-local-keycloak, label: "Obtain OAuth token", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§6"}]}
+      - {id: nessie-local-validate, from: nessie-local-server, to: nessie-local-keycloak, label: "Validate authentication", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§6"}]}
+      - {id: nessie-local-create-bucket, from: nessie-local-init, to: nessie-local-minio, label: "Initialize warehouse bucket", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§6"}]}
+      - {id: nessie-local-signed-access, from: nessie-local-spark, to: nessie-local-minio, label: "Read and write signed S3 requests", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§6"}]}
       - id: nessie-local-bind
         from: nessie-local-warehouse
         to: nessie-local-server
@@ -385,3 +393,104 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-project-nessie.md#§6
+    layout2d:
+      tiers: [{id: local, label: Local Docker Compose host, z: 0, size: [22, 11]}]
+      nodes:
+        nessie-local-host: {tier: local, x: 2, y: 1}
+        nessie-local-spark: {tier: local, x: 6, y: 1}
+        nessie-local-cli: {tier: local, x: 10, y: 1}
+        nessie-local-server: {tier: local, x: 14, y: 1}
+        nessie-local-history: {tier: local, x: 18, y: 1}
+        nessie-local-minio: {tier: local, x: 2, y: 5}
+        nessie-local-warehouse: {tier: local, x: 6, y: 5}
+        nessie-local-keycloak: {tier: local, x: 10, y: 5}
+        nessie-local-init: {tier: local, x: 14, y: 5}
+      groups:
+        - {kind: datacenter, label: Local host, tier: local, nodes: [nessie-local-host, nessie-local-spark, nessie-local-cli, nessie-local-server, nessie-local-history, nessie-local-minio, nessie-local-warehouse, nessie-local-keycloak, nessie-local-init]}
+    layout3d:
+      tiers:
+        - {id: containers, label: Containers and clients, z: 1, size: [20, 6]}
+        - {id: host, label: Local host and configuration, z: 0, size: [20, 6]}
+      nodes:
+        nessie-local-host: {tier: host, x: 2, y: 1}
+        nessie-local-spark: {tier: containers, x: 6, y: 1}
+        nessie-local-cli: {tier: containers, x: 10, y: 1}
+        nessie-local-server: {tier: containers, x: 14, y: 1}
+        nessie-local-history: {tier: containers, x: 18, y: 1}
+        nessie-local-minio: {tier: containers, x: 2, y: 4}
+        nessie-local-warehouse: {tier: host, x: 6, y: 4}
+        nessie-local-keycloak: {tier: containers, x: 10, y: 4}
+        nessie-local-init: {tier: containers, x: 14, y: 4}
+      groups:
+        - {kind: datacenter, label: Local host, tier: [containers, host], nodes: [nessie-local-host, nessie-local-spark, nessie-local-cli, nessie-local-server, nessie-local-history, nessie-local-minio, nessie-local-warehouse, nessie-local-keycloak, nessie-local-init]}
+  - id: aws-eks-nessie
+    label: AWS：EKS・Nessie・RDS for PostgreSQL
+    description: EKS の EC2 ノード上に Nessie と Spark を配置し、RDS for PostgreSQL に版を永続化し、Iceberg のデータを S3 へ保存する例。
+    sources:
+      - {title: Nessie on Kubernetes, url: https://projectnessie.org/guides/kubernetes/}
+      - {title: Nessie server configuration, url: https://projectnessie.org/nessie-0-107-4/configuration/}
+      - {title: Configure Nessie with Iceberg REST, url: https://projectnessie.org/guides/iceberg-rest/}
+      - {title: Spark on Kubernetes, url: https://spark.apache.org/docs/3.5.7/running-on-kubernetes.html}
+      - {title: Amazon EKS managed node groups, url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html}
+      - {title: IAM roles for service accounts, url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html}
+      - {title: Amazon RDS for PostgreSQL, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: control, label: Kubernetes 管理と運用, z: 2, size: [20, 4]}
+      - {id: compute, label: カタログとクエリの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: 版とテーブルの保存, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [control, compute, storage], nodes: [aws-nessie-eks, aws-nessie-sts, aws-nessie-ec2, aws-nessie-spark, aws-nessie-server, aws-nessie-rds, aws-nessie-s3]}
+      - {kind: cluster, label: EKS クラスタ, tier: compute, nodes: [aws-nessie-ec2, aws-nessie-spark, aws-nessie-server]}
+    nodes:
+      aws-nessie-eks: {label: "Amazon EKS / Kubernetes API", svc: eks, kind: service, tier: control, x: 3, y: 1.5, description: "Kubernetes のコントロールプレーンと EC2 マネージドノードグループを管理する。", management: {type: shared, scope: "AWS operates EKS control plane; customer configures Kubernetes API and workloads."}, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      aws-nessie-sts: {label: "AWS STS", svc: sts, kind: service, tier: control, x: 9, y: 1.5, description: "Nessie が引き受けるロールと、Spark のテーブルアクセス用の短期資格情報を発行する。", management: {type: shared, scope: "AWS operates STS; customer configures role trust and permissions."}, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      aws-nessie-cli: {label: "運用者 / Nessie CLI", kind: actor, tier: control, x: 17, y: 1.5, realizes: [operator], description: "到達可能な Nessie の管理 API を使って参照を作成・マージする。", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      aws-nessie-spark: {label: "Spark Driver・Executor Pod", kind: worker, tier: compute, x: 4, y: 1.5, realizes: [engine], description: "Iceberg REST でブランチを選び、S3 のデータファイルを読み書きする。", management: {type: customer, scope: "Customer manages Spark jobs and runtime settings."}, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      aws-nessie-server: {label: "Nessie Server Pod", kind: service, tier: compute, x: 10, y: 1.5, realizes: [api, refs, contents], description: "Nessie API と Iceberg REST を提供し、ブランチ・タグやテーブル状態を解決する。", management: {type: customer, scope: "Customer manages Nessie deployment and configuration."}, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      aws-nessie-ec2: {label: "Amazon EC2 / EKS ノードグループ", svc: ec2, kind: host, tier: compute, x: 16, y: 1.5, description: "Nessie と Spark の Pod を実行する Kubernetes ワーカーノード。", management: {type: shared, scope: "AWS manages node group lifecycle; customer configures nodes and workloads."}, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      aws-nessie-s3: {label: "Amazon S3 / Iceberg warehouse", svc: s3, kind: db, tier: storage, x: 4, y: 1.5, realizes: [files], description: "Iceberg のテーブルメタデータ・Manifest・データファイルを保持する。", management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      aws-nessie-rds: {label: "Amazon RDS for PostgreSQL", svc: rds, kind: db, tier: storage, x: 13, y: 1.5, realizes: [version-store], description: "Nessie の参照・コミット履歴・コンテンツ状態をトランザクション付きで永続化する。", management: {type: shared, scope: "AWS operates RDS infrastructure; customer manages database contents and access."}, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+    links:
+      - {id: aws-nessie-provision, from: aws-nessie-eks, to: aws-nessie-ec2, label: "EC2 ノードグループを管理", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-deploy, from: aws-nessie-eks, to: aws-nessie-server, label: "Kubernetes が Nessie Pod を配置", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-allocate-spark, from: aws-nessie-eks, to: aws-nessie-spark, label: "Kubernetes が Spark Pod を配置", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-history, from: aws-nessie-server, to: aws-nessie-rds, label: "参照・コミット・コンテンツを読み書き", realizes: [select-commit], replace: true, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-resolve, from: aws-nessie-server, to: aws-nessie-rds, label: "コミット時点のテーブル状態を取得", realizes: [resolve-key], replace: true, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-persist, from: aws-nessie-server, to: aws-nessie-rds, label: "参照先とコミットを確定", realizes: [commit], replace: true, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-table-meta, from: aws-nessie-server, to: aws-nessie-s3, label: "Iceberg の表メタデータを読み書き", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-read-data, from: aws-nessie-spark, to: aws-nessie-s3, label: "対象の Iceberg ファイルを読み取る", realizes: [read-files], replace: true, evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-credentials, from: aws-nessie-server, to: aws-nessie-sts, label: "S3 アクセス用の短期資格情報を取得", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+      - {id: aws-nessie-vend, from: aws-nessie-server, to: aws-nessie-spark, label: "テーブル用の一時資格情報を返す", evidence: [{type: doc, ref: "docs/reference-project-nessie.md#§7"}]}
+    layout2d:
+      tiers: [{id: diagram, label: EKS Nessie and AWS services, z: 0, size: [23, 11]}]
+      nodes:
+        aws-nessie-eks: {tier: diagram, x: 13, y: 1}
+        aws-nessie-sts: {tier: diagram, x: 17, y: 1}
+        aws-nessie-cli: {tier: diagram, x: 0, y: 5}
+        aws-nessie-spark: {tier: diagram, x: 3, y: 6}
+        aws-nessie-server: {tier: diagram, x: 7, y: 6}
+        aws-nessie-ec2: {tier: diagram, x: 5, y: 3}
+        aws-nessie-s3: {tier: diagram, x: 13, y: 6}
+        aws-nessie-rds: {tier: diagram, x: 17, y: 6}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: diagram, nodes: [aws-nessie-eks, aws-nessie-sts, aws-nessie-spark, aws-nessie-server, aws-nessie-ec2, aws-nessie-s3, aws-nessie-rds]}
+        - {kind: cluster, label: EKS cluster, tier: diagram, nodes: [aws-nessie-spark, aws-nessie-server, aws-nessie-ec2]}
+    layout3d:
+      tiers:
+        - {id: pods, label: Spark and Nessie Pods, z: 1, size: [8, 3]}
+        - {id: nodes, label: EKS EC2 nodes, z: 0, size: [8, 3]}
+        - {id: services, label: AWS services, z: 0, origin: [11, 0], size: [16, 3]}
+        - {id: user, label: Operator, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        aws-nessie-eks: {tier: services, x: 2, y: 1.5}
+        aws-nessie-sts: {tier: services, x: 6, y: 1.5}
+        aws-nessie-cli: {tier: user, x: 0, y: 1.5}
+        aws-nessie-spark: {tier: pods, x: 2, y: 1.5}
+        aws-nessie-server: {tier: pods, x: 6, y: 1.5}
+        aws-nessie-ec2: {tier: nodes, x: 4, y: 1.5}
+        aws-nessie-s3: {tier: services, x: 10, y: 1.5}
+        aws-nessie-rds: {tier: services, x: 14, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS account, tier: [pods, nodes, services], nodes: [aws-nessie-eks, aws-nessie-sts, aws-nessie-spark, aws-nessie-server, aws-nessie-ec2, aws-nessie-s3, aws-nessie-rds]}
+        - {kind: cluster, label: EKS cluster, tier: [pods, nodes], nodes: [aws-nessie-spark, aws-nessie-server, aws-nessie-ec2]}

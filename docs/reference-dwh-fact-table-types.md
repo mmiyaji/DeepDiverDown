@@ -72,7 +72,7 @@
 |---|---|---|
 | 出荷工程のイベント | landing.shipping_events | 発生時刻と一意なイベント識別子を保持する。 |
 | イベント取り込み | BigQuery の増分ロード SQL | 一意なイベントを追記し、工程が進んだ注文を特定する。 |
-| 倉庫別の日次締め | スケジュールされた日次締め SQL | 倉庫と営業日の組ごとに出荷数と残数を計算する。 |
+| 倉庫別の日次締め | 同じ GoogleSQL スクリプトの日次締め処理 | 倉庫と営業日の組ごとに出荷数と残数を計算する。 |
 | 分析者 | 集計・工程分析用 SQL ビュー | 指標に対応する粒度の表をクエリする。 |
 | トランザクションファクト | warehouse.fact_shipping_event | 発生日で区切る 1 工程イベントごとの表。 |
 | 定期スナップショット | warehouse.fact_warehouse_day | 1 倉庫・営業日ごとに出荷数と残数を保持する。 |
@@ -81,4 +81,14 @@
 
 出荷量は日別で加算できる。日末の未出荷残を日付方向に足すと期間末の残数にならないため、その指標は日次表の時点を指定して読む。
 
+出荷システムが出力した CSV は Cloud Storage に置き、同じロケーションの BigQuery ロードジョブで `landing.shipping_events` に取り込む。BigQuery Data Transfer Service のスケジュールされたクエリを専用のサービスアカウントで起動する。GoogleSQL のスクリプトは、処理対象のロード済みバッチを読み、イベント ID を重複排除してトランザクション・進捗・発生有無の表を更新した後、倉庫と営業日のカレンダーを使って日次締めを行う。
+
+営業日の境界は倉庫のタイムゾーンで求め、スケジュールの起動時刻と区別する。後着イベントは影響する営業日を指定して日次表を再計算する。分析者は BigQuery Studio から各粒度のビューを問い、運用者はジョブ履歴と対象営業日を照合する。
+
+- [Cloud Storage からの CSV ロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
+- [BigQuery のスケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)
+- [BigQuery の JOBS ビュー](https://docs.cloud.google.com/bigquery/docs/information-schema-jobs)
+
 出典 [Kimball Group Transaction Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/transaction-fact-table/)、[Kimball Group Periodic Snapshot Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/periodic-snapshot-fact-table/)、[Kimball Group Accumulating Snapshot Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/accumulating-snapshot-fact-table/)、[Kimball Group Factless Fact Tables](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/factless-fact-table/)、[Kimball Group Additive, Semi-Additive, and Non-Additive Facts](https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/)、[BigQuery パーティション表](https://docs.cloud.google.com/bigquery/docs/creating-partitioned-tables)、[BigQuery スケジュールされたクエリ](https://docs.cloud.google.com/bigquery/docs/scheduling-queries)、[BigQuery DML](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax)
+
+BigQuery と Cloud Storage の基盤は Google が運用し、利用者はデータ、GoogleSQL、スケジュール、サービスアカウントと権限を設定する。各ファクトとビューは論理データであり個別サービスではない。内部の計算ノードを直接操作しない。資料を組み合わせた例で、ロード・日次締めと SQL の結果は実動作未検証。[BigQuery overview](https://docs.cloud.google.com/bigquery/docs/introduction)

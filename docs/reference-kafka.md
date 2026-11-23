@@ -48,7 +48,7 @@ Consumer Group にメンバーが加わる・抜けると、Group Coordinator �
 
 ## 9. 実装例：分離 KRaft クォーラムの Kafka
 
-Kafka のデータブローカー群と KRaft コントローラー群を別プロセスにする例。図の P0・P1・P2 は注文トピックの分割で、トピック設定とコンシューマーグループは別に管理する。
+Kafka のデータブローカー群と KRaft コントローラー群を別プロセスにする概念例。実行ホストやネットワークを特定した導入構成ではない。具体的な AWS の実行環境は §10 を参照。図の P0・P1・P2 は注文トピックの分割で、トピック設定とコンシューマーグループは別に管理する。
 
 | 機能 | 実装での担い手 | 配置・設定 |
 | --- | --- | --- |
@@ -70,3 +70,27 @@ Kafka のデータブローカー群と KRaft コントローラー群を別プ�
 - [Apache Kafka Protocol](https://kafka.apache.org/44/design/protocol/)
 - [KRaft](https://kafka.apache.org/44/operations/kraft/)
 - [Producer Configs](https://kafka.apache.org/44/configuration/producer-configs/)
+
+## 10. 実装例：AWS（Amazon MSK と ECS on Fargate）
+
+同じ AWS アカウントの VPC で、3 つの AZ に Standard ブローカーを配置した MSK Provisioned に、ECS の Fargate タスクから接続する。例では注文トピックを 3 パーティション・複製係数 3 とし、KRaft モードを使う。
+
+| 機能 | 担い手 | 設定・動作 |
+| --- | --- | --- |
+| イベント送信 | ECS の送信サービスが起動する Fargate タスク | Java Producer がパーティションのリーダーへ追記する |
+| 分散ログとメタデータ管理 | Amazon MSK Provisioned | Standard ブローカー間でログを複製し、KRaft がメタデータとリーダーを管理する。MSK が Kafka 基盤を運用する |
+| 下流の購読 | ECS の購読サービスが起動する 2 つの Fargate タスク | 2 タスクの `group.id` をそろえ、Kafka のグループ内でパーティションを分担する |
+| アプリの配置 | Amazon ECS、AWS Fargate、Amazon ECR | ECS サービスが指定数のタスクを維持し、Fargate がタスク起動時に ECR から対応するイメージを取得する |
+
+Kafka クライアントは ECS タスクロールの認証情報を使い、IAM 認証のブローカーへ接続する。ECR からのイメージ取得にはタスク実行ロールを使う。ECR への通信経路（NAT または適切な VPC エンドポイント）と MSK の認証・ネットワーク設定が必要。MSK や Fargate の基盤は AWS が運用し、利用者はアプリ、トピック、権限、サービス設定を管理する。MSK の枠は論理的所属を示し、コントローラーの内部ネットワーク配置を表すものではない。図のブローカー番号とリーダーの割り当ては例示で、切り替わるブローカーは稼働状態とレプリカの状態に依存する。これは公式資料を組み合わせた代表例であり、実在の導入事例や動作検証済みの構成ではない。
+
+- [MSK Provisioned クラスターの作成](https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html)
+- [Amazon MSK と KRaft](https://docs.aws.amazon.com/msk/latest/developerguide/metadata-management.html)
+- [Amazon MSK の IAM アクセス制御](https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html)
+- [Amazon ECS のサービス定義](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html)
+- [Amazon ECS の IAM ロール](https://docs.aws.amazon.com/AmazonECS/latest/bestpracticesguide/security-iam-roles.html)
+
+- [Fargate タスクのネットワーク](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html)
+- [ECS タスク実行 IAM ロール](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html)
+
+自前例の Linux ホスト、プロセス、設定、データとネットワークは利用者が管理する。ホスト配置や構成は公式機能を組み合わせた例であり、具体的な環境での接続、権限、障害復旧は未検証。

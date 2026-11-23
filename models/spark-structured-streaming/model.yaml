@@ -45,10 +45,15 @@ implementations:
       - {title: Structured Streaming Programming Guide, url: https://spark.apache.org/docs/latest/streaming/index.html}
       - {title: Structured Streaming Getting Started, url: https://spark.apache.org/docs/latest/streaming/getting-started.html}
       - {title: Structured Streaming + Kafka Integration Guide, url: https://spark.apache.org/docs/latest/streaming/structured-streaming-kafka-integration.html}
+      - {title: Spark Standalone Mode, url: https://spark.apache.org/docs/latest/spark-standalone.html}
+      - {title: HDFS Architecture, url: https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html}
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      kafka-parquet-master: {label: Spark Standalone Master, kind: service, tier: processing, x: 1, y: 0, description: Worker を登録し Executor の資源を割り当てる。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
+      kafka-parquet-host: {label: 自前 Linux Worker ホスト群, kind: host, tier: processing, x: 5, y: 0, description: Spark Worker と cluster モードの Driver・Executor JVM を実行する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
+      kafka-parquet-hdfs: {label: 自前 HDFS クラスター, kind: host, tier: processing, x: 9, y: 0, description: 別ホスト群の NameNode と DataNode で出力とチェックポイントを提供する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-source: {label: Kafka orders トピック, kind: queue, tier: processing, x: 1, y: 1.15, realizes: [kafka], description: Spark Kafka ソースが分割ごとの読み取り位置を管理する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-driver: {label: Spark Driver のストリーミングクエリ, kind: service, tier: processing, x: 1, y: 3.65, realizes: [driver], description: クエリのトリガーごとにマイクロバッチを起動する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-executors: {label: Executor JVM の窓集計と State Store, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [executor, state], description: ウィンドウとキーに対応する状態をタスクで更新する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
@@ -56,4 +61,130 @@ implementations:
       kafka-parquet-checkpoint: {label: クエリ固有の checkpointLocation, kind: db, tier: processing, x: 9, y: 1.15, realizes: [checkpoint], description: クエリ進捗と状態ストアの復旧に必要なデータを保持する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-module: {label: Spark SQL 用 Kafka コネクター, kind: file, tier: setup, x: 1, y: 1.5, description: Spark と Scala に合う Kafka コネクターをアプリケーションに組み込む。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
     links:
+      - {id: kafka-parquet-master-allocate, from: kafka-parquet-master, to: kafka-parquet-host, label: Worker の資源を割り当て}
+      - {id: kafka-parquet-host-driver, from: kafka-parquet-host, to: kafka-parquet-driver, label: Driver を実行}
+      - {id: kafka-parquet-host-executor, from: kafka-parquet-host, to: kafka-parquet-executors, label: Executor を実行}
+      - {id: kafka-parquet-hdfs-output, from: kafka-parquet-hdfs, to: kafka-parquet-parquet, label: 出力パスを提供}
+      - {id: kafka-parquet-hdfs-checkpoint, from: kafka-parquet-hdfs, to: kafka-parquet-checkpoint, label: チェックポイントパスを提供}
+      - {id: kafka-parquet-driver-progress, from: kafka-parquet-driver, to: kafka-parquet-checkpoint, label: 入力範囲とコミットを保存}
+      - {id: kafka-parquet-executor-read, from: kafka-parquet-source, to: kafka-parquet-executors, label: Kafka レコードを取得}
       - {id: kafka-parquet-module-connection, from: kafka-parquet-module, to: kafka-parquet-driver, label: Kafka ソースを読み込む}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 自前運用のストリーミング構成, z: 0, size: [23, 12]}
+      nodes:
+        kafka-parquet-source: {tier: diagram, x: 2, y: 3}
+        kafka-parquet-master: {tier: diagram, x: 7, y: 2}
+        kafka-parquet-host: {tier: diagram, x: 12, y: 2}
+        kafka-parquet-driver: {tier: diagram, x: 7, y: 6}
+        kafka-parquet-executors: {tier: diagram, x: 12, y: 6}
+        kafka-parquet-module: {tier: diagram, x: 7, y: 10}
+        kafka-parquet-hdfs: {tier: diagram, x: 19, y: 2}
+        kafka-parquet-checkpoint: {tier: diagram, x: 17.5, y: 6}
+        kafka-parquet-parquet: {tier: diagram, x: 21, y: 6}
+      groups:
+        - {kind: cluster, label: Spark Standalone クラスター, tier: [diagram], x0: 4.5, y0: -0.5, x1: 14.5, y1: 11.6, nodes: [kafka-parquet-master, kafka-parquet-host, kafka-parquet-driver, kafka-parquet-executors, kafka-parquet-module]}
+        - {kind: cluster, label: HDFS クラスター, tier: [diagram], x0: 14.8, y0: -0.5, x1: 23.5, y1: 8.5, nodes: [kafka-parquet-hdfs, kafka-parquet-checkpoint, kafka-parquet-parquet]}
+    layout3d:
+      tiers:
+        - {id: kafka, label: 自前 Kafka, z: 0, origin: [-5, 0], size: [3, 4]}
+        - {id: hosts, label: Spark ホスト, z: 0, size: [12, 4]}
+        - {id: app, label: Spark の JVM, z: 1, size: [12, 4]}
+        - {id: hdfs, label: HDFS, z: 0, origin: [16, 0], size: [11, 4]}
+      nodes:
+        kafka-parquet-source: {tier: kafka, x: 1, y: 1.5}
+        kafka-parquet-master: {tier: hosts, x: 2, y: 1.5}
+        kafka-parquet-host: {tier: hosts, x: 7, y: 1.5}
+        kafka-parquet-driver: {tier: app, x: 2, y: 1.5}
+        kafka-parquet-executors: {tier: app, x: 7, y: 1.5}
+        kafka-parquet-module: {tier: app, x: 11, y: 1.5}
+        kafka-parquet-hdfs: {tier: hdfs, x: 1, y: 1.5}
+        kafka-parquet-checkpoint: {tier: hdfs, x: 5, y: 1.5}
+        kafka-parquet-parquet: {tier: hdfs, x: 9, y: 1.5}
+      groups:
+        - {kind: cluster, label: Spark Standalone クラスター, tier: [hosts, app], nodes: [kafka-parquet-master, kafka-parquet-host, kafka-parquet-driver, kafka-parquet-executors, kafka-parquet-module]}
+        - {kind: cluster, label: HDFS クラスター, tier: [hdfs], nodes: [kafka-parquet-hdfs, kafka-parquet-checkpoint, kafka-parquet-parquet]}
+
+  - id: aws-emr-serverless
+    label: "EMR Serverless・Amazon MSK・S3"
+    description: "EMR Serverless の Spark アプリケーションにストリーミングジョブを投入し、Amazon MSK のイベントを集計して S3 に保存する例。"
+    sources:
+      - {title: "EMR Serverless のストリーミングジョブ", url: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-streaming.html}
+      - {title: "EMR Serverless のジョブ再試行", url: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-resiliency.html}
+      - {title: "EMR Serverless の VPC アクセス", url: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/vpc-access.html}
+      - {title: "Spark の Kafka コネクター", url: https://spark.apache.org/docs/latest/streaming/structured-streaming-kafka-integration.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-emr-serverless-manager, aws-emr-serverless-driver, aws-emr-serverless-executor, aws-emr-serverless-eni, aws-emr-serverless-msk, aws-emr-serverless-out, aws-emr-serverless-checkpoint, aws-emr-serverless-endpoint, aws-emr-serverless-role]}
+      - {kind: vpc, label: "アプリケーション接続先の VPC", provider: aws, tier: [runtime], nodes: [aws-emr-serverless-eni, aws-emr-serverless-msk, aws-emr-serverless-endpoint]}
+    nodes:
+      aws-emr-serverless-endpoint: {label: S3 Gateway Endpoint, kind: gateway, tier: runtime, x: 15, y: 6, description: プライベートサブネットから S3 に到達するためルートテーブルに関連付ける。, management: {type: shared, scope: "AWS が基盤を運用し、利用者がエンドポイントとルートを設定する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-role: {label: ジョブ実行 IAM ロール, kind: policy, tier: runtime, x: 4, y: 5.5, description: ジョブに必要な S3 などのアクセス許可を利用者が設定する。, management: {type: customer, scope: "利用者がロールと権限を設定する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-cli: {label: "運用者の AWS CLI", kind: client, tier: entry, x: 1, y: 1.5, description: "対象アプリケーションを指定してジョブを投入する。", evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-manager: {label: "EMR Serverless Spark", kind: service, tier: runtime, x: 1, y: 1.5, svc: emr, description: "Driver と Executor のワーカーを確保し、失敗したジョブを再試行する。", management: {type: shared, scope: "AWS がサービス基盤を運用し、利用者がアプリケーションとジョブを設定する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-driver: {label: "Spark Driver ワーカー", kind: service, tier: runtime, x: 6, y: 1.5, realizes: [driver], description: "Kafka のオフセットから入力範囲を決め、マイクロバッチを起動する。", management: {type: shared, scope: "AWS がワーカーを運用し、利用者がクエリとジョブ設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-executor: {label: "Executor と State Store", kind: worker, tier: runtime, x: 11, y: 1.5, realizes: [executor, state], parallel: N, description: "割り当てられた Kafka パーティションを読み、窓状態を更新する。", management: {type: shared, scope: "AWS がワーカーを運用し、利用者が処理と状態の設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-eni: {label: "ワーカーの VPC 接続", kind: gateway, tier: runtime, x: 9, y: 4.7, description: "設定したサブネットに作成した ENI を介して MSK に接続する。", management: {type: aws, scope: "AWS が接続用 ENI を管理し、利用者がサブネットとセキュリティグループを指定する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-msk: {label: "Amazon MSK 注文トピック", kind: queue, tier: runtime, x: 14, y: 4.7, svc: msk, realizes: [kafka], description: "注文イベントを再読可能な Kafka パーティションに保存する。", management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-out: {label: "S3 の Parquet 出力", kind: db, tier: data, x: 13, y: 1.5, svc: s3, realizes: [sink], description: "確定した窓集計結果を出力用プレフィックスに保存する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-checkpoint: {label: "S3 チェックポイント", kind: db, tier: data, x: 7, y: 1.5, svc: s3, realizes: [checkpoint], description: "クエリ固有のプレフィックスに進捗と復旧用の状態を保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が復旧データと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+    links:
+      - {id: aws-emr-serverless-role-use, from: aws-emr-serverless-manager, to: aws-emr-serverless-role, label: ジョブ実行ロールを使用}
+      - {id: aws-emr-serverless-write-eni, from: aws-emr-serverless-executor, to: aws-emr-serverless-eni, label: 集計結果を送る, realizes: [write], replace: true}
+      - {id: aws-emr-serverless-write-endpoint, from: aws-emr-serverless-eni, to: aws-emr-serverless-endpoint, label: S3 宛てに転送, realizes: [write], replace: true}
+      - {id: aws-emr-serverless-write-s3, from: aws-emr-serverless-endpoint, to: aws-emr-serverless-out, label: Parquet を保存, realizes: [write], replace: true}
+      - {id: aws-emr-serverless-save-eni, from: aws-emr-serverless-executor, to: aws-emr-serverless-eni, label: 状態を送る, realizes: [save], replace: true}
+      - {id: aws-emr-serverless-save-endpoint, from: aws-emr-serverless-eni, to: aws-emr-serverless-endpoint, label: チェックポイントを転送, realizes: [save], replace: true}
+      - {id: aws-emr-serverless-save-s3, from: aws-emr-serverless-endpoint, to: aws-emr-serverless-checkpoint, label: 状態を保存, realizes: [save], replace: true}
+      - {id: aws-emr-serverless-progress, from: aws-emr-serverless-driver, to: aws-emr-serverless-eni, label: 進捗を送る}
+      - {id: aws-emr-serverless-resume-endpoint, from: aws-emr-serverless-checkpoint, to: aws-emr-serverless-endpoint, label: 進捗を返す, realizes: [resume], replace: true}
+      - {id: aws-emr-serverless-resume-eni, from: aws-emr-serverless-endpoint, to: aws-emr-serverless-eni, label: チェックポイントを転送, realizes: [resume], replace: true}
+      - {id: aws-emr-serverless-resume-driver, from: aws-emr-serverless-eni, to: aws-emr-serverless-driver, label: 進捗を読み戻す, realizes: [resume], replace: true}
+      - {id: aws-emr-serverless-request, from: aws-emr-serverless-cli, to: aws-emr-serverless-manager, label: "STREAMING モードで投入", evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      - {id: aws-emr-serverless-start, from: aws-emr-serverless-manager, to: aws-emr-serverless-driver, label: "Driver を起動・再起動", evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      - {id: aws-emr-serverless-allocate, from: aws-emr-serverless-manager, to: aws-emr-serverless-executor, label: "Executor ワーカーを確保", evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      - {id: aws-emr-serverless-source, from: aws-emr-serverless-msk, to: aws-emr-serverless-eni, label: "Kafka レコードとメタデータを返す", realizes: [read], replace: true, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      - {id: aws-emr-serverless-offset, from: aws-emr-serverless-eni, to: aws-emr-serverless-driver, label: "Kafka オフセットを取得", realizes: [read], replace: true, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      - {id: aws-emr-serverless-records, from: aws-emr-serverless-eni, to: aws-emr-serverless-executor, label: "Kafka レコードを読み込む", evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: EMR Serverless の構成, z: 0, size: [27, 13]}
+      nodes:
+        aws-emr-serverless-cli: {tier: diagram, x: 1, y: 2}
+        aws-emr-serverless-manager: {tier: diagram, x: 6, y: 2}
+        aws-emr-serverless-role: {tier: diagram, x: 6, y: 5}
+        aws-emr-serverless-driver: {tier: diagram, x: 11, y: 2}
+        aws-emr-serverless-executor: {tier: diagram, x: 16, y: 2}
+        aws-emr-serverless-eni: {tier: diagram, x: 11, y: 7.6}
+        aws-emr-serverless-msk: {tier: diagram, x: 6, y: 10}
+        aws-emr-serverless-endpoint: {tier: diagram, x: 16, y: 10}
+        aws-emr-serverless-checkpoint: {tier: diagram, x: 22, y: 7}
+        aws-emr-serverless-out: {tier: diagram, x: 22, y: 11}
+      groups:
+        - {kind: cloud, label: AWS の論理的所属, provider: aws, tier: [diagram], x0: 3.2, y0: -0.5, x1: 25, y1: 13, nodes: [aws-emr-serverless-manager, aws-emr-serverless-driver, aws-emr-serverless-executor, aws-emr-serverless-eni, aws-emr-serverless-msk, aws-emr-serverless-out, aws-emr-serverless-checkpoint, aws-emr-serverless-endpoint, aws-emr-serverless-role]}
+        - {kind: vpc, label: 利用者 VPC, provider: aws, tier: [diagram], x0: 3.7, y0: 6, x1: 18.7, y1: 12.5, nodes: [aws-emr-serverless-eni, aws-emr-serverless-msk, aws-emr-serverless-endpoint]}
+    layout3d:
+      tiers:
+        - {id: entry, label: ジョブ投入, kind: origin, z: 0, origin: [-5, 0], size: [3, 4]}
+        - {id: runtime, label: EMR Serverless の実行, z: 0, size: [19, 4]}
+        - {id: vpc, label: 利用者 VPC, z: 0, origin: [0, 7], size: [18, 4]}
+        - {id: storage, label: 独立した S3, z: 0, origin: [23, 0], size: [8, 4]}
+      nodes:
+        aws-emr-serverless-cli: {tier: entry, x: 1, y: 1.5}
+        aws-emr-serverless-manager: {tier: runtime, x: 2, y: 1.5}
+        aws-emr-serverless-role: {tier: runtime, x: 6, y: 1.5}
+        aws-emr-serverless-driver: {tier: runtime, x: 11, y: 1.5}
+        aws-emr-serverless-executor: {tier: runtime, x: 16, y: 1.5}
+        aws-emr-serverless-msk: {tier: vpc, x: 2, y: 1.5}
+        aws-emr-serverless-eni: {tier: vpc, x: 8, y: 1.5}
+        aws-emr-serverless-endpoint: {tier: vpc, x: 14, y: 1.5}
+        aws-emr-serverless-checkpoint: {tier: storage, x: 2, y: 1.5}
+        aws-emr-serverless-out: {tier: storage, x: 6, y: 1.5}
+      groups:
+        - {kind: cloud, label: AWS の論理的所属, provider: aws, tier: [runtime, vpc, storage], nodes: [aws-emr-serverless-manager, aws-emr-serverless-driver, aws-emr-serverless-executor, aws-emr-serverless-eni, aws-emr-serverless-msk, aws-emr-serverless-out, aws-emr-serverless-checkpoint, aws-emr-serverless-endpoint, aws-emr-serverless-role]}
+        - {kind: vpc, label: 利用者 VPC, provider: aws, tier: [vpc], nodes: [aws-emr-serverless-eni, aws-emr-serverless-msk, aws-emr-serverless-endpoint]}

@@ -243,13 +243,14 @@ implementations:
           - 24
           - 3
     nodes:
+      ex-engine: {label: BigQuery managed query service, kind: service, tier: flow, x: 24, y: 1.5, svc: "gcp:bigquery", description: "Google operates the service; customers configure SQL, access and datasets. Internal compute is not shown.", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§4"}]}
+      ex-access: {label: BigQuery IAM and view access, kind: policy, tier: control, x: 12, y: 1.5, description: "Customer grants query and view permissions and restricts direct source access.", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§4"}]}
       ex-source:
         label: BigQuery 元テーブル
         kind: db
         tier: flow
         x: 0
         'y': 1.5
-        svc: gcp:bigquery
         evidence:
           - type: doc
             ref: docs/reference-dwh-differential-privacy.md#§4
@@ -261,7 +262,6 @@ implementations:
         tier: flow
         x: 4
         'y': 1.5
-        svc: gcp:bigquery
         evidence:
           - type: doc
             ref: docs/reference-dwh-differential-privacy.md#§4
@@ -273,7 +273,6 @@ implementations:
         tier: flow
         x: 8
         'y': 1.5
-        svc: gcp:bigquery
         evidence:
           - type: doc
             ref: docs/reference-dwh-differential-privacy.md#§4
@@ -285,7 +284,6 @@ implementations:
         tier: flow
         x: 12
         'y': 1.5
-        svc: gcp:bigquery
         evidence:
           - type: doc
             ref: docs/reference-dwh-differential-privacy.md#§4
@@ -297,7 +295,6 @@ implementations:
         tier: flow
         x: 16
         'y': 1.5
-        svc: gcp:bigquery
         evidence:
           - type: doc
             ref: docs/reference-dwh-differential-privacy.md#§4
@@ -307,7 +304,7 @@ implementations:
         label: 分析者
         kind: actor
         tier: flow
-        x: 20
+        x: -5
         'y': 1.5
         evidence:
           - type: doc
@@ -320,7 +317,6 @@ implementations:
         tier: control
         x: 4
         'y': 1.5
-        svc: gcp:bigquery
         evidence:
           - type: doc
             ref: docs/reference-dwh-differential-privacy.md#§4
@@ -332,7 +328,6 @@ implementations:
         tier: control
         x: 8
         'y': 1.5
-        svc: gcp:bigquery
         evidence:
           - type: doc
             ref: docs/reference-dwh-differential-privacy.md#§4
@@ -342,7 +337,7 @@ implementations:
         label: 方針管理者
         kind: actor
         tier: control
-        x: 0
+        x: -5
         'y': 1.5
         evidence:
           - type: doc
@@ -350,22 +345,123 @@ implementations:
         realizes:
           - admin
     groups:
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud / BigQuery
-        tier:
-          - flow
-        nodes:
-          - ex-source
-          - ex-view
-          - ex-bound
-          - ex-aggregate
-          - ex-result
-      - kind: cloud
-        provider: gcp
-        label: Google Cloud / BigQuery
-        tier:
-          - control
-        nodes:
-          - ex-policy
-          - ex-budget
+      - {kind: cloud, provider: gcp, label: Google Cloud project / BigQuery, tier: [flow, control], nodes: [ex-engine, ex-access, ex-source, ex-view, ex-bound, ex-aggregate, ex-result, ex-policy, ex-budget]}
+    links:
+      - {id: dp-bigquery-access, from: ex-analyst, to: ex-access, label: "Authenticate and authorize query", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§4"}]}
+      - {id: dp-bigquery-run, from: ex-access, to: ex-engine, label: "Submit authorized SQL", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§4"}]}
+      - {id: dp-bigquery-exec, from: ex-engine, to: ex-aggregate, label: "Execute protected query", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§4"}]}
+    layout2d:
+      tiers: [{id: diagram, label: BigQuery protected analysis, z: 0, size: [30, 12]}]
+      nodes:
+        ex-admin: {tier: diagram, x: 0, y: 1}
+        ex-analyst: {tier: diagram, x: 0, y: 6}
+        ex-access: {tier: diagram, x: 5, y: 1}
+        ex-engine: {tier: diagram, x: 10, y: 1}
+        ex-policy: {tier: diagram, x: 15, y: 1}
+        ex-budget: {tier: diagram, x: 20, y: 1}
+        ex-source: {tier: diagram, x: 5, y: 6}
+        ex-view: {tier: diagram, x: 10, y: 6}
+        ex-bound: {tier: diagram, x: 15, y: 6}
+        ex-aggregate: {tier: diagram, x: 20, y: 6}
+        ex-result: {tier: diagram, x: 25, y: 6}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project / BigQuery, tier: diagram, nodes: [ex-engine, ex-access, ex-source, ex-view, ex-bound, ex-aggregate, ex-result, ex-policy, ex-budget]}
+    layout3d:
+      tiers:
+        - {id: service, label: BigQuery managed service, z: 0, size: [27, 8]}
+        - {id: users, label: Users, kind: origin, z: 0, origin: [-6, 0], size: [4, 5]}
+      nodes:
+        ex-admin: {tier: users, x: 1, y: 1}
+        ex-analyst: {tier: users, x: 1, y: 4}
+        ex-access: {tier: service, x: 2, y: 1}
+        ex-engine: {tier: service, x: 7, y: 1}
+        ex-policy: {tier: service, x: 12, y: 1}
+        ex-budget: {tier: service, x: 17, y: 1}
+        ex-source: {tier: service, x: 2, y: 6}
+        ex-view: {tier: service, x: 7, y: 6}
+        ex-bound: {tier: service, x: 12, y: 6}
+        ex-aggregate: {tier: service, x: 17, y: 6}
+        ex-result: {tier: service, x: 22, y: 6}
+      groups:
+        - {kind: cloud, provider: gcp, label: Google Cloud project / BigQuery, tier: service, nodes: [ex-engine, ex-access, ex-source, ex-view, ex-bound, ex-aggregate, ex-result, ex-policy, ex-budget]}
+
+  - id: aws-clean-rooms-dp
+    label: "AWS Clean Rooms のユーザー単位の差分プライバシー"
+    description: "提供者アカウントの S3 データを AWS Clean Rooms コラボレーションへ関連付け、分析側に差分プライバシー付き集計結果だけを配信する。"
+    sources:
+      - {title: "AWS Clean Rooms Differential Privacy", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/differential-privacy.html}
+      - {title: "差分プライバシー付きカスタム分析ルール", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/custom-diff-privacy.html}
+      - {title: "Clean Rooms の予算とノイズ設定", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/dp-settings.html}
+      - {title: "Clean Rooms のデータテーブルの準備", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/working-with-data-tables.html}
+      - {title: "Clean Rooms のサービスロール", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/setting-up-roles.html}
+      - {title: "Clean Rooms の結果受領設定", url: https://docs.aws.amazon.com/clean-rooms/latest/userguide/use-sql-editor.html}
+    tiers:
+      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
+      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
+      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+    groups:
+      - {kind: cloud, label: "AWS Clean Rooms コラボレーション", provider: aws, tier: [runtime], nodes: [aws-clean-rooms-dp-policy, aws-clean-rooms-dp-budget, aws-clean-rooms-dp-view, aws-clean-rooms-dp-bound, aws-clean-rooms-dp-aggregate]}
+      - {kind: cloud, label: "提供者の AWS アカウント", provider: aws, tier: [data], nodes: [aws-clean-rooms-dp-catalog, aws-clean-rooms-dp-source, aws-clean-rooms-dp-input-role]}
+      - {kind: cloud, label: "受領者の AWS アカウント", provider: aws, tier: [data], nodes: [aws-clean-rooms-dp-result, aws-clean-rooms-dp-output-role]}
+    nodes:
+      aws-clean-rooms-dp-input-role: {label: Provider S3 read service role, kind: policy, tier: data, x: 7, y: 0.7, management: {type: customer, scope: "Customer configures trust and read permissions for Glue and S3; KMS permissions may also be required."}, evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§5"}]}
+      aws-clean-rooms-dp-output-role: {label: Recipient result service role, kind: policy, tier: data, x: 11, y: 0.7, management: {type: customer, scope: "Recipient configures role trust and result-bucket permissions."}, evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§5"}]}
+      aws-clean-rooms-dp-admin: {label: "データ提供側の管理者", kind: actor, tier: entry, x: 1, y: 0.9, realizes: [admin], description: "保護単位、受領可能なメンバー、プライバシー予算を設定する。", evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-analyst: {label: "分析側のメンバー", kind: actor, tier: entry, x: 1, y: 2.8, realizes: [analyst], description: "クエリ権限と結果受領権限が付いたメンバーとして分析する。", evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-policy: {label: "カスタム分析ルール", kind: policy, tier: runtime, x: 3, y: 0.7, realizes: [policy], description: "差分プライバシーを有効にし、同一人物を含むレコードを結び付ける列を指定する。", management: {type: customer, scope: "Customer configures the analysis rule and privacy budget within Clean Rooms."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-budget: {label: "コラボレーションの予算", kind: policy, tier: runtime, x: 8, y: 0.7, realizes: [budget], description: "提供者の差分プライバシー対象表に適用する予算とクエリごとのノイズ量を管理する。", management: {type: customer, scope: "Customer configures the analysis rule and privacy budget within Clean Rooms."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-view: {label: "Clean Rooms の設定済みテーブル", kind: service, tier: runtime, x: 3, y: 4.6, svc: cleanrooms, realizes: [view], description: "許可された分析を受け付ける。提供者のサービスロールで実データを参照する。", management: {type: shared, scope: "AWS operates Clean Rooms; customers configure the collaboration, permissions and analysis rules."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-bound: {label: "ユーザー単位の貢献制御", kind: service, tier: runtime, x: 8, y: 4.6, realizes: [bound], description: "ユーザー識別列を使い、対応する SQL 集計のユーザー単位の貢献を制御する。", management: {type: shared, scope: "AWS operates Clean Rooms; customers configure the collaboration, permissions and analysis rules."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-aggregate: {label: "Clean Rooms の保護付き SQL 集計", kind: worker, tier: runtime, x: 14, y: 4.6, svc: cleanrooms, realizes: [aggregate], description: "集計値にノイズを加え、予算内の結果を出力する。", management: {type: shared, scope: "AWS operates Clean Rooms; customers configure the collaboration, permissions and analysis rules."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-catalog: {label: "AWS Glue Data Catalog", kind: catalog, tier: data, x: 3, y: 0.7, svc: glue, description: "入力テーブルのスキーマと S3 の位置を保持する。", management: {type: shared, scope: "AWS operates Glue Data Catalog; customer manages metadata and permissions."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-source: {label: "提供者 S3 の保護対象データ", kind: db, tier: data, x: 3, y: 3.7, svc: s3, realizes: [source], description: "同一人物を一貫して識別できるイベントデータを保持する。", management: {type: shared, scope: "AWS operates S3; customer manages buckets, data and access."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      aws-clean-rooms-dp-result: {label: "分析側 S3 の集計結果", kind: db, tier: data, x: 14, y: 3.7, svc: s3, realizes: [result], description: "結果受領者の権限で、ノイズ付き集計を保存する。", management: {type: shared, scope: "AWS operates S3; customer manages buckets, data and access."}, evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+    links:
+      - {id: aws-clean-rooms-dp-location, from: aws-clean-rooms-dp-view, to: aws-clean-rooms-dp-catalog, label: "テーブルの定義と保管場所を確認", evidence: [{type: doc, ref: docs/reference-dwh-differential-privacy.md#§5}]}
+      - {id: dp-input-assume, from: aws-clean-rooms-dp-view, to: aws-clean-rooms-dp-input-role, label: "Assume read role", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§5"}]}
+      - {id: dp-input-data, from: aws-clean-rooms-dp-input-role, to: aws-clean-rooms-dp-source, label: "Authorize S3 read", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§5"}]}
+      - {id: dp-input-catalog, from: aws-clean-rooms-dp-input-role, to: aws-clean-rooms-dp-catalog, label: "Authorize Glue metadata read", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§5"}]}
+      - {id: dp-output-assume, from: aws-clean-rooms-dp-aggregate, to: aws-clean-rooms-dp-output-role, label: "Assume result role", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§5"}]}
+      - {id: dp-output-data, from: aws-clean-rooms-dp-output-role, to: aws-clean-rooms-dp-result, label: "Authorize result write", evidence: [{type: doc, ref: "docs/reference-dwh-differential-privacy.md#§5"}]}
+    layout2d:
+      tiers: [{id: diagram, label: Clean Rooms collaboration, z: 0, size: [31, 19]}]
+      nodes:
+        aws-clean-rooms-dp-admin: {tier: diagram, x: 0, y: 1}
+        aws-clean-rooms-dp-analyst: {tier: diagram, x: 0, y: 6}
+        aws-clean-rooms-dp-policy: {tier: diagram, x: 10, y: 1}
+        aws-clean-rooms-dp-budget: {tier: diagram, x: 15, y: 1}
+        aws-clean-rooms-dp-view: {tier: diagram, x: 10, y: 6}
+        aws-clean-rooms-dp-bound: {tier: diagram, x: 15, y: 6}
+        aws-clean-rooms-dp-aggregate: {tier: diagram, x: 20, y: 6}
+        aws-clean-rooms-dp-catalog: {tier: diagram, x: 4, y: 11}
+        aws-clean-rooms-dp-source: {tier: diagram, x: 8, y: 11}
+        aws-clean-rooms-dp-result: {tier: diagram, x: 25, y: 11}
+        aws-clean-rooms-dp-input-role: {tier: diagram, x: 4, y: 15}
+        aws-clean-rooms-dp-output-role: {tier: diagram, x: 25, y: 15}
+      groups:
+        - {kind: cloud, provider: aws, label: Provider AWS account, tier: diagram, nodes: [aws-clean-rooms-dp-catalog, aws-clean-rooms-dp-source, aws-clean-rooms-dp-input-role]}
+        - {kind: cloud, provider: aws, label: AWS Clean Rooms collaboration, tier: diagram, nodes: [aws-clean-rooms-dp-policy, aws-clean-rooms-dp-budget, aws-clean-rooms-dp-view, aws-clean-rooms-dp-bound, aws-clean-rooms-dp-aggregate]}
+        - {kind: cloud, provider: aws, label: Recipient AWS account, tier: diagram, nodes: [aws-clean-rooms-dp-result, aws-clean-rooms-dp-output-role]}
+    layout3d:
+      tiers:
+        - {id: users, label: Members, kind: origin, z: 0, origin: [-5, 0], size: [3, 5]}
+        - {id: provider, label: Provider account, z: 0, origin: [0, 0], size: [12, 5]}
+        - {id: collaboration, label: Clean Rooms managed service, z: 0, origin: [15, 0], size: [15, 7]}
+        - {id: recipient, label: Recipient account, z: 0, origin: [33, 0], size: [8, 5]}
+      nodes:
+        aws-clean-rooms-dp-admin: {tier: users, x: 1, y: 1}
+        aws-clean-rooms-dp-analyst: {tier: users, x: 1, y: 4}
+        aws-clean-rooms-dp-policy: {tier: collaboration, x: 2, y: 1}
+        aws-clean-rooms-dp-budget: {tier: collaboration, x: 7, y: 1}
+        aws-clean-rooms-dp-view: {tier: collaboration, x: 2, y: 5}
+        aws-clean-rooms-dp-bound: {tier: collaboration, x: 7, y: 5}
+        aws-clean-rooms-dp-aggregate: {tier: collaboration, x: 12, y: 5}
+        aws-clean-rooms-dp-catalog: {tier: provider, x: 2, y: 1}
+        aws-clean-rooms-dp-source: {tier: provider, x: 7, y: 1}
+        aws-clean-rooms-dp-result: {tier: recipient, x: 2, y: 1}
+        aws-clean-rooms-dp-input-role: {tier: provider, x: 4, y: 4}
+        aws-clean-rooms-dp-output-role: {tier: recipient, x: 5, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: Provider AWS account, tier: provider, nodes: [aws-clean-rooms-dp-catalog, aws-clean-rooms-dp-source, aws-clean-rooms-dp-input-role]}
+        - {kind: cloud, provider: aws, label: AWS Clean Rooms collaboration, tier: collaboration, nodes: [aws-clean-rooms-dp-policy, aws-clean-rooms-dp-budget, aws-clean-rooms-dp-view, aws-clean-rooms-dp-bound, aws-clean-rooms-dp-aggregate]}
+        - {kind: cloud, provider: aws, label: Recipient AWS account, tier: recipient, nodes: [aws-clean-rooms-dp-result, aws-clean-rooms-dp-output-role]}

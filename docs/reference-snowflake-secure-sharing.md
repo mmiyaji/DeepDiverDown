@@ -41,4 +41,10 @@
 
 提供側で Share に受領アカウントを加え、受領側で参照権限を設定する。共有を失効させても、受領者が事前に別の対象へ出力した結果の回収はこの仕組みの対象外である。
 
+この例では提供者が公開用ビューの参照権限を Share に直接付与する。受領側では、インポートしたデータベースの `IMPORTED PRIVILEGES` と `BI_WH` の使用権限を受領側 BI ロールに付与する。公開用ビューの参照に使うソースデータは提供者のアカウントに残り、BI クエリは受領者の Warehouse で動く。
+
+- [インポートしたデータの利用](https://docs.snowflake.com/en/user-guide/data-share-consumers)
+
 出典 [Secure Data Sharing の概念](https://docs.snowflake.com/en/user-guide/data-sharing-intro)、[共有用の secure object](https://docs.snowflake.com/en/user-guide/data-sharing-secure-views)、[Snowflake: Create and configure shares](https://docs.snowflake.com/en/user-guide/data-sharing-provider)
+
+提供者と受領者のアカウントは別の領域である。提供者は Secure View、Share、権限と受領先を設定し、受領者は共有から読み取り専用 DB を作り、自分の Warehouse とロールで参照する。Snowflake は基盤を運用し、各利用者は内部計算・保存ノードを直接操作しない。共有の失効は将来のアクセスを制限し、既に利用者が保存したデータを消去するものではない。この構成は公式資料を組み合わせた例であり、実動作は未検証。[Snowflake architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)

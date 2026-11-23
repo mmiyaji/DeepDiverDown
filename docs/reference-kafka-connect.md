@@ -54,3 +54,30 @@ PostgreSQL の変更を Debezium で取り込み、Kafka Connect の分散ワー
 - [Kafka Connect User Guide](https://kafka.apache.org/44/kafka-connect/user-guide/)
 - [Debezium Connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
 - [Confluent S3 Sink Connector](https://docs.confluent.io/kafka-connectors/s3-sink/current/overview.html)
+
+## 7. 実装例：AWS（MSK Connect と Amazon S3）
+
+Source と Sink を、それぞれカスタムプラグインを指定した MSK Connect コネクターとして作成する。各コネクターは独自のワーカー容量を持ち、AWS がワーカーを管理する。
+
+| 機能 | 担い手 | 設定・動作 |
+| --- | --- | --- |
+| 業務 DB | Amazon RDS for PostgreSQL | 論理レプリケーションを有効にし、対象テーブルの Publication とスロットを使う |
+| 取り込み | MSK Connect の Debezium PostgreSQL Source | スナップショットと `pgoutput` の変更を取り込み、イベントを発行する |
+| イベントログ | Amazon MSK | Source が発行する CDC トピックを Sink が購読する |
+| 出力と保存 | MSK Connect の Confluent S3 Sink、Amazon S3 | Sink がイベントをファイル化し、出力用バケットへ書き込む |
+| 再開位置 | Amazon MSK | Source の位置はコネクター用オフセットトピックに、Sink の位置は `connect-{CONNECTOR_NAME}` グループのコミット済みオフセットに保存する |
+| 実行と登録 | MSK Connect、Amazon S3 | プラグイン用バケットの ZIP を登録時にコピーし、ワーカーで実行する |
+
+Source・Sink は同じ VPC のプライベートサブネットに作成される接続用 ENI を使う。RDS・MSK へのセキュリティグループ、Sink から S3 への到達性と書き込み権限を設定する。両コネクターの Converter は同じイベント形式を扱えるよう設定する。
+
+- [AWS の PostgreSQL CDC 構成例](https://aws.amazon.com/blogs/database/implementing-real-time-change-data-capture-with-debezium-for-amazon-aurora-postgresql-and-amazon-rds-for-postgresql/)
+- [MSK Connect のワーカー](https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-workers.html)
+- [Amazon S3 Sink Connector の作成](https://docs.aws.amazon.com/msk/latest/developerguide/mkc-S3sink-connector-example.html)
+- [MSK Connect のカスタムプラグイン](https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html)
+- [MSK Connect のソースオフセットと Sink の Consumer Group](https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-set-offset-storage-topic.html)
+
+これらは公式資料の手順を組み合わせた代表例であり、動作検証済みの導入事例ではない。分散モードの例では利用者がワーカーを稼働させ、プラグインと設定を各ホストに配置する。この例では自前 Linux ホスト群の Java JVM 上で分散ワーカーを動かし、PostgreSQL と Kafka も自前で運用する。ホストの調達先、DB・Kafka の詳細な配置とネットワーク構成は未指定である。AWS の例では MSK Connect のワーカー自体と利用者 VPC の接続用 ENI を区別する。AWS はワーカーや各サービスの基盤を運用し、利用者はコネクター、容量、サブネット、セキュリティグループ、データとアクセス権を設定する。内部ワーカーホストへの直接アクセスは図に含めない。S3 への経路はこの例では利用者 VPC の S3 エンドポイントを前提とする。
+
+- [MSK Connect の S3 接続の準備](https://docs.aws.amazon.com/msk/latest/developerguide/mkc-tutorial-setup.html)
+
+自前例の Linux ホスト、プロセス、設定、データとネットワークは利用者が管理する。ホスト配置や構成は公式機能を組み合わせた例であり、具体的な環境での接続、権限、障害復旧は未検証。

@@ -61,3 +61,25 @@ HDFS 上の Avro Object Container File を AvroKeyInputFormat で二つの Map �
 - [Avro Schema Resolution](https://avro.apache.org/docs/current/specification/#schema-resolution)
 - [AvroKeyInputFormat](https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/mapreduce/AvroKeyInputFormat.html)
 - [Avro DataFileReader](https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/file/DataFileReader.html)
+
+## 8. 実装例：AWS（EMR on EC2・HDFS）
+
+Amazon EMR on EC2 に Hadoop クラスタを作成し、S3 に保存した Avro Object Container File をクラスタの HDFS にステージする。EMR のカスタム JAR ステップには使用する Hadoop リリースに合わせてビルドしたジョブを指定し、`AvroKeyInputFormat` と対応する Avro の依存関係をジョブに含める。
+
+| 機能 | 担い手 |
+|---|---|
+| クラスタとステップの管理 | Amazon EMR |
+| Map タスクの配置・実行 | EC2 上の Hadoop YARN |
+| 入力原本とジョブの配布 | Amazon S3 上の Avro ファイルとジョブ JAR |
+| 分割対象のファイル | HDFS 上の同一 Avro Object Container File |
+| 分割の境界調整とデコード | Map タスク内の Avro RecordReader |
+
+各 Map タスクは割り当てられた Split を処理する。後半のタスクは Avro の同期マーカーで境界を合わせる。タスクが二つあるのは図の例で、実際の Split 数はファイルと入力設定による。HDFS はクラスタ内の作業領域として使い、原本は S3 に保持する。
+
+- [EMR クラスタのノードとステップ](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html)
+- [EMR のカスタム JAR ステップ](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-launch-custom-jar-cli.html)
+- [Apache Avro AvroKeyInputFormat](https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/mapreduce/AvroKeyInputFormat.html)
+
+自前例は Linux の Hadoop ノード群で YARN と HDFS を運用し、利用者がジョブを投入する。例示の Map 出力は HDFS の別パスへ保存する。AWS 例は AWS が EMR・EC2・S3 基盤を運用し、利用者がクラスター、ジョブ、HDFS の作業データと権限を管理する。S3 からのステージングは別途行う前提で、具体的なコピー手順・ネットワークと依存バージョンの実動作は未検証。いずれも公式資料を組み合わせた代表例である。
+
+- [Hadoop MapReduce Tutorial](https://hadoop.apache.org/docs/stable/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html)

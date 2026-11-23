@@ -278,6 +278,8 @@ implementations:
         url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3
       - title: Databricks のリネージシステムテーブル
         url: https://docs.databricks.com/aws/en/admin/system-tables/lineage
+      - {title: Databricks deployment architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
+      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
     tiers:
       - id: flow
         label: 構成と処理の流れ
@@ -292,13 +294,15 @@ implementations:
           - 8
           - 3
     nodes:
+      example-user: {label: Data analyst, kind: client, tier: flow, x: -2, y: 11, evidence: [{type: doc, ref: "docs/reference-databricks-unity-catalog.md#§5"}]}
+      example-serverless: {label: Databricks serverless compute plane, kind: host, tier: flow, x: 14, y: 5, evidence: [{type: doc, ref: "docs/reference-databricks-unity-catalog.md#§5"}]}
       example-workspace:
         label: Databricks 本番ワークスペース
         kind: client
         tier: flow
         svc: databricks:platform
-        x: 0
-        'y': 2
+        x: 2
+        y: 1
         realizes:
           - workspace
         description: 本番カタログを利用するワークスペースを制限する。
@@ -309,8 +313,8 @@ implementations:
         label: Unity Catalog のメタストアと prod.sales
         kind: service
         tier: flow
-        x: 4
-        'y': 2
+        x: 6
+        y: 1
         realizes:
           - metastore
           - catalog
@@ -323,8 +327,8 @@ implementations:
         label: prod.sales.orders 管理 Delta テーブル
         kind: db
         tier: flow
-        x: 12
-        'y': 0
+        x: 10
+        y: 1
         realizes:
           - managed
         description: サービスがデータライフサイクルを管理する。
@@ -336,8 +340,8 @@ implementations:
         label: prod.sales.orders_landing 外部表
         kind: db
         tier: flow
-        x: 12
-        'y': 4
+        x: 14
+        y: 1
         realizes:
           - external
         description: 外部ロケーションのファイルを表として登録する。
@@ -349,8 +353,8 @@ implementations:
         label: Unity Catalog 外部ロケーションと Storage Credential
         kind: service
         tier: flow
-        x: 8
-        'y': 5
+        x: 2
+        y: 5
         realizes:
           - location
         description: アクセスを許可する S3 パスと認証主体を関連付ける。
@@ -359,24 +363,25 @@ implementations:
             ref: docs/reference-databricks-unity-catalog.md#§5
         svc: databricks:unity
       example-storage:
-        label: Amazon S3 の着地・管理領域
+        label: Amazon S3 の外部着地領域
         kind: db
         tier: flow
         x: 23
-        'y': 4
+        y: 1
         svc: s3
         realizes:
           - storage
-        description: 外部ファイルと管理テーブル用の保存先を分ける。
+        description: 取り込みで作られた外部表のファイルを保持し、外部データの所有者が管理する。
+        management: {type: shared, scope: "AWS operates S3; customer manages external files and access."}
         evidence:
           - type: doc
             ref: docs/reference-databricks-unity-catalog.md#§5
       example-masked:
         label: 分析者用 SQL Warehouse
-        kind: client
+        kind: worker
         tier: flow
-        x: 16
-        'y': 0
+        x: 6
+        y: 5
         realizes:
           - masked
         description: 許可された表と、マスクされた列の出力を参照する。
@@ -388,8 +393,8 @@ implementations:
         label: Unity Catalog リネージと system.access の履歴
         kind: service
         tier: flow
-        x: 19
-        'y': 2
+        x: 10
+        y: 5
         realizes:
           - lineage
         description: 対応する処理で記録されたテーブル・列の依存を確認する。
@@ -400,15 +405,20 @@ implementations:
       example-iam:
         label: AWS IAM ロール
         kind: service
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
+        tier: flow
+        x: 23
+        y: 9
         description: 外部着地パスの S3 アクセスを Storage Credential の主体に許可する。
+        management: {type: customer, scope: "Customer manages IAM trust and permissions."}
         evidence:
           - type: doc
             ref: docs/reference-databricks-unity-catalog.md#§5
         svc: iam
+      example-managed-storage: {label: Amazon S3 の Unity Catalog 管理領域, svc: s3, kind: db, tier: flow, x: 23, y: 5, description: Unity Catalog が管理する Delta テーブルの実体を、着地領域と別のプレフィックスに保持する。, management: {type: shared, scope: "AWS operates S3; customer configures storage and access."}, evidence: [{type: doc, ref: docs/reference-databricks-unity-catalog.md#§5}]}
     links:
+      - {id: example-user-query, from: example-user, to: example-masked, label: "Submit authorized SQL", evidence: [{type: doc, ref: "docs/reference-databricks-unity-catalog.md#§5"}]}
+      - {id: example-serverless-sql, from: example-serverless, to: example-masked, label: "Run SQL Warehouse", evidence: [{type: doc, ref: "docs/reference-databricks-unity-catalog.md#§5"}]}
+      - {id: example-managed-files, from: example-managed, to: example-managed-storage, label: 管理テーブルのファイルを保管, realizes: [files], replace: true, evidence: [{type: doc, ref: docs/reference-databricks-unity-catalog.md#§5}]}
       - id: example-iam-connection
         from: example-iam
         to: example-location
@@ -417,30 +427,45 @@ implementations:
           - type: doc
             ref: docs/reference-databricks-unity-catalog.md#§5
     groups:
-      - kind: cloud
-        label: AWS・Amazon S3
-        provider: aws
-        tier:
-          - flow
-        nodes:
-          - example-storage
-      - kind: cloud
-        provider: databricks
-        label: Databricks
-        tier:
-          - flow
-        nodes:
-          - example-workspace
-          - example-metastore
-          - example-managed
-          - example-external
-          - example-location
-          - example-masked
-          - example-lineage
-      - kind: cloud
-        label: AWS サービス
-        provider: aws
-        tier:
-          - implementation-setup
-        nodes:
-          - example-iam
+      - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: flow, nodes: [example-workspace, example-metastore, example-managed, example-external, example-location, example-masked, example-lineage, example-serverless]}
+      - {kind: cloud, provider: aws, label: Customer AWS account, tier: flow, nodes: [example-storage, example-managed-storage, example-iam]}
+    layout2d:
+      tiers: [{id: diagram, label: Unity Catalog and AWS, z: 0, size: [32, 13]}]
+      nodes:
+        example-workspace: {tier: diagram, x: 2, y: 1}
+        example-metastore: {tier: diagram, x: 6, y: 1}
+        example-managed: {tier: diagram, x: 10, y: 1}
+        example-external: {tier: diagram, x: 14, y: 1}
+        example-location: {tier: diagram, x: 2, y: 5}
+        example-masked: {tier: diagram, x: 6, y: 5}
+        example-lineage: {tier: diagram, x: 10, y: 5}
+        example-serverless: {tier: diagram, x: 14, y: 5}
+        example-storage: {tier: diagram, x: 23, y: 1}
+        example-managed-storage: {tier: diagram, x: 23, y: 5}
+        example-iam: {tier: diagram, x: 23, y: 9}
+        example-user: {tier: diagram, x: 0, y: 11}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: diagram, nodes: [example-workspace, example-metastore, example-managed, example-external, example-location, example-masked, example-lineage, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-storage, example-managed-storage, example-iam]}
+    layout3d:
+      tiers:
+        - {id: workspace, label: Workspace and catalog, z: 1, size: [16, 6]}
+        - {id: serverless, label: Serverless compute, z: 0, size: [16, 6]}
+        - {id: customer, label: Customer AWS account, z: 0, origin: [20, 0], size: [12, 3]}
+        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        example-workspace: {tier: workspace, x: 2, y: 1}
+        example-metastore: {tier: workspace, x: 6, y: 1}
+        example-managed: {tier: workspace, x: 10, y: 1}
+        example-external: {tier: workspace, x: 14, y: 1}
+        example-location: {tier: workspace, x: 2, y: 4}
+        example-masked: {tier: workspace, x: 6, y: 4}
+        example-lineage: {tier: workspace, x: 10, y: 4}
+        example-serverless: {tier: serverless, x: 6, y: 1.5}
+        example-storage: {tier: customer, x: 2, y: 1.5}
+        example-managed-storage: {tier: customer, x: 6, y: 1.5}
+        example-iam: {tier: customer, x: 10, y: 1.5}
+        example-user: {tier: user, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: [workspace, serverless], nodes: [example-workspace, example-metastore, example-managed, example-external, example-location, example-masked, example-lineage, example-serverless]}
+        - {kind: cloud, provider: aws, label: Customer AWS account, tier: customer, nodes: [example-storage, example-managed-storage, example-iam]}

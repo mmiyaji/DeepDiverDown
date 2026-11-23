@@ -170,6 +170,10 @@ implementations:
         url: https://docs.cloud.google.com/knowledge-catalog/docs/data-products-overview
       - title: Use data products
         url: https://docs.cloud.google.com/knowledge-catalog/docs/use-data-products
+      - title: Manage data products
+        url: https://docs.cloud.google.com/knowledge-catalog/docs/manage-data-products
+      - title: Run a query in BigQuery
+        url: https://docs.cloud.google.com/bigquery/docs/running-queries
     tiers:
       - id: flow
         label: 問い合わせと利用
@@ -220,7 +224,7 @@ implementations:
         realizes:
           - access
       ex-asset:
-        label: BigQuery テーブル・ビュー
+        label: BigQuery 管理テーブル
         kind: db
         tier: flow
         x: 12
@@ -231,6 +235,27 @@ implementations:
             ref: docs/reference-trend-data-product.md#§4
         realizes:
           - asset
+      ex-group:
+        label: アクセス用 Google グループ
+        kind: policy
+        tier: definition
+        x: 9
+        'y': 1.5
+        description: 承認された利用者をメンバーに追加する。このグループに対象テーブルの閲覧権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+      ex-job:
+        label: BigQuery クエリジョブ
+        kind: service
+        tier: flow
+        x: 16
+        'y': 1.5
+        svc: gcp:bigquery
+        description: 利用側プロジェクトで起動し、資産 IAM に従って提供側のテーブルを読む。
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
       ex-owner:
         label: プロダクト所有者
         kind: actor
@@ -253,10 +278,51 @@ implementations:
             ref: docs/reference-trend-data-product.md#§4
         realizes:
           - contract
+    links:
+      - id: ex-approve
+        from: ex-access
+        to: ex-group
+        label: 承認した利用者をグループに追加
+        realizes:
+          - grant
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+      - id: ex-asset-iam
+        from: ex-group
+        to: ex-asset
+        label: グループにデータ閲覧権限を設定
+        realizes:
+          - grant
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+      - id: ex-start-job
+        from: ex-user
+        to: ex-job
+        label: 利用側でクエリジョブを作成
+        realizes:
+          - read
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
+      - id: ex-reading
+        from: ex-job
+        to: ex-asset
+        label: 認可された注文データを読む
+        realizes:
+          - read
+        replace: true
+        evidence:
+          - type: doc
+            ref: docs/reference-trend-data-product.md#§4
     groups:
       - kind: cloud
         provider: gcp
-        label: Google Cloud
+        label: 提供側 Google Cloud プロジェクト
         tier:
           - flow
         nodes:
@@ -265,8 +331,45 @@ implementations:
           - ex-asset
       - kind: cloud
         provider: gcp
-        label: Google Cloud
+        label: 利用側 Google Cloud プロジェクト
+        tier:
+          - flow
+        nodes:
+          - ex-job
+      - kind: cloud
+        provider: gcp
+        label: 提供側 Google Cloud プロジェクト
         tier:
           - definition
         nodes:
           - ex-contract
+    layout2d:
+      tiers:
+        - {id: diagram, label: データプロダクト, z: 0, size: [27, 12]}
+      nodes:
+        ex-user: {tier: diagram, x: 2, y: 2}
+        ex-owner: {tier: diagram, x: 8, y: 2}
+        ex-catalog: {tier: diagram, x: 14, y: 2}
+        ex-access: {tier: diagram, x: 20, y: 2}
+        ex-contract: {tier: diagram, x: 2, y: 6}
+        ex-asset: {tier: diagram, x: 8, y: 6}
+        ex-group: {tier: diagram, x: 14, y: 6}
+        ex-job: {tier: diagram, x: 20, y: 6}
+      groups:
+        - {kind: cloud, provider: gcp, label: 提供側 Google Cloud プロジェクト, tier: [diagram], nodes: [ex-catalog, ex-access, ex-contract, ex-asset]}
+        - {kind: cloud, provider: gcp, label: 利用側 Google Cloud プロジェクト, tier: [diagram], nodes: [ex-job]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: データプロダクト, z: 0, size: [27, 12]}
+      nodes:
+        ex-user: {tier: diagram, x: 2, y: 2}
+        ex-owner: {tier: diagram, x: 8, y: 2}
+        ex-catalog: {tier: diagram, x: 14, y: 2}
+        ex-access: {tier: diagram, x: 20, y: 2}
+        ex-contract: {tier: diagram, x: 2, y: 6}
+        ex-asset: {tier: diagram, x: 8, y: 6}
+        ex-group: {tier: diagram, x: 14, y: 6}
+        ex-job: {tier: diagram, x: 20, y: 6}
+      groups:
+        - {kind: cloud, provider: gcp, label: 提供側 Google Cloud プロジェクト, tier: [diagram], nodes: [ex-catalog, ex-access, ex-contract, ex-asset]}
+        - {kind: cloud, provider: gcp, label: 利用側 Google Cloud プロジェクト, tier: [diagram], nodes: [ex-job]}

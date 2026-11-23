@@ -31,7 +31,7 @@ Head Sampling は Trace の初期段階で決め、Tail Sampling は収集した
 出典 [OpenTelemetry Context propagation](https://opentelemetry.io/docs/concepts/context-propagation/)、[Collector Configuration](https://opentelemetry.io/docs/collector/configuration/)、[OpenTelemetry Sampling](https://opentelemetry.io/docs/concepts/sampling/)
 
 ## 6. 実装例：Kubernetes の分配・サンプリング Gateway
-OpenTelemetry Collector を Kubernetes に 2 段で配置し、注文処理のトレースを Jaeger へ送る例。
+Amazon EKS の EC2 ノードに OpenTelemetry Collector を 2 段で配置し、注文処理のトレースを Jaeger へ送る例。Collector と Jaeger は利用者が Kubernetes 上で運用する。
 
 | 機能配置 | この例での担い手 |
 |---|---|
@@ -41,13 +41,21 @@ OpenTelemetry Collector を Kubernetes に 2 段で配置し、注文処理の�
 | テレメトリ受信 | Collector 入口 Deployment |
 | トレースの保持判定 | Collector サンプリング Deployment |
 | 採用トレースの送信 | Collector サンプリング Deployment |
-| 分散トレースの保存と検索 | Jaeger Collector / Query |
+| 分散トレースの保存と検索 | Jaeger の取り込み・検索 Deployment と、クラスター外の Amazon OpenSearch Service |
 
 - **第2段 Collector 用 Headless Service**。サンプリング側レプリカの集合を入口側が解決する。
 
 同一 Trace の Span が同じサンプリングインスタンスに集まるようにする。スケールや再起動時の到着遅延・判定漏れは観測対象とし、保持するすべての Trace の完全性を仮定しない。
 
+EKS 制御プレーンは AWS 管理 VPC にあり、利用者は Kubernetes API と公開設定を操作できるが制御プレーンサーバーには直接アクセスしない。EKS がノードの作成・更新を支援し、利用者はアプリ、Collector、Jaeger、設定と権限を管理する。OpenSearch Service はクラスタ外の独立サービスで、AWS が基盤を運用し利用者がドメイン設定とデータを管理する。複数の公式資料を組み合わせた未検証の例であり、バージョン互換性、アクセス制御、復旧とスケール時の動作は導入時に確認する。
+
+Collector の OTLP はアクセス元を制限して TLS で接続する。Jaeger は VPC の OpenSearch ドメインへ HTTPS 接続し、トレース索引に限定した専用の内部ユーザーを使う。この場合は署名済み IAM リクエストを必須にするドメインポリシーを組み合わせず、ドメインのネットワーク到達性と細粒度アクセス制御で保護する。Collector のサンプリング判定に使う一時状態と、OpenSearch が保存するトレース索引にはそれぞれ保持方針を設ける。
+
 公式資料
 - [OpenTelemetry Collector gateway pattern](https://opentelemetry.io/docs/collector/deploy/gateway/)
 - [Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
 - [Jaeger APIs](https://www.jaegertracing.io/docs/latest/apis/)
+- [Jaeger のストレージ](https://www.jaegertracing.io/docs/2.23/storage/)
+- [Amazon OpenSearch Service のアクセス制御](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html)
+- [EKS Control Plane](https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html)
+- [EKS のマネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)

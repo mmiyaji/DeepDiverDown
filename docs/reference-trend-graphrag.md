@@ -20,3 +20,25 @@ Microsoft GraphRAG の索引処理はテキストから実体と関係を抽出�
 | 利用 | 質問者 |
 
 [Gartner 2026 発表](https://www.gartner.com/en/newsroom/press-releases/2026-06-16-gartner-identifies-the-top-trends-for-data-and-analytics)、[GraphRAG 索引](https://microsoft.github.io/graphrag/index/overview/)、[GraphRAG 概要](https://microsoft.github.io/graphrag/)。
+
+## 5. 実装例：Azure（GraphRAG on VM・Blob・Cosmos DB）
+
+運用者が Azure の Linux VM に Python と Microsoft GraphRAG を導入し、CLI の `index` と `query --method local` を実行する。実行環境と GraphRAG のバージョンは VM の運用者が管理する。
+
+| 機能 | 担い手 |
+|---|---|
+| 索引の入力 | Azure Blob Storage の入力コンテナー |
+| 文書の分割、実体・関係の抽出、索引作成 | VM 上の GraphRAG の索引処理 |
+| グラフと要約、ベクトル索引 | Azure Blob Storage に出力する Parquet と Azure Cosmos DB for NoSQL のベクトルストア |
+| 検索と回答 | VM 上の GraphRAG Local Search |
+| チャットと埋め込み | Azure OpenAI に個別にデプロイしたチャットモデルと埋め込みモデル |
+
+GraphRAG の入力と出力に Blob Storage を、ベクトルストアに `cosmosdb` を選ぶ。チャットと埋め込みのデプロイ名を指定し、ベクトル索引の次元を埋め込みモデルの出力に合わせる。Local Search は Parquet とベクトル索引を読み、質問に関連する文脈をモデルに渡す。
+
+- [Azure 仮想マシン](https://learn.microsoft.com/azure/virtual-machines/overview)
+- [GraphRAG 詳細設定](https://microsoft.github.io/graphrag/config/yaml/)
+- [GraphRAG を始める](https://microsoft.github.io/graphrag/get_started/)
+- [GraphRAG Local Search](https://microsoft.github.io/graphrag/query/local_search/)
+- [Azure Cosmos DB for NoSQL のベクトル検索](https://learn.microsoft.com/en-us/azure/cosmos-db/vector-search)
+
+利用者は実行ホスト、GraphRAG の設定、入力文書、索引、資格情報とモデルの選択を管理する。汎用例のモデルと索引ストアの提供者・配置は未指定であり、別環境の可能性がある。Azure 例では Azure が VM の基盤と各マネージドサービスの基盤を運用し、利用者が VM の OS・アプリ、アクセス権、データ、モデルのデプロイとサービス設定を管理する。サービス内部のホストへの直接操作は前提としない。資料を組み合わせた代表例であり、特定のバージョン、認証経路、ネットワーク設定を含む通しの動作は未検証。

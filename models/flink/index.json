@@ -2,8 +2,8 @@
   "model": "flink",
   "name": "Apache Flink の基本アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "source": {
@@ -70,10 +70,22 @@
       "type": "scenario",
       "label": "イベント時刻の窓集計と復旧"
     },
+    "kafka-managed-state-host": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "自前 Linux Flink ホスト群",
+      "realizes": []
+    },
+    "kafka-managed-state-hdfs": {
+      "type": "implementation",
+      "impl": "kafka-managed-state",
+      "label": "自前 HDFS クラスター",
+      "realizes": []
+    },
     "kafka-managed-state-source": {
       "type": "implementation",
       "impl": "kafka-managed-state",
-      "label": "Flink KafkaSource と注文トピック",
+      "label": "Kafka 注文トピック",
       "realizes": [
         "source"
       ]
@@ -116,6 +128,83 @@
       "impl": "kafka-managed-state",
       "label": "JobManager のチェックポイント調整",
       "realizes": []
+    },
+    "aws-emr-eks-flink-kubectl": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "kubectl",
+      "realizes": []
+    },
+    "aws-emr-eks-flink-control": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "EKS Kubernetes API",
+      "realizes": []
+    },
+    "aws-emr-eks-flink-operator": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "Flink Kubernetes Operator",
+      "realizes": []
+    },
+    "aws-emr-eks-flink-capacity": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "EKS の EC2 ノード",
+      "realizes": []
+    },
+    "aws-emr-eks-flink-jobmanager": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "Flink JobManager Pod",
+      "realizes": []
+    },
+    "aws-emr-eks-flink-taskmanager": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "Flink TaskManager Pod",
+      "realizes": [
+        "watermark",
+        "operator"
+      ]
+    },
+    "aws-emr-eks-flink-state": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "TaskManager の RocksDB",
+      "realizes": [
+        "state"
+      ]
+    },
+    "aws-emr-eks-flink-source": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "MSK 注文トピック",
+      "realizes": [
+        "source"
+      ]
+    },
+    "aws-emr-eks-flink-sink": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "MSK 集計トピック",
+      "realizes": [
+        "sink"
+      ]
+    },
+    "aws-emr-eks-flink-checkpoint": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "S3 チェックポイント",
+      "realizes": [
+        "checkpoint"
+      ]
+    },
+    "aws-emr-eks-flink-ha": {
+      "type": "implementation",
+      "impl": "aws-emr-eks-flink",
+      "label": "S3 の HA メタデータ",
+      "realizes": []
     }
   },
   "byRef": {
@@ -138,12 +227,25 @@
       "snapshot",
       "restore",
       "flink-window-recovery",
+      "kafka-managed-state-host",
+      "kafka-managed-state-hdfs",
       "kafka-managed-state-source",
       "kafka-managed-state-tasks",
       "kafka-managed-state-rocks",
       "kafka-managed-state-checkpoint",
       "kafka-managed-state-out",
-      "kafka-managed-state-coordinator"
+      "kafka-managed-state-coordinator",
+      "aws-emr-eks-flink-kubectl",
+      "aws-emr-eks-flink-control",
+      "aws-emr-eks-flink-operator",
+      "aws-emr-eks-flink-capacity",
+      "aws-emr-eks-flink-jobmanager",
+      "aws-emr-eks-flink-taskmanager",
+      "aws-emr-eks-flink-state",
+      "aws-emr-eks-flink-source",
+      "aws-emr-eks-flink-sink",
+      "aws-emr-eks-flink-checkpoint",
+      "aws-emr-eks-flink-ha"
     ],
     "docs/reference-flink.md#§2": [
       "source",
@@ -172,12 +274,27 @@
       "flink-window-recovery"
     ],
     "docs/reference-flink.md#§8": [
+      "kafka-managed-state-host",
+      "kafka-managed-state-hdfs",
       "kafka-managed-state-source",
       "kafka-managed-state-tasks",
       "kafka-managed-state-rocks",
       "kafka-managed-state-checkpoint",
       "kafka-managed-state-out",
       "kafka-managed-state-coordinator"
+    ],
+    "docs/reference-flink.md#§9": [
+      "aws-emr-eks-flink-kubectl",
+      "aws-emr-eks-flink-control",
+      "aws-emr-eks-flink-operator",
+      "aws-emr-eks-flink-capacity",
+      "aws-emr-eks-flink-jobmanager",
+      "aws-emr-eks-flink-taskmanager",
+      "aws-emr-eks-flink-state",
+      "aws-emr-eks-flink-source",
+      "aws-emr-eks-flink-sink",
+      "aws-emr-eks-flink-checkpoint",
+      "aws-emr-eks-flink-ha"
     ]
   },
   "reference": {

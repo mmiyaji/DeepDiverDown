@@ -413,8 +413,8 @@ fileLayout:
       sample: 18    → Postscript は 24 バイト
 implementations:
   - id: trino-orc
-    label: Trino Hive と S3 上の ORC
-    description: ORC を使う Hive テーブルを Trino で検索する例。ファイルは S3 に置き、対応する述語と利用可能な統計で不要な Stripe や行グループを除外する。
+    label: EKS の Trino で S3 の ORC を読む
+    description: EKS 上の Trino と Glue Data Catalog を使い、S3 に置いた ORC ファイルを読む構成例。
     sources:
       - title: ORC Specification v1
         url: https://orc.apache.org/specification/ORCv1/
@@ -424,38 +424,59 @@ implementations:
         url: https://trino.io/docs/current/object-storage/file-formats.html
       - title: Trino Hive connector
         url: https://trino.io/docs/current/connector/hive.html
+      - title: Trino on Kubernetes with Helm
+        url: https://trino.io/docs/current/installation/kubernetes.html
+      - title: Trino Hive connector
+        url: https://trino.io/docs/current/connector/hive.html
+      - title: EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
     tiers:
-      - id: processing
-        label: データの処理と保存
-        z: 0
+      - id: management
+        label: クラスタとカタログ
+        z: 2
         size:
-          - 14
-          - 5
-      - id: setup
-        label: 実行に必要な設定・成果物
+          - 16
+          - 3
+      - id: processing
+        label: EKS 上の読み取り
         z: 1
         size:
-          - 14
+          - 16
+          - 3
+      - id: storage
+        label: ORC の保存
+        z: 0
+        size:
+          - 16
           - 3
     nodes:
+      trino-orc-client:
+        label: Trino CLI の SQL 利用者
+        kind: client
+        tier: management
+        x: 0
+        y: 1.5
+        description: Coordinator に SQL を送り結果を取得する。
+        evidence: [{type: doc, ref: docs/reference-orc-internals.md#§7}]
       trino-orc-trino:
         label: Trino Worker の ORC Reader
         kind: worker
         tier: processing
-        x: 1
-        'y': 1.15
+        x: 8
+        'y': 1.5
         realizes:
           - reader
         description: Postscript から圧縮・メタデータを解釈し、述語と投影を読取に適用する。
         evidence:
           - type: doc
             ref: docs/reference-orc-internals.md#§7
+        management: {type: customer, scope: "利用者が Trino Worker と読取設定を管理する。"}
       trino-orc-file:
         label: S3 上の ORC オブジェクト
         kind: file
-        tier: processing
-        x: 1
-        'y': 3.65
+        tier: storage
+        x: 8
+        'y': 1.5
         svc: s3
         realizes:
           - magic
@@ -470,26 +491,159 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-orc-internals.md#§7
+        management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がファイルと権限を管理する。"}
       trino-orc-hive:
         label: Hive カタログの ORC 設定
         kind: catalog
-        tier: setup
-        x: 1
+        tier: processing
+        x: 2
         'y': 1.5
         description: ブルームフィルターも使う場合はファイルにインデックスがあることと orc.bloom-filters.enabled を確認する。
         evidence:
           - type: doc
             ref: docs/reference-orc-internals.md#§7
+        management: {type: customer, scope: "利用者が Hive Connector の設定を管理する。"}
+      trino-orc-eks:
+        label: Amazon EKS / Kubernetes API
+        svc: eks
+        kind: service
+        tier: management
+        x: 2
+        'y': 1.5
+        description: Trino の Coordinator と Worker の Pod を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
+        management: {type: shared, scope: "AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}
+      trino-orc-glue:
+        label: AWS Glue Data Catalog
+        svc: glue
+        kind: catalog
+        tier: management
+        x: 8
+        'y': 1.5
+        description: Hive テーブルのメタデータとデータの格納先を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
+        management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。"}
+      trino-orc-coordinator:
+        label: Trino Coordinator Pod
+        kind: service
+        tier: processing
+        x: 5
+        'y': 1.5
+        description: Hive Connector でテーブルを解決し Worker に読み取りを割り当てる。
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
+        management: {type: customer, scope: "利用者が Trino Coordinator を管理する。"}
+      trino-orc-ec2:
+        label: EC2 / EKS ノード
+        svc: ec2
+        kind: host
+        tier: processing
+        x: 13
+        'y': 1.5
+        description: Trino の Pod を実行する EC2 ノード。
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
+        management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループを管理する。"}
     links:
+      - {id: trino-orc-submit, from: trino-orc-client, to: trino-orc-coordinator, label: SQL を送る}
+      - {id: trino-orc-result, from: trino-orc-coordinator, to: trino-orc-client, label: 結果を返す}
+      - {id: trino-orc-host-coordinator, from: trino-orc-ec2, to: trino-orc-coordinator, label: Coordinator Pod を実行}
       - id: trino-orc-hive-connection
         from: trino-orc-hive
         to: trino-orc-trino
         label: 使用する索引を設定
+      - id: trino-orc-glue-resolve
+        from: trino-orc-coordinator
+        to: trino-orc-glue
+        label: テーブルの格納先を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
+      - id: trino-orc-schedule
+        from: trino-orc-eks
+        to: trino-orc-coordinator
+        label: Coordinator Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
+      - id: trino-orc-task
+        from: trino-orc-coordinator
+        to: trino-orc-trino
+        label: 読み取りを割り当てる
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
+      - id: trino-orc-host
+        from: trino-orc-ec2
+        to: trino-orc-trino
+        label: Worker Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-orc-internals.md#§7
     groups:
       - kind: cloud
         provider: aws
-        label: AWS サービス
+        label: AWS アカウント
+        tier:
+          - management
+          - processing
+          - storage
+        nodes:
+          - trino-orc-trino
+          - trino-orc-file
+          - trino-orc-hive
+          - trino-orc-eks
+          - trino-orc-glue
+          - trino-orc-coordinator
+          - trino-orc-ec2
+      - kind: cluster
+        label: EKS クラスタ / Trino
         tier:
           - processing
         nodes:
-          - trino-orc-file
+          - trino-orc-coordinator
+          - trino-orc-trino
+          - trino-orc-ec2
+          - trino-orc-hive
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 20]}
+      nodes:
+        trino-orc-client: {tier: diagram, x: 2, y: 2}
+        trino-orc-eks: {tier: diagram, x: 8, y: 2}
+        trino-orc-ec2: {tier: diagram, x: 14, y: 2}
+        trino-orc-coordinator: {tier: diagram, x: 14, y: 5}
+        trino-orc-trino: {tier: diagram, x: 14, y: 8}
+        trino-orc-hive: {tier: diagram, x: 14, y: 11}
+        trino-orc-glue: {tier: diagram, x: 20, y: 2}
+        trino-orc-file: {tier: diagram, x: 20, y: 5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [trino-orc-eks, trino-orc-ec2, trino-orc-coordinator, trino-orc-trino, trino-orc-hive, trino-orc-glue, trino-orc-file]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC の実行ノード, tier: [diagram], nodes: [trino-orc-ec2, trino-orc-coordinator, trino-orc-trino, trino-orc-hive]}
+        - {kind: cluster, label: "EKS の Trino", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 15, nodes: [trino-orc-ec2, trino-orc-coordinator, trino-orc-trino, trino-orc-hive]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "Trino CLI", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "EKS 制御プレーン", z: 0, origin: [7, 0], size: [5, 5]}
+        - {id: zone2, label: "EKS の Trino", z: 0, origin: [14, 0], size: [5, 12]}
+        - {id: zone3, label: "Glue と S3", z: 0, origin: [21, 0], size: [5, 6]}
+      nodes:
+        trino-orc-client: {tier: zone0, x: 2, y: 1}
+        trino-orc-eks: {tier: zone1, x: 2, y: 1}
+        trino-orc-ec2: {tier: zone2, x: 2, y: 1}
+        trino-orc-coordinator: {tier: zone2, x: 2, y: 4}
+        trino-orc-trino: {tier: zone2, x: 2, y: 7}
+        trino-orc-hive: {tier: zone2, x: 2, y: 10}
+        trino-orc-glue: {tier: zone3, x: 2, y: 1}
+        trino-orc-file: {tier: zone3, x: 2, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [trino-orc-eks, trino-orc-ec2, trino-orc-coordinator, trino-orc-trino, trino-orc-hive, trino-orc-glue, trino-orc-file]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC の実行ノード, tier: [zone0, zone1, zone2, zone3], nodes: [trino-orc-ec2, trino-orc-coordinator, trino-orc-trino, trino-orc-hive]}
+        - {kind: cluster, label: "EKS の Trino", tier: [zone2], nodes: [trino-orc-ec2, trino-orc-coordinator, trino-orc-trino, trino-orc-hive]}

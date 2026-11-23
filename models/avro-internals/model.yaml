@@ -89,6 +89,7 @@ implementations:
     label: "Hadoop MapReduce の Avro 分割読み取り"
     description: "HDFS 上の Avro Object Container File を AvroKeyInputFormat で二つの Map タスクに分担させる例。Split の開始点がブロック途中なら、同期マーカーで読み始めを合わせる。"
     sources:
+      - {title: Hadoop MapReduce Tutorial, url: https://hadoop.apache.org/docs/stable/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html}
       - {title: Avro Specification - Object Container Files, url: https://avro.apache.org/docs/current/specification/#object-container-files}
       - {title: Avro Schema Resolution, url: https://avro.apache.org/docs/current/specification/#schema-resolution}
       - {title: AvroKeyInputFormat, url: https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/mapreduce/AvroKeyInputFormat.html}
@@ -97,9 +98,118 @@ implementations:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
     nodes:
+      hadoop-mapreduce-client: {label: Hadoop ジョブ投入者, kind: client, tier: setup, x: 0, y: 1.5, description: AvroKeyInputFormat を使うジョブと入力・出力パスを指定する。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
+      hadoop-mapreduce-host: {label: 自前 Linux Hadoop ノード群, kind: host, tier: processing, x: 3, y: 0, description: YARN と HDFS を運用し Map タスクを実行する。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
+      hadoop-mapreduce-output: {label: HDFS の Map 出力, kind: file, tier: processing, x: 9, y: 3, description: この例では読み取ったレコードの結果を別パスに書き出す。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
       hadoop-mapreduce-front: {label: Map タスク A の Avro レコード読取, kind: worker, tier: processing, x: 1, y: 1.15, realizes: [task-a], description: 先頭側の Split を読み、ブロックの所有範囲で止める。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
       hadoop-mapreduce-tail: {label: Map タスク B の Avro レコード読取, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [task-b], description: 後半側の Split を受け取り、次の同期位置に合わせる。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
       hadoop-mapreduce-hdfs: {label: HDFS 上の Avro Object Container File, kind: file, tier: processing, x: 5, y: 1.15, realizes: [header, blocks, sync], description: 同一ファイルのヘッダー、データブロック、同期マーカーを二つのタスクが読む。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
       hadoop-mapreduce-input: {label: AvroKeyInputFormat のジョブ設定, kind: file, tier: setup, x: 1, y: 1.5, description: 入力パスと形式を Hadoop ジョブに登録し、Map タスク用に Split を用意する。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§7}]}
     links:
+      - {id: hadoop-mapreduce-submit, from: hadoop-mapreduce-client, to: hadoop-mapreduce-host, label: ジョブを投入}
+      - {id: hadoop-mapreduce-run-a, from: hadoop-mapreduce-host, to: hadoop-mapreduce-front, label: Map A を実行}
+      - {id: hadoop-mapreduce-run-b, from: hadoop-mapreduce-host, to: hadoop-mapreduce-tail, label: Map B を実行}
+      - {id: hadoop-mapreduce-store, from: hadoop-mapreduce-host, to: hadoop-mapreduce-hdfs, label: HDFS を提供}
+      - {id: hadoop-mapreduce-output-a, from: hadoop-mapreduce-front, to: hadoop-mapreduce-output, label: 結果を書き出す}
+      - {id: hadoop-mapreduce-output-b, from: hadoop-mapreduce-tail, to: hadoop-mapreduce-output, label: 結果を書き出す}
       - {id: hadoop-mapreduce-input-connection, from: hadoop-mapreduce-input, to: hadoop-mapreduce-front, label: Avro 入力を割り当てる}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 20]}
+      nodes:
+        hadoop-mapreduce-client: {tier: diagram, x: 2, y: 2}
+        hadoop-mapreduce-input: {tier: diagram, x: 2, y: 5}
+        hadoop-mapreduce-host: {tier: diagram, x: 8, y: 2}
+        hadoop-mapreduce-front: {tier: diagram, x: 8, y: 5}
+        hadoop-mapreduce-tail: {tier: diagram, x: 8, y: 8}
+        hadoop-mapreduce-hdfs: {tier: diagram, x: 14, y: 2}
+        hadoop-mapreduce-output: {tier: diagram, x: 14, y: 5}
+      groups:
+        - {kind: cluster, label: "自前 Hadoop ノード", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 12, nodes: [hadoop-mapreduce-host, hadoop-mapreduce-front, hadoop-mapreduce-tail]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "ジョブ投入者", z: 0, origin: [0, 0], size: [5, 6]}
+        - {id: zone1, label: "自前 Hadoop ノード", z: 0, origin: [7, 0], size: [5, 9]}
+        - {id: zone2, label: "HDFS ファイル", z: 0, origin: [14, 0], size: [5, 6]}
+      nodes:
+        hadoop-mapreduce-client: {tier: zone0, x: 2, y: 1}
+        hadoop-mapreduce-input: {tier: zone0, x: 2, y: 4}
+        hadoop-mapreduce-host: {tier: zone1, x: 2, y: 1}
+        hadoop-mapreduce-front: {tier: zone1, x: 2, y: 4}
+        hadoop-mapreduce-tail: {tier: zone1, x: 2, y: 7}
+        hadoop-mapreduce-hdfs: {tier: zone2, x: 2, y: 1}
+        hadoop-mapreduce-output: {tier: zone2, x: 2, y: 4}
+      groups:
+        - {kind: cluster, label: "自前 Hadoop ノード", tier: [zone1], nodes: [hadoop-mapreduce-host, hadoop-mapreduce-front, hadoop-mapreduce-tail]}
+  - id: aws-emr-avro
+    label: AWS（EMR on EC2・HDFS）
+    description: Amazon EMR on EC2 の MapReduce タスクが、S3 から HDFS にステージした同一 Avro ファイルの異なる Split を読む。
+    sources:
+      - {title: EMR クラスタのノードとステップ, url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html}
+      - {title: EMR のカスタム JAR ステップ, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-launch-custom-jar-cli.html}
+      - {title: Apache Avro AvroKeyInputFormat, url: https://avro.apache.org/docs/1.12.0/api/java/org/apache/avro/mapreduce/AvroKeyInputFormat.html}
+    tiers:
+      - {id: management, label: EMR のステップ管理と入力, z: 1, size: [22, 3]}
+      - {id: runtime, label: Hadoop クラスタ, z: 0, size: [22, 6]}
+    groups:
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [management, runtime], nodes: [aws-emr, aws-s3, aws-ec2, aws-stage-job, aws-front, aws-tail, aws-hdfs, aws-output]}
+      - {kind: cluster, label: Amazon EMR on EC2 クラスタ, tier: runtime, nodes: [aws-ec2, aws-hdfs, aws-front, aws-tail]}
+    nodes:
+      aws-client: {label: 運用者の AWS CLI, kind: client, tier: management, x: 0, y: 1.5, description: S3 の入力と JAR を指定してステップを投入する。, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-stage-job: {label: HDFS ステージ用コピー, kind: worker, tier: runtime, x: 12, y: 0, description: 利用者が用意した先行ステップで S3 入力を HDFS にコピーする。, management: {type: customer, scope: "利用者がステップとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-output: {label: HDFS の Map 出力, kind: file, tier: runtime, x: 17, y: 5, description: Map タスクの結果を入力と別の作業パスに書き出す。, management: {type: customer, scope: "利用者が結果と出力設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-emr: {label: "Amazon EMR（カスタム JAR ステップ）", svc: emr, kind: service, tier: management, x: 3, y: 1.5, description: "指定の JAR を取得して MapReduce ジョブを提出する。", management: {type: shared, scope: "AWS が EMR 基盤を運用し、利用者がクラスターとジョブを設定する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-s3: {label: "Amazon S3（入力 Avro とジョブ JAR）", svc: s3, kind: db, tier: management, x: 16, y: 1.5, description: "EMR の入力元として Avro ファイルとジョブ JAR を保存する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が入力ファイルと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-ec2: {label: "Amazon EC2（EMR のコアノード）", svc: ec2, kind: host, tier: runtime, x: 2, y: 2.8, description: "YARN の Map タスクと HDFS のデータノードを実行する。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者が EMR ノードと Hadoop 設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-front: {label: "Map タスク A（Avro RecordReader）", kind: worker, tier: runtime, x: 8, y: 1.3, realizes: [task-a], description: "入力前半の Split でヘッダーを取得し、割り当て範囲のブロックを処理する。", management: {type: customer, scope: "利用者が Map ジョブと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-tail: {label: "Map タスク B（Avro RecordReader）", kind: worker, tier: runtime, x: 8, y: 4.5, realizes: [task-b], description: "入力後半の Split を同期マーカーに合わせて処理する。", management: {type: customer, scope: "利用者が Map ジョブと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+      aws-hdfs: {label: "HDFS 上の Avro Object Container File", kind: file, tier: runtime, x: 17, y: 2.8, realizes: [header, blocks, sync], description: "クラスタ内にステージした同一ファイルを Map タスクが分割して読む。", management: {type: customer, scope: "利用者が HDFS のデータとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-avro-internals.md#§8}]}
+    links:
+      - {id: aws-submit, from: aws-client, to: aws-emr, label: カスタム JAR ステップを投入}
+      - {id: aws-output-a, from: aws-front, to: aws-output, label: Map 結果を書き出す}
+      - {id: aws-output-b, from: aws-tail, to: aws-output, label: Map 結果を書き出す}
+      - {id: aws-get-jar, from: aws-emr, to: aws-s3, label: ジョブ JAR を取得}
+      - {id: aws-stage-read, from: aws-s3, to: aws-stage-job, label: 入力 Avro を取得}
+      - {id: aws-stage, from: aws-stage-job, to: aws-hdfs, label: Avro を HDFS にステージ}
+      - {id: aws-stage-start, from: aws-emr, to: aws-stage-job, label: 先行コピーステップを開始}
+      - {id: aws-node-runtime, from: aws-emr, to: aws-ec2, label: Hadoop クラスタを構成}
+      - {id: aws-task-a, from: aws-ec2, to: aws-front, label: YARN で前半の Map タスクを実行}
+      - {id: aws-task-b, from: aws-ec2, to: aws-tail, label: YARN で後半の Map タスクを実行}
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 20]}
+      nodes:
+        aws-client: {tier: diagram, x: 2, y: 2}
+        aws-emr: {tier: diagram, x: 8, y: 2}
+        aws-ec2: {tier: diagram, x: 14, y: 2}
+        aws-stage-job: {tier: diagram, x: 14, y: 5}
+        aws-front: {tier: diagram, x: 14, y: 8}
+        aws-tail: {tier: diagram, x: 14, y: 11}
+        aws-hdfs: {tier: diagram, x: 14, y: 14}
+        aws-output: {tier: diagram, x: 14, y: 17}
+        aws-s3: {tier: diagram, x: 20, y: 2}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [diagram], nodes: [aws-emr, aws-ec2, aws-stage-job, aws-front, aws-tail, aws-hdfs, aws-output, aws-s3]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC の実行ノード, tier: [diagram], nodes: [aws-ec2, aws-stage-job, aws-front, aws-tail, aws-hdfs, aws-output]}
+        - {kind: cluster, label: "EMR クラスター", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 21, nodes: [aws-ec2, aws-stage-job, aws-front, aws-tail, aws-hdfs, aws-output]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "ジョブ投入者", z: 0, origin: [0, 0], size: [5, 5]}
+        - {id: zone1, label: "EMR サービス", z: 0, origin: [7, 0], size: [5, 5]}
+        - {id: zone2, label: "EMR クラスター", z: 0, origin: [14, 0], size: [5, 18]}
+        - {id: zone3, label: "S3 入力と JAR", z: 0, origin: [21, 0], size: [5, 5]}
+      nodes:
+        aws-client: {tier: zone0, x: 2, y: 1}
+        aws-emr: {tier: zone1, x: 2, y: 1}
+        aws-ec2: {tier: zone2, x: 2, y: 1}
+        aws-stage-job: {tier: zone2, x: 2, y: 4}
+        aws-front: {tier: zone2, x: 2, y: 7}
+        aws-tail: {tier: zone2, x: 2, y: 10}
+        aws-hdfs: {tier: zone2, x: 2, y: 13}
+        aws-output: {tier: zone2, x: 2, y: 16}
+        aws-s3: {tier: zone3, x: 2, y: 1}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS の論理的所属, tier: [zone0, zone1, zone2, zone3], nodes: [aws-emr, aws-ec2, aws-stage-job, aws-front, aws-tail, aws-hdfs, aws-output, aws-s3]}
+        - {kind: vpc, provider: aws, label: 利用者 VPC の実行ノード, tier: [zone0, zone1, zone2, zone3], nodes: [aws-ec2, aws-stage-job, aws-front, aws-tail, aws-hdfs, aws-output]}
+        - {kind: cluster, label: "EMR クラスター", tier: [zone2], nodes: [aws-ec2, aws-stage-job, aws-front, aws-tail, aws-hdfs, aws-output]}

@@ -876,6 +876,9 @@ implementations:
         url: https://iceberg.apache.org/spec/#sorting
       - title: Create partitioned tables
         url: https://cloud.google.com/bigquery/docs/creating-partitioned-tables
+      - {title: Cloud Storage からの CSV ロード, url: https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv}
+      - {title: BigQuery のクエリジョブ, url: https://docs.cloud.google.com/bigquery/docs/running-queries}
+      - {title: BigQuery の JOBS ビュー, url: https://docs.cloud.google.com/bigquery/docs/information-schema-jobs}
     tiers:
       - id: processing
         label: データの処理と保存
@@ -890,8 +893,10 @@ implementations:
           - 14
           - 3
     nodes:
+      bigquery-clustered-source: {label: Cloud Storage（注文 CSV）, svc: gcp:gcs, kind: file, tier: setup, x: 1, y: 1.5, description: BigQuery と同じロケーションで入力を保持する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§9}]}
+      bigquery-clustered-load: {label: BigQuery（CSV ロードジョブ）, svc: gcp:bigquery, kind: worker, tier: setup, x: 6, y: 1.5, description: Google がロード基盤を運用する。利用者が入力 URI、テーブル定義と権限を設定する。, evidence: [{type: doc, ref: docs/reference-sorting-pruning.md#§9}]}
       bigquery-clustered-client:
-        label: BigQuery コンソールの SQL エディター
+        label: BigQuery Studio の SQL エディター
         kind: client
         tier: processing
         svc: gcp:bigquery
@@ -919,7 +924,7 @@ implementations:
           - type: doc
             ref: docs/reference-sorting-pruning.md#§9
       bigquery-clustered-engine:
-        label: BigQuery の SQL 実行
+        label: BigQuery（GoogleSQL クエリジョブ）
         kind: service
         tier: processing
         x: 5
@@ -927,7 +932,7 @@ implementations:
         realizes:
           - query
           - scan
-        description: 関係する月に絞り、クラスタ列を使う述語で不要なブロックを除外し得る。
+        description: Google 管理のクエリジョブが関係する月と不要なブロックを除外し得る。利用者は SQL と権限を設定し、内部ホストは直接操作しない。
         evidence:
           - type: doc
             ref: docs/reference-sorting-pruning.md#§9
@@ -944,19 +949,20 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-sorting-pruning.md#§9
-        svc: gcp:bigquery
       bigquery-clustered-stats:
-        label: クエリジョブの処理量
+        label: BigQuery（JOBS ビュー）
         kind: monitor
         tier: setup
         svc: gcp:bigquery
-        x: 1
+        x: 11
         'y': 1.5
         description: パーティションによる見積りと、実行後の処理バイトなどを参照する。クラスタリングの除外量は実行まで確定しない。
         evidence:
           - type: doc
             ref: docs/reference-sorting-pruning.md#§9
     links:
+      - {id: bigquery-clustered-read-input, from: bigquery-clustered-source, to: bigquery-clustered-load, label: 注文 CSV を読み取る}
+      - {id: bigquery-clustered-write-input, from: bigquery-clustered-load, to: bigquery-clustered-table, label: ネイティブテーブルへロード}
       - id: bigquery-clustered-stats-connection
         from: bigquery-clustered-stats
         to: bigquery-clustered-engine
@@ -964,16 +970,43 @@ implementations:
     groups:
       - kind: cloud
         provider: gcp
-        label: Google Cloud サービス
+        label: Google Cloud プロジェクト
         tier:
           - processing
+          - setup
         nodes:
           - bigquery-clustered-client
           - bigquery-clustered-table
           - bigquery-clustered-engine
           - bigquery-clustered-result
-      - kind: cloud
-        provider: gcp
-        label: BigQuery ジョブの観測
-        tier: [setup]
-        nodes: [bigquery-clustered-stats]
+          - bigquery-clustered-source
+          - bigquery-clustered-load
+          - bigquery-clustered-stats
+
+    layout2d:
+      tiers:
+        - {id: diagram, label: BigQuery の注文分析, z: 0, size: [18, 12]}
+      nodes:
+        bigquery-clustered-client: {tier: diagram, x: 2, y: 2}
+        bigquery-clustered-source: {tier: diagram, x: 6, y: 2}
+        bigquery-clustered-load: {tier: diagram, x: 10, y: 2}
+        bigquery-clustered-table: {tier: diagram, x: 14, y: 2}
+        bigquery-clustered-engine: {tier: diagram, x: 10, y: 7}
+        bigquery-clustered-result: {tier: diagram, x: 14, y: 7}
+        bigquery-clustered-stats: {tier: diagram, x: 6, y: 8}
+      groups:
+        - {kind: cloud, label: Google Cloud プロジェクト, provider: gcp, tier: [diagram], x0: 0, y0: 0, x1: 17, y1: 10, nodes: [bigquery-clustered-client, bigquery-clustered-source, bigquery-clustered-load, bigquery-clustered-table, bigquery-clustered-engine, bigquery-clustered-result, bigquery-clustered-stats]}
+    layout3d:
+      tiers:
+        - {id: input, label: Cloud Storage, z: 0, size: [4, 5]}
+        - {id: bigquery, label: BigQuery の管理サービス, z: 0, origin: [8, 0], size: [17, 8]}
+      nodes:
+        bigquery-clustered-source: {tier: input, x: 2, y: 2}
+        bigquery-clustered-client: {tier: bigquery, x: 2, y: 1}
+        bigquery-clustered-load: {tier: bigquery, x: 7, y: 1}
+        bigquery-clustered-table: {tier: bigquery, x: 12, y: 1}
+        bigquery-clustered-engine: {tier: bigquery, x: 7, y: 5}
+        bigquery-clustered-result: {tier: bigquery, x: 12, y: 5}
+        bigquery-clustered-stats: {tier: bigquery, x: 2, y: 5}
+      groups:
+        - {kind: cloud, label: Google Cloud プロジェクト, provider: gcp, tier: [input, bigquery], nodes: [bigquery-clustered-client, bigquery-clustered-source, bigquery-clustered-load, bigquery-clustered-table, bigquery-clustered-engine, bigquery-clustered-result, bigquery-clustered-stats]}

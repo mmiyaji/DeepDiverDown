@@ -44,7 +44,12 @@ implementations:
         url: https://hudi.apache.org/docs/deployment/
       - title: Hudi Compaction
         url: https://hudi.apache.org/docs/compaction/
+      - {title: Hudi Docker Demo, url: https://hudi.apache.org/docs/docker_demo/}
     nodes:
+      hudi-spark-host: {label: "Docker Compose host", kind: host, tier: ingest, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
+      hudi-spark-master: {label: "Spark master", kind: scheduler, tier: ingest, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
+      hudi-spark-worker: {label: "Spark worker", kind: host, tier: ingest, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
+      hudi-spark-hdfs: {label: "HDFS NameNode / DataNode", kind: service, tier: ingest, x: 2, y: 0, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
       hudi-spark-kafka:
         label: Kafka の注文更新トピック
         kind: external
@@ -140,6 +145,11 @@ implementations:
           - type: doc
             ref: docs/reference-apache-hudi.md#§6
     links:
+      - {id: hudi-spark-allocate, from: hudi-spark-master, to: hudi-spark-worker, label: "Allocate executors", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
+      - {id: hudi-spark-run-ingestion, from: hudi-spark-worker, to: hudi-spark-ingestion, label: "Run Streamer", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
+      - {id: hudi-spark-run-query, from: hudi-spark-worker, to: hudi-spark-spark, label: "Run query", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
+      - {id: hudi-spark-write-storage, from: hudi-spark-ingestion, to: hudi-spark-hdfs, label: "Write HDFS table", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
+      - {id: hudi-spark-read-storage, from: hudi-spark-spark, to: hudi-spark-hdfs, label: "Read HDFS table", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§6"}]}
       - id: hudi-spark-ingest
         from: hudi-spark-kafka
         to: hudi-spark-ingestion
@@ -154,3 +164,119 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-apache-hudi.md#§6
+    layout2d:
+      tiers: [{id: local, label: Local execution, z: 0, size: [24, 14]}]
+      nodes:
+        hudi-spark-host: {tier: local, x: 2, y: 1}
+        hudi-spark-master: {tier: local, x: 6, y: 1}
+        hudi-spark-worker: {tier: local, x: 10, y: 1}
+        hudi-spark-hdfs: {tier: local, x: 14, y: 1}
+        hudi-spark-kafka: {tier: local, x: 18, y: 1}
+        hudi-spark-timeline: {tier: local, x: 2, y: 5}
+        hudi-spark-cow: {tier: local, x: 6, y: 5}
+        hudi-spark-mor: {tier: local, x: 10, y: 5}
+        hudi-spark-compact: {tier: local, x: 14, y: 5}
+        hudi-spark-spark: {tier: local, x: 18, y: 5}
+        hudi-spark-output: {tier: local, x: 2, y: 9}
+        hudi-spark-ingestion: {tier: local, x: 6, y: 9}
+      groups:
+        - {kind: datacenter, label: Local host, tier: local, nodes: [hudi-spark-host, hudi-spark-master, hudi-spark-worker, hudi-spark-hdfs, hudi-spark-kafka, hudi-spark-timeline, hudi-spark-cow, hudi-spark-mor, hudi-spark-compact, hudi-spark-spark, hudi-spark-output, hudi-spark-ingestion]}
+    layout3d:
+      tiers:
+        - {id: processes, label: Processes and jobs, z: 1, size: [24, 6]}
+        - {id: host, label: Local host and files, z: 0, size: [24, 6]}
+      nodes:
+        hudi-spark-host: {tier: host, x: 2, y: 1}
+        hudi-spark-master: {tier: processes, x: 6, y: 1}
+        hudi-spark-worker: {tier: processes, x: 10, y: 1}
+        hudi-spark-hdfs: {tier: processes, x: 14, y: 1}
+        hudi-spark-kafka: {tier: processes, x: 18, y: 1}
+        hudi-spark-timeline: {tier: host, x: 2, y: 4}
+        hudi-spark-cow: {tier: host, x: 6, y: 4}
+        hudi-spark-mor: {tier: host, x: 10, y: 4}
+        hudi-spark-compact: {tier: processes, x: 14, y: 4}
+        hudi-spark-spark: {tier: processes, x: 18, y: 4}
+        hudi-spark-output: {tier: processes, x: 2, y: 7}
+        hudi-spark-ingestion: {tier: processes, x: 6, y: 7}
+      groups:
+        - {kind: datacenter, label: Local host, tier: [processes, host], nodes: [hudi-spark-host, hudi-spark-master, hudi-spark-worker, hudi-spark-hdfs, hudi-spark-kafka, hudi-spark-timeline, hudi-spark-cow, hudi-spark-mor, hudi-spark-compact, hudi-spark-spark, hudi-spark-output, hudi-spark-ingestion]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Spark・Hudi"
+    description: "EMR on EC2 の Hudi Streamer が Amazon MSK から更新を読み、S3 の Hudi テーブルを書き、Glue Data Catalog に同期する例。"
+    sources:
+      - {title: "How Hudi works on Amazon EMR", url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-hudi-how-it-works.html}
+      - {title: "Apache Hudi Streamer", url: https://hudi.apache.org/docs/deployment/}
+      - {title: "Apache Hudi Compaction", url: https://hudi.apache.org/docs/compaction/}
+      - {title: "Amazon MSK", url: https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html}
+      - {title: "Amazon EMR クラスタの構成", url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html}
+      - {title: "AWS shared responsibility", url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理とテーブル登録, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルの永続ストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-emr-control, aws-emr-host, aws-emr-msk, aws-emr-glue, aws-emr-streamer, aws-emr-compact, aws-emr-query, aws-emr-s3, aws-emr-cow, aws-emr-mor]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-emr-host, aws-emr-streamer, aws-emr-compact, aws-emr-query]}
+    nodes:
+      aws-emr-control: {label: "Amazon EMR", svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: "EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。", management: {type: shared, scope: "AWS は EMR サービスを運用し、利用者はクラスタとステップを設定する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-host: {label: "Amazon EC2 / YARN", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "EMR の EC2 ノードで YARN がアプリケーションの実行リソースを割り当てる。", management: {type: shared, scope: "AWS は EC2 基盤を運用し、利用者はクラスタ、ゲスト OS とソフトウェアを管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-msk: {label: "Amazon MSK / 更新トピック", svc: msk, kind: queue, tier: management, x: 8, y: 1.5, realizes: [cdc], description: "上流が生成した注文の更新イベントを Kafka トピックに保持する。", management: {type: shared, scope: "AWS は MSK 基盤を運用し、利用者はトピック、データとアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-glue: {label: "AWS Glue Data Catalog", svc: glue, kind: catalog, tier: management, x: 15, y: 1.5, description: "Hive metastore としてテーブル名・スキーマ・保存先を保持する。", management: {type: shared, scope: "AWS は Glue カタログ基盤を運用し、利用者は表定義とアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-streamer: {label: "Spark / Hudi Streamer", kind: worker, tier: compute, x: 4, y: 1.5, description: "MSK の更新を読み、Hudi テーブルに upsert してコミットする。", management: {type: customer, scope: "利用者がジョブ、入力と Hudi の設定を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-compact: {label: "Hudi Compactor", kind: worker, tier: compute, x: 8, y: 2.8, realizes: [compact], description: "MoR ストリームの書き込みと同じ Spark アプリケーションで非同期にログとベースファイルを統合する。", management: {type: customer, scope: "利用者がコンパクションの設定と運用を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-query: {label: "Spark SQL / Hudi", kind: worker, tier: compute, x: 12, y: 1.5, realizes: [query], description: "カタログまたは S3 のテーブルパスを使い、クエリ方式に応じてタイムライン、ベースファイル、ログを読む。", management: {type: customer, scope: "利用者が Spark ジョブとクエリを管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-output: {label: "下流の分析利用者", kind: external, tier: compute, x: 22, y: 1.5, realizes: [output], description: "Spark の読み取りや集計の結果を受け取る。", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-s3: {label: "Amazon S3 / .hoodie", svc: s3, kind: db, tier: storage, x: 3, y: 1.5, realizes: [timeline], description: "CoW と MoR の別テーブルプレフィックスに、それぞれのタイムラインを保持する。", management: {type: shared, scope: "AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-cow: {label: "CoW / ベースファイル", kind: file, tier: storage, x: 9, y: 1.5, realizes: [cow], description: "CoW の S3 プレフィックスに更新後の Parquet を書く。", management: {type: customer, scope: "利用者がテーブルのデータと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      aws-emr-mor: {label: "MoR / ベースと更新ログ", kind: file, tier: storage, x: 15, y: 1.5, realizes: [mor], description: "MoR の S3 プレフィックスにベースと差分ログを置く。", management: {type: customer, scope: "利用者がテーブルのデータと保持方針を管理する。"}, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+    links:
+      - {id: aws-emr-provision, from: aws-emr-control, to: aws-emr-host, label: "クラスタを作成・管理", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-submit, from: aws-emr-control, to: aws-emr-streamer, label: "Streamer の Spark step を投入", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-submit-query, from: aws-emr-control, to: aws-emr-query, label: "Spark SQL ジョブを起動", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-read-kafka, from: aws-emr-msk, to: aws-emr-streamer, label: "更新イベントを読み取る", realizes: [ingest], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-commit, from: aws-emr-streamer, to: aws-emr-s3, label: "変更をコミット", realizes: [ingest], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-write-cow, from: aws-emr-streamer, to: aws-emr-cow, label: "CoW ベースファイルを書き換える", realizes: [cow-write], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-write-mor, from: aws-emr-streamer, to: aws-emr-mor, label: "MoR 更新ログを追記", realizes: [mor-write], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-compact-write, from: aws-emr-compact, to: aws-emr-mor, label: "統合した MoR ベースを保存", realizes: [compact], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-compact-read, from: aws-emr-mor, to: aws-emr-compact, label: "MoR ベースとログを読む", realizes: [compact], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-sync, from: aws-emr-streamer, to: aws-emr-glue, label: "表定義と保存先を同期", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+      - {id: aws-emr-resolve, from: aws-emr-query, to: aws-emr-glue, label: "表名から保存先を取得", evidence: [{type: doc, ref: "docs/reference-apache-hudi.md#§7"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [12, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [12, 3]}
+        - {id: services, label: AWS 管理サービスとデータ, z: 0, origin: [15, 0], size: [24, 3]}
+        - {id: outside, label: 外部, kind: origin, z: 0, origin: [-5, 0], size: [2, 3]}
+      nodes:
+        aws-emr-host: {tier: cluster, x: 5, y: 1.5}
+        aws-emr-streamer: {tier: apps, x: 1, y: 1.5}
+        aws-emr-compact: {tier: apps, x: 5, y: 1.5}
+        aws-emr-query: {tier: apps, x: 9, y: 1.5}
+        aws-emr-control: {tier: services, x: 2, y: 1.5}
+        aws-emr-msk: {tier: services, x: 6, y: 1.5}
+        aws-emr-glue: {tier: services, x: 10, y: 1.5}
+        aws-emr-s3: {tier: services, x: 14, y: 1.5}
+        aws-emr-cow: {tier: services, x: 18, y: 1.5}
+        aws-emr-mor: {tier: services, x: 22, y: 1.5}
+        aws-emr-output: {tier: outside, x: 0, y: 1.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, cluster, services], nodes: [aws-emr-host, aws-emr-streamer, aws-emr-compact, aws-emr-query, aws-emr-control, aws-emr-msk, aws-emr-glue, aws-emr-s3, aws-emr-cow, aws-emr-mor]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-emr-host, aws-emr-streamer, aws-emr-compact, aws-emr-query]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 14]}
+      nodes:
+        aws-emr-host: {tier: diagram, x: 7, y: 4}
+        aws-emr-streamer: {tier: diagram, x: 3, y: 7}
+        aws-emr-compact: {tier: diagram, x: 7, y: 7}
+        aws-emr-query: {tier: diagram, x: 11, y: 7}
+        aws-emr-control: {tier: diagram, x: 16, y: 1}
+        aws-emr-msk: {tier: diagram, x: 20, y: 1}
+        aws-emr-glue: {tier: diagram, x: 24, y: 1}
+        aws-emr-s3: {tier: diagram, x: 16, y: 5}
+        aws-emr-cow: {tier: diagram, x: 20, y: 5}
+        aws-emr-mor: {tier: diagram, x: 24, y: 5}
+        aws-emr-output: {tier: diagram, x: -1, y: 7}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 1, y0: -1, x1: 26, y1: 11, nodes: [aws-emr-host, aws-emr-streamer, aws-emr-compact, aws-emr-query, aws-emr-control, aws-emr-msk, aws-emr-glue, aws-emr-s3, aws-emr-cow, aws-emr-mor]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 1, y0: 3, x1: 13, y1: 9, nodes: [aws-emr-host, aws-emr-streamer, aws-emr-compact, aws-emr-query]}
