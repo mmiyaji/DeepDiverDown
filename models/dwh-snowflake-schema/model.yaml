@@ -1,0 +1,46 @@
+name: "DWH のスノーフレークスキーマとスタースキーマの比較"
+description: "注文と商品カテゴリの関係を、同じディメンションで持つ構成と、カテゴリを独立させる構成で比較する。"
+parent: {"model":"dwh-design-patterns","node":"snowflake-schema"}
+reference:
+  objectives:
+    - "ディメンションの正規化と、ファクトの粒度や製品名との関係を区別する。"
+    - "カテゴリ変更の管理場所・結合段数・履歴への影響を比較する。"
+  sources:
+    - {"title":"Snowflaked Dimensions","url":"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/snowflake-dimension/"}
+    - {"title":"Power BI のスタースキーマ設計","url":"https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
+sources: ["docs/reference-dwh-snowflake-schema.md"]
+evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[15.5,4.5]}
+nodes:
+  star-category: {"label":"商品＋カテゴリ","kind":"db","tier":"flow","x":3,"y":0,"description":"スター案の平坦なディメンション。","drill":"dwh-star-schema","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§2"}]}
+  star-fact: {"label":"明細ファクト（スター）","kind":"db","tier":"flow","x":7,"y":0,"description":"粒度は1注文明細。","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§2"}]}
+  star-report: {"label":"カテゴリ別売上（スター）","kind":"client","tier":"flow","x":12,"y":0,"description":"商品に直接結合する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§2"}]}
+  norm-category: {"label":"カテゴリ","kind":"db","tier":"flow","x":0,"y":4,"description":"名前を管理する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§3"}]}
+  norm-product: {"label":"商品・カテゴリキー","kind":"db","tier":"flow","x":3,"y":4,"description":"カテゴリへの参照を持つ。","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§3"}]}
+  norm-fact: {"label":"明細ファクト（階層分離）","kind":"db","tier":"flow","x":7,"y":4,"description":"粒度は1注文明細。","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§3"}]}
+  norm-report: {"label":"カテゴリ別売上（階層分離）","kind":"client","tier":"flow","x":12,"y":4,"description":"カテゴリまで階層を辿る。","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§3"}]}
+  review: {"label":"履歴と結合の比較","kind":"actor","tier":"flow","x":15,"y":2,"description":"公開する履歴と読まれる範囲を確認。","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§4"}]}
+links:
+  - {"id":"star-dim","from":"star-category","to":"star-fact","label":"商品ディメンションで絞る","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§2"}]}
+  - {"id":"star-read","from":"star-fact","to":"star-report","label":"一段の結合でカテゴリ集計","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§2"}]}
+  - {"id":"category","from":"norm-category","to":"norm-product","label":"カテゴリキーで結合","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§3"}]}
+  - {"id":"product","from":"norm-product","to":"norm-fact","label":"商品キーで結合","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§3"}]}
+  - {"id":"snow-read","from":"norm-fact","to":"norm-report","label":"階層を辿ってカテゴリ集計","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§3"}]}
+  - {"id":"compare-star","from":"star-report","to":"review","label":"更新と問い合わせコストを比較","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§4"}]}
+  - {"id":"compare-snow","from":"norm-report","to":"review","label":"過去集計への影響を確認","evidence":[{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§4"}]}
+scenarios:
+  - id: compare
+    label: "カテゴリ売上の結合経路を比較"
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§1"}]
+    steps:
+      - {"links":["star-dim","star-read"],"note":"スター案では商品ディメンションにカテゴリ属性がある。"}
+      - {"links":["category","product","snow-read"],"note":"階層分離案ではカテゴリキーの結合が加わる。"}
+      - {"links":["compare-star","compare-snow"],"note":"粒度とフィルターを揃えた結果で整合性と運用負荷を比較する。"}
+  - id: rename
+    label: "カテゴリ名称の変更と履歴"
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-snowflake-schema.md#§4"}]
+    steps:
+      - {"links":["star-dim"],"note":"スター案では同じカテゴリに属する商品行へ名称を反映する。"}
+      - {"links":["category","product"],"note":"階層分離案ではカテゴリ表の名称を更新する。"}
+      - {"links":["compare-star","compare-snow"],"note":"当時の名称を残す必要があれば、どちらの案でも履歴ポリシーを設計する。"}

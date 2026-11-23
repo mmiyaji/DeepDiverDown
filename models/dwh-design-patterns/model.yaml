@@ -1,0 +1,60 @@
+name: "DWH 設計パターンの選び方"
+description: "データをどの層で整えるか、DWH でどう統合するか、BI にどんな粒度で出すかを同じ注文データで比較する。"
+reference:
+  objectives:
+    - "データ層、統合方法、分析用モデル、配信時の集約を別の判断として扱う。"
+    - "現在と当時の値、複数業務の集計をどのモデルで再現できるか確認する。"
+  sources:
+    - {"title":"Kimball Group の次元モデリング技法","url":"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+    - {"title":"Databricks のメダリオン","url":"https://docs.databricks.com/aws/en/lakehouse/medallion"}
+    - {"title":"Bill Inmon の CIF と Data Warehousing 2.0","url":"https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf"}
+    - {"title":"Data Vault Alliance","url":"https://datavaultalliance.com/engineering/data-vault-2-0-an-introduction/"}
+    - {"title":"BigQuery のネストと繰り返し列","url":"https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested"}
+    - {"title":"dbt Semantic Layer","url":"https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture"}
+sources: ["docs/reference-dwh-design-patterns.md"]
+evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[20.5,6.5]}
+nodes:
+  source: {"label":"注文・商品・顧客・返品","kind":"external","tier":"flow","x":0,"y":4,"description":"共通の比較題材。","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§1"}]}
+  medallion: {"label":"メダリオン","kind":"service","tier":"flow","x":4,"y":0,"description":"原本から段階的に整備。","drill":"medallion","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  inmon: {"label":"Inmon CIF","kind":"service","tier":"flow","x":4,"y":3,"description":"統合 EDW と用途別マート。","drill":"dwh-inmon-cif","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  vault: {"label":"Data Vault","kind":"db","tier":"flow","x":4,"y":6,"description":"業務キーと履歴を保持。","drill":"dwh-data-vault","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  kimball: {"label":"Kimball バス","kind":"service","tier":"flow","x":8,"y":0,"description":"業務を共通の分析軸で結ぶ。","drill":"dwh-kimball-bus","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  star: {"label":"スタースキーマ","kind":"db","tier":"flow","x":8,"y":3,"description":"一つの粒度を中心に集計。","drill":"dwh-star-schema","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  snowflake-schema: {"label":"スノーフレーク","kind":"db","tier":"flow","x":12,"y":0,"description":"ディメンションの階層を分ける。","drill":"dwh-snowflake-schema","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  scd: {"label":"SCD","kind":"db","tier":"flow","x":8,"y":6,"description":"属性の履歴を扱う。","drill":"dwh-slowly-changing-dimensions","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  fact-types: {"label":"ファクトテーブルの型","kind":"db","tier":"flow","x":12,"y":3,"description":"イベント・時点・工程で選ぶ。","drill":"dwh-fact-table-types","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  wide: {"label":"ワイドテーブル","kind":"db","tier":"flow","x":12,"y":6,"description":"定型利用向けに平坦化やネストを選ぶ。","drill":"dwh-wide-table","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  aggregates: {"label":"事前集約と指標定義","kind":"service","tier":"flow","x":16,"y":2,"description":"よく使う指標と対応する粒度。","drill":"dwh-aggregate-tables","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§4"}]}
+  bi: {"label":"BI／業務レポート","kind":"client","tier":"flow","x":20,"y":4,"description":"整備済みのデータを利用。","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§4"}]}
+links:
+  - {"id":"layers","from":"source","to":"medallion","label":"品質と再処理の起点を設計","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  - {"id":"integrate","from":"source","to":"inmon","label":"共通の定義で統合","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  - {"id":"record","from":"source","to":"vault","label":"出所と履歴を保存","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  - {"id":"conform","from":"medallion","to":"kimball","label":"共有する分析軸を決める","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  - {"id":"mart","from":"inmon","to":"star","label":"用途別マートの例","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  - {"id":"derive","from":"vault","to":"star","label":"履歴を分析用マートへ展開","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]}
+  - {"id":"dimensions","from":"kimball","to":"star","label":"共通ディメンションを利用","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  - {"id":"hierarchy","from":"star","to":"snowflake-schema","label":"次元の階層を分ける選択肢","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  - {"id":"historical","from":"scd","to":"star","label":"当時の属性で事実を読む","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  - {"id":"grain","from":"star","to":"fact-types","label":"記録したい事実の粒度を選ぶ","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  - {"id":"denormalize","from":"star","to":"wide","label":"配信用に平坦化する選択肢","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§3"}]}
+  - {"id":"build","from":"star","to":"aggregates","label":"再利用する粒度で集約","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§4"}]}
+  - {"id":"query","from":"aggregates","to":"bi","label":"定義済み指標を表示","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§4"}]}
+  - {"id":"export","from":"wide","to":"bi","label":"定型の利用先へ配信","evidence":[{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§4"}]}
+scenarios:
+  - id: sales
+    label: "受注の共通指標を BI に届ける"
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§4"}]
+    steps:
+      - {"links":["layers","conform"],"note":"整備の層を決め、受注と返品で共通に使う日付・商品を整理する。"}
+      - {"links":["dimensions","grain","historical"],"note":"ファクトの粒度と、当時の属性が必要な指標を決める。"}
+      - {"links":["build","query"],"note":"利用頻度の高い指標を公開し、どの粒度まで事前集約で答えられるか確認する。"}
+  - id: sources
+    label: "複数ソースの統合とマートを比較"
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-design-patterns.md#§2"}]
+    steps:
+      - {"links":["integrate","record"],"note":"同じ受注データを統合 EDW と履歴中心の Vault で扱う場合の違いを見る。"}
+      - {"links":["mart","derive"],"note":"分析用マートに必要な業務ルールと粒度を整理する。"}
+      - {"links":["hierarchy","denormalize","export"],"note":"用途に合わせ、階層の分離や定型配信のワイドテーブルを検討する。"}

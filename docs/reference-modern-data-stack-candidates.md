@@ -69,3 +69,25 @@ Kafka Connect は Kafka と外部システムの間でデータを運ぶ。Kafka
 1. **Kafka からつなぐ**：Kafka Connect → Debezium → Spark Structured Streaming → Flink → Kafka Streams。共通の受注イベントで、取り込み・変換・状態復元を比較する。
 2. **保存と分析まで広げる**：メダリオンアーキテクチャ → Iceberg・Delta Lake・Hudi → dbt → Snowflake・Databricks。同じ受注データが保存され、分析用に整備される流れを追う。
 3. **組織間での利用を扱う**：データクリーンルーム → リネージ。誰が何を実行でき、どの結果まで受け取れるかを図解する。
+
+## 追加調査と対応リファレンス
+
+同じ注文・受注データを使い、製品の違いと障害時の境界を比較できる題材です。共通条件の例は、顧客 42 の 2026年1月25日以上・2月1日未満の注文です。ClickHouse と DuckDB はこの条件を用い、各エンジンの区画や実行計画に着目します。
+
+| 調査テーマ | 対応リファレンス |
+|---|---|
+| ClickHouse の疎インデックスとマージ | [ClickHouse](reference-clickhouse.md) |
+| DuckDB の Parquet プッシュダウン | [DuckDB](reference-duckdb.md) |
+| Apache Paimon の更新と変更ログ | [Apache Paimon](reference-apache-paimon.md) |
+| Iceberg カタログの権限・更新・公開 | [Apache Polaris](reference-apache-polaris.md)・[Project Nessie](reference-project-nessie.md) |
+| 分散トレースとサンプリング | [OpenTelemetry](reference-opentelemetry.md) |
+| Raft の選出とクォーラム | [etcd](reference-etcd-raft.md) |
+| GitOps の同期と構成のずれ | [Argo CD](reference-argo-cd.md) |
+| PostgreSQL の WAL と論理デコーディング | [PostgreSQL](reference-postgresql-logical-decoding.md) |
+| Kubernetes の通信とネットワークポリシー | [Cilium と Hubble](reference-cilium-hubble.md) |
+| メタデータ、列リネージ、データ契約 | [DataHub](reference-datahub.md)・[OpenMetadata](reference-openmetadata.md) |
+| 設定の検証と CI の判定 | [OPA と Conftest](reference-opa-conftest.md) |
+| Kafka の Avro スキーマ互換性 | [Apicurio Registry](reference-apicurio-registry.md) |
+| 履歴再生と外部処理の再試行 | [Temporal](reference-temporal.md) |
+
+[カタログの責務](reference-data-catalog-architecture.md)、[DWH 設計パターン](reference-dwh-design-patterns.md)、[Snowflake](reference-snowflake.md)、[Databricks](reference-databricks.md)から各分野の詳細図を辿れます。

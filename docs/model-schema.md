@@ -255,6 +255,6 @@ groups:
 
 ## リファレンスの階層とラベル（registry.json）
 
-- `reference.domain`（領域：データ基盤／コンテナ基盤）、`reference.kind`（種別：製品・技術のアーキテクチャ／仕組みの深掘り／設計パターン・ユースケース）、`reference.category`（分類）、`reference.order` でサイドバーの階層と並びを決める。
+- `reference.domain`（領域：データ基盤／コンテナ基盤／運用基盤）、`reference.kind`（種別：製品・技術のアーキテクチャ／仕組みの深掘り／設計パターン・ユースケース）、`reference.category`（分類）、`reference.order` でサイドバーの階層と並びを決める。
 - `reference.detailOf: <親のモデル ID>` を書いた詳細図は、親の直後に字下げして並ぶ。
 - `tags` は検索・絞り込み用のラベル。提供形態（OSS／商用サービス／クラウドマネージド／商用製品／ソース公開（BSL）／商用サービスあり／仕様／概念／パターン）と、提供元・団体（Apache、CNCF、AWS など）を書く。サイドバーのラベルを押すと絞り込み（複数はすべてを持つもの）、ヘッダーの検索もラベルで引ける。

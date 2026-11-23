@@ -1,0 +1,301 @@
+name: Amazon DataZone のデータ公開と購読
+description: プロジェクトの資産をドメインに公開し、購読申請の承認から接続先での利用権限付与へ進む流れを追います。
+parent:
+  model: data-catalog-architecture
+  node: datazone
+reference:
+  objectives:
+    - プロジェクトのインベントリと公開済み資産を区別する。
+    - 購読の承認とソース権限の付与を追う。
+    - 管理対象と非管理対象での権限付与の違いを説明する。
+  sources:
+    - title: 'AWS Reference Architecture: Building a Unified Catalog with Amazon DataZone'
+      url: https://docs.aws.amazon.com/reference-architecture-diagrams/latest/data-analytics/unified-catalog-datazone.html
+    - title: Data Discovery, Subscription, and Consumption
+      url: https://docs.aws.amazon.com/datazone/latest/userguide/discover-subscribe-consume-data.html
+    - title: Grant Access to Unmanaged Assets
+      url: https://docs.aws.amazon.com/datazone/latest/userguide/grant-access-to-unmanaged-asset.html
+    - title: Data Lineage in Amazon DataZone
+      url: https://docs.aws.amazon.com/datazone/latest/userguide/datazone-data-lineage.html
+    - title: Amazon SageMaker vs Amazon DataZone
+      url: https://docs.aws.amazon.com/datazone/latest/userguide/sagemaker-datazone.html
+sources:
+  - docs/reference-amazon-datazone.md
+evidence:
+  - type: doc
+    ref: docs/reference-amazon-datazone.md#§1
+tiers:
+  - id: people
+    label: 提供側と利用側
+    z: 2
+    size:
+      - 15
+      - 3
+  - id: catalog
+    label: Amazon DataZone ドメイン
+    z: 1
+    size:
+      - 15
+      - 4
+  - id: sources
+    label: メタデータ取得元と権限の実施先
+    z: 0
+    size:
+      - 15
+      - 4
+nodes:
+  owner:
+    label: 提供プロジェクト・所有者
+    kind: actor
+    tier: people
+    x: 4
+    y: 1
+    description: 資産の説明を整え、購読を審査する。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§2
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§3
+  consumer:
+    label: 購読プロジェクト
+    kind: actor
+    tier: people
+    x: 10
+    y: 1
+    description: 公開資産を検索し、目的とともに利用を申請する。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§3
+  inventory:
+    label: プロジェクトのインベントリ
+    kind: db
+    tier: catalog
+    x: 2
+    y: 1
+    description: 取り込んだ資産を公開前に編集できる。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§2
+  published:
+    label: ビジネスデータカタログ
+    kind: service
+    tier: catalog
+    x: 5
+    y: 1
+    description: ドメイン内の公開済み資産とリネージを表示する。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§2
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§5
+  subscription:
+    label: 購読・権限付与処理
+    kind: service
+    tier: catalog
+    x: 9
+    y: 1
+    description: 申請状態を管理し、承認後に資産種別に応じた処理を進める。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§3
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  events:
+    label: Amazon EventBridge
+    kind: queue
+    tier: catalog
+    x: 13
+    y: 2.5
+    description: 非管理対象の承認イベントを配信する。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  glue:
+    label: AWS Glue Data Catalog
+    kind: external
+    tier: sources
+    x: 2
+    y: 1
+    description: 資産メタデータの取得元。
+    drill: aws-glue
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§2
+  lineage:
+    label: OpenLineage 対応ジョブ
+    kind: external
+    tier: sources
+    x: 4
+    y: 2.5
+    description: 変換の実行イベントを DataZone に送る。
+    drill: openlineage
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§5
+  lake:
+    label: AWS Lake Formation
+    kind: external
+    tier: sources
+    x: 7
+    y: 1
+    description: 管理対象の Glue テーブルに利用権限を反映する。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  athena:
+    label: Athena・購読の環境
+    kind: external
+    tier: sources
+    x: 10
+    y: 1
+    description: 購読プロジェクトで権限付与済みテーブルをクエリする。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  external:
+    label: 外部処理・非管理対象ソース
+    kind: external
+    tier: sources
+    x: 13
+    y: 2.5
+    description: 承認イベントを受け、対象ソースの権限を付与する。
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+links:
+  - id: import
+    from: glue
+    to: inventory
+    label: テーブル情報を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§2
+  - id: curate
+    from: owner
+    to: inventory
+    label: 説明や業務用語を補う
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§2
+  - id: publish
+    from: inventory
+    to: published
+    label: ドメインへ公開
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§2
+  - id: collect-lineage
+    from: lineage
+    to: published
+    label: 変換の入出力を関連付ける
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§5
+  - id: discover
+    from: consumer
+    to: published
+    label: 公開資産・リネージを探す
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§5
+  - id: request
+    from: consumer
+    to: subscription
+    label: プロジェクトとして購読申請
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§3
+  - id: approve
+    from: owner
+    to: subscription
+    label: 所有者が審査・承認
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§3
+  - id: managed-grant
+    from: subscription
+    to: lake
+    label: 管理対象に権限を反映
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  - id: query
+    from: athena
+    to: lake
+    label: 権限に従ってテーブルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  - id: publish-event
+    from: subscription
+    to: events
+    label: 承認イベントを送信
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  - id: custom-grant
+    from: events
+    to: external
+    label: 外部処理で権限を付与
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+  - id: report
+    from: external
+    to: subscription
+    label: 権限付与の状態を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4
+scenarios:
+  - id: managed-subscription
+    label: Glue 資産を公開して Athena で使う
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§6
+    steps:
+      - links:
+          - import
+          - curate
+          - publish
+          - collect-lineage
+        note: 注文テーブルを取り込み、説明と変換の由来を添えて公開する。
+      - links:
+          - discover
+          - request
+          - approve
+        note: 分析プロジェクトが資産を探し、所有者の承認を受ける。
+      - links:
+          - managed-grant
+          - query
+        note: 管理対象の権限を Lake Formation に設定し、購読側の Athena から利用する。
+  - id: unmanaged-subscription
+    label: 非管理対象の購読を反映する
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§6
+    steps:
+      - links:
+          - discover
+          - request
+          - approve
+        note: 公開されている非管理対象資産の購読を申請し、承認される。
+      - links:
+          - publish-event
+          - custom-grant
+        note: EventBridge のイベントで外部の権限付与処理を起動する。
+      - links:
+          - report
+        note: 外部処理が権限付与の状態を DataZone に報告する。
+requirements:
+  - id: R-01
+    kind: rule
+    title: 申請と実際の付与を追跡すること
+    text: 承認結果と対象データを利用する権限の反映状況を追跡できる。
+    links:
+      - approve
+      - managed-grant
+      - report
+    evidence:
+      - type: doc
+        ref: docs/reference-amazon-datazone.md#§4

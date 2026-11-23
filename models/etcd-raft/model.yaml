@@ -1,0 +1,92 @@
+name: "etcd と Raft のクォーラム"
+description: "3メンバーの etcd を例に、注文 API の設定変更がコミットされる条件と、リーダーが孤立した場合の選出・復旧を追います。"
+reference:
+  objectives:
+    - "リーダー、フォロワー、過半数の関係を把握する。"
+    - "過半数を維持した側で書き込みが再開する過程を追う。"
+    - "クライアントのタイムアウトとコミットの有無を区別する。"
+  sources:
+    - {title: "etcd Failure modes", url: "https://etcd.io/docs/v3.6/op-guide/failures/"}
+    - {title: "etcd API guarantees", url: "https://etcd.io/docs/v3.6/learning/api_guarantees/"}
+    - {title: "In Search of an Understandable Consensus Algorithm (Raft)", url: "https://raft.github.io/raft.pdf"}
+    - {title: "etcd FAQ", url: "https://etcd.io/docs/v3.6/faq/"}
+sources: [docs/reference-etcd-raft.md]
+evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§1"}]
+tiers:
+  - {id: "client", label: "設定の更新", z: 1, size: [14,4], kind: "origin"}
+  - {id: "cluster", label: "etcd クラスタ", z: 0, size: [14,7]}
+nodes:
+  operator: {label: "運用者", kind: "actor", tier: "client", x: 0, y: 1.5, description: "注文 API の受付上限を設定変更する。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§1"}]}
+  client: {label: "etcd クライアント", kind: "client", tier: "client", x: 5, y: 1.5, description: "設定キーへの Put と完了を確認する。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§2"}]}
+  member-a: {label: "メンバー A", kind: "db", tier: "cluster", x: 2, y: 1.5, description: "初期状態のリーダー。分断時には単独になる。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§3"}]}
+  member-b: {label: "メンバー B", kind: "db", tier: "cluster", x: 6, y: 1.5, description: "初期状態のフォロワー。例では分断後にリーダーとなる。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§4"}]}
+  member-c: {label: "メンバー C", kind: "db", tier: "cluster", x: 10, y: 1.5, description: "初期状態のフォロワー。分断中も B と通信できる。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§4"}]}
+  setting: {label: "コミット済みの設定", kind: "segment", tier: "cluster", x: 6, y: 5, description: "各メンバーの状態機械で反映される注文 API の設定キーを論理的に表す。", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§2"}]}
+links:
+  - {id: "update", from: "operator", to: "client", label: "受付上限の更新を指示", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§1"}]}
+  - {id: "put-a", from: "client", to: "member-a", label: "A に Put", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§2"}]}
+  - {id: "put-b", from: "client", to: "member-b", label: "B に Put", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§4"}]}
+  - {id: "a-replicate-b", from: "member-a", to: "member-b", label: "Raft ログを複製", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§3"}]}
+  - {id: "a-replicate-c", from: "member-a", to: "member-c", label: "Raft ログを複製", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§3"}]}
+  - {id: "elect-replicate", from: "member-b", to: "member-c", label: "投票・ログ複製", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§4"}]}
+  - {id: "apply-a", from: "member-a", to: "setting", label: "コミット後に設定に反映", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§3"}]}
+  - {id: "apply-b", from: "member-b", to: "setting", label: "コミット後に設定に反映", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§4"}]}
+  - {id: "catch-up", from: "member-b", to: "member-a", label: "復旧した A が追随", evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§5"}]}
+scenarios:
+  - id: write-majority
+    label: "3メンバーで設定を更新"
+    evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§2"}, {type: doc, ref: "docs/reference-etcd-raft.md#§3"}]
+    steps:
+      - {links: ["update","put-a"], note: "クライアントがリーダー A に受付上限を 100 にする Put を送る。"}
+      - {links: ["a-replicate-b","a-replicate-c"], note: "A が今の任期のログエントリを複製する。A 自身とフォロワー 1 台で 2/3 の過半数を満たす。"}
+      - {links: ["apply-a"], note: "コミット済みの更新を状態機械に適用し、Put の成功を返す。"}
+  - id: partition
+    label: "リーダーが 1 対 2 の分断で孤立"
+    evidence: [{type: doc, ref: "docs/reference-etcd-raft.md#§3"}, {type: doc, ref: "docs/reference-etcd-raft.md#§4"}, {type: doc, ref: "docs/reference-etcd-raft.md#§5"}]
+    visual: partition-quorum
+    steps:
+      - links: [put-a]
+        note: 分断で A が孤立する。A は過半数を得られず追加の更新をコミットできない。
+        lanes:
+          a: {sub: 少数派・到達可能 1/3, tone: down}
+          b: {sub: 多数派・選挙前}
+          c: {sub: 多数派・選挙前}
+      - links: [elect-replicate]
+        note: B と C は互いに通信できる。選挙が完了して B が新しいリーダーになる。
+        lanes:
+          a: {sub: 少数派・到達可能 1/3, tone: down}
+          b: {sub: 新リーダー・到達可能 2/3, tone: new}
+          c: {sub: フォロワー}
+      - links: [put-b]
+        note: クライアントが B に受付上限を 120 にする Put を送る。B が新しい値をログに追加する。
+        lanes:
+          a: {sub: 少数派・到達可能 1/3, tone: down}
+          b: {sub: リーダー・到達可能 2/3}
+          c: {sub: フォロワー}
+        blocks:
+          b: [{id: b120, label: 上限 120, k: 3}]
+      - links: [elect-replicate, apply-b]
+        note: B が C にログを複製する。B と C の 2 台でコミットし、更新を適用する。
+        blocks:
+          b: [{id: b120, label: 上限 120, k: 0}]
+          c: [{id: c120, label: 上限 120, k: 0, from: [b120]}]
+      - links: [catch-up]
+        note: 分断が解消すると A が新しいリーダーに追随し、コミット済みの状態に追いつく。
+        lanes:
+          a: {sub: 復旧したフォロワー, tone: new}
+          b: {sub: リーダー・到達可能 3/3}
+          c: {sub: フォロワー}
+        blocks:
+          a: [{id: a120, label: 上限 120, k: 0, from: [b120]}]
+          b: [{id: b120, label: 上限 120, k: 0}]
+          c: [{id: c120, label: 上限 120, k: 0}]
+blocks:
+  id: partition-quorum
+  title: 分断前後のメンバーと新しい設定
+  note: 受付上限 120 がコミットされ、各メンバーに反映される順序を追う。
+  legend: {0: コミット済み, 3: 未コミット}
+  lanes:
+    - {id: a, label: メンバー A, sub: 初期リーダー, node: member-a}
+    - {id: b, label: メンバー B, sub: 初期フォロワー, node: member-b}
+    - {id: c, label: メンバー C, sub: 初期フォロワー, node: member-c}
+  items: {a: [], b: [], c: []}

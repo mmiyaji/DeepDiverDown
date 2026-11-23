@@ -1,0 +1,49 @@
+name: "OpenTelemetry の分散トレーシングとサンプリング"
+description: "注文 API の設計上の依存関係と、OTLP と Collector を経由して観測されたトレースの違いを追います。"
+reference:
+  objectives:
+    - "コンテキスト伝播と OTLP による Span の送信を区別する。"
+    - "Collector の Receiver、Processor、Exporter を順に追う。"
+    - "サンプリングと計装の有無が設計図・観測結果の照合に与える影響を説明する。"
+  sources:
+    - {title: "OpenTelemetry Context propagation", url: "https://opentelemetry.io/docs/concepts/context-propagation/"}
+    - {title: "OTLP Specification", url: "https://opentelemetry.io/docs/specs/otlp/"}
+    - {title: "Collector Configuration", url: "https://opentelemetry.io/docs/collector/configuration/"}
+    - {title: "OpenTelemetry Sampling", url: "https://opentelemetry.io/docs/concepts/sampling/"}
+    - {title: "Tail Sampling Processor", url: "https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor"}
+sources: [docs/reference-opentelemetry.md]
+evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§1"}]
+tiers:
+  - {id: "app", label: "アプリケーション", z: 1, size: [16,4], kind: "origin"}
+  - {id: "collect", label: "テレメトリー収集", z: 0, size: [16,4]}
+nodes:
+  caller: {label: "注文クライアント", kind: "client", tier: "app", x: 0, y: 1.5, description: "注文リクエストを送る。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§1"}]}
+  order: {label: "注文 API + SDK", kind: "service", tier: "app", x: 4, y: 1.5, description: "サーバー Span と下流呼び出しの Span を生成する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}]}
+  inventory: {label: "在庫 API + SDK", kind: "service", tier: "app", x: 8, y: 1.5, description: "受け取った Trace Context に基づき子 Span を生成する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}]}
+  receiver: {label: "OTLP Receiver", kind: "service", tier: "collect", x: 0, y: 1.5, description: "SDK 等からトレースデータを受信する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§3"}]}
+  sampling: {label: "Tail Sampling Processor", kind: "worker", tier: "collect", x: 4, y: 1.5, description: "同じ Trace ID の Span を集め、設定した条件で保持を判定する。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§4"}]}
+  exporter: {label: "Collector Exporter", kind: "worker", tier: "collect", x: 8, y: 1.5, description: "保持されたトレースをバックエンドに送る。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§3"}]}
+  backend: {label: "トレースバックエンド", kind: "db", tier: "collect", x: 12, y: 1.5, description: "届いた Span を検索・表示できる状態にする。", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§5"}]}
+links:
+  - {id: "request", from: "caller", to: "order", label: "注文リクエスト", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§1"}]}
+  - {id: "reserve", from: "order", to: "inventory", label: "在庫引当 + Trace Context", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}]}
+  - {id: "order-otlp", from: "order", to: "receiver", label: "注文側 Span を OTLP 送信", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§3"}]}
+  - {id: "inventory-otlp", from: "inventory", to: "receiver", label: "在庫側 Span を OTLP 送信", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§3"}]}
+  - {id: "process", from: "receiver", to: "sampling", label: "受信した Span を処理", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§3"}]}
+  - {id: "keep", from: "sampling", to: "exporter", label: "保持対象の Trace", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§4"}]}
+  - {id: "export", from: "exporter", to: "backend", label: "保持した Span を送信", evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§5"}]}
+scenarios:
+  - id: keep-error
+    label: "在庫エラーのトレースを保持"
+    evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}, {type: doc, ref: "docs/reference-opentelemetry.md#§3"}, {type: doc, ref: "docs/reference-opentelemetry.md#§4"}, {type: doc, ref: "docs/reference-opentelemetry.md#§5"}]
+    steps:
+      - {links: ["request","reserve"], note: "注文 API が在庫 API を呼び出す。在庫 API は親コンテキストを引き継ぎ、失敗した処理を ERROR の Span として記録する。"}
+      - {links: ["order-otlp","inventory-otlp","process"], note: "両サービスの SDK が同じ Trace ID の Span を OTLP で送る。Collector が判定に必要な Span を集める。"}
+      - {links: ["keep","export"], note: "ERROR を含むためトレースを保持する。バックエンドで注文と在庫の Span をたどる。"}
+  - id: drop-success
+    label: "成功した注文が検索結果に現れない"
+    evidence: [{type: doc, ref: "docs/reference-opentelemetry.md#§2"}, {type: doc, ref: "docs/reference-opentelemetry.md#§4"}, {type: doc, ref: "docs/reference-opentelemetry.md#§5"}]
+    steps:
+      - {links: ["request","reserve"], note: "在庫引当を含む注文処理が成功する。設計上の依存先を実際に呼び出している。"}
+      - {links: ["order-otlp","inventory-otlp","process"], note: "Collector は両サービスの Span を受信する。例の保持条件に一致しない Trace を破棄する。"}
+      - {links: [], note: "バックエンドにこの注文の Trace は届かない。検索結果を設計と照合する際は、サンプリング方針と計装範囲を確認する。"}

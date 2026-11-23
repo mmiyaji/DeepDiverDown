@@ -1,0 +1,149 @@
+{
+  "model": "dwh-wide-table",
+  "name": "ワイドテーブルの粒度と BigQuery のネスト",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "orders": {
+      "type": "node",
+      "label": "注文ヘッダー",
+      "status": "claim"
+    },
+    "items": {
+      "type": "node",
+      "label": "注文明細",
+      "status": "claim"
+    },
+    "transform": {
+      "type": "node",
+      "label": "注文テーブルの生成",
+      "status": "claim"
+    },
+    "flat": {
+      "type": "node",
+      "label": "明細粒度のワイドテーブル",
+      "status": "claim"
+    },
+    "nested": {
+      "type": "node",
+      "label": "注文粒度のネストテーブル",
+      "status": "claim"
+    },
+    "report": {
+      "type": "node",
+      "label": "注文・明細の集計",
+      "status": "claim"
+    },
+    "read-order": {
+      "type": "link",
+      "label": "注文ヘッダー → 注文テーブルの生成",
+      "status": "claim"
+    },
+    "read-items": {
+      "type": "link",
+      "label": "注文明細 → 注文テーブルの生成",
+      "status": "claim"
+    },
+    "line-rows": {
+      "type": "link",
+      "label": "注文テーブルの生成 → 明細粒度のワイドテーブル",
+      "status": "claim"
+    },
+    "order-row": {
+      "type": "link",
+      "label": "注文テーブルの生成 → 注文粒度のネストテーブル",
+      "status": "claim"
+    },
+    "flat-report": {
+      "type": "link",
+      "label": "明細粒度のワイドテーブル → 注文・明細の集計",
+      "status": "claim"
+    },
+    "nested-report": {
+      "type": "link",
+      "label": "注文粒度のネストテーブル → 注文・明細の集計",
+      "status": "claim"
+    },
+    "aggregate-grain": {
+      "type": "scenario",
+      "label": "2明細の注文で二重計上を見分ける"
+    },
+    "late-line-update": {
+      "type": "scenario",
+      "label": "後着する金額訂正と置換範囲"
+    }
+  },
+  "byRef": {
+    "docs/reference-dwh-wide-table.md#§1": [
+      "model",
+      "orders",
+      "items",
+      "aggregate-grain"
+    ],
+    "docs/reference-dwh-wide-table.md": [
+      "model",
+      "orders",
+      "items",
+      "transform",
+      "flat",
+      "nested",
+      "report",
+      "read-order",
+      "read-items",
+      "line-rows",
+      "order-row",
+      "flat-report",
+      "nested-report",
+      "aggregate-grain",
+      "late-line-update"
+    ],
+    "docs/reference-dwh-wide-table.md#§2": [
+      "transform",
+      "flat",
+      "nested",
+      "read-order",
+      "read-items",
+      "line-rows",
+      "order-row",
+      "aggregate-grain",
+      "late-line-update"
+    ],
+    "docs/reference-dwh-wide-table.md#§3": [
+      "report",
+      "flat-report",
+      "nested-report",
+      "aggregate-grain"
+    ],
+    "docs/reference-dwh-wide-table.md#§4": [
+      "late-line-update"
+    ]
+  },
+  "reference": {
+    "category": "DWH 設計パターン",
+    "order": 90,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
+    "detailOf": "dwh-design-patterns",
+    "objectives": [
+      "平坦なワイドテーブルとネストされた注文表の1行の意味を説明する。",
+      "1対多の展開と集計粒度の違いが二重計上を起こすことを確認する。",
+      "後着変更で置き換える対象を、明細キーまたは注文キーで特定する。"
+    ],
+    "sources": [
+      {
+        "title": "BigQuery: Use nested and repeated fields",
+        "url": "https://docs.cloud.google.com/bigquery/docs/best-practices-performance-nested"
+      },
+      {
+        "title": "BigQuery: Work with arrays",
+        "url": "https://docs.cloud.google.com/bigquery/docs/arrays"
+      },
+      {
+        "title": "BigQuery: Data manipulation language",
+        "url": "https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax"
+      }
+    ]
+  }
+}

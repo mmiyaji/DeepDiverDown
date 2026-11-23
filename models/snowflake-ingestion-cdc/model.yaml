@@ -1,0 +1,55 @@
+name: "Snowflake の取り込みと増分処理"
+description: "注文ファイルと行ストリームの取り込みから、Streams／Tasks または Dynamic Tables で増分を整える。"
+parent: {"model":"snowflake","node":"load"}
+reference:
+  objectives:
+    - "ファイルのロードと行の連続取り込みを区別する。"
+    - "CDC の消費位置と、変換結果の鮮度目標を区別する。"
+  sources:
+    - {"title":"Snowpipe","url":"https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro"}
+    - {"title":"Snowpipe Streaming","url":"https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"}
+    - {"title":"Streams and Tasks","url":"https://docs.snowflake.com/en/user-guide/data-pipelines-intro"}
+    - {"title":"Dynamic Tables の選択ガイド","url":"https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide"}
+sources: ["docs/reference-snowflake-ingestion-cdc.md"]
+evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[15.5,4.5]}
+nodes:
+  files: {"label":"注文ファイル","kind":"external","tier":"flow","x":0,"y":0,"description":"オブジェクトストレージ上のステージ。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
+  pipe: {"label":"Snowpipe","kind":"service","tier":"flow","x":3,"y":0,"description":"通知を受け、COPY INTO を実行。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
+  client: {"label":"注文イベント送信元","kind":"external","tier":"flow","x":0,"y":4,"description":"SDK または対応コネクタで行を送る。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
+  streaming: {"label":"Snowpipe Streaming","kind":"service","tier":"flow","x":3,"y":4,"description":"チャネルから行を受け取る。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
+  raw: {"label":"RAW_ORDERS","kind":"db","tier":"flow","x":6,"y":2,"description":"到着順の変更イベントを保持。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§1"}]}
+  change: {"label":"Stream・消費位置","kind":"service","tier":"flow","x":9,"y":0,"description":"変更範囲のオフセットを管理。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
+  task: {"label":"Task・MERGE","kind":"worker","tier":"flow","x":12,"y":0,"description":"注文の現在状態を更新。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
+  orders: {"label":"ORDERS_CURRENT","kind":"db","tier":"flow","x":15,"y":0,"description":"業務キー別の現在状態。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
+  dynamic: {"label":"注文集計 Dynamic Table","kind":"db","tier":"flow","x":11,"y":4,"description":"定義と目標遅延に基づく分析用テーブル。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
+  bi: {"label":"BI","kind":"client","tier":"flow","x":15,"y":4,"description":"集計結果の利用先。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
+links:
+  - {"id":"notify","from":"files","to":"pipe","label":"到着通知とファイル名","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
+  - {"id":"copy","from":"pipe","to":"raw","label":"COPY INTO","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§2"}]}
+  - {"id":"send","from":"client","to":"streaming","label":"チャネルに行を送る","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
+  - {"id":"commit","from":"streaming","to":"raw","label":"行をコミット","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§3"}]}
+  - {"id":"delta","from":"raw","to":"change","label":"未消費の変更を参照","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
+  - {"id":"consume","from":"change","to":"task","label":"変更行を読む","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
+  - {"id":"merge","from":"task","to":"orders","label":"注文状態を更新","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}
+  - {"id":"refresh","from":"raw","to":"dynamic","label":"SELECT に従いリフレッシュ","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
+  - {"id":"serve","from":"dynamic","to":"bi","label":"集計を参照","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]}
+scenarios:
+  - id: load-files
+    label: "ファイルを取り込んで現在状態を更新"
+    evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]
+    steps:
+      - {"links":["notify","copy"],"note":"日次ファイルの到着通知を受け、Snowpipe が RAW にロードする。"}
+      - {"links":["delta","consume"],"note":"Task が未消費の Stream の差分を読む。"}
+      - {"links":["merge"],"note":"MERGE をコミットし、現在状態と Stream の消費位置を進める。"}
+  - id: stream-rows
+    label: "連続取り込みから定義済み集計へ"
+    evidence: [{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§5"}]
+    steps:
+      - {"links":["send"],"note":"送信元はチャネルに注文イベントを行単位で送る。"}
+      - {"links":["commit"],"note":"RAW へのコミットと送信元の再開位置を対応付ける。"}
+      - {"links":["refresh"],"note":"依存テーブルをもとに目標遅延を意識して集計を更新する。"}
+      - {"links":["serve"],"note":"BI は直近のリフレッシュ結果を参照する。"}
+requirements:
+  - {"id":"REQ-1","kind":"usecase","title":"増分で注文状態を更新","text":"処理済みデータと未処理の変更を再開位置で区別できる。","scenario":"load-files","evidence":[{"type":"doc","ref":"docs/reference-snowflake-ingestion-cdc.md#§4"}]}

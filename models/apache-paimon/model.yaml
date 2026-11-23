@@ -1,0 +1,214 @@
+name: "Apache Paimon の主キーテーブル：Flink 更新と変更ログ"
+description: "Flink から届く注文更新が主キーで統合される過程を追い、スナップショットと下流向けの変更ログを比較する。"
+reference:
+  objectives:
+    - 主キーの更新が sorted run とスナップショットにどう現れるかを追う。
+    - merge-engine と changelog-producer が担う役割を説明する。
+    - Paimon の LSM と Hudi の CoW・MoR の保存単位を比較する。
+  sources:
+    - title: Paimon 2.1 Primary-Key Table
+      url: https://paimon.apache.org/docs/2.1/primary-key-table/
+    - title: Paimon 2.1 Merge Engines
+      url: https://paimon.apache.org/docs/2.1/primary-key-table/merge-engine/
+    - title: Paimon 2.1 Changelog Producer
+      url: https://paimon.apache.org/docs/2.1/primary-key-table/changelog-producer/
+    - title: Paimon 2.1 Compaction
+      url: https://paimon.apache.org/docs/2.1/primary-key-table/compaction/
+    - title: Apache Hudi Concepts
+      url: https://hudi.apache.org/docs/concepts/
+    - title: Paimon 2.1 Table Mode
+      url: https://paimon.apache.org/docs/2.1/primary-key-table/table-mode/
+sources: ["docs/reference-apache-paimon.md"]
+evidence:
+  - {"type":"doc","ref":"docs/reference-apache-paimon.md#§1"}
+  - {"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}
+  - {"type":"doc","ref":"docs/reference-apache-paimon.md#§3"}
+  - {"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}
+  - {"type":"doc","ref":"docs/reference-apache-paimon.md#§5"}
+  - {"type":"doc","ref":"docs/reference-apache-paimon.md#§6"}
+tiers:
+  - {"id":"processing","label":"Flink と下流","z":1,"origin":[0,0],"size":[16,3]}
+  - {"id":"lake","label":"Paimon 主キーテーブル","z":0,"origin":[2,0],"size":[14,3]}
+nodes:
+  source: {"label":"上流の注文更新","kind":"external","tier":"processing","x":0,"y":1.5,"description":"order_id=42 の完全な更新行を送る。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§1"}]}
+  writer: {"label":"Flink / Paimon Sink","kind":"worker","tier":"processing","x":4,"y":1.5,"description":"同じ主キーを同じパーティション・バケットへ書き込む。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  reader: {"label":"スナップショット読み取り","kind":"service","tier":"processing","x":10,"y":0.5,"description":"選択したスナップショットの論理行を取得する。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  consumer: {"label":"ストリーム利用者","kind":"external","tier":"processing","x":15,"y":2.5,"description":"主キー upsert または更新前後の変更を受け取る。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
+  runs: {"label":"バケット内の sorted run","kind":"db","tier":"lake","x":3,"y":1.5,"description":"ソート済みファイルに複数の世代を持ち得る LSM の保存単位。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  compact: {"label":"LSM コンパクション","kind":"worker","tier":"lake","x":7,"y":1.5,"description":"run をマージし、同じキーを merge-engine で統合する。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§3"}]}
+  snapshots: {"label":"コミット済みスナップショット","kind":"db","tier":"lake","x":10,"y":0.3,"description":"読み取り対象のファイル集合を確定する。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  changelog: {"label":"Changelog Producer","kind":"service","tier":"lake","x":12,"y":2.4,"description":"選んだ方式に応じて下流が読める変更を決める。","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
+links:
+  - {"id":"ingest","from":"source","to":"writer","label":"主キー付きの更新行を渡す","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  - {"id":"flush","from":"writer","to":"runs","label":"ソート済みファイルを書く","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  - {"id":"commit","from":"runs","to":"snapshots","label":"ファイル集合をコミット","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  - {"id":"read-state","from":"snapshots","to":"reader","label":"論理行を読む","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  - {"id":"pick-runs","from":"runs","to":"compact","label":"重なる run を選ぶ","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§3"}]}
+  - {"id":"publish-compact","from":"compact","to":"snapshots","label":"新しいファイル集合をコミット","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§3"}]}
+  - {"id":"upsert","from":"snapshots","to":"consumer","label":"増分 upsert を読む","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
+  - {"id":"lookup","from":"compact","to":"changelog","label":"旧値を参照して前後を生成","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
+  - {"id":"deliver","from":"changelog","to":"consumer","label":"コミットした変更を読む","evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
+scenarios:
+  - id: state
+    label: 注文 42 のスナップショットを更新する
+    visual: lsm
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-paimon.md#§2
+    steps:
+      - links:
+          - commit
+          - read-state
+        note: 既存スナップショットでは、注文 42 の状態は open。
+        highlight:
+          - v1
+      - links:
+          - ingest
+          - flush
+          - commit
+        note: 同じキーの paid を新しい run に保存し、コミットする。
+        blocks:
+          previous:
+            - id: v1
+              label: "#42 · open"
+              k: 0
+          incoming:
+            - id: v2
+              label: "#42 · paid"
+              k: 1
+          output: []
+        highlight:
+          - v2
+      - links:
+          - read-state
+        note: deduplicate がキー 42 の最新行 paid を返す。元の run が両方残っている間も論理行は 1 行。
+        highlight:
+          - v1
+          - v2
+      - links:
+          - pick-runs
+          - publish-compact
+        note: コンパクションが run をマージし、新しいスナップショットは統合後のファイルを参照する。
+        blocks:
+          previous: []
+          incoming: []
+          output:
+            - id: v3
+              label: "#42 · paid"
+              k: 2
+              from:
+                - v1
+                - v2
+        highlight:
+          - v3
+  - id: changes
+    label: paid への更新を下流へ届ける
+    visual: changes
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-paimon.md#§4
+    steps:
+      - links:
+          - ingest
+          - flush
+        note: 入力は更新後の paid のみ。既存の open はテーブル側にある。
+        highlight:
+          - after
+      - links:
+          - commit
+          - upsert
+        note: none の場合、増分読み取りでは paid の upsert を受け取り、下流がキー 42 の状態を置き換えられる。
+        blocks:
+          input:
+            - id: after
+              label: +U paid
+              k: 1
+          none:
+            - id: upsert-only
+              label: +U paid
+              k: 1
+              from:
+                - after
+          lookup: []
+        highlight:
+          - upsert-only
+      - links:
+          - pick-runs
+          - lookup
+          - deliver
+        note: 別の設定 lookup では、旧値 open を参照して −U open と +U paid を生成し、変更をコミットする。
+        blocks:
+          input:
+            - id: after
+              label: +U paid
+              k: 1
+          none:
+            - id: upsert-only
+              label: +U paid
+              k: 1
+          lookup:
+            - id: before
+              label: −U open
+              k: 0
+            - id: after-lookup
+              label: +U paid
+              k: 1
+              from:
+                - after
+        highlight:
+          - before
+          - after-lookup
+requirements:
+  - {"id":"BR-01","kind":"rule","title":"キーごとに現在状態を得る","text":"最新の完全な注文行をキーごとに読み取れる。","links":["commit","read-state"],"evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§2"}]}
+  - {"id":"BR-02","kind":"usecase","title":"下流の更新形式を選ぶ","text":"下流が上書きだけで処理できるか、旧値の取り消しが必要かに応じて提供する変更を選ぶ。","links":["upsert","lookup","deliver"],"evidence":[{"type":"doc","ref":"docs/reference-apache-paimon.md#§4"}]}
+unknowns:
+  - {"id":"UNK-01","text":"実環境の到着順と業務順、ストレージモード、下流の更新要件、コンパクションの時期は未確認。","refs":["writer","compact","consumer"]}
+gates: {maxDrift: 0, maxHigh: 0}
+blocks:
+  - id: lsm
+    title: 注文 42 の sorted run とマージ
+    note: 現在のスナップショットから見えるファイルを表す。
+    legend:
+      "0": 以前の版
+      "1": 新しい版
+      "2": 統合後の出力
+    lanes:
+      - id: previous
+        label: 既存 run
+        node: runs
+      - id: incoming
+        label: 新しい run
+        node: runs
+      - id: output
+        label: コンパクション出力
+        node: compact
+    items:
+      previous:
+        - id: v1
+          label: "#42 · open"
+          k: 0
+      incoming: []
+      output: []
+  - id: changes
+    title: 同じ変更を none と lookup で読む
+    note: 二つの設定を並べて比較する。
+    legend:
+      "0": 更新前
+      "1": 更新後
+    lanes:
+      - id: input
+        label: 入力
+        node: source
+      - id: none
+        label: none
+        node: snapshots
+      - id: lookup
+        label: lookup
+        node: changelog
+    items:
+      input:
+        - id: after
+          label: +U paid
+          k: 1
+      none: []
+      lookup: []

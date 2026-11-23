@@ -1,0 +1,439 @@
+name: データカタログの責務と連携
+description: テーブルの読み書きを調停するカタログと、データを探して意味・由来・利用条件を調べるカタログの接点を追います。
+reference:
+  objectives:
+    - テーブル状態の正本と、検索用メタデータの反映範囲を特定する。
+    - リネージ、所有者、分類、アクセス方針の関係と、権限の実施点を説明する。
+    - データ契約の定義・検証とテーブルコミットを区別する。
+    - 製品ごとの機能を担当する責務から比較する。
+  sources:
+    - title: Iceberg REST Catalog Spec
+      url: https://iceberg.apache.org/rest-catalog-spec/
+    - title: DataHub Metadata Model
+      url: https://docs.datahub.com/docs/metadata-modeling/metadata-model
+    - title: OpenLineage Object Model
+      url: https://openlineage.io/docs/spec/object-model/
+    - title: Open Data Contract Standard
+      url: https://github.com/bitol-io/open-data-contract-standard
+    - title: OpenMetadata Authorization
+      url: https://docs.open-metadata.org/v1.12.x/how-to-guides/admin-guide/roles-policies/authorization
+    - title: Databricks Unity Catalog
+      url: https://docs.databricks.com/aws/en/data-governance/unity-catalog
+    - title: Snowflake Horizon Iceberg REST Catalog
+      url: https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon
+    - title: Apache Polaris
+      url: https://polaris.apache.org/
+    - title: Nessie Specification
+      url: https://projectnessie.org/develop/spec/
+    - title: DataZone Discovery and Subscription
+      url: https://docs.aws.amazon.com/datazone/latest/userguide/discover-subscribe-consume-data.html
+    - title: Microsoft Purview Data Governance
+      url: https://learn.microsoft.com/en-us/azure/purview/overview
+    - title: Knowledge Catalog Metadata Model
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/metadata-overview
+    - title: Microsoft Fabric OneLake Catalog
+      url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview
+    - title: Microsoft Data Governance Strategy Update
+      url: https://learn.microsoft.com/partner-center/announcements/2026-november#update-on-the-microsoft-data-governance-strategy
+sources:
+  - docs/reference-data-catalog-architecture.md
+evidence:
+  - type: doc
+    ref: docs/reference-data-catalog-architecture.md#§1
+tiers:
+  - id: actors
+    label: 利用者と処理
+    z: 3
+    size:
+      - 17
+      - 3
+  - id: runtime
+    label: テーブルの更新・参照
+    z: 2
+    size:
+      - 17
+      - 3
+  - id: governance
+    label: 横断ガバナンス
+    z: 1
+    size:
+      - 17
+      - 4
+  - id: technical-products
+    label: 技術カタログ・統合例
+    z: 0
+    size:
+      - 17
+      - 3
+  - id: governance-products
+    label: メタデータ基盤・マネージド製品例
+    z: -1
+    size:
+      - 22
+      - 3
+nodes:
+  publisher:
+    label: データ提供パイプライン
+    kind: worker
+    tier: actors
+    x: 2
+    y: 1
+    description: 契約を検証し、処理エンジンでテーブルを更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§5
+  consumer:
+    label: データ利用者
+    kind: actor
+    tier: actors
+    x: 13
+    y: 1
+    description: 資産を発見し、所有者や利用条件を調べる。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+  engine:
+    label: 処理エンジン
+    kind: service
+    tier: runtime
+    x: 3
+    y: 1
+    description: Iceberg テーブルのデータファイルを書き、REST で変更を送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§2
+  technical:
+    label: Iceberg REST Catalog
+    kind: service
+    tier: runtime
+    x: 8
+    y: 1
+    description: 現在のテーブル状態の解決とコミットを管理する。
+    drill: iceberg-rest-catalog
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§2
+  storage:
+    label: データ・メタデータファイル
+    kind: db
+    tier: runtime
+    x: 13
+    y: 1
+    description: 処理エンジンが認可された範囲のファイルへアクセスする。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§2
+  validation:
+    label: データ契約の検証
+    kind: worker
+    tier: governance
+    x: 2
+    y: 1
+    description: スキーマ、鮮度や品質を検証する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§5
+  collect:
+    label: メタデータ・イベント収集
+    kind: worker
+    tier: governance
+    x: 6
+    y: 1
+    description: 技術カタログと処理の入出力からメタデータを集める。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+  catalog:
+    label: 検索・リネージ・所有者
+    kind: service
+    tier: governance
+    x: 10
+    y: 1
+    description: 事業用語、所有者、分類、由来を資産から引く。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§4
+  policy:
+    label: ポリシー・利用申請
+    kind: service
+    tier: governance
+    x: 14
+    y: 1
+    description: 利用条件と申請状態を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§4
+  polaris:
+    label: Apache Polaris
+    kind: external
+    tier: technical-products
+    x: 2
+    y: 1
+    description: Iceberg REST と認可を担う代表例。
+    drill: apache-polaris
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  nessie:
+    label: Project Nessie
+    kind: external
+    tier: technical-products
+    x: 6
+    y: 1
+    description: カタログ全体を版管理する代表例。
+    drill: project-nessie
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  horizon:
+    label: Snowflake Horizon Catalog
+    kind: external
+    tier: technical-products
+    x: 10
+    y: 1
+    description: Snowflake のガバナンスと外部エンジン向けの接点。
+    drill: snowflake-horizon-catalog
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  unity:
+    label: Databricks Unity Catalog
+    kind: external
+    tier: technical-products
+    x: 14
+    y: 1
+    description: Databricks のガバナンスと外部エンジン向けの接点。
+    drill: databricks-unity-catalog
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  datahub:
+    label: DataHub
+    kind: external
+    tier: governance-products
+    x: 1
+    y: 1
+    description: メタデータグラフを使った探索の代表例。
+    drill: datahub
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  openmetadata:
+    label: OpenMetadata
+    kind: external
+    tier: governance-products
+    x: 4
+    y: 1
+    description: 分類、検索、契約の代表例。
+    drill: openmetadata
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  datazone:
+    label: Amazon DataZone
+    kind: external
+    tier: governance-products
+    x: 7
+    y: 1
+    description: 公開、購読と権限反映の例。
+    drill: amazon-datazone
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  purview:
+    label: Microsoft Purview
+    kind: external
+    tier: governance-products
+    x: 10
+    y: 1
+    description: 既存環境での Data Map と Unified Catalog の例。ガバナンス機能は Fabric に集約される。
+    drill: microsoft-purview
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  knowledge:
+    label: Knowledge Catalog
+    kind: external
+    tier: governance-products
+    x: 14
+    y: 1
+    description: Google Cloud のメタデータ管理とデータ製品の例。
+    drill: google-cloud-knowledge-catalog
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+  onelake:
+    label: Microsoft Fabric OneLake catalog
+    kind: external
+    tier: governance-products
+    x: 18
+    y: 1
+    description: Fabric でデータを発見し、ガバナンス状態と権限を確認する例。
+    drill: fabric-onelake-catalog
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§6
+links:
+  - id: prepare
+    from: publisher
+    to: engine
+    label: エンジンで更新を開始
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§2
+  - id: write
+    from: engine
+    to: storage
+    label: データファイルを書く
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§2
+  - id: commit
+    from: engine
+    to: technical
+    label: 事前条件付きでコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§2
+  - id: snapshot
+    from: technical
+    to: collect
+    label: テーブル識別子とスキーマを収集
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+  - id: lineage
+    from: engine
+    to: collect
+    label: ジョブの入出力イベントを渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+  - id: index
+    from: collect
+    to: catalog
+    label: 資産と依存関係を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+  - id: discover
+    from: consumer
+    to: catalog
+    label: 検索し下流と所有者を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+  - id: check
+    from: publisher
+    to: validation
+    label: 公開候補の契約を検証
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§5
+  - id: result
+    from: validation
+    to: catalog
+    label: 資産・契約版に結果を関連付ける
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§5
+  - id: apply
+    from: consumer
+    to: policy
+    label: データ利用を申請
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§4
+  - id: grant
+    from: policy
+    to: engine
+    label: 承認済みの権限を実行系へ反映
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§4
+  - id: enforce
+    from: engine
+    to: storage
+    label: 実行経路でアクセスを認可
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§4
+scenarios:
+  - id: iceberg-write
+    label: 注文テーブルの更新を公開する
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§7
+    steps:
+      - links:
+          - prepare
+          - write
+        note: 処理エンジンが新しい注文データのファイルを保存する。
+      - links:
+          - commit
+        note: 書き込み側が最新状態を基にコミットし、成功した変更を公開する。
+  - id: asset-discovery
+    label: 注文データを探して下流を確認する
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§7
+    steps:
+      - links:
+          - snapshot
+          - lineage
+        note: テーブル情報とジョブの入出力を別の経路から集める。
+      - links:
+          - index
+          - discover
+        note: 資産を検索して下流レポートと所有者を確認する。
+  - id: contract-policy
+    label: 契約適合とアクセス許可を確かめる
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§7
+    steps:
+      - links:
+          - check
+          - result
+        note: 公開前に候補のスキーマと品質を検証し、資産から確認できるようにする。
+      - links:
+          - apply
+          - grant
+        note: 利用申請を承認し、実行系に権限を反映する。
+      - links:
+          - enforce
+        note: 実データへのアクセス時に権限を評価する。
+requirements:
+  - id: R-01
+    kind: rule
+    title: 公開したテーブル状態を解決できること
+    text: 処理エンジンがコミット成功後のテーブル状態をたどれる。
+    links:
+      - commit
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§2
+  - id: R-02
+    kind: rule
+    title: 資産識別子の一貫性
+    text: テーブル情報、実行イベント、検証結果を同じ資産に関連付けられる。
+    links:
+      - snapshot
+      - lineage
+      - index
+      - result
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§3
+  - id: R-03
+    kind: rule
+    title: 利用権限を実行時に評価すること
+    text: データに到達する経路で許可を確認する。
+    links:
+      - grant
+      - enforce
+    evidence:
+      - type: doc
+        ref: docs/reference-data-catalog-architecture.md#§4

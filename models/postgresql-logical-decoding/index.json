@@ -1,0 +1,213 @@
+{
+  "model": "postgresql-logical-decoding",
+  "name": "PostgreSQL の論理デコーディング：WAL・スロット・再開",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "orders": {
+      "type": "node",
+      "label": "注文トランザクション",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "WAL",
+      "status": "claim"
+    },
+    "slot": {
+      "type": "node",
+      "label": "論理スロット",
+      "status": "claim"
+    },
+    "publication": {
+      "type": "node",
+      "label": "Publication",
+      "status": "claim"
+    },
+    "decoder": {
+      "type": "node",
+      "label": "論理デコーダ / pgoutput",
+      "status": "claim"
+    },
+    "connector": {
+      "type": "node",
+      "label": "Debezium Source Task",
+      "status": "claim"
+    },
+    "offset": {
+      "type": "node",
+      "label": "Kafka Connect ソースオフセット",
+      "status": "claim"
+    },
+    "kafka": {
+      "type": "node",
+      "label": "Kafka の変更イベント",
+      "status": "claim"
+    },
+    "log": {
+      "type": "link",
+      "label": "注文トランザクション → WAL",
+      "status": "claim"
+    },
+    "retain": {
+      "type": "link",
+      "label": "論理スロット → WAL",
+      "status": "claim"
+    },
+    "decode": {
+      "type": "link",
+      "label": "WAL → 論理デコーダ / pgoutput",
+      "status": "claim"
+    },
+    "select": {
+      "type": "link",
+      "label": "Publication → 論理デコーダ / pgoutput",
+      "status": "claim"
+    },
+    "stream": {
+      "type": "link",
+      "label": "論理デコーダ / pgoutput → Debezium Source Task",
+      "status": "claim"
+    },
+    "publish": {
+      "type": "link",
+      "label": "Debezium Source Task → Kafka の変更イベント",
+      "status": "claim"
+    },
+    "feedback": {
+      "type": "link",
+      "label": "Debezium Source Task → 論理スロット",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "Debezium Source Task → Kafka Connect ソースオフセット",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "link",
+      "label": "Kafka Connect ソースオフセット → Debezium Source Task",
+      "status": "claim"
+    },
+    "stream-update": {
+      "type": "scenario",
+      "label": "注文 42 の更新を Kafka へ配信する"
+    },
+    "restart": {
+      "type": "scenario",
+      "label": "コネクタの停止後に T2 を再配信する"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "コミット済み更新を配信",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "安全に購読を再開",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境のレプリカアイデンティティ、スロット保持設定、オフセット保存周期、下流の重複処理は未確認。"
+    }
+  },
+  "byRef": {
+    "docs/reference-postgresql-logical-decoding.md#§1": [
+      "model"
+    ],
+    "docs/reference-postgresql-logical-decoding.md": [
+      "model",
+      "orders",
+      "wal",
+      "slot",
+      "publication",
+      "decoder",
+      "connector",
+      "offset",
+      "kafka",
+      "log",
+      "retain",
+      "decode",
+      "select",
+      "stream",
+      "publish",
+      "feedback",
+      "persist",
+      "resume",
+      "stream-update",
+      "restart",
+      "BR-01",
+      "BR-02"
+    ],
+    "docs/reference-postgresql-logical-decoding.md#§2": [
+      "model",
+      "orders",
+      "wal",
+      "publication",
+      "decoder",
+      "connector",
+      "log",
+      "decode",
+      "select",
+      "stream",
+      "publish",
+      "stream-update",
+      "BR-01"
+    ],
+    "docs/reference-postgresql-logical-decoding.md#§3": [
+      "model",
+      "slot",
+      "retain",
+      "feedback"
+    ],
+    "docs/reference-postgresql-logical-decoding.md#§4": [
+      "model",
+      "offset",
+      "kafka",
+      "persist",
+      "resume",
+      "restart",
+      "BR-02"
+    ],
+    "docs/reference-postgresql-logical-decoding.md#§5": [
+      "model"
+    ],
+    "docs/reference-postgresql-logical-decoding.md#§6": [
+      "model"
+    ]
+  },
+  "reference": {
+    "category": "取り込み",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "objectives": [
+      "WAL、出力プラグイン、Publication、論理レプリケーションスロットの役割を説明する。",
+      "restart_lsn、confirmed_flush_lsn、コネクタのソースオフセットを区別する。",
+      "CDC の再開で再配信が起こる場合と、必要な WAL が失われた場合を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL 18 Logical Decoding Concepts",
+        "url": "https://www.postgresql.org/docs/18/logicaldecoding-explanation.html"
+      },
+      {
+        "title": "PostgreSQL 18 pg_replication_slots",
+        "url": "https://www.postgresql.org/docs/18/view-pg-replication-slots.html"
+      },
+      {
+        "title": "PostgreSQL 18 Logical Replication Publications",
+        "url": "https://www.postgresql.org/docs/18/logical-replication-publication.html"
+      },
+      {
+        "title": "Debezium PostgreSQL Connector",
+        "url": "https://debezium.io/documentation/reference/stable/connectors/postgresql.html"
+      }
+    ]
+  }
+}

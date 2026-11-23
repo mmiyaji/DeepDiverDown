@@ -1,0 +1,52 @@
+name: "OPA と Conftest による PR のポリシーチェック"
+description: "注文 API の Kubernetes マニフェストを Rego で評価し、CI の結果が PR のマージにどう反映されるかを追います。"
+reference:
+  objectives:
+    - "Conftest の構造化入力と OPA の Rego ルールを区別する。"
+    - "ポリシー違反から CI 失敗、必須チェックによるマージ保留までを追う。"
+    - "修正コミットを再評価し、違反を解消した結果を確認する。"
+  sources:
+    - {title: "Open Policy Agent Policy Language", url: "https://www.openpolicyagent.org/docs/policy-language"}
+    - {title: "Conftest Usage", url: "https://www.conftest.dev/"}
+    - {title: "Conftest Options", url: "https://www.conftest.dev/options/"}
+    - {title: "GitHub About protected branches", url: "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches"}
+    - {title: "GitHub Troubleshooting required status checks", url: "https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks"}
+sources: [docs/reference-opa-conftest.md]
+evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§1"}]
+tiers:
+  - {id: "source", label: "変更とポリシー", z: 2, size: [16,4], kind: "origin"}
+  - {id: "ci", label: "CI による評価", z: 1, size: [16,4]}
+  - {id: "merge", label: "PR の必須チェック", z: 0, size: [16,4]}
+nodes:
+  author: {label: "注文 API の開発者", kind: "actor", tier: "source", x: 1, y: 1.5, description: "マニフェスト変更を PR として提出し、違反を修正する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§1"}]}
+  pull-request: {label: "注文 API の PR", kind: "service", tier: "source", x: 5, y: 1.5, description: "評価対象のコミットを持つ。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
+  manifest: {label: "Deployment マニフェスト", kind: "segment", tier: "source", x: 9, y: 1.5, description: "Conftest に渡す構造化 YAML。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
+  policy: {label: "Rego ポリシー", kind: "segment", tier: "source", x: 13, y: 1.5, description: "注文 API のコンテナに CPU request を求めるルール。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§3"}]}
+  runner: {label: "CI ジョブ", kind: "worker", tier: "ci", x: 3, y: 1.5, description: "PR のコミットをチェックアウトして Conftest を実行する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
+  conftest: {label: "Conftest / OPA 評価", kind: "service", tier: "ci", x: 8, y: 1.5, description: "構造化入力を Rego で評価し、違反を出力する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§3"}]}
+  check: {label: "必須ステータスチェック", kind: "service", tier: "merge", x: 5, y: 1.5, description: "CI 結果を対象コミットに関連付け、マージ条件として要求する。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§4"}]}
+  branch: {label: "保護されたブランチ", kind: "db", tier: "merge", x: 11, y: 1.5, description: "必須チェックなどのマージ条件が満たされた PR を取り込める。", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§4"}]}
+links:
+  - {id: "submit", from: "author", to: "pull-request", label: "PR 作成・修正コミット", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
+  - {id: "trigger", from: "pull-request", to: "runner", label: "対象コミットでチェック起動", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
+  - {id: "load-yaml", from: "manifest", to: "runner", label: "評価対象の YAML を渡す", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}]}
+  - {id: "evaluate", from: "runner", to: "conftest", label: "conftest test を実行", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§3"}]}
+  - {id: "load-policy", from: "policy", to: "conftest", label: "Rego を読み込む", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§3"}]}
+  - {id: "result", from: "conftest", to: "runner", label: "出力と終了コード", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§3"}]}
+  - {id: "report", from: "runner", to: "check", label: "コミットにチェック結果を報告", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§4"}]}
+  - {id: "merge", from: "check", to: "branch", label: "必須チェック合格でマージ可能", evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§4"}]}
+scenarios:
+  - id: reject-missing-cpu
+    label: "CPU request がない変更をブロック"
+    evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}, {type: doc, ref: "docs/reference-opa-conftest.md#§3"}, {type: doc, ref: "docs/reference-opa-conftest.md#§4"}]
+    steps:
+      - {links: ["submit","trigger","load-yaml"], note: "開発者が CPU request を設定していない Deployment を PR に出す。CI がそのコミットの YAML を取得する。"}
+      - {links: ["evaluate","load-policy","result"], note: "Rego の deny に一致する。Conftest は CPU request の不足を出力し、非ゼロで終了する。"}
+      - {links: ["report"], note: "CI が失敗し、必須チェックの条件を満たさないため PR をマージできない。"}
+  - id: pass-corrected
+    label: "修正コミットを再評価して合格"
+    evidence: [{type: doc, ref: "docs/reference-opa-conftest.md#§2"}, {type: doc, ref: "docs/reference-opa-conftest.md#§3"}, {type: doc, ref: "docs/reference-opa-conftest.md#§4"}]
+    steps:
+      - {links: ["submit","trigger","load-yaml"], note: "開発者が CPU request を追加したコミットを PR に送る。CI は更新後のコミットを評価する。"}
+      - {links: ["evaluate","load-policy","result","report"], note: "この例の違反が解消され、Conftest が成功し CI が合格を報告する。"}
+      - {links: ["merge"], note: "保護ブランチの必須チェックを満たす。ほかの条件も満たせば PR をマージできる。"}

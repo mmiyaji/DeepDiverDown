@@ -1,0 +1,241 @@
+name: "PostgreSQL の論理デコーディング：WAL・スロット・再開"
+description: "コミット済みの注文更新が WAL から CDC イベントに変わる過程と、スロット・コネクタの進捗から再開する条件を追う。"
+parent: {"model":"debezium","node":"logical"}
+reference:
+  objectives:
+    - WAL、出力プラグイン、Publication、論理レプリケーションスロットの役割を説明する。
+    - restart_lsn、confirmed_flush_lsn、コネクタのソースオフセットを区別する。
+    - CDC の再開で再配信が起こる場合と、必要な WAL が失われた場合を説明する。
+  sources:
+    - title: PostgreSQL 18 Logical Decoding Concepts
+      url: https://www.postgresql.org/docs/18/logicaldecoding-explanation.html
+    - title: PostgreSQL 18 pg_replication_slots
+      url: https://www.postgresql.org/docs/18/view-pg-replication-slots.html
+    - title: PostgreSQL 18 Logical Replication Publications
+      url: https://www.postgresql.org/docs/18/logical-replication-publication.html
+    - title: Debezium PostgreSQL Connector
+      url: https://debezium.io/documentation/reference/stable/connectors/postgresql.html
+sources: ["docs/reference-postgresql-logical-decoding.md"]
+evidence:
+  - {"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§1"}
+  - {"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}
+  - {"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§3"}
+  - {"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}
+  - {"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§5"}
+  - {"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§6"}
+tiers:
+  - {"id":"database","label":"PostgreSQL","z":0,"origin":[0,0],"size":[16,3]}
+  - {"id":"client","label":"Debezium / Kafka","z":1,"origin":[3,0],"size":[13,3]}
+nodes:
+  orders: {"label":"注文トランザクション","kind":"db","tier":"database","x":0,"y":1.5,"description":"orders の更新をコミットする。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  wal: {"label":"WAL","kind":"queue","tier":"database","x":3,"y":1.5,"description":"永続化のための更新記録を保持する。LSN は WAL 上の位置。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  slot: {"label":"論理スロット","kind":"db","tier":"database","x":6,"y":0.4,"description":"接続とは独立して進捗を持ち、必要な WAL を保持する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§3"}]}
+  publication: {"label":"Publication","kind":"service","tier":"database","x":6,"y":2.6,"description":"公開するテーブルと操作を定義する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  decoder: {"label":"論理デコーダ / pgoutput","kind":"worker","tier":"database","x":10,"y":1.5,"description":"WAL から行変更を復元し、pgoutput がレプリケーション用に出力する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  connector: {"label":"Debezium Source Task","kind":"worker","tier":"client","x":7,"y":1.5,"description":"行変更を Kafka に発行する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  offset: {"label":"Kafka Connect ソースオフセット","kind":"db","tier":"client","x":10,"y":0.4,"description":"コネクタが再開を要求するための位置を保持する。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
+  kafka: {"label":"Kafka の変更イベント","kind":"queue","tier":"client","x":13,"y":1.5,"description":"下流で消費する変更イベント。再開時には重複し得る。","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
+links:
+  - {"id":"log","from":"orders","to":"wal","label":"WAL を生成してコミットする","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  - {"id":"retain","from":"slot","to":"wal","label":"必要な WAL を保持する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§3"}]}
+  - {"id":"decode","from":"wal","to":"decoder","label":"WAL から行変更を復元する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  - {"id":"select","from":"publication","to":"decoder","label":"公開設定を適用する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  - {"id":"stream","from":"decoder","to":"connector","label":"pgoutput の変更を送る","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  - {"id":"publish","from":"connector","to":"kafka","label":"CDC イベントを発行する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  - {"id":"feedback","from":"connector","to":"slot","label":"受信済み位置を通知する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§3"}]}
+  - {"id":"persist","from":"connector","to":"offset","label":"処理済みオフセットを保存する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
+  - {"id":"resume","from":"offset","to":"connector","label":"最後の記録位置から再開する","evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
+scenarios:
+  - id: stream-update
+    label: 注文 42 の更新を Kafka へ配信する
+    visual: stream
+    evidence:
+      - type: doc
+        ref: docs/reference-postgresql-logical-decoding.md#§2
+    steps:
+      - links:
+          - log
+        note: T1 が注文 42 を paid に更新してコミットする。WAL 上に処理に必要な記録が残る。
+        blocks:
+          storage:
+            - id: tx-1
+              label: T1 · 0/180
+              k: 0
+          wire: []
+          topic: []
+        highlight:
+          - tx-1
+      - links:
+          - retain
+          - decode
+          - select
+          - stream
+        note: スロットが必要な WAL を保持し、論理デコードと pgoutput が公開対象の行変更を送る。
+        blocks:
+          storage:
+            - id: tx-1
+              label: T1 · 0/180
+              k: 0
+          wire:
+            - id: update
+              label: "UPDATE #42"
+              k: 1
+              from:
+                - tx-1
+          topic: []
+        highlight:
+          - update
+      - links:
+          - publish
+        note: Debezium が変更を Kafka のイベントにする。
+        blocks:
+          storage:
+            - id: tx-1
+              label: T1 · 0/180
+              k: 0
+          wire:
+            - id: update
+              label: "UPDATE #42"
+              k: 1
+          topic:
+            - id: event
+              label: "注文 #42 · paid"
+              k: 2
+              from:
+                - update
+        highlight:
+          - event
+      - links:
+          - persist
+          - feedback
+        note: コネクタ側の再開位置を保存し、サーバー側の論理スロットにも受信位置を通知する。
+        highlight:
+          - event
+  - id: restart
+    label: コネクタの停止後に T2 を再配信する
+    visual: restart
+    evidence:
+      - type: doc
+        ref: docs/reference-postgresql-logical-decoding.md#§4
+    steps:
+      - links:
+          - persist
+          - feedback
+        note: T1 まで再開情報が永続化されている。WAL 上では T2 もコミット済み。
+        highlight:
+          - saved
+      - links:
+          - stream
+          - publish
+        note: T2 を Kafka へ発行した後、オフセット保存とスロットへの確認の前にコネクタが停止する。
+        blocks:
+          wal:
+            - id: tx-1
+              label: T1 · 0/180
+              k: 0
+            - id: tx-2
+              label: T2 · 0/1C0
+              k: 1
+          offset:
+            - id: saved
+              label: 保存済み · T1
+              k: 2
+          kafka:
+            - id: published
+              label: T2 を発行済み
+              k: 1
+              from:
+                - tx-2
+        highlight:
+          - published
+      - links:
+          - resume
+          - decode
+          - stream
+          - publish
+        note: 有効なスロットと WAL が残っているため、保存済みの位置から T2 を受け取り直し、Kafka に発行し得る。
+        blocks:
+          wal:
+            - id: tx-1
+              label: T1 · 0/180
+              k: 0
+            - id: tx-2
+              label: T2 · 0/1C0
+              k: 1
+          offset:
+            - id: saved
+              label: 保存済み · T1
+              k: 2
+          kafka:
+            - id: published
+              label: T2 を発行済み
+              k: 1
+              from:
+                - tx-2
+            - id: replayed
+              label: T2 の再配信
+              k: 3
+              from:
+                - tx-2
+        highlight:
+          - published
+          - replayed
+requirements:
+  - {"id":"BR-01","kind":"usecase","title":"コミット済み更新を配信","text":"対象の更新を、下流で処理できる変更イベントとして届ける。","links":["decode","stream","publish"],"evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§2"}]}
+  - {"id":"BR-02","kind":"rule","title":"安全に購読を再開","text":"必要な履歴が残っていることを確認し、再配信される更新の処理を冪等にする。","links":["retain","resume","publish"],"evidence":[{"type":"doc","ref":"docs/reference-postgresql-logical-decoding.md#§4"}]}
+unknowns:
+  - {"id":"UNK-01","text":"実環境のレプリカアイデンティティ、スロット保持設定、オフセット保存周期、下流の重複処理は未確認。","refs":["publication","slot","offset","kafka"]}
+gates: {maxDrift: 0, maxHigh: 0}
+blocks:
+  - id: stream
+    title: WAL の記録から Kafka のイベントへ
+    note: T1 と LSN は説明用。1 トランザクションから複数のイベントが出ることもある。
+    legend:
+      "0": WAL 記録
+      "1": プロトコル上の変更
+      "2": CDC イベント
+    lanes:
+      - id: storage
+        label: WAL
+        node: wal
+      - id: wire
+        label: pgoutput
+        node: decoder
+      - id: topic
+        label: Kafka
+        node: kafka
+    items:
+      storage: []
+      wire: []
+      topic: []
+  - id: restart
+    title: 発行済みイベントの再配信
+    note: この例では T2 のスロット確認とソースオフセット保存が未完了。
+    legend:
+      "0": 永続化済みの境界
+      "1": 更新 T2
+      "2": Connect の保存位置
+      "3": 再配信
+    lanes:
+      - id: wal
+        label: WAL
+        node: wal
+      - id: offset
+        label: ソースオフセット
+        node: offset
+      - id: kafka
+        label: Kafka
+        node: kafka
+    items:
+      wal:
+        - id: tx-1
+          label: T1 · 0/180
+          k: 0
+        - id: tx-2
+          label: T2 · 0/1C0
+          k: 1
+      offset:
+        - id: saved
+          label: 保存済み · T1
+          k: 2
+      kafka: []

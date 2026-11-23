@@ -1,0 +1,25 @@
+# OPA と Conftest による PR のポリシーチェック
+
+## 1. モデルの範囲
+
+注文 API の Deployment に CPU request を設定するチームルールを、GitHub の PR に対する CI で検査する架空例。図はマージ前の評価を扱う。
+
+出典 [Conftest Usage](https://www.conftest.dev/)、[GitHub About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
+
+## 2. 入力をそろえる
+
+CI は PR の評価対象コミットから Deployment の YAML を取得し、Conftest に渡す。テンプレートを使う場合は、検査したい最終マニフェストを生成してから渡す。チェックの結果は評価対象のコミットに紐付く。
+
+出典 [Conftest Usage](https://www.conftest.dev/)、[GitHub Troubleshooting required status checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)
+
+## 3. Rego と Conftest の評価
+
+Rego は構造化された入力に対する条件を記述する。例の `deny` は注文 API のコンテナに `resources.requests.cpu` がなければ理由を返す。Conftest は YAML を解析して評価し、`deny` があれば違反として非ゼロで終了する。通常の `warn` は設定によって失敗にできる。
+
+出典 [Open Policy Agent Policy Language](https://www.openpolicyagent.org/docs/policy-language)、[Conftest Usage](https://www.conftest.dev/)、[Conftest Options](https://www.conftest.dev/options/)
+
+## 4. マージ条件
+
+CI ジョブが Conftest の失敗をチェックの失敗として報告し、保護ブランチがそのチェックを必須にする。修正後は最新の評価対象コミットでチェックが成功して初めて、このマージ条件を満たす。承認などの他のマージ条件はそれぞれ適用される。
+
+出典 [GitHub About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、[GitHub Troubleshooting required status checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)

@@ -1,0 +1,48 @@
+name: "DWH のスタースキーマとファクトの粒度"
+description: "受注明細ファクトを中心に、日付・顧客・商品ディメンションで売上を絞り込み、同じ粒度で集計する。"
+parent: {"model":"dwh-design-patterns","node":"star"}
+reference:
+  objectives:
+    - "ファクトの1行が何を表すかを先に決める。"
+    - "1対多の関係と加算できる指標を確認する。"
+  sources:
+    - {"title":"Kimball Group の次元モデリング技法","url":"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+    - {"title":"Fact Tables and Dimension Tables","url":"https://www.kimballgroup.com/2003/01/fact-tables-and-dimension-tables/"}
+    - {"title":"Power BI のスタースキーマ設計","url":"https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
+sources: ["docs/reference-dwh-star-schema.md"]
+evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[12.5,4.5]}
+nodes:
+  source: {"label":"受注イベント","kind":"external","tier":"flow","x":0,"y":2,"description":"注文IDと明細ID、売上を取り込む。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]}
+  fact: {"label":"fact_order_line","kind":"db","tier":"flow","x":6,"y":2,"description":"一行を一注文の一明細とする。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]}
+  date: {"label":"dim_date","kind":"db","tier":"flow","x":3,"y":0,"description":"日付とカレンダー属性。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  customer: {"label":"dim_customer","kind":"db","tier":"flow","x":6,"y":0,"description":"顧客の説明属性。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  product: {"label":"dim_product","kind":"db","tier":"flow","x":9,"y":0,"description":"商品とカテゴリを引く。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  tag: {"label":"商品と販促タグの関係","kind":"db","tier":"flow","x":11,"y":4,"description":"1商品に複数タグがある。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§4"}]}
+  bi: {"label":"BI／集計結果","kind":"client","tier":"flow","x":12,"y":2,"description":"月・顧客・カテゴリ別に集計。","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§3"}]}
+links:
+  - {"id":"load","from":"source","to":"fact","label":"明細の粒度でロード","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§1"}]}
+  - {"id":"date","from":"date","to":"fact","label":"日付で絞り込み","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  - {"id":"customer","from":"customer","to":"fact","label":"顧客で絞り込み","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  - {"id":"product","from":"product","to":"fact","label":"商品分類を引く","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§2"}]}
+  - {"id":"report","from":"fact","to":"bi","label":"同じ通貨の売上を集計","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§3"}]}
+  - {"id":"tag","from":"tag","to":"product","label":"商品に複数のタグ","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§4"}]}
+  - {"id":"guard","from":"tag","to":"fact","label":"タグは集合として選ぶ例","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§4"}]}
+scenarios:
+  - id: sales
+    label: "注文1件の売上と明細件数を集計"
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§3"}]
+    steps:
+      - {"links":["load"],"note":"注文42に、1,200円と600円の明細を1行ずつ登録する。"}
+      - {"links":["date","customer","product"],"note":"日付・顧客・商品ディメンションの属性で絞る。"}
+      - {"links":["report"],"note":"売上は1,800円、注文数は注文IDの重複を除いて1件になる。"}
+  - id: fanout
+    label: "タグ結合の多重計上を見つける"
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§4"}]
+    steps:
+      - {"links":["tag"],"note":"販促タグが2つある商品を確認する。"}
+      - {"links":["tag","product","report"],"note":"1,200円の明細をタグ2行と結合した場合、その明細が二重計上される。"}
+      - {"links":["guard","report"],"note":"対象タグを持つ商品の集合として明細を絞り、元の粒度で集計する。"}
+requirements:
+  - {"id":"REQ-1","kind":"usecase","title":"売上を注文明細から再現する","text":"明細金額の合計と注文IDの件数を区別する。","scenario":"sales","evidence":[{"type":"doc","ref":"docs/reference-dwh-star-schema.md#§3"}]}

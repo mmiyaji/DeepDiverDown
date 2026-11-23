@@ -1,0 +1,48 @@
+name: "DWH の Slowly Changing Dimensions：Type 1 と Type 2"
+description: "顧客の移転を題材に、単純上書きと有効期間を持つ履歴管理を同じ注文で比較する。"
+parent: {"model":"dwh-design-patterns","node":"scd"}
+reference:
+  objectives:
+    - "Type 1 と Type 2 を情報の使い方で選ぶ。"
+    - "業務キー・代理キー・有効期間の役割を確認する。"
+  sources:
+    - {"title":"Kimball Group の Slowly Changing Dimension 技法","url":"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+    - {"title":"Power BI の SCD ガイダンス","url":"https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"}
+sources: ["docs/reference-dwh-slowly-changing-dimensions.md"]
+evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[15.5,4.5]}
+nodes:
+  change: {"label":"顧客 C42 の移転","kind":"external","tier":"flow","x":0,"y":0,"description":"1/20 から西地区。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§1"}]}
+  ingest: {"label":"履歴を反映する変換","kind":"worker","tier":"flow","x":3,"y":1,"description":"有効開始と終了を設定。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
+  current: {"label":"Type 1 現在行","kind":"db","tier":"flow","x":7,"y":0,"description":"最新の地区だけを保持。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
+  history: {"label":"Type 2 の有効期間","kind":"db","tier":"flow","x":7,"y":3,"description":"同じ業務キーに別の代理キー。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
+  event: {"label":"遅れて届いた注文明細","kind":"external","tier":"flow","x":0,"y":4,"description":"発生は 1/17。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
+  fact: {"label":"明細ファクト","kind":"db","tier":"flow","x":11,"y":3,"description":"事実発生時点の顧客キー。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
+  analytics: {"label":"地域別売上","kind":"client","tier":"flow","x":15,"y":1,"description":"当時／現在の見方を選ぶ。","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
+links:
+  - {"id":"record","from":"change","to":"ingest","label":"地区の変更を取得","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§1"}]}
+  - {"id":"replace","from":"ingest","to":"current","label":"既存行を上書き","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
+  - {"id":"expire","from":"ingest","to":"history","label":"旧行を閉じ、新行を追加","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
+  - {"id":"arrive","from":"event","to":"ingest","label":"業務時刻でキーを引く","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
+  - {"id":"key","from":"history","to":"fact","label":"該当期間の代理キーを設定","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]}
+  - {"id":"current-report","from":"current","to":"analytics","label":"現在地区で過去の売上も分類","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§2"}]}
+  - {"id":"history-report","from":"fact","to":"analytics","label":"注文当時の地区で集計","evidence":[{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]}
+scenarios:
+  - id: update
+    label: "移転日に Type 1 と Type 2 を比較"
+    visual: timeline
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§3"}]
+    steps:
+      - {"links":["record"],"note":"顧客 C42 が東から西へ移転する。","current":"east"}
+      - {"links":["replace","current-report"],"note":"Type 1 は上書きし、以前の売上も現在の西として見える。"}
+      - {"links":["expire","history-report"],"note":"Type 2 は旧行を閉じ、新しい代理キーを西に割り当てる。","current":"west","travel":"east"}
+  - id: late
+    label: "遅延注文を正しい履歴の行に紐付ける"
+    visual: timeline
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-slowly-changing-dimensions.md#§4"}]
+    steps:
+      - {"links":["arrive"],"note":"1月17日発生の注文が移転後に届く。","current":"west"}
+      - {"links":["key"],"note":"イベント時刻で旧行の代理キーを引く。","travel":"east"}
+      - {"links":["history-report"],"note":"遅延注文は発生当時の東地区の売上に入る。","highlight":["east"]}
+timeline: {"title":"顧客 C42 の Type 2 有効期間","current":"east","note":"代理キーは例示。期間は開始を含み、終了を含まない。永続的な削除を表す図ではない。","commits":[{"id":"east","label":"東地区・SK 101","time":"[1/01, 1/20)","kind":"append","node":"history"},{"id":"west","label":"西地区・SK 102","time":"[1/20, 現在)","kind":"append","node":"history"}]}

@@ -2,8 +2,8 @@
   "model": "databricks",
   "name": "Databricks レイクハウス参照アーキテクチャ",
   "coverage": {
-    "covered": 6,
-    "total": 6
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "source": {
@@ -13,7 +13,7 @@
     },
     "ingest": {
       "type": "node",
-      "label": "Ingest",
+      "label": "Lakeflow・取り込み",
       "status": "claim"
     },
     "storage": {
@@ -33,7 +33,7 @@
     },
     "query": {
       "type": "node",
-      "label": "SQL / Query",
+      "label": "Databricks SQL",
       "status": "claim"
     },
     "serving": {
@@ -41,14 +41,24 @@
       "label": "BI / Serving",
       "status": "claim"
     },
+    "sharing": {
+      "type": "node",
+      "label": "OpenSharing",
+      "status": "claim"
+    },
+    "ml": {
+      "type": "node",
+      "label": "MLflow と Model Serving",
+      "status": "claim"
+    },
     "ingest-data": {
       "type": "link",
-      "label": "Source → Ingest",
+      "label": "Source → Lakeflow・取り込み",
       "status": "claim"
     },
     "land": {
       "type": "link",
-      "label": "Ingest → Object storage",
+      "label": "Lakeflow・取り込み → Object storage",
       "status": "claim"
     },
     "refine": {
@@ -63,17 +73,41 @@
     },
     "query-data": {
       "type": "link",
-      "label": "Unity Catalog → SQL / Query",
+      "label": "Databricks SQL → Unity Catalog",
+      "status": "claim"
+    },
+    "read-storage": {
+      "type": "link",
+      "label": "Databricks SQL → Object storage",
       "status": "claim"
     },
     "serve": {
       "type": "link",
-      "label": "SQL / Query → BI / Serving",
+      "label": "Databricks SQL → BI / Serving",
+      "status": "claim"
+    },
+    "share": {
+      "type": "link",
+      "label": "Unity Catalog → OpenSharing",
+      "status": "claim"
+    },
+    "train": {
+      "type": "link",
+      "label": "Object storage → MLflow と Model Serving",
+      "status": "claim"
+    },
+    "model": {
+      "type": "link",
+      "label": "MLflow と Model Serving → Unity Catalog",
       "status": "claim"
     },
     "lakehouse-flow": {
       "type": "scenario",
       "label": "取り込みから分析"
+    },
+    "reuse": {
+      "type": "scenario",
+      "label": "整備したデータを共有とモデル学習に利用"
     },
     "BR-01": {
       "type": "requirement",
@@ -105,13 +139,19 @@
       "catalog",
       "query",
       "serving",
+      "sharing",
+      "ml",
       "ingest-data",
       "land",
       "refine",
       "govern",
       "query-data",
+      "read-storage",
       "serve",
+      "share",
+      "train",
       "lakehouse-flow",
+      "reuse",
       "BR-01",
       "NFR-01"
     ],
@@ -135,26 +175,48 @@
       "query",
       "govern",
       "query-data",
+      "read-storage",
       "NFR-01"
     ],
     "docs/reference-databricks.md#§5": [
       "serving",
       "serve",
       "lakehouse-flow"
+    ],
+    "docs/reference-databricks.md#§7": [
+      "sharing",
+      "share"
+    ],
+    "docs/reference-databricks.md#§8": [
+      "ml",
+      "train",
+      "model",
+      "reuse"
     ]
   },
   "reference": {
     "category": "クラウド分析基盤",
     "order": 20,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "SourceからStorageまでのレーンを追う。",
       "TransformとQuery/Processを区別する。",
-      "Unity Catalogのガバナンスを理解する。"
+      "Unity Catalogのガバナンスを理解する。",
+      "データ共有と学習済みモデルの配備を区別する。"
     ],
     "sources": [
       {
         "title": "Databricks reference architectures",
         "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/reference"
+      },
+      {
+        "title": "OpenSharing",
+        "url": "https://docs.databricks.com/aws/en/opensharing"
+      },
+      {
+        "title": "Model Serving",
+        "url": "https://docs.databricks.com/aws/en/machine-learning/model-serving/"
       }
     ]
   }

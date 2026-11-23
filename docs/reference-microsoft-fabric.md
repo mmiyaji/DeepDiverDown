@@ -12,9 +12,14 @@ Fabric のパイプラインが受注データを Lakehouse の Files 領域へ�
 
 Lakehouse 作成時に用意される SQL 分析エンドポイントで Delta テーブルを T-SQL から参照する。テーブルの更新は Spark 側で行う。Power BI のセマンティックモデルはこの SQL 接続を利用できる。Fabric Warehouse はこの例の Lakehouse とは別の項目である。
 
+## 4. 資産の発見とガバナンス
+
+OneLake catalog から Fabric の資産を探す。発見できることと、SQL エンドポイントやストレージへの読み取り権限はそれぞれ確認する。探索、アクセスの申請、運用管理は [OneLake catalog の詳細図](reference-fabric-onelake-catalog.md) を参照する。
+
 ## 公式資料
 
 - [Microsoft Learn · Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview)
 - [Microsoft Learn · OneLake](https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview)
 - [Microsoft Learn · SQL analytics endpoint](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)
 - [Microsoft Learn · Fabric Lakehouse](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview)
+- [Microsoft Learn · OneLake catalog](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)

@@ -1,0 +1,139 @@
+{
+  "model": "dwh-star-schema",
+  "name": "DWH のスタースキーマとファクトの粒度",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "受注イベント",
+      "status": "claim"
+    },
+    "fact": {
+      "type": "node",
+      "label": "fact_order_line",
+      "status": "claim"
+    },
+    "date": {
+      "type": "link",
+      "label": "dim_date → fact_order_line",
+      "status": "claim"
+    },
+    "customer": {
+      "type": "link",
+      "label": "dim_customer → fact_order_line",
+      "status": "claim"
+    },
+    "product": {
+      "type": "link",
+      "label": "dim_product → fact_order_line",
+      "status": "claim"
+    },
+    "tag": {
+      "type": "link",
+      "label": "商品と販促タグの関係 → dim_product",
+      "status": "claim"
+    },
+    "bi": {
+      "type": "node",
+      "label": "BI／集計結果",
+      "status": "claim"
+    },
+    "load": {
+      "type": "link",
+      "label": "受注イベント → fact_order_line",
+      "status": "claim"
+    },
+    "report": {
+      "type": "link",
+      "label": "fact_order_line → BI／集計結果",
+      "status": "claim"
+    },
+    "guard": {
+      "type": "link",
+      "label": "商品と販促タグの関係 → fact_order_line",
+      "status": "claim"
+    },
+    "sales": {
+      "type": "scenario",
+      "label": "注文1件の売上と明細件数を集計"
+    },
+    "fanout": {
+      "type": "scenario",
+      "label": "タグ結合の多重計上を見つける"
+    },
+    "REQ-1": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "売上を注文明細から再現する",
+      "status": "claim"
+    }
+  },
+  "byRef": {
+    "docs/reference-dwh-star-schema.md#§1": [
+      "model",
+      "source",
+      "fact",
+      "load"
+    ],
+    "docs/reference-dwh-star-schema.md": [
+      "model",
+      "source",
+      "fact",
+      "date",
+      "customer",
+      "product",
+      "tag",
+      "bi",
+      "load",
+      "report",
+      "guard",
+      "sales",
+      "fanout",
+      "REQ-1"
+    ],
+    "docs/reference-dwh-star-schema.md#§2": [
+      "date",
+      "customer",
+      "product"
+    ],
+    "docs/reference-dwh-star-schema.md#§4": [
+      "tag",
+      "guard",
+      "fanout"
+    ],
+    "docs/reference-dwh-star-schema.md#§3": [
+      "bi",
+      "report",
+      "sales",
+      "REQ-1"
+    ]
+  },
+  "reference": {
+    "category": "DWH 設計パターン",
+    "order": 20,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
+    "detailOf": "dwh-design-patterns",
+    "objectives": [
+      "ファクトの1行が何を表すかを先に決める。",
+      "1対多の関係と加算できる指標を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "Kimball Group の次元モデリング技法",
+        "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
+      },
+      {
+        "title": "Fact Tables and Dimension Tables",
+        "url": "https://www.kimballgroup.com/2003/01/fact-tables-and-dimension-tables/"
+      },
+      {
+        "title": "Power BI のスタースキーマ設計",
+        "url": "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"
+      }
+    ]
+  }
+}

@@ -1,0 +1,221 @@
+{
+  "model": "apache-paimon",
+  "name": "Apache Paimon の主キーテーブル：Flink 更新と変更ログ",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "上流の注文更新",
+      "status": "claim"
+    },
+    "writer": {
+      "type": "node",
+      "label": "Flink / Paimon Sink",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "スナップショット読み取り",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "ストリーム利用者",
+      "status": "claim"
+    },
+    "runs": {
+      "type": "node",
+      "label": "バケット内の sorted run",
+      "status": "claim"
+    },
+    "compact": {
+      "type": "node",
+      "label": "LSM コンパクション",
+      "status": "claim"
+    },
+    "snapshots": {
+      "type": "node",
+      "label": "コミット済みスナップショット",
+      "status": "claim"
+    },
+    "changelog": {
+      "type": "node",
+      "label": "Changelog Producer",
+      "status": "claim"
+    },
+    "ingest": {
+      "type": "link",
+      "label": "上流の注文更新 → Flink / Paimon Sink",
+      "status": "claim"
+    },
+    "flush": {
+      "type": "link",
+      "label": "Flink / Paimon Sink → バケット内の sorted run",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "バケット内の sorted run → コミット済みスナップショット",
+      "status": "claim"
+    },
+    "read-state": {
+      "type": "link",
+      "label": "コミット済みスナップショット → スナップショット読み取り",
+      "status": "claim"
+    },
+    "pick-runs": {
+      "type": "link",
+      "label": "バケット内の sorted run → LSM コンパクション",
+      "status": "claim"
+    },
+    "publish-compact": {
+      "type": "link",
+      "label": "LSM コンパクション → コミット済みスナップショット",
+      "status": "claim"
+    },
+    "upsert": {
+      "type": "link",
+      "label": "コミット済みスナップショット → ストリーム利用者",
+      "status": "claim"
+    },
+    "lookup": {
+      "type": "link",
+      "label": "LSM コンパクション → Changelog Producer",
+      "status": "claim"
+    },
+    "deliver": {
+      "type": "link",
+      "label": "Changelog Producer → ストリーム利用者",
+      "status": "claim"
+    },
+    "state": {
+      "type": "scenario",
+      "label": "注文 42 のスナップショットを更新する"
+    },
+    "changes": {
+      "type": "scenario",
+      "label": "paid への更新を下流へ届ける"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "キーごとに現在状態を得る",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "下流の更新形式を選ぶ",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境の到着順と業務順、ストレージモード、下流の更新要件、コンパクションの時期は未確認。"
+    }
+  },
+  "byRef": {
+    "docs/reference-apache-paimon.md#§1": [
+      "model",
+      "source"
+    ],
+    "docs/reference-apache-paimon.md": [
+      "model",
+      "source",
+      "writer",
+      "reader",
+      "consumer",
+      "runs",
+      "compact",
+      "snapshots",
+      "changelog",
+      "ingest",
+      "flush",
+      "commit",
+      "read-state",
+      "pick-runs",
+      "publish-compact",
+      "upsert",
+      "lookup",
+      "deliver",
+      "state",
+      "changes",
+      "BR-01",
+      "BR-02"
+    ],
+    "docs/reference-apache-paimon.md#§2": [
+      "model",
+      "writer",
+      "reader",
+      "runs",
+      "snapshots",
+      "ingest",
+      "flush",
+      "commit",
+      "read-state",
+      "state",
+      "BR-01"
+    ],
+    "docs/reference-apache-paimon.md#§3": [
+      "model",
+      "compact",
+      "pick-runs",
+      "publish-compact"
+    ],
+    "docs/reference-apache-paimon.md#§4": [
+      "model",
+      "consumer",
+      "changelog",
+      "upsert",
+      "lookup",
+      "deliver",
+      "changes",
+      "BR-02"
+    ],
+    "docs/reference-apache-paimon.md#§5": [
+      "model"
+    ],
+    "docs/reference-apache-paimon.md#§6": [
+      "model"
+    ]
+  },
+  "reference": {
+    "category": "テーブル形式とカタログ",
+    "order": 80,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
+    "objectives": [
+      "主キーの更新が sorted run とスナップショットにどう現れるかを追う。",
+      "merge-engine と changelog-producer が担う役割を説明する。",
+      "Paimon の LSM と Hudi の CoW・MoR の保存単位を比較する。"
+    ],
+    "sources": [
+      {
+        "title": "Paimon 2.1 Primary-Key Table",
+        "url": "https://paimon.apache.org/docs/2.1/primary-key-table/"
+      },
+      {
+        "title": "Paimon 2.1 Merge Engines",
+        "url": "https://paimon.apache.org/docs/2.1/primary-key-table/merge-engine/"
+      },
+      {
+        "title": "Paimon 2.1 Changelog Producer",
+        "url": "https://paimon.apache.org/docs/2.1/primary-key-table/changelog-producer/"
+      },
+      {
+        "title": "Paimon 2.1 Compaction",
+        "url": "https://paimon.apache.org/docs/2.1/primary-key-table/compaction/"
+      },
+      {
+        "title": "Apache Hudi Concepts",
+        "url": "https://hudi.apache.org/docs/concepts/"
+      },
+      {
+        "title": "Paimon 2.1 Table Mode",
+        "url": "https://paimon.apache.org/docs/2.1/primary-key-table/table-mode/"
+      }
+    ]
+  }
+}

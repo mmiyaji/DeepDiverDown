@@ -1,0 +1,270 @@
+name: Microsoft Fabric OneLake catalog の発見とガバナンス
+description: Fabric のアイテムを探し、リネージや認定の状態を確認し、ワークスペースとデータアクセスの権限を管理する流れを追います。
+parent:
+  model: microsoft-fabric
+  node: catalog
+reference:
+  objectives:
+    - Explore、Govern、Secure の役割を区別する。
+    - アイテムの発見、リネージ、利用申請を追う。
+    - ワークスペースの権限と OneLake の実データに適用される権限の関係を説明する。
+  sources:
+    - title: OneLake Catalog Overview
+      url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview
+    - title: OneLake Catalog Item Details
+      url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-item-details
+    - title: Govern Your Fabric Data
+      url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-govern
+    - title: Secure Your Fabric Data
+      url: https://learn.microsoft.com/en-us/fabric/governance/secure-your-data
+    - title: Discovery Admin Settings
+      url: https://learn.microsoft.com/en-us/fabric/admin/service-admin-portal-discovery
+    - title: Read Data Secured with OneLake Security
+      url: https://learn.microsoft.com/en-us/fabric/onelake/security/read-secured-data
+    - title: What's New in Fabric
+      url: https://learn.microsoft.com/fabric/fundamentals/whats-new
+    - title: Microsoft Data Governance Strategy Update
+      url: https://learn.microsoft.com/partner-center/announcements/2026-november#update-on-the-microsoft-data-governance-strategy
+sources:
+  - docs/reference-fabric-onelake-catalog.md
+evidence:
+  - type: doc
+    ref: docs/reference-fabric-onelake-catalog.md#§1
+tiers:
+  - id: people
+    label: 利用者・管理者
+    z: 2
+    size:
+      - 15
+      - 3
+  - id: catalog
+    label: OneLake catalog
+    z: 1
+    size:
+      - 15
+      - 4
+  - id: fabric
+    label: ワークスペースの資産と実行
+    z: 0
+    size:
+      - 15
+      - 3
+nodes:
+  consumer:
+    label: データ利用者
+    kind: actor
+    tier: people
+    x: 3
+    y: 1
+    description: Fabric アイテムを発見し、必要に応じてアクセスを申請する。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§2
+  admin:
+    label: 管理者・所有者
+    kind: actor
+    tier: people
+    x: 10
+    y: 1
+    description: 資産の認定やドメイン、利用権限を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§3
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  explore:
+    label: Explore
+    kind: service
+    tier: catalog
+    x: 3
+    y: 1
+    description: アイテムの検索と詳細を表示する。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§2
+  govern:
+    label: Govern
+    kind: service
+    tier: catalog
+    x: 7
+    y: 1
+    description: 資産のガバナンス状態を把握し、組織の設定にアクセスする。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§3
+  secure:
+    label: Secure
+    kind: service
+    tier: catalog
+    x: 11
+    y: 1
+    description: ワークスペースと OneLake セキュリティのロールを表示・管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  items:
+    label: Fabric アイテム
+    kind: external
+    tier: fabric
+    x: 3
+    y: 1
+    description: レポート、セマンティックモデル、レイクハウスなど。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§2
+  workspaces:
+    label: ドメイン・ワークスペース
+    kind: external
+    tier: fabric
+    x: 7
+    y: 1
+    description: 資産を整理し、ワークスペースロールを適用する。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§3
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  roles:
+    label: OneLake セキュリティロール
+    kind: service
+    tier: fabric
+    x: 11
+    y: 1
+    description: OneLake 内のデータに適用する権限範囲を定義する。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  engine:
+    label: 対応クエリエンジン
+    kind: service
+    tier: fabric
+    x: 13
+    y: 2
+    description: 利用者の実効権限に基づいて行・列を制御する。
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+links:
+  - id: search
+    from: consumer
+    to: explore
+    label: アイテムを検索
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§2
+  - id: metadata
+    from: explore
+    to: items
+    label: 詳細・認定・リネージを表示
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§2
+  - id: request
+    from: consumer
+    to: explore
+    label: 発見可能なアイテムの利用を申請
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§2
+  - id: monitor
+    from: admin
+    to: govern
+    label: 管理状態・推奨アクションを確認
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§3
+  - id: domains
+    from: govern
+    to: workspaces
+    label: ドメイン・管理設定を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§3
+  - id: review
+    from: admin
+    to: secure
+    label: 権限と役割をレビュー
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  - id: workspace-role
+    from: secure
+    to: workspaces
+    label: ワークスペースの役割を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  - id: configure
+    from: secure
+    to: roles
+    label: 対象のデータロールを設定
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  - id: query
+    from: consumer
+    to: engine
+    label: 対応エンジンにクエリを送る
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  - id: authorize
+    from: engine
+    to: roles
+    label: 利用者の実効権限を評価
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+  - id: read
+    from: engine
+    to: items
+    label: 許可された行・列を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4
+scenarios:
+  - id: discover-report
+    label: 認定済みレポートの上流を確認する
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§5
+    steps:
+      - links:
+          - monitor
+          - domains
+        note: 管理者が資産を整理するドメインとガバナンスの状態を確認する。
+      - links:
+          - search
+          - metadata
+        note: 利用者が候補のレポートを探し、認定と上流を確認する。
+      - links:
+          - request
+        note: 利用権限がない発見可能な資産を申請する。
+  - id: query-secured
+    label: 制限付きのデータを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§5
+    steps:
+      - links:
+          - review
+          - workspace-role
+          - configure
+        note: 管理者がワークスペースの権限を点検し、必要な範囲のデータロールを設定する。
+      - links:
+          - query
+          - authorize
+          - read
+        note: 利用者の権限に従い、対応エンジンが行・列を制限してデータを返す。
+requirements:
+  - id: R-01
+    kind: rule
+    title: 利用者の権限をクエリに適用すること
+    text: データに適用する制限を利用者ごとに評価し、許可された行と列を返す。
+    links:
+      - configure
+      - authorize
+      - read
+    evidence:
+      - type: doc
+        ref: docs/reference-fabric-onelake-catalog.md#§4

@@ -1,0 +1,222 @@
+name: "DWH のファクトテーブル：トランザクション・定期・累積スナップショット"
+description: "受注から出荷までの一つの明細を、イベントの追記、倉庫別の日次集計、明細の進捗更新で記録し、問いに合う粒度を選ぶ。"
+parent: {"model":"dwh-design-patterns","node":"fact-types"}
+reference:
+  objectives:
+    - 測定したい業務プロセスから、1 行が何を表すかを決める。
+    - トランザクション、定期スナップショット、累積スナップショットの行の増え方を比較する。
+    - 日末残高を日付で足し上げる誤りを避け、数値尺度のないイベントを説明する。
+  sources:
+    - title: Kimball Group Transaction Fact Tables
+      url: >-
+        https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/transaction-fact-table/
+    - title: Kimball Group Periodic Snapshot Fact Tables
+      url: >-
+        https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/periodic-snapshot-fact-table/
+    - title: Kimball Group Accumulating Snapshot Fact Tables
+      url: >-
+        https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/accumulating-snapshot-fact-table/
+    - title: Kimball Group Factless Fact Tables
+      url: >-
+        https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/factless-fact-table/
+    - title: Kimball Group Additive, Semi-Additive, and Non-Additive Facts
+      url: >-
+        https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/
+sources: ["docs/reference-dwh-fact-table-types.md"]
+evidence:
+  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§1"}
+  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}
+  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}
+  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§4"}
+  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}
+  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§6"}
+  - {"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§7"}
+tiers:
+  - {"id":"input","label":"出荷業務と日次締め","z":1,"origin":[0,0],"size":[16,3]}
+  - {"id":"warehouse","label":"粒度が異なるファクト","z":0,"origin":[0,0],"size":[16,3]}
+nodes:
+  events: {"label":"出荷工程のイベント","kind":"queue","tier":"input","x":0.5,"y":1.5,"description":"倉庫 W1 で受注受付・梱包完了・出荷を記録する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§1"}]}
+  load: {"label":"イベント取り込み","kind":"worker","tier":"input","x":4.4,"y":1.5,"description":"イベント ID で明細の工程を識別し、追記と進捗更新に使う。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
+  day-close: {"label":"倉庫別の日次締め","kind":"worker","tier":"input","x":8.6,"y":1.5,"description":"日中の出荷と日末の未出荷を、営業日と倉庫で集計する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
+  analyst: {"label":"分析者","kind":"actor","tier":"input","x":13.4,"y":1.5,"description":"個々の工程、日別の残、受注から出荷までの時間を分析する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
+  transactions: {"label":"トランザクションファクト","kind":"db","tier":"warehouse","x":2.2,"y":1.5,"description":"1 行は注文の 1 明細・1 工程イベント。発生に応じて行を追加する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
+  periodic: {"label":"定期スナップショット","kind":"db","tier":"warehouse","x":6.2,"y":1.5,"description":"1 行は倉庫・営業日。出荷のない日にも締めの行を持つ。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
+  accumulating: {"label":"累積スナップショット","kind":"db","tier":"warehouse","x":10.4,"y":1.5,"description":"1 行は注文の 1 明細。工程が進むたびにその行の日時列を更新する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§4"}]}
+  factless: {"label":"数値尺度のないファクト","kind":"db","tier":"warehouse","x":14.4,"y":1.5,"description":"発生の有無などをディメンションの組み合わせで記録する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§6"}]}
+links:
+  - {"id":"collect","from":"events","to":"load","label":"発生した工程を取り込む","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
+  - {"id":"append","from":"load","to":"transactions","label":"イベントごとに 1 行を追加","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§2"}]}
+  - {"id":"maintain","from":"load","to":"accumulating","label":"同じ明細行の工程日時を更新","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§4"}]}
+  - {"id":"summarize","from":"transactions","to":"day-close","label":"営業日・倉庫で締める","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
+  - {"id":"snapshot-row","from":"day-close","to":"periodic","label":"活動のない日も 1 行を保存","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
+  - {"id":"drill-event","from":"transactions","to":"analyst","label":"個々の工程を調べる","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
+  - {"id":"read-daily","from":"periodic","to":"analyst","label":"日次の出荷数と残を読む","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
+  - {"id":"lead-time","from":"accumulating","to":"analyst","label":"受注から出荷までの時間を読む","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
+  - {"id":"record-relation","from":"load","to":"factless","label":"計測値のない実施イベントを記録","evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§6"}]}
+scenarios:
+  - id: one-line
+    label: 明細 42-1 の 3 工程を記録する
+    visual: timeline
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§4
+    steps:
+      - links:
+          - collect
+          - append
+          - maintain
+        note: 11 月 18 日 09:00 に受注。イベント表に 1 行、累積表に明細 42-1 の初期行を作る。
+        current: ordered
+        highlight:
+          - ordered
+      - links:
+          - collect
+          - append
+          - maintain
+        note: 同日 14:30 に梱包完了。イベント表には 2 行目を追加し、累積表では同じ行に梱包時刻を入れる。
+        current: packed
+        highlight:
+          - packed
+      - links:
+          - collect
+          - append
+          - maintain
+          - drill-event
+          - lead-time
+        note: 11 月 20 日 10:00 に出荷。イベント表は 3 行、累積表は引き続き 1 行。受注からの経過時間は 49 時間。
+        current: shipped
+        highlight:
+          - shipped
+  - id: daily-close
+    label: イベントがない日も倉庫 W1 を締める
+    visual: daily-rows
+    evidence:
+      - type: doc
+        ref: docs/reference-dwh-fact-table-types.md#§3
+    steps:
+      - links:
+          - summarize
+          - snapshot-row
+        note: 11 月 18 日は出荷 0 件。受注し梱包済みの明細が日末に 1 件残る。
+        blocks:
+          days:
+            - id: day19
+              label: 11/19 · イベントなし
+              k: 1
+            - id: day20
+              label: 11/20
+              k: 0
+          rows:
+            - id: day18-row
+              label: 11/18 · 出荷 0 / 未出荷 1
+              k: 2
+              from:
+                - day18
+        highlight:
+          - day18-row
+      - links:
+          - summarize
+          - snapshot-row
+        note: 11 月 19 日は工程イベントが 0 件でも、日末未出荷 1 件の定期スナップショット行を保存する。
+        blocks:
+          days:
+            - id: day20
+              label: 11/20
+              k: 0
+          rows:
+            - id: day18-row
+              label: 11/18 · 出荷 0 / 未出荷 1
+              k: 2
+              from:
+                - day18
+            - id: day19-row
+              label: 11/19 · 出荷 0 / 未出荷 1
+              k: 2
+              from:
+                - day19
+        highlight:
+          - day19-row
+      - links:
+          - summarize
+          - snapshot-row
+          - read-daily
+        note: 11 月 20 日の出荷は 1 件で、日末未出荷は 0 件。期間の出荷は合計でき、期間末の残は最終日の 0 件を読む。
+        blocks:
+          days: []
+          rows:
+            - id: day18-row
+              label: 11/18 · 出荷 0 / 未出荷 1
+              k: 2
+              from:
+                - day18
+            - id: day19-row
+              label: 11/19 · 出荷 0 / 未出荷 1
+              k: 2
+              from:
+                - day19
+            - id: day20-row
+              label: 11/20 · 出荷 1 / 未出荷 0
+              k: 2
+              from:
+                - day20
+        highlight:
+          - day20-row
+requirements:
+  - {"id":"BR-01","kind":"rule","title":"1 行が表す業務上の粒度を固定する","text":"明細のイベント、倉庫の営業日、明細の進捗をそれぞれの粒度で記録する。","links":["append","snapshot-row","maintain"],"evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§5"}]}
+  - {"id":"BR-02","kind":"usecase","title":"出荷実績と期末残高を計算する","text":"期間内の出荷件数と、期間末時点の未出荷明細数を取得する。","links":["snapshot-row","read-daily"],"evidence":[{"type":"doc","ref":"docs/reference-dwh-fact-table-types.md#§3"}]}
+unknowns:
+  - {"id":"UNK-01","text":"実際の締め時刻、倉庫間移動、分割出荷、取消、遅着イベントの扱いは未確認。","refs":["events","day-close","accumulating"]}
+gates: {maxDrift: 0, maxHigh: 0}
+blocks:
+  id: daily-rows
+  title: 倉庫 W1 の日次ファクト
+  note: 各行の出荷は日中の出荷明細数、未出荷は締め時点の未出荷明細数。時点をまたいで未出荷を合計すると、同じ明細を重複して数える。
+  legend:
+    "0": 工程イベントあり
+    "1": 工程イベントなし
+    "2": 倉庫・営業日ごとのファクト行
+  lanes:
+    - id: days
+      label: 締め前の営業日
+      node: day-close
+    - id: rows
+      label: 保存済みの定期スナップショット
+      node: periodic
+  items:
+    days:
+      - id: day18
+        label: 11/18
+        k: 0
+      - id: day19
+        label: 11/19 · イベントなし
+        k: 1
+      - id: day20
+        label: 11/20
+        k: 0
+    rows: []
+timeline:
+  title: 明細 42-1 の工程と累積スナップショットの更新
+  current: ordered
+  note: 操作の順を表す図。累積スナップショットには同じ明細の現在行が 1 行だけ残る。
+  commits:
+    - id: ordered
+      label: 受注受付
+      time: 11/18 09:00
+      kind: append
+      node: accumulating
+      description: 注文明細が作られた時刻で初期行を登録する。
+      sample: order_line=42-1, ordered=11/18 09:00, packed=未到達, shipped=未到達
+    - id: packed
+      label: 梱包完了
+      time: 11/18 14:30
+      kind: overwrite
+      node: accumulating
+      description: 同じ明細行に梱包日時を記録する。
+      sample: order_line=42-1, ordered=11/18 09:00, packed=11/18 14:30, shipped=未到達
+    - id: shipped
+      label: 出荷
+      time: 11/20 10:00
+      kind: overwrite
+      node: accumulating
+      description: 同じ明細行に出荷日時と経過時間を記録する。
+      sample: order_line=42-1, ordered=11/18 09:00, packed=11/18 14:30, shipped=11/20 10:00, elapsed_hours=49

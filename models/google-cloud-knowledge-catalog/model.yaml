@@ -1,0 +1,315 @@
+name: Google Cloud Knowledge Catalog のメタデータ管理
+description: BigQuery などの資産に構造化メタデータを付け、検索、リネージ、データ製品のアクセス申請につなげる流れを追います。
+parent:
+  model: data-catalog-architecture
+  node: knowledge
+reference:
+  objectives:
+    - 旧 Data Catalog と旧 Dataplex Universal Catalog からの移行を区別する。
+    - Entry と Aspect から資産の説明や分類を探す。
+    - メタデータの閲覧とデータ製品のアクセス権限を区別する。
+  sources:
+    - title: Knowledge Catalog Release Notes
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/release-notes
+    - title: Transition from Dataplex Universal Catalog
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/transition-dataplex-universal-catalog
+    - title: Transition from Data Catalog
+      url: https://docs.cloud.google.com/dataplex/docs/transition-to-dataplex-catalog?hl=en
+    - title: About Metadata in Knowledge Catalog
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/metadata-overview
+    - title: Manage Aspects and Enrich Metadata
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/enrich-entries-metadata
+    - title: About Data Lineage
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/about-data-lineage
+    - title: Manage Access with IAM
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/iam-and-access-control
+    - title: About Data Products
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/data-products-overview
+    - title: Manage Data Products
+      url: https://docs.cloud.google.com/knowledge-catalog/docs/manage-data-products
+sources:
+  - docs/reference-google-cloud-knowledge-catalog.md
+evidence:
+  - type: doc
+    ref: docs/reference-google-cloud-knowledge-catalog.md#§1
+tiers:
+  - id: people
+    label: 提供側・利用側
+    z: 2
+    size:
+      - 15
+      - 3
+  - id: catalog
+    label: Knowledge Catalog
+    z: 1
+    size:
+      - 15
+      - 4
+  - id: sources
+    label: ソースと IAM
+    z: 0
+    size:
+      - 15
+      - 3
+nodes:
+  owner:
+    label: データ製品の所有者
+    kind: actor
+    tier: people
+    x: 5
+    y: 1
+    description: 利用文脈とアクセスグループを設定し、申請を処理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§3
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  consumer:
+    label: データ利用者
+    kind: actor
+    tier: people
+    x: 11
+    y: 1
+    description: 資産を検索し、製品の利用を申請する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  entries:
+    label: Entry Group・Entry
+    kind: db
+    tier: catalog
+    x: 2
+    y: 1
+    description: Google Cloud 資産や取り込んだ外部資産を登録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§2
+  aspects:
+    label: Aspect Type・Aspect
+    kind: service
+    tier: catalog
+    x: 5
+    y: 2.5
+    description: 項目を型で定義して資産・列に構造化情報を付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§3
+  lineage:
+    label: リネージ
+    kind: service
+    tier: catalog
+    x: 8
+    y: 1
+    description: 収集した処理の入出力を資産に関連付ける。
+    drill: openlineage
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§4
+  products:
+    label: データ製品・アクセス申請
+    kind: service
+    tier: catalog
+    x: 12
+    y: 1
+    description: 用途に沿って資産をまとめ、グループごとの利用を承認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  bigquery:
+    label: BigQuery の資産
+    kind: db
+    tier: sources
+    x: 3
+    y: 1
+    description: テーブルのスキーマを提供し、実行時にデータ権限を評価する。
+    drill: bigquery
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§2
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§4
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  group:
+    label: Google グループ・IAM
+    kind: external
+    tier: sources
+    x: 12
+    y: 1
+    description: 承認経路に応じて利用者を追加し、資産の IAM に対応付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+links:
+  - id: catalog
+    from: bigquery
+    to: entries
+    label: テーブルを Entry として取り込む
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§2
+  - id: curate
+    from: owner
+    to: aspects
+    label: 分類・利用目的・連絡先を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§3
+  - id: enrich
+    from: aspects
+    to: entries
+    label: Entry や列に Aspect を付与
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§3
+  - id: collect-lineage
+    from: bigquery
+    to: lineage
+    label: 対応する処理履歴を連携
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§4
+  - id: link-lineage
+    from: lineage
+    to: entries
+    label: 処理の上流・下流を資産と対応付ける
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§4
+  - id: search
+    from: consumer
+    to: entries
+    label: 資産とリネージを調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§4
+  - id: package
+    from: owner
+    to: products
+    label: 利用目的に沿って資産・権限を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  - id: request
+    from: consumer
+    to: products
+    label: アクセスグループを選び申請
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  - id: approve
+    from: owner
+    to: products
+    label: 申請をコンソールで承認
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  - id: membership
+    from: products
+    to: group
+    label: グループに利用者を追加
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  - id: enforce
+    from: group
+    to: bigquery
+    label: 資産の IAM ロールを評価
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+  - id: read
+    from: consumer
+    to: bigquery
+    label: 認可範囲でクエリを実行
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5
+scenarios:
+  - id: discover-metadata
+    label: 注文テーブルの意味と由来を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§6
+    steps:
+      - links:
+          - catalog
+          - curate
+          - enrich
+        note: 登録した注文テーブルと列に運用の文脈を付ける。
+        read: [schema, purpose, classification]
+      - links:
+          - collect-lineage
+          - link-lineage
+          - search
+        note: 上流の処理と利用目的を確認する。
+        read: [upstream, purpose]
+  - id: request-access
+    label: データ製品の利用を申請する
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§6
+    steps:
+      - links:
+          - package
+          - request
+        note: 所有者はデータ製品を公開し、利用者は必要な権限のグループへ申請する。
+      - links:
+          - approve
+          - membership
+        note: コンソールから承認し、利用者がグループに追加される。
+      - links:
+          - enforce
+          - read
+        note: BigQuery が IAM を評価し、許可されたデータを読み込む。
+treeLayout:
+  title: 注文データ製品から資産の文脈へ
+  unit: 情報項目
+  levels:
+    - データ製品
+    - 資産の Entry
+    - 紐付く情報
+  note: 注文テーブル一件に付く技術情報と事業上の情報の論理ビュー。
+  root:
+    id: order-product
+    label: 注文データ製品
+    kind: meta
+    node: products
+    children:
+      - id: orders-entry
+        label: BigQuery / orders
+        kind: snapshot
+        node: entries
+        children:
+          - id: schema
+            label: Schema
+            kind: data
+            node: entries
+            sub: テーブルのスキーマ
+          - id: purpose
+            label: Overview / Contacts
+            kind: data
+            node: aspects
+            sub: 利用目的と運用連絡先
+          - id: classification
+            label: 列の分類
+            kind: data
+            node: aspects
+            sub: 顧客識別子の扱い
+          - id: upstream
+            label: 上流のジョブ
+            kind: data
+            node: lineage
+            sub: 注文データの入力と変換
+requirements:
+  - id: R-01
+    kind: rule
+    title: 利用権限を資産ごとに評価すること
+    text: 承認で選ばれた権限を対応する資産に反映し、アクセス時に検証する。
+    links:
+      - approve
+      - membership
+      - enforce
+    evidence:
+      - type: doc
+        ref: docs/reference-google-cloud-knowledge-catalog.md#§5

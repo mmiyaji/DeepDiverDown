@@ -1,0 +1,285 @@
+name: Microsoft Purview の Data Map と Unified Catalog
+description: 既存環境で、接続先から収集した Data Map の資産を公開し、申請承認とソース権限の付与へつなぐ流れを追います。
+parent:
+  model: data-catalog-architecture
+  node: purview
+reference:
+  objectives:
+    - Data Map の資産・分類と Unified Catalog のデータ製品を区別する。
+    - ソーススキャンとジョブからのリネージ連携を追う。
+    - 承認とソース権限の反映を区別し、サービスの移行先を確認する。
+  sources:
+    - title: Microsoft Purview Data Governance Overview
+      url: https://learn.microsoft.com/en-us/purview/data-governance-overview
+    - title: Microsoft Data Governance Strategy Update
+      url: https://learn.microsoft.com/partner-center/announcements/2026-november#update-on-the-microsoft-data-governance-strategy
+    - title: Microsoft Purview Data Map Scans and Ingestion
+      url: https://learn.microsoft.com/en-us/purview/data-map-scan-ingestion
+    - title: Data Map Supported Sources
+      url: https://learn.microsoft.com/en-us/purview/data-map-data-sources
+    - title: Microsoft Purview Unified Catalog
+      url: https://learn.microsoft.com/en-us/purview/unified-catalog
+    - title: Unified Catalog Data Product Access Policies
+      url: https://learn.microsoft.com/en-us/purview/unified-catalog-data-product-access-policies
+    - title: Request Access to Data Products
+      url: https://learn.microsoft.com/en-us/purview/unified-catalog-data-product-access-requests
+sources:
+  - docs/reference-microsoft-purview.md
+evidence:
+  - type: doc
+    ref: docs/reference-microsoft-purview.md#§1
+tiers:
+  - id: people
+    label: 既存テナントの利用者
+    z: 2
+    size:
+      - 15
+      - 3
+  - id: purview
+    label: Microsoft Purview Data Governance
+    z: 1
+    size:
+      - 15
+      - 4
+  - id: sources
+    label: ソース・移行先
+    z: 0
+    size:
+      - 15
+      - 3
+nodes:
+  steward:
+    label: データ製品の所有者
+    kind: actor
+    tier: people
+    x: 4
+    y: 1
+    description: 資産を製品としてまとめ、説明・利用条件を整える。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§3
+  consumer:
+    label: データ利用者
+    kind: actor
+    tier: people
+    x: 9
+    y: 1
+    description: 製品を探しアクセスを申請する。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  provider:
+    label: 権限付与担当者
+    kind: actor
+    tier: people
+    x: 13
+    y: 1
+    description: 承認されたソース権限を付与し完了を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  scan:
+    label: 登録・スキャン
+    kind: worker
+    tier: purview
+    x: 2
+    y: 1
+    description: 資産のスキーマと対応する分類を取得する。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§2
+  map:
+    label: Data Map
+    kind: db
+    tier: purview
+    x: 5
+    y: 1
+    description: ソース資産、分類、実行系のリネージを集約する。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§2
+  unified:
+    label: Unified Catalog
+    kind: service
+    tier: purview
+    x: 9
+    y: 1
+    description: ドメイン、データ製品、所有者、利用条件を公開する。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§3
+  workflow:
+    label: アクセス申請・承認
+    kind: service
+    tier: purview
+    x: 13
+    y: 2
+    description: 申請経路と権限付与の完了状況を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  source:
+    label: データソース
+    kind: db
+    tier: sources
+    x: 2
+    y: 1
+    description: 元のデータとアクセス権限を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§2
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  factory:
+    label: Azure Data Factory
+    kind: external
+    tier: sources
+    x: 6
+    y: 1
+    description: 対応する変換処理の入出力を送る。
+    drill: azure-data-factory
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§2
+  fabric:
+    label: Microsoft Fabric OneLake catalog
+    kind: external
+    tier: sources
+    x: 12
+    y: 1
+    description: 既存のデータガバナンス機能の集約先。
+    drill: fabric-onelake-catalog
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§1
+links:
+  - id: inspect
+    from: scan
+    to: source
+    label: スキーマと対応する分類を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§2
+  - id: ingest
+    from: scan
+    to: map
+    label: 技術メタデータを登録
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§2
+  - id: lineage
+    from: factory
+    to: map
+    label: 変換処理を資産に関連付ける
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§2
+  - id: surface
+    from: map
+    to: unified
+    label: データ製品に資産を関連付ける
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§3
+  - id: curate
+    from: steward
+    to: unified
+    label: 所有者と利用条件を整える
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§3
+  - id: search
+    from: consumer
+    to: unified
+    label: 公開製品を探す
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§3
+  - id: request
+    from: consumer
+    to: workflow
+    label: データ利用を申請
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  - id: notify
+    from: workflow
+    to: provider
+    label: 承認された申請を引き渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  - id: grant
+    from: provider
+    to: source
+    label: ソースの利用権限を付与
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  - id: complete
+    from: provider
+    to: workflow
+    label: 付与完了と利用手順を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  - id: query
+    from: consumer
+    to: source
+    label: 権限に従ってデータにアクセス
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4
+  - id: transition
+    from: unified
+    to: fabric
+    label: ガバナンス機能を Fabric へ集約
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§1
+scenarios:
+  - id: publish-product
+    label: 注文データ製品を公開する
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§5
+    steps:
+      - links:
+          - inspect
+          - ingest
+          - lineage
+        note: ソースの情報と処理の入出力を Data Map にそろえる。
+      - links:
+          - surface
+          - curate
+          - search
+        note: 資産を業務上の目的に沿って製品にまとめ、利用者が検索する。
+  - id: request-product
+    label: 申請を承認してソースで権限を付与する
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§5
+    steps:
+      - links:
+          - search
+          - request
+        note: 利用者が注文データ製品を見つけ、利用を申請する。
+      - links:
+          - notify
+          - grant
+          - complete
+        note: 担当者が承認済みの申請に基づいてソース権限を付与する。
+      - links:
+          - query
+        note: 利用者がソース側に接続して注文データを読む。
+requirements:
+  - id: R-01
+    kind: rule
+    title: 付与完了の記録
+    text: 承認された利用申請について、対象ソースへの権限付与と利用者に伝える手順を記録する。
+    links:
+      - grant
+      - complete
+    evidence:
+      - type: doc
+        ref: docs/reference-microsoft-purview.md#§4

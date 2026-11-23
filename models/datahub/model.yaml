@@ -1,0 +1,260 @@
+name: DataHub のメタデータ基盤
+description: ソースから集めたメタデータを検索・リネージに活用し、所有者とデータ契約の検証結果へたどる流れを追います。
+parent:
+  model: data-catalog-architecture
+  node: datahub
+reference:
+  objectives:
+    - Entity、URN、Aspect の役割を区別する。
+    - 取り込み、メタデータ保存、検索・関係の参照を追う。
+    - データ契約の記録と assertion の実行条件を説明する。
+  sources:
+    - title: DataHub Architecture Overview
+      url: https://docs.datahub.com/docs/architecture/architecture/
+    - title: Metadata Ingestion Architecture
+      url: https://docs.datahub.com/docs/architecture/metadata-ingestion
+    - title: The Metadata Model
+      url: https://docs.datahub.com/docs/metadata-modeling/metadata-model
+    - title: About DataHub Lineage
+      url: https://docs.datahub.com/docs/features/feature-guides/lineage
+    - title: Access Policies
+      url: https://docs.datahub.com/docs/authorization/access-policies-guide
+    - title: Domains
+      url: https://docs.datahub.com/docs/domains
+    - title: Data Contract Metamodel
+      url: https://archive.docs.datahub.com/docs/1.8.0/generated/metamodel/entities/datacontract
+    - title: DataHub Cloud Observe Assertions
+      url: https://docs.datahub.com/docs/managed-datahub/observe/assertions
+sources:
+  - docs/reference-datahub.md
+evidence:
+  - type: doc
+    ref: docs/reference-datahub.md#§1
+tiers:
+  - id: people
+    label: 利用者と接続元
+    z: 2
+    size:
+      - 13
+      - 3
+  - id: datahub
+    label: DataHub
+    z: 1
+    size:
+      - 13
+      - 4
+  - id: stores
+    label: 保存・検索
+    z: 0
+    size:
+      - 13
+      - 3
+nodes:
+  source:
+    label: ウェアハウス・変換基盤
+    kind: external
+    tier: people
+    x: 1
+    y: 1
+    description: Dataset、スキーマ、リネージの取り込み元。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§1
+  test:
+    label: 品質・鮮度の検証器
+    kind: worker
+    tier: people
+    x: 5
+    y: 1
+    description: 例の assertion を実行し結果を送る外部ツール。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§5
+  user:
+    label: 利用者・所有者
+    kind: actor
+    tier: people
+    x: 10
+    y: 1
+    description: 資産の検索、契約結果の確認やメタデータの編集を行う。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§3
+      - type: doc
+        ref: docs/reference-datahub.md#§4
+      - type: doc
+        ref: docs/reference-datahub.md#§5
+  ingest:
+    label: 取り込みコネクタ
+    kind: worker
+    tier: datahub
+    x: 1
+    y: 1
+    description: 抽出結果を Metadata Change Proposal として送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+  gms:
+    label: Metadata Service（GMS）
+    kind: service
+    tier: datahub
+    x: 5
+    y: 1
+    description: Entity と Aspect を受け付け、検索・関係 API を提供する。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§1
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+  portal:
+    label: 検索・資産 UI
+    kind: service
+    tier: datahub
+    x: 10
+    y: 1
+    description: 所有者、タグ、リネージ、検証結果を表示する。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§3
+      - type: doc
+        ref: docs/reference-datahub.md#§4
+      - type: doc
+        ref: docs/reference-datahub.md#§5
+  meta-store:
+    label: メタデータ保存
+    kind: db
+    tier: stores
+    x: 5
+    y: 1
+    description: スキーマ、所有者などのバージョン付き Aspect を保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+  index:
+    label: 検索・関係の索引
+    kind: db
+    tier: stores
+    x: 10
+    y: 1
+    description: 資産の検索と関係の参照を支える。
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+      - type: doc
+        ref: docs/reference-datahub.md#§3
+links:
+  - id: collect
+    from: source
+    to: ingest
+    label: スキーマ・依存関係を抽出
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+  - id: proposal
+    from: ingest
+    to: gms
+    label: HTTP で MCP を送信
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+  - id: store
+    from: gms
+    to: meta-store
+    label: Aspect を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+  - id: index-update
+    from: gms
+    to: index
+    label: 検索・関係に反映
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§2
+  - id: search
+    from: user
+    to: portal
+    label: 資産・所有者を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§3
+  - id: edit
+    from: user
+    to: portal
+    label: 許可範囲でタグや説明を編集
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§4
+  - id: lookup
+    from: portal
+    to: gms
+    label: メタデータ・関係を照会
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§3
+  - id: impact
+    from: gms
+    to: index
+    label: 下流の依存関係をたどる
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§3
+  - id: report
+    from: test
+    to: gms
+    label: assertion の実行結果を登録
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§5
+  - id: result
+    from: portal
+    to: gms
+    label: 契約と assertion 結果を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§5
+scenarios:
+  - id: impact-analysis
+    label: 列変更の影響を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§6
+    steps:
+      - links:
+          - collect
+          - proposal
+          - store
+          - index-update
+        note: ソースのスキーマと依存関係を取り込み、検索できるようにする。
+      - links:
+          - search
+          - lookup
+          - impact
+        note: 列を使う下流資産と連絡すべき所有者を確認する。
+      - links:
+          - edit
+        note: 許可された担当者が影響を受ける資産の説明を更新する。
+  - id: freshness
+    label: 鮮度契約を検証する
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§6
+    steps:
+      - links:
+          - report
+        note: 外部チェックが鮮度の assertion を実行して結果を送る。
+      - links:
+          - search
+          - result
+        note: 利用者は期待値と最近の実行結果を確認する。
+requirements:
+  - id: R-01
+    kind: rule
+    title: 検証結果を追跡できること
+    text: 契約に紐づく検証の結果を、利用者が対象資産から確認できる。
+    links:
+      - report
+      - result
+    evidence:
+      - type: doc
+        ref: docs/reference-datahub.md#§5

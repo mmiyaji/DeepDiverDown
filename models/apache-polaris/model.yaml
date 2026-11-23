@@ -1,0 +1,248 @@
+name: Apache Polaris の Iceberg カタログ
+description: Iceberg REST API でのテーブル解決・コミットと、ロールおよび一時認証情報によるストレージアクセスを追います。
+parent:
+  model: data-catalog-architecture
+  node: polaris
+reference:
+  objectives:
+    - 管理 API と Iceberg REST API の用途を区別する。
+    - Principal Role と Catalog Role からテーブル権限をたどる。
+    - カタログへのコミットとストレージへのアクセスを区別する。
+  sources:
+    - title: Apache Polaris 1.9.0 Documentation
+      url: https://polaris.apache.org/releases/1.9.0/
+    - title: Using the Polaris REST APIs with curl
+      url: https://polaris.apache.org/guides/rest-api/
+    - title: Role-Based Access Control
+      url: https://polaris.apache.org/releases/1.9.0/managing-security/access-control/
+    - title: Configuring S3 Storage
+      url: https://polaris.apache.org/releases/1.9.0/configuration/configuring-polaris-for-production/configuring-aws-s3-cloud-storage-specific/
+    - title: Iceberg REST Catalog Spec
+      url: https://iceberg.apache.org/rest-catalog-spec/
+sources:
+  - docs/reference-apache-polaris.md
+evidence:
+  - type: doc
+    ref: docs/reference-apache-polaris.md#§1
+tiers:
+  - id: client
+    label: 操作主体
+    z: 2
+    size:
+      - 8
+      - 3
+  - id: catalog
+    label: Polaris
+    z: 1
+    size:
+      - 11
+      - 4
+  - id: storage
+    label: ストレージアクセス
+    z: 0
+    size:
+      - 11
+      - 3
+nodes:
+  admin:
+    label: カタログ管理者
+    kind: actor
+    tier: client
+    x: 1
+    y: 1
+    description: カタログ、Principal、ロールを準備する。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§1
+  engine:
+    label: 処理エンジン
+    kind: client
+    tier: client
+    x: 6
+    y: 1
+    description: Iceberg REST クライアントでテーブルを読む・更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+  management:
+    label: 管理 API
+    kind: service
+    tier: catalog
+    x: 1
+    y: 1
+    description: ロールやカタログを作成・変更する。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§1
+  rbac:
+    label: ロール・権限判定
+    kind: service
+    tier: catalog
+    x: 4
+    y: 2
+    description: Principal から Catalog Role と操作権限を解決する。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§3
+  api:
+    label: Iceberg REST API
+    kind: service
+    tier: catalog
+    x: 7
+    y: 1
+    description: テーブルのロードやコミットを受け付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+  catalog-db:
+    label: カタログ状態
+    kind: db
+    tier: catalog
+    x: 9
+    y: 2.5
+    description: テーブルの識別子と現在の Iceberg メタデータを対応付ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+  sts:
+    label: AWS STS
+    kind: external
+    tier: storage
+    x: 4
+    y: 1
+    description: カタログ用 IAM ロールの一時認証情報を発行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§4
+  bucket:
+    label: S3 ファイル
+    kind: db
+    tier: storage
+    x: 9
+    y: 1
+    description: Iceberg メタデータ、Manifest、データファイルを保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§4
+links:
+  - id: setup
+    from: admin
+    to: management
+    label: カタログ・ロールを構成
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§1
+  - id: grant
+    from: management
+    to: rbac
+    label: Catalog Role を付与
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§3
+  - id: load
+    from: engine
+    to: api
+    label: テーブルをロード
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+  - id: authorize
+    from: api
+    to: rbac
+    label: テーブル操作を認可
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§3
+  - id: resolve
+    from: api
+    to: catalog-db
+    label: 現在のメタデータを解決
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+  - id: vend
+    from: api
+    to: sts
+    label: 一時認証情報を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§4
+  - id: read
+    from: engine
+    to: bucket
+    label: 一時認証情報でファイルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§4
+  - id: write
+    from: engine
+    to: bucket
+    label: データファイルを配置
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+  - id: submit
+    from: engine
+    to: api
+    label: 事前条件と更新内容を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+  - id: commit
+    from: api
+    to: catalog-db
+    label: 検証済みの更新を公開
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§2
+scenarios:
+  - id: load-orders
+    label: 注文テーブルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§5
+    steps:
+      - links:
+          - setup
+          - grant
+        note: 管理者が読み取り用の Principal Role と Catalog Role の対応を設定する。
+      - links:
+          - load
+          - authorize
+          - resolve
+        note: エンジンが orders をロードし、権限判定後に現在のテーブルメタデータを得る。
+      - links:
+          - vend
+          - read
+        note: 一時認証情報を使って必要なファイルを S3 から読む。
+  - id: commit-orders
+    label: 追加ファイルを公開する
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§5
+    steps:
+      - links:
+          - load
+          - authorize
+          - resolve
+          - vend
+        note: 書き込み権限を持つエンジンが現在のテーブル状態と認証情報を得る。
+      - links:
+          - write
+        note: 追加するデータファイルを S3 に書く。
+      - links:
+          - submit
+          - commit
+        note: コミット要求が事前条件を満たすと、新しい状態がテーブルの読み手に公開される。
+requirements:
+  - id: R-01
+    kind: rule
+    title: ストレージ権限の有効範囲
+    text: 利用者の許可操作と対象に対応した期限付きの認証情報を発行する。
+    links:
+      - authorize
+      - vend
+      - read
+    evidence:
+      - type: doc
+        ref: docs/reference-apache-polaris.md#§4

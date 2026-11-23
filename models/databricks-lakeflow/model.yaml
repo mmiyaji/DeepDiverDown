@@ -1,0 +1,55 @@
+name: "Databricks Lakeflow の CDC と品質管理"
+description: "DB の CDC または到着ファイルを取り込み、宣言型パイプラインで変更と品質を管理する。"
+parent: {"model":"databricks","node":"ingest"}
+reference:
+  objectives:
+    - "Lakeflow Connect、Auto Loader、Lakeflow パイプライン、Jobs の責務を区別する。"
+    - "遅延イベントと不正行を観測し、再処理の起点を選ぶ。"
+  sources:
+    - {"title":"Lakeflow Connect DB コネクタ","url":"https://docs.databricks.com/aws/en/ingestion/lakeflow-connect/cdc-overview"}
+    - {"title":"Auto Loader","url":"https://docs.databricks.com/aws/en/ingestion/cloud-object-storage/auto-loader/"}
+    - {"title":"Lakeflow パイプラインの運用","url":"https://docs.databricks.com/aws/en/ldp/concepts/how-to-use-pipelines"}
+    - {"title":"Apache Spark Declarative Pipelines と Lakeflow","url":"https://docs.databricks.com/aws/en/ldp/concepts/spark-declarative-pipelines"}
+sources: ["docs/reference-databricks-lakeflow.md"]
+evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[18.5,4.5]}
+nodes:
+  db: {"label":"注文DB","kind":"external","tier":"flow","x":0,"y":0,"description":"初期状態と変更ログを提供。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  gateway: {"label":"Lakeflow Connect ゲートウェイ","kind":"service","tier":"flow","x":3,"y":0,"description":"ソースに接続して取得。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  stage: {"label":"ステージング Volume","kind":"db","tier":"flow","x":6,"y":0,"description":"変更を一時保持。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  connector: {"label":"取り込みパイプライン","kind":"worker","tier":"flow","x":9,"y":0,"description":"宛先の RAW へ反映。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  files: {"label":"到着ファイル","kind":"external","tier":"flow","x":0,"y":4,"description":"バックフィルや外部からのファイル。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
+  auto-loader: {"label":"Auto Loader","kind":"service","tier":"flow","x":5,"y":4,"description":"ファイルを見つけ増分ロード。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
+  raw: {"label":"RAW Delta テーブル","kind":"db","tier":"flow","x":10,"y":4,"description":"取り込まれた注文変更。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§1"}]}
+  sdp: {"label":"Lakeflow パイプライン","kind":"worker","tier":"flow","x":14,"y":4,"description":"順序付け、品質チェック、更新。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
+  clean: {"label":"分析用注文テーブル","kind":"db","tier":"flow","x":18,"y":4,"description":"検証済みの注文状態。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
+  jobs: {"label":"Lakeflow Jobs","kind":"service","tier":"flow","x":13,"y":0,"description":"実行順とスケジュール。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
+  event-log: {"label":"イベントログ","kind":"db","tier":"flow","x":18,"y":0,"description":"進捗と品質を確認。","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
+links:
+  - {"id":"capture","from":"db","to":"gateway","label":"DB の変更を取得","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  - {"id":"spool","from":"gateway","to":"stage","label":"変更を一時保存","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  - {"id":"consume","from":"stage","to":"connector","label":"ステージを読む","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  - {"id":"ingest","from":"connector","to":"raw","label":"RAW の Delta テーブルへ反映","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§2"}]}
+  - {"id":"discover","from":"files","to":"auto-loader","label":"新着を検出","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
+  - {"id":"load","from":"auto-loader","to":"raw","label":"取り込み進捗を記録しロード","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§3"}]}
+  - {"id":"validate","from":"raw","to":"sdp","label":"キー・順序・期待値で検証","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
+  - {"id":"apply","from":"sdp","to":"clean","label":"整形済みの行を反映","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]}
+  - {"id":"schedule","from":"jobs","to":"sdp","label":"パイプラインを起動","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
+  - {"id":"observe","from":"sdp","to":"event-log","label":"進捗と違反を記録","evidence":[{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]}
+scenarios:
+  - id: cdc
+    label: "変更ログから注文の現在状態を整える"
+    evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§4"}]
+    steps:
+      - {"links":["capture","spool"],"note":"対応コネクタで DB の変更をステージへ送る。"}
+      - {"links":["consume","ingest"],"note":"取り込みパイプラインが RAW 側へ反映する。"}
+      - {"links":["schedule","validate","apply"],"note":"キーと業務上の順序を使って注文の現在状態を更新する。"}
+      - {"links":["observe"],"note":"イベントログで進捗と品質を確認する。"}
+  - id: files
+    label: "到着ファイルの増分と品質違反を調べる"
+    evidence: [{"type":"doc","ref":"docs/reference-databricks-lakeflow.md#§5"}]
+    steps:
+      - {"links":["discover","load"],"note":"Auto Loader が新着ファイルを増分ロードする。"}
+      - {"links":["schedule","validate"],"note":"パイプラインが期待値を評価する。例では不正な行を除外する。"}
+      - {"links":["apply","observe"],"note":"正しい行を反映し、除外の件数を確認して訂正の範囲を決める。"}

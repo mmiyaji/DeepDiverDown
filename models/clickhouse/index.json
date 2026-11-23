@@ -1,0 +1,203 @@
+{
+  "model": "clickhouse",
+  "name": "ClickHouse の MergeTree：疎インデックスとパートのマージ",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "insert": {
+      "type": "node",
+      "label": "INSERT",
+      "status": "claim"
+    },
+    "planner": {
+      "type": "node",
+      "label": "SELECT / EXPLAIN",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "列の読み取り",
+      "status": "claim"
+    },
+    "result": {
+      "type": "node",
+      "label": "注文別の金額",
+      "status": "claim"
+    },
+    "partition": {
+      "type": "node",
+      "label": "月パーティション",
+      "status": "claim"
+    },
+    "parts": {
+      "type": "node",
+      "label": "データパート",
+      "status": "claim"
+    },
+    "granules": {
+      "type": "node",
+      "label": "疎主インデックスとマーク",
+      "status": "claim"
+    },
+    "merger": {
+      "type": "node",
+      "label": "パートのマージ",
+      "status": "claim"
+    },
+    "store": {
+      "type": "link",
+      "label": "INSERT → 月パーティション",
+      "status": "claim"
+    },
+    "sort": {
+      "type": "link",
+      "label": "月パーティション → データパート",
+      "status": "claim"
+    },
+    "partition-prune": {
+      "type": "link",
+      "label": "SELECT / EXPLAIN → 月パーティション",
+      "status": "claim"
+    },
+    "index-prune": {
+      "type": "link",
+      "label": "SELECT / EXPLAIN → 疎主インデックスとマーク",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "疎主インデックスとマーク → 列の読み取り",
+      "status": "claim"
+    },
+    "return": {
+      "type": "link",
+      "label": "列の読み取り → 注文別の金額",
+      "status": "claim"
+    },
+    "pick": {
+      "type": "link",
+      "label": "データパート → パートのマージ",
+      "status": "claim"
+    },
+    "replace": {
+      "type": "link",
+      "label": "パートのマージ → データパート",
+      "status": "claim"
+    },
+    "query-week": {
+      "type": "scenario",
+      "label": "直近 7 日から顧客 42 を探す"
+    },
+    "merge-parts": {
+      "type": "scenario",
+      "label": "1 月の二つのパートをマージする"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "対象期間の注文を返す",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "同じ月で物理配置を整理",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境のパート数、グラニュール境界、索引による除外数、マージの時期は未確認。"
+    }
+  },
+  "byRef": {
+    "docs/reference-clickhouse.md#§1": [
+      "model",
+      "result"
+    ],
+    "docs/reference-clickhouse.md": [
+      "model",
+      "insert",
+      "planner",
+      "scan",
+      "result",
+      "partition",
+      "parts",
+      "granules",
+      "merger",
+      "store",
+      "sort",
+      "partition-prune",
+      "index-prune",
+      "read",
+      "return",
+      "pick",
+      "replace",
+      "query-week",
+      "merge-parts",
+      "BR-01",
+      "BR-02"
+    ],
+    "docs/reference-clickhouse.md#§2": [
+      "model",
+      "insert",
+      "partition",
+      "parts",
+      "store",
+      "sort"
+    ],
+    "docs/reference-clickhouse.md#§3": [
+      "model",
+      "planner",
+      "scan",
+      "granules",
+      "partition-prune",
+      "index-prune",
+      "read",
+      "return",
+      "query-week",
+      "BR-01"
+    ],
+    "docs/reference-clickhouse.md#§4": [
+      "model",
+      "merger",
+      "pick",
+      "replace",
+      "merge-parts",
+      "BR-02"
+    ],
+    "docs/reference-clickhouse.md#§5": [
+      "model",
+      "planner"
+    ],
+    "docs/reference-clickhouse.md#§6": [
+      "model"
+    ]
+  },
+  "reference": {
+    "category": "バッチ・SQL エンジン",
+    "order": 40,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
+    "objectives": [
+      "パーティション、パート、グラニュール、マークの関係を説明する。",
+      "パートの候補選択と疎主インデックスによるグラニュールの絞り込みを追う。",
+      "パートのマージが物理配置とクエリ結果に与える影響を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "ClickHouse MergeTree table engine",
+        "url": "https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree"
+      },
+      {
+        "title": "ClickHouse EXPLAIN",
+        "url": "https://clickhouse.com/docs/reference/statements/explain"
+      },
+      {
+        "title": "ClickHouse system.parts",
+        "url": "https://clickhouse.com/docs/operations/system-tables/parts"
+      }
+    ]
+  }
+}

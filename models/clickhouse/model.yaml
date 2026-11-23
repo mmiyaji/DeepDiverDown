@@ -1,0 +1,218 @@
+name: "ClickHouse の MergeTree：疎インデックスとパートのマージ"
+description: "直近 7 日の注文を例に、月パーティションと疎主インデックスで読む範囲を絞り、バックグラウンドマージでパートが置き換わる流れを追う。"
+reference:
+  objectives:
+    - パーティション、パート、グラニュール、マークの関係を説明する。
+    - パートの候補選択と疎主インデックスによるグラニュールの絞り込みを追う。
+    - パートのマージが物理配置とクエリ結果に与える影響を説明する。
+  sources:
+    - title: ClickHouse MergeTree table engine
+      url: https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree
+    - title: ClickHouse EXPLAIN
+      url: https://clickhouse.com/docs/reference/statements/explain
+    - title: ClickHouse system.parts
+      url: https://clickhouse.com/docs/operations/system-tables/parts
+sources: ["docs/reference-clickhouse.md"]
+evidence:
+  - {"type":"doc","ref":"docs/reference-clickhouse.md#§1"}
+  - {"type":"doc","ref":"docs/reference-clickhouse.md#§2"}
+  - {"type":"doc","ref":"docs/reference-clickhouse.md#§3"}
+  - {"type":"doc","ref":"docs/reference-clickhouse.md#§4"}
+  - {"type":"doc","ref":"docs/reference-clickhouse.md#§5"}
+  - {"type":"doc","ref":"docs/reference-clickhouse.md#§6"}
+tiers:
+  - {"id":"engine","label":"書き込みとクエリ","z":1,"origin":[0,0],"size":[15,3]}
+  - {"id":"storage","label":"MergeTree の保存単位","z":0,"origin":[0,0],"size":[15,3]}
+nodes:
+  insert: {"label":"INSERT","kind":"actor","tier":"engine","x":1,"y":1.5,"description":"注文のバッチを書き込む。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
+  planner: {"label":"SELECT / EXPLAIN","kind":"service","tier":"engine","x":5,"y":1.5,"description":"日付と顧客の述語から候補範囲を計画する。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"},{"type":"doc","ref":"docs/reference-clickhouse.md#§5"}]}
+  scan: {"label":"列の読み取り","kind":"worker","tier":"engine","x":9,"y":1.5,"description":"候補グラニュールの必要列を読み、行の述語を評価する。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  result: {"label":"注文別の金額","kind":"external","tier":"engine","x":14,"y":1.5,"description":"条件を満たす注文の order_id と amount を返す。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§1"}]}
+  partition: {"label":"月パーティション","kind":"db","tier":"storage","x":1,"y":1.5,"description":"toYYYYMM(order_date) でパートを分離する。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
+  parts: {"label":"データパート","kind":"db","tier":"storage","x":5,"y":1.5,"description":"並べ替え済みの列データとインデックスを備えた不変の単位。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
+  granules: {"label":"疎主インデックスとマーク","kind":"segment","tier":"storage","x":9,"y":1.5,"description":"グラニュール境界のキーと列データ上の位置を使い、読む範囲を決める。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  merger: {"label":"パートのマージ","kind":"worker","tier":"storage","x":14,"y":1.5,"description":"同じパーティションの選択されたパートを新しいパートにまとめる。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
+links:
+  - {"id":"store","from":"insert","to":"partition","label":"月ごとに行を振り分ける","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
+  - {"id":"sort","from":"partition","to":"parts","label":"ソート済みパートを作る","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
+  - {"id":"partition-prune","from":"planner","to":"partition","label":"対象月の候補を選ぶ","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  - {"id":"index-prune","from":"planner","to":"granules","label":"疎インデックスを探索する","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  - {"id":"read","from":"granules","to":"scan","label":"候補の列データを読む","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  - {"id":"return","from":"scan","to":"result","label":"条件を満たす行を返す","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  - {"id":"pick","from":"parts","to":"merger","label":"同じ月のパートを選ぶ","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
+  - {"id":"replace","from":"merger","to":"parts","label":"新しいパートを有効にする","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
+scenarios:
+  - id: query-week
+    label: 直近 7 日から顧客 42 を探す
+    visual: tree
+    evidence:
+      - type: doc
+        ref: docs/reference-clickhouse.md#§3
+    steps:
+      - links:
+          - partition-prune
+        note: 1 月 25 日から 2 月 1 日未満のため、12 月と 2 月の枝を除外する。
+        prune:
+          - dec
+          - feb
+      - links:
+          - index-prune
+        note: 1 月の各パートで疎主インデックスを調べ、対象の日付と顧客を含み得るグラニュールを残す。
+        prune:
+          - a-older
+          - b-other
+      - links:
+          - read
+          - return
+        note: マークで列データの読み取り位置を決め、候補の行に日付と顧客の条件を適用する。
+        read:
+          - a-match
+          - b-match
+  - id: merge-parts
+    label: 1 月の二つのパートをマージする
+    visual: merge
+    evidence:
+      - type: doc
+        ref: docs/reference-clickhouse.md#§4
+    steps:
+      - links:
+          - store
+          - sort
+        note: 1 月への二つの INSERT で、独立して並べ替えた A と B ができる。
+        highlight:
+          - part-a
+          - part-b
+      - links:
+          - pick
+        note: バックグラウンドタスクが同じ月の A と B を選ぶ。2 月の C は別のパーティションに属する。
+        highlight:
+          - part-a
+          - part-b
+      - links:
+          - replace
+        note: 二つの入力をキー順にマージし、新しいパート M のグラニュール境界と索引を作る。
+        blocks:
+          january:
+            - id: part-m
+              label: パート M
+              k: 2
+              from:
+                - part-a
+                - part-b
+          february:
+            - id: part-c
+              label: パート C
+              k: 1
+        highlight:
+          - part-m
+requirements:
+  - {"id":"BR-01","kind":"usecase","title":"対象期間の注文を返す","text":"日付と顧客の条件を満たす注文だけを返す。","links":["read","return"],"evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
+  - {"id":"BR-02","kind":"rule","title":"同じ月で物理配置を整理","text":"選択されたパートを同じ月の中でまとめ、注文行を保持する。","links":["pick","replace"],"evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
+unknowns:
+  - {"id":"UNK-01","text":"実環境のパート数、グラニュール境界、索引による除外数、マージの時期は未確認。","refs":["parts","granules","merger"]}
+gates: {maxDrift: 0, maxHigh: 0}
+treeLayout:
+  title: 月パーティションからグラニュールまで
+  levels:
+    - テーブル
+    - 月
+    - パート
+    - 候補グラニュール
+  note: 説明用の配置。各葉はグラニュールの例。
+  root:
+    id: orders
+    label: orders
+    kind: meta
+    node: partition
+    children:
+      - id: dec
+        label: 2025-12
+        kind: snapshot
+        node: partition
+        children:
+          - id: dec-part
+            label: パート D
+            kind: manifest
+            node: parts
+            children:
+              - id: dec-granule
+                label: 期間外
+                kind: data
+                node: granules
+      - id: jan
+        label: 2026-01
+        kind: snapshot
+        node: partition
+        children:
+          - id: a
+            label: パート A
+            kind: manifest
+            node: parts
+            children:
+              - id: a-older
+                label: 期間外
+                kind: data
+                node: granules
+                description: 先頭キーは (42, 2026-01-01)。次のグラニュールの先頭は (42, 2026-01-20) で、期間より前にある。
+              - id: a-match
+                label: 顧客 42 の候補
+                kind: data
+                node: granules
+                description: 先頭キーは (42, 2026-01-20)。対象期間に重なる可能性がある。
+          - id: b
+            label: パート B
+            kind: manifest
+            node: parts
+            children:
+              - id: b-match
+                label: 顧客 42 の候補
+                kind: data
+                node: granules
+                description: 先頭キーは (42, 2026-01-25)。顧客 42 と対象期間に合う行を含む。
+              - id: b-other
+                label: 顧客範囲外
+                kind: data
+                node: granules
+                description: 先頭キーは (43, 2026-01-01)。顧客 42 はソート順でこの境界より前にある。
+      - id: feb
+        label: 2026-02
+        kind: snapshot
+        node: partition
+        children:
+          - id: feb-part
+            label: パート C
+            kind: manifest
+            node: parts
+            children:
+              - id: feb-granule
+                label: 期間外
+                kind: data
+                node: granules
+  unit: 図中のグラニュール
+blocks:
+  id: merge
+  title: 月パーティション内のバックグラウンドマージ
+  note: 塊は説明用のデータパート。
+  legend:
+    "0": 1 月の入力
+    "1": 2 月のパート
+    "2": 1 月の出力
+  lanes:
+    - id: january
+      label: 2026-01
+      node: parts
+    - id: february
+      label: 2026-02
+      node: partition
+  items:
+    january:
+      - id: part-a
+        label: パート A
+        k: 0
+      - id: part-b
+        label: パート B
+        k: 0
+    february:
+      - id: part-c
+        label: パート C
+        k: 1

@@ -1,0 +1,45 @@
+name: "Snowflake Time Travel とゼロコピークローン"
+description: "注文テーブルの誤更新後に過去状態を調べ、別名クローンで比較して復旧する。"
+parent: {"model":"snowflake","node":"storage"}
+reference:
+  objectives:
+    - "履歴参照・別名クローン・削除済みオブジェクト復元を区別する。"
+    - "Time Travel の保持期間と Fail-safe の担当範囲を確認する。"
+  sources:
+    - {"title":"Time Travel","url":"https://docs.snowflake.com/en/user-guide/data-time-travel"}
+    - {"title":"Fail-safe","url":"https://docs.snowflake.com/en/user-guide/data-failsafe"}
+    - {"title":"クローンの考慮点","url":"https://docs.snowflake.com/en/user-guide/object-clone"}
+sources: ["docs/reference-snowflake-time-travel.md"]
+evidence: [{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[12.5,5.5]}
+nodes:
+  operator: {"label":"復旧担当","kind":"actor","tier":"flow","x":0,"y":2,"description":"事故時刻とクエリIDを確かめる。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§1"}]}
+  current: {"label":"本番 ORDERS","kind":"db","tier":"flow","x":4,"y":2,"description":"誤更新した現行テーブル。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§1"}]}
+  history: {"label":"保持期間内の履歴","kind":"db","tier":"flow","x":8,"y":0,"description":"AT／BEFORE で参照する。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§2"}]}
+  clone: {"label":"復旧確認用クローン","kind":"db","tier":"flow","x":12,"y":0,"description":"復旧候補の検討先。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§2"}]}
+  repair: {"label":"差分検証・修復","kind":"worker","tier":"flow","x":12,"y":3,"description":"影響行だけを確認し直す。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§3"}]}
+  failsafe: {"label":"Fail-safe","kind":"service","tier":"flow","x":8,"y":5,"description":"条件を満たすデータをサービス側で回復するための仕組み。","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§3"}]}
+links:
+  - {"id":"inspect","from":"operator","to":"current","label":"現行と事故時刻を調査","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§1"}]}
+  - {"id":"before","from":"current","to":"history","label":"保持期間内の更新前を参照","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§2"}]}
+  - {"id":"clone","from":"history","to":"clone","label":"別名クローンを作成","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§2"}]}
+  - {"id":"verify","from":"clone","to":"repair","label":"修復候補を差分検証","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§3"}]}
+  - {"id":"restore","from":"repair","to":"current","label":"確認済みの対象行を修復","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§3"}]}
+  - {"id":"expire","from":"history","to":"failsafe","label":"保持期間外の適用条件を確認","evidence":[{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§3"}]}
+scenarios:
+  - id: recover
+    label: "誤更新直前を照合して修復"
+    visual: timeline
+    evidence: [{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§3"}]
+    steps:
+      - {"links":["inspect"],"note":"現在値と誤更新のクエリIDを確認する。","current":"bad"}
+      - {"links":["before","clone"],"note":"保持期間内の誤更新直前から別名クローンを作る。","travel":"good"}
+      - {"links":["verify","restore"],"note":"事故後の正しい変更も残し、特定した影響行だけを修復する。","current":"repaired"}
+  - id: retention
+    label: "保持期間を超えた場合"
+    evidence: [{"type":"doc","ref":"docs/reference-snowflake-time-travel.md#§3"}]
+    steps:
+      - {"links":["inspect"],"note":"対象オブジェクトの種別と保持期間を調べる。"}
+      - {"links":["expire"],"note":"SQL での過去参照が可能か確認し、Fail-safe が適用される場合はサービス側へ対応を相談する。"}
+timeline: {"title":"注文テーブルの状態","note":"時刻は説明用。指定できる過去の範囲は保持期間に依存する。","current":"good","commits":[{"id":"good","label":"更新前","time":"09:10","kind":"append","node":"history"},{"id":"bad","label":"誤更新","time":"09:30","kind":"overwrite","node":"current"},{"id":"repaired","label":"影響行を修復","time":"10:20","kind":"overwrite","node":"repair"}]}

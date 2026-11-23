@@ -1,0 +1,139 @@
+{
+  "model": "dwh-aggregate-tables",
+  "name": "DWH の集約テーブルとセマンティックレイヤー",
+  "coverage": {
+    "covered": 3,
+    "total": 3
+  },
+  "byId": {
+    "late": {
+      "type": "node",
+      "label": "遅延した注文イベント",
+      "status": "claim"
+    },
+    "fact": {
+      "type": "node",
+      "label": "受注明細ファクト",
+      "status": "claim"
+    },
+    "refresh": {
+      "type": "node",
+      "label": "増分集計・再生成",
+      "status": "claim"
+    },
+    "aggregate": {
+      "type": "node",
+      "label": "日・カテゴリ・通貨の集約",
+      "status": "claim"
+    },
+    "metrics": {
+      "type": "node",
+      "label": "指標定義と経路選択",
+      "status": "claim"
+    },
+    "bi": {
+      "type": "node",
+      "label": "BI／日次レポート",
+      "status": "claim"
+    },
+    "arrive": {
+      "type": "link",
+      "label": "遅延した注文イベント → 受注明細ファクト",
+      "status": "claim"
+    },
+    "build": {
+      "type": "link",
+      "label": "受注明細ファクト → 増分集計・再生成",
+      "status": "claim"
+    },
+    "publish": {
+      "type": "link",
+      "label": "増分集計・再生成 → 日・カテゴリ・通貨の集約",
+      "status": "claim"
+    },
+    "rollup": {
+      "type": "link",
+      "label": "日・カテゴリ・通貨の集約 → 指標定義と経路選択",
+      "status": "claim"
+    },
+    "atomic": {
+      "type": "link",
+      "label": "受注明細ファクト → 指標定義と経路選択",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "指標定義と経路選択 → BI／日次レポート",
+      "status": "claim"
+    },
+    "route": {
+      "type": "scenario",
+      "label": "日次売上と購入者数で経路を選ぶ"
+    },
+    "late-update": {
+      "type": "scenario",
+      "label": "遅延注文で該当日を再集計"
+    }
+  },
+  "byRef": {
+    "docs/reference-dwh-aggregate-tables.md#§1": [
+      "model",
+      "fact",
+      "aggregate"
+    ],
+    "docs/reference-dwh-aggregate-tables.md": [
+      "model",
+      "late",
+      "fact",
+      "refresh",
+      "aggregate",
+      "metrics",
+      "bi",
+      "arrive",
+      "build",
+      "publish",
+      "rollup",
+      "atomic",
+      "read",
+      "route",
+      "late-update"
+    ],
+    "docs/reference-dwh-aggregate-tables.md#§3": [
+      "late",
+      "refresh",
+      "arrive",
+      "build",
+      "publish",
+      "late-update"
+    ],
+    "docs/reference-dwh-aggregate-tables.md#§2": [
+      "metrics",
+      "bi",
+      "rollup",
+      "atomic",
+      "read",
+      "route"
+    ]
+  },
+  "reference": {
+    "category": "DWH 設計パターン",
+    "order": 100,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
+    "detailOf": "dwh-design-patterns",
+    "objectives": [
+      "事前集約で残す粒度と、明細に戻る条件を定義する。",
+      "割合やユニーク件数の再集計条件を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "Kimball Group の集約ファクトと加法性",
+        "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"
+      },
+      {
+        "title": "dbt Semantic Layer の構成",
+        "url": "https://docs.getdbt.com/docs/use-dbt-semantic-layer/sl-architecture"
+      }
+    ]
+  }
+}

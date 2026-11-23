@@ -1,0 +1,208 @@
+{
+  "model": "snowflake-ingestion-cdc",
+  "name": "Snowflake の取り込みと増分処理",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "files": {
+      "type": "node",
+      "label": "注文ファイル",
+      "status": "claim"
+    },
+    "pipe": {
+      "type": "node",
+      "label": "Snowpipe",
+      "status": "claim"
+    },
+    "client": {
+      "type": "node",
+      "label": "注文イベント送信元",
+      "status": "claim"
+    },
+    "streaming": {
+      "type": "node",
+      "label": "Snowpipe Streaming",
+      "status": "claim"
+    },
+    "raw": {
+      "type": "node",
+      "label": "RAW_ORDERS",
+      "status": "claim"
+    },
+    "change": {
+      "type": "node",
+      "label": "Stream・消費位置",
+      "status": "claim"
+    },
+    "task": {
+      "type": "node",
+      "label": "Task・MERGE",
+      "status": "claim"
+    },
+    "orders": {
+      "type": "node",
+      "label": "ORDERS_CURRENT",
+      "status": "claim"
+    },
+    "dynamic": {
+      "type": "node",
+      "label": "注文集計 Dynamic Table",
+      "status": "claim"
+    },
+    "bi": {
+      "type": "node",
+      "label": "BI",
+      "status": "claim"
+    },
+    "notify": {
+      "type": "link",
+      "label": "注文ファイル → Snowpipe",
+      "status": "claim"
+    },
+    "copy": {
+      "type": "link",
+      "label": "Snowpipe → RAW_ORDERS",
+      "status": "claim"
+    },
+    "send": {
+      "type": "link",
+      "label": "注文イベント送信元 → Snowpipe Streaming",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "Snowpipe Streaming → RAW_ORDERS",
+      "status": "claim"
+    },
+    "delta": {
+      "type": "link",
+      "label": "RAW_ORDERS → Stream・消費位置",
+      "status": "claim"
+    },
+    "consume": {
+      "type": "link",
+      "label": "Stream・消費位置 → Task・MERGE",
+      "status": "claim"
+    },
+    "merge": {
+      "type": "link",
+      "label": "Task・MERGE → ORDERS_CURRENT",
+      "status": "claim"
+    },
+    "refresh": {
+      "type": "link",
+      "label": "RAW_ORDERS → 注文集計 Dynamic Table",
+      "status": "claim"
+    },
+    "serve": {
+      "type": "link",
+      "label": "注文集計 Dynamic Table → BI",
+      "status": "claim"
+    },
+    "load-files": {
+      "type": "scenario",
+      "label": "ファイルを取り込んで現在状態を更新"
+    },
+    "stream-rows": {
+      "type": "scenario",
+      "label": "連続取り込みから定義済み集計へ"
+    },
+    "REQ-1": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "増分で注文状態を更新",
+      "status": "claim"
+    }
+  },
+  "byRef": {
+    "docs/reference-snowflake-ingestion-cdc.md#§1": [
+      "model",
+      "raw"
+    ],
+    "docs/reference-snowflake-ingestion-cdc.md": [
+      "model",
+      "files",
+      "pipe",
+      "client",
+      "streaming",
+      "raw",
+      "change",
+      "task",
+      "orders",
+      "dynamic",
+      "bi",
+      "notify",
+      "copy",
+      "send",
+      "commit",
+      "delta",
+      "consume",
+      "merge",
+      "refresh",
+      "serve",
+      "load-files",
+      "stream-rows",
+      "REQ-1"
+    ],
+    "docs/reference-snowflake-ingestion-cdc.md#§2": [
+      "files",
+      "pipe",
+      "notify",
+      "copy"
+    ],
+    "docs/reference-snowflake-ingestion-cdc.md#§3": [
+      "client",
+      "streaming",
+      "send",
+      "commit"
+    ],
+    "docs/reference-snowflake-ingestion-cdc.md#§4": [
+      "change",
+      "task",
+      "orders",
+      "delta",
+      "consume",
+      "merge",
+      "load-files",
+      "REQ-1"
+    ],
+    "docs/reference-snowflake-ingestion-cdc.md#§5": [
+      "dynamic",
+      "bi",
+      "refresh",
+      "serve",
+      "stream-rows"
+    ]
+  },
+  "reference": {
+    "category": "クラウド分析基盤",
+    "order": 10,
+    "domain": "データ基盤",
+    "kind": "製品・技術のアーキテクチャ",
+    "detailOf": "snowflake",
+    "objectives": [
+      "ファイルのロードと行の連続取り込みを区別する。",
+      "CDC の消費位置と、変換結果の鮮度目標を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Snowpipe",
+        "url": "https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro"
+      },
+      {
+        "title": "Snowpipe Streaming",
+        "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
+      },
+      {
+        "title": "Streams and Tasks",
+        "url": "https://docs.snowflake.com/en/user-guide/data-pipelines-intro"
+      },
+      {
+        "title": "Dynamic Tables の選択ガイド",
+        "url": "https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide"
+      }
+    ]
+  }
+}

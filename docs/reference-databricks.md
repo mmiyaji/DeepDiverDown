@@ -17,7 +17,23 @@ Unity Catalog はデータを統治し、Databricks SQLなどからクエリで�
 出典 [Databricks reference architectures](https://docs.databricks.com/aws/en/lakehouse-architecture/reference)
 
 ## 5. シナリオ
-図は Source、Ingest、Object storage、Transform、Unity Catalog、SQL/Query、BI/Serving の7ノードで、取り込みから分析までを追う。
+取り込みと表の整備から、Unity Catalog を経由した分析、外部共有、モデル学習までを追う。各詳細図で処理の境界と運用上の確認事項を検討できる。
+
+| 図の部品 | 詳細リファレンス | 観察するもの |
+|---|---|---|
+| Lakeflow・取り込み | [Lakeflow の CDC と品質管理](reference-databricks-lakeflow.md) | Connect、Auto Loader、Spark Declarative Pipelines、Jobs |
+| Unity Catalog | [権限・ストレージ・リネージ](reference-databricks-unity-catalog.md) | メタストア、ワークスペース、管理／外部テーブル、列リネージ |
+| Databricks SQL | [実行プロファイルとファイル配置](reference-databricks-sql-performance.md) | SQL Warehouse、Photon、Liquid clustering、保守 |
+| OpenSharing | [共有の接続と失効](reference-databricks-open-sharing.md) | Databricks と外部クライアントへの共有経路 |
+| MLflow と Model Serving | [モデルの版管理](reference-databricks-mlflow-serving.md) | 学習の追跡、UC への登録、推論時の配備 |
 
 ## 6. 参考資料
 - [Databricks reference architectures](https://docs.databricks.com/aws/en/lakehouse-architecture/reference)
+
+## 7. データの共有
+
+取引先に公開する注文集計は OpenSharing の Share にまとめ、受領者とアクセス範囲を設定する。利用できる認証方式と資産は、Databricks 内での利用か外部クライアントかで異なる。 [OpenSharing](https://docs.databricks.com/aws/en/opensharing)
+
+## 8. 機械学習と配備
+
+整備したテーブルを学習に利用し、MLflow で実験と成果物を追跡する。選んだモデルを Unity Catalog に版として登録し、必要な場合は明示した版で Model Serving に配備する。 [モデルライフサイクル](https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/) · [Model Serving](https://docs.databricks.com/aws/en/machine-learning/model-serving/)

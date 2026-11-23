@@ -1,0 +1,221 @@
+{
+  "model": "dwh-fact-table-types",
+  "name": "DWH のファクトテーブル：トランザクション・定期・累積スナップショット",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "events": {
+      "type": "node",
+      "label": "出荷工程のイベント",
+      "status": "claim"
+    },
+    "load": {
+      "type": "node",
+      "label": "イベント取り込み",
+      "status": "claim"
+    },
+    "day-close": {
+      "type": "node",
+      "label": "倉庫別の日次締め",
+      "status": "claim"
+    },
+    "analyst": {
+      "type": "node",
+      "label": "分析者",
+      "status": "claim"
+    },
+    "transactions": {
+      "type": "node",
+      "label": "トランザクションファクト",
+      "status": "claim"
+    },
+    "periodic": {
+      "type": "node",
+      "label": "定期スナップショット",
+      "status": "claim"
+    },
+    "accumulating": {
+      "type": "node",
+      "label": "累積スナップショット",
+      "status": "claim"
+    },
+    "factless": {
+      "type": "node",
+      "label": "数値尺度のないファクト",
+      "status": "claim"
+    },
+    "collect": {
+      "type": "link",
+      "label": "出荷工程のイベント → イベント取り込み",
+      "status": "claim"
+    },
+    "append": {
+      "type": "link",
+      "label": "イベント取り込み → トランザクションファクト",
+      "status": "claim"
+    },
+    "maintain": {
+      "type": "link",
+      "label": "イベント取り込み → 累積スナップショット",
+      "status": "claim"
+    },
+    "summarize": {
+      "type": "link",
+      "label": "トランザクションファクト → 倉庫別の日次締め",
+      "status": "claim"
+    },
+    "snapshot-row": {
+      "type": "link",
+      "label": "倉庫別の日次締め → 定期スナップショット",
+      "status": "claim"
+    },
+    "drill-event": {
+      "type": "link",
+      "label": "トランザクションファクト → 分析者",
+      "status": "claim"
+    },
+    "read-daily": {
+      "type": "link",
+      "label": "定期スナップショット → 分析者",
+      "status": "claim"
+    },
+    "lead-time": {
+      "type": "link",
+      "label": "累積スナップショット → 分析者",
+      "status": "claim"
+    },
+    "record-relation": {
+      "type": "link",
+      "label": "イベント取り込み → 数値尺度のないファクト",
+      "status": "claim"
+    },
+    "one-line": {
+      "type": "scenario",
+      "label": "明細 42-1 の 3 工程を記録する"
+    },
+    "daily-close": {
+      "type": "scenario",
+      "label": "イベントがない日も倉庫 W1 を締める"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "1 行が表す業務上の粒度を固定する",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "出荷実績と期末残高を計算する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実際の締め時刻、倉庫間移動、分割出荷、取消、遅着イベントの扱いは未確認。"
+    }
+  },
+  "byRef": {
+    "docs/reference-dwh-fact-table-types.md#§1": [
+      "model",
+      "events"
+    ],
+    "docs/reference-dwh-fact-table-types.md": [
+      "model",
+      "events",
+      "load",
+      "day-close",
+      "analyst",
+      "transactions",
+      "periodic",
+      "accumulating",
+      "factless",
+      "collect",
+      "append",
+      "maintain",
+      "summarize",
+      "snapshot-row",
+      "drill-event",
+      "read-daily",
+      "lead-time",
+      "record-relation",
+      "one-line",
+      "daily-close",
+      "BR-01",
+      "BR-02"
+    ],
+    "docs/reference-dwh-fact-table-types.md#§2": [
+      "model",
+      "load",
+      "transactions",
+      "collect",
+      "append"
+    ],
+    "docs/reference-dwh-fact-table-types.md#§3": [
+      "model",
+      "day-close",
+      "periodic",
+      "summarize",
+      "snapshot-row",
+      "daily-close",
+      "BR-02"
+    ],
+    "docs/reference-dwh-fact-table-types.md#§4": [
+      "model",
+      "accumulating",
+      "maintain",
+      "one-line"
+    ],
+    "docs/reference-dwh-fact-table-types.md#§5": [
+      "model",
+      "analyst",
+      "drill-event",
+      "read-daily",
+      "lead-time",
+      "BR-01"
+    ],
+    "docs/reference-dwh-fact-table-types.md#§6": [
+      "model",
+      "factless",
+      "record-relation"
+    ],
+    "docs/reference-dwh-fact-table-types.md#§7": [
+      "model"
+    ]
+  },
+  "reference": {
+    "category": "DWH 設計パターン",
+    "order": 50,
+    "domain": "データ基盤",
+    "kind": "設計パターン・ユースケース",
+    "detailOf": "dwh-design-patterns",
+    "objectives": [
+      "測定したい業務プロセスから、1 行が何を表すかを決める。",
+      "トランザクション、定期スナップショット、累積スナップショットの行の増え方を比較する。",
+      "日末残高を日付で足し上げる誤りを避け、数値尺度のないイベントを説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Kimball Group Transaction Fact Tables",
+        "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/transaction-fact-table/"
+      },
+      {
+        "title": "Kimball Group Periodic Snapshot Fact Tables",
+        "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/periodic-snapshot-fact-table/"
+      },
+      {
+        "title": "Kimball Group Accumulating Snapshot Fact Tables",
+        "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/accumulating-snapshot-fact-table/"
+      },
+      {
+        "title": "Kimball Group Factless Fact Tables",
+        "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/factless-fact-table/"
+      },
+      {
+        "title": "Kimball Group Additive, Semi-Additive, and Non-Additive Facts",
+        "url": "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/additive-semi-additive-non-additive-fact/"
+      }
+    ]
+  }
+}

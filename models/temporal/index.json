@@ -1,0 +1,208 @@
+{
+  "model": "temporal",
+  "name": "Temporal のワーカー障害とリプレイ",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "order": {
+      "type": "node",
+      "label": "注文 API",
+      "status": "claim"
+    },
+    "service": {
+      "type": "node",
+      "label": "Temporal Service",
+      "status": "claim"
+    },
+    "history": {
+      "type": "node",
+      "label": "Event History",
+      "status": "claim"
+    },
+    "queue": {
+      "type": "node",
+      "label": "Workflow / Activity Task Queue",
+      "status": "claim"
+    },
+    "workflow-a": {
+      "type": "node",
+      "label": "Workflow Worker A",
+      "status": "claim"
+    },
+    "workflow-b": {
+      "type": "node",
+      "label": "Workflow Worker B",
+      "status": "claim"
+    },
+    "activity": {
+      "type": "node",
+      "label": "決済 Activity Worker",
+      "status": "claim"
+    },
+    "payment": {
+      "type": "node",
+      "label": "外部決済 API",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "注文 API → Temporal Service",
+      "status": "claim"
+    },
+    "append": {
+      "type": "link",
+      "label": "Temporal Service → Event History",
+      "status": "claim"
+    },
+    "schedule-task": {
+      "type": "link",
+      "label": "Temporal Service → Workflow / Activity Task Queue",
+      "status": "claim"
+    },
+    "run-a": {
+      "type": "link",
+      "label": "Workflow / Activity Task Queue → Workflow Worker A",
+      "status": "claim"
+    },
+    "decision-a": {
+      "type": "link",
+      "label": "Workflow Worker A → Temporal Service",
+      "status": "claim"
+    },
+    "run-b": {
+      "type": "link",
+      "label": "Workflow / Activity Task Queue → Workflow Worker B",
+      "status": "claim"
+    },
+    "replay": {
+      "type": "link",
+      "label": "Event History → Workflow Worker B",
+      "status": "claim"
+    },
+    "finish": {
+      "type": "link",
+      "label": "Workflow Worker B → Temporal Service",
+      "status": "claim"
+    },
+    "run-activity": {
+      "type": "link",
+      "label": "Workflow / Activity Task Queue → 決済 Activity Worker",
+      "status": "claim"
+    },
+    "charge": {
+      "type": "link",
+      "label": "決済 Activity Worker → 外部決済 API",
+      "status": "claim"
+    },
+    "complete": {
+      "type": "link",
+      "label": "決済 Activity Worker → Temporal Service",
+      "status": "claim"
+    },
+    "worker-replay": {
+      "type": "scenario",
+      "label": "Workflow Worker の停止後に履歴から再開"
+    },
+    "activity-retry": {
+      "type": "scenario",
+      "label": "完了報告を失った決済 Activity を再試行"
+    }
+  },
+  "byRef": {
+    "docs/reference-temporal.md#§1": [
+      "model",
+      "order",
+      "start"
+    ],
+    "docs/reference-temporal.md": [
+      "model",
+      "order",
+      "service",
+      "history",
+      "queue",
+      "workflow-a",
+      "workflow-b",
+      "activity",
+      "payment",
+      "start",
+      "append",
+      "schedule-task",
+      "run-a",
+      "decision-a",
+      "run-b",
+      "replay",
+      "finish",
+      "run-activity",
+      "charge",
+      "complete",
+      "worker-replay",
+      "activity-retry"
+    ],
+    "docs/reference-temporal.md#§2": [
+      "service",
+      "history",
+      "queue",
+      "append",
+      "schedule-task",
+      "worker-replay",
+      "activity-retry"
+    ],
+    "docs/reference-temporal.md#§3": [
+      "workflow-a",
+      "workflow-b",
+      "run-a",
+      "decision-a",
+      "run-b",
+      "replay",
+      "finish",
+      "worker-replay"
+    ],
+    "docs/reference-temporal.md#§4": [
+      "activity",
+      "run-activity",
+      "complete",
+      "worker-replay",
+      "activity-retry"
+    ],
+    "docs/reference-temporal.md#§5": [
+      "payment",
+      "charge",
+      "activity-retry"
+    ]
+  },
+  "reference": {
+    "category": "ワークフロー実行",
+    "order": 10,
+    "domain": "運用基盤",
+    "kind": "製品・技術のアーキテクチャ",
+    "objectives": [
+      "Workflow Task と Activity Task の役割を区別する。",
+      "Worker 停止後に Event History から Workflow の状態を復元する流れを追う。",
+      "外部副作用が発生した後に Activity を再試行できる条件を理解する。"
+    ],
+    "sources": [
+      {
+        "title": "Temporal Event History",
+        "url": "https://docs.temporal.io/encyclopedia/event-history"
+      },
+      {
+        "title": "Temporal Workflow Definition",
+        "url": "https://docs.temporal.io/workflow-definition"
+      },
+      {
+        "title": "Temporal Activity Definition",
+        "url": "https://docs.temporal.io/activity-definition"
+      },
+      {
+        "title": "Temporal Retry Policy",
+        "url": "https://docs.temporal.io/encyclopedia/retry-policies"
+      },
+      {
+        "title": "Understanding Temporal",
+        "url": "https://docs.temporal.io/evaluate/understanding-temporal"
+      }
+    ]
+  }
+}

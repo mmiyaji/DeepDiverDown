@@ -1,0 +1,47 @@
+name: "Cilium と Hubble の通信ポリシーと観測"
+description: "注文 API に対する許可と拒否を、Kubernetes NetworkPolicy の定義、Cilium の適用、Hubble の観測から確認します。"
+reference:
+  objectives:
+    - "Kubernetes NetworkPolicy の選択対象と許可元を読む。"
+    - "Cilium が適用した判定を Hubble で確認する。"
+    - "ネットワークの転送判定とアプリケーションの成功を区別する。"
+  sources:
+    - {title: "Kubernetes Network Policies", url: "https://kubernetes.io/docs/concepts/services-networking/network-policies/"}
+    - {title: "Introduction to Cilium & Hubble", url: "https://docs.cilium.io/en/stable/overview/intro/"}
+    - {title: "Network Observability with Hubble", url: "https://docs.cilium.io/en/stable/observability/hubble/"}
+    - {title: "Inspecting Network Flows with the CLI", url: "https://docs.cilium.io/en/stable/observability/hubble/hubble-cli/"}
+sources: [docs/reference-cilium-hubble.md]
+evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§1"}]
+tiers:
+  - {id: "traffic", label: "Kubernetes ワークロード", z: 1, size: [17,7]}
+  - {id: "observe", label: "フローの観測", z: 0, size: [17,4]}
+nodes:
+  checkout: {label: "チェックアウト Pod", kind: "client", tier: "traffic", x: 0, y: 1.5, description: "注文 API の TCP 8080 に接続することを許可された Pod。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
+  report: {label: "集計 Pod", kind: "client", tier: "traffic", x: 0, y: 5, description: "同じ注文 API に接続を試みるが、許可元のセレクターに一致しない。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
+  policy: {label: "注文 API NetworkPolicy", kind: "segment", tier: "traffic", x: 6, y: 5, description: "注文 API Pod への TCP 8080 をチェックアウト Pod から許可する。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
+  datapath: {label: "Cilium データパス", kind: "service", tier: "traffic", x: 6, y: 1.5, description: "対象 Pod の Ingress で、ポリシーに基づいてパケットを転送または破棄する。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§3"}]}
+  order: {label: "注文 API Pod", kind: "service", tier: "traffic", x: 12, y: 1.5, description: "NetworkPolicy の対象となる Pod。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
+  hubble: {label: "ノードの Hubble", kind: "worker", tier: "observe", x: 4, y: 1.5, description: "Cilium のネットワークイベントをフローとして扱う。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§4"}]}
+  relay: {label: "Hubble Relay", kind: "service", tier: "observe", x: 9, y: 1.5, description: "ノードの Hubble API を集約し、クラスタ全体のフローを参照できるようにする。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§4"}]}
+  cli: {label: "Hubble CLI", kind: "client", tier: "observe", x: 14, y: 1.5, description: "フローを送信元・送信先や verdict で絞り込む。", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§5"}]}
+links:
+  - {id: "allow-attempt", from: "checkout", to: "datapath", label: "注文 API の TCP 8080 に接続", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
+  - {id: "deny-attempt", from: "report", to: "datapath", label: "注文 API の TCP 8080 に接続", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}]}
+  - {id: "enforce", from: "policy", to: "datapath", label: "Ingress 許可条件を適用", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§3"}]}
+  - {id: "forward", from: "datapath", to: "order", label: "許可されたパケットを転送", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§3"}]}
+  - {id: "flow", from: "datapath", to: "hubble", label: "フローイベントを観測", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§4"}]}
+  - {id: "aggregate", from: "hubble", to: "relay", label: "ノードのフローを集約", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§4"}]}
+  - {id: "inspect", from: "relay", to: "cli", label: "絞り込んだフローを表示", evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§5"}]}
+scenarios:
+  - id: allowed-flow
+    label: "チェックアウト Pod からの通信を許可"
+    evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}, {type: doc, ref: "docs/reference-cilium-hubble.md#§3"}, {type: doc, ref: "docs/reference-cilium-hubble.md#§5"}]
+    steps:
+      - {links: ["allow-attempt","enforce"], note: "チェックアウト Pod が注文 API の TCP 8080 に接続する。送信元ラベルとポートが許可条件に一致する。"}
+      - {links: ["forward","flow","aggregate","inspect"], note: "パケットを転送する。Hubble で例の転送イベントを FORWARDED として確認する。"}
+  - id: denied-flow
+    label: "集計 Pod からの通信を拒否"
+    evidence: [{type: doc, ref: "docs/reference-cilium-hubble.md#§2"}, {type: doc, ref: "docs/reference-cilium-hubble.md#§3"}, {type: doc, ref: "docs/reference-cilium-hubble.md#§5"}]
+    steps:
+      - {links: ["deny-attempt","enforce"], note: "集計 Pod が同じ宛先に接続を試みる。この送信元を許可するルールがない。"}
+      - {links: ["flow","aggregate","inspect"], note: "Cilium がパケットを破棄する。Hubble で宛先 Pod と DROPPED を絞り込み、Policy denied の理由を確認する。"}

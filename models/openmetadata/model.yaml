@@ -1,0 +1,279 @@
+name: OpenMetadata のメタデータ基盤
+description: 収集したメタデータに分類・所有者・列リネージを付け、データ契約の検証に活用する流れを追います。
+parent:
+  model: data-catalog-architecture
+  node: openmetadata
+reference:
+  objectives:
+    - コネクタ、OpenMetadata Server、メタデータ DB、検索エンジンの役割を説明する。
+    - 用語集、分類タグ、所有者を使った資産発見を追う。
+    - データ契約の定義、検証結果、カタログ権限の関係を区別する。
+  sources:
+    - title: Docker Deployment Architecture
+      url: https://docs.open-metadata.org/v1.12.x/deployment/docker
+    - title: System and Components
+      url: https://docs.open-metadata.org/v1.12.x/developers/architecture/code-layout
+    - title: Data Discovery
+      url: https://docs.open-metadata.org/v1.12.x/how-to-guides/data-discovery/discover
+    - title: Data Governance
+      url: https://docs.open-metadata.org/v1.12.x/how-to-guides/data-governance
+    - title: Column-Level Lineage
+      url: https://docs.open-metadata.org/v1.12.x/how-to-guides/data-lineage/column
+    - title: Roles and Policies
+      url: https://docs.open-metadata.org/v1.12.x/how-to-guides/admin-guide/roles-policies/authorization
+    - title: Creating Data Contracts
+      url: https://docs.open-metadata.org/v1.12.x/how-to-guides/data-contracts/spec
+    - title: Data Contracts API
+      url: https://docs.open-metadata.org/v1.12.x/api-reference/data-contracts
+sources:
+  - docs/reference-openmetadata.md
+evidence:
+  - type: doc
+    ref: docs/reference-openmetadata.md#§1
+tiers:
+  - id: external
+    label: 接続元・利用者
+    z: 2
+    size:
+      - 13
+      - 3
+  - id: service
+    label: OpenMetadata
+    z: 1
+    size:
+      - 13
+      - 4
+  - id: stores
+    label: メタデータと検索
+    z: 0
+    size:
+      - 13
+      - 3
+nodes:
+  source:
+    label: データベース・BI
+    kind: external
+    tier: external
+    x: 1
+    y: 1
+    description: スキーマ、クエリ、ダッシュボードの取り込み元。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+      - type: doc
+        ref: docs/reference-openmetadata.md#§3
+  steward:
+    label: データ担当者
+    kind: actor
+    tier: external
+    x: 6
+    y: 1
+    description: タグ・所有者・契約をキュレーションする。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§2
+      - type: doc
+        ref: docs/reference-openmetadata.md#§4
+      - type: doc
+        ref: docs/reference-openmetadata.md#§5
+  consumer:
+    label: データ利用者
+    kind: actor
+    tier: external
+    x: 10
+    y: 1
+    description: 資産を探して下流の影響を確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§2
+  ingest:
+    label: メタデータ・リネージ収集
+    kind: worker
+    tier: service
+    x: 1
+    y: 1
+    description: 外部ソースから必要な情報を抽出する。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+      - type: doc
+        ref: docs/reference-openmetadata.md#§3
+  api:
+    label: OpenMetadata Server
+    kind: service
+    tier: service
+    x: 5
+    y: 1
+    description: メタデータ API と操作の認可を提供する。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+      - type: doc
+        ref: docs/reference-openmetadata.md#§4
+  contracts:
+    label: データ契約・検証
+    kind: worker
+    tier: service
+    x: 8
+    y: 2.5
+    description: スキーマなどの契約条件を管理し、検証結果を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§5
+  portal:
+    label: 検索・リネージ画面
+    kind: service
+    tier: service
+    x: 11
+    y: 1
+    description: 資産、所有者、分類タグや関連列を表示する。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§2
+      - type: doc
+        ref: docs/reference-openmetadata.md#§3
+  db:
+    label: メタデータ DB
+    kind: db
+    tier: stores
+    x: 5
+    y: 1
+    description: カタログの資産・関係を保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+  index:
+    label: 検索エンジン
+    kind: db
+    tier: stores
+    x: 10
+    y: 1
+    description: メタデータを検索可能にする索引。
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+links:
+  - id: extract
+    from: source
+    to: ingest
+    label: メタデータと関係を抽出
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+  - id: ingest-api
+    from: ingest
+    to: api
+    label: 資産・リネージを登録
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§3
+  - id: save
+    from: api
+    to: db
+    label: カタログに保存
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+  - id: index-assets
+    from: api
+    to: index
+    label: 索引を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§1
+  - id: enrich
+    from: steward
+    to: portal
+    label: 所有者・分類を設定
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§2
+  - id: authorize
+    from: portal
+    to: api
+    label: 操作を認可
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§4
+  - id: search
+    from: consumer
+    to: portal
+    label: 所有者や分類で資産を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§2
+  - id: trace
+    from: portal
+    to: api
+    label: 列の下流をたどる
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§3
+  - id: define
+    from: steward
+    to: contracts
+    label: 契約条件を定義し検証を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§5
+  - id: validate
+    from: contracts
+    to: api
+    label: 最新のメタデータを検証
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§5
+  - id: result
+    from: portal
+    to: contracts
+    label: 検証結果を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§5
+scenarios:
+  - id: pii-impact
+    label: 個人情報を含む列の影響を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§6
+    steps:
+      - links:
+          - extract
+          - ingest-api
+          - save
+          - index-assets
+        note: テーブルとダッシュボードのスキーマ・依存関係を収集する。
+      - links:
+          - enrich
+          - authorize
+        note: データ担当者が顧客のメール列に分類タグを付け、所有者を登録する。
+      - links:
+          - search
+          - trace
+        note: 列を利用する下流レポートと連絡先を確認する。
+  - id: verify-contract
+    label: 公開テーブルの契約を検証する
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§6
+    steps:
+      - links:
+          - define
+        note: 必須列と型を契約に登録する。
+      - links:
+          - validate
+        note: 検証器が最新のメタデータと契約条件を照合する。
+      - links:
+          - result
+        note: データ担当者が検証結果を確認する。
+requirements:
+  - id: R-01
+    kind: rule
+    title: 分類タグの編集権限
+    text: 機密性を示す分類タグの変更を許可された担当者に限定する。
+    links:
+      - enrich
+      - authorize
+    evidence:
+      - type: doc
+        ref: docs/reference-openmetadata.md#§4

@@ -1,0 +1,49 @@
+name: "Argo CD の GitOps 同期とセルフヒール"
+description: "注文 API の Deployment を例に、Git の更新による自動同期と、クラスタで発生した差分のセルフヒールを追います。"
+reference:
+  objectives:
+    - "Git の目標状態と Kubernetes の実状態をどこで比較するか理解する。"
+    - "Git 側の変更と実環境のみの変更が起こす同期の違いを追う。"
+    - "自動同期と selfHeal の設定が担当する動作を区別する。"
+  sources:
+    - {title: "Argo CD Architectural Overview", url: "https://argo-cd.readthedocs.io/en/stable/operator-manual/architecture/"}
+    - {title: "Argo CD Automated Sync Policy", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"}
+    - {title: "Argo CD Diffing Customization", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/"}
+sources: [docs/reference-argo-cd.md]
+evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§1"}]
+tiers:
+  - {id: "inputs", label: "変更の入力", z: 2, size: [15,4], kind: "origin"}
+  - {id: "gitops", label: "Argo CD", z: 1, size: [15,4]}
+  - {id: "cluster", label: "Kubernetes", z: 0, size: [15,4]}
+nodes:
+  git: {label: "Git リポジトリ", kind: "db", tier: "inputs", x: 2, y: 1.5, description: "注文 API の Deployment マニフェストを保持する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§1"}]}
+  operator: {label: "運用者", kind: "actor", tier: "inputs", x: 10, y: 1.5, description: "障害対応を想定し、クラスタでレプリカ数を一時変更する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§4"}]}
+  application: {label: "Application", kind: "segment", tier: "gitops", x: 1, y: 1.5, description: "管理対象のリポジトリ、パス、行き先と同期方針を表す。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  repo-server: {label: "Repository Server", kind: "service", tier: "gitops", x: 5, y: 1.5, description: "対象リビジョンから Kubernetes マニフェストを生成する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  controller: {label: "Application Controller", kind: "worker", tier: "gitops", x: 10, y: 1.5, description: "目標状態と実状態を比較し、同期を実行する。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  api: {label: "Kubernetes API", kind: "service", tier: "cluster", x: 7, y: 1.5, description: "実状態を提供し、対象リソースの変更を受け付ける。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  deployment: {label: "注文 API Deployment", kind: "service", tier: "cluster", x: 11, y: 1.5, description: "例では Git 管理下の spec.replicas を持つ。", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§4"}]}
+links:
+  - {id: "app-config", from: "application", to: "controller", label: "ソース・同期方針", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  - {id: "manifest-request", from: "controller", to: "repo-server", label: "目標マニフェストを要求", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  - {id: "fetch", from: "repo-server", to: "git", label: "対象リビジョンを取得", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  - {id: "desired", from: "repo-server", to: "controller", label: "目標マニフェストを返す", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  - {id: "live", from: "api", to: "controller", label: "実状態を監視・比較", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}]}
+  - {id: "apply", from: "controller", to: "api", label: "同期して目標状態を適用", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§3"}]}
+  - {id: "scale", from: "operator", to: "api", label: "クラスタでレプリカ数を変更", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§4"}]}
+  - {id: "deploy", from: "api", to: "deployment", label: "Deployment の spec が更新", evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§4"}]}
+scenarios:
+  - id: git-change
+    label: "Git 更新を自動同期"
+    evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}, {type: doc, ref: "docs/reference-argo-cd.md#§3"}, {type: doc, ref: "docs/reference-argo-cd.md#§4"}]
+    steps:
+      - {links: ["app-config","manifest-request","fetch","desired"], note: "Git にレプリカ数を 2 から 3 にする変更が入る。Repository Server が新しい目標マニフェストを返す。"}
+      - {links: ["live"], note: "Application Controller が実状態の 2 と比較し、Application を OutOfSync と判定する。"}
+      - {links: ["apply","deploy"], note: "自動同期が有効なので、管理対象の Deployment に目標の 3 を適用する。"}
+  - id: self-heal
+    label: "クラスタだけで変更された差分を修復"
+    evidence: [{type: doc, ref: "docs/reference-argo-cd.md#§2"}, {type: doc, ref: "docs/reference-argo-cd.md#§3"}, {type: doc, ref: "docs/reference-argo-cd.md#§4"}]
+    steps:
+      - {links: ["scale","deploy"], note: "Git の値は 3 のまま、クラスタ側でレプリカ数を 1 に変更する。"}
+      - {links: ["manifest-request","desired","live"], note: "Application Controller が目標 3 と実状態 1 の差分を検出する。"}
+      - {links: ["apply","deploy"], note: "自動同期と selfHeal が有効なので、同じ Git リビジョンの目標状態 3 を再適用する。"}

@@ -1,0 +1,49 @@
+name: "Inmon CIF の統合 EDW と依存型データマート"
+description: "注文・顧客・返品データを統合した正規化 EDW から、営業と経理のマートを派生させる設計パターンです。"
+parent: {model: dwh-design-patterns, node: inmon}
+reference:
+  objectives:
+    - "CIF の統合 EDW と下流の依存型マートの役割を区別する。"
+    - "正規化した EDW で業務システム間の識別子と粒度をそろえる。"
+    - "Kimball のバスアーキテクチャと統合の位置を比較する。"
+  sources:
+    - {title: "Bill Inmon: Data Warehousing 2.0", url: "https://www.embarcadero.com/images/dm/technical-papers/bill-inmon-data-warehousing-2-0-whitepaper.pdf"}
+    - {title: "Bill Inmon: A Tale of Two Architectures", url: "https://williaminmon.substack.com/p/a-tale-of-two-architectures-kimball"}
+    - {title: "Kimball Group: Enterprise Data Warehouse Bus Architecture", url: "https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/kimball-data-warehouse-bus-architecture/"}
+sources: [docs/reference-dwh-inmon-cif.md]
+evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§1"}]
+tiers:
+  - {id: "inputs", label: "業務システム", z: 2, size: [17,4], kind: "origin"}
+  - {id: "edw", label: "統合処理と EDW", z: 1, size: [17,5]}
+  - {id: "marts", label: "依存型データマート", z: 0, size: [17,4]}
+nodes:
+  orders: {label: "注文システム", kind: "db", tier: "inputs", x: 1, y: 1.5, description: "注文と明細を発行する。EC 側の顧客識別子を持つ。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§1"}]}
+  customers: {label: "顧客マスター", kind: "db", tier: "inputs", x: 6, y: 1.5, description: "顧客の企業内識別子と属性を供給する。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§2"}]}
+  refunds: {label: "返金システム", kind: "db", tier: "inputs", x: 11, y: 1.5, description: "元の注文明細に対する返金取引を記録する。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+  integrate: {label: "ソース統合 ETL", kind: "worker", tier: "edw", x: 2, y: 2, description: "ソース識別子を照合し、統合キーに統一する。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§2"}]}
+  core: {label: "統合 EDW（3NF）", kind: "db", tier: "edw", x: 7, y: 2, description: "顧客・注文・注文明細・返金取引をキーで関連付け、明細レベルで保持する。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§3"}]}
+  serve: {label: "マート作成処理", kind: "worker", tier: "edw", x: 12, y: 2, description: "EDW の統合データを用途別の粒度と定義で変換する。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+  sales: {label: "営業マート", kind: "db", tier: "marts", x: 4, y: 1.5, description: "注文明細を粒度とし、地域別の受注金額を分析する。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+  finance: {label: "経理マート", kind: "db", tier: "marts", x: 11, y: 1.5, description: "日別・通貨別に受注金額と返金額を集計する。", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+links:
+  - {id: "order-input", from: "orders", to: "integrate", label: "注文・明細を取り込む", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§2"}]}
+  - {id: "customer-input", from: "customers", to: "integrate", label: "顧客属性と対応キーを取り込む", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§2"}]}
+  - {id: "refund-input", from: "refunds", to: "integrate", label: "返金を取り込む", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+  - {id: "integrated-write", from: "integrate", to: "core", label: "企業内の統合キーで格納", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§3"}]}
+  - {id: "integrated-read", from: "core", to: "serve", label: "関連付いた明細データを読む", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+  - {id: "sales-output", from: "serve", to: "sales", label: "注文明細と地域を提供", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+  - {id: "finance-output", from: "serve", to: "finance", label: "日別・通貨別の金額を提供", evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]}
+scenarios:
+  - id: unified-customer
+    label: "注文と顧客情報を EDW で統合"
+    evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§2"}, {type: doc, ref: "docs/reference-dwh-inmon-cif.md#§3"}, {type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}, {type: doc, ref: "docs/reference-dwh-inmon-cif.md#§5"}]
+    steps:
+      - {links: ["order-input","customer-input"], note: "注文 O-101 は EC 顧客番号 C-15 を参照する。ETL は顧客マスターと照合し、企業内顧客キー E-42 に対応付ける。"}
+      - {links: ["integrated-write"], note: "EDW では顧客、注文、注文明細を個別の表に保持し、統合キーで関連付ける。"}
+      - {links: ["integrated-read","sales-output","finance-output"], note: "営業・経理マートは共通の EDW から派生する。Kimball のバス設計では、複数のファクト表で共通の適合ディメンションを使う。"}
+  - id: late-refund
+    label: "後着の返金を EDW に反映して経理マートを更新"
+    evidence: [{type: doc, ref: "docs/reference-dwh-inmon-cif.md#§3"}, {type: doc, ref: "docs/reference-dwh-inmon-cif.md#§4"}]
+    steps:
+      - {links: ["refund-input","integrated-write"], note: "返金 R-21 が後から届く。統合処理は元の注文明細と突合し、独立した返金取引として EDW に記録する。"}
+      - {links: ["integrated-read","finance-output"], note: "経理マートの集計を返金取引日・通貨の粒度で再計算する。営業マートの受注金額は受注時金額の定義で集計する。"}

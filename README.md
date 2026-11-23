@@ -190,6 +190,28 @@ npm run icons -- --aws-pptx "C:\path\to\AWS-Toolkit.pptx"
 
 Kubernetes、主要なディストリビューション・マネージドサービス、独自 API のオーケストレーターを、注文 API の配置と復旧の流れで比較します。[コンテナオーケストレーションのリファレンス一覧](docs/reference-container-orchestration-overview.md)
 
+### データカタログ
+
+[データカタログの責務と連携](docs/reference-data-catalog-architecture.md)から、Iceberg のテーブル解決とコミット、資産の発見、列リネージ、公開承認、アクセス制御を別々の責務として追えます。
+
+- テーブルカタログは [Apache Polaris](docs/reference-apache-polaris.md) と [Project Nessie](docs/reference-project-nessie.md) で比較できます。
+- 組織横断のメタデータは [DataHub](docs/reference-datahub.md) と [OpenMetadata](docs/reference-openmetadata.md) で比較できます。
+- クラウド製品は [Amazon DataZone](docs/reference-amazon-datazone.md)、[Microsoft Purview](docs/reference-microsoft-purview.md)、[Fabric OneLake catalog](docs/reference-fabric-onelake-catalog.md)、[Google Cloud Knowledge Catalog](docs/reference-google-cloud-knowledge-catalog.md)、[Snowflake Horizon Catalog](docs/reference-snowflake-horizon-catalog.md)、[Databricks Unity Catalog](docs/reference-databricks-unity-catalog.md) を参照できます。製品の移行や提供条件も各資料に記載しています。
+
+### Snowflake と Databricks の詳細図
+
+| 機能 | Snowflake | Databricks |
+|---|---|---|
+| 取り込みと変換 | [Snowpipe・Streams／Tasks・Dynamic Tables](docs/reference-snowflake-ingestion-cdc.md) | [Lakeflow Connect・Auto Loader・宣言型パイプライン・Jobs](docs/reference-databricks-lakeflow.md) |
+| SQL と性能 | [マイクロパーティション・ウェアハウス・結果再利用](docs/reference-snowflake-query-performance.md) | [SQL Warehouse・Photon・Liquid clustering・プロファイル](docs/reference-databricks-sql-performance.md) |
+| ガバナンス | [Horizon Catalog](docs/reference-snowflake-horizon-catalog.md) | [Unity Catalog](docs/reference-databricks-unity-catalog.md) |
+| 外部共有 | [Secure Data Sharing](docs/reference-snowflake-secure-sharing.md) | [OpenSharing（Delta Sharing）](docs/reference-databricks-open-sharing.md) |
+| 製品固有のシナリオ | [Time Travel・クローン・Fail-safe](docs/reference-snowflake-time-travel.md) | [MLflow・モデル登録・Model Serving](docs/reference-databricks-mlflow-serving.md) |
+
+### DWH 設計パターン
+
+[DWH 設計パターンの選び方](docs/reference-dwh-design-patterns.md)を入口に、同じ受注データでメダリオン、Inmon CIF、Data Vault、Kimball バス、スター／スノーフレーク、SCD、ファクトの型、ワイドテーブル、集約と指標定義を比較できます。
+
 ### 大規模データ分析の基本概念
 
 同じ受注データを使って、保存時の配置、読み取り、書き換え、分散実行のどこで各手法が効くかを比較できます。
@@ -201,7 +223,7 @@ Kubernetes、主要なディストリビューション・マネージドサー�
 | 保存の保守 | [コンパクション](docs/reference-compaction.md) | 小ファイルをまとめ、ファイルを開く負荷と書き換えコストを比較する |
 | 分散実行 | [シャッフルとデータスキュー](docs/reference-shuffle-skew.md) | 結合キーで再配分し、作業が一部のタスクに偏る理由を追う |
 
-調査項目とシナリオの対応は [モダンデータスタックのリファレンス候補](docs/reference-modern-data-stack-candidates.md) に整理しています。
+ClickHouse と DuckDB の物理読み取り比較、PostgreSQL の WAL、Paimon、スキーマ互換性、基盤運用の追加項目は [追加調査と対応リファレンス](docs/reference-modern-data-stack-candidates.md#追加調査と対応リファレンス) に整理しています。
 
 詳細は `docs/model-schema.md`。
 

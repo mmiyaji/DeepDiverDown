@@ -1,0 +1,46 @@
+name: "Kimball バスとファクトコンステレーション"
+description: "受注と返品のファクトが共有する日付と商品を定義し、同じ集計キーで突き合わせる。"
+parent: {"model":"dwh-design-patterns","node":"kimball"}
+reference:
+  objectives:
+    - "バス・マトリクスで共有ディメンションを合意する。"
+    - "事実表を明細で結合する多重計上とドリルアクロスの違いを確認する。"
+  sources:
+    - {"title":"Kimball Group の Conformed Dimensions／Drilling Across／Bus Matrix","url":"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/"}
+sources: ["docs/reference-dwh-kimball-bus.md"]
+evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[13.5,5.5]}
+nodes:
+  date: {"label":"共通日付ディメンション","kind":"db","tier":"flow","x":4,"y":0,"description":"使う日付の役割を定義する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§2"}]}
+  product: {"label":"共通商品ディメンション","kind":"db","tier":"flow","x":8,"y":0,"description":"カテゴリ、商品キーを共有。","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§2"}]}
+  orders: {"label":"受注明細ファクト","kind":"db","tier":"flow","x":3,"y":2,"description":"注文日と商品別に売上を保持。","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§1"}]}
+  returns: {"label":"返品明細ファクト","kind":"db","tier":"flow","x":3,"y":5,"description":"受付日と商品別に返品額を保持。","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§1"}]}
+  sales: {"label":"日・カテゴリ・通貨別の売上","kind":"worker","tier":"flow","x":8,"y":2,"description":"受注の粒度から独立に集計。","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§3"}]}
+  refunds: {"label":"日・カテゴリ・通貨別の返品","kind":"worker","tier":"flow","x":8,"y":5,"description":"返品の粒度から独立に集計。","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§3"}]}
+  bi: {"label":"売上と返品の横並び表示","kind":"client","tier":"flow","x":13,"y":3,"description":"日とコホートの意味を区別する。","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§4"}]}
+links:
+  - {"id":"order-date","from":"date","to":"orders","label":"注文日として利用","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§2"}]}
+  - {"id":"return-date","from":"date","to":"returns","label":"返品受付日として利用","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§2"}]}
+  - {"id":"order-product","from":"product","to":"orders","label":"共通商品キー","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§2"}]}
+  - {"id":"return-product","from":"product","to":"returns","label":"共通商品キー","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§2"}]}
+  - {"id":"sales","from":"orders","to":"sales","label":"日・カテゴリ・通貨で集計","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§3"}]}
+  - {"id":"refunds","from":"returns","to":"refunds","label":"日・カテゴリ・通貨で集計","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§3"}]}
+  - {"id":"combine-sales","from":"sales","to":"bi","label":"共通集計キーで突き合わせ","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§3"}]}
+  - {"id":"combine-returns","from":"refunds","to":"bi","label":"同じ帳票に並べる","evidence":[{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§4"}]}
+scenarios:
+  - id: matrix
+    label: "ファクトが共有するディメンションを確認"
+    visual: grid
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§2"}]
+    steps:
+      - {"links":["order-date","order-product"],"note":"注文プロセスの集計軸を特定する。","read":["row:orders"]}
+      - {"links":["return-date","return-product"],"note":"返品プロセスの日付の役割と共有商品を確認する。","read":["row:returns"]}
+  - id: drill-across
+    label: "日次売上と同日の返品受付額を並べる"
+    evidence: [{"type":"doc","ref":"docs/reference-dwh-kimball-bus.md#§3"}]
+    steps:
+      - {"links":["sales"],"note":"受注明細から日次売上を別に計算する。"}
+      - {"links":["refunds"],"note":"返品明細から同日の返品受付額を別に計算する。"}
+      - {"links":["combine-sales","combine-returns"],"note":"共通集計キーで突き合わせる。元の受注月に対する返品率とは定義が異なる。"}
+grid: {"title":"バス・マトリクスの例","rowLabel":"業務プロセス","colLabel":"ディメンション","rows":[{"id":"orders","label":"受注"},{"id":"returns","label":"返品"}],"cols":[{"id":"date","label":"日付"},{"id":"product","label":"商品"}],"values":[[1,1],[1,1]],"note":"1 は利用するディメンション。日付の役割は注文日と返品受付日で異なる。比率は処理量を意味しない。"}

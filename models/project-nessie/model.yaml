@@ -1,0 +1,295 @@
+name: Project Nessie のバージョン管理カタログ
+description: カタログ全体のブランチとコミットを使い、複数の Iceberg テーブルを一貫した状態で参照・公開する流れを追います。
+parent:
+  model: data-catalog-architecture
+  node: nessie
+reference:
+  objectives:
+    - Nessie のコミットと Iceberg テーブル単位のスナップショットを区別する。
+    - ブランチ、タグ、コンテンツキーから参照時点を特定する。
+    - Iceberg REST 経由の利用における制約を確認する。
+  sources:
+    - title: Nessie Specification
+      url: https://projectnessie.org/develop/spec/
+    - title: Configure Nessie with Iceberg REST
+      url: https://projectnessie.org/guides/iceberg-rest/
+    - title: Nessie CLI Merge
+      url: https://projectnessie.org/nessie-0-107-1/generated-docs/cli-help-MergeBranchStatement/
+sources:
+  - docs/reference-project-nessie.md
+evidence:
+  - type: doc
+    ref: docs/reference-project-nessie.md#§1
+tiers:
+  - id: clients
+    label: クライアント
+    z: 2
+    size:
+      - 10
+      - 3
+  - id: catalog
+    label: Nessie のカタログ状態
+    z: 1
+    size:
+      - 12
+      - 4
+  - id: storage
+    label: ストレージ
+    z: 0
+    size:
+      - 10
+      - 3
+nodes:
+  engine:
+    label: Iceberg エンジン
+    kind: client
+    tier: clients
+    x: 7
+    y: 1
+    description: 参照を指定してテーブルを読み書きする。
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§4
+  operator:
+    label: データ運用者
+    kind: actor
+    tier: clients
+    x: 2
+    y: 1
+    description: 作業ブランチを作り検証後にマージする。
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§3
+  api:
+    label: Iceberg REST 接続
+    kind: service
+    tier: catalog
+    x: 8
+    y: 1
+    description: クライアントの参照と warehouse を選ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§4
+  refs:
+    label: ブランチ・タグ
+    kind: service
+    tier: catalog
+    x: 2
+    y: 1
+    description: 名前付き参照から Nessie コミットを選ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§1
+  version-store:
+    label: コミット履歴
+    kind: db
+    tier: catalog
+    x: 5
+    y: 2
+    description: カタログ全体の更新履歴を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§1
+      - type: doc
+        ref: docs/reference-project-nessie.md#§3
+  contents:
+    label: テーブル状態
+    kind: service
+    tier: catalog
+    x: 10
+    y: 2.5
+    description: 各キーから対応するテーブルの状態を解決する。
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§2
+  files:
+    label: Iceberg メタデータ・ファイル
+    kind: db
+    tier: storage
+    x: 7
+    y: 1
+    description: テーブルメタデータと対応する実ファイルを置く。
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§2
+      - type: doc
+        ref: docs/reference-project-nessie.md#§4
+links:
+  - id: branch
+    from: operator
+    to: refs
+    label: 作業ブランチを作成
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§3
+  - id: load
+    from: engine
+    to: api
+    label: 参照を指定して読み込む
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§4
+  - id: choose-ref
+    from: api
+    to: refs
+    label: ブランチまたはタグを解決
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§4
+  - id: select-commit
+    from: refs
+    to: version-store
+    label: 参照先コミットを選ぶ
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§1
+  - id: resolve-key
+    from: version-store
+    to: contents
+    label: テーブル状態を解決
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§2
+  - id: read-files
+    from: engine
+    to: files
+    label: 解決した状態のファイルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§4
+  - id: write-files
+    from: engine
+    to: files
+    label: 新しいデータファイルを書く
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§3
+  - id: work-change
+    from: engine
+    to: api
+    label: 作業ブランチへ更新を送る
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§3
+  - id: commit
+    from: api
+    to: version-store
+    label: 作業ブランチに変更を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§3
+  - id: merge
+    from: operator
+    to: version-store
+    label: 検証済みの変更を main にマージ
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§3
+scenarios:
+  - id: publish-review
+    label: 二つのテーブルを検証して公開する
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§5
+    steps:
+      - links:
+          - branch
+        note: main の同じ時点を基に review を作る。
+      - links:
+          - write-files
+          - work-change
+          - commit
+        note: review 上で売上と顧客テーブルを更新する。
+      - links:
+          - load
+          - choose-ref
+          - select-commit
+          - resolve-key
+          - read-files
+        note: review 上の二つの更新をまとめて検証する。
+        read:
+          - review-sales
+          - review-customers
+      - links:
+          - merge
+        note: 競合を確認し、検証済みの状態を main にマージする。
+  - id: read-close
+    label: 月次締め時点を再現する
+    evidence:
+      - type: doc
+        ref: docs/reference-project-nessie.md#§5
+    steps:
+      - links:
+          - load
+          - choose-ref
+          - select-commit
+        note: close-jun タグを指定し、締め時点のコミットを選ぶ。
+      - links:
+          - resolve-key
+          - read-files
+        note: 同じコミットに属する二つのテーブルの状態を読む。
+        read:
+          - close-sales
+          - close-customers
+treeLayout:
+  title: 名前付き参照からテーブル状態へ
+  unit: テーブル状態
+  levels:
+    - カタログ
+    - 参照
+    - キーごとの状態
+  note: マージ前の論理的な展開。同一コミットを指す参照があってもファイルは複製されない。
+  root:
+    id: nessie-root
+    label: Nessie カタログ
+    kind: meta
+    node: refs
+    children:
+      - id: main-branch
+        label: main
+        kind: snapshot
+        node: version-store
+        sub: M1（マージ前）
+        children:
+          - id: main-sales
+            label: sales
+            kind: data
+            node: contents
+            sub: 売上 S1
+          - id: main-customers
+            label: customers
+            kind: data
+            node: contents
+            sub: 顧客 C1
+      - id: review-branch
+        label: review
+        kind: snapshot
+        node: version-store
+        sub: R2（検証候補）
+        children:
+          - id: review-sales
+            label: sales
+            kind: data
+            node: contents
+            sub: 売上 S2
+          - id: review-customers
+            label: customers
+            kind: data
+            node: contents
+            sub: 顧客 C2
+      - id: close-tag
+        label: close-jun
+        kind: snapshot
+        node: version-store
+        sub: M1（締め時点）
+        children:
+          - id: close-sales
+            label: sales
+            kind: data
+            node: contents
+            sub: 売上 S1
+          - id: close-customers
+            label: customers
+            kind: data
+            node: contents
+            sub: 顧客 C1

@@ -1,0 +1,95 @@
+name: "Temporal のワーカー障害とリプレイ"
+description: "注文 Workflow の Worker が停止したときの履歴からの再開と、外部決済を伴う Activity の冪等な再試行を追います。"
+reference:
+  objectives:
+    - "Workflow Task と Activity Task の役割を区別する。"
+    - "Worker 停止後に Event History から Workflow の状態を復元する流れを追う。"
+    - "外部副作用が発生した後に Activity を再試行できる条件を理解する。"
+  sources:
+    - {title: "Temporal Event History", url: "https://docs.temporal.io/encyclopedia/event-history"}
+    - {title: "Temporal Workflow Definition", url: "https://docs.temporal.io/workflow-definition"}
+    - {title: "Temporal Activity Definition", url: "https://docs.temporal.io/activity-definition"}
+    - {title: "Temporal Retry Policy", url: "https://docs.temporal.io/encyclopedia/retry-policies"}
+    - {title: "Understanding Temporal", url: "https://docs.temporal.io/evaluate/understanding-temporal"}
+sources: [docs/reference-temporal.md]
+evidence: [{type: doc, ref: "docs/reference-temporal.md#§1"}]
+tiers:
+  - {id: "entry", label: "注文受付", z: 3, size: [16,4], kind: "origin"}
+  - {id: "service", label: "Temporal Service", z: 2, size: [16,4]}
+  - {id: "worker", label: "実行 Worker", z: 1, size: [16,4]}
+  - {id: "outside", label: "副作用の記録先", z: 0, size: [16,4]}
+nodes:
+  order: {label: "注文 API", kind: "client", tier: "entry", x: 3, y: 1.5, description: "注文を受け付け、注文 Workflow を開始する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§1"}]}
+  service: {label: "Temporal Service", kind: "service", tier: "service", x: 2, y: 1.5, description: "コマンドを受けタスク管理と Event History の永続化を行う。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
+  history: {label: "Event History", kind: "db", tier: "service", x: 7, y: 1.5, description: "Workflow の進行をイベントとして保持する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
+  queue: {label: "Workflow / Activity Task Queue", kind: "queue", tier: "service", x: 12, y: 1.5, description: "Workflow Task と Activity Task の取得先を図上でまとめて示す。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
+  workflow-a: {label: "Workflow Worker A", kind: "worker", tier: "worker", x: 2, y: 1.5, description: "注文 Workflow を最初に処理する Worker。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
+  workflow-b: {label: "Workflow Worker B", kind: "worker", tier: "worker", x: 7, y: 1.5, description: "A の停止後、履歴から Workflow の状態を再構築する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
+  activity: {label: "決済 Activity Worker", kind: "worker", tier: "worker", x: 12, y: 1.5, description: "決済 API を呼び、Activity の完了を報告する。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§4"}]}
+  payment: {label: "外部決済 API", kind: "external", tier: "outside", x: 12, y: 1.5, description: "同一操作キーで既存の決済を再利用する架空の API。", evidence: [{type: doc, ref: "docs/reference-temporal.md#§5"}]}
+links:
+  - {id: "start", from: "order", to: "service", label: "注文 Workflow を開始", evidence: [{type: doc, ref: "docs/reference-temporal.md#§1"}]}
+  - {id: "append", from: "service", to: "history", label: "イベントを永続化", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
+  - {id: "schedule-task", from: "service", to: "queue", label: "Workflow / Activity Task を提供", evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}]}
+  - {id: "run-a", from: "queue", to: "workflow-a", label: "Workflow Task を取得", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
+  - {id: "decision-a", from: "workflow-a", to: "service", label: "Activity の予約などを報告", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
+  - {id: "run-b", from: "queue", to: "workflow-b", label: "別 Worker が Workflow Task を取得", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
+  - {id: "replay", from: "history", to: "workflow-b", label: "Task とともに受け取った履歴を再生", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
+  - {id: "finish", from: "workflow-b", to: "service", label: "Workflow の結果を報告", evidence: [{type: doc, ref: "docs/reference-temporal.md#§3"}]}
+  - {id: "run-activity", from: "queue", to: "activity", label: "Activity Task を取得", evidence: [{type: doc, ref: "docs/reference-temporal.md#§4"}]}
+  - {id: "charge", from: "activity", to: "payment", label: "同一操作キーで決済を要求", evidence: [{type: doc, ref: "docs/reference-temporal.md#§5"}]}
+  - {id: "complete", from: "activity", to: "service", label: "Activity の完了を報告", evidence: [{type: doc, ref: "docs/reference-temporal.md#§4"}]}
+scenarios:
+  - id: worker-replay
+    label: "Workflow Worker の停止後に履歴から再開"
+    evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}, {type: doc, ref: "docs/reference-temporal.md#§3"}, {type: doc, ref: "docs/reference-temporal.md#§4"}]
+    visual: payment-record
+    steps:
+      - links: [start, append, schedule-task, run-a, decision-a]
+        note: 注文 Workflow を開始する。Worker A が決済 Activity の予約を指示し、Temporal Service が履歴に記録する。
+        blocks:
+          history: &scheduled
+            - &started {id: started, label: Workflow 開始, k: 0}
+            - &payment-scheduled {id: payment-scheduled, label: 決済 Activity 予約, k: 0}
+          payment: []
+      - links: [run-activity, charge, complete, append]
+        note: 決済 Activity が完了し、結果が Event History に記録される。Worker A は次の Workflow Task を処理する前に停止する。
+        blocks:
+          history: &completed
+            - *started
+            - *payment-scheduled
+            - &payment-completed {id: payment-completed, label: 決済 Activity 完了, k: 0}
+          payment: &charged
+            - {id: charged, label: 決済を登録（1 件）, k: 3}
+      - links: [run-b, replay, finish, append]
+        note: Worker B が履歴に沿って Workflow コードを実行し、記録済みの決済結果を使って注文処理を完了する。リプレイで決済 API を再呼び出ししない。
+        blocks:
+          history:
+            - *started
+            - *payment-scheduled
+            - *payment-completed
+            - {id: workflow-completed, label: Workflow 完了, k: 0}
+          payment: *charged
+  - id: activity-retry
+    label: "完了報告を失った決済 Activity を再試行"
+    evidence: [{type: doc, ref: "docs/reference-temporal.md#§2"}, {type: doc, ref: "docs/reference-temporal.md#§4"}, {type: doc, ref: "docs/reference-temporal.md#§5"}]
+    visual: payment-record
+    steps:
+      - links: [start, run-a, decision-a, append, schedule-task, run-activity]
+        note: 注文 Workflow が決済 Activity を予約し、Activity Worker が処理を始める。
+        blocks: {history: *scheduled, payment: []}
+      - links: [charge]
+        note: 外部決済が成功する。Activity Worker は Temporal Service に完了を報告する前に停止する。
+        blocks: {history: *scheduled, payment: *charged}
+      - links: [schedule-task, run-activity, charge, complete, append]
+        note: Activity がタイムアウトし、設定した再試行条件を満たすため再実行される。同じ操作キーで決済 API を呼び、既存結果を得て完了を記録する。
+        blocks: {history: *completed, payment: *charged}
+blocks:
+  id: payment-record
+  title: 履歴に記録された結果と外部決済
+  note: Workflow の代表的なイベントを抜粋。決済側の箱には外部 API が記録した決済を示す。
+  legend: {0: Event History のイベント, 3: 外部決済の記録}
+  lanes:
+    - {id: history, label: Event History, node: history}
+    - {id: payment, label: 外部決済 API, node: payment}
+  items: {history: [], payment: []}

@@ -1,0 +1,47 @@
+name: "Databricks SQL の実行プロファイルとファイル配置"
+description: "SQL Warehouse で実行し、スキャン、シャッフル、キューのどこに時間がかかるかを切り分ける。"
+parent: {"model":"databricks","node":"query"}
+reference:
+  objectives:
+    - "ストレージの配置と、実行コンピュートの選び方を区別する。"
+    - "SQL の実行プロファイルでスキャンとシャッフルを比較する。"
+  sources:
+    - {"title":"SQL Warehouse の種類","url":"https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types"}
+    - {"title":"Photon","url":"https://docs.databricks.com/aws/en/compute/photon"}
+    - {"title":"クエリプロファイル","url":"https://docs.databricks.com/aws/en/sql/user/queries/query-profile"}
+    - {"title":"Liquid clustering","url":"https://docs.databricks.com/aws/en/tables/clustering"}
+    - {"title":"Predictive optimization","url":"https://docs.databricks.com/aws/en/optimizations/predictive-optimization"}
+sources: ["docs/reference-databricks-sql-performance.md"]
+evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§1"}]
+tiers:
+  - {"id":"flow","label":"構成と処理の流れ","z":0,"size":[14.5,4.5]}
+nodes:
+  bi: {"label":"注文集計 SQL","kind":"client","tier":"flow","x":0,"y":2,"description":"条件付き集計を送信。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§1"}]}
+  warehouse: {"label":"SQL Warehouse","kind":"service","tier":"flow","x":3,"y":2,"description":"処理需要に合わせる実行先。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§2"}]}
+  engine: {"label":"Photon 対応演算","kind":"worker","tier":"flow","x":6,"y":2,"description":"対応するスキャンや結合を処理。","parallel":"N","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§2"}]}
+  scan: {"label":"Delta テーブルのファイル","kind":"db","tier":"flow","x":10,"y":0,"description":"配置と統計が読み取りに影響。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§4"}]}
+  shuffle: {"label":"結合・再分配","kind":"worker","tier":"flow","x":10,"y":4,"description":"結合時に必要なら行を集め直す。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
+  profile: {"label":"Query Profile","kind":"service","tier":"flow","x":14,"y":2,"description":"演算子の時間やデータ量を確認。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
+  optimizer: {"label":"テーブル保守","kind":"worker","tier":"flow","x":14,"y":0,"description":"クラスタリングなどの配置の調整。","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§4"}]}
+links:
+  - {"id":"submit","from":"bi","to":"warehouse","label":"SQL を発行","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§1"}]}
+  - {"id":"execute","from":"warehouse","to":"engine","label":"実行枠を割り当て","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§2"}]}
+  - {"id":"read","from":"engine","to":"scan","label":"候補ファイルと列を読む","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§4"}]}
+  - {"id":"join","from":"engine","to":"shuffle","label":"結合データの再分配","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
+  - {"id":"observe","from":"shuffle","to":"profile","label":"演算子の指標を確認","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
+  - {"id":"scan-profile","from":"scan","to":"profile","label":"スキャンの作業量を確認","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]}
+  - {"id":"maintain","from":"optimizer","to":"scan","label":"表の配置やファイルを保守","evidence":[{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§4"}]}
+scenarios:
+  - id: plan
+    label: "日付を絞った集計でスキャンを確認"
+    evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]
+    steps:
+      - {"links":["submit","execute"],"note":"同じ条件でクエリを実行し、実行時の条件を揃える。"}
+      - {"links":["read","scan-profile"],"note":"スキャンの作業量をプロファイルで確認する。"}
+      - {"links":["maintain","read"],"note":"配置の保守後に同条件で再計測し、読んだ量の違いを見る。"}
+  - id: join
+    label: "結合の待ちと再分配を調べる"
+    evidence: [{"type":"doc","ref":"docs/reference-databricks-sql-performance.md#§3"}]
+    steps:
+      - {"links":["submit","execute"],"note":"複数のテーブルを使う集計を実行する。"}
+      - {"links":["join","observe"],"note":"再分配が大きい演算子と入力行数を調べ、次に見直す条件を決める。"}
