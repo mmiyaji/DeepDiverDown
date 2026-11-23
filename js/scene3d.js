@@ -11,6 +11,7 @@ const CARD_ICONS = {
   cyl: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12a7 3 0 0 0 14 0V6M5 12a7 3 0 0 0 14 0"/>',
   queue: '<path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Zm-9 9 9 4.5 9-4.5M3 16.5l9 4.5 9-4.5"/>',
   person: '<circle cx="12" cy="7" r="3"/><path d="M5 20v-2a7 5 0 0 1 14 0v2Z"/>',
+  slab: '<path d="M3 9h18v6H3zM8 9v6m5-6v6m4-6v6"/>',
   box: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3ZM4 7.5l8 4.5 8-4.5M12 12v9"/>',
 };
 const overlaps = (a, b, gap = 0) => a.left < b.right + gap && a.right + gap > b.left &&
@@ -559,6 +560,12 @@ export class Scene3D {
         add(new THREE.BoxGeometry(0.94, 0.22, 0.23).translate(0, 0, (i - 1) * 0.31), 0.11);
       }
       top = 0.22;
+    }
+    else if (s.shape === 'slab') { // ファイル内の区画：薄い板に区切り線を入れる
+      add(new THREE.BoxGeometry(1.5, 0.2, 0.9), 0.1);
+      const tick = this.edges(new THREE.BoxGeometry(0.001, 0.2, 0.9), this.color('--ink'), 0.5);
+      for (const px of [-0.4, 0, 0.4]) { const t = tick.clone(); t.position.set(px, 0.1, 0); g.add(t); }
+      top = 0.2;
     }
     else if (s.shape === 'queue') { for (let i = 0; i < 3; i++) add(new THREE.BoxGeometry(0.92, 0.22, 0.92), 0.11 + i * 0.3); top = 0.85; }
     else if (s.shape === 'person') {

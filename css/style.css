@@ -392,3 +392,56 @@ a.b.drill{display:block;margin:.6em 0;text-align:center;text-decoration:none;fon
 @keyframes drillEnterOut{from{transform:scale(1.8);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){#view[class*=drill-]{animation:none}}
 .stage:has(#view[class*=drill-]){overflow:hidden}
+
+/* ファイルの解剖図（fileLayout）：バイト順・比率どおりの帯、入れ子のズーム、読み取り範囲の強調 */
+.filemap{border-top:1px solid var(--line);background:var(--panel);padding:8px 12px 10px;max-height:46%;overflow:auto;font-size:12px}
+.filemap[hidden]{display:none}
+.fm-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.fm-title{font-weight:700;font-size:12px}
+.fm-crumbs{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.fm-crumb{border:0;background:none;padding:1px 3px;color:var(--mute);cursor:pointer;font:inherit}
+.fm-crumb:last-child{color:var(--fg);font-weight:600}
+.fm-crumb:hover{color:var(--accent)}
+.fm-sep{color:var(--mute)}
+.fm-meter{margin-left:auto;color:var(--mute)}
+.fm-meter b{color:var(--seg-now)}
+.fm-bar{display:flex;gap:2px;height:54px}
+.fm-seg{min-width:34px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:1px;padding:3px 5px;border:1px solid color-mix(in srgb,var(--ink) 35%,transparent);border-radius:3px;background:var(--seg-c);color:var(--fg);cursor:pointer;overflow:hidden;text-align:left;font:inherit;transition:background .25s,opacity .25s,box-shadow .25s}
+.fm-seg:hover{filter:brightness(1.06)}
+.fm-seg.sel{outline:2px solid var(--accent);outline-offset:1px}
+.fm-name{font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fm-name i{font-style:normal;color:var(--mute)}
+.fm-size{font-size:10px;color:var(--mute);white-space:nowrap}
+.fm-ticks{position:relative;height:14px;color:var(--mute);font:10px var(--mono, monospace)}
+.fm-ticks span{position:absolute;top:2px;transform:translateX(-50%)}
+.fm-ticks span:first-child{transform:none}.fm-ticks span:last-child{transform:translateX(-100%)}
+.fm-note{color:var(--mute);font-size:11px;margin:2px 0 4px}
+.fm-info{border-top:1px dashed var(--line);margin-top:6px;padding-top:6px}
+.fm-info p{margin:4px 0}
+.fm-info-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.fm-info-head .mono{color:var(--mute);font-size:11px}
+.fm-hint{color:var(--mute)}
+.fm-sample-h{font-size:11px;color:var(--mute);margin-top:6px}
+.fm-sample{margin:3px 0 0;padding:6px 8px;background:var(--card);border:1px solid var(--line);border-radius:4px;font-size:11px;line-height:1.45;overflow:auto;max-height:180px;white-space:pre}
+/* 区画の種類ごとの色（カード色に色相を混ぜるので明暗どちらのテーマでも読める） */
+.filemap{--seg-now:#0f7c8c}
+:root[data-theme=dark] .filemap{--seg-now:#4fc3d1}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .filemap{--seg-now:#4fc3d1}}
+.fm-seg{--seg-c:color-mix(in srgb,#8a8170 14%,var(--card))}
+.fm-seg.k-magic{--seg-c:color-mix(in srgb,#8a8170 22%,var(--card))}
+.fm-seg.k-rowgroup{--seg-c:color-mix(in srgb,#3f7fb5 22%,var(--card))}
+.fm-seg.k-chunk{--seg-c:color-mix(in srgb,#2f8f9c 22%,var(--card))}
+.fm-seg.k-page{--seg-c:color-mix(in srgb,#4c9a5a 22%,var(--card))}
+.fm-seg.k-dict{--seg-c:color-mix(in srgb,#c08a2a 22%,var(--card))}
+.fm-seg.k-index{--seg-c:color-mix(in srgb,#9a4f97 22%,var(--card))}
+.fm-seg.k-footer{--seg-c:color-mix(in srgb,#c4673a 22%,var(--card))}
+.fm-seg.k-header{--seg-c:color-mix(in srgb,#6f5fb0 22%,var(--card))}
+/* 読み取りのリプレイ：今読む＝光る、読んだ＝濃い、読まずに済んだ＝灰色 */
+.fm-seg.s-now{background:var(--seg-now);color:#fff;box-shadow:0 0 0 2px var(--seg-now),0 0 14px var(--seg-now);animation:fmPulse 1.2s ease-in-out infinite}
+.fm-seg.s-now .fm-size,.fm-seg.s-now .fm-name i{color:#e6f7f9}
+.fm-seg.s-done{background:color-mix(in srgb,var(--seg-now) 35%,var(--seg-c))}
+.fm-seg.s-part-now,.fm-seg.s-part{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,var(--seg-now) 40%,transparent) 0 4px,transparent 4px 9px)}
+.fm-seg.s-skip{opacity:.32;filter:grayscale(1)}
+.fm-seg.s-wait{opacity:.75}
+@keyframes fmPulse{50%{box-shadow:0 0 0 2px var(--seg-now),0 0 22px var(--seg-now)}}
+@media (prefers-reduced-motion:reduce){.fm-seg.s-now{animation:none}}

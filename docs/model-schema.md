@@ -207,3 +207,11 @@ groups:
 - 部品に `drill: <モデルID>` を書くと、その部品の内部構造を表す別モデルへ移れる。図にバッジ「▼ 詳細図」が付き、詳細パネルのボタンか、部品のダブルクリックで開く。
 - モデルに `parent: {model: <モデルID>, node: <部品ID>}` を書くと、ヘッダーに「↑ 上位の図」のパンくずが出て、上位の図のその部品を選んだ状態で戻れる。
 - 例：物理ファイルフォーマットの Parquet → Parquet ファイルの内部、Iceberg 分散スキャンの metadata.json → Iceberg カタログ経由の読み取り → Data Files → Parquet ファイルの内部。
+
+## ファイルの解剖図（fileLayout）と区画（kind: segment）
+
+- 部品の `kind: segment` は、ファイル内の区画（ヘッダー、Row Group、ページ、フッターなど）を表す。3D では薄い板、2D では帯のアイコンで描き、単一障害点の指摘の対象外になる。
+- モデルの `fileLayout` は 1 つの物理ファイルを、バイト順・大きさの比率どおりの帯で描く。
+  - `file`：ファイル名、`note`：注記
+  - `segments[]`：`id`、`label`、`bytes`（省略すると子の合計）、`kind`（magic / header / rowgroup / chunk / dict / page / index / footer で色分け）、`node`（対応する部品の ID。選ぶと図の部品も選ばれる）、`description`、`sample`（中身の例）、`children`（入れ子の区画）
+- シナリオのステップに `read: [区画 ID]` を書くと、再生中にその範囲が帯の上で光る。読んだバイト数と全体に占める割合を表示し、最後のステップでは読まなかった範囲を灰色にする。

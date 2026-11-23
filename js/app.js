@@ -1,8 +1,9 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=drill2';
+import { Scene3D } from './scene3d.js?v=fm1';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=3d-styles';
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=nc1';
+import { FileMap } from './filemap.js?v=fm1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -227,6 +228,8 @@ const fmt = (k, v) => { const u = (METRICS.find(x => x[0] === k) || [])[2] || ''
 /* ================= 3D 描画 ================= */
 const scene = new Scene3D($('view'), { onPick: id => onPick(id), onDrill: id => drillInto(id) });
 /* ドリルダウン：部品へズームインしながら詳細図へ、パンくずではズームアウトしながら上位の図へ移る */
+const FM = M.fileLayout?.segments?.length ? new FileMap($('filemap'), M.fileLayout, { onNode: id => { if (M.nodes[id] && st.sel !== id) select(id); } }) : null;
+$('filemap').hidden = !FM;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function transitionTo(hash, dir, origin, from) {
   try { sessionStorage.setItem('ddd.drill', JSON.stringify({ dir, at: Date.now(), from })); } catch {}
@@ -260,7 +263,7 @@ const serviceLabel = svc => svc && `${svc.name}｜${svc.providerLabel}`;
 
 function nodeSpec(id, n, s) {
   const svc = Catalog.lookup(n.svc);
-  const shape = n.kind === 'actor' ? 'person' : (svc?.shape ?? (['db', 'cache'].includes(n.kind) ? 'cyl' : n.kind === 'queue' ? 'queue' : 'box'));
+  const shape = n.kind === 'actor' ? 'person' : n.kind === 'segment' ? 'slab' : (svc?.shape ?? (['db', 'cache'].includes(n.kind) ? 'cyl' : n.kind === 'queue' ? 'queue' : 'box'));
   const flat = st.dimension === '2';
   const solidStyle = style3D();
   const flatStyle = flat ? (S.nodeStyle2D === 'silhouette' ? 'silhouette' : 'card') : null;
@@ -271,12 +274,12 @@ function nodeSpec(id, n, s) {
   else if (['db', 'queue', 'cache'].includes(n.kind)) color = scene.color('--dark');
   if (flatStyle === 'silhouette' && !svc && n.kind !== 'actor') {
     const tint = n.shape3D === 'crate' ? '#348573'
-      : { cyl: '#477786', queue: '#397972', box: '#526885' }[shape];
+      : { cyl: '#477786', queue: '#397972', slab: '#a06a42', box: '#526885' }[shape] || '#526885';
     color = scene.mix(tint, '--paper', 0.48);
   }
   if (solidStyle === 'components' && !svc && n.kind !== 'actor') {
     const tint = n.shape3D === 'crate' ? '#348573'
-      : { cyl: '#32778f', queue: '#258477', box: n.kind === 'worker' ? '#3e718b' : '#627c96' }[shape];
+      : { cyl: '#32778f', queue: '#258477', slab: '#b0703f', box: n.kind === 'worker' ? '#3e718b' : '#627c96' }[shape] || '#627c96';
     color = scene.mix(tint, '--paper', 0.82);
   } else if (solidStyle === 'flow') color = scene.color('--paper');
   if (ext) opacity = Math.min(opacity, 0.35);
@@ -336,7 +339,18 @@ function projectState(ns, ls) {
   return { nsV, lsV };
 }
 
-function draw() {
+function draw() { drawScene(); syncFileMap(); }
+/* ファイルの解剖図：部品の選択と、シナリオの読み取り範囲（steps[].read）を帯に反映する */
+function syncFileMap() {
+  if (!FM) return;
+  if (st.mode === 'scenario' && M.scenarios?.length) {
+    const steps = M.scenarios[st.scen].steps;
+    const done = new Set(steps.slice(0, st.step).flatMap(s => s.read || []));
+    FM.setReads({ done, now: new Set(steps[st.step]?.read || []), finished: st.step >= steps.length - 1 });
+  } else if (FM.reads) FM.setReads(null);
+  FM.showNode(st.sel);
+}
+function drawScene() {
   const d = decorate(), { nsV: ns, lsV: ls } = projectState(d.ns, d.ls), P = VW(), N = P.nodes;
   scene.begin();
   for (const t of P.tiers) {
