@@ -1285,30 +1285,51 @@ function openSettings() {
   const rules = Analyze.RULES;
   modal('設定', `
     <form id="settings" class="settings">
-    <h4>表示</h4>
+    <p class="settings-intro">変更はこのブラウザに保存されます。</p>
+    <nav class="settings-nav" aria-label="設定の分類">
+      <button type="button" data-settings-target="settings-display">表示</button><button type="button" data-settings-target="settings-controls">操作</button><button type="button" data-settings-target="settings-ai">AI 支援</button><button type="button" data-settings-target="settings-review">点検</button><button type="button" data-settings-target="settings-data">データ</button>
+    </nav>
+    <section class="settings-section" id="settings-display" tabindex="-1">
+    <div class="settings-heading"><div><h3>表示</h3><p>色や図の見え方を変更します。</p></div><span>すぐに反映</span></div>
     <label class="chk"><input type="checkbox" name="officialIcons" ${S.officialIcons ? 'checked' : ''} ${hasIcons ? '' : 'disabled'}> 公式アイコンを使う</label>
     <label>テーマ <select name="theme">${[['auto', 'OS に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, n]) => `<option value="${v}" ${S.theme === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label>ラベルの大きさ <input type="range" name="labelScale" min="0.8" max="1.5" step="0.05" value="${S.labelScale}"><output>${Math.round(S.labelScale * 100)}%</output></label>
     <label>パケットの速さ <input type="range" name="packetSpeed" min="0" max="3" step="0.25" value="${S.packetSpeed}"><output>${S.packetSpeed}×</output></label>
     <label>2D の部品デザイン <select name="nodeStyle2D"><option value="card" ${S.nodeStyle2D !== 'silhouette' ? 'selected' : ''}>ラベル一体型カード</option><option value="silhouette" ${S.nodeStyle2D === 'silhouette' ? 'selected' : ''}>種類別のシルエット</option></select></label>
     <label>3D の部品デザイン <select name="nodeStyle3D"><option value="components" ${S.nodeStyle3D !== 'flow' ? 'selected' : ''}>形と色で部品を区別</option><option value="flow" ${S.nodeStyle3D === 'flow' ? 'selected' : ''}>フロアと接続を強調</option></select></label>
+    </section>
+    <section class="settings-section" id="settings-controls" tabindex="-1">
+    <div class="settings-heading"><div><h3>操作と初期表示</h3><p>図を開くときの表示とドラッグ操作を設定します。</p></div></div>
     <label>初期の表示 <select name="dimension"><option value="3" ${S.dimension === '3' ? 'selected' : ''}>3D</option><option value="2" ${S.dimension === '2' ? 'selected' : ''}>2D</option></select></label>
     <label>初期の視点 <select name="defaultView">${[['iso', '斜め'], ['top', '真上'], ['side', '横'], ['back', '裏側']].map(([v, n]) => `<option value="${v}" ${S.defaultView === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label>左ドラッグの既定 <select name="dragMode"><option value="rotate" ${S.dragMode === 'rotate' ? 'selected' : ''}>回転</option><option value="pan" ${S.dragMode === 'pan' ? 'selected' : ''}>移動</option></select></label>
-    <h4>AI 支援</h4>
+    </section>
+    <section class="settings-section" id="settings-ai" tabindex="-1">
+    <div class="settings-heading"><div><h3>AI 支援</h3><p>AI 用ビューアでの対話・取り込み・指摘対応に適用します。</p></div></div>
     <label>実行先 <select name="aiProvider">${Object.entries(AI_PROVIDERS).map(([id, label]) => `<option value="${id}" ${(S.aiProvider === 'codex' ? 'codex' : 'claude') === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-    <p class="sub">実行先は AI 用ビューアでの対話・取り込み・指摘対応に適用されます。</p>
-    <h4>点検のしきい値 <small class="sub">空欄はモデルの設定（gates）に従う</small></h4>
+    </section>
+    <section class="settings-section" id="settings-review" tabindex="-1">
+    <div class="settings-heading"><div><h3>点検</h3><p>変更は保存され、再読み込み後の点検に反映されます。</p></div><span>再読み込みが必要</span></div>
+    <h4>点検のしきい値</h4><p class="sub">空欄の場合はモデルの設定を使います。</p>
     <label>許容する「ずれ」の件数 <input type="number" name="maxDrift" min="0" value="${S.gates.maxDrift ?? ''}" placeholder="${M.gates?.maxDrift ?? 0}"></label>
     <label>許容する重大な指摘の件数 <input type="number" name="maxHigh" min="0" value="${S.gates.maxHigh ?? ''}" placeholder="${M.gates?.maxHigh ?? 0}"></label>
-    <h4>指摘ルール</h4>
+    <details class="settings-rules"><summary>指摘ルール <small>${rules.length} 件</small></summary>
     <div class="rules">${rules.map(r => `<label class="chk"><input type="checkbox" name="rule" value="${r.id}" ${S.disabledRules.includes(r.id) ? '' : 'checked'}> <span class="tag ${r.sev}">${r.sev === 'high' ? '重大' : '注意'}</span>${esc(r.title)} <small class="mono mute">${r.id}${r.for ? ' / ' + r.for : ''}</small></label>`).join('')}</div>
-    <h4>データ</h4>
+    </details>
+    <div class="settings-action"><button type="button" class="b on" data-act="reload">再読み込みして点検に反映</button></div>
+    </section>
+    <section class="settings-section" id="settings-data" tabindex="-1">
+    <div class="settings-heading"><div><h3>ブラウザ内のデータ</h3><p>読み込んだモデルを管理します。</p></div></div>
     <div class="locals">${REGISTRY.filter(r => r.local).map(r => `<div class="item">${esc(r.name || r.id)} <button type="button" class="b small" data-rmlocal="${r.id}">削除</button></div>`).join('') || '<div class="sub">ブラウザに読み込んだモデルはありません</div>'}</div>
-    <div class="row mt"><button type="button" class="b" data-act="reset-settings">設定を初期値に戻す</button><button type="button" class="b on" data-act="reload">再読み込みして点検に反映</button></div>
-    <p class="sub">表示の設定はすぐに反映されます。しきい値とルールは再読み込みで反映されます。設定はこのブラウザにだけ保存されます。</p>
+    </section>
+    <div class="settings-reset"><button type="button" class="b" data-act="reset-settings">設定を初期値に戻す</button><p class="sub">表示や点検の設定を初期値に戻します。</p></div>
     </form>`);
   const f = $('settings');
+  f.querySelectorAll('[data-settings-target]').forEach(button => button.addEventListener('click', () => {
+    const section = $(button.dataset.settingsTarget);
+    section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    section.focus({ preventScroll: true });
+  }));
   f.addEventListener('input', e => {
     const fd = new FormData(f);
     Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dimension: fd.get('dimension'), dragMode: fd.get('dragMode') });

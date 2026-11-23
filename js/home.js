@@ -1,0 +1,118 @@
+import { isUnlocked, rememberUnlock } from './home-lock.js';
+import { drawThumbnail } from './home-thumbnail.js';
+// This is deliberately a casual browser-side gate, not authentication.
+// Change this value before publishing. It remains visible in downloaded JavaScript.
+const PASSPHRASE = 'deepdiver';
+const $ = id => document.getElementById(id);
+const site = $('site');
+const lock = $('lock');
+
+const unlocked = isUnlocked(sessionStorage, localStorage);
+if (!unlocked) {
+  lock.hidden = false;
+  site.inert = true;
+  $('passphrase').focus();
+}
+$('show-password').addEventListener('click', event => {
+  const input = $('passphrase');
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  event.currentTarget.textContent = show ? '隠す' : '表示';
+  event.currentTarget.setAttribute('aria-label', show ? '合言葉を隠す' : '合言葉を表示');
+  event.currentTarget.setAttribute('aria-pressed', String(show));
+});
+$('lock-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if ($('passphrase').value !== PASSPHRASE) {
+    $('lock-error').hidden = false;
+    $('passphrase').setAttribute('aria-invalid', 'true');
+    $('passphrase').focus();
+    return;
+  }
+  rememberUnlock(sessionStorage, localStorage, $('remember').checked);
+  $('passphrase').value = '';
+  lock.hidden = true;
+  site.inert = false;
+  $('search').focus();
+});
+$('passphrase').addEventListener('input', () => {
+  $('lock-error').hidden = true;
+  $('passphrase').removeAttribute('aria-invalid');
+});
+lock.addEventListener('keydown', event => {
+  if (event.key !== 'Tab') return;
+  const controls = [...lock.querySelectorAll('input, button')].filter(el => !el.disabled);
+  const first = controls[0], last = controls.at(-1);
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+});
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+const modelCache = new Map();
+const observer = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+    observer.unobserve(entry.target);
+    const { modelId } = entry.target.dataset;
+    if (!modelCache.has(modelId)) {
+      const request = fetch(`models/${encodeURIComponent(modelId)}/model.yaml`, { cache: 'no-cache' })
+        .then(response => { if (!response.ok) throw new Error('model unavailable'); return response.text(); })
+        .then(raw => Layout.apply(jsyaml.load(raw)))
+        .catch(error => { modelCache.delete(modelId); throw error; });
+      modelCache.set(modelId, request);
+    }
+    modelCache.get(modelId).then(model => {
+      if (entry.target.isConnected) drawThumbnail(entry.target, model);
+    }).catch(() => { entry.target.textContent = 'プレビューを読み込めませんでした'; });
+  }
+}, { rootMargin: '150px' });
+function card(entry) {
+  const a = element('a', 'card');
+  a.href = `index.html#/m/${encodeURIComponent(entry.id)}/struct`;
+  const title = element('div', 'card-title');
+  title.append(element('h3', '', entry.name), element('p', '', entry.description));
+  const content = element('div', 'card-preview', '構成図を読み込み中…');
+  content.dataset.modelId = entry.id;
+  content.setAttribute('aria-hidden', 'true');
+  observer.observe(content);
+  const bottom = element('div', 'card-bottom');
+  bottom.append(element('span', '', [entry.domain, entry.category].filter(Boolean).join(' / ')), element('span', '', '構成図を開く →'));
+  a.append(title, content, bottom);
+  return a;
+}
+let entries = [];
+let showAll = false;
+const featured = ['spark', 'kafka', 'spark-streaming', 'flink', 'apache-iceberg', 'databricks', 'snowflake', 'kubernetes', 'monitoring-datadog', 'analytics-agent', 'slack-real-time-messaging', 'autoware-autonomous-driving'];
+function render() {
+  observer.disconnect();
+  const query = $('search').value.trim().toLocaleLowerCase();
+  const domain = $('domain').value;
+  const matching = entries.filter(entry => (!domain || entry.domain === domain) && [entry.name, entry.description, entry.domain, entry.category, ...(entry.tags || [])].join(' ').toLocaleLowerCase().includes(query));
+  const filtered = !showAll && !query && !domain ? matching.filter(entry => featured.includes(entry.id)) : matching;
+  $('cards').replaceChildren(...filtered.map(card));
+  $('count').textContent = !showAll && !query && !domain ? `代表例 ${filtered.length} 件 / 全 ${entries.length} 件` : `${filtered.length} 件のリファレンス`;
+  $('empty').hidden = filtered.length > 0;
+  $('show-all').hidden = !!query || !!domain;
+  $('show-all').textContent = showAll ? '代表例に戻す' : 'すべてのリファレンスを表示';
+  $('show-all').setAttribute('aria-expanded', String(showAll));
+}
+fetch('models/research-index.json').then(response => {
+  if (!response.ok) throw new Error('Reference index unavailable');
+  return response.json();
+}).then(data => {
+  entries = data.entries || [];
+  [...new Set(entries.map(entry => entry.domain).filter(Boolean))].sort().forEach(domain => {
+    const option = element('option', '', domain);
+    option.value = domain;
+    $('domain').append(option);
+  });
+  render();
+}).catch(() => { $('count').textContent = '読み込みエラー'; $('load-error').hidden = false; });
+$('search').addEventListener('input', render);
+$('domain').addEventListener('change', render);
+$('show-all').addEventListener('click', () => { showAll = !showAll; render(); });
