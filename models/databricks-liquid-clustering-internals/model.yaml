@@ -1,0 +1,642 @@
+name: Databricks Liquid Clustering：ファイル配置と Delta ログ
+description: Delta 管理テーブルでキーの選択、ファイルの再配置、ログの更新、統計による読み飛ばしを追う。図は公開情報に基づく論理モデル。
+parent:
+  model: databricks-optimization-internals
+  node: layout
+reference:
+  objectives:
+    - キー設定と既存ファイルの再配置を区別する。
+    - Delta ログとファイル単位の統計が読み取りに果たす役割を追う。
+    - AUTO・増分 OPTIMIZE・FULL の条件と費用を理解する。
+  sources:
+    - title: Liquid clustering
+      url: https://docs.databricks.com/aws/en/tables/clustering
+    - title: Delta clustered table protocol
+      url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md#clustered-table
+    - title: Data skipping
+      url: https://docs.databricks.com/aws/en/tables/data-skipping
+    - title: Predictive optimization
+      url: https://docs.databricks.com/aws/en/optimizations/predictive-optimization
+    - title: Optimize data file layout
+      url: https://docs.databricks.com/aws/en/tables/operations/optimize
+    - title: Delta protocol compatibility
+      url: https://docs.databricks.com/aws/en/delta/feature-compatibility
+    - title: Managed storage
+      url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+    - title: 'Data + AI Summit: Liquid Clustering'
+      url: https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM
+    - title: Liquid Clustering のデータ配置とファイル統計
+      url: https://www.databricks.com/blog/debunking-8-data-layout-myths-why-liquid-clustering-outperforms-partitioning
+sources:
+  - docs/reference-databricks-liquid-clustering-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-liquid-clustering-internals.md#§1
+  - type: doc
+    ref: docs/reference-databricks-liquid-clustering-internals.md#§3
+  - type: doc
+    ref: docs/reference-databricks-liquid-clustering-internals.md#§4
+  - type: doc
+    ref: docs/reference-databricks-liquid-clustering-internals.md#§5
+  - type: doc
+    ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+  - type: doc
+    ref: docs/reference-databricks-liquid-clustering-internals.md#§7
+tiers:
+  - id: control
+    label: キー選択と実行指示
+    z: 2
+    size:
+      - 22
+      - 4
+  - id: compute
+    label: テーブル保守と検索
+    z: 1
+    size:
+      - 22
+      - 4
+  - id: storage
+    label: Delta ログと Parquet ファイル
+    z: 0
+    size:
+      - 22
+      - 4
+nodes:
+  operator:
+    label: 設定・運用
+    kind: client
+    tier: control
+    x: 0
+    'y': 1.5
+    description: クラスタリング列や自動選択、手動 OPTIMIZE の方針を指定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  workload:
+    label: クエリの傾向
+    kind: service
+    tier: control
+    x: 5
+    'y': 1.5
+    description: 自動選択で検索条件などの傾向を分析する。実行中の個別検索と区別する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  selection:
+    label: キーの選択
+    kind: service
+    tier: control
+    x: 10
+    'y': 1.5
+    description: 手動指定または対象環境の自動選択。自動選択は Predictive Optimization と条件を要し、キーが選ばれない場合もある。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  config:
+    label: 配置方針の保存
+    kind: file
+    tier: control
+    x: 16
+    'y': 1.5
+    description: Delta の domainMetadata に delta.clustering と clusteringColumns を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  optimize:
+    label: 再配置の実行
+    kind: worker
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: 対象ファイルを読みクラスタリング列に沿って再編成する。通常は増分で、FULL は必要に応じ既存の配置も見直す。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  query:
+    label: 対象ファイルの選択
+    kind: worker
+    tier: compute
+    x: 7
+    'y': 1.5
+    description: クエリ条件とファイル統計から候補を絞る。範囲が重なるファイルは候補に残る。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  profile:
+    label: 効果・コストの確認
+    kind: service
+    tier: compute
+    x: 15
+    'y': 1.5
+    description: スキャンしたファイル数や時間と、保守の実行履歴・費用を比較する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  oldfiles:
+    label: 変更前のファイル
+    kind: db
+    tier: storage
+    x: 0
+    'y': 1.5
+    description: 現行スナップショットの対象 Parquet ファイル。キー変更だけではただちに書き換わらない。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  newfiles:
+    label: 再配置後のファイル
+    kind: db
+    tier: storage
+    x: 6
+    'y': 1.5
+    description: OPTIMIZE が書き出す Parquet。低カーディナリティ列ごとに値をそろえ、別のキーで細かく整理する最適化がある。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§3
+  log:
+    label: 表のバージョンと統計
+    kind: db
+    tier: storage
+    x: 12
+    'y': 1.5
+    description: Delta ログの add / remove と統計で有効ファイルを決める。クラスタリングされた add に provider を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  stats:
+    label: ファイルごとの値域
+    kind: file
+    tier: storage
+    x: 18
+    'y': 1.5
+    description: 各ファイルの最小値・最大値など。範囲が狭くなると条件に合わないファイルを除外しやすい。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+links:
+  - id: manual
+    from: operator
+    to: selection
+    label: 手動でキーを指定
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: trend
+    from: workload
+    to: selection
+    label: 検索傾向を分析
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: config
+    from: selection
+    to: config
+    label: キーを決める
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: record
+    from: config
+    to: log
+    label: 設定を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: launch
+    from: operator
+    to: optimize
+    label: OPTIMIZE を指示
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: policy
+    from: config
+    to: optimize
+    label: 配置方針を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: read
+    from: oldfiles
+    to: optimize
+    label: 対象ファイルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: write
+    from: optimize
+    to: newfiles
+    label: 新しいファイルを書く
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: commit
+    from: optimize
+    to: log
+    label: add / remove をコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: statistics
+    from: log
+    to: stats
+    label: ファイル統計を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: predicate
+    from: operator
+    to: query
+    label: 条件付き SQL を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: snapshot
+    from: log
+    to: query
+    label: 有効ファイルを取得
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: prune
+    from: stats
+    to: query
+    label: 候補を絞る
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: scan
+    from: newfiles
+    to: query
+    label: 候補ファイルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+  - id: measure
+    from: query
+    to: profile
+    label: スキャンを観測
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§2
+scenarios:
+  - id: recluster
+    label: 増分の配置とコミット
+    visual: layout
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§3
+    steps:
+      - links:
+          - manual
+          - config
+          - record
+        note: クラスタリング列の設定をログに保存する。
+        highlight:
+          - policy
+          - logitem
+      - links:
+          - launch
+          - policy
+          - read
+        note: OPTIMIZE が対象ファイルと現在の配置方針を確認する。
+        highlight:
+          - old1
+          - old2
+      - links:
+          - write
+          - commit
+        note: 新ファイルを書き、Delta ログに add / remove をコミットして表の状態を更新する。
+        highlight:
+          - new1
+          - new2
+          - logitem
+      - links:
+          - predicate
+          - snapshot
+          - statistics
+          - prune
+          - scan
+          - measure
+        note: 後続の検索で現行スナップショットと統計を使い、候補を絞って計測する。
+        highlight:
+          - new1
+          - new2
+          - statitem
+  - id: key-change
+    label: キー変更と既存ファイル
+    visual: layout
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§4
+    steps:
+      - links:
+          - manual
+          - config
+          - record
+        note: 新しいキーを設定するが、この時点で既存ファイルは書き換えない。
+        highlight:
+          - policy
+          - old1
+          - old2
+      - links:
+          - launch
+          - policy
+          - read
+        note: 通常の増分 OPTIMIZE と FULL の対象範囲を区別する。
+        highlight:
+          - old1
+          - old2
+      - links:
+          - write
+          - commit
+        note: 必要に応じ FULL を使い、現在のキーに合わせた配置へ再編成する。
+        highlight:
+          - new1
+          - new2
+          - logitem
+  - id: automatic
+    label: AUTO と保守の条件
+    visual: layout
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-liquid-clustering-internals.md#§5
+    steps:
+      - links:
+          - trend
+          - config
+        note: 対象環境でクエリ傾向や費用を分析する。キーが選択されない場合もある。
+        highlight:
+          - policy
+      - links:
+          - record
+        note: 採用されたキーの設定を表のメタデータに反映する。
+        highlight:
+          - logitem
+      - links:
+          - policy
+          - read
+          - write
+          - commit
+        note: Predictive Optimization が必要性を判断し非同期に保守する。
+        highlight:
+          - old1
+          - new1
+          - logitem
+blocks:
+  - id: layout
+    title: 配置と Delta ログの例
+    note: 値域・ファイル名は説明用。再配置の前後が同じスナップショットで同時に有効という意味ではありません。
+    hint: シナリオのステップに合わせ、設定・旧ファイル・新ファイルとログの役割を確認できます。
+    lanes:
+      - id: settings
+        label: 設定
+        node: config
+      - id: old
+        label: 再配置前
+        node: oldfiles
+      - id: new
+        label: 再配置後
+        node: newfiles
+      - id: meta
+        label: 表のメタデータ
+        node: log
+    items:
+      settings:
+        - id: policy
+          label: CLUSTER BY (日付)
+          k: 0
+          note: 表のクラスタリング列。キー変更だけでは既存ファイルは書き換わらない。
+      old:
+        - id: old1
+          label: 旧 A：1/01〜1/28
+          k: 1
+          note: 値域が広い例。
+        - id: old2
+          label: 旧 B：1/02〜1/31
+          k: 1
+          note: 値域が重複する例。
+      new:
+        - id: new1
+          label: 新 C：1/01〜1/14
+          k: 2
+          note: 再配置後、範囲を絞ったファイルの例。
+        - id: new2
+          label: 新 D：1/15〜1/31
+          k: 3
+          note: 範囲が異なる再配置後ファイルの例。
+      meta:
+        - id: logitem
+          label: add / remove
+          k: 4
+          note: Delta ログがスナップショットの有効ファイルを表す。
+        - id: statitem
+          label: min / max
+          k: 5
+          note: クエリ条件とファイル統計を比較し読み飛ばす。
+implementations:
+  - id: aws
+    label: AWS 上の管理 Delta テーブルと Serverless Jobs
+    description: >-
+      Unity Catalog 管理 Delta テーブルの Parquet とログを顧客 AWS アカウントの S3 に保存し、Databricks のサーバーレス Jobs で Predictive Optimization
+      を実行する例。手動 OPTIMIZE は別途対応する計算環境で実行する。
+    sources:
+      - title: Liquid clustering
+        url: https://docs.databricks.com/aws/en/tables/clustering
+      - title: Delta clustered table protocol
+        url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md#clustered-table
+      - title: Data skipping
+        url: https://docs.databricks.com/aws/en/tables/data-skipping
+      - title: Predictive optimization
+        url: https://docs.databricks.com/aws/en/optimizations/predictive-optimization
+      - title: Optimize data file layout
+        url: https://docs.databricks.com/aws/en/tables/operations/optimize
+      - title: Delta protocol compatibility
+        url: https://docs.databricks.com/aws/en/delta/feature-compatibility
+      - title: Managed storage
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+      - title: 'Data + AI Summit: Liquid Clustering'
+        url: >-
+          https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM
+    tiers:
+      - id: control
+        label: キー選択と実行指示
+        z: 2
+        size:
+          - 22
+          - 4
+      - id: compute
+        label: テーブル保守と検索
+        z: 1
+        size:
+          - 22
+          - 4
+      - id: storage
+        label: Delta ログと Parquet ファイル
+        z: 0
+        size:
+          - 22
+          - 4
+    nodes:
+      ex-operator:
+        label: 管理者の SQL
+        kind: client
+        tier: control
+        x: 0
+        'y': 1.5
+        description: クラスタリング列や自動選択、手動 OPTIMIZE の方針を指定する。
+        realizes:
+          - operator
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+      ex-workload:
+        label: 管理テーブルのクエリ履歴
+        kind: service
+        tier: control
+        x: 5
+        'y': 1.5
+        description: 自動選択で検索条件などの傾向を分析する。実行中の個別検索と区別する。
+        realizes:
+          - workload
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+      ex-selection:
+        label: 自動 Liquid Clustering
+        kind: service
+        tier: control
+        x: 10
+        'y': 1.5
+        description: 手動指定または対象環境の自動選択。自動選択は Predictive Optimization と条件を要し、キーが選ばれない場合もある。
+        realizes:
+          - selection
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+      ex-config:
+        label: Delta の clustering メタデータ
+        kind: file
+        tier: control
+        x: 16
+        'y': 1.5
+        description: Delta の domainMetadata に delta.clustering と clusteringColumns を記録する。
+        realizes:
+          - config
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+      ex-optimize:
+        label: Serverless Jobs の OPTIMIZE
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: 対象ファイルを読みクラスタリング列に沿って再編成する。通常は増分で、FULL は必要に応じ既存の配置も見直す。
+        realizes:
+          - optimize
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+        svc: databricks:platform
+      ex-query:
+        label: SQL Warehouse の data skipping
+        kind: worker
+        tier: compute
+        x: 7
+        'y': 1.5
+        description: クエリ条件とファイル統計から候補を絞る。範囲が重なるファイルは候補に残る。
+        realizes:
+          - query
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+        svc: databricks:sql
+      ex-profile:
+        label: Query Profile と保守履歴
+        kind: service
+        tier: compute
+        x: 15
+        'y': 1.5
+        description: スキャンしたファイル数や時間と、保守の実行履歴・費用を比較する。
+        realizes:
+          - profile
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+      ex-oldfiles:
+        label: S3 の旧 Parquet ファイル
+        kind: db
+        tier: storage
+        x: 0
+        'y': 1.5
+        description: 現行スナップショットの対象 Parquet ファイル。キー変更だけではただちに書き換わらない。
+        realizes:
+          - oldfiles
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+        svc: aws:s3
+      ex-newfiles:
+        label: S3 の新 Parquet ファイル
+        kind: db
+        tier: storage
+        x: 6
+        'y': 1.5
+        description: OPTIMIZE が書き出す Parquet。低カーディナリティ列ごとに値をそろえ、別のキーで細かく整理する最適化がある。
+        realizes:
+          - newfiles
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§3
+        svc: aws:s3
+      ex-log:
+        label: S3 の Delta transaction log
+        kind: db
+        tier: storage
+        x: 12
+        'y': 1.5
+        description: Delta ログの add / remove と統計で有効ファイルを決める。クラスタリングされた add に provider を記録する。
+        realizes:
+          - log
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+      ex-stats:
+        label: add action のファイル統計
+        kind: file
+        tier: storage
+        x: 18
+        'y': 1.5
+        description: 各ファイルの最小値・最大値など。範囲が狭くなると条件に合わないファイルを除外しやすい。
+        realizes:
+          - stats
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-liquid-clustering-internals.md#§6
+    groups:
+      - kind: cloud
+        label: Databricks 管理・サーバーレス計算（論理範囲）
+        provider: databricks
+        tier:
+          - control
+          - compute
+        nodes:
+          - ex-workload
+          - ex-selection
+          - ex-optimize
+          - ex-query
+          - ex-profile
+      - kind: cloud
+        label: 顧客 AWS アカウント：S3 管理ストレージ
+        provider: aws
+        tier:
+          - storage
+        nodes:
+          - ex-oldfiles
+          - ex-newfiles
+          - ex-log
+          - ex-stats

@@ -16,7 +16,7 @@ function copy(rel) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.cpSync(src, dest, { recursive: true });
 }
-for (const file of ['index.html', 'home.html', 'research.html', 'knowledge-graph.html', 'objects.html', 'brand-mark.svg', 'css', 'js', 'vendor', 'docs/object-samples']) copy(file);
+for (const file of ['index.html', 'home.html', 'research.html', 'knowledge-graph.html', 'objects.html', 'about.html', 'brand-mark.svg', 'css', 'js', 'vendor', 'docs/object-samples']) copy(file);
 const registry = JSON.parse(fs.readFileSync(path.join(root, 'models/registry.json'), 'utf8')).filter(e => e.reference);
 if (!registry.length) throw new Error('No reference models found');
 for (const entry of registry) {

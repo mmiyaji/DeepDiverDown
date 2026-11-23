@@ -1,0 +1,390 @@
+{
+  "model": "databricks-liquid-clustering-internals",
+  "name": "Databricks Liquid Clustering：ファイル配置と Delta ログ",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "operator": {
+      "type": "node",
+      "label": "設定・運用",
+      "status": "claim"
+    },
+    "workload": {
+      "type": "node",
+      "label": "クエリの傾向",
+      "status": "claim"
+    },
+    "selection": {
+      "type": "node",
+      "label": "キーの選択",
+      "status": "claim"
+    },
+    "config": {
+      "type": "link",
+      "label": "キーの選択 → 配置方針の保存",
+      "status": "claim"
+    },
+    "optimize": {
+      "type": "node",
+      "label": "再配置の実行",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "対象ファイルの選択",
+      "status": "claim"
+    },
+    "profile": {
+      "type": "node",
+      "label": "効果・コストの確認",
+      "status": "claim"
+    },
+    "oldfiles": {
+      "type": "node",
+      "label": "変更前のファイル",
+      "status": "claim"
+    },
+    "newfiles": {
+      "type": "node",
+      "label": "再配置後のファイル",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "表のバージョンと統計",
+      "status": "claim"
+    },
+    "stats": {
+      "type": "node",
+      "label": "ファイルごとの値域",
+      "status": "claim"
+    },
+    "manual": {
+      "type": "link",
+      "label": "設定・運用 → キーの選択",
+      "status": "claim"
+    },
+    "trend": {
+      "type": "link",
+      "label": "クエリの傾向 → キーの選択",
+      "status": "claim"
+    },
+    "record": {
+      "type": "link",
+      "label": "配置方針の保存 → 表のバージョンと統計",
+      "status": "claim"
+    },
+    "launch": {
+      "type": "link",
+      "label": "設定・運用 → 再配置の実行",
+      "status": "claim"
+    },
+    "policy": {
+      "type": "link",
+      "label": "配置方針の保存 → 再配置の実行",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "変更前のファイル → 再配置の実行",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "再配置の実行 → 再配置後のファイル",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "再配置の実行 → 表のバージョンと統計",
+      "status": "claim"
+    },
+    "statistics": {
+      "type": "link",
+      "label": "表のバージョンと統計 → ファイルごとの値域",
+      "status": "claim"
+    },
+    "predicate": {
+      "type": "link",
+      "label": "設定・運用 → 対象ファイルの選択",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "link",
+      "label": "表のバージョンと統計 → 対象ファイルの選択",
+      "status": "claim"
+    },
+    "prune": {
+      "type": "link",
+      "label": "ファイルごとの値域 → 対象ファイルの選択",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "link",
+      "label": "再配置後のファイル → 対象ファイルの選択",
+      "status": "claim"
+    },
+    "measure": {
+      "type": "link",
+      "label": "対象ファイルの選択 → 効果・コストの確認",
+      "status": "claim"
+    },
+    "recluster": {
+      "type": "scenario",
+      "label": "増分の配置とコミット"
+    },
+    "key-change": {
+      "type": "scenario",
+      "label": "キー変更と既存ファイル"
+    },
+    "automatic": {
+      "type": "scenario",
+      "label": "AUTO と保守の条件"
+    },
+    "ex-operator": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "管理者の SQL",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "ex-workload": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "管理テーブルのクエリ履歴",
+      "realizes": [
+        "workload"
+      ]
+    },
+    "ex-selection": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "自動 Liquid Clustering",
+      "realizes": [
+        "selection"
+      ]
+    },
+    "ex-config": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Delta の clustering メタデータ",
+      "realizes": [
+        "config"
+      ]
+    },
+    "ex-optimize": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Serverless Jobs の OPTIMIZE",
+      "realizes": [
+        "optimize"
+      ]
+    },
+    "ex-query": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "SQL Warehouse の data skipping",
+      "realizes": [
+        "query"
+      ]
+    },
+    "ex-profile": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Query Profile と保守履歴",
+      "realizes": [
+        "profile"
+      ]
+    },
+    "ex-oldfiles": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "S3 の旧 Parquet ファイル",
+      "realizes": [
+        "oldfiles"
+      ]
+    },
+    "ex-newfiles": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "S3 の新 Parquet ファイル",
+      "realizes": [
+        "newfiles"
+      ]
+    },
+    "ex-log": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "S3 の Delta transaction log",
+      "realizes": [
+        "log"
+      ]
+    },
+    "ex-stats": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "add action のファイル統計",
+      "realizes": [
+        "stats"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-databricks-liquid-clustering-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md": [
+      "model",
+      "operator",
+      "workload",
+      "selection",
+      "config",
+      "optimize",
+      "query",
+      "profile",
+      "oldfiles",
+      "newfiles",
+      "log",
+      "stats",
+      "manual",
+      "trend",
+      "record",
+      "launch",
+      "policy",
+      "read",
+      "write",
+      "commit",
+      "statistics",
+      "predicate",
+      "snapshot",
+      "prune",
+      "scan",
+      "measure",
+      "recluster",
+      "key-change",
+      "automatic",
+      "ex-operator",
+      "ex-workload",
+      "ex-selection",
+      "ex-config",
+      "ex-optimize",
+      "ex-query",
+      "ex-profile",
+      "ex-oldfiles",
+      "ex-newfiles",
+      "ex-log",
+      "ex-stats"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§3": [
+      "model",
+      "newfiles",
+      "recluster",
+      "ex-newfiles"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§4": [
+      "model",
+      "key-change"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§5": [
+      "model",
+      "automatic"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§6": [
+      "model",
+      "ex-operator",
+      "ex-workload",
+      "ex-selection",
+      "ex-config",
+      "ex-optimize",
+      "ex-query",
+      "ex-profile",
+      "ex-oldfiles",
+      "ex-newfiles",
+      "ex-log",
+      "ex-stats"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§7": [
+      "model"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§2": [
+      "operator",
+      "workload",
+      "selection",
+      "config",
+      "optimize",
+      "query",
+      "profile",
+      "oldfiles",
+      "newfiles",
+      "log",
+      "stats",
+      "manual",
+      "trend",
+      "record",
+      "launch",
+      "policy",
+      "read",
+      "write",
+      "commit",
+      "statistics",
+      "predicate",
+      "snapshot",
+      "prune",
+      "scan",
+      "measure"
+    ]
+  },
+  "reference": {
+    "category": "クラウド分析基盤",
+    "order": 23,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "databricks-optimization-internals",
+    "objectives": [
+      "キー設定と既存ファイルの再配置を区別する。",
+      "Delta ログとファイル単位の統計が読み取りに果たす役割を追う。",
+      "AUTO・増分 OPTIMIZE・FULL の条件と費用を理解する。"
+    ],
+    "sources": [
+      {
+        "title": "Liquid clustering",
+        "url": "https://docs.databricks.com/aws/en/tables/clustering"
+      },
+      {
+        "title": "Delta clustered table protocol",
+        "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#clustered-table"
+      },
+      {
+        "title": "Data skipping",
+        "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
+      },
+      {
+        "title": "Predictive optimization",
+        "url": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"
+      },
+      {
+        "title": "Optimize data file layout",
+        "url": "https://docs.databricks.com/aws/en/tables/operations/optimize"
+      },
+      {
+        "title": "Delta protocol compatibility",
+        "url": "https://docs.databricks.com/aws/en/delta/feature-compatibility"
+      },
+      {
+        "title": "Managed storage",
+        "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
+      },
+      {
+        "title": "Data + AI Summit: Liquid Clustering",
+        "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
+      },
+      {
+        "title": "Liquid Clustering のデータ配置とファイル統計",
+        "url": "https://www.databricks.com/blog/debunking-8-data-layout-myths-why-liquid-clustering-outperforms-partitioning"
+      }
+    ]
+  }
+}

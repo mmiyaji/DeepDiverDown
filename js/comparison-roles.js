@@ -1,6 +1,25 @@
 // Correspondences describe responsibilities in the published example diagrams.
 // Node IDs are scoped to a model: "source" can be a database or an adapter.
 const roles = {
+  '読み取り範囲の選択': { 'snowflake-optima-internals':'prune', 'databricks-dynamic-file-pruning':'prune' },
+  '読み飛ばしに使う統計': { 'snowflake-optima-internals':'stats', 'databricks-dynamic-file-pruning':'stats' },
+  'ストレージへの短期認証情報': { 'snowflake-iceberg-vended-credentials':'credentials', 'databricks-unity-vended-credentials':'credential' },
+  'クラウド上のテーブルデータ': { 'snowflake-iceberg-vended-credentials':'files', 'databricks-unity-vended-credentials':'files' },
+  'クラスタリングの設定': { 'snowflake-clustering-internals':'key', 'databricks-liquid-clustering-internals':'config' },
+  'データ配置の再編成（Snowflake は Classic の例）': { 'snowflake-clustering-internals':'execute', 'databricks-liquid-clustering-internals':'optimize' },
+  '再配置前のデータ': { 'snowflake-clustering-internals':'before', 'databricks-liquid-clustering-internals':'oldfiles' },
+  '再配置後のデータ': { 'snowflake-clustering-internals':'after', 'databricks-liquid-clustering-internals':'newfiles' },
+  '表の状態と統計': { 'snowflake-clustering-internals':'metadata', 'databricks-liquid-clustering-internals':'log' },
+  '保守の観測': { 'snowflake-clustering-internals':'monitor', 'databricks-liquid-clustering-internals':'profile' },
+  'SQL の受付と計画': { 'snowflake-optimization-internals':'planner', 'databricks-optimization-internals':'planner' },
+  '条件による読み取り範囲の絞り込み': { 'snowflake-optimization-internals':'metadata', 'databricks-optimization-internals':'log' },
+  '列指向データの保存': { 'snowflake-optimization-internals':'partitions', 'databricks-optimization-internals':'files' },
+  'データのスキャン': { 'snowflake-optimization-internals':'scan', 'databricks-optimization-internals':'scan' },
+  '結合と集計の実行': { 'snowflake-optimization-internals':'operators', 'databricks-optimization-internals':'operators' },
+  '保存済みクエリ結果': { 'snowflake-optimization-internals':'result', 'databricks-optimization-internals':'result' },
+  '実行資源のデータキャッシュ': { 'snowflake-optimization-internals':'whcache', 'databricks-optimization-internals':'diskcache' },
+  'データ配置の保守': { 'snowflake-optimization-internals':'cluster', 'databricks-optimization-internals':'maintenance' },
+  'クエリ実行の観測': { 'snowflake-optimization-internals':'profile', 'databricks-optimization-internals':'profile' },
   '車載アプリ': { 'autosar-classic':'app', 'autosar-adaptive':'app', 'automotive-grade-linux':'ui', 'android-automotive':'app', 'kuksa-vss':'app' },
   'アプリが利用する基盤': { 'autosar-classic':'runtime', 'autosar-adaptive':'runtime', 'automotive-grade-linux':'framework', 'android-automotive':'service' },
   '現場の処理': { 'edge-k3s':'workload', 'kubeedge':'workload', 'aws-iot-greengrass':'component' },
@@ -70,6 +89,12 @@ const roles = {
 // Explicit method names from the examples distinguish techniques even when
 // the models have no service catalog IDs.
 const methods = {
+  'snowflake-optima-internals': { prune:'式向けの追加メタデータや索引も使って micro-partition を除外', stats:'micro-partition の通常統計と、対象となる式向けの追加メタデータ' },
+  'databricks-dynamic-file-pruning': { prune:'JOIN の実行時キーとファイル統計から Delta ファイルを除外', stats:'Delta ログのファイル単位の列統計' },
+  'snowflake-iceberg-vended-credentials': { credentials:'外部カタログが発行し、Snowflake が取得・更新して読み取る', files:'Snowflake が一時認証情報で外部 Iceberg データにアクセス' },
+  'databricks-unity-vended-credentials': { credential:'Unity Catalog が発行し、外部エンジンが取得・更新する', files:'外部エンジンが一時認証情報で Unity Catalog 管理データにアクセス' },
+  'snowflake-optimization-internals': { metadata:'micro-partition ごとの列統計で候補を絞る', partitions:'Snowflake 管理テーブルの micro-partition', operators:'Virtual Warehouse のクエリ演算', result:'永続化されたクエリ結果', whcache:'稼働中ウェアハウスのデータキャッシュ', cluster:'Automatic Clustering による再編成' },
+  'databricks-optimization-internals': { log:'Delta ログのファイル統計で候補を絞る', files:'Delta テーブルの Parquet ファイル', operators:'Photon と対応しない演算の実行経路', result:'ローカルとサーバーレスのリモート結果キャッシュ', diskcache:'計算ノード上のディスクキャッシュ', maintenance:'Predictive Optimization と OPTIMIZE による再編成' },
   'kafka-streams': { changelog:'内部トピックの変更ログを再読し、ローカルの状態ストアを復元する。' },
   flink: { checkpoint:'成功したチェックポイントから演算子の状態と入力位置を復元する。' },
   'kafka-connect': { offsets:'コネクターのオフセットと購読グループのコミット位置' },

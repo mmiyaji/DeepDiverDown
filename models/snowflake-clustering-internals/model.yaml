@@ -1,0 +1,622 @@
+name: Snowflake：Classic と Optima Clustering の内部
+description: 2024 年公開の Classic の区画選択・段階的再配置と、Optima で確認できる違いを分けて追う。
+parent:
+  model: snowflake-optimization-internals
+  node: cluster
+reference:
+  objectives:
+    - Classic のレベル、対象選択、再配置と競合確認を追う。
+    - Classic と Optima の公開された違いと未公開部分を区別する。
+    - 課金と実行方式の観測方法を理解する。
+  sources:
+    - title: Automatic Clustering at Snowflake（2024年の内部構造）
+      url: https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/
+    - title: Automatic Clustering の仕様と費用
+      url: https://docs.snowflake.com/en/user-guide/tables-auto-reclustering
+    - title: Optima Clustering の発表
+      url: https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/
+    - title: Clustering Keys
+      url: https://docs.snowflake.com/en/user-guide/tables-clustering-keys
+    - title: SYSTEM$CLUSTERING_INFORMATION
+      url: https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information
+    - title: Workload-Aware Incremental Reclustering（研究試作）
+      url: https://arxiv.org/html/2602.23289
+sources:
+  - docs/reference-snowflake-clustering-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-clustering-internals.md#§1
+  - type: doc
+    ref: docs/reference-snowflake-clustering-internals.md#§3
+  - type: doc
+    ref: docs/reference-snowflake-clustering-internals.md#§4
+  - type: doc
+    ref: docs/reference-snowflake-clustering-internals.md#§5
+  - type: doc
+    ref: docs/reference-snowflake-clustering-internals.md#§6
+  - type: doc
+    ref: docs/reference-snowflake-clustering-internals.md#§7
+tiers:
+  - id: input
+    label: 設定と観測
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: control
+    label: Classic の保守処理（2024年の公開説明）
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: テーブルの micro-partition
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  user:
+    label: 設定と確認
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: キーを設定し、テーブルの方式と費用・クエリ性能を確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  key:
+    label: クラスタリングキー
+    kind: file
+    tier: input
+    x: 5
+    'y': 1.5
+    description: 列や式で整理の基準を指定する。キーの自動選択は公開状況を確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  optima:
+    label: 新方式の再配置
+    kind: service
+    tier: input
+    x: 11
+    'y': 1.5
+    description: Optima の内部手順は未公開。性能に重要なデータを優先すると説明される。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  monitor:
+    label: 方式と費用の観測
+    kind: service
+    tier: input
+    x: 17
+    'y': 1.5
+    description: 方式は SYSTEM$CLUSTERING_INFORMATION、利用費用は AUTOMATIC_CLUSTERING_HISTORY で確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  metrics:
+    label: 区画の重なりの評価
+    kind: service
+    tier: control
+    x: 0
+    'y': 1.5
+    description: Classic の説明では width・depth と各 level の集計値を使い、区画の重なりを評価する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  select:
+    label: 対象区画の選択
+    kind: worker
+    tier: control
+    x: 5
+    'y': 1.5
+    description: Classic の説明では重なりの大きい区画を同じバッチにまとめる。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  execute:
+    label: 対象区画の再配置
+    kind: worker
+    tier: control
+    x: 10
+    'y': 1.5
+    description: 選んだバッチを読み、ソートし、新しい区画を上位レベルに作る。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  validate:
+    label: コミット前の競合確認
+    kind: service
+    tier: control
+    x: 16
+    'y': 1.5
+    description: Classic の説明では対象区画への並行 DML を確認し、競合時は実行をロールバックする。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  before:
+    label: 再配置前の区画
+    kind: db
+    tier: data
+    x: 0
+    'y': 1.5
+    description: 書き込み後の区画はキーの値域が互いに重なる場合がある。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  after:
+    label: 再配置後の区画
+    kind: db
+    tier: data
+    x: 7
+    'y': 1.5
+    description: 区画を読み直して新しい区画を作り、成功時に表の状態へ反映する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  metadata:
+    label: 区画の値域と表の状態
+    kind: db
+    tier: data
+    x: 14
+    'y': 1.5
+    description: 各区画の統計とテーブルの状態。読み取りでは候補の絞り込みにも使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  dml:
+    label: 並行する更新
+    kind: client
+    tier: data
+    x: 20
+    'y': 1.5
+    description: ユーザーの DML が対象区画を変更すると Classic の競合確認に影響し得る。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+links:
+  - id: define
+    from: user
+    to: key
+    label: キーを設定
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: evaluate
+    from: metadata
+    to: metrics
+    label: 値域と重なりを評価
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: levels
+    from: metrics
+    to: select
+    label: レベルと対象を選ぶ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: batch
+    from: select
+    to: execute
+    label: 区画をバッチで渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: read
+    from: before
+    to: execute
+    label: 対象区画を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: write
+    from: execute
+    to: after
+    label: 新しい区画を作る
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: check
+    from: execute
+    to: validate
+    label: コミット前に検証
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: dml
+    from: dml
+    to: validate
+    label: 並行変更と照合
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: commit
+    from: validate
+    to: metadata
+    label: 競合がなければ反映
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: choose
+    from: key
+    to: optima
+    label: 定義されたキーを使用
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: optimize
+    from: optima
+    to: after
+    label: 必要に応じ再配置
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: inspect
+    from: user
+    to: monitor
+    label: 方式と費用を調べる
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+  - id: measure
+    from: metadata
+    to: monitor
+    label: 区画の状態を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§2
+scenarios:
+  - id: classic
+    label: Classic：選択から段階的な再配置
+    visual: levels
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§3
+    steps:
+      - links:
+          - define
+          - evaluate
+        note: キーと区画の値域を確認し、重なりを評価する。
+        highlight:
+          - level0
+          - old1
+          - old2
+      - links:
+          - levels
+          - batch
+          - read
+        note: 選択ジョブがレベルを選び、重なる区画をバッチにまとめる。
+        highlight:
+          - level0
+          - batchitem
+      - links:
+          - write
+          - check
+          - commit
+        note: 実行ジョブが新しい区画を作り、競合がなければ反映する。
+        highlight:
+          - level1
+          - new1
+          - new2
+  - id: conflict
+    label: Classic：並行更新との競合
+    visual: levels
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§4
+    steps:
+      - links:
+          - batch
+          - read
+          - write
+        note: 再配置の対象を読み、新しい区画を用意する。
+        highlight:
+          - old1
+          - new1
+      - links:
+          - dml
+          - check
+        note: コミット直前に並行 DML による変更を検証する。
+        highlight:
+          - old1
+          - dmlitem
+      - links:
+          - check
+        note: 対象区画に競合があれば、その再配置実行をロールバックする。
+        highlight:
+          - dmlitem
+  - id: optima
+    label: Optima：公開された動作と観測
+    visual: levels
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-clustering-internals.md#§5
+    steps:
+      - links:
+          - define
+          - choose
+        note: クラスタリングキーを指定する。AUTO 選択の利用可能性は別に確認する。
+        highlight:
+          - keyitem
+      - links:
+          - optimize
+        note: 重要なデータを優先して再配置すると説明される。内部手順は公開資料から特定できない。
+        highlight:
+          - optimaitem
+      - links:
+          - inspect
+          - measure
+        note: テーブルの方式と費用、クエリで読んだ区画を確認する。
+        highlight:
+          - monitoritem
+blocks:
+  - id: levels
+    title: Classic のレベルと再配置（概念例）
+    note: 値域とレベルは説明用。Classic の 2024 年の記事に基づき、Optima が同じ構造を使うことは意味しません。
+    hint: シナリオの各ステップで対象となる設定、区画、バッチを強調します。
+    lanes:
+      - id: cfg
+        label: 設定と方式
+        node: key
+      - id: l0
+        label: 再配置前のレベル
+        node: before
+      - id: l1
+        label: 再配置後のレベル
+        node: after
+      - id: obs
+        label: 競合と観測
+        node: monitor
+    items:
+      cfg:
+        - id: keyitem
+          label: キー：日付
+          k: 0
+          note: クラスタリングの基準。
+        - id: optimaitem
+          label: Optima（内部未公開）
+          k: 5
+          note: Classic と同じ選択・レベル構造だとは確認されていない。
+      l0:
+        - id: level0
+          label: level 0
+          k: 0
+          note: 未整理の新しいデータを含む例。
+        - id: old1
+          label: A：1月〜6月
+          k: 1
+          note: B と値域が重なり、同じバッチ候補となる例。
+        - id: old2
+          label: B：4月〜9月
+          k: 1
+          note: A と値域が重なる例。
+        - id: batchitem
+          label: 対象バッチ
+          k: 2
+          note: 選択された区画をまとめて処理する。
+      l1:
+        - id: level1
+          label: level 1
+          k: 0
+          note: 再配置の結果を置く上位レベルの概念例。
+        - id: new1
+          label: C：1月〜4月
+          k: 3
+          note: 値域の重なりを減らした区画の例。
+        - id: new2
+          label: D：5月〜9月
+          k: 4
+          note: 上位レベルの新しい区画の例。
+      obs:
+        - id: dmlitem
+          label: 並行 DML
+          k: 1
+          note: 対象の区画に並行更新があれば、競合として検出され得る。
+        - id: monitoritem
+          label: 方式・費用・読み取り
+          k: 4
+          note: 運用者は方式、費用、クエリの読み取りを確認する。
+implementations:
+  - id: snowflake
+    label: Snowflake 管理テーブルのクラスタリング
+    description: Snowflake 管理テーブルの例。Classic の処理役割は 2024 年の記事の説明であり、Optima の内部手順を表さない。公開サービスの内部実行環境を利用者が直接管理するものではない。
+    sources:
+      - title: Automatic Clustering at Snowflake（2024年の内部構造）
+        url: https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/
+      - title: Automatic Clustering の仕様と費用
+        url: https://docs.snowflake.com/en/user-guide/tables-auto-reclustering
+      - title: Optima Clustering の発表
+        url: https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/
+      - title: Clustering Keys
+        url: https://docs.snowflake.com/en/user-guide/tables-clustering-keys
+      - title: SYSTEM$CLUSTERING_INFORMATION
+        url: https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information
+      - title: Workload-Aware Incremental Reclustering（研究試作）
+        url: https://arxiv.org/html/2602.23289
+    tiers:
+      - id: input
+        label: 設定と観測
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: control
+        label: Classic の保守処理（2024年の公開説明）
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: テーブルの micro-partition
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-user:
+        label: 利用者の SQL と Snowsight
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: キーを設定し、テーブルの方式と費用・クエリ性能を確認する。
+        realizes:
+          - user
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-key:
+        label: ORDERS の clustering key
+        kind: file
+        tier: input
+        x: 5
+        'y': 1.5
+        description: 列や式で整理の基準を指定する。キーの自動選択は公開状況を確認する。
+        realizes:
+          - key
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-optima:
+        label: Optima Clustering（内部は非公開）
+        kind: service
+        tier: input
+        x: 11
+        'y': 1.5
+        description: Optima の内部手順は未公開。性能に重要なデータを優先すると説明される。
+        realizes:
+          - optima
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+        svc: snowflake:platform
+      ex-monitor:
+        label: Snowflake の利用履歴と関数
+        kind: service
+        tier: input
+        x: 17
+        'y': 1.5
+        description: 方式は SYSTEM$CLUSTERING_INFORMATION、利用費用は AUTOMATIC_CLUSTERING_HISTORY で確認する。
+        realizes:
+          - monitor
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-metrics:
+        label: Classic の区画統計・レベル
+        kind: service
+        tier: control
+        x: 0
+        'y': 1.5
+        description: Classic の説明では width・depth と各 level の集計値を使い、区画の重なりを評価する。
+        realizes:
+          - metrics
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-select:
+        label: Classic の partition-selection job
+        kind: worker
+        tier: control
+        x: 5
+        'y': 1.5
+        description: Classic の説明では重なりの大きい区画を同じバッチにまとめる。
+        realizes:
+          - select
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-execute:
+        label: Classic の clustering-execution job
+        kind: worker
+        tier: control
+        x: 10
+        'y': 1.5
+        description: 選んだバッチを読み、ソートし、新しい区画を上位レベルに作る。
+        realizes:
+          - execute
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-validate:
+        label: Classic の楽観的競合確認
+        kind: service
+        tier: control
+        x: 16
+        'y': 1.5
+        description: Classic の説明では対象区画への並行 DML を確認し、競合時は実行をロールバックする。
+        realizes:
+          - validate
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-before:
+        label: ORDERS の既存 micro-partitions
+        kind: db
+        tier: data
+        x: 0
+        'y': 1.5
+        description: 書き込み後の区画はキーの値域が互いに重なる場合がある。
+        realizes:
+          - before
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-after:
+        label: ORDERS の新しい micro-partitions
+        kind: db
+        tier: data
+        x: 7
+        'y': 1.5
+        description: 区画を読み直して新しい区画を作り、成功時に表の状態へ反映する。
+        realizes:
+          - after
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-metadata:
+        label: Snowflake 管理の区画メタデータ
+        kind: db
+        tier: data
+        x: 14
+        'y': 1.5
+        description: 各区画の統計とテーブルの状態。読み取りでは候補の絞り込みにも使う。
+        realizes:
+          - metadata
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+      ex-dml:
+        label: 利用者による並行 DML
+        kind: client
+        tier: data
+        x: 20
+        'y': 1.5
+        description: ユーザーの DML が対象区画を変更すると Classic の競合確認に影響し得る。
+        realizes:
+          - dml
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-clustering-internals.md#§6
+    groups:
+      - kind: cloud
+        label: Snowflake 管理のサービス領域（内部部品は公開情報による論理表現）
+        provider: snowflake
+        tier:
+          - input
+          - control
+          - data
+        nodes:
+          - ex-key
+          - ex-optima
+          - ex-monitor
+          - ex-metrics
+          - ex-select
+          - ex-execute
+          - ex-validate
+          - ex-before
+          - ex-after
+          - ex-metadata

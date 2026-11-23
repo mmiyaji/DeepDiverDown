@@ -1,0 +1,481 @@
+name: Databricks：Deletion Vector と Delta の更新
+description: Parquet ファイルを書き換えずに行を無効化し、読み取り時に反映する仕組みを追う。
+parent:
+  model: databricks-optimization-internals
+  node: maintenance
+reference:
+  objectives:
+    - Parquet ファイルを書き換えずに行を無効化し、読み取り時に反映する仕組みを追う。
+    - 変更対象を特定し、無効な行位置と必要な新しい行をコミットする。
+    - 読み手はスナップショットを参照し、無効な位置を除いて結果を返す。
+  sources:
+    - title: Deletion vectors の仕様
+      url: https://docs.databricks.com/aws/en/tables/features/deletion-vectors
+    - title: 'Delta Lake protocol: Deletion Vectors'
+      url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md#deletion-vectors
+    - title: Delta Lake の内部構造
+      url: >-
+        https://community.databricks.com/t5/technical-blog/delta-lake-under-the-hood-what-every-data-engineer-should-know/ba-p/156311
+    - title: Unity Catalog 管理ストレージ
+      url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+sources:
+  - docs/reference-databricks-deletion-vectors-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-deletion-vectors-internals.md#§1
+  - type: doc
+    ref: docs/reference-databricks-deletion-vectors-internals.md#§4
+tiers:
+  - id: input
+    label: 変更要求
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: 変更対象の判定
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: 読み取りと物理保守
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: Delta ログとファイル
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  writer:
+    label: 行の変更要求
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: DELETE / UPDATE / MERGE の変更を要求する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  locate:
+    label: 変更対象の判定
+    kind: worker
+    tier: process
+    x: 0
+    'y': 1.5
+    description: 条件に一致する行を特定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  original:
+    label: 既存ファイル
+    kind: db
+    tier: data
+    x: 0
+    'y': 1.5
+    description: 元の Parquet データファイルは論理削除後も直ちに書き換えられない。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  dv:
+    label: 無効な行の位置
+    kind: file
+    tier: data
+    x: 5.2
+    'y': 1.5
+    description: Deletion Vector はデータファイル内で無効になった行の位置を記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  newrows:
+    label: 変更後の行
+    kind: db
+    tier: data
+    x: 10.4
+    'y': 1.5
+    description: UPDATE / MERGE では新しい行を別途書き込む場合がある。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  log:
+    label: 表のバージョン
+    kind: file
+    tier: data
+    x: 15.600000000000001
+    'y': 1.5
+    description: Delta ログは有効なファイルとその deletion vector の参照を持つスナップショットを定義する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  read:
+    label: 結果の読み取り
+    kind: worker
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: スナップショットのファイルを読み、ベクトルで無効な位置を除外する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  purge:
+    label: 物理的な再書き込み
+    kind: worker
+    tier: compute
+    x: 5.2
+    'y': 1.5
+    description: REORG TABLE APPLY PURGE 等で対象ファイルの論理削除を物理データに反映できる。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  vacuum:
+    label: 古いファイルの削除
+    kind: service
+    tier: compute
+    x: 10.4
+    'y': 1.5
+    description: 保持期間などの条件を満たした不要ファイルは VACUUM で削除する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+links:
+  - id: request
+    from: writer
+    to: locate
+    label: 変更を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: scan
+    from: original
+    to: locate
+    label: 対象行を探す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: mark
+    from: locate
+    to: dv
+    label: 行位置を無効化
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: new
+    from: locate
+    to: newrows
+    label: 変更後の行を書く
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: commit
+    from: locate
+    to: log
+    label: 変更をコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: reference
+    from: log
+    to: read
+    label: 有効ファイルとベクトルを参照
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: apply
+    from: dv
+    to: read
+    label: 無効な行を除外
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: rows
+    from: original
+    to: read
+    label: 元データを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: added
+    from: newrows
+    to: read
+    label: 追加された行を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: rewrite
+    from: dv
+    to: purge
+    label: 論理削除を物理的に反映
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+  - id: cleanup
+    from: purge
+    to: vacuum
+    label: 保持期間後に旧ファイルを削除
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-deletion-vectors-internals.md#§3
+    steps:
+      - links:
+          - request
+          - scan
+          - mark
+          - new
+          - commit
+        note: 変更対象を特定し、無効な行位置と必要な新しい行をコミットする。
+        highlight:
+          - row2
+          - deleted1
+          - new1
+          - version
+      - links:
+          - reference
+          - rows
+          - apply
+          - added
+        note: 読み手はスナップショットを参照し、無効な位置を除いて結果を返す。
+        highlight:
+          - row1
+          - row3
+          - new1
+      - links:
+          - rewrite
+          - cleanup
+        note: 物理的な書き換えと古いファイルの削除は別の処理・保持条件に従う。
+    visual: rows
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: databricks
+    label: AWS 上の Databricks SQL Warehouse と S3
+    description: >-
+      Databricks SQL Warehouse と Unity Catalog 管理 Delta テーブルを使い、顧客 AWS アカウントの S3 にデータと Delta
+      ログを保存する概念例。機能を有効にした表への更新と読み取りの後、必要に応じ物理再書き込みと保持期間後の削除を行う。
+    sources:
+      - title: Deletion vectors の仕様
+        url: https://docs.databricks.com/aws/en/tables/features/deletion-vectors
+      - title: 'Delta Lake protocol: Deletion Vectors'
+        url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md#deletion-vectors
+      - title: Delta Lake の内部構造
+        url: >-
+          https://community.databricks.com/t5/technical-blog/delta-lake-under-the-hood-what-every-data-engineer-should-know/ba-p/156311
+      - title: Unity Catalog 管理ストレージ
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+    tiers:
+      - id: input
+        label: 変更要求
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: 変更対象の判定
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: 読み取りと物理保守
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: Delta ログとファイル
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-writer:
+        label: SQL の DELETE / UPDATE / MERGE
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: DELETE / UPDATE / MERGE の変更を要求する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - writer
+      ex-locate:
+        label: Databricks Runtime の変更処理
+        kind: worker
+        tier: process
+        x: 0
+        'y': 1.5
+        description: 条件に一致する行を特定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - locate
+        svc: databricks:sql
+      ex-original:
+        label: S3 の Parquet ファイル（S3）
+        kind: db
+        tier: data
+        x: 0
+        'y': 1.5
+        description: 元の Parquet データファイルは論理削除後も直ちに書き換えられない。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - original
+        svc: aws:s3
+      ex-dv:
+        label: Deletion Vector
+        kind: file
+        tier: data
+        x: 5.2
+        'y': 1.5
+        description: Deletion Vector はデータファイル内で無効になった行の位置を記録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - dv
+      ex-newrows:
+        label: 新しい Parquet ファイル（S3）
+        kind: db
+        tier: data
+        x: 10.4
+        'y': 1.5
+        description: UPDATE / MERGE では新しい行を別途書き込む場合がある。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - newrows
+        svc: aws:s3
+      ex-log:
+        label: Delta transaction log（S3）
+        kind: file
+        tier: data
+        x: 15.600000000000001
+        'y': 1.5
+        description: Delta ログは有効なファイルとその deletion vector の参照を持つスナップショットを定義する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - log
+        svc: aws:s3
+      ex-read:
+        label: Delta reader / SQL Warehouse
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: スナップショットのファイルを読み、ベクトルで無効な位置を除外する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - read
+        svc: databricks:sql
+      ex-purge:
+        label: REORG TABLE APPLY PURGE
+        kind: worker
+        tier: compute
+        x: 5.2
+        'y': 1.5
+        description: REORG TABLE APPLY PURGE 等で対象ファイルの論理削除を物理データに反映できる。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - purge
+      ex-vacuum:
+        label: VACUUM
+        kind: service
+        tier: compute
+        x: 10.4
+        'y': 1.5
+        description: 保持期間などの条件を満たした不要ファイルは VACUUM で削除する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-deletion-vectors-internals.md#§5
+        realizes:
+          - vacuum
+    groups:
+      - kind: cloud
+        label: Databricks Jobs compute（論理範囲）
+        provider: databricks
+        tier:
+          - process
+          - compute
+        nodes:
+          - ex-locate
+          - ex-read
+          - ex-purge
+          - ex-vacuum
+      - kind: cloud
+        label: 顧客 AWS アカウント：S3
+        provider: aws
+        tier:
+          - data
+        nodes:
+          - ex-original
+          - ex-dv
+          - ex-newrows
+          - ex-log
+blocks:
+  - id: rows
+    title: ファイルと無効行（概念例）
+    note: 行番号は説明用。更新後も元ファイルは保持され、読み取り時に無効行を除外する。
+    lanes:
+      - id: old
+        label: 元ファイル
+        node: original
+      - id: deleted
+        label: 削除ベクトル
+        node: dv
+      - id: added
+        label: 更新後の行
+        node: newrows
+      - id: meta
+        label: 表の状態
+        node: log
+    items:
+      old:
+        - id: row1
+          label: 行 0
+          k: 0
+          note: 読み取る行。
+        - id: row2
+          label: 行 1
+          k: 1
+          note: 変更対象の元の行。
+        - id: row3
+          label: 行 2
+          k: 0
+          note: 読み取る行。
+      deleted:
+        - id: deleted1
+          label: 行 1 を無効化
+          k: 1
+          note: 該当行は論理的に除外される。
+      added:
+        - id: new1
+          label: 変更後の行
+          k: 2
+          note: UPDATE の場合の例。
+      meta:
+        - id: version
+          label: 有効ファイルと DV
+          k: 3
+          note: Delta ログでスナップショットを構成する。

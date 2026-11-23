@@ -46,3 +46,52 @@ BI の Snowflake ロールに `BI_WH` の使用と注文データの参照を許
 出典 [マイクロパーティション](https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions)、[マルチクラスターウェアハウス](https://docs.snowflake.com/en/user-guide/warehouses-multicluster)、[永続化されたクエリ結果](https://docs.snowflake.com/en/user-guide/querying-persisted-results)、[QUERY_HISTORY ビュー](https://docs.snowflake.com/en/sql-reference/account-usage/query_history)
 
 Snowflake が計算・ストレージ・Cloud Services の基盤を運用する。利用者は BI_WH のサイズ、最小・最大クラスター数やスケーリング方針を設定し、権限に応じて Query History を参照できる。パーティションや保存済み結果はサービスが管理し、内部ノードを利用者が直接操作するものではない。結果再利用は公式資料の条件に依存し、同一 SQL だけで保証されない。この調査手順・数値は例示であり実環境での性能検証は行っていない。[Snowflake architecture](https://docs.snowflake.com/en/user-guide/intro-key-concepts)
+
+## パフォーマンス最適化の調査メモ
+
+### まず遅い箇所を分ける
+
+Query History で実行待ちと実行時間を区別し、Query Profile の TableScan、Join、Aggregate、Sort などの演算子を確認する。TableScan の `Partitions scanned` / `Partitions total`、読み取った量、Join の入出力行数、ローカル・リモートへの spill に着目する。全件集計のように多くの行が必要な処理では、区画を除外できなくても直ちに異常とは限らない。[Query Profile](https://docs.snowflake.com/en/user-guide/ui-snowsight-activity)
+
+| 症状 | 主な確認点 | 検討する方向 |
+|---|---|---|
+| 同時実行時だけ遅い | 待ち行列、同時実行数、ウェアハウス負荷 | 負荷の分離、マルチクラスターによる並行処理。単一クエリの高速化とは分ける |
+| 対象を絞っても多くを読む | TableScan の区画数、条件とデータ分布、列の読み取り | 条件・データ配置の見直し、必要な場合にクラスタリングや Search Optimization を評価 |
+| Join や集計で処理量が増える | Join 前後の行数、キーの型、重複、spill | 意図しない多対多結合、不要な列や行、キーの型変換を確認 |
+| ローカル・リモートへ spill | どの演算子で中間結果が増えたか | SQL やバッチの見直し、必要に応じてより大きなウェアハウスを評価 |
+| 同じ SQL の速度が安定しない | 結果キャッシュ、ウェアハウスの状態、負荷 | 再利用条件と測定条件を揃え、複数回比較 |
+
+spill の計測では、Query Acceleration Service が有効な場合、対象となるクエリで少量のリモートストレージ書き込みが発生し得る点に注意する。[メモリ不足と spill](https://docs.snowflake.com/en/user-guide/performance-query-warehouse-memory)
+
+### 読み取りを減らす仕組み
+
+- **静的・動的 pruning**：コンパイル時には条件と区画メタデータを使い、実行時には結合から得たフィルターを利用できる。区画ごとの値域が検索条件と重ならなければ読み取りを省ける。[性能ガイド](https://www.snowflake.com/en/developers/guides/performance/)
+- **列の読み取り**：マイクロパーティション内で列は独立して保存されるため、必要な列だけを選ぶことで読み取り量を抑えられる。[マイクロパーティション](https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions)
+- **クラスタリング**：よく使うフィルターとデータの配置を対応させ、区画ごとの値域を絞る。自動再クラスタリングは計算費用が発生し、書き換えに伴う保存費用にも注意する。[ストレージの性能最適化](https://docs.snowflake.com/en/user-guide/performance-query-storage)
+- **Search Optimization Service**：選択性の高い等値検索、文字列、VARIANT、地理空間など、対応する検索に有効。補助構造の作成・維持に計算とストレージの費用がかかる。頻繁な更新や再クラスタリングは維持費を増やし得る。[最適化の選択肢](https://docs.snowflake.com/en/user-guide/performance-query-options)、[費用の見積もり](https://docs.snowflake.com/en/user-guide/search-optimization/cost-estimation)
+- **Top-K pruning**：対応条件を満たす `ORDER BY` と `LIMIT` の組み合わせでは、残りの区画が上位 K 件に入らないと判断できた時点で読み取りを省ける。対象の型や NULL の順序などの条件を確認する。[Top-K pruning](https://docs.snowflake.com/en/user-guide/querying-top-k-pruning-optimization)
+- **Optima Metadata**：クエリで頻出する式に応じたメタデータを生成し、通常の統計だけでは絞り込みにくい条件の pruning を改善する。公開記事が説明する機能であり、提供状況は利用環境の最新資料で確認する。[Optima Metadata](https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/)
+
+### 計算・再利用・事前計算
+
+ウェアハウスの**サイズ変更**は、個々のクエリに利用できる計算資源やメモリを増やす選択肢である。**マルチクラスター**は主に同時要求の処理能力を増やし、同じ単一クエリに追加クラスターを自動投入する意味ではない。いずれも利用料金と実測結果を比較する。[ウェアハウスの性能](https://docs.snowflake.com/en/user-guide/performance-query-warehouse)
+
+**永続化クエリ結果**は、同じクエリ、データ、権限などの再利用条件を満たした場合に実行を省略する。通常 24 時間保持され、再利用のたびに期間が更新されるが、最初の実行から最大 31 日。条件を満たしても再利用は保証されない。ウェアハウス側のデータキャッシュとは別に扱う。[永続化されたクエリ結果](https://docs.snowflake.com/en/user-guide/querying-persisted-results)、[ウェアハウスのキャッシュ](https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache)
+
+**Materialized View** は対象となる計算結果を事前に保持し、対応するワークロードで読み取りを減らせる。**Dynamic Table** は定義したクエリの結果を目標遅延に基づき更新する仕組みであり、更新時間・費用と鮮度の要件を一緒に評価する。**Query Acceleration Service** は対象クエリの一部を共有計算資源へオフロードする別の選択肢である。いずれも適用範囲や追加費用を確認する。[性能最適化の選択肢](https://docs.snowflake.com/en/user-guide/performance-query-options)、[Dynamic Tables の概要](https://docs.snowflake.com/en/user-guide/dynamic-tables-about)
+
+### 比較・検証の手順
+
+1. 対象 SQL、データ量、結果、権限、ウェアハウスサイズ、同時実行数を記録する。
+2. `USE_CACHED_RESULT` とウェアハウス再開状況を含むキャッシュ条件を揃え、待ち時間と実行時間を別々に比較する。
+3. Query Profile の区画数、Join 前後の行数、spill、処理時間を比較し、どの演算子が改善したか確認する。
+4. クラスタリング・Search Optimization・事前計算を導入する場合は、維持費やストレージを含む総費用と、更新頻度・データの鮮度を比較する。
+
+クエリ最適化は随時改善される。固定的なルールとして扱わず、[性能改善のリリースノート](https://docs.snowflake.com/en/release-notes/performance-improvements-2025)と実際の Query Profile を確認する。
+
+### 関連する公式動画
+
+- [Automatic Clustering Updates](https://www.youtube.com/watch?v=wA5kNjV4z34)（Snowflake Developers、2024 年）：動画の説明では、マイクロパーティション、クラスタリング、費用見積もりとデモを扱う。
+- [Optimized Network Encryption | Built[By] Bowei Chen](https://www.youtube.com/watch?v=XizKA_k1rMA)（Snowflake Inc.、2024 年）：動画の説明では、計算ノード間の暗号化処理を最適化した事例を扱う。
+
+上記は公開された動画説明に基づく候補で、字幕・内容全体は未確認。改善の数値を一般的な性能保証として扱わない。

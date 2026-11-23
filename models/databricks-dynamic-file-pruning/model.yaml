@@ -1,0 +1,343 @@
+name: Databricks：JOIN からの Dynamic File Pruning
+description: JOIN の実行中に得たキーを使い、Delta ファイル統計で読み取り候補を絞る。
+parent:
+  model: databricks-optimization-internals
+  node: log
+reference:
+  objectives:
+    - JOIN の実行中に得たキーを使い、Delta ファイル統計で読み取り候補を絞る。
+    - 小さい入力をフィルターし、実際に使われる JOIN キーを得る。
+    - 大きい側のファイル統計と照合し、無関係なファイルを除外する。
+  sources:
+    - title: Dynamic file pruning
+      url: https://docs.databricks.com/aws/en/optimizations/dynamic-file-pruning
+    - title: Dynamic File Pruning の技術ブログ
+      url: https://www.databricks.com/blog/2020/04/30/faster-sql-queries-on-delta-lake-with-dynamic-file-pruning.html
+    - title: Photon
+      url: https://docs.databricks.com/aws/en/compute/photon
+    - title: 管理ストレージ
+      url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+sources:
+  - docs/reference-databricks-dynamic-file-pruning.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-dynamic-file-pruning.md#§1
+  - type: doc
+    ref: docs/reference-databricks-dynamic-file-pruning.md#§4
+tiers:
+  - id: input
+    label: SQL
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: 入力側のフィルター
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: ファイルの選択と JOIN
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: Delta ログとファイル
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  query:
+    label: JOIN 問い合わせ
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: 小さい側を絞り込んで大きな Delta テーブルと結合する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  filter:
+    label: 小さい側の絞り込み
+    kind: worker
+    tier: process
+    x: 0
+    'y': 1.5
+    description: 条件に合うキーを実行時に得る。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  keys:
+    label: 実行時のキー
+    kind: file
+    tier: process
+    x: 5.2
+    'y': 1.5
+    description: 小さい側の結果から大きい側の走査に使うキーの情報を渡す。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  stats:
+    label: ファイルの統計
+    kind: file
+    tier: data
+    x: 0
+    'y': 1.5
+    description: Delta ログのファイル統計で条件に合う可能性を判定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  prune:
+    label: ファイルの選択
+    kind: worker
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: 実行時のキーとファイル統計から一致しないファイルを読み飛ばす。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  data:
+    label: 大きい側のファイル
+    kind: db
+    tier: data
+    x: 5.2
+    'y': 1.5
+    description: 対象となる Delta の Parquet データファイル。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  join:
+    label: 結合と結果
+    kind: worker
+    tier: compute
+    x: 5.2
+    'y': 1.5
+    description: 候補に残ったファイルを読み、小さい側と結合する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+links:
+  - id: submit
+    from: query
+    to: filter
+    label: 条件を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  - id: derive
+    from: filter
+    to: keys
+    label: JOIN キーを得る
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  - id: push
+    from: keys
+    to: prune
+    label: 実行時の条件を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  - id: stats
+    from: stats
+    to: prune
+    label: ファイル統計を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  - id: select
+    from: prune
+    to: data
+    label: 候補ファイルを決める
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  - id: scan
+    from: data
+    to: join
+    label: 候補ファイルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+  - id: join
+    from: filter
+    to: join
+    label: 絞り込み結果と結合
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-dynamic-file-pruning.md#§3
+    steps:
+      - links:
+          - submit
+          - derive
+        note: 小さい入力をフィルターし、実際に使われる JOIN キーを得る。
+      - links:
+          - push
+          - stats
+          - select
+        note: 大きい側のファイル統計と照合し、無関係なファイルを除外する。
+      - links:
+          - scan
+          - join
+        note: 候補ファイルだけを読み、小さい側と JOIN する。
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: databricks
+    label: AWS 上の Databricks SQL Warehouse と S3
+    description: >-
+      AWS 上の Databricks SQL Warehouse が顧客 S3 の Unity Catalog 管理 Delta テーブルに SELECT の JOIN
+      を実行し、適用条件を満たしたときに実行時キーを使ってファイルを読み飛ばす概念例。Photon と対象表の適用条件を確認する。
+    sources:
+      - title: Dynamic file pruning
+        url: https://docs.databricks.com/aws/en/optimizations/dynamic-file-pruning
+      - title: Dynamic File Pruning の技術ブログ
+        url: https://www.databricks.com/blog/2020/04/30/faster-sql-queries-on-delta-lake-with-dynamic-file-pruning.html
+      - title: Photon
+        url: https://docs.databricks.com/aws/en/compute/photon
+      - title: 管理ストレージ
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+    tiers:
+      - id: input
+        label: SQL
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: 入力側のフィルター
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: ファイルの選択と JOIN
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: Delta ログとファイル
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-query:
+        label: JOIN を含む SQL
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: 小さい側を絞り込んで大きな Delta テーブルと結合する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-dynamic-file-pruning.md#§5
+        realizes:
+          - query
+      ex-filter:
+        label: Photon / Spark のフィルター
+        kind: worker
+        tier: process
+        x: 0
+        'y': 1.5
+        description: 条件に合うキーを実行時に得る。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-dynamic-file-pruning.md#§5
+        realizes:
+          - filter
+      ex-keys:
+        label: JOIN のキー情報
+        kind: file
+        tier: process
+        x: 5.2
+        'y': 1.5
+        description: 小さい側の結果から大きい側の走査に使うキーの情報を渡す。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-dynamic-file-pruning.md#§5
+        realizes:
+          - keys
+      ex-stats:
+        label: Delta ログのファイル統計（S3）
+        kind: file
+        tier: data
+        x: 0
+        'y': 1.5
+        description: Delta ログのファイル統計で条件に合う可能性を判定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-dynamic-file-pruning.md#§5
+        realizes:
+          - stats
+        svc: aws:s3
+      ex-prune:
+        label: Dynamic File Pruning
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: 実行時のキーとファイル統計から一致しないファイルを読み飛ばす。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-dynamic-file-pruning.md#§5
+        realizes:
+          - prune
+      ex-data:
+        label: S3 の Delta ファイル（S3）
+        kind: db
+        tier: data
+        x: 5.2
+        'y': 1.5
+        description: 対象となる Delta の Parquet データファイル。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-dynamic-file-pruning.md#§5
+        realizes:
+          - data
+        svc: aws:s3
+      ex-join:
+        label: Photon / Spark の JOIN
+        kind: worker
+        tier: compute
+        x: 5.2
+        'y': 1.5
+        description: 候補に残ったファイルを読み、小さい側と結合する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-dynamic-file-pruning.md#§5
+        realizes:
+          - join
+        svc: databricks:sql
+    groups:
+      - kind: cloud
+        label: Databricks Jobs compute（論理範囲）
+        provider: databricks
+        tier:
+          - process
+          - compute
+        nodes:
+          - ex-filter
+          - ex-keys
+          - ex-prune
+          - ex-join
+      - kind: cloud
+        label: 顧客 AWS アカウント：S3
+        provider: aws
+        tier:
+          - data
+        nodes:
+          - ex-stats
+          - ex-data

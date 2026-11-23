@@ -3,7 +3,7 @@ import { Scene3D } from './scene3d.js?v=view-accent1';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=compare-layout3';
 import { implementation3D, platformFootprint } from './implementation-3d.js';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
-import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=compare-layout3';
+import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=performance-compare1';
 import { NODE_KINDS, nodeShape } from './node-kinds.js';
 import { loadServiceIcons } from './service-icons.js';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=view-accent2';

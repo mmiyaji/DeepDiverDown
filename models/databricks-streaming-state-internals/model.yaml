@@ -1,0 +1,495 @@
+name: Databricks：RocksDB 状態とチェックポイント
+description: 状態付き Structured Streaming の RocksDB、差分チェックポイント、障害復旧を追う。
+parent:
+  model: spark-structured-streaming
+  node: state
+reference:
+  objectives:
+    - 状態付き Structured Streaming の RocksDB、差分チェックポイント、障害復旧を追う。
+    - 入力範囲の各イベントで RocksDB のキー別状態を更新する。
+    - 差分と進捗を保存し、結果を出力する。snapshot はバックグラウンドで作られる。
+  sources:
+    - title: 状態付きパイプラインの性能改善
+      url: >-
+        https://www.databricks.com/blog/deep-dive-latest-performance-improvements-stateful-pipelines-apache-spark-structured-streaming
+    - title: RocksDB state store の設定
+      url: https://docs.databricks.com/aws/en/structured-streaming/rocksdb-state-store
+    - title: Structured Streaming のチェックポイント
+      url: https://docs.databricks.com/aws/en/structured-streaming/checkpoints
+    - title: 非同期 state checkpointing
+      url: https://docs.databricks.com/aws/en/structured-streaming/async-checkpointing
+    - title: Databricks コンピュート
+      url: https://docs.databricks.com/aws/en/compute/
+    - title: Unity Catalog 管理ストレージ
+      url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+sources:
+  - docs/reference-databricks-streaming-state-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-streaming-state-internals.md#§1
+  - type: doc
+    ref: docs/reference-databricks-streaming-state-internals.md#§4
+tiers:
+  - id: input
+    label: 入力
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: バッチ処理と状態
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: 再開
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: チェックポイントと出力
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  source:
+    label: 再読できる入力
+    kind: queue
+    tier: input
+    x: 0
+    'y': 1.5
+    description: 入力イベントと処理位置を取得する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  driver:
+    label: バッチの進行管理
+    kind: service
+    tier: process
+    x: 0
+    'y': 1.5
+    description: マイクロバッチの入力範囲と完了状況を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  task:
+    label: 状態付き演算
+    kind: worker
+    tier: process
+    x: 5.2
+    'y': 1.5
+    description: キー別の集計などを行い、状態ストアを読み書きする。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  state:
+    label: ローカル状態ストア
+    kind: db
+    tier: process
+    x: 10.4
+    'y': 1.5
+    description: RocksDB がネイティブメモリとローカルディスクを利用してキー別状態を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  changes:
+    label: 状態の差分
+    kind: file
+    tier: data
+    x: 0
+    'y': 1.5
+    description: changelog checkpointing では各バッチの変更を永続ストレージに記録する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  snapshot:
+    label: 状態のスナップショット
+    kind: file
+    tier: data
+    x: 5.2
+    'y': 1.5
+    description: 復旧を速めるためのスナップショットをバックグラウンドで保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  progress:
+    label: オフセットと完了記録
+    kind: file
+    tier: data
+    x: 10.4
+    'y': 1.5
+    description: 入力位置、コミット、クエリと状態のメタデータをチェックポイントに保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  sink:
+    label: 結果の出力
+    kind: db
+    tier: data
+    x: 15.600000000000001
+    'y': 1.5
+    description: 結果を出力先に保存する。処理保証は出力先の対応に依存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  restart:
+    label: 障害からの再開
+    kind: service
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: チェックポイントから進捗と状態を復元し、必要な入力を再処理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+links:
+  - id: input
+    from: source
+    to: driver
+    label: 入力位置を取得
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: schedule
+    from: driver
+    to: task
+    label: 入力範囲を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: update
+    from: task
+    to: state
+    label: キー別の状態を読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: change
+    from: state
+    to: changes
+    label: 変更を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: save
+    from: state
+    to: snapshot
+    label: 状態の基準を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: offset
+    from: driver
+    to: progress
+    label: 進捗と完了を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: output
+    from: task
+    to: sink
+    label: 結果を出力
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: replay
+    from: changes
+    to: restart
+    label: 差分を読み戻す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: restore
+    from: snapshot
+    to: restart
+    label: 基準状態を読み戻す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: resume
+    from: progress
+    to: restart
+    label: 再開位置を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: rebuild
+    from: restart
+    to: state
+    label: 状態を復元
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+  - id: reread
+    from: restart
+    to: source
+    label: 必要な入力を再読
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-streaming-state-internals.md#§3
+    steps:
+      - links:
+          - input
+          - schedule
+          - update
+        note: 入力範囲の各イベントで RocksDB のキー別状態を更新する。
+        highlight:
+          - localstate
+      - links:
+          - change
+          - save
+          - offset
+          - output
+        note: 差分と進捗を保存し、結果を出力する。snapshot はバックグラウンドで作られる。
+        highlight:
+          - change1
+          - change2
+          - snapshot1
+          - offset1
+      - links:
+          - resume
+          - restore
+          - replay
+          - rebuild
+          - reread
+        note: 障害後に保存済みの状態と進捗を復元し、必要な入力を再処理する。
+        highlight:
+          - snapshot1
+          - change1
+          - change2
+          - offset1
+    visual: checkpoint
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: databricks
+    label: AWS 上の Databricks Jobs と S3
+    description: >-
+      Kafka 等の再読可能な入力を AWS 上の Databricks クラシック Jobs compute が処理し、RocksDB の状態差分と進捗を顧客 S3 の各クエリ専用チェックポイントに保存し、S3 上の Delta
+      テーブルに出力する概念例。クラスター、バケットと権限は事前に用意する。個々の環境の権限、再処理の保証は公式ガイドで確認する。
+    sources:
+      - title: 状態付きパイプラインの性能改善
+        url: >-
+          https://www.databricks.com/blog/deep-dive-latest-performance-improvements-stateful-pipelines-apache-spark-structured-streaming
+      - title: RocksDB state store の設定
+        url: https://docs.databricks.com/aws/en/structured-streaming/rocksdb-state-store
+      - title: Structured Streaming のチェックポイント
+        url: https://docs.databricks.com/aws/en/structured-streaming/checkpoints
+      - title: 非同期 state checkpointing
+        url: https://docs.databricks.com/aws/en/structured-streaming/async-checkpointing
+      - title: Databricks コンピュート
+        url: https://docs.databricks.com/aws/en/compute/
+      - title: Unity Catalog 管理ストレージ
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+    tiers:
+      - id: input
+        label: 入力
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: バッチ処理と状態
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: 再開
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: チェックポイントと出力
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-source:
+        label: Kafka などの入力
+        kind: queue
+        tier: input
+        x: 0
+        'y': 1.5
+        description: 入力イベントと処理位置を取得する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - source
+      ex-driver:
+        label: Structured Streaming のクエリ
+        kind: service
+        tier: process
+        x: 0
+        'y': 1.5
+        description: マイクロバッチの入力範囲と完了状況を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - driver
+      ex-task:
+        label: Databricks Runtime のタスク
+        kind: worker
+        tier: process
+        x: 5.2
+        'y': 1.5
+        description: キー別の集計などを行い、状態ストアを読み書きする。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - task
+        svc: databricks:platform
+      ex-state:
+        label: RocksDB state store
+        kind: db
+        tier: process
+        x: 10.4
+        'y': 1.5
+        description: RocksDB がネイティブメモリとローカルディスクを利用してキー別状態を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - state
+      ex-changes:
+        label: 状態の changelog（S3）
+        kind: file
+        tier: data
+        x: 0
+        'y': 1.5
+        description: changelog checkpointing では各バッチの変更を永続ストレージに記録する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - changes
+        svc: aws:s3
+      ex-snapshot:
+        label: RocksDB snapshot（S3）
+        kind: file
+        tier: data
+        x: 5.2
+        'y': 1.5
+        description: 復旧を速めるためのスナップショットをバックグラウンドで保存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - snapshot
+        svc: aws:s3
+      ex-progress:
+        label: チェックポイントログ（S3）
+        kind: file
+        tier: data
+        x: 10.4
+        'y': 1.5
+        description: 入力位置、コミット、クエリと状態のメタデータをチェックポイントに保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - progress
+        svc: aws:s3
+      ex-sink:
+        label: Delta 出力テーブル（S3）
+        kind: db
+        tier: data
+        x: 15.600000000000001
+        'y': 1.5
+        description: 結果を出力先に保存する。処理保証は出力先の対応に依存する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - sink
+      ex-restart:
+        label: クエリの再起動
+        kind: service
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: チェックポイントから進捗と状態を復元し、必要な入力を再処理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+        realizes:
+          - restart
+    groups:
+      - kind: cloud
+        label: Databricks Jobs compute（論理範囲）
+        provider: databricks
+        tier:
+          - process
+          - compute
+        nodes:
+          - ex-driver
+          - ex-task
+          - ex-state
+          - ex-restart
+      - kind: cloud
+        label: 顧客 AWS アカウント：S3
+        provider: aws
+        tier:
+          - data
+        nodes:
+          - ex-changes
+          - ex-snapshot
+          - ex-progress
+          - ex-sink
+blocks:
+  - id: checkpoint
+    title: 状態とチェックポイント（概念例）
+    note: バッチ番号は説明用。差分・スナップショット・進捗を組み合わせて復元する。
+    lanes:
+      - id: local
+        label: 実行中の状態
+        node: state
+      - id: delta
+        label: 差分
+        node: changes
+      - id: base
+        label: スナップショット
+        node: snapshot
+      - id: progress
+        label: 入力の進捗
+        node: progress
+    items:
+      local:
+        - id: localstate
+          label: key A → 42
+          k: 0
+          note: 実行中の状態例。
+      delta:
+        - id: change1
+          label: batch 2 の変更
+          k: 1
+          note: 変更したキーの差分。
+        - id: change2
+          label: batch 3 の変更
+          k: 2
+          note: 続くバッチの差分。
+      base:
+        - id: snapshot1
+          label: batch 1 の基準
+          k: 3
+          note: 復旧の基準となる状態の例。
+      progress:
+        - id: offset1
+          label: 入力 offset と commit
+          k: 4
+          note: どこから再開するかを判断する。

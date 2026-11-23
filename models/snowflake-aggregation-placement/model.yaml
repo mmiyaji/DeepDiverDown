@@ -1,0 +1,391 @@
+name: Snowflake：JOIN 前後の集約と適応的実行
+description: JOIN で膨らむ中間行に対し、事前集約を加えて処理量を抑える適応的な実行を追う。
+parent:
+  model: snowflake-optimization-internals
+  node: operators
+reference:
+  objectives:
+    - JOIN で膨らむ中間行に対し、事前集約を加えて処理量を抑える適応的な実行を追う。
+    - SQL を演算子の計画に変換し、可能な集約配置を検討する。
+    - 一部の入力を先に集約し、JOIN と最終集約の中間行数を抑える。
+  sources:
+    - title: Aggregation Placement の概要
+      url: >-
+        https://www.snowflake.com/en/blog/engineering/aggregation-placement-an-adaptive-query-optimization-for-snowflake/
+    - title: Optima Planning
+      url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-planning-query-performance/
+sources:
+  - docs/reference-snowflake-aggregation-placement.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-aggregation-placement.md#§1
+  - type: doc
+    ref: docs/reference-snowflake-aggregation-placement.md#§4
+tiers:
+  - id: input
+    label: SQL
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: 計画と観測
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: JOIN と集約
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: 入力テーブル
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  query:
+    label: 集計 SQL
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: JOIN と GROUP BY を含む分析 SQL を実行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  planner:
+    label: 計画と変換
+    kind: service
+    tier: process
+    x: 0
+    'y': 1.5
+    description: クエリを演算子の計画に変換し、集約を別の位置に置く候補を生成する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  left:
+    label: 左側の入力
+    kind: db
+    tier: data
+    x: 0
+    'y': 1.5
+    description: 結合する一方のテーブルを読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  right:
+    label: 右側の入力
+    kind: db
+    tier: data
+    x: 5.2
+    'y': 1.5
+    description: 結合するもう一方のテーブルを読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  early:
+    label: 事前集約
+    kind: worker
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: 適用可能な場合、JOIN の入力を事前集約して行数を減らす。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  join:
+    label: 結合
+    kind: worker
+    tier: compute
+    x: 5.2
+    'y': 1.5
+    description: 入力を JOIN する。キーの重複などにより中間行数が膨らむことがある。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  aggregate:
+    label: 最終集約
+    kind: worker
+    tier: compute
+    x: 10.4
+    'y': 1.5
+    description: 必要な最終結果を集約する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  adaptive:
+    label: 実行時の判定
+    kind: service
+    tier: process
+    x: 5.2
+    'y': 1.5
+    description: 事前集約が十分有効でない場合は、実行時にその効果を見て無効化する設計。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  profile:
+    label: 演算の観測
+    kind: service
+    tier: process
+    x: 10.4
+    'y': 1.5
+    description: Query Profile で演算子と入出力行数を確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+links:
+  - id: submit
+    from: query
+    to: planner
+    label: SQL を計画
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: choose
+    from: planner
+    to: early
+    label: 事前集約を計画
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: left
+    from: left
+    to: join
+    label: 左入力を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: right
+    from: right
+    to: early
+    label: 右入力を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: reduce
+    from: early
+    to: join
+    label: 集約した入力を結合
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: bypass
+    from: right
+    to: join
+    label: 事前集約を使わず結合
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: group
+    from: join
+    to: aggregate
+    label: 結合後に集約
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: adapt
+    from: adaptive
+    to: early
+    label: 効果を見て適用を調整
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+  - id: inspect
+    from: aggregate
+    to: profile
+    label: 演算結果を観測
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-aggregation-placement.md#§3
+    steps:
+      - links:
+          - submit
+          - choose
+        note: SQL を演算子の計画に変換し、可能な集約配置を検討する。
+      - links:
+          - right
+          - reduce
+          - left
+          - group
+        note: 一部の入力を先に集約し、JOIN と最終集約の中間行数を抑える。
+      - links:
+          - adapt
+          - inspect
+        note: 効果が小さい事前集約は実行時に無効化し、Profile で演算を確認する。
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: snowflake
+    label: Snowflake の実装例
+    description: >-
+      Snowflake Virtual Warehouse で JOIN と GROUP BY を含む SQL を実行し、Snowflake の適応的集約配置が適用される場合の論理例。Query Profile
+      で処理行数と演算を比較する。
+    sources:
+      - title: Aggregation Placement の概要
+        url: >-
+          https://www.snowflake.com/en/blog/engineering/aggregation-placement-an-adaptive-query-optimization-for-snowflake/
+      - title: Optima Planning
+        url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-planning-query-performance/
+    tiers:
+      - id: input
+        label: SQL
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: 計画と観測
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: JOIN と集約
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: 入力テーブル
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-query:
+        label: 集計 SQL
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: JOIN と GROUP BY を含む分析 SQL を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - query
+      ex-planner:
+        label: Snowflake のクエリ最適化
+        kind: service
+        tier: process
+        x: 0
+        'y': 1.5
+        description: クエリを演算子の計画に変換し、集約を別の位置に置く候補を生成する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - planner
+      ex-left:
+        label: 左側テーブル
+        kind: db
+        tier: data
+        x: 0
+        'y': 1.5
+        description: 結合する一方のテーブルを読む。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - left
+      ex-right:
+        label: 右側テーブル
+        kind: db
+        tier: data
+        x: 5.2
+        'y': 1.5
+        description: 結合するもう一方のテーブルを読む。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - right
+      ex-early:
+        label: 追加された Aggregate
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: 適用可能な場合、JOIN の入力を事前集約して行数を減らす。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - early
+      ex-join:
+        label: Join オペレーター
+        kind: worker
+        tier: compute
+        x: 5.2
+        'y': 1.5
+        description: 入力を JOIN する。キーの重複などにより中間行数が膨らむことがある。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - join
+        svc: snowflake:warehouse
+      ex-aggregate:
+        label: 最終 Aggregate
+        kind: worker
+        tier: compute
+        x: 10.4
+        'y': 1.5
+        description: 必要な最終結果を集約する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - aggregate
+      ex-adaptive:
+        label: 適応的な事前集約
+        kind: service
+        tier: process
+        x: 5.2
+        'y': 1.5
+        description: 事前集約が十分有効でない場合は、実行時にその効果を見て無効化する設計。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - adaptive
+      ex-profile:
+        label: Query Profile
+        kind: service
+        tier: process
+        x: 10.4
+        'y': 1.5
+        description: Query Profile で演算子と入出力行数を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-aggregation-placement.md#§5
+        realizes:
+          - profile
+    groups:
+      - kind: cloud
+        label: Snowflake の管理サービスと実行処理（論理範囲）
+        provider: snowflake
+        tier:
+          - process
+          - compute
+          - data
+        nodes:
+          - ex-planner
+          - ex-left
+          - ex-right
+          - ex-early
+          - ex-join
+          - ex-aggregate
+          - ex-adaptive
+          - ex-profile

@@ -1,0 +1,391 @@
+name: Kafka から Snowflake 管理 Iceberg への取り込み
+description: Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。
+parent:
+  model: snowflake-snowpipe-streaming-internals
+  node: producer
+reference:
+  objectives:
+    - Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。
+    - 既存 Kafka と Connect からイベントを送信する。
+    - PIPE で検証・対応する変換を行い、失敗は設定したログで確認する。
+  sources:
+    - title: Kafka topics を Iceberg に取り込む
+      url: https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/
+    - title: Snowflake Connector for Kafka
+      url: https://docs.snowflake.com/en/user-guide/kafka-connector
+    - title: Snowpipe Streaming
+      url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+sources:
+  - docs/reference-snowflake-kafka-iceberg-streaming.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§1
+  - type: doc
+    ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§4
+tiers:
+  - id: input
+    label: 既存 Kafka と Connect
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: 取り込み
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: Iceberg への書き込み
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: 表と観測
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  producer:
+    label: イベント送信元
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: アプリケーションが注文イベントを発行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  topic:
+    label: イベントログ
+    kind: queue
+    tier: input
+    x: 5.2
+    'y': 1.5
+    description: イベントをトピックに保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  connect:
+    label: 外部の接続処理
+    kind: worker
+    tier: input
+    x: 10.4
+    'y': 1.5
+    description: トピックを購読し、Snowpipe Streaming を使って対象表に送信する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  pipe:
+    label: 取り込みと検証
+    kind: service
+    tier: process
+    x: 0
+    'y': 1.5
+    description: 受信し PIPE の定義に従って検証や対応する変換を行う。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  reject:
+    label: エラーの確認
+    kind: file
+    tier: data
+    x: 0
+    'y': 1.5
+    description: サーバー側で拒否された行は設定したエラーログで確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  writer:
+    label: テーブル書き込み
+    kind: worker
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: 受信データから Iceberg 互換のデータファイルとメタデータを作る。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  metadata:
+    label: Iceberg メタデータ
+    kind: file
+    tier: data
+    x: 5.2
+    'y': 1.5
+    description: スナップショットやファイルの情報を保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  data:
+    label: データファイル
+    kind: db
+    tier: data
+    x: 10.4
+    'y': 1.5
+    description: Parquet データを保持し、管理テーブルの compaction がファイル配置を保守する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  read:
+    label: SQL による参照
+    kind: client
+    tier: data
+    x: 15.600000000000001
+    'y': 1.5
+    description: 取り込んだテーブルを SQL で直接問い合わせる。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+links:
+  - id: produce
+    from: producer
+    to: topic
+    label: イベントを発行
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: consume
+    from: topic
+    to: connect
+    label: トピックを購読
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: send
+    from: connect
+    to: pipe
+    label: 行を送信
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: error
+    from: pipe
+    to: reject
+    label: 拒否された行を記録
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: ingest
+    from: pipe
+    to: writer
+    label: 検証・変換後に書き込む
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: commit
+    from: writer
+    to: metadata
+    label: 表のメタデータを更新
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: store
+    from: writer
+    to: data
+    label: Parquet ファイルを保存
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: discover
+    from: metadata
+    to: read
+    label: 表の状態を解決
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+  - id: query
+    from: data
+    to: read
+    label: 表のデータを問い合わせ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§3
+    steps:
+      - links:
+          - produce
+          - consume
+          - send
+        note: 既存 Kafka と Connect からイベントを送信する。
+      - links:
+          - ingest
+          - error
+        note: PIPE で検証・対応する変換を行い、失敗は設定したログで確認する。
+      - links:
+          - commit
+          - store
+          - discover
+          - query
+        note: Snowflake が管理 Iceberg のファイルとメタデータを作り、SQL で参照する。
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: snowflake
+    label: Snowflake の実装例
+    description: >-
+      既存の Kafka と Kafka Connect を利用者が運用し、Snowflake Connector v4 から Snowflake 管理 Iceberg テーブルへ取り込む公式記事の構成。Snowflake
+      が取り込みと管理表のファイル・メタデータを保守する。Kafka や Connect の基盤は既存環境であり所在を推測しない。
+    sources:
+      - title: Kafka topics を Iceberg に取り込む
+        url: https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/
+      - title: Snowflake Connector for Kafka
+        url: https://docs.snowflake.com/en/user-guide/kafka-connector
+      - title: Snowpipe Streaming
+        url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+    tiers:
+      - id: input
+        label: 既存 Kafka と Connect
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: 取り込み
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: Iceberg への書き込み
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: 表と観測
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-producer:
+        label: 注文アプリケーション
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: アプリケーションが注文イベントを発行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - producer
+      ex-topic:
+        label: 既存 Kafka トピック
+        kind: queue
+        tier: input
+        x: 5.2
+        'y': 1.5
+        description: イベントをトピックに保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - topic
+      ex-connect:
+        label: Kafka Connect と Snowflake Connector v4
+        kind: worker
+        tier: input
+        x: 10.4
+        'y': 1.5
+        description: トピックを購読し、Snowpipe Streaming を使って対象表に送信する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - connect
+      ex-pipe:
+        label: Snowpipe Streaming と PIPE
+        kind: service
+        tier: process
+        x: 0
+        'y': 1.5
+        description: 受信し PIPE の定義に従って検証や対応する変換を行う。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - pipe
+        svc: snowflake:pipe
+      ex-reject:
+        label: Snowflake のエラーログ
+        kind: file
+        tier: data
+        x: 0
+        'y': 1.5
+        description: サーバー側で拒否された行は設定したエラーログで確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - reject
+      ex-writer:
+        label: Snowflake 管理 Iceberg の書き込み
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: 受信データから Iceberg 互換のデータファイルとメタデータを作る。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - writer
+      ex-metadata:
+        label: 管理 Iceberg メタデータ
+        kind: file
+        tier: data
+        x: 5.2
+        'y': 1.5
+        description: スナップショットやファイルの情報を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - metadata
+      ex-data:
+        label: 管理 Iceberg の Parquet
+        kind: db
+        tier: data
+        x: 10.4
+        'y': 1.5
+        description: Parquet データを保持し、管理テーブルの compaction がファイル配置を保守する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - data
+      ex-read:
+        label: Snowflake SQL
+        kind: client
+        tier: data
+        x: 15.600000000000001
+        'y': 1.5
+        description: 取り込んだテーブルを SQL で直接問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
+        realizes:
+          - read
+    groups:
+      - kind: cloud
+        label: Snowflake の取り込みと管理テーブル（論理範囲）
+        provider: snowflake
+        tier:
+          - process
+          - compute
+          - data
+        nodes:
+          - ex-pipe
+          - ex-reject
+          - ex-writer
+          - ex-metadata
+          - ex-data

@@ -1,0 +1,333 @@
+name: Snowflake：Iceberg カタログの一時認証情報
+description: 外部 Iceberg カタログから取得する短期認証情報とストレージへのアクセスを追う。
+parent:
+  model: iceberg-catalog-read
+  node: creds
+reference:
+  objectives:
+    - 外部 Iceberg カタログから取得する短期認証情報とストレージへのアクセスを追う。
+    - SQL に対し外部カタログから表の情報を取得する。
+    - テーブル単位で短期認証情報を取得し、必要に応じ更新する。
+  sources:
+    - title: Snowflake の Iceberg 認証情報管理
+      url: https://www.snowflake.com/en/blog/engineering/iceberg-catalog-credentials/
+    - title: カタログ連携とストレージ認証
+      url: https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-catalog-integration-rest
+sources:
+  - docs/reference-snowflake-iceberg-vended-credentials.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-iceberg-vended-credentials.md#§1
+  - type: doc
+    ref: docs/reference-snowflake-iceberg-vended-credentials.md#§4
+tiers:
+  - id: input
+    label: 利用者と外部カタログ
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: Snowflake の認証と実行
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: 処理
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: Iceberg ストレージ
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  user:
+    label: SQL を実行
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: 利用者が外部カタログの Iceberg テーブルを問い合わせる。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  catalog:
+    label: 外部カタログ
+    kind: service
+    tier: input
+    x: 5.2
+    'y': 1.5
+    description: Iceberg REST カタログは表メタデータとスコープを絞った短期認証情報を提供する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  engine:
+    label: クエリの実行
+    kind: worker
+    tier: process
+    x: 0
+    'y': 1.5
+    description: カタログを通じて対象テーブルを解決し、データを取得する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  volume:
+    label: 表ごとの内部ボリューム
+    kind: service
+    tier: process
+    x: 5.2
+    'y': 1.5
+    description: カタログ発行の認証情報を用いるテーブル単位の内部ボリューム。表のライフサイクルに関連付く。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  credentials:
+    label: 短期認証情報
+    kind: file
+    tier: process
+    x: 10.4
+    'y': 1.5
+    description: 必要なスコープに限定された一時的なストレージ認証情報を取得し、期限に応じて更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  metadata:
+    label: 表のメタデータ
+    kind: file
+    tier: data
+    x: 0
+    'y': 1.5
+    description: Iceberg の metadata / manifest をたどりデータファイルを特定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  files:
+    label: データファイル
+    kind: db
+    tier: data
+    x: 5.2
+    'y': 1.5
+    description: 認証情報を用いて Iceberg のデータファイルにアクセスする。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+links:
+  - id: execute
+    from: user
+    to: engine
+    label: SQL を実行
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  - id: resolve
+    from: engine
+    to: catalog
+    label: テーブルを解決
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  - id: vend
+    from: catalog
+    to: volume
+    label: 短期認証情報を発行
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  - id: cache
+    from: volume
+    to: credentials
+    label: 取得・更新
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  - id: authorize
+    from: credentials
+    to: engine
+    label: ストレージアクセスに使用
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  - id: meta
+    from: engine
+    to: metadata
+    label: メタデータを読み取る
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+  - id: scan
+    from: engine
+    to: files
+    label: 対象ファイルを読み取る
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-iceberg-vended-credentials.md#§3
+    steps:
+      - links:
+          - execute
+          - resolve
+        note: SQL に対し外部カタログから表の情報を取得する。
+      - links:
+          - vend
+          - cache
+          - authorize
+        note: テーブル単位で短期認証情報を取得し、必要に応じ更新する。
+      - links:
+          - meta
+          - scan
+        note: Iceberg メタデータをたどって該当データを読む。
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: snowflake
+    label: Snowflake の実装例
+    description: >-
+      外部 Iceberg REST カタログと顧客 S3 の Iceberg テーブルを Snowflake から読む概念例。カタログ側で一時認証情報の発行とアクセス権を設定し、対応する Snowflake の catalog
+      integration を用意する。
+    sources:
+      - title: Snowflake の Iceberg 認証情報管理
+        url: https://www.snowflake.com/en/blog/engineering/iceberg-catalog-credentials/
+      - title: カタログ連携とストレージ認証
+        url: https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-catalog-integration-rest
+    tiers:
+      - id: input
+        label: 利用者と外部カタログ
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: Snowflake の認証と実行
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: 処理
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: Iceberg ストレージ
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-user:
+        label: 利用者の SQL
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: 利用者が外部カタログの Iceberg テーブルを問い合わせる。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-iceberg-vended-credentials.md#§5
+        realizes:
+          - user
+      ex-catalog:
+        label: 外部 Iceberg REST カタログ
+        kind: service
+        tier: input
+        x: 5.2
+        'y': 1.5
+        description: Iceberg REST カタログは表メタデータとスコープを絞った短期認証情報を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-iceberg-vended-credentials.md#§5
+        realizes:
+          - catalog
+      ex-engine:
+        label: Snowflake のクエリエンジン
+        kind: worker
+        tier: process
+        x: 0
+        'y': 1.5
+        description: カタログを通じて対象テーブルを解決し、データを取得する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-iceberg-vended-credentials.md#§5
+        realizes:
+          - engine
+        svc: snowflake:warehouse
+      ex-volume:
+        label: Snowflake の内部ボリューム
+        kind: service
+        tier: process
+        x: 5.2
+        'y': 1.5
+        description: カタログ発行の認証情報を用いるテーブル単位の内部ボリューム。表のライフサイクルに関連付く。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-iceberg-vended-credentials.md#§5
+        realizes:
+          - volume
+      ex-credentials:
+        label: vended credentials
+        kind: file
+        tier: process
+        x: 10.4
+        'y': 1.5
+        description: 必要なスコープに限定された一時的なストレージ認証情報を取得し、期限に応じて更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-iceberg-vended-credentials.md#§5
+        realizes:
+          - credentials
+      ex-metadata:
+        label: S3 の Iceberg メタデータ
+        kind: file
+        tier: data
+        x: 0
+        'y': 1.5
+        description: Iceberg の metadata / manifest をたどりデータファイルを特定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-iceberg-vended-credentials.md#§5
+        realizes:
+          - metadata
+        svc: aws:s3
+      ex-files:
+        label: S3 の Iceberg データ
+        kind: db
+        tier: data
+        x: 5.2
+        'y': 1.5
+        description: 認証情報を用いて Iceberg のデータファイルにアクセスする。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-iceberg-vended-credentials.md#§5
+        realizes:
+          - files
+        svc: aws:s3
+    groups:
+      - kind: cloud
+        label: Snowflake のクエリ・認証処理（論理範囲）
+        provider: snowflake
+        tier:
+          - process
+        nodes:
+          - ex-engine
+          - ex-volume
+          - ex-credentials
+      - kind: cloud
+        label: 顧客 AWS アカウント：S3
+        provider: aws
+        tier:
+          - data
+        nodes:
+          - ex-metadata
+          - ex-files

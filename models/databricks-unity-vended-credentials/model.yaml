@@ -1,0 +1,345 @@
+name: Databricks Unity Catalog：外部エンジンへの一時認証
+description: 外部エンジンが Unity Catalog から一時認証情報を取得し、管理された表へアクセスする経路を追う。
+parent:
+  model: databricks-unity-catalog
+  node: catalog
+reference:
+  objectives:
+    - 外部エンジンが Unity Catalog から一時認証情報を取得し、管理された表へアクセスする経路を追う。
+    - 外部エンジンを認証し、権限を確認して一時資格情報を返す。
+    - ストレージに直接アクセスし、対応クライアントは期限前に更新する。
+  sources:
+    - title: Unity Catalog credential vending
+      url: https://docs.databricks.com/aws/en/external-access/credential-vending
+    - title: Unity Catalog Open APIs
+      url: https://www.databricks.com/blog/expanded-interoperability-unity-catalog-open-apis
+    - title: Unity Catalog の管理ストレージ
+      url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+sources:
+  - docs/reference-databricks-unity-vended-credentials.md
+evidence:
+  - type: doc
+    ref: docs/reference-databricks-unity-vended-credentials.md#§1
+  - type: doc
+    ref: docs/reference-databricks-unity-vended-credentials.md#§4
+tiers:
+  - id: input
+    label: 外部エンジン
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: カタログと認証
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: 更新とコミット
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: クラウドストレージ
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  user:
+    label: 外部エンジン
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: 外部の互換エンジンが認証してテーブルへのアクセスを要求する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  catalog:
+    label: 認証と権限判定
+    kind: service
+    tier: process
+    x: 0
+    'y': 1.5
+    description: プリンシパルの権限と外部アクセス設定を確認する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  metadata:
+    label: テーブル解決
+    kind: service
+    tier: process
+    x: 5.2
+    'y': 1.5
+    description: 対応する API を通じて対象の表情報を提供する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  credential:
+    label: 短期認証情報
+    kind: service
+    tier: process
+    x: 10.4
+    'y': 1.5
+    description: 要求されたテーブルや操作に応じた一時的なストレージ認証情報を発行する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  refresh:
+    label: 認証情報の更新
+    kind: worker
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: 長時間処理では対応クライアントが認証情報を更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  files:
+    label: メタデータとデータ
+    kind: db
+    tier: data
+    x: 0
+    'y': 1.5
+    description: エンジンは取得した資格情報を使ってクラウドストレージ上のファイルにアクセスする。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  commit:
+    label: 書き込みの調整
+    kind: service
+    tier: compute
+    x: 5.2
+    'y': 1.5
+    description: 対応する管理 Delta テーブルの外部書き込みでは catalog commits による調整が必要。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+links:
+  - id: ask
+    from: user
+    to: catalog
+    label: 認証してアクセスを要求
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  - id: resolve
+    from: catalog
+    to: metadata
+    label: 権限を確認して表を解決
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  - id: issue
+    from: catalog
+    to: credential
+    label: 資格情報を発行
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  - id: return
+    from: credential
+    to: user
+    label: 一時資格情報を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  - id: access
+    from: user
+    to: files
+    label: 資格情報でファイルにアクセス
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  - id: renew
+    from: refresh
+    to: credential
+    label: 期限前に更新を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  - id: use
+    from: refresh
+    to: user
+    label: 更新した資格情報を利用
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+  - id: write
+    from: user
+    to: commit
+    label: 対応する表へのコミットを調整
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-unity-vended-credentials.md#§3
+    steps:
+      - links:
+          - ask
+          - resolve
+          - issue
+          - return
+        note: 外部エンジンを認証し、権限を確認して一時資格情報を返す。
+      - links:
+          - access
+          - renew
+          - use
+        note: ストレージに直接アクセスし、対応クライアントは期限前に更新する。
+      - links:
+          - write
+        note: 対応する管理 Delta テーブルへの書き込みではカタログがコミットを調整する。
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: databricks
+    label: 外部エンジン・Unity Catalog・S3
+    description: >-
+      外部の互換 Iceberg エンジンが Unity Catalog に認証して一時資格情報を受け取り、顧客 AWS アカウントの S3 にある管理 Iceberg
+      テーブルにアクセスする概念例。外部アクセス設定と必要な権限、クライアントの対応を事前に確認する。
+    sources:
+      - title: Unity Catalog credential vending
+        url: https://docs.databricks.com/aws/en/external-access/credential-vending
+      - title: Unity Catalog Open APIs
+        url: https://www.databricks.com/blog/expanded-interoperability-unity-catalog-open-apis
+      - title: Unity Catalog の管理ストレージ
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+    tiers:
+      - id: input
+        label: 外部エンジン
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: カタログと認証
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: 更新とコミット
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: クラウドストレージ
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-user:
+        label: 外部 Spark / Iceberg エンジン
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: 外部の互換エンジンが認証してテーブルへのアクセスを要求する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-vended-credentials.md#§5
+        realizes:
+          - user
+      ex-catalog:
+        label: Unity Catalog
+        kind: service
+        tier: process
+        x: 0
+        'y': 1.5
+        description: プリンシパルの権限と外部アクセス設定を確認する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-vended-credentials.md#§5
+        realizes:
+          - catalog
+        svc: databricks:unity
+      ex-metadata:
+        label: Unity / Iceberg REST API
+        kind: service
+        tier: process
+        x: 5.2
+        'y': 1.5
+        description: 対応する API を通じて対象の表情報を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-vended-credentials.md#§5
+        realizes:
+          - metadata
+      ex-credential:
+        label: credential vending
+        kind: service
+        tier: process
+        x: 10.4
+        'y': 1.5
+        description: 要求されたテーブルや操作に応じた一時的なストレージ認証情報を発行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-vended-credentials.md#§5
+        realizes:
+          - credential
+      ex-refresh:
+        label: 対応クライアントの更新処理
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: 長時間処理では対応クライアントが認証情報を更新する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-vended-credentials.md#§5
+        realizes:
+          - refresh
+      ex-files:
+        label: 顧客 S3 のテーブル（S3）
+        kind: db
+        tier: data
+        x: 0
+        'y': 1.5
+        description: エンジンは取得した資格情報を使ってクラウドストレージ上のファイルにアクセスする。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-vended-credentials.md#§5
+        realizes:
+          - files
+        svc: aws:s3
+      ex-commit:
+        label: catalog commits（対応時）
+        kind: service
+        tier: compute
+        x: 5.2
+        'y': 1.5
+        description: 対応する管理 Delta テーブルの外部書き込みでは catalog commits による調整が必要。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-unity-vended-credentials.md#§5
+        realizes:
+          - commit
+    groups:
+      - kind: cloud
+        label: Databricks Unity Catalog（論理範囲）
+        provider: databricks
+        tier:
+          - process
+          - compute
+        nodes:
+          - ex-catalog
+          - ex-metadata
+          - ex-credential
+          - ex-commit
+      - kind: cloud
+        label: 顧客 AWS アカウント：S3
+        provider: aws
+        tier:
+          - data
+        nodes:
+          - ex-files

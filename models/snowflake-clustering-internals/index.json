@@ -1,0 +1,374 @@
+{
+  "model": "snowflake-clustering-internals",
+  "name": "Snowflake：Classic と Optima Clustering の内部",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "user": {
+      "type": "node",
+      "label": "設定と確認",
+      "status": "claim"
+    },
+    "key": {
+      "type": "node",
+      "label": "クラスタリングキー",
+      "status": "claim"
+    },
+    "optima": {
+      "type": "scenario",
+      "label": "Optima：公開された動作と観測",
+      "status": "claim"
+    },
+    "monitor": {
+      "type": "node",
+      "label": "方式と費用の観測",
+      "status": "claim"
+    },
+    "metrics": {
+      "type": "node",
+      "label": "区画の重なりの評価",
+      "status": "claim"
+    },
+    "select": {
+      "type": "node",
+      "label": "対象区画の選択",
+      "status": "claim"
+    },
+    "execute": {
+      "type": "node",
+      "label": "対象区画の再配置",
+      "status": "claim"
+    },
+    "validate": {
+      "type": "node",
+      "label": "コミット前の競合確認",
+      "status": "claim"
+    },
+    "before": {
+      "type": "node",
+      "label": "再配置前の区画",
+      "status": "claim"
+    },
+    "after": {
+      "type": "node",
+      "label": "再配置後の区画",
+      "status": "claim"
+    },
+    "metadata": {
+      "type": "node",
+      "label": "区画の値域と表の状態",
+      "status": "claim"
+    },
+    "dml": {
+      "type": "link",
+      "label": "並行する更新 → コミット前の競合確認",
+      "status": "claim"
+    },
+    "define": {
+      "type": "link",
+      "label": "設定と確認 → クラスタリングキー",
+      "status": "claim"
+    },
+    "evaluate": {
+      "type": "link",
+      "label": "区画の値域と表の状態 → 区画の重なりの評価",
+      "status": "claim"
+    },
+    "levels": {
+      "type": "link",
+      "label": "区画の重なりの評価 → 対象区画の選択",
+      "status": "claim"
+    },
+    "batch": {
+      "type": "link",
+      "label": "対象区画の選択 → 対象区画の再配置",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "再配置前の区画 → 対象区画の再配置",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "対象区画の再配置 → 再配置後の区画",
+      "status": "claim"
+    },
+    "check": {
+      "type": "link",
+      "label": "対象区画の再配置 → コミット前の競合確認",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "コミット前の競合確認 → 区画の値域と表の状態",
+      "status": "claim"
+    },
+    "choose": {
+      "type": "link",
+      "label": "クラスタリングキー → 新方式の再配置",
+      "status": "claim"
+    },
+    "optimize": {
+      "type": "link",
+      "label": "新方式の再配置 → 再配置後の区画",
+      "status": "claim"
+    },
+    "inspect": {
+      "type": "link",
+      "label": "設定と確認 → 方式と費用の観測",
+      "status": "claim"
+    },
+    "measure": {
+      "type": "link",
+      "label": "区画の値域と表の状態 → 方式と費用の観測",
+      "status": "claim"
+    },
+    "classic": {
+      "type": "scenario",
+      "label": "Classic：選択から段階的な再配置"
+    },
+    "conflict": {
+      "type": "scenario",
+      "label": "Classic：並行更新との競合"
+    },
+    "ex-user": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "利用者の SQL と Snowsight",
+      "realizes": [
+        "user"
+      ]
+    },
+    "ex-key": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "ORDERS の clustering key",
+      "realizes": [
+        "key"
+      ]
+    },
+    "ex-optima": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Optima Clustering（内部は非公開）",
+      "realizes": [
+        "optima"
+      ]
+    },
+    "ex-monitor": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Snowflake の利用履歴と関数",
+      "realizes": [
+        "monitor"
+      ]
+    },
+    "ex-metrics": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Classic の区画統計・レベル",
+      "realizes": [
+        "metrics"
+      ]
+    },
+    "ex-select": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Classic の partition-selection job",
+      "realizes": [
+        "select"
+      ]
+    },
+    "ex-execute": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Classic の clustering-execution job",
+      "realizes": [
+        "execute"
+      ]
+    },
+    "ex-validate": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Classic の楽観的競合確認",
+      "realizes": [
+        "validate"
+      ]
+    },
+    "ex-before": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "ORDERS の既存 micro-partitions",
+      "realizes": [
+        "before"
+      ]
+    },
+    "ex-after": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "ORDERS の新しい micro-partitions",
+      "realizes": [
+        "after"
+      ]
+    },
+    "ex-metadata": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Snowflake 管理の区画メタデータ",
+      "realizes": [
+        "metadata"
+      ]
+    },
+    "ex-dml": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "利用者による並行 DML",
+      "realizes": [
+        "dml"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-snowflake-clustering-internals.md#§1": [
+      "model"
+    ],
+    "docs/reference-snowflake-clustering-internals.md": [
+      "model",
+      "user",
+      "key",
+      "optima",
+      "monitor",
+      "metrics",
+      "select",
+      "execute",
+      "validate",
+      "before",
+      "after",
+      "metadata",
+      "dml",
+      "define",
+      "evaluate",
+      "levels",
+      "batch",
+      "read",
+      "write",
+      "check",
+      "commit",
+      "choose",
+      "optimize",
+      "inspect",
+      "measure",
+      "classic",
+      "conflict",
+      "ex-user",
+      "ex-key",
+      "ex-optima",
+      "ex-monitor",
+      "ex-metrics",
+      "ex-select",
+      "ex-execute",
+      "ex-validate",
+      "ex-before",
+      "ex-after",
+      "ex-metadata",
+      "ex-dml"
+    ],
+    "docs/reference-snowflake-clustering-internals.md#§3": [
+      "model",
+      "classic"
+    ],
+    "docs/reference-snowflake-clustering-internals.md#§4": [
+      "model",
+      "conflict"
+    ],
+    "docs/reference-snowflake-clustering-internals.md#§5": [
+      "model",
+      "optima"
+    ],
+    "docs/reference-snowflake-clustering-internals.md#§6": [
+      "model",
+      "ex-user",
+      "ex-key",
+      "ex-optima",
+      "ex-monitor",
+      "ex-metrics",
+      "ex-select",
+      "ex-execute",
+      "ex-validate",
+      "ex-before",
+      "ex-after",
+      "ex-metadata",
+      "ex-dml"
+    ],
+    "docs/reference-snowflake-clustering-internals.md#§7": [
+      "model"
+    ],
+    "docs/reference-snowflake-clustering-internals.md#§2": [
+      "user",
+      "key",
+      "optima",
+      "monitor",
+      "metrics",
+      "select",
+      "execute",
+      "validate",
+      "before",
+      "after",
+      "metadata",
+      "dml",
+      "define",
+      "evaluate",
+      "levels",
+      "batch",
+      "read",
+      "write",
+      "check",
+      "commit",
+      "choose",
+      "optimize",
+      "inspect",
+      "measure"
+    ]
+  },
+  "reference": {
+    "category": "クラウド分析基盤",
+    "order": 24,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "snowflake-optimization-internals",
+    "objectives": [
+      "Classic のレベル、対象選択、再配置と競合確認を追う。",
+      "Classic と Optima の公開された違いと未公開部分を区別する。",
+      "課金と実行方式の観測方法を理解する。"
+    ],
+    "sources": [
+      {
+        "title": "Automatic Clustering at Snowflake（2024年の内部構造）",
+        "url": "https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/"
+      },
+      {
+        "title": "Automatic Clustering の仕様と費用",
+        "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
+      },
+      {
+        "title": "Optima Clustering の発表",
+        "url": "https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/"
+      },
+      {
+        "title": "Clustering Keys",
+        "url": "https://docs.snowflake.com/en/user-guide/tables-clustering-keys"
+      },
+      {
+        "title": "SYSTEM$CLUSTERING_INFORMATION",
+        "url": "https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information"
+      },
+      {
+        "title": "Workload-Aware Incremental Reclustering（研究試作）",
+        "url": "https://arxiv.org/html/2602.23289"
+      }
+    ]
+  }
+}

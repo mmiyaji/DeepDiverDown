@@ -8,6 +8,26 @@ import yaml from 'js-yaml';
 const registry = JSON.parse(readFileSync(new URL('../models/registry.json', import.meta.url), 'utf8'));
 const load = id => ({ id, model: yaml.load(readFileSync(new URL('../models/' + id + '/model.yaml', import.meta.url), 'utf8')) });
 
+test('カタログ発行の認証情報は取得側と発行側の違いを比較できる', () => {
+  const ids = ['snowflake-iceberg-vended-credentials', 'databricks-unity-vended-credentials'];
+  assert.ok(comparisonCandidates(registry, ids[0]).some(c => c.entry.id === ids[1]));
+  const group = compareRoles(ids.map(load)).groups.find(g => g.sides[0].includes('credentials') && g.sides[1].includes('credential'));
+  assert.ok(group?.difference);
+});
+
+test('Snowflake と Databricks の性能詳細は対応役割と異なる実装を示す', () => {
+  const a = 'snowflake-optimization-internals', b = 'databricks-optimization-internals';
+  assert.ok(comparisonCandidates(registry, a).some(c => c.entry.id === b));
+  assert.ok(comparisonCandidates(registry, b).some(c => c.entry.id === a));
+  const pair = [load(a), load(b)];
+  const comparison = compareRoles(pair);
+  for (const [left, right] of [['metadata','log'], ['partitions','files'], ['whcache','diskcache'], ['cluster','maintenance']]) {
+    const group = comparison.groups.find(g => g.sides[0].includes(left) && g.sides[1].includes(right));
+    assert.ok(group?.difference, `${left} / ${right}`);
+  }
+  assert.ok(comparison.other[0].includes('qas'));
+});
+
 test('comparison distinguishes adapters from inputs and explains a shared role with different mechanisms', () => {
   const pair = ['kafka-connect', 'airbyte'].map(load);
   const { groups } = compareRoles(pair);

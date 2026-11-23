@@ -1,0 +1,408 @@
+name: Snowpipe Streaming：バッファからテーブルへの取り込み
+description: 高性能アーキテクチャで受信、バッファ、サーバーレスジョブ、pre-clustering を追う。2025年の記事を基にした論理図。
+parent:
+  model: snowflake-ingestion-cdc
+  node: streaming
+reference:
+  objectives:
+    - 高性能アーキテクチャで受信、バッファ、サーバーレスジョブ、pre-clustering を追う。2025年の記事を基にした論理図。
+    - SDK または REST から行を受信して認証し、バッファに振り分ける。
+    - 負荷を観測し、Assigner が振り分け先を調整する。
+  sources:
+    - title: 次世代 Snowpipe Streaming の内部構造
+      url: https://www.snowflake.com/en/blog/engineering/next-gen-snowpipe-streaming-architecture/
+    - title: Snowpipe Streaming の現行仕様
+      url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+    - title: Kafka から Iceberg へ
+      url: https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/
+    - title: 取り込み設計と性能
+      url: https://www.snowflake.com/en/blog/engineering/efficient-snowflake-ingestion-query-ready/
+sources:
+  - docs/reference-snowflake-snowpipe-streaming-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§1
+  - type: doc
+    ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§4
+tiers:
+  - id: input
+    label: 送信元
+    z: 3
+    size:
+      - 23
+      - 4
+  - id: process
+    label: 受信と振り分け
+    z: 2
+    size:
+      - 23
+      - 4
+  - id: compute
+    label: 取り込みの実行
+    z: 1
+    size:
+      - 23
+      - 4
+  - id: data
+    label: テーブルとクエリ
+    z: 0
+    size:
+      - 23
+      - 4
+nodes:
+  producer:
+    drill: snowflake-kafka-iceberg-streaming
+    label: イベント送信
+    kind: client
+    tier: input
+    x: 0
+    'y': 1.5
+    description: アプリケーションは SDK または REST から行を送信する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  ingress:
+    label: 認証と振り分け
+    kind: service
+    tier: process
+    x: 0
+    'y': 1.5
+    description: Ingress は認証した要求を受け、Assigner のルーティングに従って Buffering Tier に振り分ける。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  assign:
+    label: 負荷に応じた割当
+    kind: service
+    tier: process
+    x: 5.2
+    'y': 1.5
+    description: Assigner は Buffering Tier の負荷情報を基に割当を調整する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  buffer:
+    label: 一時バッファ
+    kind: queue
+    tier: process
+    x: 10.4
+    'y': 1.5
+    description: Buffering Service は暗号化された行または blob 参照を保持し、負荷情報を提供する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  pipe:
+    label: 取り込み定義
+    kind: file
+    tier: process
+    x: 15.600000000000001
+    'y': 1.5
+    description: PIPE は対象テーブルと取り込み時の処理を指定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  job:
+    label: 取り込みジョブ
+    kind: worker
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: Snowpipe がサーバーレスのジョブをスケジュールし、チャネルのスループットに応じて処理を分担する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  cluster:
+    label: 取り込み時の配置
+    kind: worker
+    tier: compute
+    x: 5.2
+    'y': 1.5
+    description: 設定した場合、ミニバッチを作り、クラスタリングキーに沿って書き込み前に配置を調整する。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  table:
+    label: 分析対象の表
+    kind: db
+    tier: data
+    x: 0
+    'y': 1.5
+    description: Snowflake テーブルまたは Snowflake 管理 Iceberg テーブルへ書き込み、クエリ可能にする。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  query:
+    label: 読み取り
+    kind: client
+    tier: data
+    x: 5.2
+    'y': 1.5
+    description: テーブルに反映されたデータを SQL で読み取る。
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+links:
+  - id: send
+    from: producer
+    to: ingress
+    label: 行を送信
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: route
+    from: ingress
+    to: buffer
+    label: 認証してバッファへ振り分け
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: load
+    from: buffer
+    to: assign
+    label: 負荷情報を通知
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: routing
+    from: assign
+    to: ingress
+    label: 振り分け先を提供
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: definition
+    from: pipe
+    to: job
+    label: 取り込み設定を適用
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: consume
+    from: buffer
+    to: job
+    label: バッファから読み取る
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: prepare
+    from: job
+    to: cluster
+    label: 設定時はミニバッチを整理
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: write
+    from: cluster
+    to: table
+    label: 配置後に表へ反映
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: direct
+    from: job
+    to: table
+    label: 事前配置なしで表へ反映
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+  - id: read
+    from: table
+    to: query
+    label: 反映済みデータを問い合わせ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§2
+scenarios:
+  - id: flow
+    label: データと処理の流れ
+    evidence:
+      - type: doc
+        ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§3
+    steps:
+      - links:
+          - send
+          - route
+        note: SDK または REST から行を受信して認証し、バッファに振り分ける。
+      - links:
+          - load
+          - routing
+        note: 負荷を観測し、Assigner が振り分け先を調整する。
+      - links:
+          - definition
+          - consume
+        note: PIPE の定義に基づき、サーバーレスジョブがバッファから取得する。
+      - links:
+          - prepare
+          - write
+          - read
+        note: 設定時は取り込み前に配置を調整して表へ反映し、SQL から読む。
+unknowns:
+  - id: internal-deployment
+    description: 公開されていない内部配置・閾値は特定できない。
+implementations:
+  - id: snowflake
+    label: Snowflake の実装例
+    description: >-
+      アプリが SDK で送信し、Snowflake が公開した高性能取り込みアーキテクチャを介して管理 Iceberg テーブルに書き込み、SQL で読む。pre-clustering
+      は対応する設定を有効にした場合の経路。公式記事と現行ガイドを組み合わせた概念例である。
+    sources:
+      - title: 次世代 Snowpipe Streaming の内部構造
+        url: https://www.snowflake.com/en/blog/engineering/next-gen-snowpipe-streaming-architecture/
+      - title: Snowpipe Streaming の現行仕様
+        url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+      - title: Kafka から Iceberg へ
+        url: https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/
+      - title: 取り込み設計と性能
+        url: https://www.snowflake.com/en/blog/engineering/efficient-snowflake-ingestion-query-ready/
+    tiers:
+      - id: input
+        label: 送信元
+        z: 3
+        size:
+          - 23
+          - 4
+      - id: process
+        label: 受信と振り分け
+        z: 2
+        size:
+          - 23
+          - 4
+      - id: compute
+        label: 取り込みの実行
+        z: 1
+        size:
+          - 23
+          - 4
+      - id: data
+        label: テーブルとクエリ
+        z: 0
+        size:
+          - 23
+          - 4
+    nodes:
+      ex-producer:
+        label: SDK / REST の送信元
+        kind: client
+        tier: input
+        x: 0
+        'y': 1.5
+        description: アプリケーションは SDK または REST から行を送信する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - producer
+      ex-ingress:
+        label: Snowflake Ingress
+        kind: service
+        tier: process
+        x: 0
+        'y': 1.5
+        description: Ingress は認証した要求を受け、Assigner のルーティングに従って Buffering Tier に振り分ける。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - ingress
+      ex-assign:
+        label: Assigner
+        kind: service
+        tier: process
+        x: 5.2
+        'y': 1.5
+        description: Assigner は Buffering Tier の負荷情報を基に割当を調整する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - assign
+      ex-buffer:
+        label: Buffering Tier
+        kind: queue
+        tier: process
+        x: 10.4
+        'y': 1.5
+        description: Buffering Service は暗号化された行または blob 参照を保持し、負荷情報を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - buffer
+      ex-pipe:
+        label: Snowpipe の PIPE
+        kind: file
+        tier: process
+        x: 15.600000000000001
+        'y': 1.5
+        description: PIPE は対象テーブルと取り込み時の処理を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - pipe
+        svc: snowflake:pipe
+      ex-job:
+        label: Snowpipe serverless jobs
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: Snowpipe がサーバーレスのジョブをスケジュールし、チャネルのスループットに応じて処理を分担する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - job
+        svc: snowflake:pipe
+      ex-cluster:
+        label: pre-clustering（任意）
+        kind: worker
+        tier: compute
+        x: 5.2
+        'y': 1.5
+        description: 設定した場合、ミニバッチを作り、クラスタリングキーに沿って書き込み前に配置を調整する。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - cluster
+      ex-table:
+        label: Snowflake / 管理 Iceberg テーブル
+        kind: db
+        tier: data
+        x: 0
+        'y': 1.5
+        description: Snowflake テーブルまたは Snowflake 管理 Iceberg テーブルへ書き込み、クエリ可能にする。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - table
+      ex-query:
+        label: SQL クエリ
+        kind: client
+        tier: data
+        x: 5.2
+        'y': 1.5
+        description: テーブルに反映されたデータを SQL で読み取る。
+        evidence:
+          - type: doc
+            ref: docs/reference-snowflake-snowpipe-streaming-internals.md#§5
+        realizes:
+          - query
+    groups:
+      - kind: cloud
+        label: Snowflake の管理サービスと実行処理（論理範囲）
+        provider: snowflake
+        tier:
+          - process
+          - compute
+          - data
+        nodes:
+          - ex-ingress
+          - ex-assign
+          - ex-buffer
+          - ex-pipe
+          - ex-job
+          - ex-cluster
+          - ex-table

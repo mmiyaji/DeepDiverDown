@@ -1,0 +1,226 @@
+{
+  "model": "snowflake-iceberg-vended-credentials",
+  "name": "Snowflake：Iceberg カタログの一時認証情報",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "user": {
+      "type": "node",
+      "label": "SQL を実行",
+      "status": "claim"
+    },
+    "catalog": {
+      "type": "node",
+      "label": "外部カタログ",
+      "status": "claim"
+    },
+    "engine": {
+      "type": "node",
+      "label": "クエリの実行",
+      "status": "claim"
+    },
+    "volume": {
+      "type": "node",
+      "label": "表ごとの内部ボリューム",
+      "status": "claim"
+    },
+    "credentials": {
+      "type": "node",
+      "label": "短期認証情報",
+      "status": "claim"
+    },
+    "metadata": {
+      "type": "node",
+      "label": "表のメタデータ",
+      "status": "claim"
+    },
+    "files": {
+      "type": "node",
+      "label": "データファイル",
+      "status": "claim"
+    },
+    "execute": {
+      "type": "link",
+      "label": "SQL を実行 → クエリの実行",
+      "status": "claim"
+    },
+    "resolve": {
+      "type": "link",
+      "label": "クエリの実行 → 外部カタログ",
+      "status": "claim"
+    },
+    "vend": {
+      "type": "link",
+      "label": "外部カタログ → 表ごとの内部ボリューム",
+      "status": "claim"
+    },
+    "cache": {
+      "type": "link",
+      "label": "表ごとの内部ボリューム → 短期認証情報",
+      "status": "claim"
+    },
+    "authorize": {
+      "type": "link",
+      "label": "短期認証情報 → クエリの実行",
+      "status": "claim"
+    },
+    "meta": {
+      "type": "link",
+      "label": "クエリの実行 → 表のメタデータ",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "link",
+      "label": "クエリの実行 → データファイル",
+      "status": "claim"
+    },
+    "flow": {
+      "type": "scenario",
+      "label": "データと処理の流れ"
+    },
+    "internal-deployment": {
+      "type": "unknown"
+    },
+    "ex-user": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "利用者の SQL",
+      "realizes": [
+        "user"
+      ]
+    },
+    "ex-catalog": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "外部 Iceberg REST カタログ",
+      "realizes": [
+        "catalog"
+      ]
+    },
+    "ex-engine": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Snowflake のクエリエンジン",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "ex-volume": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Snowflake の内部ボリューム",
+      "realizes": [
+        "volume"
+      ]
+    },
+    "ex-credentials": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "vended credentials",
+      "realizes": [
+        "credentials"
+      ]
+    },
+    "ex-metadata": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "S3 の Iceberg メタデータ",
+      "realizes": [
+        "metadata"
+      ]
+    },
+    "ex-files": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "S3 の Iceberg データ",
+      "realizes": [
+        "files"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-snowflake-iceberg-vended-credentials.md#§1": [
+      "model"
+    ],
+    "docs/reference-snowflake-iceberg-vended-credentials.md": [
+      "model",
+      "user",
+      "catalog",
+      "engine",
+      "volume",
+      "credentials",
+      "metadata",
+      "files",
+      "execute",
+      "resolve",
+      "vend",
+      "cache",
+      "authorize",
+      "meta",
+      "scan",
+      "flow",
+      "ex-user",
+      "ex-catalog",
+      "ex-engine",
+      "ex-volume",
+      "ex-credentials",
+      "ex-metadata",
+      "ex-files"
+    ],
+    "docs/reference-snowflake-iceberg-vended-credentials.md#§4": [
+      "model"
+    ],
+    "docs/reference-snowflake-iceberg-vended-credentials.md#§2": [
+      "user",
+      "catalog",
+      "engine",
+      "volume",
+      "credentials",
+      "metadata",
+      "files",
+      "execute",
+      "resolve",
+      "vend",
+      "cache",
+      "authorize",
+      "meta",
+      "scan"
+    ],
+    "docs/reference-snowflake-iceberg-vended-credentials.md#§3": [
+      "flow"
+    ],
+    "docs/reference-snowflake-iceberg-vended-credentials.md#§5": [
+      "ex-user",
+      "ex-catalog",
+      "ex-engine",
+      "ex-volume",
+      "ex-credentials",
+      "ex-metadata",
+      "ex-files"
+    ]
+  },
+  "reference": {
+    "category": "クラウド分析基盤",
+    "order": 95,
+    "domain": "データ基盤",
+    "kind": "仕組みの深掘り",
+    "detailOf": "iceberg-catalog-read",
+    "objectives": [
+      "外部 Iceberg カタログから取得する短期認証情報とストレージへのアクセスを追う。",
+      "SQL に対し外部カタログから表の情報を取得する。",
+      "テーブル単位で短期認証情報を取得し、必要に応じ更新する。"
+    ],
+    "sources": [
+      {
+        "title": "Snowflake の Iceberg 認証情報管理",
+        "url": "https://www.snowflake.com/en/blog/engineering/iceberg-catalog-credentials/"
+      },
+      {
+        "title": "カタログ連携とストレージ認証",
+        "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-configure-catalog-integration-rest"
+      }
+    ]
+  }
+}
