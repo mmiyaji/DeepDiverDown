@@ -3,6 +3,16 @@
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151618;--panel:#1b1c1f;--card:#202124;--fg:#ededee;--mute:#a7a8ad;--line:#393a3e;--grid:#292b2e;--ink:#d9dadd;--accent:#ff741c;--plate:#222427;--research-link:#f5a574;--research-active:#39291f}}
 :root[data-theme="dark"]{--bg:#151618;--panel:#1b1c1f;--card:#202124;--fg:#ededee;--mute:#a7a8ad;--line:#393a3e;--grid:#292b2e;--ink:#d9dadd;--accent:#ff741c;--plate:#222427;--research-link:#f5a574;--research-active:#39291f}
 :root{--view-accent:var(--accent)}
+.flow-controls{display:flex;align-items:center;gap:12px;flex:none;padding:8px 20px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12px;min-width:0}
+.flow-controls[hidden],.flow-position[hidden]{display:none}
+.flow-controls button{font:inherit;cursor:pointer;border:1px solid var(--line);border-radius:5px;color:var(--fg);background:var(--card);padding:6px 10px}
+.flow-controls button:hover,.flow-controls button:focus-visible{border-color:var(--view-accent)}
+.flow-controls .flow-play{border-color:var(--view-accent);font-weight:700;white-space:nowrap}
+.flow-controls .flow-play[aria-pressed="true"]{background:var(--view-accent);color:var(--card)}
+.flow-position{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.flow-controls button:disabled{opacity:.4;cursor:default}
+.flow-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mute)}
+@media(max-width:550px){.flow-controls{padding:7px 10px;gap:8px}.flow-name{display:none}}
 :root[data-view-accent="blue"]{--view-accent:#1670c5}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"])[data-view-accent="blue"]{--view-accent:#66b9ff}}
 :root[data-theme="dark"][data-view-accent="blue"]{--view-accent:#66b9ff}
@@ -61,6 +71,10 @@
 .panel .detail-close{position:static;margin:0;min-width:38px;min-height:38px;border:1px solid var(--line);border-radius:6px}
 #panel-body{padding:20px}
 #panel-body>h3:first-child{border-left:4px solid var(--accent);padding-left:12px}
+.view-overview{margin:0 20px 20px;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.view-overview h2{margin:0 0 10px;color:var(--mute);font-size:12px;font-weight:600}
+.view-overview h3{margin:0 0 8px;font-size:14px;line-height:1.5}
+.view-overview p{margin:0;color:var(--fg);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 .panel h4{letter-spacing:0}
 .menu-list{border-color:var(--line);border-radius:8px;overflow:auto}
 .objects-page{--objects-link:var(--research-link)}
@@ -81,6 +95,7 @@
   .toolbar{padding:8px 10px}
   .panel{border-radius:14px 14px 0 0;max-height:min(70vh,calc(var(--screen-height) - var(--head)));padding-bottom:env(safe-area-inset-bottom,0px)}
   #panel-body{padding:16px}
+  .view-overview{margin:0 16px 16px}
 }
 @media(max-width:620px){
   .top{grid-template-areas:'nav brand actions' 'search search search';grid-template-columns:auto minmax(0,1fr) auto;gap:4px 6px}
@@ -96,3 +111,34 @@
   body.research-page .research-top,body.objects-page .objects-header{display:flex;height:auto;align-items:flex-start;flex-direction:column;padding:12px 16px;gap:8px}
   .research-top nav,.objects-header nav{margin:0;gap:8px 14px}
 }
+
+/* Keep the diagram as the main workspace; its controls stay outside the zoomed canvas. */
+.stage-head{padding:10px 16px;align-items:center;gap:12px}
+.stage-context{display:flex;align-items:center;gap:16px;min-width:0}
+.stage-context h1{margin:0;font-size:16px;line-height:1.35;flex:none}
+.stage-context .stats{padding:0;gap:12px;min-width:0;overflow:auto;flex-wrap:nowrap}
+.stage-context .stat{border:0;border-left:1px solid var(--line);padding:0 0 0 10px;min-width:max-content}
+.stage-context .stat small{font-size:10px}.stage-context .stat b{font-size:12px}
+.stage.scenario-active .stats{display:none}
+.stage-actions{flex:none;flex-wrap:nowrap}
+.toolbar{padding:6px 12px;gap:6px}
+.view-extra>summary{min-width:34px;justify-content:center}
+.view-extra .view-extra-list{min-width:230px;gap:6px;padding:10px}
+.view-extra .tb-group{width:max-content;max-width:100%}
+.view-extra .tb-group button{width:auto;justify-content:center;border:0;border-left:1px solid var(--line);border-radius:0;padding:5px 10px}
+.view-extra .tb-group button:first-child{border-left:0}
+.view-extra .tb-group button.on{border-left-color:var(--line);background:var(--ink);color:var(--bg)}
+.diagram-workspace{position:relative;display:flex;flex:1;min-width:0;min-height:0;container-type:inline-size}
+.diagram-workspace>.view{width:100%}
+.flow-controls{position:absolute;left:12px;bottom:12px;z-index:5;max-width:calc(100% - 220px);gap:7px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:0 4px 16px #0004}
+.flow-controls button{min-height:32px}
+.flow-scenario{display:flex;align-items:center;gap:6px;min-width:0;border-left:1px solid var(--line);padding-left:8px;color:var(--mute)}
+.flow-scenario[hidden]{display:none}
+.flow-scenario select{max-width:210px;min-width:0;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--fg);font:inherit;padding:6px}
+.diagram-workspace:has(.flow-controls:not([hidden])) .hint{bottom:62px}
+.diagram-workspace:has(.flow-controls:not([hidden])) .compare-viewport .hint{display:none}
+@container (max-width: 720px){.flow-controls{max-width:calc(100% - 205px)}.flow-scenario span{display:none}.flow-scenario select{max-width:125px}}
+@container (max-width: 500px){.flow-controls{max-width:calc(100% - 24px)}.flow-scenario select{max-width:95px}.flow-controls .flow-play{font-size:0}.flow-controls .flow-play::before{content:'▶';font-size:13px}.flow-controls .flow-play[aria-pressed="true"]::before{content:'❚❚'}}
+@container (max-width: 300px){.flow-scenario{display:none}}
+@media(max-width:900px){.stage-head{padding:8px 12px;flex-wrap:nowrap}.stage-context{flex-basis:auto}.stage-context .stats{display:none}.stage-actions{justify-content:flex-end}.toolbar{padding:6px 10px}.flow-controls{max-width:calc(100% - 24px)}}
+@media(max-width:620px){.stage-context h1{font-size:14px}.stage-actions{gap:4px}.stage-head{gap:6px}.stage-context h1{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.toolbar .tb-group button span{display:none}.view-extra .tb-group button span{display:inline}.flow-controls{padding:5px;gap:5px}}

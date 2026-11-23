@@ -1,0 +1,261 @@
+name: 時系列データの保持と階層化
+description: Hot・Warm・Cold の役割、集計、アーカイブと復元を分けて整理する。
+reference:
+  objectives:
+    - データのアクセス頻度と保持要件に応じて保存層を分ける。
+    - 生データと集計値の保持期間や遅延到着を考慮する。
+    - 層間の移動・復元の担い手を特定する。
+  sources:
+    - title: Timescale hypertables
+      url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+    - title: Timescale continuous aggregates
+      url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+    - title: PostgreSQL COPY
+      url: https://www.postgresql.org/docs/current/sql-copy.html
+sources:
+  - docs/reference-time-series-tiering.md
+evidence:
+  - type: doc
+    ref: docs/reference-time-series-tiering.md#§1
+  - type: doc
+    ref: docs/reference-time-series-tiering.md#§3
+  - type: doc
+    ref: docs/reference-time-series-tiering.md#§5
+tiers:
+  - id: flow
+    label: 処理の流れ
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  source:
+    label: 時系列の観測値
+    kind: client
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 時刻付きの生データを受け取る。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+  hot:
+    label: Hot：最近の生データ
+    kind: db
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: 高頻度の書き込みと直近の検索に使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+  rollup:
+    label: 時間幅別の集計
+    kind: service
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: 用途に合わせて粒度を変えた値を作る。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+  warm:
+    label: Warm：集計済みデータ
+    kind: db
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 過去期間の分析に使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+  cold:
+    label: Cold：長期保存
+    kind: file
+    tier: flow
+    x: 16
+    'y': 1.5
+    description: 選んだデータをアーカイブし、必要に応じて復元する。
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+links:
+  - id: step-1
+    from: source
+    to: hot
+    label: 観測値を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+  - id: step-2
+    from: hot
+    to: rollup
+    label: 時間幅で集計
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+  - id: step-3
+    from: rollup
+    to: warm
+    label: 集計値を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+  - id: step-4
+    from: warm
+    to: cold
+    label: 保存対象を長期保管
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+scenarios:
+  - id: flow
+    label: 入力から結果まで
+    evidence:
+      - type: doc
+        ref: docs/reference-time-series-tiering.md#§2
+    steps:
+      - links:
+          - step-1
+        note: 観測値を保存。
+        highlight:
+          - raw
+      - links:
+          - step-2
+        note: 時間幅で集計。
+        highlight:
+          - raw
+          - sum
+      - links:
+          - step-3
+        note: 集計値を保存。
+        highlight:
+          - sum
+      - links:
+          - step-4
+        note: 保存対象を長期保管。
+        highlight:
+          - sum
+          - arch
+    visual: detail-map
+implementations:
+  - id: timescaledb-export
+    label: TimescaleDB と明示的なファイル書き出し
+    description: 利用者が運用する PostgreSQL / TimescaleDB で生データと継続集計を管理し、選んだデータを COPY でファイルに書き出す。
+    sources:
+      - title: Timescale hypertables
+        url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+      - title: Timescale continuous aggregates
+        url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+      - title: PostgreSQL COPY
+        url: https://www.postgresql.org/docs/current/sql-copy.html
+    tiers:
+      - id: runtime
+        label: 利用者が管理する実行環境
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-source:
+        label: SQL 投入クライアント
+        kind: client
+        tier: runtime
+        x: 0
+        'y': 1.5
+        realizes:
+          - source
+        description: 利用者が運用する PostgreSQL / TimescaleDB で生データと継続集計を管理し、選んだデータを COPY でファイルに書き出す。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-tiering.md#§4
+      impl-hot:
+        label: 生データの hypertable
+        kind: db
+        tier: runtime
+        x: 4
+        'y': 1.5
+        realizes:
+          - hot
+        description: PostgreSQL、継続集計の更新、COPY の起動、ファイルの保管・復元・保持期限は利用者が管理する。層の移動は自動ではない。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-tiering.md#§4
+      impl-rollup:
+        label: continuous aggregate 更新
+        kind: service
+        tier: runtime
+        x: 8
+        'y': 1.5
+        realizes:
+          - rollup
+        description: 利用者が運用する PostgreSQL / TimescaleDB で生データと継続集計を管理し、選んだデータを COPY でファイルに書き出す。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-tiering.md#§4
+      impl-warm:
+        label: 集計結果の hypertable
+        kind: db
+        tier: runtime
+        x: 12
+        'y': 1.5
+        realizes:
+          - warm
+        description: 利用者が運用する PostgreSQL / TimescaleDB で生データと継続集計を管理し、選んだデータを COPY でファイルに書き出す。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-tiering.md#§4
+      impl-cold:
+        label: 利用者が書き出すアーカイブファイル
+        kind: file
+        tier: runtime
+        x: 16
+        'y': 1.5
+        realizes:
+          - cold
+        description: 利用者が運用する PostgreSQL / TimescaleDB で生データと継続集計を管理し、選んだデータを COPY でファイルに書き出す。
+        evidence:
+          - type: doc
+            ref: docs/reference-time-series-tiering.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者の実行環境（論理範囲）
+        tier:
+          - runtime
+        nodes:
+          - impl-source
+          - impl-hot
+          - impl-rollup
+          - impl-warm
+          - impl-cold
+blocks:
+  - id: detail-map
+    title: 保持期間とデータ粒度の例
+    note: 配置・期間は説明用です。集計は自動的な階層移行を意味せず、保管・復元方法は別途設計します。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: hot
+        label: Hot
+        node: hot
+      - id: warm
+        label: Warm
+        node: warm
+      - id: cold
+        label: Cold
+        node: cold
+    items:
+      hot:
+        - id: raw
+          label: 高頻度の生値
+          k: 0
+          note: 最近の観測値。保持期間と再集計に必要な期間を決める。
+      warm:
+        - id: sum
+          label: 時間別の集計
+          k: 2
+          note: 分析用に時間幅をまとめた例。
+      cold:
+        - id: arch
+          label: 長期保管
+          k: 3
+          note: 利用者が選択し書き出して保管する例。

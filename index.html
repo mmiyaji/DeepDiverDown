@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/settings-panel.css">
 <link rel="stylesheet" href="css/diagram-symbols.css?v=compare-layout3">
 <link rel="stylesheet" href="css/review-actions.css">
-<link rel="stylesheet" href="css/product-theme.css?v=brand2">
+<link rel="stylesheet" href="css/product-theme.css?v=view-overview1">
 <script type="importmap">
 { "imports": {
   "three": "./vendor/three/three.module.js",
@@ -80,7 +80,7 @@
   <main class="main">
     <div class="stage">
       <div class="stage-head">
-        <div class="stage-context"><span>構成図</span><h1 id="viewer-title"></h1><div class="stats" id="stats" aria-live="polite"></div></div>
+        <div class="stage-context"><h1 id="viewer-title"></h1><div class="stats" id="stats" aria-live="polite"></div></div>
         <div class="stage-actions"><a class="b small" id="graph-entry" hidden>関連グラフ</a><button type="button" class="b small compare-entry" id="compare-entry" data-act="reference-compare" aria-haspopup="dialog" hidden></button></div>
       </div>
         <div class="toolbar" role="toolbar" aria-label="構成図の操作">
@@ -102,29 +102,46 @@
                 <label class="chk"><input type="checkbox" id="nbr"> 選択中の部品の周辺だけ</label>
                 <label class="chk"><input type="checkbox" id="spread-floors"> 3D のフロア間隔を広げる</label>
                 <label class="chk"><input type="checkbox" id="minimap"> 全体図（ミニマップ）</label>
+                <button type="button" class="b small" data-act="readable-diagram" hidden aria-pressed="false" title="文字を大きく表示し、図をスクロールして見る">文字を拡大</button>
               </div>
             </details>
-          </div>
-          <div class="tb-group" role="group" aria-label="ドラッグの操作">
-            <button data-drag="rotate" title="ドラッグで回転（R）">⟳<span>回転</span></button>
-            <button data-drag="pan" title="ドラッグで移動（M）">✥<span>移動</span></button>
           </div>
           <div class="tb-group" role="group" aria-label="次元">
             <button data-dimension="2" title="依存関係を追う（D で切替）">2D 接続図</button>
             <button data-dimension="3" title="フロアと境界を見る（D で切替）">3D 配置図</button>
           </div>
-          <div class="tb-group" role="group" aria-label="視点">
-            <button data-view="iso" title="斜めから">斜め</button><button data-view="top" title="真上から">真上</button><button data-view="side" title="横から">横</button><button data-view="back" title="裏側から">裏</button><button data-view="reset" title="全体が収まるように戻す">⤢<span>全体</span></button>
-          </div>
+          <div class="tb-group" role="group" aria-label="視点"><button data-view="reset" title="全体が収まるように戻す">⤢<span>全体</span></button></div>
+          <details class="menu tb-menu view-extra">
+            <summary title="回転・移動と視点の設定" aria-label="その他の図の操作">⋯</summary>
+            <div class="menu-list view-extra-list">
+              <span class="tb-opts-h">ドラッグ</span>
+              <div class="tb-group" role="group" aria-label="ドラッグの操作">
+                <button data-drag="rotate" title="ドラッグで回転（R）">⟳<span>回転</span></button>
+                <button data-drag="pan" title="ドラッグで移動（M）">✥<span>移動</span></button>
+              </div>
+              <span class="tb-opts-h">視点</span>
+              <div class="tb-group" role="group" aria-label="視点の切り替え"><button data-view="iso" title="斜めから">斜め</button><button data-view="top" title="真上から">真上</button><button data-view="side" title="横から">横</button><button data-view="back" title="裏側から">裏</button></div>
+            </div>
+          </details>
           <div class="tb-spacer"></div>
           <div class="tb-group" role="group" aria-label="表示領域">
-            <button data-act="readable-diagram" hidden aria-pressed="false" title="文字を大きく表示し、図をスクロールして見る">文字を拡大</button>
             <button data-act="maximize-view" aria-pressed="false" title="構成図を画面内で最大化">⛶<span>最大化</span></button>
             <button class="detail-toggle" id="detail-toggle" aria-controls="panel" aria-expanded="true" title="詳細パネルの開閉">詳細</button>
           </div>
         </div>
+      <div class="diagram-workspace">
       <div class="view" id="view" aria-label="構成図。部品や矢印を選択">
         <div class="hint" id="hint"></div>
+      </div>
+      <div class="flow-controls" id="flow-controls" role="group" aria-label="処理の流れの操作" hidden>
+        <button type="button" class="flow-play" data-act="flow-play"></button>
+        <div class="flow-position" id="flow-position" hidden>
+          <button type="button" data-step="-1" aria-label="前のステップ">←</button>
+          <span id="flow-progress"></span>
+          <button type="button" data-step="1" aria-label="次のステップ">→</button>
+        </div>
+        <label class="flow-scenario" id="flow-scenario-label" hidden><span>シナリオ</span><select id="flow-scenario" aria-label="シナリオを選択"></select></label>
+      </div>
       </div>
       <div class="legend" id="legend" role="group" aria-label="図の凡例と表示切替"></div>
       <section class="filemap" id="filemap" hidden aria-label="データの見取り図"></section>
@@ -134,6 +151,11 @@
   <aside class="panel" id="panel" tabindex="-1" aria-label="詳細">
     <div class="panel-heading"><div><strong>詳細</strong><span>選択した部品・接続の情報</span></div><button class="icon detail-close" id="detail-close" aria-label="詳細パネルを閉じる" title="閉じる">×</button></div>
     <div id="panel-body"></div>
+    <section class="view-overview" aria-labelledby="view-overview-heading">
+      <h2 id="view-overview-heading">構成概要</h2>
+      <h3 id="view-overview-title"></h3>
+      <p id="view-overview-description"></p>
+    </section>
   </aside>
 </div>
 
@@ -153,6 +175,6 @@
 <script src="js/analyze.js?v=routes1"></script>
 <script src="js/views.js?v=routes1"></script>
 <script src="js/view-controls.js?v=tbmenu1"></script>
-<script type="module" src="js/app.js?v=ai-local1"></script>
+<script type="module" src="js/app.js?v=detail-map1"></script>
 </body>
 </html>

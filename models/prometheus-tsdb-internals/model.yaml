@@ -1,0 +1,390 @@
+name: Prometheus TSDB：WAL・Head・ブロック
+description: 利用者管理の Linux 上で Prometheus を実行し、対象を scrape してローカルディスクに WAL とブロックを保存する。
+parent:
+  model: time-series-data
+  node: store
+reference:
+  objectives:
+    - 書き込みと検索の経路を追う。
+    - データ構造と保持・復旧の役割を区別する。
+    - 実装の前提と制約を確認する。
+  sources:
+    - title: Prometheus Storage
+      url: https://prometheus.io/docs/prometheus/latest/storage/
+    - title: Prometheus data model
+      url: https://prometheus.io/docs/concepts/data_model/
+sources:
+  - docs/reference-prometheus-tsdb-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-prometheus-tsdb-internals.md#§1
+  - type: doc
+    ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - type: doc
+    ref: docs/reference-prometheus-tsdb-internals.md#§3
+  - type: doc
+    ref: docs/reference-prometheus-tsdb-internals.md#§5
+tiers:
+  - id: write
+    label: 処理と検索
+    z: 1
+    size:
+      - 21
+      - 4
+  - id: disk
+    label: データと保存
+    z: 0
+    size:
+      - 21
+      - 4
+nodes:
+  scrape:
+    label: 監視対象のメトリクス
+    kind: client
+    tier: write
+    x: 0
+    'y': 1.5
+    description: メトリクス公開対象からサンプルを scrape する。
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§1
+  head:
+    label: Head：最新サンプル
+    kind: db
+    tier: write
+    x: 4
+    'y': 1.5
+    description: 最近のサンプルを保持し、検索対象とする。
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§1
+  wal:
+    label: WAL：復旧用ログ
+    kind: file
+    tier: disk
+    x: 4
+    'y': 1.5
+    description: Head の復旧に使う write-ahead log。
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  blocks:
+    label: 時間別ブロック
+    kind: db
+    tier: disk
+    x: 9
+    'y': 1.5
+    description: 時間範囲ごとにチャンク、索引とメタデータを保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  index:
+    label: ブロック内の索引
+    kind: file
+    tier: disk
+    x: 14
+    'y': 1.5
+    description: メトリクス名とラベルからブロック内の系列を特定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  compact:
+    label: Compaction・保持
+    kind: service
+    tier: write
+    x: 9
+    'y': 1.5
+    description: 古いブロックを統合し、保持ポリシーに基づき期限切れを削除する。
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§1
+  query:
+    label: PromQL 検索
+    kind: service
+    tier: write
+    x: 14
+    'y': 1.5
+    description: PromQL で Head と保存済みブロックを対象に検索する。
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§1
+links:
+  - id: s
+    from: scrape
+    to: head
+    label: サンプルを取得
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - id: w
+    from: head
+    to: wal
+    label: 復旧用ログを記録
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - id: b
+    from: head
+    to: blocks
+    label: 時間区間をブロック化
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - id: i
+    from: blocks
+    to: index
+    label: 系列とラベルを索引化
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - id: c
+    from: blocks
+    to: compact
+    label: 古いブロックをまとめる
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - id: q1
+    from: query
+    to: head
+    label: 最新サンプルを参照
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - id: q2
+    from: query
+    to: index
+    label: 系列を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+  - id: q3
+    from: index
+    to: blocks
+    label: 対象チャンクを読み出す
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+scenarios:
+  - id: write
+    label: 収集と永続化
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+    steps:
+      - links:
+          - s
+        note: サンプルを取得。
+        highlight:
+          - h1
+          - h2
+      - links:
+          - w
+        note: 復旧用ログを記録。
+        highlight:
+          - w1
+      - links:
+          - b
+        note: 時間区間をブロック化。
+        highlight:
+          - h1
+          - b1
+      - links:
+          - i
+        note: 系列とラベルを索引化。
+        highlight:
+          - b2
+      - links:
+          - c
+        note: 古いブロックをまとめる。
+        highlight:
+          - b1
+          - b3
+    visual: detail-map
+  - id: query
+    label: 最新と過去の検索
+    evidence:
+      - type: doc
+        ref: docs/reference-prometheus-tsdb-internals.md#§2
+    steps:
+      - links:
+          - q1
+        note: 最新サンプルを参照。
+        highlight:
+          - h1
+          - h2
+      - links:
+          - q2
+        note: 系列を検索。
+        highlight:
+          - b2
+      - links:
+          - q3
+        note: 対象チャンクを読み出す。
+        highlight:
+          - b1
+    visual: detail-map
+implementations:
+  - id: local
+    label: Linux 上の Prometheus ローカル TSDB
+    description: 利用者管理の Linux 上で Prometheus を実行し、対象を scrape してローカルディスクに WAL とブロックを保存する。
+    sources:
+      - title: Prometheus Storage
+        url: https://prometheus.io/docs/prometheus/latest/storage/
+      - title: Prometheus data model
+        url: https://prometheus.io/docs/concepts/data_model/
+    tiers:
+      - id: write
+        label: 処理と検索
+        z: 1
+        size:
+          - 21
+          - 4
+      - id: disk
+        label: データと保存
+        z: 0
+        size:
+          - 21
+          - 4
+    nodes:
+      ex-scrape:
+        label: 監視対象のメトリクス
+        kind: client
+        tier: write
+        x: 0
+        'y': 1.5
+        description: メトリクス公開対象からサンプルを scrape する。
+        evidence:
+          - type: doc
+            ref: docs/reference-prometheus-tsdb-internals.md#§4
+        realizes:
+          - scrape
+      ex-head:
+        label: Head：最新サンプル
+        kind: db
+        tier: write
+        x: 4
+        'y': 1.5
+        description: 最近のサンプルを保持し、検索対象とする。
+        evidence:
+          - type: doc
+            ref: docs/reference-prometheus-tsdb-internals.md#§4
+        realizes:
+          - head
+      ex-wal:
+        label: WAL：復旧用ログ
+        kind: file
+        tier: disk
+        x: 4
+        'y': 1.5
+        description: Head の復旧に使う write-ahead log。
+        evidence:
+          - type: doc
+            ref: docs/reference-prometheus-tsdb-internals.md#§4
+        realizes:
+          - wal
+      ex-blocks:
+        label: 時間別ブロック
+        kind: db
+        tier: disk
+        x: 9
+        'y': 1.5
+        description: 時間範囲ごとにチャンク、索引とメタデータを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-prometheus-tsdb-internals.md#§4
+        realizes:
+          - blocks
+      ex-index:
+        label: ブロック内の索引
+        kind: file
+        tier: disk
+        x: 14
+        'y': 1.5
+        description: メトリクス名とラベルからブロック内の系列を特定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-prometheus-tsdb-internals.md#§4
+        realizes:
+          - index
+      ex-compact:
+        label: Compaction・保持
+        kind: service
+        tier: write
+        x: 9
+        'y': 1.5
+        description: 古いブロックを統合し、保持ポリシーに基づき期限切れを削除する。
+        evidence:
+          - type: doc
+            ref: docs/reference-prometheus-tsdb-internals.md#§4
+        realizes:
+          - compact
+      ex-query:
+        label: PromQL 検索
+        kind: service
+        tier: write
+        x: 14
+        'y': 1.5
+        description: PromQL で Head と保存済みブロックを対象に検索する。
+        evidence:
+          - type: doc
+            ref: docs/reference-prometheus-tsdb-internals.md#§4
+        realizes:
+          - query
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - write
+          - disk
+        nodes:
+          - ex-scrape
+          - ex-head
+          - ex-wal
+          - ex-blocks
+          - ex-index
+          - ex-compact
+          - ex-query
+blocks:
+  - id: detail-map
+    title: サンプル・WAL・ブロックの対応
+    note: 概念例です。WAL は復旧用の記録で、Head とブロックの単純な移動を示すものではありません。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: head
+        label: Head
+        node: head
+      - id: wal
+        label: WAL
+        node: wal
+      - id: block
+        label: 時間別ブロック
+        node: blocks
+    items:
+      head:
+        - id: h1
+          label: CPU系列
+          k: 0
+          note: メモリ上の最近のサンプル。
+        - id: h2
+          label: メモリ系列
+          k: 0
+          note: 別のラベルを持つ系列の例。
+      wal:
+        - id: w1
+          label: ログ
+          k: 1
+          note: 障害時に Head を復旧するための記録。
+      block:
+        - id: b1
+          label: chunks
+          k: 2
+          note: 時間範囲内の系列サンプル。
+        - id: b2
+          label: index
+          k: 3
+          note: 系列を探すための索引。
+        - id: b3
+          label: meta
+          k: 4
+          note: ブロックのメタデータ。

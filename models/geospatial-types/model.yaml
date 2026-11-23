@@ -1,0 +1,221 @@
+name: 地理空間データ型と空間検索
+description: Geometry と Geography、座標参照系、空間インデックスを使った近傍検索を整理する。
+reference:
+  objectives:
+    - Geometry と Geography の座標系と距離の単位を区別する。
+    - 空間インデックスによる候補抽出と厳密な空間判定を追う。
+    - 座標変換と SRID の整合性を確認する。
+  sources:
+    - title: PostGIS Geometry or Geography
+      url: https://postgis.net/documentation/faq/geometry-or-geography/
+    - title: PostGIS ST_DWithin
+      url: https://postgis.net/docs/ST_DWithin.html
+    - title: PostGIS Spatial Indexing
+      url: https://postgis.net/workshops/postgis-intro/indexing.html
+sources:
+  - docs/reference-geospatial-types.md
+evidence:
+  - type: doc
+    ref: docs/reference-geospatial-types.md#§1
+  - type: doc
+    ref: docs/reference-geospatial-types.md#§3
+  - type: doc
+    ref: docs/reference-geospatial-types.md#§5
+tiers:
+  - id: flow
+    label: 処理の流れ
+    z: 0
+    size:
+      - 20
+      - 4
+nodes:
+  input:
+    label: 位置情報と検索条件
+    kind: client
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: 座標・形状と検索距離を入力する。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+  crs:
+    label: 座標系と型
+    kind: service
+    tier: flow
+    x: 4
+    'y': 1.5
+    description: SRID と型を確認し、必要に応じて座標を変換する。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+  index:
+    label: 空間インデックス
+    kind: db
+    tier: flow
+    x: 8
+    'y': 1.5
+    description: 外接矩形を使って候補を絞り込む。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+    drill: postgis-spatial-index
+  predicate:
+    label: 厳密な空間判定
+    kind: service
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 距離や交差条件を候補に対して評価する。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+  result:
+    label: 検索結果
+    kind: file
+    tier: flow
+    x: 16
+    'y': 1.5
+    description: 条件に一致した形状を返す。
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+links:
+  - id: step-1
+    from: input
+    to: crs
+    label: 座標と検索条件を指定
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+  - id: step-2
+    from: crs
+    to: index
+    label: 型と座標系を確認して候補を検索
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+  - id: step-3
+    from: index
+    to: predicate
+    label: 候補の形状を判定
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+  - id: step-4
+    from: predicate
+    to: result
+    label: 一致した結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+scenarios:
+  - id: flow
+    label: 入力から結果まで
+    evidence:
+      - type: doc
+        ref: docs/reference-geospatial-types.md#§2
+    steps:
+      - links:
+          - step-1
+        note: 座標と検索条件を指定。
+      - links:
+          - step-2
+        note: 型と座標系を確認して候補を検索。
+      - links:
+          - step-3
+        note: 候補の形状を判定。
+      - links:
+          - step-4
+        note: 一致した結果を返す。
+implementations:
+  - id: postgis
+    label: Linux 上の PostgreSQL と PostGIS
+    description: Linux 上の PostgreSQL / PostGIS で geography の地点を GiST と ST_DWithin により検索する。
+    sources:
+      - title: PostGIS Geometry or Geography
+        url: https://postgis.net/documentation/faq/geometry-or-geography/
+      - title: PostGIS ST_DWithin
+        url: https://postgis.net/docs/ST_DWithin.html
+      - title: PostGIS Spatial Indexing
+        url: https://postgis.net/workshops/postgis-intro/indexing.html
+    tiers:
+      - id: runtime
+        label: 利用者が管理する実行環境
+        z: 0
+        size:
+          - 20
+          - 4
+    nodes:
+      impl-input:
+        label: SQL クライアント
+        kind: client
+        tier: runtime
+        x: 0
+        'y': 1.5
+        realizes:
+          - input
+        description: Linux 上の PostgreSQL / PostGIS で geography の地点を GiST と ST_DWithin により検索する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-types.md#§4
+      impl-crs:
+        label: PostGIS geography と SRID
+        kind: service
+        tier: runtime
+        x: 4
+        'y': 1.5
+        realizes:
+          - crs
+        description: PostgreSQL と PostGIS は利用者が Linux 上で構成・運用し、DB データ・バックアップ・認証を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-types.md#§4
+      impl-index:
+        label: GiST 空間インデックス
+        kind: db
+        tier: runtime
+        x: 8
+        'y': 1.5
+        realizes:
+          - index
+        description: Linux 上の PostgreSQL / PostGIS で geography の地点を GiST と ST_DWithin により検索する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-types.md#§4
+        drill: postgis-spatial-index
+      impl-predicate:
+        label: ST_DWithin 距離判定
+        kind: service
+        tier: runtime
+        x: 12
+        'y': 1.5
+        realizes:
+          - predicate
+        description: Linux 上の PostgreSQL / PostGIS で geography の地点を GiST と ST_DWithin により検索する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-types.md#§4
+      impl-result:
+        label: SQL 結果
+        kind: file
+        tier: runtime
+        x: 16
+        'y': 1.5
+        realizes:
+          - result
+        description: Linux 上の PostgreSQL / PostGIS で geography の地点を GiST と ST_DWithin により検索する。
+        evidence:
+          - type: doc
+            ref: docs/reference-geospatial-types.md#§4
+    groups:
+      - kind: cluster
+        label: 利用者の実行環境（論理範囲）
+        tier:
+          - runtime
+        nodes:
+          - impl-input
+          - impl-crs
+          - impl-index
+          - impl-predicate
+          - impl-result

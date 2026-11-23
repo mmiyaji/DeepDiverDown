@@ -1,0 +1,398 @@
+name: TimescaleDB：chunk と列指向保存
+description: 利用者が PostgreSQL / TimescaleDB を Linux とローカルディスク上で運用し、hypertable と列化・継続集計の設定を管理する。
+parent:
+  model: time-series-data
+  node: store
+reference:
+  objectives:
+    - 書き込みと検索の経路を追う。
+    - データ構造と保持・復旧の役割を区別する。
+    - 実装の前提と制約を確認する。
+  sources:
+    - title: Hypertables
+      url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+    - title: Hypercore
+      url: https://www.tigerdata.com/docs/learn/columnar-storage/understand-hypercore
+    - title: Continuous aggregates
+      url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+sources:
+  - docs/reference-timescaledb-storage-internals.md
+evidence:
+  - type: doc
+    ref: docs/reference-timescaledb-storage-internals.md#§1
+  - type: doc
+    ref: docs/reference-timescaledb-storage-internals.md#§2
+  - type: doc
+    ref: docs/reference-timescaledb-storage-internals.md#§3
+  - type: doc
+    ref: docs/reference-timescaledb-storage-internals.md#§5
+tiers:
+  - id: write
+    label: 処理と検索
+    z: 1
+    size:
+      - 21
+      - 4
+  - id: disk
+    label: データと保存
+    z: 0
+    size:
+      - 21
+      - 4
+nodes:
+  write:
+    label: SQL 書き込み
+    kind: client
+    tier: write
+    x: 0
+    'y': 1.5
+    description: 時刻付きの行を SQL で書き込む。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§1
+  table:
+    label: hypertable
+    kind: service
+    tier: write
+    x: 4
+    'y': 1.5
+    description: PostgreSQL の表として扱い、時間別 chunk に分割する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§1
+  row:
+    label: 時刻別 rowstore chunk
+    kind: db
+    tier: disk
+    x: 4
+    'y': 1.5
+    description: 時間範囲ごとの行指向データ。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  column:
+    label: columnstore chunk
+    kind: db
+    tier: disk
+    x: 9
+    'y': 1.5
+    description: ポリシーに応じて列指向形式に変換された chunk。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  rollup:
+    label: continuous aggregate
+    kind: db
+    tier: disk
+    x: 14
+    'y': 1.5
+    description: hypertable の時間別集計を増分更新して保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  policy:
+    label: 列化・更新ポリシー
+    kind: service
+    tier: write
+    x: 9
+    'y': 1.5
+    description: columnstore への変換と継続集計の更新範囲を設定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§1
+  query:
+    label: SQL 時間範囲検索
+    kind: service
+    tier: write
+    x: 14
+    'y': 1.5
+    description: 時間条件で chunk を絞り、行・列・集計結果を読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§1
+links:
+  - id: a
+    from: write
+    to: table
+    label: 行を投入
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: b
+    from: table
+    to: row
+    label: 時刻範囲の chunk に配置
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: c
+    from: row
+    to: column
+    label: 設定に応じて列化
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: d
+    from: row
+    to: rollup
+    label: 時間幅で増分集計
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: e
+    from: policy
+    to: column
+    label: 列化の条件を管理
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: f
+    from: policy
+    to: rollup
+    label: 更新範囲を管理
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: q1
+    from: query
+    to: row
+    label: 対象期間の行を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: q2
+    from: query
+    to: column
+    label: 対象の列データを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+  - id: q3
+    from: query
+    to: rollup
+    label: 集計済みデータを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+scenarios:
+  - id: write
+    label: 書き込みと列化
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+    steps:
+      - links:
+          - a
+        note: 行を投入。
+        highlight:
+          - r1
+      - links:
+          - b
+        note: 時刻範囲の chunk に配置。
+        highlight:
+          - r1
+          - r2
+      - links:
+          - c
+        note: 設定に応じて列化。
+        highlight:
+          - r2
+          - c1
+      - links:
+          - e
+        note: 列化の条件を管理。
+        highlight:
+          - c1
+    visual: detail-map
+  - id: query
+    label: 時間範囲と集計
+    evidence:
+      - type: doc
+        ref: docs/reference-timescaledb-storage-internals.md#§2
+    steps:
+      - links:
+          - q1
+        note: 対象期間の行を読む。
+        highlight:
+          - r1
+          - r2
+      - links:
+          - q2
+        note: 対象の列データを読む。
+        highlight:
+          - c1
+      - links:
+          - d
+        note: 時間幅で増分集計。
+        highlight:
+          - r1
+          - a1
+      - links:
+          - f
+        note: 更新範囲を管理。
+        highlight:
+          - a1
+      - links:
+          - q3
+        note: 集計済みデータを読む。
+        highlight:
+          - a1
+    visual: detail-map
+implementations:
+  - id: local
+    label: Linux 上の PostgreSQL と TimescaleDB
+    description: 利用者が PostgreSQL / TimescaleDB を Linux とローカルディスク上で運用し、hypertable と列化・継続集計の設定を管理する。
+    sources:
+      - title: Hypertables
+        url: https://www.tigerdata.com/docs/learn/hypertables/understand-hypertables
+      - title: Hypercore
+        url: https://www.tigerdata.com/docs/learn/columnar-storage/understand-hypercore
+      - title: Continuous aggregates
+        url: https://www.tigerdata.com/docs/learn/continuous-aggregates
+    tiers:
+      - id: write
+        label: 処理と検索
+        z: 1
+        size:
+          - 21
+          - 4
+      - id: disk
+        label: データと保存
+        z: 0
+        size:
+          - 21
+          - 4
+    nodes:
+      ex-write:
+        label: SQL 書き込み
+        kind: client
+        tier: write
+        x: 0
+        'y': 1.5
+        description: 時刻付きの行を SQL で書き込む。
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-storage-internals.md#§4
+        realizes:
+          - write
+      ex-table:
+        label: hypertable
+        kind: service
+        tier: write
+        x: 4
+        'y': 1.5
+        description: PostgreSQL の表として扱い、時間別 chunk に分割する。
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-storage-internals.md#§4
+        realizes:
+          - table
+      ex-row:
+        label: 時刻別 rowstore chunk
+        kind: db
+        tier: disk
+        x: 4
+        'y': 1.5
+        description: 時間範囲ごとの行指向データ。
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-storage-internals.md#§4
+        realizes:
+          - row
+      ex-column:
+        label: columnstore chunk
+        kind: db
+        tier: disk
+        x: 9
+        'y': 1.5
+        description: ポリシーに応じて列指向形式に変換された chunk。
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-storage-internals.md#§4
+        realizes:
+          - column
+      ex-rollup:
+        label: continuous aggregate
+        kind: db
+        tier: disk
+        x: 14
+        'y': 1.5
+        description: hypertable の時間別集計を増分更新して保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-storage-internals.md#§4
+        realizes:
+          - rollup
+      ex-policy:
+        label: 列化・更新ポリシー
+        kind: service
+        tier: write
+        x: 9
+        'y': 1.5
+        description: columnstore への変換と継続集計の更新範囲を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-storage-internals.md#§4
+        realizes:
+          - policy
+      ex-query:
+        label: SQL 時間範囲検索
+        kind: service
+        tier: write
+        x: 14
+        'y': 1.5
+        description: 時間条件で chunk を絞り、行・列・集計結果を読む。
+        evidence:
+          - type: doc
+            ref: docs/reference-timescaledb-storage-internals.md#§4
+        realizes:
+          - query
+    groups:
+      - kind: cluster
+        label: 利用者が管理する実行環境（論理範囲）
+        tier:
+          - write
+          - disk
+        nodes:
+          - ex-write
+          - ex-table
+          - ex-row
+          - ex-column
+          - ex-rollup
+          - ex-policy
+          - ex-query
+blocks:
+  - id: detail-map
+    title: 時間別 chunk と集計の例
+    note: 時間範囲は説明用です。列化と集計の更新は構成やポリシーに依存します。
+    hint: 項目を選ぶと説明を表示します。処理の流れに合わせて関連する項目を強調します。
+    lanes:
+      - id: rows
+        label: rowstore
+        node: row
+      - id: column
+        label: columnstore
+        node: column
+      - id: aggregate
+        label: 継続集計
+        node: rollup
+    items:
+      rows:
+        - id: r1
+          label: 今日
+          k: 0
+          note: 最近の時間範囲を持つ行指向 chunk の例。
+        - id: r2
+          label: 昨日
+          k: 0
+          note: 別の時間範囲を持つ chunk の例。
+      column:
+        - id: c1
+          label: 先週
+          k: 2
+          note: 列化された古い chunk の例。
+      aggregate:
+        - id: a1
+          label: 1時間平均
+          k: 3
+          note: 時間幅ごとに集計した結果の例。

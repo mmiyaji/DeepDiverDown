@@ -1,47 +1,25 @@
-import { isUnlocked, rememberUnlock } from './home-lock.js';
 import { drawThumbnail } from './home-thumbnail.js';
-// This is deliberately a casual browser-side gate, not authentication.
-// Change this value before publishing. It remains visible in downloaded JavaScript.
-const PASSPHRASE = 'deepdiver';
 const $ = id => document.getElementById(id);
 const site = $('site');
-const lock = $('lock');
+const notice = $('notice');
+const consentKey = 'deepdiverdown-notice-consent-v1';
 
-const unlocked = isUnlocked(sessionStorage, localStorage);
-if (!unlocked) {
-  lock.hidden = false;
+let accepted = false;
+try { accepted = sessionStorage.getItem(consentKey) === 'accepted'; } catch { /* Storage may be unavailable. */ }
+if (!accepted) {
+  notice.hidden = false;
   site.inert = true;
-  $('passphrase').focus();
+  $('accept-notice').focus();
 }
-$('show-password').addEventListener('click', event => {
-  const input = $('passphrase');
-  const show = input.type === 'password';
-  input.type = show ? 'text' : 'password';
-  event.currentTarget.textContent = show ? '隠す' : '表示';
-  event.currentTarget.setAttribute('aria-label', show ? '合言葉を隠す' : '合言葉を表示');
-  event.currentTarget.setAttribute('aria-pressed', String(show));
-});
-$('lock-form').addEventListener('submit', event => {
-  event.preventDefault();
-  if ($('passphrase').value !== PASSPHRASE) {
-    $('lock-error').hidden = false;
-    $('passphrase').setAttribute('aria-invalid', 'true');
-    $('passphrase').focus();
-    return;
-  }
-  rememberUnlock(sessionStorage, localStorage, $('remember').checked);
-  $('passphrase').value = '';
-  lock.hidden = true;
+$('accept-notice').addEventListener('click', () => {
+  try { sessionStorage.setItem(consentKey, 'accepted'); } catch { /* Continue without persistence. */ }
+  notice.hidden = true;
   site.inert = false;
   $('search').focus();
 });
-$('passphrase').addEventListener('input', () => {
-  $('lock-error').hidden = true;
-  $('passphrase').removeAttribute('aria-invalid');
-});
-lock.addEventListener('keydown', event => {
+notice.addEventListener('keydown', event => {
   if (event.key !== 'Tab') return;
-  const controls = [...lock.querySelectorAll('input, button')].filter(el => !el.disabled);
+  const controls = [...notice.querySelectorAll('button')].filter(el => !el.disabled);
   const first = controls[0], last = controls.at(-1);
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }

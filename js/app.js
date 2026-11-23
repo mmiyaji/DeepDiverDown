@@ -11,7 +11,7 @@ import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz2';
-import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=review1';
+import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -541,7 +541,34 @@ function drawScene() {
   for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node({ ...nodeSpec(id, n, ns[id] || {}), tier: n.tier });
   scene.end(st.dimension === '2');
   updateDiagramScale();
-  renderSidebar(); renderStats(); renderPanel(); syncUrl();
+  renderSidebar(); renderStats(); renderPanel(); renderViewOverview(); renderFlowControls(); syncUrl();
+}
+
+function renderViewOverview() {
+  const info = Views.info(M, st.view);
+  const description = st.view === 'cloud' && ENTRY.reference && M.description
+    ? `${info.sub}。${M.description}` : info.sub;
+  $('view-overview-title').textContent = info.label;
+  $('view-overview-description').textContent = description;
+}
+
+function renderFlowControls() {
+  const bar = $('flow-controls');
+  const sc = M.scenarios?.[st.scen];
+  bar.hidden = PREVIEW || !sc?.steps?.length;
+  if (bar.hidden) return;
+  const active = st.mode === 'scenario';
+  const play = bar.querySelector('[data-act="flow-play"]');
+  play.textContent = active && st.play ? '❚❚ 処理の流れを停止' : '▶ 処理の流れを再生';
+  play.setAttribute('aria-pressed', String(active && !!st.play));
+  $('flow-position').hidden = !active;
+  $('flow-progress').textContent = active ? `${st.step + 1} / ${sc.steps.length}` : '';
+  const select = $('flow-scenario');
+  if (!select.options.length) for (const [i, scenario] of M.scenarios.entries()) select.add(new Option(scenario.label, String(i)));
+  select.value = String(st.scen);
+  $('flow-scenario-label').hidden = !active;
+  bar.querySelector('[data-step="-1"]').disabled = st.step === 0;
+  bar.querySelector('[data-step="1"]').disabled = st.step >= sc.steps.length - 1;
 }
 
 /* ================= サイドバー ================= */
@@ -728,6 +755,7 @@ const stat = (lab, v, bad, action) => {
 };
 const count = (o, s) => Object.values(o).filter(r => r.status === s).length;
 function renderStats() {
+  document.querySelector('.stage').classList.toggle('scenario-active', st.mode === 'scenario');
   let h = '';
   if (st.mode === 'struct') h = stat('ノード', Object.keys(M.nodes).length) + stat('同期 / 非同期', `${M.links.filter(l => l.sync).length} / ${M.links.filter(l => !l.sync).length}`) + stat('指摘', ISSUES.length, ISSUES.length, 'review-issues') + stat('点検', GATES.pass ? '合格' : '不合格', !GATES.pass, 'review-gates');
   if (st.mode === 'struct' && ENTRY.reference) {
@@ -1004,7 +1032,6 @@ function renderPanel() {
       const sc = M.scenarios[st.scen], s = sc.steps[st.step];
       h = `<div class="row">${M.scenarios.map((x, i) => `<button class="b ${i === st.scen ? 'on' : ''}" data-scen="${i}">${esc(x.label)}</button>`).join('')}</div>
         <div class="num">${String(st.step + 1).padStart(2, '0')}</div><div class="sub">${esc(sc.label)}</div><div class="note">${esc(s.note)}</div>
-        <div class="row mt"><button class="b" data-step="-1" ${st.step ? '' : 'disabled'}>← 前へ</button><button class="b" data-play>${st.play ? '❚❚ 停止' : '▶ 再生'}</button><button class="b" data-step="1" ${st.step < sc.steps.length - 1 ? '' : 'disabled'}>次へ →</button></div>
         <h4>ステップ</h4><div data-review-list>${sc.steps.map((x, i) => itemButton('goto', i, `<b>${i + 1}.</b> ${esc(x.note)}`, i === st.step)).join('')}</div>`;
     }
   }
@@ -1081,8 +1108,6 @@ function setView(v) {
   st.sel = resolveSel(previous);
   if (!st.sel) st.nbr = false;
   draw();
-  const vi = Views.info(M, v);
-  toast(`${vi.label}（${vi.sub}）`);
 }
 async function setMode(m) {
   st.mode = m; st.issue = null; st.edge = null; st.req = null; stopPlay();
@@ -1090,6 +1115,7 @@ async function setMode(m) {
   if (st.mode === m) draw();
 }
 const stopPlay = () => { clearInterval(st.play); st.play = null; };
+const startPlay = () => { st.play = setInterval(() => { st.step = (st.step + 1) % M.scenarios[st.scen].steps.length; draw(); }, 2500); };
 
 let drag3D = S.dragMode;
 $('spread-floors').addEventListener('change', e => {
@@ -1435,6 +1461,12 @@ document.addEventListener('click', e => {
   if (d.hit != null) return openHit(qHits[+d.hit]);
   if (d.act) {
     const a = d.act;
+    if (a === 'flow-play') {
+      if (st.mode !== 'scenario') { setMode('scenario'); startPlay(); }
+      else if (st.play) stopPlay();
+      else startPlay();
+      return draw();
+    }
     if (a === 'readable-diagram') { readableDiagram = !readableDiagram; updateDiagramScale(); return; }
     if (a === 'review-start') return openReview('struct');
     if (a === 'review-scenario') return openReview('scenario');
@@ -1486,7 +1518,7 @@ document.addEventListener('click', e => {
   if (d.scen != null) { st.scen = +d.scen; st.step = 0; st.mode = 'scenario'; st.edge = null; stopPlay(); }
   else if (d.step != null) st.step += +d.step;
   else if (d.goto != null) { st.step = +d.goto; stopPlay(); }
-  else if (d.play != null) { if (st.play) stopPlay(); else st.play = setInterval(() => { st.step = (st.step + 1) % M.scenarios[st.scen].steps.length; draw(); }, 2500); }
+  else if (d.play != null) { if (st.play) stopPlay(); else startPlay(); }
   else if (d.reset != null) st.down = [];
   else if (d.down) st.down = [...new Set([...st.down, d.down])];
   else if (d.issue != null) {
@@ -1526,6 +1558,7 @@ $('panel-body').addEventListener('keydown', e => {
   items[Math.min(items.length - 1, Math.max(0, next))]?.focus();
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'flow-scenario') { st.scen = +e.target.value; st.step = 0; st.mode = 'scenario'; st.edge = null; stopPlay(); draw(); return; }
   if (e.target.dataset.tier) { e.target.checked ? st.hidden.delete(e.target.dataset.tier) : st.hidden.add(e.target.dataset.tier); draw(); }
   if (e.target.id === 'nbr') { st.nbr = e.target.checked; draw(); }
   if (e.target.id === 'minimap') { st.minimap = e.target.checked; S.minimap = st.minimap; saveSettings(S); scene.setMinimap(st.minimap); }
