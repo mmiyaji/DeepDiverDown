@@ -1,0 +1,73 @@
+name: "物理ファイルフォーマット：Parquet・ORC・Avro・Arrow・CSV/JSON"
+description: 主要な物理ファイル形式を、内部構造・読み飛ばしの仕組み・分割可能性・圧縮で比べ、用途ごとの使い分けを追います。
+reference:
+  objectives:
+    - 行指向と列指向、Row Group／Stripe のようなハイブリッド構造の違いを説明する。
+    - Parquet と ORC がフッターと統計で読む範囲を絞る仕組みを比べる。
+    - Avro・Arrow・CSV/JSON がそれぞれ向く用途と、分析保存に向かない理由を理解する。
+    - 圧縮コーデックの特徴と、圧縮単位が分割・範囲読みに与える影響を説明する。
+  sources:
+    - {title: Apache Parquet File Format, url: "https://parquet.apache.org/docs/file-format/"}
+    - {title: Apache ORC Specification v1, url: "https://orc.apache.org/specification/ORCv1/"}
+    - {title: Apache Avro Specification, url: "https://avro.apache.org/docs/current/specification/"}
+    - {title: Apache Arrow Columnar Format, url: "https://arrow.apache.org/docs/format/Columnar.html"}
+sources: [docs/reference-file-formats.md]
+evidence: [{type: doc, ref: "docs/reference-file-formats.md#§1"}, {type: doc, ref: "docs/reference-file-formats.md#§2"}]
+tiers:
+  - {id: compute, label: 書き手・読み手（処理系）, z: 2, size: [14, 3]}
+  - {id: row, label: 行指向・テキスト, z: 1, size: [14, 3]}
+  - {id: col, label: 列指向, z: 0, size: [14, 3]}
+nodes:
+  source: {label: Source / Events, kind: external, tier: compute, x: 0, y: 1.5, description: 外部システム、Kafka、CDC などの生データの出どころ。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
+  converter: {label: Ingest / Convert Job, kind: worker, tier: compute, x: 5, y: 1.5, parallel: N, description: 着地した CSV・Avro を読み、Parquet に変換して分析層に書く。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§9"}]}
+  engine: {label: Query Engine, kind: worker, tier: compute, x: 10, y: 1.5, parallel: N, slots: 4, description: Parquet・ORC をフッターと統計で絞って並列に読む。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}, {type: doc, ref: "docs/reference-file-formats.md#§4"}]}
+  dataframe: {label: DataFrame / Python, kind: service, tier: compute, x: 14, y: 1.5, description: Pandas・Polars・DuckDB など Arrow で受け取る処理系。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
+  csv: {label: CSV / JSON Lines, kind: db, tier: row, x: 1, y: 1.5, description: "スキーマ・統計なしのテキスト。ファイル全体の gzip は分割できない。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
+  avro: {label: Avro, kind: db, tier: row, x: 5, y: 1.5, partitions: 4, description: "ヘッダーにスキーマ、ブロックごとに圧縮、16 バイトの同期マーカーで分割可能。スキーマ進化に強い。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
+  parquet: {label: Parquet, kind: db, shape3D: crate, tier: col, x: 2, y: 1.5, partitions: 4, description: "Row Group → 列チャンク → ページ。末尾フッターに位置と統計、ページ索引・ブルームフィルターも持てる。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}]}
+  orc: {label: ORC, kind: db, shape3D: crate, tier: col, x: 7, y: 1.5, partitions: 4, description: "Stripe → Index/Row Data。ファイル・Stripe・10,000 行ごとの 3 段の統計。", evidence: [{type: doc, ref: "docs/reference-file-formats.md#§4"}]}
+  arrow: {label: Arrow IPC / Feather, kind: cache, tier: col, x: 12, y: 1.5, description: メモリ配置そのままの列指向。デコード不要・ゼロコピーで処理系間を受け渡す。, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
+links:
+  - {id: land-csv, from: source, to: csv, label: テキストで着地, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
+  - {id: land-avro, from: source, to: avro, label: 行単位で追記, sync: false, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
+  - {id: parse, from: converter, to: csv, label: パース・型推論, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}]}
+  - {id: decode-avro, from: converter, to: avro, label: スキーマ解決して読む, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§5"}]}
+  - {id: write-parquet, from: converter, to: parquet, label: 列指向に変換して書く, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§9"}]}
+  - {id: scan-parquet, from: engine, to: parquet, label: フッター→統計→必要な列, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§3"}]}
+  - {id: scan-orc, from: engine, to: orc, label: Stripe と行グループ索引で絞る, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§4"}]}
+  - {id: to-arrow, from: engine, to: arrow, label: Arrow で受け渡し, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
+  - {id: zero-copy, from: dataframe, to: arrow, label: ゼロコピーで読む, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
+  - {id: gzip-scan, from: engine, to: csv, label: gzip 全体は 1 タスクで読む, evidence: [{type: doc, ref: "docs/reference-file-formats.md#§7"}, {type: doc, ref: "docs/reference-file-formats.md#§8"}]}
+scenarios:
+  - id: analytic-scan
+    label: 列指向ファイルを分析スキャンする
+    evidence: [{type: doc, ref: "docs/reference-file-formats.md#§10"}]
+    steps:
+      - {links: [scan-parquet], note: "Parquet は末尾のフッターを読み、Row Group の統計とページ索引で読む範囲を決め、必要な列チャンクだけを取る。"}
+      - {links: [scan-orc], note: "ORC は Postscript→フッター→Stripe の統計→10,000 行ごとの行グループ索引で絞る。"}
+  - id: ingest-convert
+    label: 着地データを Parquet に変換する
+    evidence: [{type: doc, ref: "docs/reference-file-formats.md#§9"}]
+    steps:
+      - {links: [land-csv, land-avro], note: 外部連携は CSV／JSON、イベントは Avro で着地させる。}
+      - {links: [parse, decode-avro], note: "CSV はパースと型推論、Avro は埋め込みスキーマと読み手スキーマの解決で読む。"}
+      - {links: [write-parquet], note: "列指向の Parquet（zstd などのページ圧縮）に変換して分析層に置く。"}
+  - id: interchange
+    label: Arrow で処理系間を受け渡す
+    evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]
+    steps:
+      - {links: [scan-parquet, to-arrow], note: 保存は Parquet、読み込んだらメモリ上は Arrow の列で持つ。}
+      - {links: [zero-copy], note: 別の処理系はデコードせず、ゼロコピーで同じバッファを使う。}
+  - id: gzip-trap
+    label: ファイル全体 gzip の CSV を読む
+    evidence: [{type: doc, ref: "docs/reference-file-formats.md#§8"}]
+    steps:
+      - {links: [land-csv], note: 大きな CSV をファイルごと gzip して置く。}
+      - {links: [gzip-scan], note: 先頭から順にしか解凍できず、1 ファイルを 1 タスクでしか読めない。並列度が上がらない。}
+requirements:
+  - {id: FF-01, kind: rule, title: 分析保存は列指向, text: "分析テーブルは Parquet（または ORC）で保存し、列投影と統計による読み飛ばしを使う。", links: [write-parquet, scan-parquet, scan-orc], evidence: [{type: doc, ref: "docs/reference-file-formats.md#§9"}]}
+  - {id: FF-02, kind: rule, title: 分割可能な圧縮単位, text: "圧縮はページ・ブロック単位にし、テキストのファイル全体圧縮で並列読みを妨げない。", links: [gzip-scan, land-avro], evidence: [{type: doc, ref: "docs/reference-file-formats.md#§8"}]}
+  - {id: FF-03, kind: usecase, title: 受け渡しは Arrow, text: 処理系間の受け渡しは Arrow でデコードとコピーを省く。, links: [to-arrow, zero-copy], evidence: [{type: doc, ref: "docs/reference-file-formats.md#§6"}]}
+unknowns:
+  - {id: UNK-01, text: 実際のエンジン、各形式の版と既定コーデック、Row Group／Stripe サイズは未確定。, refs: [engine, converter, parquet, orc]}
+gates: {maxDrift: 0, maxHigh: 0}
