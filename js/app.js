@@ -98,6 +98,7 @@ if (peers.length && !PREVIEW) {
   $('compare-entry').textContent = `比較対象（${peers.length}件）`;
 }
 const { model: M, actual: A, docs: DOCS } = await L.loadEntry(ENTRY);
+window.viewerLoading.drawing();
 const OPTS = { disabled: S.disabledRules, gates: S.gates };
 
 const PIPE = M.type === 'pipeline';
@@ -1710,6 +1711,7 @@ if (initialSelection && Object.hasOwn(VW().nodes, initialSelection)) st.sel = re
 if (ROUTE.q.edge && (allLinks().some(l => l.id === ROUTE.q.edge) || VW().links.some(l => l.id === ROUTE.q.edge))) st.edge = ROUTE.q.edge;
 draw();
 if (ROUTE.q.v) { const v = ROUTE.q.v.split('_').map(Number); if (v.length === 7 && v.every(Number.isFinite)) scene.setView({ p: v.slice(0, 3), t: v.slice(3, 6), z: v[6] }); }
+window.viewerLoading.ready();
 if (ENTRY.id !== ROUTE.id && ROUTE.id) toast(`モデル「${ROUTE.id}」が見つからないため、${M.name} を表示しています`);
 const adminView = window === window.top && ['127.0.0.1', 'localhost'].includes(location.hostname) && location.port === '8126';
 if (!PREVIEW && !adminView && once('ddd.welcome')) openHelp(true);
