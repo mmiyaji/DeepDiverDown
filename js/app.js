@@ -67,6 +67,32 @@ if (ENTRY.reference && !PREVIEW) {
   $('graph-entry').hidden = false;
 }
 const peers = comparisonCandidates(REGISTRY, KEY);
+if (ENTRY.reference && !PREVIEW && peers.length) {
+  const section = $('related-models'), list = $('related-models-list');
+  const ordered = [...peers].sort((a, b) => {
+    const rank = p => p.topics.some(t => t === '全体構成との対応' || t === '詳細構成との対応') ? 0 : 1;
+    return rank(a) - rank(b);
+  });
+  function makeList(items) {
+    const ul = document.createElement('ul');
+    for (const { entry, topics } of items) {
+      const li = document.createElement('li'), link = document.createElement('a'), reason = document.createElement('span');
+      link.href = `index.html#/m/${encodeURIComponent(entry.id)}/struct`;
+      link.textContent = entry.name;
+      reason.textContent = [...new Set(topics)].join(' / ');
+      li.append(link, reason); ul.append(li);
+    }
+    return ul;
+  }
+  list.append(makeList(ordered.slice(0, 4)));
+  if (ordered.length > 4) {
+    const more = document.createElement('details'), summary = document.createElement('summary');
+    summary.textContent = `ほか ${ordered.length - 4} 件を表示`;
+    more.append(summary, makeList(ordered.slice(4))); list.append(more);
+  }
+  $('related-models-graph').href = 'knowledge-graph.html?model=' + encodeURIComponent(KEY);
+  section.hidden = false;
+}
 if (peers.length && !PREVIEW) {
   $('compare-entry').hidden = false;
   $('compare-entry').textContent = `比較対象（${peers.length}件）`;

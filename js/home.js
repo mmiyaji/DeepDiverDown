@@ -65,8 +65,10 @@ function card(entry) {
 }
 let entries = [];
 let showAll = false;
+let loading = true;
 const featured = ['spark', 'kafka', 'spark-streaming', 'flink', 'apache-iceberg', 'databricks', 'snowflake', 'kubernetes', 'monitoring-datadog', 'analytics-agent', 'slack-real-time-messaging', 'autoware-autonomous-driving'];
 function render() {
+  if (loading) return;
   observer.disconnect();
   const query = $('search').value.trim().toLocaleLowerCase();
   const domain = $('domain').value;
@@ -79,18 +81,39 @@ function render() {
   $('show-all').textContent = showAll ? '代表例に戻す' : 'すべてのリファレンスを表示';
   $('show-all').setAttribute('aria-expanded', String(showAll));
 }
-fetch('models/research-index.json').then(response => {
-  if (!response.ok) throw new Error('Reference index unavailable');
-  return response.json();
-}).then(data => {
-  entries = data.entries || [];
-  [...new Set(entries.map(entry => entry.domain).filter(Boolean))].sort().forEach(domain => {
-    const option = element('option', '', domain);
-    option.value = domain;
-    $('domain').append(option);
-  });
-  render();
-}).catch(() => { $('count').textContent = '読み込みエラー'; $('load-error').hidden = false; });
+async function loadEntries() {
+  loading = true;
+  $('loading').hidden = false;
+  $('load-error').hidden = true;
+  $('empty').hidden = true;
+  $('show-all').hidden = true;
+  $('count').textContent = '読み込み中…';
+  $('cards').setAttribute('aria-busy', 'true');
+  try {
+    const response = await fetch('models/research-index.json', { cache: 'no-cache' });
+    if (!response.ok) throw new Error('Reference index unavailable');
+    const data = await response.json();
+    if (!Array.isArray(data.entries)) throw new Error('Invalid reference index');
+    entries = data.entries;
+    $('domain').replaceChildren(element('option', '', 'すべて'));
+    $('domain').firstElementChild.value = '';
+    [...new Set(entries.map(entry => entry.domain).filter(Boolean))].sort().forEach(domain => {
+      const option = element('option', '', domain);
+      option.value = domain;
+      $('domain').append(option);
+    });
+    loading = false;
+    render();
+  } catch {
+    $('count').textContent = '読み込みエラー';
+    $('load-error').hidden = false;
+  } finally {
+    $('loading').hidden = true;
+    $('cards').setAttribute('aria-busy', 'false');
+  }
+}
+loadEntries();
+$('retry-load').addEventListener('click', loadEntries);
 $('search').addEventListener('input', render);
 $('domain').addEventListener('change', render);
 $('show-all').addEventListener('click', () => { showAll = !showAll; render(); });

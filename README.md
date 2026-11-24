@@ -147,9 +147,11 @@ node tools/fetch-provider-icons.mjs
 npm run icons
 ```
 
-Oracle Cloud のアイコンも同じコマンドで公式の draw.io ライブラリから SVG に変換します。変換には [draw.io Desktop](https://github.com/jgraph/drawio-desktop/releases) が必要です。通常の場所にインストールされていない場合は実行ファイルのパスを `DRAWIO_BIN` に設定してください。draw.io がない環境では OCI の変換を省略し、メッセージを表示します。
+Oracle Cloud のアイコンは同じコマンドで公式の SVG 配布物から取得します。一部のサービス固有アイコンは配布物で確認できず、略称表示になります。Cloudflare の製品アイコンも公式リポジトリから取得します。
 
 Snowflake の Warehouse、Task、Pipe、Stream、Database、Dynamic Tables、Horizon、Cortex などのアイコンは、公式ブランドガイドの PowerPoint テンプレートから変換します。変換には Windows と Microsoft PowerPoint が必要です。PowerPoint を使用中の場合は他のプレゼンテーションを保護するため変換を省略します。変換できない場合は Snowflake の製品ロゴを表示します。
+
+公開サイトの CI は配布元からアイコンを取得して対応表を作り、対応表に記載された画像のみを公開物に含めます。Linux 上の公開ビルドでは PowerPoint の変換を行わないため、Snowflake の一部は製品ロゴで代替します。アイコンの取得元や使用条件は各社の配布ページを参照してください。
 
 配布元は [Databricks Brand Guidelines](https://brand.databricks.com/)、[Snowflake Newsroom](https://www.snowflake.com/en/news/)、[Microsoft Fabric の公式アイコン](https://learn.microsoft.com/en-us/fabric/fundamentals/icons) です。Snowflake と一部 Databricks の製品ロゴは、固有アイコンが確認できないサービスで所属を示すためにも使います。
 

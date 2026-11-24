@@ -20,8 +20,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Fetch official service icons
+        run: |
+          node tools/fetch-provider-icons.mjs
+          npm run icons
       - name: Build public reference site
-        run: node tools/build-public.mjs "$RUNNER_TEMP/ddd-public"
+        run: node tools/build-public.mjs "$RUNNER_TEMP/ddd-public" --require-icons
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

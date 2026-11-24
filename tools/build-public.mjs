@@ -3,11 +3,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { copyPublicIcons } from './public-icons.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = process.argv[2];
 if (!arg) throw new Error('Usage: node tools/build-public.mjs <new-output-directory>');
 const out = path.resolve(arg);
+const requireIcons = process.argv.includes('--require-icons');
 if (out === root || fs.existsSync(out)) throw new Error('Output must be a new directory');
 fs.mkdirSync(out, { recursive: true });
 function copy(rel) {
@@ -17,6 +19,8 @@ function copy(rel) {
   fs.cpSync(src, dest, { recursive: true });
 }
 for (const file of ['index.html', 'home.html', 'research.html', 'knowledge-graph.html', 'objects.html', 'about.html', 'brand-mark.svg', 'css', 'js', 'vendor', 'docs/object-samples']) copy(file);
+const iconCount = copyPublicIcons(root, out, { required: requireIcons });
+console.log(`Prepared ${iconCount} official icon mappings`);
 const registry = JSON.parse(fs.readFileSync(path.join(root, 'models/registry.json'), 'utf8')).filter(e => e.reference);
 if (!registry.length) throw new Error('No reference models found');
 for (const entry of registry) {
@@ -32,6 +36,6 @@ const index = JSON.parse(fs.readFileSync(path.join(root, 'models/research-index.
 const ids = new Set(registry.map(entry => entry.id));
 index.entries = index.entries.filter(entry => ids.has(entry.id)).map(entry => ({ ...entry, documents: (entry.documents || []).filter(doc => /^docs\/reference-[a-z0-9-]+\.md$/.test(doc) && fs.existsSync(path.join(out, doc))) }));
 fs.writeFileSync(path.join(out, 'models/research-index.json'), JSON.stringify(index, null, 2) + '\n');
-fs.writeFileSync(path.join(out, '_headers'), '/*\n  Cache-Control: public, max-age=0, must-revalidate\n  X-Content-Type-Options: nosniff\n');
+fs.writeFileSync(path.join(out, '_headers'), "/*\n  Cache-Control: public, max-age=0, must-revalidate\n  X-Content-Type-Options: nosniff\n/icons/*\n  Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox\n");
 fs.writeFileSync(path.join(out, 'robots.txt'), 'User-agent: *\nAllow: /\n');
 console.log(`Prepared ${registry.length} references in ${out}`);

@@ -31,9 +31,11 @@ const iconArchives = [
   ['azure', 'https://arch-center.azureedge.net/icons/Azure_Public_Service_Icons_V25.zip', ['azure', 'official-download']],
   ['entra', 'https://download.microsoft.com/download/3/1/a/31a56038-856a-4489-88e4-ee5a1c4352be/Microsoft%20Entra%20architecture%20icons%20-%20Oct%202023.zip', ['azure', 'entra', 'official-download']],
 ];
-const ociUrl = 'https://docs.oracle.com/iaas/Content/Resources/Assets/OCI-Style-Guide-for-Drawio.zip';
+const ociSvgUrl = 'https://docs.oracle.com/iaas/Content/Resources/Assets/OCI_Icons_PNG_SVG.zip';
 const k8sUrl = 'https://raw.githubusercontent.com/kubernetes/community/0d3d74312c7457a6ee2cfefca9a048e9d2731391/icons/svg/resources/unlabeled/';
 const k8sIcons = ['cronjob.svg', 'deploy.svg', 'ds.svg', 'ing.svg', 'sts.svg', 'svc.svg'];
+const cloudflareUrl = 'https://raw.githubusercontent.com/cloudflare/cloudflare-docs/da4c98c649c9fc851ad2920a8e102f20789829ff/src/icons/';
+const cloudflareIcons = ['access.svg', 'cache.svg', 'dns.svg', 'r2.svg', 'tunnel.svg', 'waf.svg', 'workers.svg'];
 async function download(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(url + ': HTTP ' + response.status);
@@ -52,11 +54,13 @@ const snowflakeDir = path.join(ROOT, 'icons', 'snowflake', 'official');
 const fabricDir = path.join(ROOT, 'icons', 'fabric', 'official');
 const purviewDir = path.join(ROOT, 'icons', 'purview', 'official');
 const k8sDir = path.join(ROOT, 'icons', 'k8s', 'official-download');
+const cloudflareDir = path.join(ROOT, 'icons', 'cloudflare', 'official-download');
 fs.mkdirSync(databricksDir, { recursive: true });
 fs.mkdirSync(snowflakeDir, { recursive: true });
 fs.mkdirSync(fabricDir, { recursive: true });
 fs.mkdirSync(purviewDir, { recursive: true });
 fs.mkdirSync(k8sDir, { recursive: true });
+fs.mkdirSync(cloudflareDir, { recursive: true });
 for (const [name, url] of assets) {
   const data = await download(url);
   if (!data.toString('utf8', 0, 300).includes('<svg')) throw new Error('SVG を確認できません: ' + url);
@@ -66,6 +70,11 @@ for (const name of k8sIcons) {
   const data = await download(k8sUrl + name);
   if (!data.toString('utf8').includes('<svg')) throw new Error('SVG を確認できません: ' + name);
   fs.writeFileSync(path.join(k8sDir, name), data);
+}
+for (const name of cloudflareIcons) {
+  const data = await download(cloudflareUrl + name);
+  if (!data.toString('utf8').includes('<svg')) throw new Error('SVG を確認できません: ' + name);
+  fs.writeFileSync(path.join(cloudflareDir, name), data);
 }
 const archive = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ddd-snowflake-')), 'logos.zip');
 try {
@@ -98,16 +107,13 @@ try {
     fs.writeFileSync(path.join(outputDir, 'SOURCE.txt'), url + '\n');
     process.stdout.write(result.stdout);
   }
-  const ociArchive = path.join(vendorTemp, 'oci.zip');
+  const ociArchive = path.join(vendorTemp, 'oci-svg.zip');
   const ociDir = path.join(ROOT, 'icons', 'oci', 'official-download');
-  fs.writeFileSync(ociArchive, await download(ociUrl));
-  const oci = spawnSync(python, [path.join(ROOT, 'tools', 'extract-oci-icons.py'), ociArchive, ociDir], { encoding: 'utf8', timeout: 300000 });
-  if (oci.error || (oci.status !== 0 && oci.status !== 2)) throw new Error(oci.error?.message || oci.stderr);
-  if (oci.status === 2) process.stderr.write(oci.stderr);
-  else {
-    fs.writeFileSync(path.join(ociDir, 'SOURCE.txt'), 'Oracle OCI Architecture Diagram Toolkit\n' + ociUrl + '\n');
-    process.stdout.write(oci.stdout);
-  }
+  fs.writeFileSync(ociArchive, await download(ociSvgUrl));
+  const oci = spawnSync(python, [path.join(ROOT, 'tools', 'extract-oci-svg.py'), ociArchive, ociDir], { encoding: 'utf8' });
+  if (oci.error || oci.status !== 0) throw new Error(oci.error?.message || oci.stderr);
+  fs.writeFileSync(path.join(ociDir, 'SOURCE.txt'), 'Oracle OCI Architecture Diagram Toolkit\n' + ociSvgUrl + '\n');
+  process.stdout.write(oci.stdout);
   if (process.platform === 'win32') {
     try {
       const zip = path.join(vendorTemp, 'snowflake-template.zip');
@@ -137,4 +143,5 @@ fs.writeFileSync(path.join(databricksDir, 'SOURCE.txt'), assets.map(([name, url]
 fs.writeFileSync(path.join(snowflakeDir, 'SOURCE.txt'), '公式プレス資料: https://www.snowflake.com/en/news/\n' + snowflakeUrl + '\n');
 for (const dir of [fabricDir, purviewDir]) fs.writeFileSync(path.join(dir, 'SOURCE.txt'), '公式アイコン: https://learn.microsoft.com/en-us/fabric/fundamentals/icons\n' + fabricUrl + '\n');
 fs.writeFileSync(path.join(k8sDir, 'SOURCE.txt'), 'Kubernetes Community icons: https://github.com/kubernetes/community/tree/main/icons\n' + k8sUrl + '\n');
+fs.writeFileSync(path.join(cloudflareDir, 'SOURCE.txt'), 'Cloudflare Developers icons: https://github.com/cloudflare/cloudflare-docs/tree/production/src/icons\nhttps://github.com/cloudflare/cloudflare-docs/blob/production/LICENSE\n' + cloudflareUrl + '\n');
 console.log('公式アイコンを配置しました。npm run icons で対応表を更新してください。');
