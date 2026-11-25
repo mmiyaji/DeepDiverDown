@@ -644,7 +644,7 @@ function modelLink(entry, label) {
     ? `<span class="tag ${GATES.pass ? 'ok' : 'high'}">${GATES.pass ? '合格' : '不合格'}</span> 網羅 ${coverage}%` : '';
   const tags = entry.tags || [], sub = entry.reference?.detailOf;
   return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" data-kind="${esc(entry.reference?.kind || '')}" class="mitem ${selected ? 'on' : ''} ${sub ? 'mdetail' : ''}" data-tags="${esc(tags.join('|'))}" title="${esc([entry.name, tags.join('・')].filter(Boolean).join('\n'))}" ${selected ? 'aria-current="page"' : ''}>
-    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc(typeof label === 'string' ? label : (selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}${tags.length ? (t => ` <span class="mtag mini ${TAG_KIND(t)}">${esc(t)}</span>`)(tags.find(t => DELIVERY.includes(t)) || tags[0]) : ''}</span>
+    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc(typeof label === 'string' ? label : (selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}</span>
     ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
 }
 
