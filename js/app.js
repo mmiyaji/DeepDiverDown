@@ -11,7 +11,7 @@ import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz3';
-import { productName, isConcept, shortName } from './products.js?v=3';
+import { productOf, productName, isConcept, shortName, PRODUCT_ALSO } from './products.js?v=4';
 import { CATEGORY_INFO } from './categories.js?v=1';
 import { drawThumbnail } from './home-thumbnail.js';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
@@ -679,14 +679,15 @@ function renderLibrary() {
   panel.innerHTML = domains.map(([domain, kinds]) => {
     const groups = libraryGroups([...kinds.values()].flatMap(c => [...c.values()].flat()));
     const section = (items, concept) => order(items, REF_CATS).map(([cat, list]) => {
-      const n = list.reduce((s, g) => s + g.list.length, 0);
+      const n = new Set(list.flatMap(g => g.list.map(e => e.id))).size;
       const rows = list.map(g => {
         if (concept) return leaves(g.list).map(e => modelLink(e)).join('');
         const ls = leaves(g.list);
-        if (ls.length === 1) return modelLink(ls[0], g.name);
+        if (g.all.length === 1) return modelLink(ls[0], g.name);
         const open = LIB_PROD_OPEN.has(g.name) || ls.some(e => e.id === KEY);
         const items = ls.map((e, i) => modelLink(e, (i === 0 ? '概要　' : `${i}. `) + shortName(e.name, g.name))).join('');
-        return `<details class="lib-prod" data-prod="${esc(g.name)}"${open ? ' open' : ''}><summary><span>${esc(g.name)}</span><small>${ls.length}</small></summary><div class="mlist">${items}</div></details>`;
+        const more = g.all.length - ls.length;
+        return `<details class="lib-prod" data-prod="${esc(g.name)}" data-total="${g.all.length}"${open ? ' open' : ''}><summary><span>${esc(g.name)}</span><small>${ls.length}${more ? ` / ${g.all.length}` : ''}</small></summary><div class="mlist">${items}${more ? `<a class="lib-more" href="#/m/${encodeURIComponent(g.overview.id)}/struct" data-prod-all="${esc(g.name)}">ほかの分類の図 ${more} 件</a>` : ''}</div></details>`;
       }).join('');
       return `<div class="lib-cat">${catLink(domain, cat, n)}<div class="mlist">${rows}</div></div>`;
     }).join('');
@@ -707,16 +708,26 @@ function renderLibrary() {
 function libraryGroups(all) {
   const byId = new Map(all.map(e => [e.id, e]));
   const root = e => { let r = e, seen = 0; while (r.reference.detailOf && byId.has(r.reference.detailOf) && seen++ < 5) r = byId.get(r.reference.detailOf); return r; };
-  const products = new Map(), concepts = new Map(), prodIndex = new Map();
-  const put = (m, cat, name) => { const c = m.get(cat) || m.set(cat, []).get(cat); let g = c.find(x => x.name === name); if (!g) c.push(g = { name, list: [] }); return g; };
+  const concepts = new Map(), prods = new Map();
   for (const e of all) {
     const r = root(e);
-    if (isConcept(r)) { put(concepts, e.reference.category || 'その他', e.reference.category || 'その他').list.push(e); continue; }
-    const name = productName(r);
-    if (!prodIndex.has(name)) prodIndex.set(name, r);
-    // 製品は、いちばん基本の図の分類に置く
-    const base = prodIndex.get(name);
-    put(products, base.reference.category || 'その他', name).list.push(e);
+    if (isConcept(r)) {
+      const cat = e.reference.category || 'その他', c = concepts.get(cat) || concepts.set(cat, [{ name: cat, list: [] }]).get(cat);
+      c[0].list.push(e); continue;
+    }
+    const name = productOf(e.id) || productName(r);
+    (prods.get(name) || prods.set(name, []).get(name)).push(e);
+  }
+  const products = new Map();
+  for (const [name, list] of prods) {
+    const ordered = [...list].sort((a, b) => (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)));
+    const overview = ordered[0];
+    const cats = new Set([...list.map(e => e.reference.category || 'その他'), ...(PRODUCT_ALSO[name] || [])]);
+    for (const cat of cats) {
+      // その分類では、概要の図と、その分類に属する図だけを見せる
+      const here = list.filter(e => e === overview || (e.reference.category || 'その他') === cat);
+      (products.get(cat) || products.set(cat, []).get(cat)).push({ name, list: here, all: list, overview });
+    }
   }
   for (const list of products.values()) list.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   return { products, concepts };
@@ -749,7 +760,7 @@ async function showCategoryPage({ domain, category }) {
   };
   const first = g => [...g.list].sort((a, b) => (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)))[0];
   page.innerHTML = `<div class="cat-inner"><p class="cat-eyebrow">${esc(domain)}</p><h1>${esc(category)}</h1><p class="cat-lead">${esc(CATEGORY_INFO[category] || '')}</p>
-    ${prods.length ? `<h2>製品 <small>${prods.length}</small></h2><div class="cat-grid">${prods.map(g => card(first(g), g.name, g.list.length)).join('')}</div>` : ''}
+    ${prods.length ? `<h2>製品 <small>${prods.length}</small></h2><div class="cat-grid">${prods.map(g => card(g.overview, g.name, g.list.length === g.all.length ? g.all.length : `${g.list.length}（全 ${g.all.length}）`)).join('')}</div>` : ''}
     ${cons.length ? `<h2>仕組みとパターン <small>${cons.reduce((s, g) => s + g.list.length, 0)}</small></h2><div class="cat-grid">${cons.flatMap(g => g.list).map(e => card(e, e.name, 1)).join('')}</div>` : ''}
     ${!prods.length && !cons.length ? '<p class="sub">この分類にはまだ図がありません。</p>' : ''}</div>`;
   page.hidden = false; page.scrollTop = 0;
@@ -784,7 +795,7 @@ function filterLibrary() {
   document.querySelectorAll('#reference-list .lib-prod').forEach(p => {
     p.hidden = !p.querySelector('.mitem:not([hidden])');
     if (active) p.open = !p.hidden; else p.open = LIB_PROD_OPEN.has(p.dataset.prod) || Boolean(p.querySelector('.mitem.on'));
-    const n = p.querySelectorAll('.mitem:not([hidden])').length; p.querySelector('summary small').textContent = n;
+    const n = p.querySelectorAll('.mitem:not([hidden])').length, total = +p.dataset.total; p.querySelector('summary small').textContent = total > n ? `${n} / ${total}` : n;
   });
   document.querySelectorAll('#reference-list .lib-cat').forEach(c => { c.hidden = !c.querySelector('.mitem:not([hidden])'); });
   document.querySelectorAll('#reference-list .lib-domain').forEach(d => {
@@ -793,7 +804,7 @@ function filterLibrary() {
   });
   $('my-models').hidden = !(mineSel || (active && $('mlist').querySelector('.mitem:not([hidden])')));
   $('lib-domain-name').textContent = mineSel ? '自分の設計' : active ? '検索結果' : (LIB_SEL.domain || 'モデル一覧');
-  const n = document.querySelectorAll('#library .lib-domain:not([hidden]) .mitem:not([hidden]), #my-models:not([hidden]) .mitem:not([hidden])').length;
+  const n = new Set([...document.querySelectorAll('#library .lib-domain:not([hidden]) .mitem:not([hidden]), #my-models:not([hidden]) .mitem:not([hidden])')].map(a => a.getAttribute('href'))).size;
   $('lib-domain-count').textContent = n;
   const empty = !n;
   let note = $('reference-list').querySelector('.lib-empty');

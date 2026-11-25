@@ -18,6 +18,16 @@ export const PRODUCTS = [
   { name: 'AUTOSAR', match: /^autosar(-|$)/ },
 ];
 
+// 図の分類に加えて、製品として載せたい分類（その分類の図がなくても一覧に出す）
+export const PRODUCT_ALSO = {
+  'Apache Spark': ['ストリーム処理', 'バッチ・SQL エンジン'],
+  'Apache Kafka': ['取り込み'],
+  'Databricks': ['テーブル形式とカタログ', 'データカタログ'],
+  'Snowflake': ['データカタログ'],
+  'Apache Flink': ['ストリーム処理'],
+  'Trino': ['バッチ・SQL エンジン'],
+};
+
 export const productOf = id => PRODUCTS.find(p => p.match.test(id))?.name || null;
 
 // 製品ではなく、考え方・設計パターン・トレンドを扱う図
