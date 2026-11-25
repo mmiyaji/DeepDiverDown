@@ -134,3 +134,25 @@ test('flat overview reserves screen space for cards at the ends of a long single
   assert.equal(first[0], last[0]);
   assert.ok(first[2] < last[2]);
 });
+
+test('大量部品の 2D 経路は全接続を端点と矢印付きで描く', () => {
+  const nodes = Object.fromEntries(Array.from({ length: 210 }, (_, i) => [`n${i}`, { tier: 'a', x: i % 15, y: Math.floor(i / 15) }]));
+  const links = [
+    { id: 'l1', from: 'n0', to: 'n14' },
+    { id: 'l2', from: 'n15', to: 'n100' },
+    { id: 'l3', from: 'n0', to: 'n14' },
+  ];
+  const plan = buildDiagramLayout({ nodes, links, groups: [], tiers: [{ id: 'a', z: 0, size: [15, 14] }] },
+    { flat: true, comparison: true, width: 1000, height: 700 });
+  for (const link of links) {
+    const path = plan.routes.get(link.id);
+    assert.ok(path?.length >= 2);
+    assert.ok(path.every(point => point.every(Number.isFinite)));
+    assert.ok(plan.arrowPositions.has(link.id));
+    const start = plan.point(nodes[link.from].x, nodes[link.from].y, 'a');
+    const end = plan.point(nodes[link.to].x, nodes[link.to].y, 'a');
+    // 同じ端子が重なる場合、接続点にはわずかなずれを付ける。
+    assert.ok(Math.hypot(path[0][0] - start[0], path[0][2] - start[2]) < 1);
+    assert.ok(Math.hypot(path.at(-1)[0] - end[0], path.at(-1)[2] - end[2]) < 1);
+  }
+});

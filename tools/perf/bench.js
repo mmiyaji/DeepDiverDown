@@ -8,8 +8,8 @@ export async function bench(version) {
     Scene3D.prototype.begin = function (...a) { window.__scene = this; return ob.apply(this, a); };
   }
   const cb = document.getElementById('minimap');
-  const poke = document.querySelector('[data-legend-toggle="labels"]');
-  poke.click(); await sleep(300); poke.click(); await sleep(300);
+  const poke = () => document.querySelector('[data-legend-toggle="labels"]').click();
+  poke(); await sleep(300); poke(); await sleep(300);
   const sc = window.__scene;
   if (!cb.checked) { cb.click(); await sleep(500); }
   if (!sc.miniOn) throw new Error('minimap off');
@@ -25,13 +25,18 @@ export async function bench(version) {
   const report = ms => Object.fromEntries(Object.keys(P.t).map(k => [k, `${P.n[k]}回 ${(P.t[k] / P.n[k]).toFixed(2)}ms/回 計${P.t[k].toFixed(0)}ms (${(P.t[k] / ms * 100).toFixed(0)}%)`]));
   const run = async (label, ms, action) => {
     P.t = {}; P.n = {};
-    const frames = []; let last = performance.now(); let stop = false;
-    const tick = t => { frames.push(t - last); last = t; if (!stop) requestAnimationFrame(tick); };
+    const frames = []; let first = null, last = null, stop = false;
+    const tick = t => {
+      if (stop) return;
+      if (first === null) first = t;
+      if (last !== null) frames.push(t - last);
+      last = t; requestAnimationFrame(tick);
+    };
     requestAnimationFrame(tick);
     await (action ? action(ms) : sleep(ms));
     stop = true; await sleep(30);
     const s = [...frames].sort((a, b) => a - b);
-    return { label, fps: +(frames.length / (ms / 1000)).toFixed(1), median: +s[s.length >> 1].toFixed(1), p95: +s[Math.floor(s.length * .95)].toFixed(1), max: +s[s.length - 1].toFixed(1), cost: report(ms) };
+    return { label, fps: +(frames.length * 1000 / (last - first)).toFixed(1), median: +s[s.length >> 1].toFixed(1), p95: +s[Math.floor(s.length * .95)].toFixed(1), max: +s[s.length - 1].toFixed(1), cost: report(ms) };
   };
   const canvas = document.querySelector('#view canvas');
   const r = canvas.getBoundingClientRect();
@@ -48,12 +53,18 @@ export async function bench(version) {
   };
   const out = [];
   out.push(await run('idle', 2500));
-  out.push(await run('rotate', 2500, drag));
+  if (sc.controls.enableRotate) {
+    sc.setDragMode('rotate');
+    out.push(await run('rotate', 2500, drag));
+  }
+  const dragMode = sc.dragMode;
+  sc.setDragMode('pan');
+  out.push(await run('pan', 2500, drag));
+  sc.setDragMode(dragMode);
   out.push(await run('zoom', 2500, zoom));
   // 切り替えの 1 回あたりの待ち時間（クリックから次の描画まで）
-  const labelsBtn = document.querySelector('[data-legend-toggle="labels"]');
   const lat = [];
-  for (let i = 0; i < 6; i++) { const t0 = performance.now(); labelsBtn.click(); const dt = performance.now() - t0; await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res))); lat.push([+dt.toFixed(0), +(performance.now() - t0).toFixed(0)]); await sleep(200); }
+  for (let i = 0; i < 6; i++) { const labelsBtn = document.querySelector('[data-legend-toggle="labels"]'); const t0 = performance.now(); labelsBtn.click(); const dt = performance.now() - t0; await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res))); lat.push([+dt.toFixed(0), +(performance.now() - t0).toFixed(0)]); await sleep(200); }
   out.push({ label: 'toggle labels [click同期ms, 2フレーム後ms]', lat });
   out.push({ info: { drawCalls: sc.renderer.info.render.calls, objects: sc.root.children.length, labels: sc.lbl.children.length, dpr: devicePixelRatio } });
   return out;

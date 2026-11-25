@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { SHAPE_OVERRIDES, nodeGlyph } from './node-kinds.js';
 import { minimapViewport } from './minimap-viewport.js';
+import { RectIndex } from './rect-index.js';
 
 const LABEL_PRIORITY = new Map(['n-lbl', 'n-badge', 'g-lbl', 't-lbl', 'abbr', 'n-sub'].map((name, index) => [name, index]));
 const LABEL_GAP = 2;
@@ -65,7 +66,9 @@ export class Scene3D {
     this.renderer.domElement.addEventListener('pointermove', e => {
       if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) down = null;
       if (e.buttons) return;
+      const pending = hoverQueued !== null;
       hoverQueued = e;
+      if (pending) return;
       requestAnimationFrame(() => {
         if (!hoverQueued) return;
         const ev = hoverQueued; hoverQueued = null;
@@ -76,7 +79,7 @@ export class Scene3D {
         this.renderer.domElement.style.cursor = id || this.pickEdge(6, r.height) != null ? 'pointer' : '';
       });
     });
-    this.renderer.domElement.addEventListener('pointerleave', () => { if (this.hoverId) { this.hoverId = null; this.labelsDirty = true; } });
+    this.renderer.domElement.addEventListener('pointerleave', () => { hoverQueued = null; if (this.hoverId) { this.hoverId = null; this.labelsDirty = true; } });
     this.controls.addEventListener('start', () => { this.usingControls = true; });
     this.controls.addEventListener('end', () => { this.usingControls = false; });
     this.controls.addEventListener('change', () => {
@@ -92,6 +95,7 @@ export class Scene3D {
     this.resize();
     this.labelProjection = new THREE.Matrix4();
     this.lastLabelProjection = new THREE.Matrix4();
+    this.lastCssProjection = new THREE.Matrix4();
     document.fonts.ready.then(() => { this.labelsDirty = true; });
     // 初めて使う文字のフォントが後から読み込まれると、ラベルの幅が変わって重なり判定がずれる。読み込みのたびに配置し直す
     document.fonts.addEventListener?.('loadingdone', () => { this.labelsDirty = true; });
@@ -101,7 +105,12 @@ export class Scene3D {
     this.renderer.setAnimationLoop(() => {
       const dt = clock.getDelta();
       this.phase += dt * 1.6 * this.speed;
-      for (const p of this.packets) p.meshes.forEach((m, i) => m.position.copy(at(p, (this.phase / p.len + i / p.meshes.length) % 1)));
+      const packetInterval = this.renderMode === 'minimal' ? 250 : this.renderMode === 'light' ? 100 : 0;
+      const packetNow = performance.now();
+      if (!packetInterval || packetNow - (this.lastPacketUpdate || 0) >= packetInterval) {
+        for (const p of this.packets) p.meshes.forEach((m, i) => m.position.copy(at(p, (this.phase / p.len + i / p.meshes.length) % 1)));
+        this.lastPacketUpdate = packetNow;
+      }
       if (this.anim) { // 視点のなめらかな移動
         const a = this.anim, k = Math.min(1, (performance.now() - a.t0) / 450), e = 1 - (1 - k) ** 3;
         const tgt = a.from.clone().lerp(a.to, e), d = tgt.clone().sub(this.controls.target);
@@ -113,12 +122,17 @@ export class Scene3D {
       this.renderer.render(this.scene, this.camera);
       // 全体図は、ラベルの位置を書き換える前に処理する（書き換えた後に位置を読むと、再計算が毎フレーム走る）
       this.renderMinimap();
-      this.labels.render(this.scene, this.camera);
-      // ラベルの重なりは 2D・3D とも解消する（3D は動かしている間の負荷を抑えて間引く）
       this.labelProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+      // 視点も図も変わらなければ CSS ラベルの位置と重なり順は変わらない。
+      if (this.labelsDirty || !this.labelProjection.equals(this.lastCssProjection)) {
+        this.labels.render(this.scene, this.camera);
+        this.lastCssProjection.copy(this.labelProjection);
+      }
+      // ラベルの重なりは 2D・3D とも解消する（3D は動かしている間の負荷を抑えて間引く）
       const moved = !this.labelProjection.equals(this.lastLabelProjection), now = performance.now();
       if (this.gateFrames > 0) { this.gateFrames--; this.labelsDirty = true; }
-      if (this.labelsDirty || (moved && (this.flat || now - (this.lastPlace || 0) > 120))) {
+      const labelInterval = this.renderMode === 'minimal' ? 500 : this.renderMode === 'light' ? 250 : this.flat ? 0 : 250;
+      if (this.labelsDirty || (moved && now - (this.lastPlace || 0) > labelInterval)) {
         // 配置は前回の結果（幅の上限・ずらした量）に左右され、描き直した直後は 1〜2 回では落ち着かないことがある
         // （台数バッジが一瞬見えて消える）。画面に出す前に、結果が変わらなくなるまで繰り返す
         this.layoutLabels(this.labelsDirty);
@@ -206,7 +220,7 @@ export class Scene3D {
     // 全体図の中身は、図が変わらない限り同じ。毎フレーム全部品を描き直さず、描画結果を使い回す
     // （パケットが動く間だけ、間引いて更新する）
     const now = performance.now(), dpr = r.getPixelRatio();
-    const moving = this.packets.length > 0 && this.speed > 0 && now - (this.miniStamp || 0) > 160;
+    const moving = this.packets.length > 0 && this.speed > 0 && now - (this.miniStamp || 0) > (this.renderMode === 'minimal' ? 1000 : this.renderMode === 'light' ? 400 : 160);
     if (!this.miniRT || this.miniRT.width !== Math.round(w * dpr)) {
       this.miniRT?.dispose();
       this.miniRT = new THREE.WebGLRenderTarget(Math.round(w * dpr), Math.round(h * dpr));
@@ -248,12 +262,15 @@ export class Scene3D {
       const r = el.getBoundingClientRect();
       return { el, x: r.left + r.width / 2, y: r.top + r.height / 2 };
     });
-    for (const card of cardCenters) {
+    const cardsByY = [...cardCenters].sort((a, b) => a.y - b.y);
+    for (let i = 0; i < cardsByY.length; i++) {
+      const card = cardsByY[i];
       const pixelsPerUnit = frame.height * camera.zoom / (camera.top - camera.bottom);
       const span = Number(card.el.dataset.floorSpan);
       let space = Number.isFinite(span) ? Math.min(frame.width, span * pixelsPerUnit - 8 * labelZoom) : frame.width;
-      for (const other of cardCenters) {
-        if (other === card || Math.abs(card.y - other.y) > 26 * labelZoom) continue;
+      for (const direction of [-1, 1]) for (let j = i + direction; j >= 0 && j < cardsByY.length; j += direction) {
+        const other = cardsByY[j];
+        if (Math.abs(card.y - other.y) > 26 * labelZoom) break;
         space = Math.min(space, Math.abs(card.x - other.x) - 22 * labelZoom);
       }
       card.el.style.setProperty('--card-room', Math.max(38, space / labelZoom) + 'px');
@@ -275,9 +292,9 @@ export class Scene3D {
           el.classList.contains('g-parallel') ? -0.8 : el.dataset.icon ? -0.5 : LABEL_PRIORITY.get(el.classList[0]),
     }));
     labels.sort((a, b) => a.priority - b.priority);
-    const occupied = [];
+    const occupied = new RectIndex();
     if (layer === this.labels.domElement && this.miniOn && this.miniEl && !this.miniEl.hidden && this.miniEl.style.visibility !== 'hidden')
-      occupied.push(this.miniEl.getBoundingClientRect());
+      occupied.add(this.miniEl.getBoundingClientRect());
     for (const { el, rect } of labels) {
       const groupLabel = el.classList.contains('g-cloud') || el.classList.contains('g-datacenter');
       const floorLabel = el.classList.contains('t-lbl');
@@ -289,13 +306,13 @@ export class Scene3D {
       if (overlaps(rect, frame)) for (const [dx, dy] of horizontalOffsets.flatMap(dx => offsets.map(dy => [dx, dy]))) {
         const candidate = { left: rect.left + dx, right: rect.right + dx, top: rect.top + dy, bottom: rect.bottom + dy };
         if (((groupLabel || floorLabel) && (candidate.left < frame.left || candidate.right > frame.right)) || candidate.bottom < frame.top ||
-            candidate.top > frame.bottom || occupied.some(r => overlaps(r, candidate, LABEL_GAP))) continue;
+            candidate.top > frame.bottom || occupied.overlaps(candidate, LABEL_GAP)) continue;
         if (dx || dy) {
           el.style.translate = dx + 'px ' + dy + 'px';
           el.style.setProperty('--leader-length', Math.abs(dy) + 'px');
           el.dataset.labelOffset = String(dy);
         }
-        occupied.push(candidate);
+        occupied.add(candidate);
         placed = true;
         break;
       }

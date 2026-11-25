@@ -6,6 +6,7 @@ export const DEFAULTS = {
   viewAccent: 'blue', // orange | blue
   labelScale: 1,        // ラベルの大きさ
   packetSpeed: 1,       // パケットの速さ
+  renderMode: 'standard', // standard | light | minimal
   aiProvider: 'claude', // AI を実行する CLI
   officialIcons: true,  // 対応表がある場合に表示
   nodeStyle3D: 'components', // components | flow
@@ -19,7 +20,11 @@ export const DEFAULTS = {
 };
 
 export function loadSettings() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { ...DEFAULTS }; }
+  try {
+    const settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
+    if (!['standard', 'light', 'minimal'].includes(settings.renderMode)) settings.renderMode = DEFAULTS.renderMode;
+    return settings;
+  } catch { return { ...DEFAULTS }; }
 }
 export function saveSettings(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* 保存できない環境 */ } }
 

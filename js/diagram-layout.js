@@ -165,7 +165,7 @@ export function buildDiagramLayout(view, { flat, expanded = false, compact = fal
       s.line <= Math.max(a[2-s.axis], b[2-s.axis]) + (s.axis ? halfX : halfZ) + 3 &&
       s.hi >= Math.min(a[s.axis], b[s.axis]) - (s.axis ? halfZ : halfX) - 3 &&
       s.lo <= Math.max(a[s.axis], b[s.axis]) + (s.axis ? halfZ : halfX) + 3) : [];
-    const path = routeBetween(a, b, lane, obstacles, halfX, halfZ, flat ? 0.08 : 0.26, nearby, gap, link, comparison);
+    const path = routeBetween(a, b, lane, obstacles, halfX, halfZ, flat ? 0.08 : 0.26, nearby, gap, link, comparison, flat && centers.size >= 200);
     routes.set(link.id, path);
     if (flat) for (let j = 1; j < path.length; j++) {
       occupied.push(segment(path[j - 1], path[j], link, j, path.length));
@@ -223,7 +223,7 @@ function chooseArrow(path, id, occupied, centers, halfX, halfZ, gap) {
   return best;
 }
 
-function routeBetween(a, b, lane, obstacles, halfX, halfZ, rise, occupied, gap, link, comparison) {
+function routeBetween(a, b, lane, obstacles, halfX, halfZ, rise, occupied, gap, link, comparison, dense) {
   const [ax, ay, az] = a, [bx, by, bz] = b;
   if (ax === bx && az === bz && ay === by) {
     const x = ax + halfX + 0.85 + Math.abs(lane), z = az - halfZ - 0.9 - lane;
@@ -239,6 +239,14 @@ function routeBetween(a, b, lane, obstacles, halfX, halfZ, rise, occupied, gap, 
     const tracks = s.axis === 0 ? zTracks : xTracks;
     tracks.add(s.line - gap); tracks.add(s.line + gap);
   }
+  // 大量の部品では候補を近い経路に絞る。衝突判定には全障害物を使う。
+  const tracks = (values, from, to) => {
+    if (!dense || values.size <= 16) return values;
+    const mid = (from + to) / 2;
+    return [...values].sort((a, b) => Math.min(Math.abs(a - mid), Math.abs(a - from), Math.abs(a - to)) -
+      Math.min(Math.abs(b - mid), Math.abs(b - from), Math.abs(b - to))).slice(0, 16);
+  };
+  const xs = tracks(xTracks, ax, bx), zs = tracks(zTracks, az, bz);
   let best, bestScore = Infinity;
   function consider(p, q) {
     scorePath(start, p, q, end, 0);
@@ -273,15 +281,16 @@ function routeBetween(a, b, lane, obstacles, halfX, halfZ, rise, occupied, gap, 
         if (cy + rise < Math.min(y, v) - 0.01 || cy + rise > Math.max(y, v) + 0.01) continue;
         if (Math.max(x,u) > cx-halfX && Math.min(x,u) < cx+halfX &&
             Math.max(z,w) > cz-halfZ && Math.min(z,w) < cz+halfZ) score += 10000;
+        if (score >= bestScore) return;
       }
     }
     if (score < bestScore) { best = points; bestScore = score; }
   }
   // Parallel links need distinct corridors, even when endpoints share an axis.
-  if (az !== bz || !lane) for (const x of xTracks) consider([x, start[1], az], [x, end[1], bz]);
-  if (ax !== bx || !lane) for (const z of zTracks) consider([ax, start[1], z], [bx, end[1], z]);
+  if (az !== bz || !lane) for (const x of xs) consider([x, start[1], az], [x, end[1], bz]);
+  if (ax !== bx || !lane) for (const z of zs) consider([ax, start[1], z], [bx, end[1], z]);
   if (comparison && bestScore >= 10000) {
-    for (const x of xTracks) for (const z of zTracks) {
+    for (const x of xs) for (const z of zs) {
       evaluate([start, [x, start[1], az], [x, start[1], z], [bx, end[1], z], end], 0);
       evaluate([start, [ax, start[1], z], [x, start[1], z], [x, end[1], bz], end], 0);
     }

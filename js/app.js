@@ -1,12 +1,12 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=perf6';
-import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=compare-layout3';
+import { Scene3D } from './scene3d.js?v=perf9';
+import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=perf9';
 import { implementation3D, platformFootprint } from './implementation-3d.js';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
 import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=performance-compare1';
 import { NODE_KINDS, nodeShape } from './node-kinds.js';
 import { loadServiceIcons } from './service-icons.js';
-import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=view-accent2';
+import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=render-mode1';
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
@@ -401,7 +401,7 @@ try {
     setTimeout(() => v.classList.remove('drill-enter-in', 'drill-enter-out'), 700);
   }
 } catch {}
-scene.speed = S.packetSpeed;
+scene.speed = S.packetSpeed; scene.renderMode = S.renderMode;
 scene.initialView = S.defaultView;
 
 const serviceLabel = svc => svc && `${svc.name}｜${svc.providerLabel}`;
@@ -1628,6 +1628,7 @@ function openSettings() {
       + row('図のアクセントカラー', '処理の流れや選択中の部品・接続に使います。', select('viewAccent', '図のアクセントカラー', [['orange', 'オレンジ'], ['blue', 'ブルー']], S.viewAccent === 'orange' ? 'orange' : 'blue'))
       + row('公式アイコンを使う', hasIcons ? '' : 'アイコンが同梱されていないため使えません。', `<label class="switch"><input type="checkbox" name="officialIcons" aria-label="公式アイコンを使う" ${S.officialIcons ? 'checked' : ''} ${hasIcons ? '' : 'disabled'}><span></span></label>`)
       + group('図')
+      + row('描画モード', '軽量・最軽量では、操作中のラベル配置とパケットの更新を間引きます。', select('renderMode', '描画モード', [['standard', '標準'], ['light', '軽量'], ['minimal', '最軽量']], S.renderMode))
       + row('ラベルの大きさ', '', `<input type="range" name="labelScale" aria-label="ラベルの大きさ" min="0.8" max="1.5" step="0.05" value="${S.labelScale}"><output>${Math.round(S.labelScale * 100)}%</output>`)
       + row('パケットの速さ', '', `<input type="range" name="packetSpeed" aria-label="パケットの速さ" min="0" max="3" step="0.25" value="${S.packetSpeed}"><output>${S.packetSpeed}×</output>`)
       + row('2D の部品デザイン', '', select('nodeStyle2D', '2D の部品デザイン', [['card', 'ラベル一体型カード'], ['silhouette', '種類別のシルエット']], S.nodeStyle2D === 'silhouette' ? 'silhouette' : 'card'))
@@ -1665,6 +1666,7 @@ function openSettings() {
   f.addEventListener('input', e => {
     const fd = new FormData(f);
     Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dimension: fd.get('dimension'), dragMode: fd.get('dragMode') });
+    S.renderMode = ['standard', 'light', 'minimal'].includes(fd.get('renderMode')) ? fd.get('renderMode') : 'standard';
     S.nodeStyle3D = fd.get('nodeStyle3D') === 'flow' ? 'flow' : 'components';
     S.viewAccent = fd.get('viewAccent') === 'blue' ? 'blue' : 'orange';
     S.nodeStyle2D = fd.get('nodeStyle2D') === 'silhouette' ? 'silhouette' : 'card';
@@ -1674,7 +1676,8 @@ function openSettings() {
     S.disabledRules = rules.map(r => r.id).filter(id => !fd.getAll('rule').includes(id));
     f.querySelectorAll('output')[0].textContent = Math.round(S.labelScale * 100) + '%';
     f.querySelectorAll('output')[1].textContent = S.packetSpeed + '×';
-    saveSettings(S); applyAppearance(S); scene.speed = S.packetSpeed;
+    saveSettings(S); applyAppearance(S); scene.speed = S.packetSpeed; scene.renderMode = S.renderMode;
+    if (e.target.name === 'renderMode') scene.labelsDirty = true;
     if (e.target.name === 'labelScale') {
       scene.labelsDirty = true;
       if (st.dimension === '2') draw();
