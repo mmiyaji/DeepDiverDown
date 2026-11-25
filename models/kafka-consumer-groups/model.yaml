@@ -1,0 +1,461 @@
+name: Kafka：Consumer Group とリバランス
+description: Consumer Group がパーティションを分担し、メンバーの増減で担当を組み替え、コミット済み offset から再開する流れを追う。
+reference:
+  objectives:
+    - グループ内で 1 つのパーティションを 1 つの Consumer が読む規則を説明する。
+    - Group Coordinator と __consumer_offsets の役割を区別する。
+    - 協調的な割り当てで、動かすパーティションだけが移ることを追う。
+  sources:
+    - title: Apache Kafka Design
+      url: https://kafka.apache.org/44/design/design/
+    - title: Consumer Configs
+      url: https://kafka.apache.org/44/configuration/consumer-configs/
+    - title: Apache Kafka Protocol
+      url: https://kafka.apache.org/44/design/protocol/
+sources:
+  - docs/reference-kafka-consumer-groups.md
+evidence:
+  - type: doc
+    ref: docs/reference-kafka-consumer-groups.md#§1
+tiers:
+  - id: flow
+    label: グループと担当
+    z: 0
+    size:
+      - 24
+      - 9
+nodes:
+  topic:
+    label: Topic の 6 パーティション
+    kind: queue
+    tier: flow
+    x: 0
+    'y': 4
+    partitions: 6
+    replicas: 3
+    description: P0〜P5。グループ内では 1 つのパーティションを 1 つの Consumer だけが読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§2
+  consumer-1:
+    label: Consumer 1
+    kind: client
+    tier: flow
+    x: 9
+    'y': 1
+    description: 同じ group.id のメンバー。例では最初 P0〜P2 を読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§2
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§4
+  consumer-2:
+    label: Consumer 2
+    kind: client
+    tier: flow
+    x: 9
+    'y': 4.5
+    description: 同じ group.id のメンバー。例では最初 P3〜P5 を読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§2
+  consumer-3:
+    label: Consumer 3（途中参加）
+    kind: client
+    tier: flow
+    x: 9
+    'y': 8
+    description: 後から参加するメンバー。協調的な割り当てでは P2 と P5 だけが移る。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§5
+  coordinator:
+    label: Group Coordinator（Broker）
+    kind: service
+    tier: flow
+    x: 17
+    'y': 4.5
+    replicas: 3
+    description: メンバーの参加・離脱を受け、担当の割り当てを組み替える。commit を受けて保存する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§4
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§6
+  offsets:
+    label: __consumer_offsets
+    kind: queue
+    tier: flow
+    x: 23
+    'y': 1
+    replicas: 3
+    description: グループごとのコミット済み offset を保存する内部 Topic。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§3
+links:
+  - id: read-1
+    from: topic
+    to: consumer-1
+    label: 担当パーティションを取得
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§2
+  - id: read-2
+    from: topic
+    to: consumer-2
+    label: 担当パーティションを取得
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§2
+  - id: read-3
+    from: topic
+    to: consumer-3
+    label: 担当パーティションを取得
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§6
+  - id: join
+    from: consumer-3
+    to: coordinator
+    label: グループへ参加
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§4
+  - id: assign
+    from: coordinator
+    to: consumer-2
+    label: 担当を割り当て直す
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§5
+  - id: commit
+    from: consumer-1
+    to: coordinator
+    label: offset をコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§3
+  - id: store
+    from: coordinator
+    to: offsets
+    label: コミットを保存
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§3
+scenarios:
+  - id: kafka-rebalance
+    label: Consumer の追加と離脱（リバランス）
+    visual: rebalance
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§2
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§4
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§5
+      - type: doc
+        ref: docs/reference-kafka-consumer-groups.md#§6
+    steps:
+      - blocks:
+          c1:
+            - id: p0
+              label: P0
+              k: 0
+              note: パーティション 0
+            - id: p1
+              label: P1
+              k: 1
+              note: パーティション 1
+            - id: p2
+              label: P2
+              k: 2
+              note: パーティション 2
+          c2:
+            - id: p3
+              label: P3
+              k: 3
+              note: パーティション 3
+            - id: p4
+              label: P4
+              k: 4
+              note: パーティション 4
+            - id: p5
+              label: P5
+              k: 5
+              note: パーティション 5
+        links:
+          - read-1
+          - read-2
+        note: 2 つの Consumer が 3 パーティションずつ読んでいる。
+      - blocks:
+          c1:
+            - id: p0
+              label: P0
+              k: 0
+              note: パーティション 0
+            - id: p1
+              label: P1
+              k: 1
+              note: パーティション 1
+          c2:
+            - id: p3
+              label: P3
+              k: 3
+              note: パーティション 3
+            - id: p4
+              label: P4
+              k: 4
+              note: パーティション 4
+          c3:
+            - id: p2
+              label: P2
+              k: 2
+              note: パーティション 2
+            - id: p5
+              label: P5
+              k: 5
+              note: パーティション 5
+        highlight:
+          - p2
+          - p5
+        lanes:
+          c3:
+            tone: new
+            sub: 参加
+        links:
+          - join
+          - assign
+          - read-3
+        note: Consumer 3 が参加すると、Group Coordinator が担当を割り当て直す。協調的リバランスでは P2 と P5 だけが移り、他は読み続ける。
+      - blocks:
+          c1: []
+          c2:
+            - id: p3
+              label: P3
+              k: 3
+              note: パーティション 3
+            - id: p4
+              label: P4
+              k: 4
+              note: パーティション 4
+            - id: p0
+              label: P0
+              k: 0
+              note: パーティション 0
+          c3:
+            - id: p2
+              label: P2
+              k: 2
+              note: パーティション 2
+            - id: p5
+              label: P5
+              k: 5
+              note: パーティション 5
+            - id: p1
+              label: P1
+              k: 1
+              note: パーティション 1
+        highlight:
+          - p0
+          - p1
+        lanes:
+          c1:
+            tone: down
+            sub: 離脱
+        links:
+          - commit
+          - store
+          - read-2
+          - read-3
+        note: Consumer 1 が停止すると、その担当の P0・P1 が残る 2 つへ移る。新しい担当はコミット済みオフセットから読み始める。
+blocks:
+  - id: rebalance
+    title: Consumer Group のパーティション担当
+    legend: {}
+    note: 6 パーティションの Topic を同じ Consumer Group で読む例。
+    lanes:
+      - id: c1
+        label: Consumer 1
+        node: consumer-1
+      - id: c2
+        label: Consumer 2
+        node: consumer-2
+      - id: c3
+        label: Consumer 3
+        node: consumer-3
+        optional: true
+    items:
+      c1:
+        - id: p0
+          label: P0
+          k: 0
+          note: パーティション 0
+        - id: p1
+          label: P1
+          k: 1
+          note: パーティション 1
+        - id: p2
+          label: P2
+          k: 2
+          note: パーティション 2
+      c2:
+        - id: p3
+          label: P3
+          k: 3
+          note: パーティション 3
+        - id: p4
+          label: P4
+          k: 4
+          note: パーティション 4
+        - id: p5
+          label: P5
+          k: 5
+          note: パーティション 5
+unknowns:
+  - id: UNK-01
+    text: consumer プロトコル（group.protocol=consumer）のリバランスの段階とブロッキングの有無は、確認した資料の範囲では扱っていない。
+    refs:
+      - coordinator
+  - id: UNK-02
+    text: MSK のブローカー側のグループ設定の既定値は未確認。
+    refs:
+      - coordinator
+gates:
+  maxDrift: 0
+  maxHigh: 99
+implementations:
+  - id: aws-msk-fargate-group
+    label: AWS（Amazon MSK と ECS on Fargate）
+    description: MSK のクラスターから、ECS の購読サービスが起動する複数の Fargate タスクが同じ group.id で読む例。
+    sources:
+      - title: Amazon ECS のサービス定義
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html
+      - title: MSK の IAM アクセス制御
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html
+      - title: MSK Provisioned クラスターの作成
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html
+    tiers:
+      - id: runtime
+        label: 購読と coordinator
+        z: 0
+        size:
+          - 18
+          - 9
+      - id: operations
+        label: タスクの維持
+        z: 1
+        size:
+          - 18
+          - 3
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - runtime
+          - operations
+      - kind: vpc
+        label: アプリとブローカーの VPC
+        provider: aws
+        tier:
+          - runtime
+        nodes:
+          - aws-cg-c1
+          - aws-cg-c2
+          - aws-cg-c3
+          - aws-cg-msk
+    nodes:
+      aws-cg-ecs:
+        label: Amazon ECS（購読サービス）
+        svc: ecs
+        kind: scheduler
+        tier: operations
+        x: 3
+        'y': 1.5
+        description: 購読タスクの指定数を維持する。タスクを増減するとグループのメンバーが変わる。
+        management:
+          type: shared
+          scope: AWS が ECS の制御基盤を運用し、利用者がサービスとタスク数を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-consumer-groups.md#§7
+      aws-cg-c1:
+        label: Fargate タスク（Consumer 1）
+        svc: fargate
+        kind: worker
+        tier: runtime
+        x: 2
+        'y': 1.5
+        realizes:
+          - consumer-1
+        description: 同じ group.id で担当パーティションを読む。
+        management:
+          type: shared
+          scope: AWS が Fargate 基盤を運用し、利用者がアプリと権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-consumer-groups.md#§7
+      aws-cg-c2:
+        label: Fargate タスク（Consumer 2）
+        svc: fargate
+        kind: worker
+        tier: runtime
+        x: 2
+        'y': 4.5
+        realizes:
+          - consumer-2
+        description: 同じ group.id で担当パーティションを読む。
+        management:
+          type: shared
+          scope: AWS が Fargate 基盤を運用し、利用者がアプリと権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-consumer-groups.md#§7
+      aws-cg-c3:
+        label: Fargate タスク（Consumer 3）
+        svc: fargate
+        kind: worker
+        tier: runtime
+        x: 2
+        'y': 7.5
+        realizes:
+          - consumer-3
+        description: 途中で起動して参加するタスク。
+        management:
+          type: shared
+          scope: AWS が Fargate 基盤を運用し、利用者がアプリと権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-consumer-groups.md#§7
+      aws-cg-msk:
+        label: Amazon MSK ブローカー
+        svc: msk
+        kind: db
+        tier: runtime
+        x: 11
+        'y': 4.5
+        realizes:
+          - topic
+          - coordinator
+          - offsets
+        description: Topic のパーティション、Group Coordinator、__consumer_offsets を持つ。
+        management:
+          type: shared
+          scope: AWS が Kafka 基盤を運用し、利用者がトピックと権限を設定する。内部構成の詳細は資料で確認していない。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-consumer-groups.md#§7
+    links:
+      - id: aws-cg-start-1
+        from: aws-cg-ecs
+        to: aws-cg-c1
+        label: 購読タスクを起動
+      - id: aws-cg-start-2
+        from: aws-cg-ecs
+        to: aws-cg-c2
+        label: 購読タスクを起動
+      - id: aws-cg-start-3
+        from: aws-cg-ecs
+        to: aws-cg-c3
+        label: 購読タスクを起動

@@ -1,94 +1,79 @@
 # Apache Flink の基本アーキテクチャ
 
-## 1. 読み方と範囲
+Flink の stable 版ドキュメント（nightlies.apache.org）を基準に、構成部品・データの流れ・実行場所を整理する。ジョブグラフとスロット、イベント時刻、状態とチェックポイント、Kubernetes 上の運用は「仕組みの深掘り」の図で扱う。
 
-Kafka の受注イベントを Flink の並列ストリーム処理で読み、イベント時刻の窓集計を出力する。演算子と配置は説明用の構成である。
+## 1. Flink の位置づけ
 
-出典 [Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)・[Timely Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/)
+Flink は、無限（unbounded）と有限（bounded）のデータストリームを状態付きで処理する分散処理エンジン。API は 4 層に分かれる。最下層の ProcessFunction は状態と時刻のコールバックを細かく制御する。DataStream API は変換・結合・窓・状態の部品を持ち、多くのアプリケーションがここで書かれる。Table API は宣言的な関係演算、SQL はその最上位で、クエリを書く。
 
-## 2. Source とデータフロー
+## 2. JobManager と TaskManager
 
-Source がイベントを読み、演算子間のデータフローへ渡す。Kafka のように位置を戻せるソースはチェックポイントからの再開に利用できる。
+ランタイムは JobManager と 1 つ以上の TaskManager の 2 種類のプロセスで構成される。クライアントはランタイムに含まれず、データフローを組み立てて提出する。
 
-出典 [Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)
+- **Dispatcher**：提出を受ける REST インターフェースと Web UI を持ち、ジョブごとに JobMaster を起動する。
+- **JobMaster**：1 つのジョブの JobGraph の実行を管理する。ジョブごとに 1 つある。
+- **ResourceManager**：タスクスロットを含むリソースの確保を担う。Standalone では既存の TaskManager のスロットを配るだけで、Kubernetes などでは基盤に TaskManager を要求できる。
+- **TaskManager**：JVM プロセスで、Task を実行し、バッファを持ち、データストリームを交換する。スケジュールの最小単位はタスクスロット。
+- 高可用性を設定すると、JobManager の 1 つが leader、残りが standby になる。
 
-## 3. イベント時刻とウォーターマーク
+## 3. データの流れ：Source・Task・Sink
 
-イベントに含まれる時刻を基準に処理し、ウォーターマークがイベント時刻の進行を知らせる。遅れて届くイベントを扱うため、処理時刻とは区別する。
+Source が外部システム（Kafka など）からイベントを読み、Operator をチェーンした Task が TaskManager のスロットで並列に動き、Sink が結果を外部へ書く。Operator chaining は複数の Operator を 1 つの Task（1 スレッド）にまとめ、スレッド間の受け渡しとバッファを減らす。スロット共有により、同じジョブの異なる Task の Subtask が同じスロットを使え、必要なスロット数はジョブの最大並列度で足りる。
 
-出典 [Timely Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/)
+## 4. 状態バックエンドとチェックポイント保存先
 
-## 4. 状態付き窓演算子
+- **状態バックエンド**は、キー付き状態を動作中に持つ場所を決める。`state.backend.type` は `hashmap`（既定、JVM ヒープ）、`rocksdb`（TaskManager のローカルディスク）、`forst`（実験的）。
+- **チェックポイント保存先**は、完了したチェックポイントを置く場所。`execution.checkpointing.dir` を指定するとファイルシステム型になり、指定しないと JobManager のメモリに置く型になる。この 2 つは独立に選ぶ。
+- チェックポイントは、バリアを Source から流して、入力位置と各 Operator の状態の一貫したスナップショットを取る。障害時は最新の完了したチェックポイントから状態を戻し、Source を保存した位置に巻き戻す。
+- 増分チェックポイントは RocksDB だけが対応する（公式の状態バックエンドのページ）。詳細は「Flink：状態バックエンドとチェックポイント」。
 
-キー付き演算子は集計状態を保持し、窓が閉じると結果を Sink へ送る。並列サブタスクはキーグループを分担する。
+## 5. 動かし方
 
-出典 [Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)
+- **Application クラスタ**：1 つのアプリケーション専用で、`main()` がクラスタ上で動き、寿命がアプリケーションと同じ。資源の分離が良い。
+- **Session クラスタ**：長く動き続け、複数のジョブを受け付ける。提出時にスロットを確保し、終了で解放する。ジョブ間で資源を共有するため、TaskManager の障害などの影響が全ジョブに及ぶ。起動の待ちがなく、短い対話的な処理に向く。
+- 配備先は Standalone、Kubernetes（native）、マネージドサービスなど。Job Cluster は非推奨とされている。
 
-## 5. チェックポイント
+## 6. シナリオ
 
-チェックポイントは入力位置と各演算子の状態を一貫したスナップショットにする。失敗時は最新の成功チェックポイントからデータフローを再配置する。
+「ジョブが提出されて動き出す」：クライアント → Dispatcher → JobMaster → ResourceManager でスロットを確保し、Task をデプロイして Source から Sink までイベントが流れる。「チェックポイントと復旧」：JobMaster がバリアを注入し、各 Task が状態を保存先へ書き、障害時に最新の完了点から再開する。
 
-出典 [Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)
+## 7. 実装例：Amazon Managed Service for Apache Flink と MSK
 
-## 6. 出力と復旧
-
-Sink は集計結果を下流へ書く。復旧時は状態を復元し、ソースをチェックポイント位置へ戻して処理を続ける。実際の保証は Sink のコネクター設定にも依存する。
-
-出典 [Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)
-
-## 7. シナリオ
-
-「イベント時刻の窓集計と復旧」シナリオをクリックすると、Source、ウォーターマーク、状態、Sink、チェックポイント復帰を追える。
-
-## 8. 実装例：Flink・Kafka・永続チェックポイント
-
-Kafka の時刻付きイベントをキー別の窓で集計する Flink ジョブ。選んだ状態バックエンドとチェックポイントの保存先は独立に指定する。
-
-| 機能 | 実装での担い手 | 配置・設定 |
-| --- | --- | --- |
-| 再読できるイベント入力 | Flink KafkaSource と注文トピック | 入力の Kafka パーティションと読み取り位置を管理する。 |
-| イベント時刻の進捗生成、窓集計の実行 | TaskManager 上の時刻処理と Window Operator | WatermarkStrategy と窓処理をフローの実行タスクに組み込む。 |
-| キー別の作業状態 | EmbeddedRocksDBStateBackend | TaskManager のローカルディスクを利用し、キー別状態を持つ。 |
-| 永続チェックポイント | HDFS のチェックポイントディレクトリー | ファイルシステム型のチェックポイント保存先にする。 |
-| 結果の出力先 | Kafka の出力トピック | KafkaSink で窓集計の結果を書き込む。 |
-
-実装で加わる部品を以下に示す。
-
-- JobManager のチェックポイント調整。チェックポイントを開始し、各タスクから完了確認を集める。
-
-公式資料
-
-- [Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)
-- [Timely Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/)
-- [Flink Checkpointing](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/)
-- [Flink State Backends](https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/)
-
-## 9. 実装例：Amazon EMR on EKS の Flink・MSK・S3
-
-Flink Kubernetes Operator で EKS 上に Application モードの Flink ジョブを展開する例。MSK の受注を集計し、別のトピックへ出力する。
+利用者が S3 にアプリケーションコードを置き、サービスにアプリケーションを作る。サービスが Flink を実行し、MSK の注文トピックを読んで別のトピックへ書く。
 
 | 機能 | 担い手 |
 | --- | --- |
-| 再読可能な入力と結果出力 | MSK の注文トピックと集計トピック。 |
-| イベント時刻と窓集計 | TaskManager Pod 上の KafkaSource、ウォーターマーク生成、窓演算子。 |
-| キー別の作業状態 | TaskManager の組み込み RocksDB 状態バックエンド。 |
-| チェックポイントと復旧 | JobManager が調整し、S3 に保存した最新の成功点からタスクを復元する。 |
+| クライアント | AWS コンソール・CLI（CreateApplication・StartApplication） |
+| Dispatcher・JobMaster・ResourceManager・Task・状態バックエンド | Managed Service for Apache Flink アプリケーション（内部配置は未確認） |
+| チェックポイント保存先 | サービスが管理するチェックポイントとスナップショット（保存先は未確認） |
+| Source・Sink | Amazon MSK のトピック |
 
-EKS の EC2 ノードグループで、Flink Kubernetes Operator と EMR ランタイムを使う Flink Pod を同じ名前空間に配置する。EKS の Kubernetes API へ `FlinkDeployment` を適用し、JobManager と TaskManager のリソースを指定する。Kubernetes HA を有効にし、S3 のチェックポイントと HA メタデータを別のプレフィックスに保持する。Flink のサービスアカウントに S3 への IAM アクセスを割り当て、EKS ワークロードから MSK へのプライベート接続と認証を構成する。
+実装で加わる部品は、S3 のコード、IAM サービス実行ロール、CloudWatch Logs。容量は KPU（1 vCPU・4 GB・実行用ストレージ 50 GB）で決まり、`Parallelism / ParallelismPerKPU` が割り当て KPU 数になる（別にオーケストレーション用の KPU が 1 つ課金される）。チェックポイントは既定で有効（間隔 60000 ms、最小間隔 5000 ms）。AWS が実行基盤を運用し、利用者がコード・並列度・チェックポイント設定・権限を管理する。JobManager と TaskManager の内部への操作範囲は確認した資料に記載がなく、未確認。
 
-公式資料
+## 8. 実装例：自前ホストの Standalone クラスタと Kafka・HDFS
 
-- [EMR on EKS で Flink アプリケーションを実行する](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-kubernetes-operator-run-application.html)
-- [EMR on EKS の Flink Operator を準備する](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-kubernetes-operator-setup.html)
-- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)
-- [Flink の Kubernetes HA](https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-using-ha.html)
-- [Flink の状態バックエンド](https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/)
-- [MSK クライアントのアクセス](https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html)
+自前のサーバー群で JobManager と TaskManager を動かし、自前の Kafka を読み、チェックポイントを HDFS に置く。
 
-自前例は Linux ホスト群上の Flink Standalone JobManager と TaskManager、別の自前 Kafka と HDFS を前提とする。KafkaSource は TaskManager で動作する。ホスト数、HDFS の可用性と詳細なネットワークは未指定である。AWS 例は公式資料を組み合わせた代表構成であり、動作検証済み事例ではない。AWS が EKS 制御プレーンと EC2・MSK・S3 の基盤を運用し、利用者は Kubernetes API、ノード、Operator、ジョブ、状態と権限を管理する。制御プレーンサーバーへの直接アクセスは想定しない。Flink・Kafka コネクター・EMR のバージョン互換性は未検証。
+| 機能 | 担い手 |
+| --- | --- |
+| クライアント | Flink CLI・Web UI |
+| Dispatcher・JobMaster・ResourceManager | JobManager プロセス |
+| Task | 複数ホストの TaskManager プロセス |
+| 状態バックエンド | EmbeddedRocksDBStateBackend（TaskManager のローカルディスク） |
+| チェックポイント保存先 | HDFS（`execution.checkpointing.dir` に hdfs:// のパス） |
+| Source・Sink | 自前の Kafka のトピック |
 
-- [Flink Standalone Deployment](https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/standalone/overview/)
+すべて利用者が運用する。Standalone の起動方法、HA 構成、Java のバージョン、実動作は未確認。図は公式資料を組み合わせた代表例である。
 
-図では EKS ワーカーノードと MSK ブローカーを同一の利用者 VPC に置く例を選ぶ。EKS 制御プレーンは AWS 管理であり、図の VPC 内にあるワーカーノードとは運用境界が異なる。セキュリティグループ、サブネット、S3 への経路と MSK 認証は利用者が設定する。
+## 公式資料
 
-- [EKS VPC とサブネット](https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html)
+- [Flink · Flink Architecture](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/)
+- [Flink · Overview](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/overview/)
+- [Flink · Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/)
+- [Flink · State Backends](https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/)
+- [Flink · Native Kubernetes](https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/)
+- [Flink · Standalone deployment](https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/standalone/overview/)
+- [Flink · Kafka connector](https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/)
+- [Managed Service for Apache Flink · How it works](https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html)
+- [Managed Service for Apache Flink · Fault tolerance](https://docs.aws.amazon.com/managed-flink/latest/java/how-fault.html)
+- [Managed Service for Apache Flink · Application scaling](https://docs.aws.amazon.com/managed-flink/latest/java/how-scaling.html)

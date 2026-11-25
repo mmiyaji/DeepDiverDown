@@ -1,0 +1,521 @@
+name: Kafka：パーティションとログセグメント・offset
+description: パーティションのログがセグメントファイルに追記され、offset で読まれ、セグメント単位で削除される流れを追う。
+reference:
+  objectives:
+    - offset、LEO、コミット済みの範囲、Consumer の位置を区別する。
+    - アクティブセグメントが閉じ、閉じたセグメントが保持設定で削除される流れを追う。
+    - offset から該当セグメントを探して読む手順を説明する。
+  sources:
+    - title: Kafka Log Implementation
+      url: https://kafka.apache.org/44/implementation/log/
+    - title: Apache Kafka Design
+      url: https://kafka.apache.org/44/design/design/
+    - title: Topic Configs
+      url: https://kafka.apache.org/44/configuration/topic-configs/
+    - title: Broker Configs
+      url: https://kafka.apache.org/44/configuration/broker-configs/
+sources:
+  - docs/reference-kafka-log-segments.md
+evidence:
+  - type: doc
+    ref: docs/reference-kafka-log-segments.md#§1
+tiers:
+  - id: flow
+    label: パーティションのログ
+    z: 0
+    size:
+      - 28
+      - 7
+nodes:
+  producer:
+    label: Producer
+    kind: client
+    tier: flow
+    x: 0
+    'y': 1.5
+    description: レコードのバッチをパーティションのリーダーへ送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§4
+  leader:
+    label: パーティションのリーダー Broker
+    kind: service
+    tier: flow
+    x: 6
+    'y': 1.5
+    replicas: 3
+    description: バッチをアクティブセグメントの末尾（LEO）に追記し、offset から読み取り要求に答える。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§4
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§5
+  active:
+    label: アクティブセグメント
+    kind: file
+    tier: flow
+    x: 13
+    'y': 1.5
+    description: 追記中の末尾のセグメント。.log・.index・.timeindex の組で、ファイル名は先頭 offset。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§3
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§4
+  closed:
+    label: 閉じたセグメント
+    kind: file
+    tier: flow
+    x: 20
+    'y': 1.5
+    parallel: 'N'
+    description: segment.bytes か segment.ms で閉じた、書き換えない過去のセグメント。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§3
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§5
+  retention:
+    label: 保持による削除
+    kind: policy
+    tier: flow
+    x: 26
+    'y': 1.5
+    description: 時間とサイズの保持設定に従い、セグメント単位で削除する。アクティブセグメントは対象外。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§6
+  consumer:
+    label: Consumer
+    kind: client
+    tier: flow
+    x: 0
+    'y': 5
+    description: offset を指定して取得する。コミット済みの範囲までを読める。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§5
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§7
+  offsets:
+    label: __consumer_offsets
+    kind: queue
+    tier: flow
+    x: 6
+    'y': 5
+    replicas: 3
+    description: Consumer Group が次に読む offset を保存する内部 Topic。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§7
+links:
+  - id: append
+    from: producer
+    to: leader
+    label: バッチを送る
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§4
+  - id: write
+    from: leader
+    to: active
+    label: 末尾に追記
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§4
+  - id: roll
+    from: active
+    to: closed
+    label: 上限で閉じて新しいセグメントへ
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§3
+  - id: expire
+    from: retention
+    to: closed
+    label: 期限切れをセグメントごと削除
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§6
+  - id: lookup
+    from: closed
+    to: leader
+    label: 位置を探して読む
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§5
+  - id: fetch
+    from: leader
+    to: consumer
+    label: コミット済みの範囲を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§5
+  - id: commit
+    from: consumer
+    to: offsets
+    label: 次に読む offset を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§7
+scenarios:
+  - id: kafka-log-lifecycle
+    label: 追記・読み出し・巻き戻し・削除
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§2
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§3
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§4
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§5
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§6
+      - type: doc
+        ref: docs/reference-kafka-log-segments.md#§7
+    steps:
+      - write:
+          - seg2-new
+        marks:
+          - label: Consumer の位置
+            at:
+              - seg2-unread
+              - 0
+            tone: consumer
+          - label: High Watermark
+            at:
+              - seg2-new
+              - 0
+            tone: hw
+          - label: LEO（末尾）
+            at:
+              - seg2-new
+              - 1
+            tone: end
+        links:
+          - append
+          - write
+        note: 追記。リーダーがバッチをアクティブセグメントの末尾に書く。複製が済むまで Consumer からは見えない。
+      - marks:
+          - label: Consumer の位置
+            at:
+              - seg2-unread
+              - 0
+            tone: consumer
+          - label: High Watermark ＝ LEO
+            at:
+              - seg2-new
+              - 1
+            tone: hw
+        links:
+          - write
+        note: 複製が済み、コミット済みの範囲が末尾まで進む。
+      - read:
+          - seg2-unread
+          - seg2-new
+        links:
+          - fetch
+        note: 読み出し。Consumer が位置から、コミット済みの範囲までを取得する。
+      - marks:
+          - label: コミット済みの位置
+            at:
+              - seg2-new
+              - 1
+            tone: consumer
+          - label: High Watermark
+            at:
+              - seg2-new
+              - 1
+            tone: hw
+        links:
+          - commit
+        note: 進捗を保存。次に読む offset を __consumer_offsets に書く。
+      - read:
+          - seg1-log
+        marks:
+          - label: 巻き戻した位置
+            at:
+              - seg1-log
+              - 0.35
+            tone: consumer
+          - label: High Watermark
+            at:
+              - seg2-new
+              - 1
+            tone: hw
+        links:
+          - lookup
+          - fetch
+        note: 巻き戻し。offset を含む閉じたセグメントを探し、残っている範囲なら読み直せる。
+      - marks:
+          - label: 保持期限切れ
+            at:
+              - seg0
+              - 0.5
+            tone: retention
+        links:
+          - roll
+          - expire
+        note: 削除。アクティブセグメントが閉じて新しくなり、期限切れの古いセグメントがファイルごと消える。
+fileLayout:
+  file: orders-0/（パーティション P0 のログ・リーダー Broker）
+  note: パーティションのログはセグメントファイルの並び。帯の幅はバイト数の比率（数値は説明用）。新しいバッチは見やすさのため大きめに描いている。
+  markers:
+    - label: Consumer 1 の位置
+      at:
+        - seg2-unread
+        - 0
+      tone: consumer
+    - label: High Watermark ＝ LEO
+      at:
+        - seg2-new
+        - 0
+      tone: hw
+    - label: 保持期限切れ
+      at:
+        - seg0
+        - 0.5
+      tone: retention
+  segments:
+    - id: seg0
+      label: Segment …00000000（期限切れ）
+      kind: expired
+      node: closed
+      description: オフセット 0〜1,048,575。閉じたセグメントで、retention.ms（既定 7 日）を過ぎたため、セグメントごとまとめて削除される。
+      children:
+        - id: seg0-log
+          label: .log（レコードバッチ）
+          bytes: 1073741824
+          kind: log
+          node: closed
+          description: レコードバッチを追記順に並べた本体。
+        - id: seg0-index
+          label: .index
+          bytes: 1258291
+          kind: index
+          node: closed
+          description: オフセット → .log 内の位置の疎な索引。指定オフセットから読むときに使う。
+          sample: |-
+            offset 1048576 → position 0
+            offset 1052672 → position 4194304
+            offset 1056768 → position 8392011
+            …（約 4 KB ごとに 1 件）
+        - id: seg0-time
+          label: .timeindex
+          bytes: 1887437
+          kind: index
+          node: closed
+          description: タイムスタンプ → オフセットの索引。時刻を指定した巻き戻しや、時間による保持期限の判定に使う。
+    - id: seg1
+      label: Segment …01048576
+      kind: log
+      node: closed
+      description: オフセット 1,048,576〜2,097,151。segment.bytes（既定 1 GiB）に達して閉じたセグメント。以後は読み取り専用。
+      children:
+        - id: seg1-log
+          label: .log（レコードバッチ）
+          bytes: 1073741824
+          kind: log
+          node: closed
+          description: レコードバッチを追記順に並べた本体。
+        - id: seg1-index
+          label: .index
+          bytes: 1258291
+          kind: index
+          node: closed
+          description: オフセット → .log 内の位置の疎な索引。指定オフセットから読むときに使う。
+          sample: |-
+            offset 1048576 → position 0
+            offset 1052672 → position 4194304
+            offset 1056768 → position 8392011
+            …（約 4 KB ごとに 1 件）
+        - id: seg1-time
+          label: .timeindex
+          bytes: 1887437
+          kind: index
+          node: closed
+          description: タイムスタンプ → オフセットの索引。時刻を指定した巻き戻しや、時間による保持期限の判定に使う。
+    - id: seg2
+      label: Segment …02097152（アクティブ）
+      kind: active
+      node: active
+      description: 現在追記中のセグメント。末尾（LEO）に新しいバッチが付く。ファイル名は先頭オフセット（20 桁）。
+      children:
+        - id: seg2-log
+          label: .log（追記中）
+          kind: active
+          node: active
+          children:
+            - id: seg2-read
+              label: 既読
+              bytes: 629145600
+              kind: log
+              node: active
+              description: Consumer Group がコミット済みの範囲。ログからは消えず、保持期限まで残る。
+            - id: seg2-unread
+              label: 未読
+              bytes: 125829120
+              kind: log
+              node: consumer
+              description: コミット済みの位置から High Watermark までの、まだ読まれていない範囲（コンシューマーラグ）。
+            - id: seg2-new
+              label: 新しいバッチ
+              bytes: 25165824
+              kind: new
+              node: producer
+              description: Producer が今追記したレコードバッチ。全 ISR に複製されて High Watermark を越えるまで、Consumer からは見えない。
+              sample: |-
+                RecordBatch {
+                  baseOffset: 2,866,112, records: 512
+                  producerId: 4001, producerEpoch: 0, baseSequence: 1536
+                  compression: zstd, timestamps: 2026-11-23T10:15:02.118Z …
+                }
+        - id: seg2-index
+          label: .index
+          bytes: 1258291
+          kind: index
+          node: active
+          description: オフセット → .log 内の位置の疎な索引。指定オフセットから読むときに使う。
+          sample: |-
+            offset 1048576 → position 0
+            offset 1052672 → position 4194304
+            offset 1056768 → position 8392011
+            …（約 4 KB ごとに 1 件）
+        - id: seg2-time
+          label: .timeindex
+          bytes: 1887437
+          kind: index
+          node: active
+          description: タイムスタンプ → オフセットの索引。時刻を指定した巻き戻しや、時間による保持期限の判定に使う。
+unknowns:
+  - id: UNK-01
+    text: .index・.timeindex のファイル形式と索引の間隔は、確認した Implementation のページに記載がない。
+    refs:
+      - active
+  - id: UNK-02
+    text: High Watermark という語の定義の出典は未確認。コミット済みの範囲は Design のページに基づく。
+    refs:
+      - leader
+gates:
+  maxDrift: 0
+  maxHigh: 99
+implementations:
+  - id: onprem-log-dirs
+    label: 自前 Linux ホストのログディレクトリ
+    description: Broker プロセスが Linux ホストのローカルディスク（log.dirs）にセグメントを置く最小の例。
+    sources:
+      - title: Kafka Log Implementation
+        url: https://kafka.apache.org/44/implementation/log/
+      - title: Topic Configs
+        url: https://kafka.apache.org/44/configuration/topic-configs/
+      - title: Broker Configs
+        url: https://kafka.apache.org/44/configuration/broker-configs/
+    tiers:
+      - id: clients
+        label: 利用者
+        kind: origin
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: processing
+        label: Broker ホスト
+        z: 0
+        size:
+          - 18
+          - 7
+    groups:
+      - kind: datacenter
+        provider: onprem
+        label: 利用者管理の Kafka 実行環境
+        tier:
+          - processing
+    nodes:
+      lseg-producer:
+        label: KafkaProducer
+        kind: client
+        tier: clients
+        x: 1
+        'y': 1.5
+        realizes:
+          - producer
+        description: リーダーへバッチを送る。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8
+      lseg-consumer:
+        label: KafkaConsumer
+        kind: client
+        tier: clients
+        x: 9
+        'y': 1.5
+        realizes:
+          - consumer
+        description: offset を指定して取得し、位置をコミットする。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8
+      lseg-host:
+        label: Linux Broker ホスト
+        kind: host
+        tier: processing
+        x: 1
+        'y': 1.5
+        description: Broker プロセスとログ用ディスクを持つ。利用者が運用する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8
+      lseg-broker:
+        label: Kafka Broker プロセス
+        kind: service
+        tier: processing
+        x: 6
+        'y': 1.5
+        realizes:
+          - leader
+          - retention
+        description: リーダーとして追記と読み出しを受け、保持設定でセグメントを削除する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8
+      lseg-disk:
+        label: log.dirs のローカルディスク
+        kind: file
+        tier: processing
+        x: 12
+        'y': 1.5
+        realizes:
+          - active
+          - closed
+        description: セグメントファイル（.log・.index・.timeindex）を置く。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8
+      lseg-offsets:
+        label: Broker 上の __consumer_offsets
+        kind: queue
+        tier: processing
+        x: 6
+        'y': 5
+        realizes:
+          - offsets
+        description: コミット済み offset を保存する内部 Topic。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8
+    links:
+      - id: lseg-run
+        from: lseg-host
+        to: lseg-broker
+        label: Broker を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8
+      - id: lseg-storage
+        from: lseg-host
+        to: lseg-disk
+        label: ディスクを提供
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-log-segments.md#§8

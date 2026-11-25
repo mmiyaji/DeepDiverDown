@@ -1,388 +1,296 @@
 {
   "model": "apicurio-registry",
-  "name": "Apicurio Registry の Avro スキーマ管理と互換性",
+  "name": "Apicurio Registry の基本アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 7,
+    "total": 7
   },
   "byId": {
-    "producer": {
+    "admin": {
       "type": "node",
-      "label": "Avro Producer",
+      "label": "登録担当（Web UI・CLI・REST・Maven）",
       "status": "claim"
     },
-    "serialize": {
+    "clients": {
       "type": "node",
-      "label": "Avro Serializer",
+      "label": "Kafka クライアント（SerDes）",
       "status": "claim"
     },
-    "topic": {
+    "ui": {
       "type": "node",
-      "label": "注文イベントのトピック",
+      "label": "Web コンソール",
       "status": "claim"
     },
-    "deserialize": {
+    "api": {
       "type": "node",
-      "label": "Avro Deserializer",
+      "label": "Core Registry API v3（/apis/registry/v3）",
       "status": "claim"
     },
-    "app": {
+    "ccompat": {
       "type": "node",
-      "label": "Consumer / reader schema",
+      "label": "Confluent 互換 API（/apis/ccompat/v7）",
       "status": "claim"
     },
-    "submitter": {
+    "rules": {
       "type": "node",
-      "label": "スキーマの登録者",
+      "label": "ルール（グローバル・グループ・アーティファクト）",
       "status": "claim"
     },
-    "policy": {
+    "model": {
       "type": "node",
-      "label": "互換性ルール",
+      "label": "グループ・アーティファクト・バージョン",
       "status": "claim"
     },
-    "versions": {
+    "storage": {
       "type": "node",
-      "label": "Order のバージョンと内容 ID",
+      "label": "ストレージ（PostgreSQL・KafkaSQL など）",
       "status": "claim"
     },
-    "make": {
+    "register": {
       "type": "link",
-      "label": "Avro Producer → Avro Serializer",
+      "label": "登録担当（Web UI・CLI・REST・Maven） → Core Registry API v3（/apis/registry/v3）",
       "status": "claim"
     },
-    "writer-id": {
+    "console": {
       "type": "link",
-      "label": "Order のバージョンと内容 ID → Avro Serializer",
+      "label": "Web コンソール → Core Registry API v3（/apis/registry/v3）",
       "status": "claim"
     },
-    "write": {
+    "fetch": {
       "type": "link",
-      "label": "Avro Serializer → 注文イベントのトピック",
-      "status": "claim"
-    },
-    "consume": {
-      "type": "link",
-      "label": "注文イベントのトピック → Avro Deserializer",
-      "status": "claim"
-    },
-    "by-id": {
-      "type": "link",
-      "label": "Avro Deserializer → Order のバージョンと内容 ID",
-      "status": "claim"
-    },
-    "resolve": {
-      "type": "link",
-      "label": "Avro Deserializer → Consumer / reader schema",
-      "status": "claim"
-    },
-    "propose": {
-      "type": "link",
-      "label": "スキーマの登録者 → 互換性ルール",
+      "label": "Kafka クライアント（SerDes） → Core Registry API v3（/apis/registry/v3）",
       "status": "claim"
     },
     "check": {
       "type": "link",
-      "label": "互換性ルール → Order のバージョンと内容 ID",
+      "label": "Core Registry API v3（/apis/registry/v3） → ルール（グローバル・グループ・アーティファクト）",
       "status": "claim"
     },
-    "read-history": {
-      "type": "scenario",
-      "label": "v2 の Consumer が v1 の注文を読む"
+    "write": {
+      "type": "link",
+      "label": "Core Registry API v3（/apis/registry/v3） → グループ・アーティファクト・バージョン",
+      "status": "claim"
     },
-    "check-versions": {
+    "map-subject": {
+      "type": "link",
+      "label": "Confluent 互換 API（/apis/ccompat/v7） → グループ・アーティファクト・バージョン",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "グループ・アーティファクト・バージョン → ストレージ（PostgreSQL・KafkaSQL など）",
+      "status": "claim"
+    },
+    "register-version": {
       "type": "scenario",
-      "label": "新スキーマを最新と履歴全体で比較する"
+      "label": "新しいバージョンを登録する"
+    },
+    "resolve-schema": {
+      "type": "scenario",
+      "label": "Consumer が ID でスキーマを取得する"
     },
     "BR-01": {
       "type": "requirement",
       "kind": "rule",
-      "label": "古いイベントの読み取りを維持",
+      "label": "登録前にルールを通す",
       "status": "claim"
     },
     "BR-02": {
       "type": "requirement",
       "kind": "rule",
-      "label": "登録時に運用上の互換性を検査",
+      "label": "バージョンの内容は変更しない",
       "status": "claim"
     },
     "UNK-01": {
       "type": "unknown",
-      "label": "実環境の ID の種別・配置、比較対象のバージョン、保持中の Kafka 履歴、互換性ルールの設定は未確認。"
+      "label": "ルールの保存先（テーブルやトピック上の表現）は、確認した公式資料では説明されていない。図ではストレージが保持するものとして描く。"
     },
-    "apicurio-postgres-client-host": {
-      "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "自前 Linux クライアントホスト",
-      "realizes": []
+    "UNK-02": {
+      "type": "unknown",
+      "label": "実装例の台数、ノードサイズ、ネットワーク経路、PostgreSQL の置き場所（クラスター内外）、Operator と Registry のバージョンの組み合わせは資料で指定されていない。"
     },
-    "apicurio-postgres-kafka-host": {
+    "apicurio-k8s-admin": {
       "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "自前 Kafka ブローカーホスト群",
-      "realizes": []
-    },
-    "apicurio-postgres-registry-host": {
-      "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "自前 Docker 実行ホスト",
-      "realizes": []
-    },
-    "apicurio-postgres-writer": {
-      "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "Java Kafka Producer（Avro Serializer）",
+      "impl": "apicurio-k8s-postgres",
+      "label": "登録担当（クラスター外のクライアント）",
       "realizes": [
-        "producer",
-        "serialize"
+        "admin"
       ]
     },
-    "apicurio-postgres-kafka": {
+    "apicurio-k8s-clients": {
       "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "Apache Kafka の注文トピック",
+      "impl": "apicurio-k8s-postgres",
+      "label": "Kafka クライアント（クラスター外のアプリ）",
       "realizes": [
-        "topic"
+        "clients"
       ]
     },
-    "apicurio-postgres-reader": {
+    "apicurio-k8s-ingress": {
       "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "Java Kafka Consumer（Avro Deserializer）",
-      "realizes": [
-        "deserialize",
-        "app"
-      ]
-    },
-    "apicurio-postgres-publisher": {
-      "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "スキーマ登録用 REST クライアント",
-      "realizes": [
-        "submitter"
-      ]
-    },
-    "apicurio-postgres-registry": {
-      "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "Apicurio Registry Server",
-      "realizes": [
-        "policy",
-        "versions"
-      ]
-    },
-    "apicurio-postgres-postgres": {
-      "type": "implementation",
-      "impl": "apicurio-postgres",
-      "label": "PostgreSQL（Registry の SQL ストレージ）",
+      "impl": "apicurio-k8s-postgres",
+      "label": "Ingress（app と ui の host）",
       "realizes": []
     },
-    "aws-eks-apicurio-author": {
+    "apicurio-k8s-cr": {
       "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "スキーマの登録担当者",
-      "realizes": [
-        "submitter"
-      ]
-    },
-    "aws-eks-apicurio-idp": {
-      "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "既存の Keycloak",
+      "impl": "apicurio-k8s-postgres",
+      "label": "ApicurioRegistry3 リソース",
       "realizes": []
     },
-    "aws-eks-apicurio-eks": {
+    "apicurio-k8s-operator": {
       "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "EKS Kubernetes API",
-      "realizes": []
-    },
-    "aws-eks-apicurio-nodes": {
-      "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "EKS の EC2 ノード",
-      "realizes": []
-    },
-    "aws-eks-apicurio-operator": {
-      "type": "implementation",
-      "impl": "aws-eks-apicurio",
+      "impl": "apicurio-k8s-postgres",
       "label": "Apicurio Registry Operator",
       "realizes": []
     },
-    "aws-eks-apicurio-registry": {
+    "apicurio-k8s-app": {
       "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "Apicurio Registry API",
+      "impl": "apicurio-k8s-postgres",
+      "label": "Registry app Pods",
       "realizes": [
-        "policy"
+        "api",
+        "ccompat",
+        "rules",
+        "model"
       ]
     },
-    "aws-eks-apicurio-producer": {
+    "apicurio-k8s-ui": {
       "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "Java Producer と Avro Serializer",
+      "impl": "apicurio-k8s-postgres",
+      "label": "Registry ui Pods",
       "realizes": [
-        "producer",
-        "serialize"
+        "ui"
       ]
     },
-    "aws-eks-apicurio-consumer": {
+    "apicurio-k8s-secret": {
       "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "Java Consumer と Avro Deserializer",
-      "realizes": [
-        "deserialize",
-        "app"
-      ]
+      "impl": "apicurio-k8s-postgres",
+      "label": "Secret（DB パスワード）",
+      "realizes": []
     },
-    "aws-eks-apicurio-topic": {
+    "apicurio-k8s-postgres": {
       "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "MSK の注文トピック",
+      "impl": "apicurio-k8s-postgres",
+      "label": "PostgreSQL（利用者が用意）",
       "realizes": [
-        "topic"
-      ]
-    },
-    "aws-eks-apicurio-versions": {
-      "type": "implementation",
-      "impl": "aws-eks-apicurio",
-      "label": "RDS PostgreSQL の Registry DB",
-      "realizes": [
-        "versions"
+        "storage"
       ]
     }
   },
   "byRef": {
     "docs/reference-apicurio-registry.md#§1": [
-      "model",
-      "producer"
+      "model"
     ],
     "docs/reference-apicurio-registry.md": [
       "model",
-      "producer",
-      "serialize",
-      "topic",
-      "deserialize",
-      "app",
-      "submitter",
-      "policy",
-      "versions",
-      "make",
-      "writer-id",
-      "write",
-      "consume",
-      "by-id",
-      "resolve",
-      "propose",
+      "admin",
+      "clients",
+      "ui",
+      "api",
+      "ccompat",
+      "rules",
+      "storage",
+      "register",
+      "console",
+      "fetch",
       "check",
-      "read-history",
-      "check-versions",
+      "write",
+      "map-subject",
+      "persist",
+      "register-version",
+      "resolve-schema",
       "BR-01",
       "BR-02",
-      "apicurio-postgres-client-host",
-      "apicurio-postgres-kafka-host",
-      "apicurio-postgres-registry-host",
-      "apicurio-postgres-writer",
-      "apicurio-postgres-kafka",
-      "apicurio-postgres-reader",
-      "apicurio-postgres-publisher",
-      "apicurio-postgres-registry",
-      "apicurio-postgres-postgres",
-      "aws-eks-apicurio-author",
-      "aws-eks-apicurio-idp",
-      "aws-eks-apicurio-eks",
-      "aws-eks-apicurio-nodes",
-      "aws-eks-apicurio-operator",
-      "aws-eks-apicurio-registry",
-      "aws-eks-apicurio-producer",
-      "aws-eks-apicurio-consumer",
-      "aws-eks-apicurio-topic",
-      "aws-eks-apicurio-versions"
+      "apicurio-k8s-admin",
+      "apicurio-k8s-clients",
+      "apicurio-k8s-ingress",
+      "apicurio-k8s-cr",
+      "apicurio-k8s-operator",
+      "apicurio-k8s-app",
+      "apicurio-k8s-ui",
+      "apicurio-k8s-secret",
+      "apicurio-k8s-postgres"
     ],
     "docs/reference-apicurio-registry.md#§2": [
       "model",
-      "serialize",
-      "topic",
-      "versions",
-      "make",
-      "writer-id",
-      "write"
+      "admin",
+      "clients",
+      "ui",
+      "api",
+      "ccompat",
+      "register",
+      "console",
+      "fetch",
+      "map-subject",
+      "resolve-schema"
     ],
     "docs/reference-apicurio-registry.md#§3": [
       "model",
-      "deserialize",
-      "app",
-      "consume",
-      "by-id",
-      "resolve",
-      "read-history",
-      "BR-01"
+      "write",
+      "BR-02"
     ],
     "docs/reference-apicurio-registry.md#§4": [
       "model",
-      "submitter",
-      "policy",
-      "propose",
-      "check"
+      "rules",
+      "check",
+      "register-version",
+      "BR-01"
     ],
     "docs/reference-apicurio-registry.md#§5": [
       "model",
-      "check-versions",
-      "BR-02"
+      "storage",
+      "persist"
     ],
     "docs/reference-apicurio-registry.md#§6": [
-      "model"
+      "model",
+      "ui",
+      "api"
     ],
     "docs/reference-apicurio-registry.md#§7": [
-      "apicurio-postgres-client-host",
-      "apicurio-postgres-kafka-host",
-      "apicurio-postgres-registry-host",
-      "apicurio-postgres-writer",
-      "apicurio-postgres-kafka",
-      "apicurio-postgres-reader",
-      "apicurio-postgres-publisher",
-      "apicurio-postgres-registry",
-      "apicurio-postgres-postgres"
-    ],
-    "docs/reference-apicurio-registry.md#§8": [
-      "aws-eks-apicurio-author",
-      "aws-eks-apicurio-idp",
-      "aws-eks-apicurio-eks",
-      "aws-eks-apicurio-nodes",
-      "aws-eks-apicurio-operator",
-      "aws-eks-apicurio-registry",
-      "aws-eks-apicurio-producer",
-      "aws-eks-apicurio-consumer",
-      "aws-eks-apicurio-topic",
-      "aws-eks-apicurio-versions"
+      "model",
+      "apicurio-k8s-admin",
+      "apicurio-k8s-clients",
+      "apicurio-k8s-ingress",
+      "apicurio-k8s-cr",
+      "apicurio-k8s-operator",
+      "apicurio-k8s-app",
+      "apicurio-k8s-ui",
+      "apicurio-k8s-secret",
+      "apicurio-k8s-postgres"
     ]
   },
   "reference": {
-    "category": "ストリーム処理",
     "order": 65,
     "domain": "データ処理",
+    "category": "ストリーム処理",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "Apicurio Registry",
+    "role": "overview",
     "objectives": [
-      "メッセージに付くスキーマ ID から実際の writer schema を取得する流れを説明する。",
-      "Avro の writer schema と reader schema の役割を区別する。",
-      "BACKWARD、FORWARD、FULL と transitive が検査する組み合わせを説明する。"
+      "REST API、Web コンソール、Confluent 互換 API、SerDes クライアントの入口を区別する。",
+      "グループ、アーティファクト、バージョン、コンテンツ、ID の関係を説明する。",
+      "ルールが新しいバージョンの受け入れ前に働くことと、ストレージの選択肢（H2・PostgreSQL・KafkaSQL）を説明する。"
     ],
     "sources": [
       {
-        "title": "Apicurio Registry 3.4 Kafka SerDes",
-        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html"
+        "title": "Introduction to Apicurio Registry",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-the-registry.html"
       },
       {
-        "title": "Apicurio Registry 3.4 Schema Compatibility Modes",
-        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html"
+        "title": "Apicurio Registry concepts and glossary",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html"
       },
       {
-        "title": "Apache Avro 1.12 Schema Resolution",
-        "url": "https://avro.apache.org/docs/1.12.0/specification/#schema-resolution"
+        "title": "Apicurio Registry content rules",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html"
       },
       {
-        "title": "Apicurio Registry 3.2 Concepts Glossary",
-        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.2.x/getting-started/assembly-registry-concepts-glossary.html"
+        "title": "Installing Apicurio Registry storage on OpenShift",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html"
+      },
+      {
+        "title": "Deploying Apicurio Registry for high availability",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html"
       }
     ]
   }

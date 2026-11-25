@@ -1,0 +1,657 @@
+name: RisingWave：マテリアライズドビューの増分更新
+description: CREATE MATERIALIZED VIEW が Fragment と Actor になり、バックフィルの後に入力の差分だけでビューを更新し続ける流れ。
+reference:
+  objectives:
+    - Source・Table・マテリアライズドビューのうち、状態を持つものを区別する。
+    - SQL が Fragment と Actor に分かれ、Meta に配置されるまでを追う。
+    - バックフィルと増分更新の 2 段階、および時間による状態の整理（Watermark・Temporal Filter）を説明する。
+  sources:
+    - title: RisingWave · CREATE MATERIALIZED VIEW
+      url: https://docs.risingwave.com/sql/commands/sql-create-mv
+    - title: RisingWave · Key concepts
+      url: https://docs.risingwave.com/reference/key-concepts
+    - title: RisingWave · Architecture
+      url: https://docs.risingwave.com/get-started/architecture
+    - title: RisingWave · Source, Table, MV, and Sink
+      url: https://docs.risingwave.com/get-started/source-table-mv-sink
+    - title: RisingWave · CREATE SOURCE vs CREATE TABLE
+      url: https://docs.risingwave.com/ingestion/create-source-vs-create-table
+    - title: RisingWave · Watermarks
+      url: https://docs.risingwave.com/processing/watermarks
+    - title: RisingWave · Temporal filters
+      url: https://docs.risingwave.com/processing/sql/temporal-filters
+    - title: RisingWave · Specific bottlenecks (compaction)
+      url: https://docs.risingwave.com/performance/specific-bottlenecks
+sources:
+  - docs/reference-risingwave-incremental-mv.md
+evidence:
+  - type: doc
+    ref: docs/reference-risingwave-incremental-mv.md#§1
+tiers:
+  - id: flow
+    label: ビューが作られ更新される流れ
+    z: 0
+    size:
+      - 26
+      - 10
+nodes:
+  reader:
+    label: SQL クライアント
+    kind: client
+    tier: flow
+    x: 0
+    'y': 1.5
+    replicas: 2
+    description: CREATE MATERIALIZED VIEW を送り、後で SELECT で最新の結果を読む。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§2
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+  planner:
+    label: Frontend（計画とフラグメント化）
+    kind: service
+    tier: flow
+    x: 5.5
+    'y': 1.5
+    parallel: 'N'
+    description: 問い合わせを解析・最適化し、Fragment に分けた計画を Meta に送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+  sched:
+    label: Meta（Actor の割り当て）
+    kind: scheduler
+    tier: flow
+    x: 11.5
+    'y': 1.5
+    replicas: 2
+    description: Actor を Streaming Node に割り当て、履歴のバックフィルを経て増分処理へ進める。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§4
+  upstream:
+    label: 上流の Table・Source
+    kind: db
+    tier: flow
+    x: 0
+    'y': 5
+    description: Table は RisingWave 内にデータを持つ。Source は持たず、外部の保持方針に従う。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§2
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§5
+  backfill:
+    label: バックフィル
+    kind: worker
+    tier: flow
+    x: 6
+    'y': 5
+    parallel: 'N'
+    description: 作成時に上流の既存データを取り込む。スナップショットバックフィルが既定で、ストリーム処理と資源を奪い合わない。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§4
+  actors:
+    label: Actor（演算子の並び）
+    kind: worker
+    tier: flow
+    x: 12
+    'y': 5
+    parallel: 'N'
+    description: Fragment を並列に実行し、変更を受けて集約・結合などを更新し、差分を下流へ流す。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§5
+  state:
+    label: 演算子の状態
+    kind: db
+    tier: flow
+    x: 18
+    'y': 5
+    description: ハッシュ集約・結合の状態。メモリにキャッシュし、永続コピーは Hummock に置く。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§5
+  mv:
+    label: マテリアライズドビュー
+    kind: table
+    tier: flow
+    x: 18
+    'y': 1.5
+    description: 結果を RisingWave 内に保持する。SELECT は事前計算された結果を返す。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§2
+  expire:
+    label: Watermark・Temporal Filter
+    kind: policy
+    tier: flow
+    x: 12
+    'y': 8.5
+    description: イベント時刻の進みで、期限切れの行と状態を消す。Temporal Filter は下流へリトラクションを送る。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§6
+links:
+  - id: create
+    from: reader
+    to: planner
+    label: CREATE MATERIALIZED VIEW
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+  - id: submit
+    from: planner
+    to: sched
+    label: Fragment 化した計画を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+  - id: place
+    from: sched
+    to: actors
+    label: Actor を割り当てる
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+  - id: snapshot
+    from: upstream
+    to: backfill
+    label: 既存データを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§4
+  - id: replay
+    from: backfill
+    to: actors
+    label: 履歴を流す
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§4
+  - id: changes
+    from: upstream
+    to: actors
+    label: 挿入・更新・削除を流す
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§2
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§4
+  - id: rw-state
+    from: actors
+    to: state
+    label: 状態を読み書き
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§5
+  - id: apply
+    from: actors
+    to: mv
+    label: 差分を反映
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§2
+  - id: trim
+    from: expire
+    to: state
+    label: 期限切れを削除
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§6
+  - id: select
+    from: mv
+    to: reader
+    label: 最新の結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§2
+scenarios:
+  - id: incremental
+    label: ビューの作成から増分更新まで
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§2
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§3
+      - type: doc
+        ref: docs/reference-risingwave-incremental-mv.md#§4
+    steps:
+      - links:
+          - create
+          - submit
+        note: Frontend が計画を Fragment に分け、Meta に渡す。
+      - links:
+          - place
+        note: Meta が Actor を Streaming Node に配置する。
+      - links:
+          - snapshot
+          - replay
+        note: まず上流の既存データをバックフィルする。
+      - links:
+          - changes
+          - rw-state
+          - apply
+        note: 以後は上流の変更を差分として流し、状態を更新して結果へ反映する。
+      - links:
+          - trim
+        note: 時刻の進みに合わせて、期限切れの状態を消す。
+      - links:
+          - select
+        note: SELECT は更新済みの結果を返す。
+unknowns:
+  - id: UNK-01
+    text: マテリアライズドビューを別のマテリアライズドビューの上に重ねた（連鎖）ときの更新の伝わり方は、確認した資料に明記がない。CREATE MATERIALIZED VIEW の資料の例が示すのみ。
+    refs:
+      - actors
+  - id: UNK-02
+    text: 演算子ごとの状態の持ち方（キー設計、状態テーブルの構成）と、差分の内部表現は確認した資料に記載がない。
+    refs:
+      - state
+  - id: UNK-03
+    text: 実装例の台数・ノードサイズ・バージョン互換性は資料で指定されていない。
+    refs:
+      - actors
+gates:
+  maxDrift: 0
+  maxHigh: 6
+implementations:
+  - id: aws-eks
+    label: EKS 上の RisingWave・S3・RDS for PostgreSQL
+    description: EKS の EC2 ノード上に RisingWave の Frontend・Meta・Compute・Compactor の Pod を置き、S3 を state store、RDS for PostgreSQL を meta store にする構成例。
+    sources:
+      - title: RisingWave · CREATE MATERIALIZED VIEW
+        url: https://docs.risingwave.com/sql/commands/sql-create-mv
+      - title: RisingWave · Architecture
+        url: https://docs.risingwave.com/get-started/architecture
+      - title: RisingWave · Source, Table, MV, and Sink
+        url: https://docs.risingwave.com/get-started/source-table-mv-sink
+      - title: RisingWave · Deploy on Kubernetes
+        url: https://docs.risingwave.com/deploy/risingwave-kubernetes
+      - title: RisingWave · Hardware requirements
+        url: https://docs.risingwave.com/deploy/hardware-requirements
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: IAM roles for service accounts
+        url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+      - title: Amazon RDS for PostgreSQL
+        url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html
+    tiers:
+      - id: entry
+        label: 利用者・外部システム
+        kind: origin
+        z: 2
+        size:
+          - 18
+          - 3
+      - id: control-plane
+        label: AWS の管理・認証
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: processing
+        label: EKS の RisingWave 実行
+        z: 0
+        size:
+          - 18
+          - 3
+      - id: storage
+        label: 状態とメタデータの保存
+        z: -1
+        size:
+          - 18
+          - 3
+    nodes:
+      rw-aws-client:
+        label: psql などの SQL クライアント
+        kind: client
+        tier: entry
+        x: 1
+        'y': 1.5
+        realizes:
+          - reader
+        description: CREATE MATERIALIZED VIEW と SELECT を送る。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-eks:
+        label: Amazon EKS / Kubernetes API
+        svc: eks
+        kind: service
+        tier: control-plane
+        x: 3
+        'y': 1.5
+        description: Kubernetes の制御プレーン。RisingWave Operator のカスタムリソースと Pod の配置を管理する。
+        management:
+          type: shared
+          scope: AWS が制御プレーンを運用し、利用者が Kubernetes API、Operator、クラスタ設定を操作する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-iam:
+        label: IAM / サービスアカウント用ロール
+        svc: iam
+        kind: policy
+        tier: control-plane
+        x: 9
+        'y': 1.5
+        description: state store の useServiceAccount を使い S3 へ届くための権限。必要な権限の一覧は資料で確認していない。
+        management:
+          type: customer
+          scope: 利用者がサービスアカウントと IAM ロール・ポリシーを設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-ec2:
+        label: EC2 / EKS ノードグループ
+        svc: ec2
+        kind: host
+        tier: processing
+        x: 15
+        'y': 1.5
+        description: マネージドノードグループの EC2 が RisingWave の Pod を実行する。
+        management:
+          type: shared
+          scope: AWS が EC2 基盤を運用し、利用者がノードグループ、台数、更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-frontend:
+        label: Frontend Pod
+        kind: service
+        tier: processing
+        x: 1
+        'y': 1.5
+        parallel: 'N'
+        realizes:
+          - planner
+        description: 計画と Fragment 化を担う。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-meta:
+        label: Meta Pod
+        kind: service
+        tier: processing
+        x: 5
+        'y': 1.5
+        realizes:
+          - sched
+        description: Actor の配置とバックフィルの進行を管理する。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-compute:
+        label: Compute Pod
+        kind: worker
+        tier: processing
+        x: 9
+        'y': 1.5
+        parallel: 'N'
+        realizes:
+          - backfill
+          - actors
+          - expire
+        description: バックフィル、Actor、時間による状態の整理を実行する。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-compactor:
+        label: Compactor Pod
+        kind: worker
+        tier: processing
+        x: 13
+        'y': 1.5
+        parallel: 'N'
+        description: 状態の SST を整理する（次の図で扱う）。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-s3:
+        label: Amazon S3（Hummock の state store）
+        svc: s3
+        kind: db
+        tier: storage
+        x: 9
+        'y': 1.5
+        realizes:
+          - state
+          - mv
+          - upstream
+        description: 状態とビューの永続コピーを保存する。
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がバケット、権限、データを管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      rw-aws-rds:
+        label: RDS for PostgreSQL（meta store）
+        svc: rds
+        kind: db
+        tier: storage
+        x: 3
+        'y': 1.5
+        description: 上流の Table の行は Hummock にあり、RDS には置かれない。この部品は実装例の meta store として加わる。
+        management:
+          type: shared
+          scope: AWS がデータベース基盤を運用し、利用者がスキーマ、接続、バックアップ設定を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+    links:
+      - id: rw-aws-eks-ec2
+        from: rw-aws-eks
+        to: rw-aws-ec2
+        label: ノードグループに Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      - id: rw-aws-ec2-fe
+        from: rw-aws-ec2
+        to: rw-aws-frontend
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      - id: rw-aws-ec2-meta
+        from: rw-aws-ec2
+        to: rw-aws-meta
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      - id: rw-aws-ec2-cn
+        from: rw-aws-ec2
+        to: rw-aws-compute
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      - id: rw-aws-ec2-cp
+        from: rw-aws-ec2
+        to: rw-aws-compactor
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      - id: rw-aws-iam-cn
+        from: rw-aws-iam
+        to: rw-aws-compute
+        label: S3 アクセス権を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      - id: rw-aws-iam-cp
+        from: rw-aws-iam
+        to: rw-aws-compactor
+        label: S3 アクセス権を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+      - id: rw-aws-meta-rds
+        from: rw-aws-meta
+        to: rw-aws-rds
+        label: メタデータを保存
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-incremental-mv.md#§7
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - control-plane
+          - processing
+          - storage
+        nodes:
+          - rw-aws-eks
+          - rw-aws-iam
+          - rw-aws-ec2
+          - rw-aws-frontend
+          - rw-aws-meta
+          - rw-aws-compute
+          - rw-aws-compactor
+          - rw-aws-s3
+          - rw-aws-rds
+      - kind: cluster
+        label: EKS クラスタ / RisingWave
+        tier:
+          - processing
+        nodes:
+          - rw-aws-frontend
+          - rw-aws-meta
+          - rw-aws-compute
+          - rw-aws-compactor
+          - rw-aws-ec2
+    layout2d:
+      tiers:
+        - id: diagram
+          label: AWS 上の RisingWave
+          z: 0
+          size:
+            - 26
+            - 13.5
+      nodes:
+        rw-aws-client:
+          tier: diagram
+          x: 1
+          'y': 2
+        rw-aws-eks:
+          tier: diagram
+          x: 4.5
+          'y': 2
+        rw-aws-iam:
+          tier: diagram
+          x: 4.5
+          'y': 6.5
+        rw-aws-ec2:
+          tier: diagram
+          x: 13
+          'y': 2
+        rw-aws-frontend:
+          tier: diagram
+          x: 8
+          'y': 6.5
+        rw-aws-meta:
+          tier: diagram
+          x: 11
+          'y': 6.5
+        rw-aws-compute:
+          tier: diagram
+          x: 14
+          'y': 6.5
+        rw-aws-compactor:
+          tier: diagram
+          x: 17.5
+          'y': 6.5
+        rw-aws-s3:
+          tier: diagram
+          x: 15
+          'y': 11
+        rw-aws-rds:
+          tier: diagram
+          x: 9
+          'y': 11
+      groups:
+        - kind: cloud
+          label: AWS アカウント
+          provider: aws
+          tier:
+            - diagram
+          x0: 2.8
+          y0: -0.3
+          x1: 22.3
+          y1: 12.8
+          nodes:
+            - rw-aws-eks
+            - rw-aws-iam
+            - rw-aws-ec2
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor
+            - rw-aws-s3
+            - rw-aws-rds
+        - kind: vpc
+          label: EKS ワーカーの利用者 VPC
+          provider: aws
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 0.7
+          x1: 20.5
+          y1: 8.8
+          nodes:
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor
+            - rw-aws-ec2
+        - kind: cluster
+          label: EKS クラスター（ワーカー側）
+          provider: k8s
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 0.7
+          x1: 20.5
+          y1: 8.8
+          nodes:
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor
+            - rw-aws-ec2
+        - kind: namespace
+          label: RisingWave 名前空間
+          provider: k8s
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 4.7
+          x1: 20.5
+          y1: 8.8
+          nodes:
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor

@@ -1,0 +1,349 @@
+name: "Apicurio Registry：互換性ルールとバージョン管理"
+description: 新しいバージョンの登録時に、ルールの優先順位、互換性モード、比較対象の版が検査結果を決める流れ。
+reference:
+  objectives:
+    - ルールがグローバル・グループ・アーティファクトの順に優先し、新しいバージョンの追加時に働くことを説明する。
+    - BACKWARD、FORWARD、FULL と transitive が比べる版の範囲を区別する。
+    - DISABLED と DEPRECATED の版が比較対象に入るかどうかを説明する。
+  sources:
+    - title: Schema compatibility modes
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html
+    - title: Content rules
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html
+    - title: Content rule reference
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-rule-reference.html
+    - title: Concepts and glossary
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html
+sources:
+  - docs/reference-apicurio-registry-compatibility.md
+evidence:
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§1" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§2" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§3" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§4" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§5" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§6" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§7" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§8" }
+tiers:
+  - id: flow
+    label: 登録から保存まで
+    z: 0
+    size: [24, 7]
+nodes:
+  submitter:
+    label: 登録者（CI・REST・Web コンソール）
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 2.5
+    description: Order の新しいバージョンを提案する。dryRun=true なら保存せず結果だけ得る。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§7" }]
+  api:
+    label: バージョン作成 API
+    kind: service
+    tier: flow
+    x: 5
+    'y': 2.5
+    replicas: 2
+    description: 新しいバージョンを受け取り、ルールを引いて検査し、通れば保存する。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§3" }]
+  rules:
+    label: ルール（アーティファクト › グループ › グローバル）
+    kind: policy
+    tier: flow
+    x: 10
+    'y': 0.5
+    replicas: 2
+    description: 種類ごとに最も具体的な範囲の設定を使う。下位で NONE にすると継承を止められる。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§3" }]
+  compat:
+    label: 互換性チェック（Avro・Protobuf・JSON Schema）
+    kind: service
+    tier: flow
+    x: 10
+    'y': 4.5
+    replicas: 2
+    description: COMPATIBILITY の値に従い、候補を比較対象の版と照らす。型ごとに検査の仕組みが違う。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§4" }
+      - { type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§6" }
+  versions:
+    label: Order のバージョン（ENABLED・DEPRECATED・DISABLED）
+    kind: catalog
+    tier: flow
+    x: 17
+    'y': 2.5
+    replicas: 2
+    description: 不変のバージョンと状態を持つ。DISABLED の版は比較に使われず、DEPRECATED の版は使われる。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§2" }]
+  storage:
+    label: ストレージ
+    kind: db
+    tier: flow
+    x: 22
+    'y': 2.5
+    replicas: 2
+    description: 通ったバージョンとコンテンツを永続化する。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§2" }]
+links:
+  - id: propose
+    from: submitter
+    to: api
+    label: 新しいバージョンを提案
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§3" }]
+  - id: select
+    from: api
+    to: rules
+    label: 適用するルールを引く
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§3" }]
+  - id: check
+    from: rules
+    to: compat
+    label: COMPATIBILITY の値で検査
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§4" }]
+  - id: compare
+    from: compat
+    to: versions
+    label: 比較対象の版を読む
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§4" }]
+  - id: commit
+    from: api
+    to: versions
+    label: 通れば版を追加
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§3" }]
+  - id: persist
+    from: versions
+    to: storage
+    label: 保存
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§2" }]
+  - id: set-state
+    from: submitter
+    to: versions
+    label: 古い版を DISABLED にする
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§2" }]
+scenarios:
+  - id: check-versions
+    label: 新スキーマを直前の版と履歴全体で比べる
+    visual: rules
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§5" }]
+    steps:
+      - links: [propose, select, check, compare]
+        note: v2 は currency に既定値を付けて追加する。新しい読み手は旧データを読め、旧読み手は新フィールドを無視して読める。
+        highlight: [v1, v2]
+      - links: [propose, select, check, compare]
+        note: 既定値を外した v3 を提案する。v2 の writer は currency を書くため、v3 の読み手は v2 のデータを読める。BACKWARD は通る。
+        blocks:
+          history:
+            - { id: v1, label: v1 · id, k: 0 }
+            - { id: v2, label: v2 · currency = JPY, k: 1 }
+          proposed:
+            - { id: v3, label: v3 · currency 必須, k: 2 }
+          result:
+            - { id: pass, label: BACKWARD · 通過, k: 1 }
+        highlight: [v2, v3, pass]
+      - links: [check, compare]
+        note: BACKWARD_TRANSITIVE は v1 も比べる。v1 のデータに currency はなく、v3 に既定値もないので拒否される（HTTP 400）。
+        blocks:
+          history:
+            - { id: v1, label: v1 · id, k: 0 }
+            - { id: v2, label: v2 · currency = JPY, k: 1 }
+          proposed:
+            - { id: v3, label: v3 · currency 必須, k: 2 }
+          result:
+            - { id: fail, label: BACKWARD_TRANSITIVE · 拒否, k: 2 }
+        highlight: [v1, v3, fail]
+      - links: [commit, persist]
+        note: ルールを通ったときだけ、新しい版が追加されて保存される。
+  - id: disable-old
+    label: 古い版を比較対象から外す
+    visual: rules
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§4" }]
+    steps:
+      - links: [set-state]
+        note: v1 を DISABLED にする。メタデータは見えるが内容は取得できず、比較対象から外れる。DEPRECATED のままなら比較に含まれる。
+        blocks:
+          history:
+            - { id: v1, label: v1 · DISABLED, k: 0 }
+            - { id: v2, label: v2 · currency = JPY, k: 1 }
+          proposed:
+            - { id: v3, label: v3 · currency 必須, k: 2 }
+          result: []
+        highlight: [v1]
+      - links: [propose, check, compare]
+        note: v1 を除くと、BACKWARD_TRANSITIVE でも v3 は v2 だけと比べられて通る。ただし v1 のデータを読む Consumer は、v1 の内容を取得できなくなる点に注意する。
+        blocks:
+          history:
+            - { id: v1, label: v1 · DISABLED, k: 0 }
+            - { id: v2, label: v2 · currency = JPY, k: 1 }
+          proposed:
+            - { id: v3, label: v3 · currency 必須, k: 2 }
+          result:
+            - { id: pass2, label: BACKWARD_TRANSITIVE · 通過, k: 1 }
+        highlight: [pass2]
+requirements:
+  - id: BR-01
+    kind: rule
+    title: 登録時に互換性を検査する
+    text: 新しいバージョンの追加時に、設定された範囲の COMPATIBILITY ルールで、比較対象の版と照らす。
+    links: [propose, select, check, compare]
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§3" }]
+  - id: BR-02
+    kind: rule
+    title: 比較対象の範囲を運用に合わせる
+    text: transitive は全版を比べる。DISABLED の版は比較から外れ、DEPRECATED の版は含まれる。
+    links: [compare, set-state]
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§4" }]
+unknowns:
+  - id: UNK-01
+    text: ルールの保存先、dryRun を CI でどう使うかの手順、CI の認証方式は確認した公式資料に記載がない。
+    refs: [rules, submitter]
+  - id: UNK-02
+    text: 実装例の台数、CI の実行場所、Kubernetes と Registry のバージョンの組み合わせは資料で指定されていない。
+    refs: [api, storage]
+gates: { maxDrift: 0, maxHigh: 0 }
+blocks:
+  - id: rules
+    title: 直前の版と履歴全体の互換性検査
+    note: v1 と v2 がともに比較対象として有効な場合の例。
+    legend:
+      "0": v1
+      "1": v2 または通過
+      "2": v3 または拒否
+    lanes:
+      - { id: history, label: 登録済みの版, node: versions }
+      - { id: proposed, label: 登録候補, node: submitter }
+      - { id: result, label: 検査結果, node: compat }
+    items:
+      history:
+        - { id: v1, label: v1 · id, k: 0 }
+        - { id: v2, label: v2 · currency = JPY, k: 1 }
+      proposed: []
+      result: []
+implementations:
+  - id: apicurio-compat-k8s-postgres
+    label: オンプレミス Kubernetes・PostgreSQL・CI
+    description: 利用者のデータセンターで、CI のジョブが Kubernetes 上の Registry（PostgreSQL）へスキーマを登録する構成例。
+    sources:
+      - title: Deploying Apicurio Registry using the Operator
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-deploying-registry-operator.html
+      - title: Content rules
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html
+      - title: Schema compatibility modes
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html
+      - title: Apicurio Registry Maven plug-in
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-managing-registry-artifacts-maven.html
+    tiers:
+      - { id: ci, label: 登録, z: 2, size: [20, 4] }
+      - { id: cluster, label: Kubernetes クラスター, z: 1, size: [20, 6] }
+      - { id: data, label: データストア, z: 0, size: [20, 4] }
+    nodes:
+      apicurio-compat-ci:
+        label: CI ジョブ（REST・Maven プラグイン）
+        kind: worker
+        tier: ci
+        x: 2
+        'y': 1.5
+        svc: onprem:server
+        realizes: [submitter]
+        description: スキーマの変更を dryRun で検査し、通れば登録する。公式資料に CI の手順は無く、使い方は例である。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§8" }]
+        management: { type: customer, scope: 利用者が CI と認証を管理する。 }
+      apicurio-compat-ingress:
+        label: Ingress（app の host）
+        kind: gateway
+        tier: cluster
+        x: 4
+        'y': 2
+        svc: k8s:ingress
+        description: Operator が ingress.host から HTTP の Ingress を作る。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§8" }]
+        management: { type: customer, scope: 利用者が Ingress と TLS を管理する。 }
+      apicurio-compat-app:
+        label: Registry app Pods
+        kind: service
+        tier: cluster
+        x: 10
+        'y': 2
+        svc: k8s:deployment
+        replicas: 3
+        realizes: [api, rules, compat, versions]
+        description: バージョン作成 API、ルール、互換性チェック、バージョン管理を担う。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§8" }]
+        management: { type: customer, scope: 利用者が台数、ルール設定、認証を管理する。 }
+      apicurio-compat-cr:
+        label: ApicurioRegistry3 リソース
+        kind: file
+        tier: cluster
+        x: 16
+        'y': 2
+        description: "spec.app.storage.type に postgresql を指定し、sql.dataSource を書く。"
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§8" }]
+        management: { type: customer, scope: 利用者が CR を管理する。 }
+      apicurio-compat-postgres:
+        label: PostgreSQL（利用者が用意）
+        kind: db
+        tier: data
+        x: 10
+        'y': 1.5
+        svc: onprem:db
+        replicas: 2
+        realizes: [storage]
+        description: 通ったバージョンとコンテンツを保存する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§8" }]
+        management: { type: customer, scope: 利用者が DB の運用とバックアップを管理する。 }
+    links:
+      - id: apicurio-compat-ci-ingress
+        from: apicurio-compat-ci
+        to: apicurio-compat-ingress
+        label: 新しいバージョンを送る
+        realizes: [propose]
+        replace: true
+      - id: apicurio-compat-ingress-app
+        from: apicurio-compat-ingress
+        to: apicurio-compat-app
+        label: HTTP を中継
+        realizes: [propose]
+        replace: true
+      - id: apicurio-compat-cr-app
+        from: apicurio-compat-cr
+        to: apicurio-compat-app
+        label: 構成を渡す
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-compatibility.md#§8" }]
+    groups:
+      - kind: datacenter
+        label: 利用者のデータセンター
+        provider: onprem
+        tier: [ci, cluster, data]
+        nodes: [apicurio-compat-ci, apicurio-compat-ingress, apicurio-compat-app, apicurio-compat-cr, apicurio-compat-postgres]
+      - kind: cluster
+        label: Kubernetes クラスター
+        provider: k8s
+        tier: [cluster]
+        nodes: [apicurio-compat-ingress, apicurio-compat-app, apicurio-compat-cr]
+    layout2d:
+      tiers:
+        - { id: diagram, label: オンプレミスの Registry と CI, z: 0, size: [24, 11] }
+      nodes:
+        apicurio-compat-ci: { tier: diagram, x: 2, y: 4 }
+        apicurio-compat-ingress: { tier: diagram, x: 8, y: 4 }
+        apicurio-compat-app: { tier: diagram, x: 13, y: 4 }
+        apicurio-compat-cr: { tier: diagram, x: 13, y: 1 }
+        apicurio-compat-postgres: { tier: diagram, x: 18, y: 4 }
+      groups:
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [diagram], x0: 0, y0: -0.6, x1: 21, y1: 8, nodes: [apicurio-compat-ci, apicurio-compat-ingress, apicurio-compat-app, apicurio-compat-cr, apicurio-compat-postgres] }
+        - { kind: cluster, label: Kubernetes クラスター, provider: k8s, tier: [diagram], x0: 6, y0: 0, x1: 15.6, y1: 6.6, nodes: [apicurio-compat-ingress, apicurio-compat-app, apicurio-compat-cr] }
+    layout3d:
+      tiers:
+        - { id: zone0, label: CI, z: 0, size: [5, 5] }
+        - { id: zone1, label: クラスター, z: 0, origin: [7, 0], size: [5, 8] }
+        - { id: zone2, label: データストア, z: 0, origin: [14, 0], size: [5, 5] }
+      nodes:
+        apicurio-compat-ci: { tier: zone0, x: 2, y: 2 }
+        apicurio-compat-ingress: { tier: zone1, x: 2, y: 1 }
+        apicurio-compat-app: { tier: zone1, x: 2, y: 4 }
+        apicurio-compat-cr: { tier: zone1, x: 2, y: 7 }
+        apicurio-compat-postgres: { tier: zone2, x: 2, y: 2 }
+      groups:
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [zone0, zone1, zone2], nodes: [apicurio-compat-ci, apicurio-compat-ingress, apicurio-compat-app, apicurio-compat-cr, apicurio-compat-postgres] }
+        - { kind: cluster, label: Kubernetes クラスター, provider: k8s, tier: [zone1], nodes: [apicurio-compat-ingress, apicurio-compat-app, apicurio-compat-cr] }

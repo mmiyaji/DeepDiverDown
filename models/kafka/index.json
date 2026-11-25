@@ -2,8 +2,8 @@
   "model": "kafka",
   "name": "Apache Kafka の基本アーキテクチャ",
   "coverage": {
-    "covered": 10,
-    "total": 10
+    "covered": 9,
+    "total": 9
   },
   "byId": {
     "producer": {
@@ -31,6 +31,11 @@
       "label": "ログノード 3 · P2 リーダー",
       "status": "claim"
     },
+    "storage": {
+      "type": "node",
+      "label": "各 Broker のログ保存領域",
+      "status": "claim"
+    },
     "consumer-1": {
       "type": "node",
       "label": "購読プロセス 1",
@@ -44,6 +49,11 @@
     "produce": {
       "type": "link",
       "label": "イベント送信元 → ログノード 1 · P0 リーダー",
+      "status": "claim"
+    },
+    "append": {
+      "type": "link",
+      "label": "ログノード 1 · P0 リーダー → 各 Broker のログ保存領域",
       "status": "claim"
     },
     "replicate-2": {
@@ -104,9 +114,13 @@
       "type": "scenario",
       "label": "Broker 障害とリーダー切り替え"
     },
-    "rebalance": {
-      "type": "scenario",
-      "label": "Consumer の追加と離脱（リバランス）"
+    "UNK-01": {
+      "type": "unknown",
+      "label": "MSK のレプリカの AZ 間配置の既定とストレージの種類は、確認した資料の範囲では扱っていない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "MSK 管理の Controller の台数と配置は不明。図の Controller の台数は KRaft の資料の推奨（3 または 5）に基づく例。"
     },
     "kraft-broker-hosts": {
       "type": "implementation",
@@ -182,6 +196,14 @@
       "label": "orders のトピック設定",
       "realizes": []
     },
+    "kraft-logdirs": {
+      "type": "implementation",
+      "impl": "kraft",
+      "label": "Broker ホストのローカルディスク（log.dirs）",
+      "realizes": [
+        "storage"
+      ]
+    },
     "aws-producer": {
       "type": "implementation",
       "impl": "aws-msk-ecs",
@@ -195,7 +217,8 @@
       "impl": "aws-msk-ecs",
       "label": "MSK Standard ブローカー 1",
       "realizes": [
-        "broker-1"
+        "broker-1",
+        "storage"
       ]
     },
     "aws-b2": {
@@ -203,7 +226,8 @@
       "impl": "aws-msk-ecs",
       "label": "MSK Standard ブローカー 2",
       "realizes": [
-        "broker-2"
+        "broker-2",
+        "storage"
       ]
     },
     "aws-b3": {
@@ -211,7 +235,8 @@
       "impl": "aws-msk-ecs",
       "label": "MSK Standard ブローカー 3",
       "realizes": [
-        "broker-3"
+        "broker-3",
+        "storage"
       ]
     },
     "aws-consumer-1": {
@@ -253,11 +278,7 @@
   },
   "byRef": {
     "docs/reference-kafka.md#§1": [
-      "model",
-      "controller",
-      "broker-1",
-      "broker-2",
-      "broker-3"
+      "model"
     ],
     "docs/reference-kafka.md": [
       "model",
@@ -266,9 +287,11 @@
       "broker-1",
       "broker-2",
       "broker-3",
+      "storage",
       "consumer-1",
       "consumer-2",
       "produce",
+      "append",
       "replicate-2",
       "replicate-3",
       "ack",
@@ -281,7 +304,8 @@
       "replicate-after",
       "kafka-normal",
       "kafka-failover",
-      "rebalance",
+      "kraft-broker-hosts",
+      "kraft-controller-hosts",
       "kraft-producer",
       "kraft-controllers",
       "kraft-b1",
@@ -290,6 +314,7 @@
       "kraft-c1",
       "kraft-c2",
       "kraft-topic",
+      "kraft-logdirs",
       "aws-producer",
       "aws-b1",
       "aws-b2",
@@ -300,49 +325,53 @@
       "aws-ecs",
       "aws-ecr"
     ],
-    "docs/reference-kafka.md#§7": [
-      "model"
-    ],
-    "docs/reference-kafka.md#§2": [
+    "docs/reference-kafka.md#§3": [
       "producer",
       "produce",
+      "ack",
       "kafka-normal"
     ],
-    "docs/reference-kafka.md#§6": [
+    "docs/reference-kafka.md#§5": [
       "controller",
+      "elect"
+    ],
+    "docs/reference-kafka.md#§7": [
+      "controller",
+      "broker-1",
       "broker-2",
       "broker-3",
+      "replicate-2",
+      "replicate-3",
       "elect",
       "retry",
       "replicate-after",
       "kafka-failover"
     ],
-    "docs/reference-kafka.md#§3": [
+    "docs/reference-kafka.md#§2": [
       "broker-1",
+      "broker-2",
       "broker-3",
       "replicate-2",
-      "replicate-3",
-      "ack",
-      "kafka-normal"
-    ],
-    "docs/reference-kafka.md#§5": [
-      "broker-2",
-      "consumer-1",
-      "commit",
-      "kafka-normal"
+      "replicate-3"
     ],
     "docs/reference-kafka.md#§4": [
+      "broker-2",
       "consumer-1",
       "consumer-2",
       "read-p0",
       "read-p1",
       "read-p2",
+      "commit",
+      "kafka-normal"
+    ],
+    "docs/reference-kafka.md#§6": [
+      "storage",
+      "append",
       "kafka-normal"
     ],
     "docs/reference-kafka.md#§8": [
-      "rebalance"
-    ],
-    "docs/reference-kafka.md#§9": [
+      "kraft-broker-hosts",
+      "kraft-controller-hosts",
       "kraft-producer",
       "kraft-controllers",
       "kraft-b1",
@@ -350,9 +379,10 @@
       "kraft-b3",
       "kraft-c1",
       "kraft-c2",
-      "kraft-topic"
+      "kraft-topic",
+      "kraft-logdirs"
     ],
-    "docs/reference-kafka.md#§10": [
+    "docs/reference-kafka.md#§9": [
       "aws-producer",
       "aws-b1",
       "aws-b2",
@@ -365,13 +395,15 @@
     ]
   },
   "reference": {
-    "category": "ストリーム処理",
     "order": 10,
     "domain": "データ処理",
+    "category": "ストリーム処理",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "Apache Kafka",
+    "role": "overview",
     "objectives": [
-      "Topic、パーティション、Broker、Controller の役割を区別する。",
-      "書き込み、複製、ACK、読み出し、オフセットの保存を順に追う。",
+      "Topic、パーティション、Broker、KRaft Controller の役割を区別する。",
+      "書き込み、複製、読み出し、offset の保存、ログの保存先を順に追う。",
       "Broker 障害でパーティションのリーダーが切り替わる流れを理解する。"
     ],
     "sources": [
@@ -390,6 +422,10 @@
       {
         "title": "Producer Configs",
         "url": "https://kafka.apache.org/44/configuration/producer-configs/"
+      },
+      {
+        "title": "Consumer Configs",
+        "url": "https://kafka.apache.org/44/configuration/consumer-configs/"
       }
     ]
   }

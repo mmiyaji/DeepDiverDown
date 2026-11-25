@@ -1,0 +1,455 @@
+name: "Apicurio Registry：シリアライザーとスキーマ ID の受け渡し"
+description: Serializer がアーティファクトの座標を決めて ID をレコードに付け、Deserializer がその ID から writer schema を取り出す流れ。
+reference:
+  objectives:
+    - Serializer が座標の決定、検索、登録、ID の書き込みを行う順序を説明する。
+    - contentId と globalId、ペイロードとヘッダーの違いを区別する。
+    - Deserializer が ID から writer schema を取得し、キャッシュと再試行、フォールバックを使う流れを追う。
+  sources:
+    - title: Validating Kafka messages using SerDes in Java clients
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html
+    - title: Configuring Kafka SerDes in Java clients
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-configuring-kafka-client-serdes.html
+    - title: Apicurio Registry concepts and glossary
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html
+    - title: Installing Apicurio Registry storage on OpenShift
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html
+sources:
+  - docs/reference-apicurio-registry-serdes-id.md
+evidence:
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§1" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§2" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§3" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§4" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§6" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§7" }
+  - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }
+tiers:
+  - id: flow
+    label: 書き込みと読み取り
+    z: 0
+    size: [30, 8]
+nodes:
+  producer:
+    label: Producer アプリ
+    kind: worker
+    tier: flow
+    x: 0
+    'y': 1
+    replicas: 2
+    description: Order のレコードを作って Serializer に渡す。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§1" }]
+  serializer:
+    label: Serializer
+    kind: worker
+    tier: flow
+    x: 5
+    'y': 1
+    replicas: 2
+    description: 座標を決め、writer schema の ID をレコードに付けてエンコードする。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§2" }]
+  s-resolver:
+    label: SchemaResolver（Producer 側）
+    kind: service
+    tier: flow
+    x: 5
+    'y': 4.5
+    replicas: 2
+    description: find-latest と auto-register に従ってスキーマを探す・登録し、結果を check-period-ms の間キャッシュする。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§3" }
+      - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§6" }
+  registry:
+    label: Registry API
+    kind: service
+    tier: flow
+    x: 12
+    'y': 3
+    replicas: 2
+    description: 座標で最新バージョンを返し、ID でスキーマの内容を返す。ID に対応する内容はストレージが持つ。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  topic:
+    label: Kafka トピック（ID ＋ Avro データ）
+    kind: queue
+    tier: flow
+    x: 18
+    'y': 1
+    replicas: 2
+    description: ペイロードにマジックバイト、ID、データの順で載る。headers.enabled なら ID はヘッダー。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§4" }]
+  deserializer:
+    label: Deserializer
+    kind: worker
+    tier: flow
+    x: 23
+    'y': 1
+    replicas: 2
+    description: マジックバイトの有無で ID の場所を判定し、ID から writer schema を得て復号する。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  d-resolver:
+    label: SchemaResolver（Consumer 側）
+    kind: service
+    tier: flow
+    x: 23
+    'y': 4.5
+    replicas: 2
+    description: ID でスキーマを取得し、キャッシュする。失敗すると retry-count 回再試行する。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }
+      - { type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§6" }
+  fallback:
+    label: フォールバックのアーティファクト
+    kind: policy
+    tier: flow
+    x: 28
+    'y': 4.5
+    replicas: 2
+    description: fallback.provider が指す group-id・artifact-id・version。取得に失敗したときだけ使う。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  consumer:
+    label: Consumer アプリ
+    kind: worker
+    tier: flow
+    x: 28
+    'y': 1
+    replicas: 2
+    description: 復号したレコードを、読み手側のスキーマで受け取る。
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§7" }]
+links:
+  - id: produce
+    from: producer
+    to: serializer
+    label: レコードを渡す
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§2" }]
+  - id: s-lookup
+    from: serializer
+    to: s-resolver
+    label: 座標のスキーマを要求
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§2" }]
+  - id: s-find
+    from: s-resolver
+    to: registry
+    label: 最新を検索・なければ登録
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§3" }]
+  - id: write
+    from: serializer
+    to: topic
+    label: ID とデータを送る
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§4" }]
+  - id: consume
+    from: topic
+    to: deserializer
+    label: レコードを取得
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  - id: d-lookup
+    from: deserializer
+    to: d-resolver
+    label: ID でスキーマを要求
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  - id: d-fetch
+    from: d-resolver
+    to: registry
+    label: キャッシュになければ ID で取得
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  - id: use-fallback
+    from: d-resolver
+    to: fallback
+    label: 取得に失敗したときの代替
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  - id: deliver
+    from: deserializer
+    to: consumer
+    label: 復号したレコードを渡す
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§7" }]
+scenarios:
+  - id: write-path
+    label: Serializer が ID を付けて書く
+    visual: wire
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§4" }]
+    steps:
+      - links: [produce, s-lookup]
+        note: TopicIdStrategy が topic 名から artifactId を作り、SchemaResolver にスキーマを要求する。
+        blocks:
+          value: []
+          headers: []
+      - links: [s-find]
+        note: find-latest で最新を探し、auto-register が true でなければ登録しない。結果は check-period-ms の間キャッシュされる。
+      - links: [write]
+        note: 既定ではペイロードに、マジックバイト、ID、Avro データの順で載せる。
+        blocks:
+          value:
+            - { id: magic, label: マジックバイト, k: 0 }
+            - { id: id, label: contentId（4 バイト）, k: 1 }
+            - { id: data, label: Avro データ, k: 2 }
+          headers: []
+        highlight: [id]
+      - links: [write]
+        note: headers.enabled=true なら、ID をヘッダーに入れ、ペイロードにはデータだけを載せる。
+        blocks:
+          value:
+            - { id: data, label: Avro データ, k: 2 }
+          headers:
+            - { id: hid, label: ID（キー名は未確認）, k: 1 }
+        highlight: [hid]
+  - id: read-path
+    label: Deserializer が ID から読む
+    visual: decode
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+    steps:
+      - links: [write]
+        note: v1 の writer schema で書かれた注文が、トピックに残っている。
+        blocks:
+          registered:
+            - { id: v1, label: v1 · id, k: 0 }
+            - { id: v2, label: v2 · currency = JPY, k: 1 }
+          topic:
+            - { id: old, label: v1 の ID ＋ Avro, k: 0 }
+          consumer: []
+        highlight: [old]
+      - links: [consume, d-lookup, d-fetch]
+        note: レコードの ID で v1 の writer schema を取得する。取得結果は ID をキーにキャッシュされ、期限はない。
+        highlight: [v1, old]
+      - links: [use-fallback]
+        note: 取得に失敗すると、retry-count 回の再試行のあと、fallback.provider のアーティファクトを使える。
+      - links: [deliver]
+        note: v2 の読み手が v1 のデータを読むと、v1 にない currency は v2 の既定値 JPY で補われる。
+        blocks:
+          registered:
+            - { id: v1, label: v1 · id, k: 0 }
+            - { id: v2, label: v2 · currency = JPY, k: 1 }
+          topic:
+            - { id: old, label: v1 の ID ＋ Avro, k: 0 }
+          consumer:
+            - { id: value, label: "#42 · JPY", k: 1, from: [old] }
+        highlight: [value]
+requirements:
+  - id: BR-01
+    kind: rule
+    title: 書いたスキーマを ID から再現できる
+    text: Kafka に残る各レコードを、書き込みに使った writer schema で解釈できる。
+    links: [write, consume, d-lookup, d-fetch]
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§5" }]
+  - id: BR-02
+    kind: rule
+    title: Registry への問い合わせをキャッシュで抑える
+    text: 座標の検索は check-period-ms の間、ID による検索は期限なしでキャッシュする。
+    links: [s-find, d-fetch]
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§6" }]
+unknowns:
+  - id: UNK-01
+    text: マジックバイトの値と、ID をヘッダーに入れるときのキー名は、確認した公式資料に記載がない。
+    refs: [topic]
+  - id: UNK-02
+    text: Avro の reader schema を指定する専用の設定や、Specific reader での読み手側スキーマの決まり方は、確認した公式資料に記載がない。
+    refs: [deserializer, consumer]
+  - id: UNK-03
+    text: 業務データのトピックと kafkasql-journal を同じ Kafka クラスターに置くかどうか、Kafka のブローカー台数と認証、Pod の台数は資料で指定されていない。
+    refs: [topic, registry]
+gates: { maxDrift: 0, maxHigh: 0 }
+blocks:
+  - id: wire
+    title: Kafka レコードの中身
+    note: 既定（ペイロード）と headers.enabled=true の場合を比べる。マジックバイトの値は未確認。
+    legend:
+      "0": マジックバイト
+      "1": スキーマ ID
+      "2": Avro データ
+    lanes:
+      - { id: value, label: レコードの value, node: topic }
+      - { id: headers, label: レコードのヘッダー, node: topic, optional: true }
+    items:
+      value: []
+      headers: []
+  - id: decode
+    title: Kafka レコードの ID で v1 を取得する
+    note: 読み手が v2 のスキーマを使う例。contentId を ID にしている想定。
+    legend:
+      "0": v1 の内容
+      "1": v2 のフィールド
+    lanes:
+      - { id: registered, label: Registry, node: registry }
+      - { id: topic, label: Kafka 履歴, node: topic }
+      - { id: consumer, label: v2 の Consumer, node: consumer }
+    items:
+      registered:
+        - { id: v1, label: v1 · id, k: 0 }
+        - { id: v2, label: v2 · currency = JPY, k: 1 }
+      topic: []
+      consumer: []
+implementations:
+  - id: apicurio-serdes-k8s-kafkasql
+    label: オンプレミス Kubernetes・Kafka・KafkaSQL
+    description: 利用者のデータセンターで、Kubernetes 上の Producer / Consumer の Pod と Registry（KafkaSQL）が同じ Kafka を使う構成例。
+    sources:
+      - title: Configuring Kafka SerDes in Java clients
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-configuring-kafka-client-serdes.html
+      - title: Installing Apicurio Registry storage on OpenShift
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html
+      - title: Deploying Apicurio Registry for high availability
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html
+      - title: Deploying Apicurio Registry using the Operator
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-deploying-registry-operator.html
+    tiers:
+      - { id: pods, label: Kubernetes の Pod, z: 1, size: [22, 8] }
+      - { id: kafka, label: Kafka, z: 0, size: [22, 5] }
+    nodes:
+      apicurio-serdes-producer:
+        label: Producer Pod（Java・Serializer）
+        kind: worker
+        tier: pods
+        x: 2
+        'y': 1.5
+        svc: k8s:deployment
+        replicas: 2
+        realizes: [producer, serializer, s-resolver]
+        description: SerDes ライブラリを組み込んだ Producer。apicurio.registry.url に Registry の Service を設定する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+        management: { type: customer, scope: 利用者がアプリと SerDes の設定を管理する。 }
+      apicurio-serdes-consumer:
+        label: Consumer Pod（Java・Deserializer）
+        kind: worker
+        tier: pods
+        x: 2
+        'y': 5.5
+        svc: k8s:deployment
+        replicas: 2
+        realizes: [deserializer, d-resolver, consumer, fallback]
+        description: ID で writer schema を取得し、キャッシュと再試行、フォールバックを使って復号する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+        management: { type: customer, scope: 利用者がアプリと SerDes の設定を管理する。 }
+      apicurio-serdes-service:
+        label: Registry の Service
+        kind: gateway
+        tier: pods
+        x: 8
+        'y': 3.5
+        svc: k8s:service
+        description: SerDes が呼ぶ宛先。Registry の app Pod へ振り分ける。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+        management: { type: customer, scope: 利用者が Service を管理する。 }
+      apicurio-serdes-registry:
+        label: Registry app Pods（KafkaSQL）
+        kind: service
+        tier: pods
+        x: 13
+        'y': 3.5
+        svc: k8s:deployment
+        replicas: 3
+        realizes: [registry]
+        description: storage.type が kafkasql の Registry。書き込みは journal トピックへ追記する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+        management: { type: customer, scope: 利用者が台数、Kafka 接続、認証を管理する。 }
+      apicurio-serdes-h2:
+        label: 組み込み H2（Pod ごと）
+        kind: db
+        tier: pods
+        x: 18
+        'y': 3.5
+        description: 各レプリカが journal を最初から読み直して再構築する、ローカルの SQL ストア。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+        management: { type: customer, scope: 内容は journal から再構築される。永続化は Kafka が担う。 }
+      apicurio-serdes-topic:
+        label: Kafka の注文トピック
+        kind: queue
+        tier: kafka
+        x: 5
+        'y': 1.5
+        svc: onprem:mq
+        replicas: 3
+        realizes: [topic]
+        description: ID と Avro データのレコードを保持する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+        management: { type: customer, scope: 利用者が Kafka の台数、トピック、認証を管理する。 }
+      apicurio-serdes-journal:
+        label: kafkasql-journal トピック
+        kind: queue
+        tier: kafka
+        x: 15
+        'y': 1.5
+        svc: onprem:mq
+        replicas: 3
+        description: Registry の変更を記録する。cleanup.policy は delete、retention.ms と retention.bytes は -1。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+        management: { type: customer, scope: 利用者が保持設定を含めて管理する。 }
+    links:
+      - id: apicurio-serdes-find
+        from: apicurio-serdes-producer
+        to: apicurio-serdes-service
+        label: 最新を検索・登録
+        realizes: [s-find]
+        replace: true
+      - id: apicurio-serdes-find-app
+        from: apicurio-serdes-service
+        to: apicurio-serdes-registry
+        label: 要求を中継
+        realizes: [s-find]
+        replace: true
+      - id: apicurio-serdes-fetch
+        from: apicurio-serdes-consumer
+        to: apicurio-serdes-service
+        label: ID で取得
+        realizes: [d-fetch]
+        replace: true
+      - id: apicurio-serdes-fetch-app
+        from: apicurio-serdes-service
+        to: apicurio-serdes-registry
+        label: 要求を中継
+        realizes: [d-fetch]
+        replace: true
+      - id: apicurio-serdes-append
+        from: apicurio-serdes-registry
+        to: apicurio-serdes-journal
+        label: 変更を journal に追記
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+      - id: apicurio-serdes-replay
+        from: apicurio-serdes-journal
+        to: apicurio-serdes-h2
+        label: journal を読み直して再構築
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+      - id: apicurio-serdes-query
+        from: apicurio-serdes-h2
+        to: apicurio-serdes-registry
+        label: ID に対応するスキーマを返す
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry-serdes-id.md#§8" }]
+    groups:
+      - kind: datacenter
+        label: 利用者のデータセンター
+        provider: onprem
+        tier: [pods, kafka]
+        nodes: [apicurio-serdes-producer, apicurio-serdes-consumer, apicurio-serdes-service, apicurio-serdes-registry, apicurio-serdes-h2, apicurio-serdes-topic, apicurio-serdes-journal]
+      - kind: cluster
+        label: Kubernetes クラスター
+        provider: k8s
+        tier: [pods]
+        nodes: [apicurio-serdes-producer, apicurio-serdes-consumer, apicurio-serdes-service, apicurio-serdes-registry, apicurio-serdes-h2]
+    layout2d:
+      tiers:
+        - { id: diagram, label: オンプレミスの SerDes と Registry, z: 0, size: [26, 14] }
+      nodes:
+        apicurio-serdes-producer: { tier: diagram, x: 2, y: 2 }
+        apicurio-serdes-consumer: { tier: diagram, x: 2, y: 6 }
+        apicurio-serdes-service: { tier: diagram, x: 8, y: 4 }
+        apicurio-serdes-registry: { tier: diagram, x: 13, y: 4 }
+        apicurio-serdes-h2: { tier: diagram, x: 18, y: 4 }
+        apicurio-serdes-topic: { tier: diagram, x: 4, y: 11 }
+        apicurio-serdes-journal: { tier: diagram, x: 14, y: 11 }
+      groups:
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [diagram], x0: 0, y0: -0.6, x1: 21, y1: 13.4, nodes: [apicurio-serdes-producer, apicurio-serdes-consumer, apicurio-serdes-service, apicurio-serdes-registry, apicurio-serdes-h2, apicurio-serdes-topic, apicurio-serdes-journal] }
+        - { kind: cluster, label: Kubernetes クラスター, provider: k8s, tier: [diagram], x0: 0.6, y0: 0.4, x1: 20.2, y1: 8.4, nodes: [apicurio-serdes-producer, apicurio-serdes-consumer, apicurio-serdes-service, apicurio-serdes-registry, apicurio-serdes-h2] }
+    layout3d:
+      tiers:
+        - { id: zone0, label: SerDes の Pod, z: 0, size: [5, 8] }
+        - { id: zone1, label: Registry の Pod, z: 0, origin: [7, 0], size: [5, 8] }
+        - { id: zone2, label: Kafka, z: 0, origin: [14, 0], size: [5, 8] }
+      nodes:
+        apicurio-serdes-producer: { tier: zone0, x: 2, y: 2 }
+        apicurio-serdes-consumer: { tier: zone0, x: 2, y: 6 }
+        apicurio-serdes-service: { tier: zone1, x: 2, y: 1 }
+        apicurio-serdes-registry: { tier: zone1, x: 2, y: 4 }
+        apicurio-serdes-h2: { tier: zone1, x: 2, y: 7 }
+        apicurio-serdes-topic: { tier: zone2, x: 2, y: 2 }
+        apicurio-serdes-journal: { tier: zone2, x: 2, y: 6 }
+      groups:
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [zone0, zone1, zone2], nodes: [apicurio-serdes-producer, apicurio-serdes-consumer, apicurio-serdes-service, apicurio-serdes-registry, apicurio-serdes-h2, apicurio-serdes-topic, apicurio-serdes-journal] }
+        - { kind: cluster, label: Kubernetes クラスター, provider: k8s, tier: [zone0, zone1], nodes: [apicurio-serdes-producer, apicurio-serdes-consumer, apicurio-serdes-service, apicurio-serdes-registry, apicurio-serdes-h2] }

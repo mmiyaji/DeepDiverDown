@@ -1,10 +1,11 @@
-name: Apache Kafka Connect の基本アーキテクチャ
+name: Kafka：Kafka Connect の Worker・Task とオフセット
 description: 外部DBの受注データが Source Connector、Kafka Topic、Sink Connector を経て保存先に届く流れを追います。
 reference:
   objectives:
     - Connector と Worker、Source Task と Sink Task の役割を区別する。
     - 外部DBから Kafka を経由し、保存先に書き込まれる流れを追う。
     - Source 側と Sink 側で何の進捗を記録するかを理解する。
+    - 分散モードの内部 Topic と、変換・エラー処理の設定を区別する。
   sources:
     - title: Kafka Connect Overview
       url: https://kafka.apache.org/44/kafka-connect/overview/
@@ -59,6 +60,8 @@ nodes:
         ref: docs/reference-kafka-connect.md#§2
       - type: doc
         ref: docs/reference-kafka-connect.md#§3
+      - type: doc
+        ref: docs/reference-kafka-connect.md#§7
   kafka:
     label: 変更イベントのログ
     kind: queue
@@ -82,6 +85,8 @@ nodes:
         ref: docs/reference-kafka-connect.md#§1
       - type: doc
         ref: docs/reference-kafka-connect.md#§4
+      - type: doc
+        ref: docs/reference-kafka-connect.md#§7
   destination:
     label: 保存先（オブジェクトストレージ）
     kind: db
@@ -103,6 +108,8 @@ nodes:
     evidence:
       - type: doc
         ref: docs/reference-kafka-connect.md#§1
+      - type: doc
+        ref: docs/reference-kafka-connect.md#§6
   offsets:
     label: 再開位置の保存領域
     kind: db
@@ -113,6 +120,8 @@ nodes:
     evidence:
       - type: doc
         ref: docs/reference-kafka-connect.md#§5
+      - type: doc
+        ref: docs/reference-kafka-connect.md#§6
 links:
   - id: start-source
     from: worker
@@ -236,9 +245,7 @@ scenarios:
 implementations:
   - id: distributed
     label: Kafka Connect Distributed と S3
-    description: >-
-      PostgreSQL の変更を Debezium で取り込み、Kafka Connect の分散ワーカー上の S3 Sink
-      でバケットへ格納する例。ワーカー設定の内部トピックと業務イベントのトピックは用途が異なる。
+    description: PostgreSQL の変更を Debezium で取り込み、Kafka Connect の分散ワーカー上の S3 Sink でバケットへ格納する例。ワーカー設定の内部トピックと業務イベントのトピックは用途が異なる。
     sources:
       - title: Kafka Connect Overview
         url: https://kafka.apache.org/44/kafka-connect/overview/
@@ -273,7 +280,7 @@ implementations:
         description: 論理レプリケーションを有効にしたデータベース。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
       distributed-host:
         label: 自前 Linux ホスト群
         kind: host
@@ -281,7 +288,9 @@ implementations:
         x: 3
         'y': 4.5
         description: 利用者が複数の Linux ホストと Java を管理し、各ホストで Connect ワーカーを起動する。
-        evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§6}]
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§8
       distributed-worker:
         label: 分散 Kafka Connect ワーカー
         kind: service
@@ -293,7 +302,7 @@ implementations:
         description: 同じグループに参加し、配置されたソース・シンクタスクを動かす。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
       distributed-source:
         label: Debezium PostgreSQL コネクター
         kind: worker
@@ -305,7 +314,7 @@ implementations:
         description: 初期同期と WAL の変更イベント化を担う。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
       distributed-sink:
         label: Confluent S3 Sink コネクター
         kind: worker
@@ -317,7 +326,7 @@ implementations:
         description: Kafka のイベントを設定した形式でオブジェクトに書く。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
       distributed-kafka:
         label: Kafka クラスター
         kind: queue
@@ -330,7 +339,7 @@ implementations:
         description: 業務トピック、ソースオフセットトピックおよびコンシューマーグループの位置を保存する。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
       distributed-s3:
         label: Amazon S3 バケット
         kind: db
@@ -343,7 +352,7 @@ implementations:
         description: S3 Sink の書き出したオブジェクトを保持する。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
       distributed-plugins:
         label: 各ワーカーの plugin.path
         kind: file
@@ -353,7 +362,7 @@ implementations:
         description: コネクターのプラグインと依存 JAR を各ワーカーに用意する。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
       distributed-configuration:
         label: 設定・状態の内部トピック
         kind: queue
@@ -363,9 +372,12 @@ implementations:
         description: 分散ワーカーのコネクター設定とタスク状態を保存する。
         evidence:
           - type: doc
-            ref: docs/reference-kafka-connect.md#§6
+            ref: docs/reference-kafka-connect.md#§8
     links:
-      - {id: distributed-host-runtime, from: distributed-host, to: distributed-worker, label: ワーカー JVM を実行}
+      - id: distributed-host-runtime
+        from: distributed-host
+        to: distributed-worker
+        label: ワーカー JVM を実行
       - id: distributed-plugins-connection
         from: distributed-plugins
         to: distributed-worker
@@ -375,10 +387,32 @@ implementations:
         to: distributed-worker
         label: 設定と状態を共有
     groups:
+      - kind: datacenter
+        provider: onprem
+        label: 利用者管理の実行環境
+        tier:
+          - processing
+          - setup
+        nodes:
+          - distributed-pg
+          - distributed-host
+          - distributed-worker
+          - distributed-source
+          - distributed-sink
+          - distributed-kafka
+          - distributed-plugins
+          - distributed-configuration
       - kind: cluster
         label: 自前運用の Connect ワーカー群
-        tier: [processing, setup]
-        nodes: [distributed-host, distributed-worker, distributed-source, distributed-sink, distributed-plugins]
+        tier:
+          - processing
+          - setup
+        nodes:
+          - distributed-host
+          - distributed-worker
+          - distributed-source
+          - distributed-sink
+          - distributed-plugins
       - kind: cloud
         label: AWS・Amazon S3
         provider: aws
@@ -388,115 +422,639 @@ implementations:
           - distributed-s3
     layout2d:
       tiers:
-        - {id: diagram, label: 自前 Connect と S3, z: 0, size: [27, 14]}
+        - id: diagram
+          label: 自前 Connect と S3
+          z: 0
+          size:
+            - 27
+            - 14
       nodes:
-        distributed-pg: {tier: diagram, x: 1, y: 1}
-        distributed-kafka: {tier: diagram, x: 1, y: 7}
-        distributed-host: {tier: diagram, x: 8, y: 1}
-        distributed-worker: {tier: diagram, x: 14, y: 1}
-        distributed-source: {tier: diagram, x: 8, y: 5}
-        distributed-sink: {tier: diagram, x: 14, y: 5}
-        distributed-plugins: {tier: diagram, x: 8, y: 9}
-        distributed-configuration: {tier: diagram, x: 1, y: 10}
-        distributed-s3: {tier: diagram, x: 22, y: 5}
+        distributed-pg:
+          tier: diagram
+          x: 1
+          'y': 1
+        distributed-kafka:
+          tier: diagram
+          x: 1
+          'y': 7
+        distributed-host:
+          tier: diagram
+          x: 8
+          'y': 1
+        distributed-worker:
+          tier: diagram
+          x: 14
+          'y': 1
+        distributed-source:
+          tier: diagram
+          x: 8
+          'y': 5
+        distributed-sink:
+          tier: diagram
+          x: 14
+          'y': 5
+        distributed-plugins:
+          tier: diagram
+          x: 8
+          'y': 9
+        distributed-configuration:
+          tier: diagram
+          x: 1
+          'y': 10
+        distributed-s3:
+          tier: diagram
+          x: 22
+          'y': 5
       groups:
-        - {kind: datacenter, provider: onprem, label: 利用者管理の Connect ホスト群, tier: [diagram], nodes: [distributed-host, distributed-worker, distributed-source, distributed-sink, distributed-plugins]}
-        - {kind: cloud, provider: aws, label: AWS アカウント（Amazon S3）, tier: [diagram], nodes: [distributed-s3]}
+        - kind: datacenter
+          provider: onprem
+          label: 利用者管理の Connect ホスト群
+          tier:
+            - diagram
+          nodes:
+            - distributed-host
+            - distributed-worker
+            - distributed-source
+            - distributed-sink
+            - distributed-plugins
+            - distributed-pg
+            - distributed-kafka
+            - distributed-configuration
+        - kind: cloud
+          provider: aws
+          label: AWS アカウント（Amazon S3）
+          tier:
+            - diagram
+          nodes:
+            - distributed-s3
     layout3d:
       tiers:
-        - {id: diagram, label: 自前 Connect と S3, z: 0, size: [27, 14]}
+        - id: diagram
+          label: 自前 Connect と S3
+          z: 0
+          size:
+            - 27
+            - 14
       nodes:
-        distributed-pg: {tier: diagram, x: 1, y: 1}
-        distributed-kafka: {tier: diagram, x: 1, y: 7}
-        distributed-host: {tier: diagram, x: 8, y: 1}
-        distributed-worker: {tier: diagram, x: 14, y: 1}
-        distributed-source: {tier: diagram, x: 8, y: 5}
-        distributed-sink: {tier: diagram, x: 14, y: 5}
-        distributed-plugins: {tier: diagram, x: 8, y: 9}
-        distributed-configuration: {tier: diagram, x: 1, y: 10}
-        distributed-s3: {tier: diagram, x: 22, y: 5}
+        distributed-pg:
+          tier: diagram
+          x: 1
+          'y': 1
+        distributed-kafka:
+          tier: diagram
+          x: 1
+          'y': 7
+        distributed-host:
+          tier: diagram
+          x: 8
+          'y': 1
+        distributed-worker:
+          tier: diagram
+          x: 14
+          'y': 1
+        distributed-source:
+          tier: diagram
+          x: 8
+          'y': 5
+        distributed-sink:
+          tier: diagram
+          x: 14
+          'y': 5
+        distributed-plugins:
+          tier: diagram
+          x: 8
+          'y': 9
+        distributed-configuration:
+          tier: diagram
+          x: 1
+          'y': 10
+        distributed-s3:
+          tier: diagram
+          x: 22
+          'y': 5
       groups:
-        - {kind: datacenter, provider: onprem, label: 利用者管理の Connect ホスト群, tier: [diagram], nodes: [distributed-host, distributed-worker, distributed-source, distributed-sink, distributed-plugins]}
-        - {kind: cloud, provider: aws, label: AWS アカウント（Amazon S3）, tier: [diagram], nodes: [distributed-s3]}
+        - kind: datacenter
+          provider: onprem
+          label: 利用者管理の Connect ホスト群
+          tier:
+            - diagram
+          nodes:
+            - distributed-host
+            - distributed-worker
+            - distributed-source
+            - distributed-sink
+            - distributed-plugins
+            - distributed-pg
+            - distributed-kafka
+            - distributed-configuration
+        - kind: cloud
+          provider: aws
+          label: AWS アカウント（Amazon S3）
+          tier:
+            - diagram
+          nodes:
+            - distributed-s3
   - id: aws-msk-connect
     label: AWS（MSK Connect と Amazon S3）
     description: MSK Connect に Debezium Source と Confluent S3 Sink を別々に作成し、Amazon MSK を介して CDC イベントを S3 に保存する例。
     sources:
-      - {title: RDS for PostgreSQL の論理レプリケーション, url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html}
-      - {title: MSK Connect のワーカー, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-workers.html}
-      - {title: AWS の PostgreSQL CDC 構成例, url: https://aws.amazon.com/blogs/database/implementing-real-time-change-data-capture-with-debezium-for-amazon-aurora-postgresql-and-amazon-rds-for-postgresql/}
-      - {title: Amazon S3 Sink Connector の作成, url: https://docs.aws.amazon.com/msk/latest/developerguide/mkc-S3sink-connector-example.html}
-      - {title: MSK Connect のカスタムプラグイン, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html}
-      - {title: MSK Connect の S3 接続の準備, url: https://docs.aws.amazon.com/msk/latest/developerguide/mkc-tutorial-setup.html}
-      - {title: MSK Connect のソースオフセット, url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-set-offset-storage-topic.html}
+      - title: RDS for PostgreSQL の論理レプリケーション
+        url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html
+      - title: MSK Connect のワーカー
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-workers.html
+      - title: AWS の PostgreSQL CDC 構成例
+        url: https://aws.amazon.com/blogs/database/implementing-real-time-change-data-capture-with-debezium-for-amazon-aurora-postgresql-and-amazon-rds-for-postgresql/
+      - title: Amazon S3 Sink Connector の作成
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/mkc-S3sink-connector-example.html
+      - title: MSK Connect のカスタムプラグイン
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html
+      - title: MSK Connect の S3 接続の準備
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/mkc-tutorial-setup.html
+      - title: MSK Connect のソースオフセット
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-set-offset-storage-topic.html
     tiers:
-      - {id: processing, label: 変更データの処理と保存, z: 0, size: [24, 4]}
-      - {id: operations, label: ワーカー管理とプラグイン登録, z: 1, size: [24, 3]}
+      - id: processing
+        label: 変更データの処理と保存
+        z: 0
+        size:
+          - 24
+          - 4
+      - id: operations
+        label: ワーカー管理とプラグイン登録
+        z: 1
+        size:
+          - 24
+          - 3
     groups:
-      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [processing, operations]}
-      - {kind: vpc, label: 利用者 VPC（接続用 ENI を含む）, provider: aws, tier: processing, nodes: [aws-rds, aws-msk, aws-source-eni, aws-sink-eni, aws-s3-endpoint]}
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - processing
+          - operations
+      - kind: vpc
+        label: 利用者 VPC（接続用 ENI を含む）
+        provider: aws
+        tier: processing
+        nodes:
+          - aws-rds
+          - aws-msk
+          - aws-source-eni
+          - aws-sink-eni
+          - aws-s3-endpoint
     nodes:
-      aws-rds: {label: RDS for PostgreSQL, svc: rds, kind: db, tier: processing, x: 1, y: 1.5, realizes: [database], description: 注文テーブルと論理レプリケーションスロットを保持する。, management: {type: shared, scope: "AWS が DB 基盤を運用し、利用者がテーブル、論理レプリケーションと権限を設定する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-s3-endpoint: {label: S3 Gateway Endpoint, kind: gateway, tier: processing, x: 21, y: 3, description: 利用者がルートテーブルに関連付ける S3 宛ての VPC エンドポイント。, management: {type: shared, scope: "AWS が基盤を運用し、利用者がエンドポイントとルートを設定する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-source-eni: {label: Source 接続用 ENI, kind: gateway, tier: processing, x: 4, y: 3, description: Source ワーカーが利用者サブネットへの接続に使う ENI。, management: {type: aws, scope: "AWS が接続用 ENI を作成する。利用者はサブネットとセキュリティグループを指定する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-sink-eni: {label: Sink 接続用 ENI, kind: gateway, tier: processing, x: 14, y: 3, description: Sink ワーカーが利用者サブネットへの接続に使う ENI。, management: {type: aws, scope: "AWS が接続用 ENI を作成する。利用者はサブネットとセキュリティグループを指定する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-source: {label: MSK Connect（Debezium Source）, svc: mskconnect, kind: worker, tier: processing, x: 6, y: 1.5, realizes: [source], description: PostgreSQL の初期スナップショットと pgoutput の変更を Kafka イベントに変換する。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者がプラグイン、接続設定と権限を指定する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-msk: {label: Amazon MSK（イベント・進捗）, svc: msk, kind: queue, tier: processing, x: 11, y: 1.5, realizes: [kafka, offsets], description: 業務トピック、Source のオフセット、Sink の Consumer Group の位置を別に保持する。, management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-sink: {label: MSK Connect（Confluent S3 Sink）, svc: mskconnect, kind: worker, tier: processing, x: 16, y: 1.5, realizes: [sink], description: 対象トピックを購読し、S3 に書き込む。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者がプラグイン、接続設定と権限を指定する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-s3-output: {label: Amazon S3（変更イベントの保存先）, svc: s3, kind: db, tier: processing, x: 21, y: 1.5, realizes: [destination], description: Sink が生成したファイルを保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-worker: {label: MSK Connect（ワーカー管理）, svc: mskconnect, kind: service, tier: operations, x: 11, y: 1.5, realizes: [worker], description: コネクターごとに容量とワーカーを管理する。, management: {type: shared, scope: "AWS がワーカーを運用し、利用者が容量とコネクター設定を指定する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
-      aws-s3-plugin: {label: Amazon S3（プラグイン成果物）, svc: s3, kind: file, tier: operations, x: 6, y: 1.5, description: 2 種類のプラグインの ZIP を登録用に保持する。, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が ZIP とアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-kafka-connect.md#§7}]}
+      aws-rds:
+        label: RDS for PostgreSQL
+        svc: rds
+        kind: db
+        tier: processing
+        x: 1
+        'y': 1.5
+        realizes:
+          - database
+        description: 注文テーブルと論理レプリケーションスロットを保持する。
+        management:
+          type: shared
+          scope: AWS が DB 基盤を運用し、利用者がテーブル、論理レプリケーションと権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-s3-endpoint:
+        label: S3 Gateway Endpoint
+        kind: gateway
+        tier: processing
+        x: 21
+        'y': 3
+        description: 利用者がルートテーブルに関連付ける S3 宛ての VPC エンドポイント。
+        management:
+          type: shared
+          scope: AWS が基盤を運用し、利用者がエンドポイントとルートを設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-source-eni:
+        label: Source 接続用 ENI
+        kind: gateway
+        tier: processing
+        x: 4
+        'y': 3
+        description: Source ワーカーが利用者サブネットへの接続に使う ENI。
+        management:
+          type: aws
+          scope: AWS が接続用 ENI を作成する。利用者はサブネットとセキュリティグループを指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-sink-eni:
+        label: Sink 接続用 ENI
+        kind: gateway
+        tier: processing
+        x: 14
+        'y': 3
+        description: Sink ワーカーが利用者サブネットへの接続に使う ENI。
+        management:
+          type: aws
+          scope: AWS が接続用 ENI を作成する。利用者はサブネットとセキュリティグループを指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-source:
+        label: MSK Connect（Debezium Source）
+        svc: mskconnect
+        kind: worker
+        tier: processing
+        x: 6
+        'y': 1.5
+        realizes:
+          - source
+        description: PostgreSQL の初期スナップショットと pgoutput の変更を Kafka イベントに変換する。
+        management:
+          type: shared
+          scope: AWS がワーカーを運用し、利用者がプラグイン、接続設定と権限を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-msk:
+        label: Amazon MSK（イベント・進捗）
+        svc: msk
+        kind: queue
+        tier: processing
+        x: 11
+        'y': 1.5
+        realizes:
+          - kafka
+          - offsets
+        description: 業務トピック、Source のオフセット、Sink の Consumer Group の位置を別に保持する。
+        management:
+          type: shared
+          scope: AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-sink:
+        label: MSK Connect（Confluent S3 Sink）
+        svc: mskconnect
+        kind: worker
+        tier: processing
+        x: 16
+        'y': 1.5
+        realizes:
+          - sink
+        description: 対象トピックを購読し、S3 に書き込む。
+        management:
+          type: shared
+          scope: AWS がワーカーを運用し、利用者がプラグイン、接続設定と権限を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-s3-output:
+        label: Amazon S3（変更イベントの保存先）
+        svc: s3
+        kind: db
+        tier: processing
+        x: 21
+        'y': 1.5
+        realizes:
+          - destination
+        description: Sink が生成したファイルを保持する。
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がデータとアクセス権を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-worker:
+        label: MSK Connect（ワーカー管理）
+        svc: mskconnect
+        kind: service
+        tier: operations
+        x: 11
+        'y': 1.5
+        realizes:
+          - worker
+        description: コネクターごとに容量とワーカーを管理する。
+        management:
+          type: shared
+          scope: AWS がワーカーを運用し、利用者が容量とコネクター設定を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
+      aws-s3-plugin:
+        label: Amazon S3（プラグイン成果物）
+        svc: s3
+        kind: file
+        tier: operations
+        x: 6
+        'y': 1.5
+        description: 2 種類のプラグインの ZIP を登録用に保持する。
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者が ZIP とアクセス権を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-connect.md#§9
     links:
-      - {id: aws-capture-to-eni, from: aws-rds, to: aws-source-eni, label: スナップショットと変更を返す, realizes: [capture], replace: true}
-      - {id: aws-capture-to-source, from: aws-source-eni, to: aws-source, label: 変更を受信, realizes: [capture], replace: true}
-      - {id: aws-publish-to-eni, from: aws-source, to: aws-source-eni, label: イベントを送る, realizes: [publish], replace: true}
-      - {id: aws-publish-to-msk, from: aws-source-eni, to: aws-msk, label: イベントを発行, realizes: [publish], replace: true}
-      - {id: aws-source-offset-to-eni, from: aws-source, to: aws-source-eni, label: 読み取り位置を送る, realizes: [source-offset], replace: true}
-      - {id: aws-source-offset-to-msk, from: aws-source-eni, to: aws-msk, label: 読み取り位置を保存, realizes: [source-offset], replace: true}
-      - {id: aws-fetch-to-eni, from: aws-msk, to: aws-sink-eni, label: イベントを返す, realizes: [fetch], replace: true}
-      - {id: aws-fetch-to-sink, from: aws-sink-eni, to: aws-sink, label: イベントを受信, realizes: [fetch], replace: true}
-      - {id: aws-sink-offset-to-eni, from: aws-sink, to: aws-sink-eni, label: 購読位置を送る, realizes: [sink-offset], replace: true}
-      - {id: aws-sink-offset-to-msk, from: aws-sink-eni, to: aws-msk, label: 購読位置を保存, realizes: [sink-offset], replace: true}
-      - {id: aws-resume-to-eni, from: aws-msk, to: aws-sink-eni, label: 購読位置を返す, realizes: [resume], replace: true}
-      - {id: aws-resume-to-sink, from: aws-sink-eni, to: aws-sink, label: 購読位置を読み戻す, realizes: [resume], replace: true}
-      - {id: aws-write-to-eni, from: aws-sink, to: aws-sink-eni, label: ファイルを送る, realizes: [write], replace: true}
-      - {id: aws-write-to-s3, from: aws-sink-eni, to: aws-s3-endpoint, label: S3 宛てに送る, realizes: [write], replace: true}
-      - {id: aws-endpoint-to-s3, from: aws-s3-endpoint, to: aws-s3-output, label: ファイルを保存, realizes: [write], replace: true}
-      - {id: aws-register-plugins, from: aws-s3-plugin, to: aws-worker, label: 登録時にプラグインをコピー}
-
+      - id: aws-capture-to-eni
+        from: aws-rds
+        to: aws-source-eni
+        label: スナップショットと変更を返す
+        realizes:
+          - capture
+        replace: true
+      - id: aws-capture-to-source
+        from: aws-source-eni
+        to: aws-source
+        label: 変更を受信
+        realizes:
+          - capture
+        replace: true
+      - id: aws-publish-to-eni
+        from: aws-source
+        to: aws-source-eni
+        label: イベントを送る
+        realizes:
+          - publish
+        replace: true
+      - id: aws-publish-to-msk
+        from: aws-source-eni
+        to: aws-msk
+        label: イベントを発行
+        realizes:
+          - publish
+        replace: true
+      - id: aws-source-offset-to-eni
+        from: aws-source
+        to: aws-source-eni
+        label: 読み取り位置を送る
+        realizes:
+          - source-offset
+        replace: true
+      - id: aws-source-offset-to-msk
+        from: aws-source-eni
+        to: aws-msk
+        label: 読み取り位置を保存
+        realizes:
+          - source-offset
+        replace: true
+      - id: aws-fetch-to-eni
+        from: aws-msk
+        to: aws-sink-eni
+        label: イベントを返す
+        realizes:
+          - fetch
+        replace: true
+      - id: aws-fetch-to-sink
+        from: aws-sink-eni
+        to: aws-sink
+        label: イベントを受信
+        realizes:
+          - fetch
+        replace: true
+      - id: aws-sink-offset-to-eni
+        from: aws-sink
+        to: aws-sink-eni
+        label: 購読位置を送る
+        realizes:
+          - sink-offset
+        replace: true
+      - id: aws-sink-offset-to-msk
+        from: aws-sink-eni
+        to: aws-msk
+        label: 購読位置を保存
+        realizes:
+          - sink-offset
+        replace: true
+      - id: aws-resume-to-eni
+        from: aws-msk
+        to: aws-sink-eni
+        label: 購読位置を返す
+        realizes:
+          - resume
+        replace: true
+      - id: aws-resume-to-sink
+        from: aws-sink-eni
+        to: aws-sink
+        label: 購読位置を読み戻す
+        realizes:
+          - resume
+        replace: true
+      - id: aws-write-to-eni
+        from: aws-sink
+        to: aws-sink-eni
+        label: ファイルを送る
+        realizes:
+          - write
+        replace: true
+      - id: aws-write-to-s3
+        from: aws-sink-eni
+        to: aws-s3-endpoint
+        label: S3 宛てに送る
+        realizes:
+          - write
+        replace: true
+      - id: aws-endpoint-to-s3
+        from: aws-s3-endpoint
+        to: aws-s3-output
+        label: ファイルを保存
+        realizes:
+          - write
+        replace: true
+      - id: aws-register-plugins
+        from: aws-s3-plugin
+        to: aws-worker
+        label: 登録時にプラグインをコピー
     layout2d:
       tiers:
-        - {id: diagram, label: AWS の実装構成, z: 0, size: [25, 13]}
+        - id: diagram
+          label: AWS の実装構成
+          z: 0
+          size:
+            - 25
+            - 13
       nodes:
-        aws-rds: {tier: diagram, x: 2, y: 3}
-        aws-msk: {tier: diagram, x: 12, y: 3}
-        aws-source-eni: {tier: diagram, x: 7, y: 3}
-        aws-sink-eni: {tier: diagram, x: 17, y: 3}
-        aws-source: {tier: diagram, x: 7, y: 7}
-        aws-sink: {tier: diagram, x: 17, y: 7}
-        aws-worker: {tier: diagram, x: 12, y: 10}
-        aws-s3-plugin: {tier: diagram, x: 2, y: 10}
-        aws-s3-output: {tier: diagram, x: 22, y: 10}
-        aws-s3-endpoint: {tier: diagram, x: 22, y: 3}
+        aws-rds:
+          tier: diagram
+          x: 2
+          'y': 3
+        aws-msk:
+          tier: diagram
+          x: 12
+          'y': 3
+        aws-source-eni:
+          tier: diagram
+          x: 7
+          'y': 3
+        aws-sink-eni:
+          tier: diagram
+          x: 17
+          'y': 3
+        aws-source:
+          tier: diagram
+          x: 7
+          'y': 7
+        aws-sink:
+          tier: diagram
+          x: 17
+          'y': 7
+        aws-worker:
+          tier: diagram
+          x: 12
+          'y': 10
+        aws-s3-plugin:
+          tier: diagram
+          x: 2
+          'y': 10
+        aws-s3-output:
+          tier: diagram
+          x: 22
+          'y': 10
+        aws-s3-endpoint:
+          tier: diagram
+          x: 22
+          'y': 3
       groups:
-        - {kind: cloud, label: AWS アカウント（管理サービスを含む論理的な所属）, provider: aws, tier: [diagram], x0: -1, y0: 0, x1: 25, y1: 12, nodes: [aws-rds, aws-msk, aws-source-eni, aws-sink-eni, aws-source, aws-sink, aws-worker, aws-s3-plugin, aws-s3-output, aws-s3-endpoint]}
-        - {kind: vpc, label: 利用者 VPC, provider: aws, tier: [diagram], x0: -0.5, y0: 1, x1: 24.5, y1: 5, nodes: [aws-rds, aws-msk, aws-source-eni, aws-sink-eni, aws-s3-endpoint]}
+        - kind: cloud
+          label: AWS アカウント（管理サービスを含む論理的な所属）
+          provider: aws
+          tier:
+            - diagram
+          x0: -1
+          y0: 0
+          x1: 25
+          y1: 12
+          nodes:
+            - aws-rds
+            - aws-msk
+            - aws-source-eni
+            - aws-sink-eni
+            - aws-source
+            - aws-sink
+            - aws-worker
+            - aws-s3-plugin
+            - aws-s3-output
+            - aws-s3-endpoint
+        - kind: vpc
+          label: 利用者 VPC
+          provider: aws
+          tier:
+            - diagram
+          x0: -0.5
+          y0: 1
+          x1: 24.5
+          y1: 5
+          nodes:
+            - aws-rds
+            - aws-msk
+            - aws-source-eni
+            - aws-sink-eni
+            - aws-s3-endpoint
     layout3d:
       tiers:
-        - {id: vpc, label: 利用者 VPC の接続先, z: 0, size: [25, 4]}
-        - {id: managed, label: MSK Connect の実行, z: 0, origin: [0, 7], size: [20, 4]}
-        - {id: storage, label: 独立した S3 サービス, z: 0, origin: [28, 0], size: [7, 4]}
+        - id: vpc
+          label: 利用者 VPC の接続先
+          z: 0
+          size:
+            - 25
+            - 4
+        - id: managed
+          label: MSK Connect の実行
+          z: 0
+          origin:
+            - 0
+            - 7
+          size:
+            - 20
+            - 4
+        - id: storage
+          label: 独立した S3 サービス
+          z: 0
+          origin:
+            - 28
+            - 0
+          size:
+            - 7
+            - 4
       nodes:
-        aws-s3-endpoint: {tier: vpc, x: 22, y: 1.5}
-        aws-rds: {tier: vpc, x: 2, y: 1.5}
-        aws-source-eni: {tier: vpc, x: 7, y: 1.5}
-        aws-msk: {tier: vpc, x: 12, y: 1.5}
-        aws-sink-eni: {tier: vpc, x: 17, y: 1.5}
-        aws-source: {tier: managed, x: 7, y: 1.5}
-        aws-sink: {tier: managed, x: 17, y: 1.5}
-        aws-worker: {tier: managed, x: 12, y: 1.5}
-        aws-s3-plugin: {tier: storage, x: 1, y: 1.5}
-        aws-s3-output: {tier: storage, x: 5, y: 1.5}
+        aws-s3-endpoint:
+          tier: vpc
+          x: 22
+          'y': 1.5
+        aws-rds:
+          tier: vpc
+          x: 2
+          'y': 1.5
+        aws-source-eni:
+          tier: vpc
+          x: 7
+          'y': 1.5
+        aws-msk:
+          tier: vpc
+          x: 12
+          'y': 1.5
+        aws-sink-eni:
+          tier: vpc
+          x: 17
+          'y': 1.5
+        aws-source:
+          tier: managed
+          x: 7
+          'y': 1.5
+        aws-sink:
+          tier: managed
+          x: 17
+          'y': 1.5
+        aws-worker:
+          tier: managed
+          x: 12
+          'y': 1.5
+        aws-s3-plugin:
+          tier: storage
+          x: 1
+          'y': 1.5
+        aws-s3-output:
+          tier: storage
+          x: 5
+          'y': 1.5
       groups:
-        - {kind: cloud, label: AWS アカウント（管理サービスを含む論理的な所属）, provider: aws, tier: [vpc, managed, storage], nodes: [aws-rds, aws-msk, aws-source-eni, aws-sink-eni, aws-source, aws-sink, aws-worker, aws-s3-plugin, aws-s3-output, aws-s3-endpoint]}
-        - {kind: vpc, label: 利用者 VPC, provider: aws, tier: [vpc], nodes: [aws-rds, aws-msk, aws-source-eni, aws-sink-eni, aws-s3-endpoint]}
+        - kind: cloud
+          label: AWS アカウント（管理サービスを含む論理的な所属）
+          provider: aws
+          tier:
+            - vpc
+            - managed
+            - storage
+          nodes:
+            - aws-rds
+            - aws-msk
+            - aws-source-eni
+            - aws-sink-eni
+            - aws-source
+            - aws-sink
+            - aws-worker
+            - aws-s3-plugin
+            - aws-s3-output
+            - aws-s3-endpoint
+        - kind: vpc
+          label: 利用者 VPC
+          provider: aws
+          tier:
+            - vpc
+          nodes:
+            - aws-rds
+            - aws-msk
+            - aws-source-eni
+            - aws-sink-eni
+            - aws-s3-endpoint
+unknowns:
+  - id: UNK-01
+    text: 分散モードのリバランス（Worker の増減時に Task が止まるか）は、確認した User Guide のページに記載がない。
+    refs:
+      - worker
+  - id: UNK-02
+    text: Debezium と Confluent S3 Sink の動作は各社資料に依存し、バージョン間の互換性は未確認。
+    refs:
+      - source
+      - sink
+gates:
+  maxDrift: 0
+  maxHigh: 99

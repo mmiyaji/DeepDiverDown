@@ -1,0 +1,330 @@
+{
+  "model": "risingwave-incremental-mv",
+  "name": "RisingWave：マテリアライズドビューの増分更新",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "reader": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "planner": {
+      "type": "node",
+      "label": "Frontend（計画とフラグメント化）",
+      "status": "claim"
+    },
+    "sched": {
+      "type": "node",
+      "label": "Meta（Actor の割り当て）",
+      "status": "claim"
+    },
+    "upstream": {
+      "type": "node",
+      "label": "上流の Table・Source",
+      "status": "claim"
+    },
+    "backfill": {
+      "type": "node",
+      "label": "バックフィル",
+      "status": "claim"
+    },
+    "actors": {
+      "type": "node",
+      "label": "Actor（演算子の並び）",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "演算子の状態",
+      "status": "claim"
+    },
+    "mv": {
+      "type": "node",
+      "label": "マテリアライズドビュー",
+      "status": "claim"
+    },
+    "expire": {
+      "type": "node",
+      "label": "Watermark・Temporal Filter",
+      "status": "claim"
+    },
+    "create": {
+      "type": "link",
+      "label": "SQL クライアント → Frontend（計画とフラグメント化）",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "Frontend（計画とフラグメント化） → Meta（Actor の割り当て）",
+      "status": "claim"
+    },
+    "place": {
+      "type": "link",
+      "label": "Meta（Actor の割り当て） → Actor（演算子の並び）",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "link",
+      "label": "上流の Table・Source → バックフィル",
+      "status": "claim"
+    },
+    "replay": {
+      "type": "link",
+      "label": "バックフィル → Actor（演算子の並び）",
+      "status": "claim"
+    },
+    "changes": {
+      "type": "link",
+      "label": "上流の Table・Source → Actor（演算子の並び）",
+      "status": "claim"
+    },
+    "rw-state": {
+      "type": "link",
+      "label": "Actor（演算子の並び） → 演算子の状態",
+      "status": "claim"
+    },
+    "apply": {
+      "type": "link",
+      "label": "Actor（演算子の並び） → マテリアライズドビュー",
+      "status": "claim"
+    },
+    "trim": {
+      "type": "link",
+      "label": "Watermark・Temporal Filter → 演算子の状態",
+      "status": "claim"
+    },
+    "select": {
+      "type": "link",
+      "label": "マテリアライズドビュー → SQL クライアント",
+      "status": "claim"
+    },
+    "incremental": {
+      "type": "scenario",
+      "label": "ビューの作成から増分更新まで"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "マテリアライズドビューを別のマテリアライズドビューの上に重ねた（連鎖）ときの更新の伝わり方は、確認した資料に明記がない。CREATE MATERIALIZED VIEW の資料の例が示すのみ。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "演算子ごとの状態の持ち方（キー設計、状態テーブルの構成）と、差分の内部表現は確認した資料に記載がない。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "実装例の台数・ノードサイズ・バージョン互換性は資料で指定されていない。"
+    },
+    "rw-aws-client": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "psql などの SQL クライアント",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "rw-aws-eks": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Amazon EKS / Kubernetes API",
+      "realizes": []
+    },
+    "rw-aws-iam": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "IAM / サービスアカウント用ロール",
+      "realizes": []
+    },
+    "rw-aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "EC2 / EKS ノードグループ",
+      "realizes": []
+    },
+    "rw-aws-frontend": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Frontend Pod",
+      "realizes": [
+        "planner"
+      ]
+    },
+    "rw-aws-meta": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Meta Pod",
+      "realizes": [
+        "sched"
+      ]
+    },
+    "rw-aws-compute": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Compute Pod",
+      "realizes": [
+        "backfill",
+        "actors",
+        "expire"
+      ]
+    },
+    "rw-aws-compactor": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Compactor Pod",
+      "realizes": []
+    },
+    "rw-aws-s3": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Amazon S3（Hummock の state store）",
+      "realizes": [
+        "state",
+        "mv",
+        "upstream"
+      ]
+    },
+    "rw-aws-rds": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "RDS for PostgreSQL（meta store）",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-risingwave-incremental-mv.md#§1": [
+      "model"
+    ],
+    "docs/reference-risingwave-incremental-mv.md": [
+      "model",
+      "reader",
+      "planner",
+      "sched",
+      "upstream",
+      "backfill",
+      "actors",
+      "state",
+      "mv",
+      "expire",
+      "create",
+      "submit",
+      "place",
+      "snapshot",
+      "replay",
+      "changes",
+      "rw-state",
+      "apply",
+      "trim",
+      "select",
+      "incremental",
+      "rw-aws-client",
+      "rw-aws-eks",
+      "rw-aws-iam",
+      "rw-aws-ec2",
+      "rw-aws-frontend",
+      "rw-aws-meta",
+      "rw-aws-compute",
+      "rw-aws-compactor",
+      "rw-aws-s3",
+      "rw-aws-rds"
+    ],
+    "docs/reference-risingwave-incremental-mv.md#§2": [
+      "reader",
+      "upstream",
+      "mv",
+      "changes",
+      "apply",
+      "select",
+      "incremental"
+    ],
+    "docs/reference-risingwave-incremental-mv.md#§3": [
+      "reader",
+      "planner",
+      "sched",
+      "actors",
+      "create",
+      "submit",
+      "place",
+      "incremental"
+    ],
+    "docs/reference-risingwave-incremental-mv.md#§4": [
+      "sched",
+      "backfill",
+      "snapshot",
+      "replay",
+      "changes",
+      "incremental"
+    ],
+    "docs/reference-risingwave-incremental-mv.md#§5": [
+      "upstream",
+      "actors",
+      "state",
+      "rw-state"
+    ],
+    "docs/reference-risingwave-incremental-mv.md#§6": [
+      "expire",
+      "trim"
+    ],
+    "docs/reference-risingwave-incremental-mv.md#§7": [
+      "rw-aws-client",
+      "rw-aws-eks",
+      "rw-aws-iam",
+      "rw-aws-ec2",
+      "rw-aws-frontend",
+      "rw-aws-meta",
+      "rw-aws-compute",
+      "rw-aws-compactor",
+      "rw-aws-s3",
+      "rw-aws-rds"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "RisingWave",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "risingwave",
+    "objectives": [
+      "Source・Table・マテリアライズドビューのうち、状態を持つものを区別する。",
+      "SQL が Fragment と Actor に分かれ、Meta に配置されるまでを追う。",
+      "バックフィルと増分更新の 2 段階、および時間による状態の整理（Watermark・Temporal Filter）を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "RisingWave · CREATE MATERIALIZED VIEW",
+        "url": "https://docs.risingwave.com/sql/commands/sql-create-mv"
+      },
+      {
+        "title": "RisingWave · Key concepts",
+        "url": "https://docs.risingwave.com/reference/key-concepts"
+      },
+      {
+        "title": "RisingWave · Architecture",
+        "url": "https://docs.risingwave.com/get-started/architecture"
+      },
+      {
+        "title": "RisingWave · Source, Table, MV, and Sink",
+        "url": "https://docs.risingwave.com/get-started/source-table-mv-sink"
+      },
+      {
+        "title": "RisingWave · CREATE SOURCE vs CREATE TABLE",
+        "url": "https://docs.risingwave.com/ingestion/create-source-vs-create-table"
+      },
+      {
+        "title": "RisingWave · Watermarks",
+        "url": "https://docs.risingwave.com/processing/watermarks"
+      },
+      {
+        "title": "RisingWave · Temporal filters",
+        "url": "https://docs.risingwave.com/processing/sql/temporal-filters"
+      },
+      {
+        "title": "RisingWave · Specific bottlenecks (compaction)",
+        "url": "https://docs.risingwave.com/performance/specific-bottlenecks"
+      }
+    ]
+  }
+}

@@ -1,0 +1,310 @@
+{
+  "model": "flink-kubernetes-operations",
+  "name": "Flink：Kubernetes 上の運用",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "kubectl・Helm",
+      "status": "claim"
+    },
+    "api": {
+      "type": "node",
+      "label": "Kubernetes API",
+      "status": "claim"
+    },
+    "operator": {
+      "type": "node",
+      "label": "Flink Kubernetes Operator",
+      "status": "claim"
+    },
+    "jm": {
+      "type": "node",
+      "label": "JobManager（Deployment）",
+      "status": "claim"
+    },
+    "tm": {
+      "type": "node",
+      "label": "TaskManager Pod",
+      "status": "claim"
+    },
+    "haconfig": {
+      "type": "node",
+      "label": "HA の ConfigMap",
+      "status": "claim"
+    },
+    "hastore": {
+      "type": "node",
+      "label": "HA 保存先（high-availability.storageDir）",
+      "status": "claim"
+    },
+    "snap": {
+      "type": "node",
+      "label": "チェックポイント・セーブポイント",
+      "status": "claim"
+    },
+    "apply": {
+      "type": "link",
+      "label": "kubectl・Helm → Kubernetes API",
+      "status": "claim"
+    },
+    "watch": {
+      "type": "link",
+      "label": "Kubernetes API → Flink Kubernetes Operator",
+      "status": "claim"
+    },
+    "create": {
+      "type": "link",
+      "label": "Flink Kubernetes Operator → JobManager（Deployment）",
+      "status": "claim"
+    },
+    "pod-request": {
+      "type": "link",
+      "label": "JobManager（Deployment） → Kubernetes API",
+      "status": "claim"
+    },
+    "pod-create": {
+      "type": "link",
+      "label": "Kubernetes API → TaskManager Pod",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "JobManager（Deployment） → TaskManager Pod",
+      "status": "claim"
+    },
+    "leader": {
+      "type": "link",
+      "label": "JobManager（Deployment） → HA の ConfigMap",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "JobManager（Deployment） → HA 保存先（high-availability.storageDir）",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "link",
+      "label": "TaskManager Pod → チェックポイント・セーブポイント",
+      "status": "claim"
+    },
+    "recover": {
+      "type": "link",
+      "label": "チェックポイント・セーブポイント → JobManager（Deployment）",
+      "status": "claim"
+    },
+    "deploy-recover": {
+      "type": "scenario",
+      "label": "適用から復旧まで"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Flink のカスタムリソースの種類（FlinkDeployment・FlinkSessionJob）とアップグレードモード（stateless・last-state・savepoint）の名前と挙動は、確認した概要ページに明記がなく、未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Operator 自身が使う権限（RBAC）と Helm の値は確認していない。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Kubernetes HA の leader 選出の仕組みは、確認した資料に記載がない。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "実装例のイメージの置き場所（コンテナレジストリ）、台数、ノードサイズは資料で指定されていない。"
+    },
+    "eks-operator-kubectl": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "kubectl・Helm",
+      "realizes": [
+        "client"
+      ]
+    },
+    "eks-operator-api": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "EKS の Kubernetes API（HA ConfigMap を含む）",
+      "realizes": [
+        "api",
+        "haconfig"
+      ]
+    },
+    "eks-operator-ec2": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "EKS のノード（EC2）",
+      "realizes": []
+    },
+    "eks-operator-iam": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "IAM / Pod 用ロール",
+      "realizes": []
+    },
+    "eks-operator-operator": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "Flink Kubernetes Operator Pod",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "eks-operator-jm": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "JobManager Pod",
+      "realizes": [
+        "jm"
+      ]
+    },
+    "eks-operator-tm": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "TaskManager Pods",
+      "realizes": [
+        "tm"
+      ]
+    },
+    "eks-operator-s3-ha": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "S3 の HA 保存先",
+      "realizes": [
+        "hastore"
+      ]
+    },
+    "eks-operator-s3-snap": {
+      "type": "implementation",
+      "impl": "eks-operator",
+      "label": "S3 のチェックポイント・セーブポイント",
+      "realizes": [
+        "snap"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-flink-kubernetes-operations.md#§1": [
+      "model"
+    ],
+    "docs/reference-flink-kubernetes-operations.md": [
+      "model",
+      "client",
+      "api",
+      "operator",
+      "jm",
+      "tm",
+      "haconfig",
+      "hastore",
+      "snap",
+      "apply",
+      "watch",
+      "create",
+      "pod-request",
+      "pod-create",
+      "assign",
+      "leader",
+      "persist",
+      "checkpoint",
+      "recover",
+      "deploy-recover",
+      "eks-operator-kubectl",
+      "eks-operator-api",
+      "eks-operator-ec2",
+      "eks-operator-iam",
+      "eks-operator-operator",
+      "eks-operator-jm",
+      "eks-operator-tm",
+      "eks-operator-s3-ha",
+      "eks-operator-s3-snap"
+    ],
+    "docs/reference-flink-kubernetes-operations.md#§4": [
+      "client",
+      "api",
+      "operator",
+      "apply",
+      "watch",
+      "create"
+    ],
+    "docs/reference-flink-kubernetes-operations.md#§2": [
+      "api",
+      "jm",
+      "tm",
+      "pod-request",
+      "pod-create",
+      "assign"
+    ],
+    "docs/reference-flink-kubernetes-operations.md#§6": [
+      "operator",
+      "snap",
+      "checkpoint",
+      "recover"
+    ],
+    "docs/reference-flink-kubernetes-operations.md#§3": [
+      "jm"
+    ],
+    "docs/reference-flink-kubernetes-operations.md#§5": [
+      "haconfig",
+      "hastore",
+      "leader",
+      "persist"
+    ],
+    "docs/reference-flink-kubernetes-operations.md#§7": [
+      "deploy-recover"
+    ],
+    "docs/reference-flink-kubernetes-operations.md#§8": [
+      "eks-operator-kubectl",
+      "eks-operator-api",
+      "eks-operator-ec2",
+      "eks-operator-iam",
+      "eks-operator-operator",
+      "eks-operator-jm",
+      "eks-operator-tm",
+      "eks-operator-s3-ha",
+      "eks-operator-s3-snap"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Flink",
+    "role": "internals",
+    "step": 4,
+    "detailOf": "flink",
+    "objectives": [
+      "JobManager Deployment と TaskManager Pod の作られ方を説明する。",
+      "Operator が宣言どおりに Flink クラスタを保つ役割を、Flink 本体の ResourceManager と区別する。",
+      "HA の ConfigMap と保存先、チェックポイントからの復旧を結び付ける。"
+    ],
+    "sources": [
+      {
+        "title": "Flink · Native Kubernetes",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+      },
+      {
+        "title": "Flink Kubernetes Operator · Overview",
+        "url": "https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-stable/docs/concepts/overview/"
+      },
+      {
+        "title": "Flink · Kubernetes HA Services",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/"
+      },
+      {
+        "title": "Flink · Checkpointing",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/"
+      },
+      {
+        "title": "Amazon EKS managed node groups",
+        "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+      },
+      {
+        "title": "IAM roles for service accounts",
+        "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+      }
+    ]
+  }
+}

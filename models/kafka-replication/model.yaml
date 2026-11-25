@@ -1,0 +1,683 @@
+name: Kafka：レプリケーションと ISR・障害復旧
+description: リーダーとフォロワーの複製、ISR、acks、リーダー障害後の選出と再開を追う。
+reference:
+  objectives:
+    - リーダー、フォロワー、ISR、コミット済みの関係を説明する。
+    - acks=all と min.insync.replicas が書き込み応答にどう効くかを追う。
+    - リーダー障害から選出、再送、ISR 復帰までの流れを追う。
+  sources:
+    - title: Apache Kafka Design
+      url: https://kafka.apache.org/44/design/design/
+    - title: Producer Configs
+      url: https://kafka.apache.org/44/configuration/producer-configs/
+    - title: Broker Configs
+      url: https://kafka.apache.org/44/configuration/broker-configs/
+    - title: KRaft
+      url: https://kafka.apache.org/44/operations/kraft/
+sources:
+  - docs/reference-kafka-replication.md
+evidence:
+  - type: doc
+    ref: docs/reference-kafka-replication.md#§1
+tiers:
+  - id: producer
+    label: 書き込み側
+    kind: origin
+    z: 0
+    origin:
+      - -5
+      - 0
+    size:
+      - 2.5
+      - 9
+  - id: brokers
+    label: Kafka クラスタ
+    z: 0
+    size:
+      - 8
+      - 9
+  - id: metadata
+    label: メタデータ管理
+    z: 1
+    origin:
+      - 2
+      - 0
+    size:
+      - 4
+      - 2
+nodes:
+  producer:
+    label: イベント送信元
+    kind: client
+    tier: producer
+    x: 0.5
+    'y': 2
+    description: Topic にイベントを書き込む。対象パーティションのリーダーに接続する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§2
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§4
+  controller:
+    label: クラスターのメタデータ管理
+    kind: service
+    tier: metadata
+    x: 1.5
+    'y': 0.5
+    description: トピック、パーティションの割り当てとリーダーの選出を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§5
+    replicas: 3
+  broker-1:
+    label: Broker 1 · P0 リーダー
+    kind: db
+    tier: brokers
+    x: 3
+    'y': 1.5
+    description: 開始時に P0 のリーダーを担当し、他のパーティションのレプリカも保持する。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§2
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§3
+  broker-2:
+    label: Broker 2 · P0 フォロワー（ISR）
+    kind: db
+    tier: brokers
+    x: 3
+    'y': 4.5
+    description: P0 のフォロワー。リーダー障害時の切り替え先。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§3
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§5
+  broker-3:
+    label: Broker 3 · P0 フォロワー
+    kind: db
+    tier: brokers
+    x: 3
+    'y': 7.5
+    description: P0 のフォロワー。遅れていて ISR から外れている例。
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§3
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§6
+links:
+  - id: produce
+    from: producer
+    to: broker-1
+    label: P0 に追記
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§2
+  - id: replicate-2
+    from: broker-1
+    to: broker-2
+    label: P0 の複製データ
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§3
+  - id: replicate-3
+    from: broker-1
+    to: broker-3
+    label: P0 の複製データ
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§3
+  - id: ack
+    from: broker-1
+    to: producer
+    label: 書き込み成功応答
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§4
+  - id: elect
+    from: controller
+    to: broker-2
+    label: ISR から P0 の新リーダーを選出
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§5
+  - id: retry
+    from: producer
+    to: broker-2
+    label: 新リーダーに P0 を再送
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§6
+  - id: replicate-after
+    from: broker-2
+    to: broker-3
+    label: 新リーダーから P0 を複製
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§6
+scenarios:
+  - id: kafka-replicate
+    label: 複製と書き込み応答
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§2
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§3
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§4
+    steps:
+      - links:
+          - produce
+        note: 追記。Producer が P0 のリーダー Broker 1 にバッチを送る。
+      - links:
+          - replicate-2
+          - replicate-3
+        note: 複製。フォロワーがリーダーのログを取り込む。遅れて ISR を外れたフォロワーは、応答の待ち対象から外れる。
+      - links:
+          - ack
+        note: 応答。acks=all では ISR 全員が受け、ISR が min.insync.replicas を満たすと成功応答が返る。
+  - id: kafka-failover
+    visual: replicas
+    label: Broker 障害とリーダー切り替え
+    evidence:
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§5
+      - type: doc
+        ref: docs/reference-kafka-replication.md#§6
+    steps:
+      - blocks:
+          b1:
+            - id: b1@1
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 1 の複製）
+            - id: b2@1
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 1 の複製）
+            - id: b3@1
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 1 の複製）
+            - id: b4@1
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 1 の複製）
+            - id: b5@1
+              label: '#5'
+              k: 0
+              note: P0 のバッチ 5（Broker 1 の複製）
+            - id: b6@1
+              label: '#6'
+              k: 0
+              note: P0 のバッチ 6（Broker 1 の複製）
+          b2:
+            - id: b1@2
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 2 の複製）
+            - id: b2@2
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 2 の複製）
+            - id: b3@2
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 2 の複製）
+            - id: b4@2
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 2 の複製）
+            - id: b5@2
+              label: '#5'
+              k: 0
+              note: P0 のバッチ 5（Broker 2 の複製）
+            - id: b6@2
+              label: '#6'
+              k: 0
+              note: P0 のバッチ 6（Broker 2 の複製）
+          b3:
+            - id: b1@3
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 3 の複製）
+            - id: b2@3
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 3 の複製）
+            - id: b3@3
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 3 の複製）
+            - id: b4@3
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 3 の複製）
+        lanes:
+          b1:
+            tone: down
+            sub: 停止
+        links:
+          - produce
+        note: 障害。P0 のリーダーだった Broker 1 が停止する。図は停止直前の書き込み経路を示す。
+      - blocks:
+          b1:
+            - id: b1@1
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 1 の複製）
+            - id: b2@1
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 1 の複製）
+            - id: b3@1
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 1 の複製）
+            - id: b4@1
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 1 の複製）
+            - id: b5@1
+              label: '#5'
+              k: 0
+              note: P0 のバッチ 5（Broker 1 の複製）
+            - id: b6@1
+              label: '#6'
+              k: 0
+              note: P0 のバッチ 6（Broker 1 の複製）
+          b2:
+            - id: b1@2
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 2 の複製）
+            - id: b2@2
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 2 の複製）
+            - id: b3@2
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 2 の複製）
+            - id: b4@2
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 2 の複製）
+            - id: b5@2
+              label: '#5'
+              k: 0
+              note: P0 のバッチ 5（Broker 2 の複製）
+            - id: b6@2
+              label: '#6'
+              k: 0
+              note: P0 のバッチ 6（Broker 2 の複製）
+          b3:
+            - id: b1@3
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 3 の複製）
+            - id: b2@3
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 3 の複製）
+            - id: b3@3
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 3 の複製）
+            - id: b4@3
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 3 の複製）
+        lanes:
+          b1:
+            tone: down
+            sub: 停止
+          b2:
+            tone: new
+            sub: 新リーダー
+        links:
+          - elect
+        note: 選出。KRaft Controller が ISR に残る Broker 2 を P0 の新リーダーに選出する。
+      - blocks:
+          b1:
+            - id: b1@1
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 1 の複製）
+            - id: b2@1
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 1 の複製）
+            - id: b3@1
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 1 の複製）
+            - id: b4@1
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 1 の複製）
+            - id: b5@1
+              label: '#5'
+              k: 0
+              note: P0 のバッチ 5（Broker 1 の複製）
+            - id: b6@1
+              label: '#6'
+              k: 0
+              note: P0 のバッチ 6（Broker 1 の複製）
+          b2:
+            - id: b1@2
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 2 の複製）
+            - id: b2@2
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 2 の複製）
+            - id: b3@2
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 2 の複製）
+            - id: b4@2
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 2 の複製）
+            - id: b5@2
+              label: '#5'
+              k: 0
+              note: P0 のバッチ 5（Broker 2 の複製）
+            - id: b6@2
+              label: '#6'
+              k: 0
+              note: P0 のバッチ 6（Broker 2 の複製）
+            - id: b7@2
+              label: '#7'
+              k: 4
+              note: P0 のバッチ 7（Broker 2 の複製）
+          b3:
+            - id: b1@3
+              label: '#1'
+              k: 0
+              note: P0 のバッチ 1（Broker 3 の複製）
+            - id: b2@3
+              label: '#2'
+              k: 0
+              note: P0 のバッチ 2（Broker 3 の複製）
+            - id: b3@3
+              label: '#3'
+              k: 0
+              note: P0 のバッチ 3（Broker 3 の複製）
+            - id: b4@3
+              label: '#4'
+              k: 0
+              note: P0 のバッチ 4（Broker 3 の複製）
+            - id: b5@3
+              label: '#5'
+              k: 0
+              note: P0 のバッチ 5（Broker 3 の複製）
+              from:
+                - b5@2
+            - id: b6@3
+              label: '#6'
+              k: 0
+              note: P0 のバッチ 6（Broker 3 の複製）
+              from:
+                - b6@2
+            - id: b7@3
+              label: '#7'
+              k: 4
+              note: P0 のバッチ 7（Broker 3 の複製）
+              from:
+                - b7@2
+        highlight:
+          - b7@2
+          - b5@3
+          - b6@3
+          - b7@3
+        lanes:
+          b1:
+            tone: down
+            sub: 停止
+          b2:
+            tone: new
+            sub: 新リーダー
+          b3:
+            sub: 追い付いて ISR に復帰
+        links:
+          - retry
+          - replicate-after
+        note: 再開。Producer はメタデータを更新して Broker 2 に再送し、Broker 3 が新リーダーからログを取得する。
+blocks:
+  - id: replicas
+    title: P0 の複製（各 Broker のログ）
+    legend:
+      '0': 複製済みのバッチ
+      '4': 新リーダーが受けたバッチ
+    note: Broker 3 は遅れていて ISR から外れている例。数値は説明用。
+    lanes:
+      - id: b1
+        label: Broker 1
+        sub: リーダー
+        node: broker-1
+      - id: b2
+        label: Broker 2
+        sub: フォロワー（ISR）
+        node: broker-2
+      - id: b3
+        label: Broker 3
+        sub: フォロワー（遅れ・ISR 外）
+        node: broker-3
+    items:
+      b1:
+        - id: b1@1
+          label: '#1'
+          k: 0
+          note: P0 のバッチ 1（Broker 1 の複製）
+        - id: b2@1
+          label: '#2'
+          k: 0
+          note: P0 のバッチ 2（Broker 1 の複製）
+        - id: b3@1
+          label: '#3'
+          k: 0
+          note: P0 のバッチ 3（Broker 1 の複製）
+        - id: b4@1
+          label: '#4'
+          k: 0
+          note: P0 のバッチ 4（Broker 1 の複製）
+        - id: b5@1
+          label: '#5'
+          k: 0
+          note: P0 のバッチ 5（Broker 1 の複製）
+        - id: b6@1
+          label: '#6'
+          k: 0
+          note: P0 のバッチ 6（Broker 1 の複製）
+      b2:
+        - id: b1@2
+          label: '#1'
+          k: 0
+          note: P0 のバッチ 1（Broker 2 の複製）
+        - id: b2@2
+          label: '#2'
+          k: 0
+          note: P0 のバッチ 2（Broker 2 の複製）
+        - id: b3@2
+          label: '#3'
+          k: 0
+          note: P0 のバッチ 3（Broker 2 の複製）
+        - id: b4@2
+          label: '#4'
+          k: 0
+          note: P0 のバッチ 4（Broker 2 の複製）
+        - id: b5@2
+          label: '#5'
+          k: 0
+          note: P0 のバッチ 5（Broker 2 の複製）
+        - id: b6@2
+          label: '#6'
+          k: 0
+          note: P0 のバッチ 6（Broker 2 の複製）
+      b3:
+        - id: b1@3
+          label: '#1'
+          k: 0
+          note: P0 のバッチ 1（Broker 3 の複製）
+        - id: b2@3
+          label: '#2'
+          k: 0
+          note: P0 のバッチ 2（Broker 3 の複製）
+        - id: b3@3
+          label: '#3'
+          k: 0
+          note: P0 のバッチ 3（Broker 3 の複製）
+        - id: b4@3
+          label: '#4'
+          k: 0
+          note: P0 のバッチ 4（Broker 3 の複製）
+unknowns:
+  - id: UNK-01
+    text: replica.lag.time.max.ms と min.insync.replicas の既定値は、確認した Design のページに記載がない。
+    refs:
+      - broker-1
+  - id: UNK-02
+    text: 障害時のリーダー切り替えにかかる時間は未確認。
+    refs:
+      - controller
+gates:
+  maxDrift: 0
+  maxHigh: 99
+implementations:
+  - id: aws-msk-fargate
+    label: AWS（Amazon MSK と ECS on Fargate）
+    description: 3 つの AZ に Standard ブローカーを置いた MSK Provisioned に、Fargate 上の Producer が書き込む例。
+    sources:
+      - title: MSK Provisioned クラスターの作成
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html
+      - title: Amazon MSK と KRaft
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/metadata-management.html
+      - title: MSK の IAM アクセス制御
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html
+      - title: Amazon ECS のサービス定義
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html
+    tiers:
+      - id: runtime
+        label: 書き込みと複製
+        z: 0
+        size:
+          - 14
+          - 9
+      - id: operations
+        label: メタデータ管理
+        z: 1
+        size:
+          - 14
+          - 3
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - runtime
+          - operations
+      - kind: vpc
+        label: アプリとブローカーの VPC
+        provider: aws
+        tier:
+          - runtime
+        nodes:
+          - aws-repl-producer
+          - aws-repl-b1
+          - aws-repl-b2
+          - aws-repl-b3
+      - kind: cluster
+        label: MSK Provisioned（論理的な所属）
+        tier:
+          - runtime
+          - operations
+        nodes:
+          - aws-repl-b1
+          - aws-repl-b2
+          - aws-repl-b3
+          - aws-repl-controller
+    nodes:
+      aws-repl-producer:
+        label: Fargate タスク（Producer）
+        svc: fargate
+        kind: worker
+        tier: runtime
+        x: 1
+        'y': 4.5
+        realizes:
+          - producer
+        description: IAM 認証でブローカーに接続し、P0 のリーダーへ書き込む。
+        management:
+          type: shared
+          scope: AWS が Fargate 基盤を運用し、利用者がタスク定義、コンテナ、権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-replication.md#§7
+      aws-repl-b1:
+        label: MSK ブローカー 1（P0 リーダー）
+        svc: msk
+        kind: db
+        tier: runtime
+        x: 7
+        'y': 1.5
+        realizes:
+          - broker-1
+        description: 例では P0 のリーダー。
+        management:
+          type: shared
+          scope: AWS が Kafka 基盤を運用し、利用者がトピック、複製係数、権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-replication.md#§7
+      aws-repl-b2:
+        label: MSK ブローカー 2
+        svc: msk
+        kind: db
+        tier: runtime
+        x: 7
+        'y': 4.5
+        realizes:
+          - broker-2
+        description: 例では ISR のフォロワーで、リーダーの切り替え先。
+        management:
+          type: shared
+          scope: AWS が Kafka 基盤を運用し、利用者がトピックと権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-replication.md#§7
+      aws-repl-b3:
+        label: MSK ブローカー 3
+        svc: msk
+        kind: db
+        tier: runtime
+        x: 7
+        'y': 7.5
+        realizes:
+          - broker-3
+        description: 例では遅れたフォロワー。
+        management:
+          type: shared
+          scope: AWS が Kafka 基盤を運用し、利用者がトピックと権限を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-replication.md#§7
+      aws-repl-controller:
+        label: MSK 管理の KRaft Controller
+        svc: msk
+        kind: service
+        tier: operations
+        x: 7
+        'y': 1.5
+        realizes:
+          - controller
+        description: リーダーと ISR のメタデータを管理する。配置は模式図。
+        management:
+          type: shared
+          scope: AWS が Kafka 基盤を運用する。Controller の台数と配置は資料で確認していない。
+        evidence:
+          - type: doc
+            ref: docs/reference-kafka-replication.md#§7
+    links: []

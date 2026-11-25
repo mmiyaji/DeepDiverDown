@@ -1,0 +1,308 @@
+{
+  "model": "apicurio-registry-serdes-id",
+  "name": "Apicurio Registry：シリアライザーとスキーマ ID の受け渡し",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "producer": {
+      "type": "node",
+      "label": "Producer アプリ",
+      "status": "claim"
+    },
+    "serializer": {
+      "type": "node",
+      "label": "Serializer",
+      "status": "claim"
+    },
+    "s-resolver": {
+      "type": "node",
+      "label": "SchemaResolver（Producer 側）",
+      "status": "claim"
+    },
+    "registry": {
+      "type": "node",
+      "label": "Registry API",
+      "status": "claim"
+    },
+    "topic": {
+      "type": "node",
+      "label": "Kafka トピック（ID ＋ Avro データ）",
+      "status": "claim"
+    },
+    "deserializer": {
+      "type": "node",
+      "label": "Deserializer",
+      "status": "claim"
+    },
+    "d-resolver": {
+      "type": "node",
+      "label": "SchemaResolver（Consumer 側）",
+      "status": "claim"
+    },
+    "fallback": {
+      "type": "node",
+      "label": "フォールバックのアーティファクト",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "Consumer アプリ",
+      "status": "claim"
+    },
+    "produce": {
+      "type": "link",
+      "label": "Producer アプリ → Serializer",
+      "status": "claim"
+    },
+    "s-lookup": {
+      "type": "link",
+      "label": "Serializer → SchemaResolver（Producer 側）",
+      "status": "claim"
+    },
+    "s-find": {
+      "type": "link",
+      "label": "SchemaResolver（Producer 側） → Registry API",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "Serializer → Kafka トピック（ID ＋ Avro データ）",
+      "status": "claim"
+    },
+    "consume": {
+      "type": "link",
+      "label": "Kafka トピック（ID ＋ Avro データ） → Deserializer",
+      "status": "claim"
+    },
+    "d-lookup": {
+      "type": "link",
+      "label": "Deserializer → SchemaResolver（Consumer 側）",
+      "status": "claim"
+    },
+    "d-fetch": {
+      "type": "link",
+      "label": "SchemaResolver（Consumer 側） → Registry API",
+      "status": "claim"
+    },
+    "use-fallback": {
+      "type": "link",
+      "label": "SchemaResolver（Consumer 側） → フォールバックのアーティファクト",
+      "status": "claim"
+    },
+    "deliver": {
+      "type": "link",
+      "label": "Deserializer → Consumer アプリ",
+      "status": "claim"
+    },
+    "write-path": {
+      "type": "scenario",
+      "label": "Serializer が ID を付けて書く"
+    },
+    "read-path": {
+      "type": "scenario",
+      "label": "Deserializer が ID から読む"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "書いたスキーマを ID から再現できる",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "Registry への問い合わせをキャッシュで抑える",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "マジックバイトの値と、ID をヘッダーに入れるときのキー名は、確認した公式資料に記載がない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Avro の reader schema を指定する専用の設定や、Specific reader での読み手側スキーマの決まり方は、確認した公式資料に記載がない。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "業務データのトピックと kafkasql-journal を同じ Kafka クラスターに置くかどうか、Kafka のブローカー台数と認証、Pod の台数は資料で指定されていない。"
+    },
+    "apicurio-serdes-producer": {
+      "type": "implementation",
+      "impl": "apicurio-serdes-k8s-kafkasql",
+      "label": "Producer Pod（Java・Serializer）",
+      "realizes": [
+        "producer",
+        "serializer",
+        "s-resolver"
+      ]
+    },
+    "apicurio-serdes-consumer": {
+      "type": "implementation",
+      "impl": "apicurio-serdes-k8s-kafkasql",
+      "label": "Consumer Pod（Java・Deserializer）",
+      "realizes": [
+        "deserializer",
+        "d-resolver",
+        "consumer",
+        "fallback"
+      ]
+    },
+    "apicurio-serdes-service": {
+      "type": "implementation",
+      "impl": "apicurio-serdes-k8s-kafkasql",
+      "label": "Registry の Service",
+      "realizes": []
+    },
+    "apicurio-serdes-registry": {
+      "type": "implementation",
+      "impl": "apicurio-serdes-k8s-kafkasql",
+      "label": "Registry app Pods（KafkaSQL）",
+      "realizes": [
+        "registry"
+      ]
+    },
+    "apicurio-serdes-h2": {
+      "type": "implementation",
+      "impl": "apicurio-serdes-k8s-kafkasql",
+      "label": "組み込み H2（Pod ごと）",
+      "realizes": []
+    },
+    "apicurio-serdes-topic": {
+      "type": "implementation",
+      "impl": "apicurio-serdes-k8s-kafkasql",
+      "label": "Kafka の注文トピック",
+      "realizes": [
+        "topic"
+      ]
+    },
+    "apicurio-serdes-journal": {
+      "type": "implementation",
+      "impl": "apicurio-serdes-k8s-kafkasql",
+      "label": "kafkasql-journal トピック",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-apicurio-registry-serdes-id.md#§1": [
+      "model",
+      "producer"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md": [
+      "model",
+      "producer",
+      "serializer",
+      "s-resolver",
+      "registry",
+      "topic",
+      "deserializer",
+      "d-resolver",
+      "fallback",
+      "consumer",
+      "produce",
+      "s-lookup",
+      "s-find",
+      "write",
+      "consume",
+      "d-lookup",
+      "d-fetch",
+      "use-fallback",
+      "deliver",
+      "write-path",
+      "read-path",
+      "BR-01",
+      "BR-02",
+      "apicurio-serdes-producer",
+      "apicurio-serdes-consumer",
+      "apicurio-serdes-service",
+      "apicurio-serdes-registry",
+      "apicurio-serdes-h2",
+      "apicurio-serdes-topic",
+      "apicurio-serdes-journal"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md#§2": [
+      "model",
+      "serializer",
+      "produce",
+      "s-lookup"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md#§3": [
+      "model",
+      "s-resolver",
+      "s-find"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md#§4": [
+      "model",
+      "topic",
+      "write",
+      "write-path"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md#§5": [
+      "model",
+      "registry",
+      "deserializer",
+      "d-resolver",
+      "fallback",
+      "consume",
+      "d-lookup",
+      "d-fetch",
+      "use-fallback",
+      "read-path",
+      "BR-01"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md#§6": [
+      "model",
+      "s-resolver",
+      "d-resolver",
+      "BR-02"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md#§7": [
+      "model",
+      "consumer",
+      "deliver"
+    ],
+    "docs/reference-apicurio-registry-serdes-id.md#§8": [
+      "model",
+      "apicurio-serdes-producer",
+      "apicurio-serdes-consumer",
+      "apicurio-serdes-service",
+      "apicurio-serdes-registry",
+      "apicurio-serdes-h2",
+      "apicurio-serdes-topic",
+      "apicurio-serdes-journal"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apicurio Registry",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "apicurio-registry",
+    "objectives": [
+      "Serializer が座標の決定、検索、登録、ID の書き込みを行う順序を説明する。",
+      "contentId と globalId、ペイロードとヘッダーの違いを区別する。",
+      "Deserializer が ID から writer schema を取得し、キャッシュと再試行、フォールバックを使う流れを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Validating Kafka messages using SerDes in Java clients",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html"
+      },
+      {
+        "title": "Configuring Kafka SerDes in Java clients",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-configuring-kafka-client-serdes.html"
+      },
+      {
+        "title": "Apicurio Registry concepts and glossary",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html"
+      },
+      {
+        "title": "Installing Apicurio Registry storage on OpenShift",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html"
+      }
+    ]
+  }
+}

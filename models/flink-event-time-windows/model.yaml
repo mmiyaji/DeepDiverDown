@@ -1,0 +1,281 @@
+name: Flink：イベント時刻とウォーターマーク・ウィンドウ
+description: イベントの時刻を基準に Watermark が進み、窓が確定して結果が出る流れと、遅れて届いたデータの扱い。
+reference:
+  objectives:
+    - イベント時刻と処理時刻を区別する。
+    - Watermark が窓を確定させる条件と、並列入力での進み方（最小値）を説明する。
+    - 許容遅延と side output の役割を区別する。
+  sources:
+    - title: Flink · Timely Stream Processing
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/
+    - title: Flink · Generating Watermarks
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/event-time/generating_watermarks/
+    - title: Flink · Windows
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/operators/windows/
+    - title: Flink · Kafka connector
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/
+    - title: Managed Service for Apache Flink · How it works
+      url: https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html
+sources:
+  - docs/reference-flink-event-time-windows.md
+evidence:
+  - type: doc
+    ref: docs/reference-flink-event-time-windows.md#§1
+tiers:
+  - id: flow
+    label: 時刻と窓の処理
+    z: 0
+    size:
+      - 28
+      - 6
+nodes:
+  source:
+    label: Kafka パーティション（時刻付きイベント）
+    kind: queue
+    tier: flow
+    x: 0
+    "y": 1.5
+    partitions: 4
+    description: Kafka や Kinesis ではレコード自身のタイムスタンプが使える。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§2
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§3
+  wmgen:
+    label: WatermarkStrategy
+    kind: service
+    tier: flow
+    x: 6
+    "y": 1.5
+    replicas: 2
+    description: タイムスタンプ抽出と Watermark の生成を組にする。forBoundedOutOfOrderness で順序の乱れを許容し、withIdleness で止まった入力を除く。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§3
+  window:
+    label: 窓の割り当て（Window Operator）
+    kind: worker
+    tier: flow
+    x: 12
+    "y": 1.5
+    parallel: "N"
+    description: キーごと・窓ごとにイベントを集める。Tumbling・Sliding・Session・Global の割り当てがある。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§4
+  state:
+    label: 窓ごとの状態
+    kind: db
+    tier: flow
+    x: 12
+    "y": 4.5
+    partitions: 4
+    description: ReduceFunction・AggregateFunction なら増分で集計し、ProcessWindowFunction は要素を保持する。窓は最初の要素で作られ、終端と許容遅延を過ぎると消える。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§4
+  trigger:
+    label: Trigger（EventTimeTrigger）
+    kind: service
+    tier: flow
+    x: 18
+    "y": 1.5
+    replicas: 2
+    description: Watermark が窓の終端を越えたときに窓を確定して結果を出す。既定の Trigger を trigger() で置き換えられる。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§5
+  late:
+    label: 遅延データの side output
+    kind: queue
+    tier: flow
+    x: 18
+    "y": 4.5
+    replicas: 2
+    description: 許容遅延（既定 0）を過ぎたデータは捨てられる。sideOutputLateData で別ストリームに回せる。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§6
+  sink:
+    label: Sink（窓の結果）
+    kind: queue
+    tier: flow
+    x: 24
+    "y": 1.5
+    replicas: 2
+    description: 確定した窓の結果を Kafka などへ書く。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§5
+links:
+  - id: ingest
+    from: source
+    to: wmgen
+    label: イベントと時刻を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§3
+  - id: advance
+    from: wmgen
+    to: window
+    label: イベントと Watermark を流す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§3
+  - id: accumulate
+    from: window
+    to: state
+    label: 窓の状態を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§4
+  - id: check
+    from: window
+    to: trigger
+    label: Watermark を渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§5
+  - id: fire
+    from: trigger
+    to: sink
+    label: 確定した窓の結果を出力
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§5
+  - id: late-out
+    from: window
+    to: late
+    label: 許容遅延を過ぎたデータ
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§6
+scenarios:
+  - id: window-fire
+    label: Watermark で窓が確定する
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-event-time-windows.md#§7
+    steps:
+      - links:
+          - ingest
+          - advance
+        note: Source が時刻付きのイベントを渡し、Watermark がイベントと一緒に流れる。複数の入力があるときは最小の Watermark で進む。
+      - links:
+          - accumulate
+        note: Window Operator が窓ごとの状態を更新する。
+      - links:
+          - check
+          - fire
+        note: Watermark が窓の終端（最大タイムスタンプ）を越えた窓を確定し、結果を出す。
+      - links:
+          - late-out
+        note: 許容遅延を過ぎて届いたデータは、side output に回さなければ捨てられる。
+unknowns:
+  - id: UNK-01
+    text: Watermark の定期生成間隔の設定キー（pipeline.auto-watermark-interval）は、確認した資料では API 名（setAutoWatermarkInterval）しか読めていない。
+    refs:
+      - wmgen
+  - id: UNK-02
+    text: Flink SQL・Table API の窓テーブル値関数（TUMBLE など）と、DataStream API の窓の対応は扱っていない。
+    refs:
+      - window
+  - id: UNK-03
+    text: Managed Service for Apache Flink で RocksDB など状態バックエンドを利用者が選べるかは、確認した資料に記載がない。
+    refs:
+      - state
+gates:
+  maxDrift: 0
+  maxHigh: 2
+implementations:
+  - id: msf
+    label: Amazon Managed Service for Apache Flink と MSK
+    description: MSK の注文トピックを Managed Service for Apache Flink のジョブがイベント時刻の窓で集計し、別トピックへ書く構成例。
+    sources:
+      - title: Managed Service for Apache Flink · How it works
+        url: https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html
+      - title: Managed Service for Apache Flink · Application scaling
+        url: https://docs.aws.amazon.com/managed-flink/latest/java/how-scaling.html
+      - title: Flink · Timely Stream Processing
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/
+      - title: Flink · Kafka connector
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/
+    tiers:
+      - id: managed
+        label: Flink の実行（サービスが運用）
+        z: 1
+        size:
+          - 16
+          - 4
+      - id: data
+        label: 入出力
+        z: 0
+        size:
+          - 16
+          - 4
+    nodes:
+      msf-app:
+        label: Managed Service for Apache Flink アプリケーション
+        kind: service
+        tier: managed
+        x: 3
+        "y": 1.5
+        provider: aws
+        realizes:
+          - wmgen
+          - window
+          - state
+          - trigger
+          - late
+        description: KafkaSource・WatermarkStrategy・窓集計を 1 つのジョブとして実行する。Parallelism は既定 1、ParallelismPerKPU は既定 1（最大 8）。maxParallelism を変えると以前のスナップショットから再開できない。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-event-time-windows.md#§8
+        management:
+          type: shared
+          scope: AWS がサービスの実行基盤を運用し、利用者がアプリケーションコード・並列度・チェックポイント設定・権限を管理する。内部の JobManager・TaskManager の配置と操作範囲は確認した資料に記載がない。
+      msf-source:
+        label: MSK 注文トピック
+        kind: queue
+        tier: data
+        x: 3
+        "y": 1.5
+        svc: msk
+        realizes:
+          - source
+        description: イベントとレコードのタイムスタンプを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-event-time-windows.md#§8
+        management:
+          type: shared
+          scope: AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。
+      msf-sink:
+        label: MSK 集計トピック
+        kind: queue
+        tier: data
+        x: 10
+        "y": 1.5
+        svc: msk
+        realizes:
+          - sink
+        description: 窓の結果を保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-event-time-windows.md#§8
+        management:
+          type: shared
+          scope: AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。
+    links: []
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - managed
+          - data
+        nodes:
+          - msf-app
+          - msf-source
+          - msf-sink

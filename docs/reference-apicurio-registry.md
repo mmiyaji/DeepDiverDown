@@ -1,85 +1,92 @@
-# Apicurio Registry の Avro スキーマ管理と互換性
+# Apicurio Registry の基本アーキテクチャ
 
-## 1. 題材と範囲
+Apicurio Registry 3.4 の公式ドキュメントを基準に、構成部品・情報モデル・ストレージ・実行場所を整理する。SerDes の ID の受け渡しは「Apicurio Registry：シリアライザーとスキーマ ID の受け渡し」、互換性ルールとバージョン管理は「Apicurio Registry：互換性ルールとバージョン管理」で扱う。
 
-Apicurio Registry 3.4 と Kafka の Avro SerDe を使う架空の構成で、注文イベント `Order` のスキーマを更新する。例の ID、イベント、登録可否は仕様を追うための説明で、稼働環境を測定した結果は含まない。[Avro ファイル形式の教材](reference-avro-internals.md) は Avro のコンテナファイルを扱う。この例では Kafka レコードに ID とエンコード済みデータを載せる。
+## 1. Apicurio Registry の位置づけ
 
-## 2. 書き込みに使ったスキーマを識別する
+Apicurio Registry は、イベントのスキーマと API 定義を共有するデータストアである。クライアントは、スキーマの更新を実行時に取得でき、更新のたびにアプリケーションを再デプロイしなくてよい。Avro、Protobuf、JSON Schema、OpenAPI、AsyncAPI などを扱う。バックエンドは Quarkus で動く Java アプリケーションである。
 
-Registry に Avro スキーマを artifact として登録し、改訂をバージョンにする。Avro serializer は書き込みに使う writer schema を解決し、対応する ID を付けて Kafka へ送る。この例では `apicurio.registry.use-id=contentId` を使い、ID を Kafka ペイロードに載せる。設定で `globalId` を使ったり、ID を Kafka ヘッダーに載せたりできるため、Producer と Consumer の SerDe の構成を合わせる。
+メッセージ本体の保管やストリーム処理は担わない。Kafka のレコードにはスキーマ全体ではなく、スキーマを指す ID を載せ、実際のスキーマは Registry から取り出す。
 
-`contentId` はスキーマの内容を識別し、同じ内容の複数バージョンに共有され得る。`globalId` は個別の artifact バージョンを識別する。
+## 2. 入口：API・Web コンソール・クライアント
 
-## 3. writer schema と reader schema を組み合わせる
+- **Core Registry API v3**：REST API。ベースパスは `/apis/registry/v3`。グループ、アーティファクト、バージョン、ルール、検索、管理（`/admin/export`・`/admin/import`）を扱う。API ドキュメントは `/apis` で見られる。
+- **Web コンソール**：スキーマの閲覧・検索・追加とルールの設定ができる。バックエンドとは別のコンポーネントで、コンテナイメージも別に配布される。
+- **ほかのクライアント**：コマンドライン、Maven プラグイン、各言語の SDK。
+- **Confluent 互換 API**：`/apis/ccompat/v7`（`/apis/ccompat/v8` も対応）に `schema.registry.url` を向ければ、Confluent のクライアントを使える。subject は既定グループのアーティファクト ID になり、スキーマ ID は既定では contentId になる。Schema Linking、Data Contract、KEK/DEK は未対応。
+- **Kafka クライアントの SerDes**：Java の Serializer / Deserializer が、Producer と Consumer の中から Registry の API を呼ぶ。Kafka Connect 用の Avro・JSON Schema コンバーターもある。
 
-Consumer はメッセージに付いた ID から、実際に書き込みに使われた v1 の writer schema を特定する。Avro のスキーマ解決には、この writer schema と、読み手が指定した v2 の reader schema を使える。
+## 3. 情報モデル：グループ・アーティファクト・バージョン
 
-| バージョン | フィールド |
+| 用語 | 内容 |
 | --- | --- |
-| v1 | `id: long` |
-| v2 | `id: long` と `currency: string`。currency の既定値は `"JPY"`。 |
-| v3 | `id: long` と `currency: string`。currency の既定値なし。 |
+| グループ | アーティファクトをまとめる名前空間。指定しなければ `default`。 |
+| アーティファクト | `groupId` と `artifactId` で決まる 1 つのスキーマや API 定義。`artifactType`（AVRO など）を持つ。 |
+| バージョン | アーティファクトの内容の不変なスナップショット。状態は `ENABLED`・`DEPRECATED`・`DISABLED`。 |
+| コンテンツ | スキーマ本体。同じ内容のバージョンは同じ `contentId` を共有する（重複排除）。 |
+| globalId | バージョンごとに自動採番される、Registry 全体で一意な ID。 |
+| ブランチ | バージョンの順序付きの並び。既定は `latest`。 |
+| 参照 | アーティファクトから別のアーティファクトへのリンク（JSON Schema の `$ref`、Protobuf の `import` など）。 |
 
-三つのスキーマのレコード完全名は同じとする。v2 の reader が v1 の注文を読むと、writer schema にない `currency` を reader schema の既定値 `"JPY"` で補う。v1 の reader が v2 の注文を読むと、v2 の writer schema にだけある `currency` を読み飛ばす。Avro のフィールド既定値はスキーマ解決で使われ、writer schema にあるフィールドは書き込み時にエンコードされる。
+バージョンの内容は変更しない。変更は新しいバージョンの追加で表す。`contentId` と `globalId` の使い分けは「シリアライザーとスキーマ ID の受け渡し」で扱う。
 
-## 4. 互換性ルールで読み手と書き手の向きを指定する
+## 4. ルール
 
-| モード | 旧版と新版の比較 |
+ルールは、新しいバージョンを受け入れる前に通すべき検査である。種類は `VALIDITY`（構文と意味）、`COMPATIBILITY`（過去のバージョンとの互換性）、`INTEGRITY`（参照の整合性）、`GOVERNANCE`（データコントラクトのメタデータ）。
+
+- 設定できる範囲は、グローバル、グループ、アーティファクトの 3 つ。アーティファクト、グループ、グローバルの順に優先する。優先は種類ごとに判定する。継承したルールを止めるには、下位の範囲で同じルールを `NONE` にする。
+- 既定のグローバルルールは `apicurio.rules.global.<ルール名>`（`compatibility`・`validity`・`integrity`・`governance`）で設定できる。
+- 新しいバージョンの追加、ドラフトの公開、`dryRun=true` の検査で適用される。違反は HTTP 400 と `ruleViolation` で返る。ルールを変えても、登録済みのバージョンは再検査されない。
+
+互換性の中身は「互換性ルールとバージョン管理」で扱う。
+
+## 5. ストレージ
+
+保存先は設定で選ぶ（`apicurio.storage.kind`）。公式資料にある選択肢は次のとおり。
+
+| 選択肢 | 位置づけ |
 | --- | --- |
-| `BACKWARD` | 新しい reader が、直前の writer のデータを読める。 |
-| `FORWARD` | 直前の reader が、新しい writer のデータを読める。 |
-| `FULL` | 上の両方向を満たす。 |
+| 組み込み H2 | 既定。メモリ上で再起動すると消える。開発・テスト用。 |
+| PostgreSQL | 本番で推奨。バックアップや復元などのデータ管理がしやすい。`APICURIO_STORAGE_KIND=sql`、`APICURIO_STORAGE_SQL_KIND=postgresql`。 |
+| Kafka（KafkaSQL） | データベースの運用に慣れていない環境や、データを Kafka に置く要件がある環境向け。`APICURIO_STORAGE_KIND=kafkasql`。 |
+| GitOps | 読み取り専用。Git リポジトリのデータを読み込む。変更は Git のコミットで行う。 |
+| KubernetesOps | 実験的で読み取り専用。Operator の CR に `kubernetesops` を指定する。 |
 
-`*_TRANSITIVE` は、比較を直前の版からすべての比較対象の旧版に広げる。Apicurio Registry 3.4 のルールは `DISABLED` のバージョンを比較から除き、`DEPRECATED` のバージョンを含める。
+Operator の CR では `spec.app.storage.type` に `postgresql`、`mysql`、`kafkasql`、`kubernetesops` を指定する（省略は H2）。KafkaSQL は Kafka を主のデータストアにし、変更を `kafkasql-journal` トピックへ書く。各レプリカは、組み込み H2 を journal から再構築する。詳細は「シリアライザーとスキーマ ID の受け渡し」の実装例で扱う。
 
-## 5. 二世代前の履歴が残る場合
+## 6. 動く場所と台数
 
-v2 のフィールド追加は v1 に対して両方向に互換。v3 では `currency` の既定値を外す。v2 で書かれたデータには `currency` が含まれるため、v3 の reader で読め、v2 だけを比較する `BACKWARD` を通過する。v1 が比較対象に残っている場合、`BACKWARD_TRANSITIVE` は v1 も検査する。v1 のデータに `currency` はなく、v3 の reader に既定値がないため拒否される。Kafka の履歴を再読する期間と、Registry で比較対象に含めるバージョンを対応付ける。
+- バックエンド（`app`）と UI（`ui`）は別の Pod で、ステートレスに水平スケールできる。Operator の CR に `app.replicas`、`ui.replicas` を書く。
+- SQL ストレージで複数レプリカにするには、データベース側にレプリケーションとフェイルオーバーが要る。複数レプリカで組み込み H2 を使ってはならない。
+- KafkaSQL では、Kafka クラスターを高可用にする（例：3 ブローカー、レプリケーション係数 3、`min.insync.replicas: 2`）。
+- Docker イメージは `apicurio/apicurio-registry`。ポートは 8080。ヘルスチェックの `/health/ready`・`/health/live` と `/metrics` は管理ポート 9000 にある。
+- Kubernetes では Apicurio Registry Operator が `ApicurioRegistry3`（`registry.apicur.io/v1`）を受け取り、Ingress、NetworkPolicy、PodDisruptionBudget（`maxUnavailable: 1` が既定）などを作る。Ingress は HTTP のみで、TLS は利用者が用意する。
+- 認証は OpenID Connect で、Keycloak が例として挙げられている。
 
-## 6. 公式資料
+## 7. 実装例：オンプレミス Kubernetes・Operator・PostgreSQL
 
-- [Apicurio Registry 3.4 Kafka SerDes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html)
-- [Apicurio Registry 3.4 Schema Compatibility Modes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html)
-- [Apache Avro 1.12 Schema Resolution](https://avro.apache.org/docs/1.12.0/specification/#schema-resolution)
-- [Apicurio Registry 3.2 Concepts Glossary](https://www.apicur.io/registry/docs/apicurio-registry/3.2.x/getting-started/assembly-registry-concepts-glossary.html)
-
-## 7. 実装例：Kafka・Apicurio Registry・PostgreSQL
-
-Kafka Java クライアント用の Avro SerDes と、PostgreSQL を使う Apicurio Registry を分けて配置する例。
-
-| 機能 | 具体的な担い手 | 配置・設定 |
-| --- | --- | --- |
-| Avro Producer・Avro Serializer | Java Kafka Producer（Avro Serializer） | Registry からスキーマを解決し、Avro データと参照 ID を送る。 |
-| 注文イベントのトピック | Apache Kafka の注文トピック | Avro メッセージを保持する。 |
-| Avro Deserializer・Consumer / reader schema | Java Kafka Consumer（Avro Deserializer） | スキーマ参照を解決し、読取側スキーマで展開する。 |
-| スキーマの登録者 | スキーマ登録用 REST クライアント | 変更候補を登録 API へ送る。 |
-| 互換性ルール・Order のバージョンと内容 ID | Apicurio Registry Server | 互換性を評価してバージョンと内容 ID を解決する。 |
-| 実装で追加 | PostgreSQL（Registry の SQL ストレージ） | スキーマ本文とレジストリの永続状態を保持する。 |
-
-メッセージを保存する Kafka と、スキーマを保持する PostgreSQL は別の永続化先。レジストリの 3.x コンテナで `APICURIO_STORAGE_KIND=sql` と PostgreSQL 接続を選び、SerDes には Registry の URL を設定する。
-
-[Apicurio Registry 3.4 Kafka SerDes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html)、[Apicurio Registry 3.4 Schema Compatibility Modes](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html)、[Apicurio Registry Docker Deployment](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html)
-
-
-## 8. 実装例：Amazon EKS 上の Apicurio Registry・RDS・MSK
-
-EKS の EC2 ノードで Apicurio Registry Operator と Registry API を運用する。MSK は注文レコード、RDS PostgreSQL はスキーマの履歴を保持する。
+利用者のデータセンターの Kubernetes クラスターに Apicurio Registry Operator を置き、`ApicurioRegistry3` で Registry の `app` と `ui` を展開する例。ストレージは利用者が用意する PostgreSQL（`spec.app.storage.type: postgresql`）で、DB のパスワードは Kubernetes の Secret から渡す。
 
 | 機能 | 担い手 |
 | --- | --- |
-| 登録・互換性判定 | EKS の Apicurio Registry 3.1 系の API。Operator で展開を管理する。 |
-| 版、内容 ID とルールの保存 | RDS for PostgreSQL。 |
-| Avro の書込・読取 | EKS 上の Kafka Producer／Consumer 用 Java アプリケーションと Apicurio の SerDes。 |
-| 注文イベント保持 | Amazon MSK。 |
+| 登録担当（Web UI・CLI・REST・Maven） | クラスターの外のクライアント |
+| Kafka クライアント | クラスターの外のアプリケーション |
+| REST API・ccompat API・ルール・情報モデル | Registry の app Pod（Deployment） |
+| Web コンソール | Registry の ui Pod（Deployment） |
+| ストレージ | PostgreSQL（`sql.dataSource.url`） |
+| 実装で加わる部品 | Operator、`ApicurioRegistry3` リソース、DB パスワードの Secret、Ingress |
 
-API と SerDes の 3.1 系を合わせ、Avro の参照方式と互換性ルールを対象アーティファクトに設定する。登録 API は Keycloak の OIDC と Registry の権限を使い、書き込み権限を登録担当に限定する。アプリの SerDes にも読み取り用の資格情報を設定する。MSK のブローカー認証・トピック権限と、PostgreSQL の専用ユーザー・TLS 接続は別に設定する。
+Ingress は `spec.app.ingress.host` と `spec.ui.ingress.host` から作られる。PostgreSQL がクラスター内外のどちらで動くかは公式資料の例が `postgresql.my-project.svc` を使うだけで、固定されていない。図ではクラスターの外の利用者管理の DB とした。公式資料を組み合わせた代表例で、実環境での動作は未検証である。
 
-公式資料
+## 公式資料
 
-- [Apicurio Registry Operator の PostgreSQL 構成](https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-deploying-registry-operator.html)
-- [Apicurio Registry の Java Kafka SerDes](https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-configuring-kafka-client-serdes.html)
-- [Apicurio Registry Operator の認証設定](https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-operator-config-reference.html)
-- [Amazon MSK への接続](https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html)
-- [EKS マネージドノードグループ](https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html)
-
-自前例は Linux 上の Java クライアント、自前 Kafka、Docker ホスト上の Registry と PostgreSQL を想定し、各データの永続化とバックアップは利用者が設計する。AWS 例は EKS ノード上の Registry とクライアント、MSK、RDS の組合せである。AWS が EKS 制御プレーンと EC2・MSK・RDS の基盤を運用し、利用者は Kubernetes API、ノード、Operator、Registry、認証、トピックと DB 設定を管理する。EKS 制御プレーンサーバーは直接操作しない。Keycloak のホスト、クライアント接続と認証の設定、および各バージョンの組合せは未検証で、公式資料を組み合わせた代表例である。
+- [Introduction to Apicurio Registry](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-the-registry.html)
+- [Apicurio Registry concepts and glossary](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html)
+- [Managing artifacts using the REST API](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-managing-registry-artifacts-api.html)
+- [Apicurio Registry content rules](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html)
+- [Confluent Schema Registry compatibility](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-confluent-schema-registry-compatibility.html)
+- [Installing Apicurio Registry storage on OpenShift](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html)
+- [Installing using Docker](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html)
+- [Deploying using the Operator](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-deploying-registry-operator.html)
+- [Deploying for high availability](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html)
+- [Configuration reference](https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-config-reference.html)

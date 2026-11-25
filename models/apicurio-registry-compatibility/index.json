@@ -1,0 +1,248 @@
+{
+  "model": "apicurio-registry-compatibility",
+  "name": "Apicurio Registry：互換性ルールとバージョン管理",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "submitter": {
+      "type": "node",
+      "label": "登録者（CI・REST・Web コンソール）",
+      "status": "claim"
+    },
+    "api": {
+      "type": "node",
+      "label": "バージョン作成 API",
+      "status": "claim"
+    },
+    "rules": {
+      "type": "node",
+      "label": "ルール（アーティファクト › グループ › グローバル）",
+      "status": "claim"
+    },
+    "compat": {
+      "type": "node",
+      "label": "互換性チェック（Avro・Protobuf・JSON Schema）",
+      "status": "claim"
+    },
+    "versions": {
+      "type": "node",
+      "label": "Order のバージョン（ENABLED・DEPRECATED・DISABLED）",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "ストレージ",
+      "status": "claim"
+    },
+    "propose": {
+      "type": "link",
+      "label": "登録者（CI・REST・Web コンソール） → バージョン作成 API",
+      "status": "claim"
+    },
+    "select": {
+      "type": "link",
+      "label": "バージョン作成 API → ルール（アーティファクト › グループ › グローバル）",
+      "status": "claim"
+    },
+    "check": {
+      "type": "link",
+      "label": "ルール（アーティファクト › グループ › グローバル） → 互換性チェック（Avro・Protobuf・JSON Schema）",
+      "status": "claim"
+    },
+    "compare": {
+      "type": "link",
+      "label": "互換性チェック（Avro・Protobuf・JSON Schema） → Order のバージョン（ENABLED・DEPRECATED・DISABLED）",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "バージョン作成 API → Order のバージョン（ENABLED・DEPRECATED・DISABLED）",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "Order のバージョン（ENABLED・DEPRECATED・DISABLED） → ストレージ",
+      "status": "claim"
+    },
+    "set-state": {
+      "type": "link",
+      "label": "登録者（CI・REST・Web コンソール） → Order のバージョン（ENABLED・DEPRECATED・DISABLED）",
+      "status": "claim"
+    },
+    "check-versions": {
+      "type": "scenario",
+      "label": "新スキーマを直前の版と履歴全体で比べる"
+    },
+    "disable-old": {
+      "type": "scenario",
+      "label": "古い版を比較対象から外す"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "登録時に互換性を検査する",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "比較対象の範囲を運用に合わせる",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "ルールの保存先、dryRun を CI でどう使うかの手順、CI の認証方式は確認した公式資料に記載がない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "実装例の台数、CI の実行場所、Kubernetes と Registry のバージョンの組み合わせは資料で指定されていない。"
+    },
+    "apicurio-compat-ci": {
+      "type": "implementation",
+      "impl": "apicurio-compat-k8s-postgres",
+      "label": "CI ジョブ（REST・Maven プラグイン）",
+      "realizes": [
+        "submitter"
+      ]
+    },
+    "apicurio-compat-ingress": {
+      "type": "implementation",
+      "impl": "apicurio-compat-k8s-postgres",
+      "label": "Ingress（app の host）",
+      "realizes": []
+    },
+    "apicurio-compat-app": {
+      "type": "implementation",
+      "impl": "apicurio-compat-k8s-postgres",
+      "label": "Registry app Pods",
+      "realizes": [
+        "api",
+        "rules",
+        "compat",
+        "versions"
+      ]
+    },
+    "apicurio-compat-cr": {
+      "type": "implementation",
+      "impl": "apicurio-compat-k8s-postgres",
+      "label": "ApicurioRegistry3 リソース",
+      "realizes": []
+    },
+    "apicurio-compat-postgres": {
+      "type": "implementation",
+      "impl": "apicurio-compat-k8s-postgres",
+      "label": "PostgreSQL（利用者が用意）",
+      "realizes": [
+        "storage"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-apicurio-registry-compatibility.md#§1": [
+      "model"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md": [
+      "model",
+      "submitter",
+      "api",
+      "rules",
+      "compat",
+      "versions",
+      "storage",
+      "propose",
+      "select",
+      "check",
+      "compare",
+      "commit",
+      "persist",
+      "set-state",
+      "check-versions",
+      "disable-old",
+      "BR-01",
+      "BR-02",
+      "apicurio-compat-ci",
+      "apicurio-compat-ingress",
+      "apicurio-compat-app",
+      "apicurio-compat-cr",
+      "apicurio-compat-postgres"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md#§2": [
+      "model",
+      "versions",
+      "storage",
+      "persist",
+      "set-state"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md#§3": [
+      "model",
+      "api",
+      "rules",
+      "propose",
+      "select",
+      "commit",
+      "BR-01"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md#§4": [
+      "model",
+      "compat",
+      "check",
+      "compare",
+      "disable-old",
+      "BR-02"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md#§5": [
+      "model",
+      "check-versions"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md#§6": [
+      "model",
+      "compat"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md#§7": [
+      "model",
+      "submitter"
+    ],
+    "docs/reference-apicurio-registry-compatibility.md#§8": [
+      "model",
+      "apicurio-compat-ci",
+      "apicurio-compat-ingress",
+      "apicurio-compat-app",
+      "apicurio-compat-cr",
+      "apicurio-compat-postgres"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apicurio Registry",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "apicurio-registry",
+    "objectives": [
+      "ルールがグローバル・グループ・アーティファクトの順に優先し、新しいバージョンの追加時に働くことを説明する。",
+      "BACKWARD、FORWARD、FULL と transitive が比べる版の範囲を区別する。",
+      "DISABLED と DEPRECATED の版が比較対象に入るかどうかを説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Schema compatibility modes",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html"
+      },
+      {
+        "title": "Content rules",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html"
+      },
+      {
+        "title": "Content rule reference",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-rule-reference.html"
+      },
+      {
+        "title": "Concepts and glossary",
+        "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html"
+      }
+    ]
+  }
+}

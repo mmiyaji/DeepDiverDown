@@ -1,0 +1,252 @@
+{
+  "model": "flink-job-graph-slots",
+  "name": "Flink：ジョブグラフ・Task とスロット",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント",
+      "status": "claim"
+    },
+    "jobgraph": {
+      "type": "node",
+      "label": "JobGraph（Operator をつないだ並び）",
+      "status": "claim"
+    },
+    "dispatcher": {
+      "type": "node",
+      "label": "Dispatcher",
+      "status": "claim"
+    },
+    "jobmaster": {
+      "type": "node",
+      "label": "JobMaster",
+      "status": "claim"
+    },
+    "resourcemanager": {
+      "type": "node",
+      "label": "ResourceManager",
+      "status": "claim"
+    },
+    "tm": {
+      "type": "node",
+      "label": "TaskManager のスロット",
+      "status": "claim"
+    },
+    "subtask": {
+      "type": "node",
+      "label": "Task の Subtask（並列実行）",
+      "status": "claim"
+    },
+    "exchange": {
+      "type": "node",
+      "label": "Task 間のデータ交換",
+      "status": "claim"
+    },
+    "build": {
+      "type": "link",
+      "label": "クライアント → JobGraph（Operator をつないだ並び）",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "クライアント → Dispatcher",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "Dispatcher → JobMaster",
+      "status": "claim"
+    },
+    "request": {
+      "type": "link",
+      "label": "JobMaster → ResourceManager",
+      "status": "claim"
+    },
+    "allocate": {
+      "type": "link",
+      "label": "ResourceManager → TaskManager のスロット",
+      "status": "claim"
+    },
+    "deploy": {
+      "type": "link",
+      "label": "JobMaster → Task の Subtask（並列実行）",
+      "status": "claim"
+    },
+    "host": {
+      "type": "link",
+      "label": "TaskManager のスロット → Task の Subtask（並列実行）",
+      "status": "claim"
+    },
+    "shuffle": {
+      "type": "link",
+      "label": "Task の Subtask（並列実行） → Task 間のデータ交換",
+      "status": "claim"
+    },
+    "slot-allocation": {
+      "type": "scenario",
+      "label": "提出からスロット上の実行まで"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "JobGraph から実行時の内部グラフ（ExecutionGraph）への展開や、スロット割り当てのアルゴリズムの詳細は、今回確認した資料の範囲では扱っていない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Operator chaining を切る API（disableChaining など）と、スロット共有グループの指定方法は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "スロット数（taskmanager.numberOfTaskSlots）の既定値は、確認した資料に記載がない。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "実装例の台数・ノードサイズ・イメージの置き場所（コンテナレジストリ）は資料で指定されていない。"
+    },
+    "eks-native-cli": {
+      "type": "implementation",
+      "impl": "eks-native",
+      "label": "Flink CLI",
+      "realizes": [
+        "client"
+      ]
+    },
+    "eks-native-api": {
+      "type": "implementation",
+      "impl": "eks-native",
+      "label": "EKS の Kubernetes API",
+      "realizes": []
+    },
+    "eks-native-ec2": {
+      "type": "implementation",
+      "impl": "eks-native",
+      "label": "EKS のノード（EC2）",
+      "realizes": []
+    },
+    "eks-native-jm": {
+      "type": "implementation",
+      "impl": "eks-native",
+      "label": "JobManager Pod",
+      "realizes": [
+        "jobgraph",
+        "dispatcher",
+        "jobmaster",
+        "resourcemanager"
+      ]
+    },
+    "eks-native-tm": {
+      "type": "implementation",
+      "impl": "eks-native",
+      "label": "TaskManager Pods",
+      "realizes": [
+        "tm",
+        "subtask",
+        "exchange"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-flink-job-graph-slots.md#§1": [
+      "model"
+    ],
+    "docs/reference-flink-job-graph-slots.md": [
+      "model",
+      "client",
+      "jobgraph",
+      "dispatcher",
+      "jobmaster",
+      "resourcemanager",
+      "tm",
+      "subtask",
+      "exchange",
+      "build",
+      "submit",
+      "start",
+      "request",
+      "allocate",
+      "deploy",
+      "host",
+      "shuffle",
+      "slot-allocation",
+      "eks-native-cli",
+      "eks-native-api",
+      "eks-native-ec2",
+      "eks-native-jm",
+      "eks-native-tm"
+    ],
+    "docs/reference-flink-job-graph-slots.md#§2": [
+      "client",
+      "jobgraph",
+      "build"
+    ],
+    "docs/reference-flink-job-graph-slots.md#§3": [
+      "jobgraph",
+      "subtask",
+      "exchange",
+      "shuffle"
+    ],
+    "docs/reference-flink-job-graph-slots.md#§5": [
+      "dispatcher",
+      "jobmaster",
+      "resourcemanager",
+      "submit",
+      "start",
+      "request",
+      "allocate",
+      "deploy"
+    ],
+    "docs/reference-flink-job-graph-slots.md#§6": [
+      "resourcemanager"
+    ],
+    "docs/reference-flink-job-graph-slots.md#§4": [
+      "tm",
+      "subtask",
+      "host"
+    ],
+    "docs/reference-flink-job-graph-slots.md#§7": [
+      "slot-allocation"
+    ],
+    "docs/reference-flink-job-graph-slots.md#§8": [
+      "eks-native-cli",
+      "eks-native-api",
+      "eks-native-ec2",
+      "eks-native-jm",
+      "eks-native-tm"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Flink",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "flink",
+    "objectives": [
+      "Operator・Task・Subtask・スロットを区別する。",
+      "Operator chaining とスロット共有が必要なスロット数をどう変えるかを説明する。",
+      "Application クラスタと Session クラスタの違いを、スロットの確保の時点で比べる。"
+    ],
+    "sources": [
+      {
+        "title": "Flink · Flink Architecture",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/"
+      },
+      {
+        "title": "Flink · Parallel Execution",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/execution/parallel/"
+      },
+      {
+        "title": "Flink · Native Kubernetes",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+      },
+      {
+        "title": "Amazon EKS managed node groups",
+        "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+      }
+    ]
+  }
+}

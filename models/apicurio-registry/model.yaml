@@ -1,467 +1,386 @@
-name: "Apicurio Registry の Avro スキーマ管理と互換性"
-description: "Kafka 上の Avro メッセージを正しい writer schema で読み、スキーマ登録時の BACKWARD・FORWARD と履歴全体の検査を比較する。"
+name: Apicurio Registry の基本アーキテクチャ
+description: REST API・Web コンソール・ルール・グループ/アーティファクト/バージョン・ストレージ・SerDes クライアントの役割と、スキーマの登録と取得の流れ。
 reference:
   objectives:
-    - メッセージに付くスキーマ ID から実際の writer schema を取得する流れを説明する。
-    - Avro の writer schema と reader schema の役割を区別する。
-    - BACKWARD、FORWARD、FULL と transitive が検査する組み合わせを説明する。
+    - REST API、Web コンソール、Confluent 互換 API、SerDes クライアントの入口を区別する。
+    - グループ、アーティファクト、バージョン、コンテンツ、ID の関係を説明する。
+    - ルールが新しいバージョンの受け入れ前に働くことと、ストレージの選択肢（H2・PostgreSQL・KafkaSQL）を説明する。
   sources:
-    - title: Apicurio Registry 3.4 Kafka SerDes
-      url: >-
-        https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html
-    - title: Apicurio Registry 3.4 Schema Compatibility Modes
-      url: >-
-        https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html
-    - title: Apache Avro 1.12 Schema Resolution
-      url: https://avro.apache.org/docs/1.12.0/specification/#schema-resolution
-    - title: Apicurio Registry 3.2 Concepts Glossary
-      url: >-
-        https://www.apicur.io/registry/docs/apicurio-registry/3.2.x/getting-started/assembly-registry-concepts-glossary.html
-sources: ["docs/reference-apicurio-registry.md"]
+    - title: Introduction to Apicurio Registry
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-the-registry.html
+    - title: Apicurio Registry concepts and glossary
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html
+    - title: Apicurio Registry content rules
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html
+    - title: Installing Apicurio Registry storage on OpenShift
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html
+    - title: Deploying Apicurio Registry for high availability
+      url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html
+sources:
+  - docs/reference-apicurio-registry.md
 evidence:
-  - {"type":"doc","ref":"docs/reference-apicurio-registry.md#§1"}
-  - {"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}
-  - {"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}
-  - {"type":"doc","ref":"docs/reference-apicurio-registry.md#§4"}
-  - {"type":"doc","ref":"docs/reference-apicurio-registry.md#§5"}
-  - {"type":"doc","ref":"docs/reference-apicurio-registry.md#§6"}
+  - { type: doc, ref: "docs/reference-apicurio-registry.md#§1" }
+  - { type: doc, ref: "docs/reference-apicurio-registry.md#§2" }
+  - { type: doc, ref: "docs/reference-apicurio-registry.md#§3" }
+  - { type: doc, ref: "docs/reference-apicurio-registry.md#§4" }
+  - { type: doc, ref: "docs/reference-apicurio-registry.md#§5" }
+  - { type: doc, ref: "docs/reference-apicurio-registry.md#§6" }
+  - { type: doc, ref: "docs/reference-apicurio-registry.md#§7" }
 tiers:
-  - {"id":"kafka","label":"Kafka のアプリケーション","z":1,"origin":[0,0],"size":[16,3]}
-  - {"id":"registry","label":"Apicurio Registry","z":0,"origin":[2,0],"size":[13,3]}
+  - id: flow
+    label: スキーマの登録と取得
+    z: 0
+    size: [24, 7]
 nodes:
-  producer: {"label":"Avro Producer","kind":"actor","tier":"kafka","x":0,"y":1.5,"description":"Order スキーマを使って注文イベントを作る。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§1"}]}
-  serialize: {"label":"Avro Serializer","kind":"worker","tier":"kafka","x":4,"y":1.5,"description":"writer schema でエンコードし、レコードに対応するスキーマ ID を付ける。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
-  topic: {"label":"注文イベントのトピック","kind":"queue","tier":"kafka","x":8,"y":1.5,"description":"シリアライズしたメッセージとスキーマ参照を保持する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
-  deserialize: {"label":"Avro Deserializer","kind":"worker","tier":"kafka","x":12,"y":1.5,"description":"メッセージの ID から writer schema を決めてレコードを復号する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
-  app: {"label":"Consumer / reader schema","kind":"external","tier":"kafka","x":15,"y":1.5,"description":"この例では v2 の reader schema で注文を読む。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
-  submitter: {"label":"スキーマの登録者","kind":"actor","tier":"registry","x":1,"y":1.5,"description":"Order の新バージョンを提案する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§4"}]}
-  policy: {"label":"互換性ルール","kind":"service","tier":"registry","x":6,"y":1.5,"description":"指定した方向と履歴の範囲で登録候補を検査する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§4"}]}
-  versions: {"label":"Order のバージョンと内容 ID","kind":"db","tier":"registry","x":11,"y":1.5,"description":"スキーマのバージョンと対応するスキーマ内容を保持する。","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
+  admin:
+    label: 登録担当（Web UI・CLI・REST・Maven）
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 0.8
+    description: スキーマや API 定義を登録し、ルールを設定する。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§2" }
+  clients:
+    label: Kafka クライアント（SerDes）
+    kind: client
+    tier: flow
+    x: 0
+    'y': 4.5
+    replicas: 2
+    description: Producer と Consumer の中で SerDes が Registry の API を呼び、ID に対応するスキーマを取得する。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§2" }
+  ui:
+    label: Web コンソール
+    kind: service
+    tier: flow
+    x: 5
+    'y': 0
+    replicas: 2
+    description: スキーマの閲覧・検索・追加とルールの設定。バックエンドとは別のコンポーネント。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§2" }
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§6" }
+  api:
+    label: Core Registry API v3（/apis/registry/v3）
+    kind: service
+    tier: flow
+    x: 5
+    'y': 2.4
+    replicas: 2
+    description: グループ、アーティファクト、バージョン、ルール、検索、管理を扱う REST API。ステートレスで水平に増やせる。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§2" }
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§6" }
+  ccompat:
+    label: Confluent 互換 API（/apis/ccompat/v7）
+    kind: service
+    tier: flow
+    x: 5
+    'y': 4.8
+    replicas: 2
+    description: subject を既定グループのアーティファクトとして扱う。Confluent のクライアントが URL を変えるだけで使える。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§2" }
+  rules:
+    label: ルール（グローバル・グループ・アーティファクト）
+    kind: policy
+    tier: flow
+    x: 11
+    'y': 1
+    replicas: 2
+    description: 新しいバージョンを受け入れる前に VALIDITY・COMPATIBILITY・INTEGRITY・GOVERNANCE を検査する。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§4" }
+  model:
+    label: グループ・アーティファクト・バージョン
+    kind: catalog
+    tier: flow
+    x: 11
+    'y': 3.8
+    replicas: 2
+    description: groupId と artifactId で決まるアーティファクトと、不変のバージョン、contentId、globalId を管理する。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§3" }
+  storage:
+    label: ストレージ（PostgreSQL・KafkaSQL など）
+    kind: db
+    tier: flow
+    x: 17
+    'y': 3.8
+    replicas: 2
+    description: バージョン、コンテンツ、ルールを永続化する。apicurio.storage.kind で選ぶ。組み込み H2 は開発・テスト用。
+    evidence:
+      - { type: doc, ref: "docs/reference-apicurio-registry.md#§5" }
 links:
-  - {"id":"make","from":"producer","to":"serialize","label":"v1 で注文を作る","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
-  - {"id":"writer-id","from":"versions","to":"serialize","label":"writer schema の ID を解決する","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
-  - {"id":"write","from":"serialize","to":"topic","label":"ID と Avro データを送る","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§2"}]}
-  - {"id":"consume","from":"topic","to":"deserialize","label":"過去のメッセージを取得する","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
-  - {"id":"by-id","from":"deserialize","to":"versions","label":"レコードの ID で writer schema を特定","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
-  - {"id":"resolve","from":"deserialize","to":"app","label":"reader schema に解決する","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
-  - {"id":"propose","from":"submitter","to":"policy","label":"新バージョンを提案する","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§4"}]}
-  - {"id":"check","from":"policy","to":"versions","label":"比較対象と互換性を検査する","evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§4"}]}
+  - id: register
+    from: admin
+    to: api
+    label: スキーマを登録する
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§2" }]
+  - id: console
+    from: ui
+    to: api
+    label: 同じ API を呼ぶ
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§2" }]
+  - id: fetch
+    from: clients
+    to: api
+    label: ID でスキーマを取得する
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§2" }]
+  - id: check
+    from: api
+    to: rules
+    label: 新しいバージョンを検査する
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§4" }]
+  - id: write
+    from: api
+    to: model
+    label: バージョンを読み書きする
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§3" }]
+  - id: map-subject
+    from: ccompat
+    to: model
+    label: subject をアーティファクトに対応させる
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§2" }]
+  - id: persist
+    from: model
+    to: storage
+    label: 永続化する
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§5" }]
 scenarios:
-  - id: read-history
-    label: v2 の Consumer が v1 の注文を読む
-    visual: decode
-    evidence:
-      - type: doc
-        ref: docs/reference-apicurio-registry.md#§3
+  - id: register-version
+    label: 新しいバージョンを登録する
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§4" }]
     steps:
-      - links:
-          - make
-          - writer-id
-          - write
-        note: v1 の writer schema で id=42 をエンコードし、v1 の内容を指す ID を Kafka レコードに付ける。
-        blocks:
-          registered:
-            - id: v1
-              label: v1 · id
-              k: 0
-            - id: v2
-              label: v2 · currency = JPY
-              k: 1
-          topic:
-            - id: old-message
-              label: v1 の ID + Avro
-              k: 0
-          consumer: []
-        highlight:
-          - old-message
-      - links:
-          - consume
-          - by-id
-        note: v2 を使う下流も、メッセージが持つ ID で v1 の writer schema を取得する。
-        highlight:
-          - v1
-          - old-message
-      - links:
-          - resolve
-        note: v1 で読み取った id を v2 に解決する。v1 にない currency は v2 の既定値 JPY になる。
-        blocks:
-          registered:
-            - id: v1
-              label: v1 · id
-              k: 0
-            - id: v2
-              label: v2 · currency = JPY
-              k: 1
-          topic:
-            - id: old-message
-              label: v1 の ID + Avro
-              k: 0
-          consumer:
-            - id: value
-              label: "#42 · JPY"
-              k: 1
-              from:
-                - old-message
-        highlight:
-          - value
-  - id: check-versions
-    label: 新スキーマを最新と履歴全体で比較する
-    visual: rules
-    evidence:
-      - type: doc
-        ref: docs/reference-apicurio-registry.md#§5
+      - links: [register]
+        note: 登録担当が REST API（または Web コンソール、CLI、Maven プラグイン）で新しいバージョンを送る。
+      - links: [check]
+        note: 適用範囲はアーティファクト、グループ、グローバルの順。違反すると HTTP 400 で拒否される。
+      - links: [write, persist]
+        note: ルールを通ったバージョンが追加され、ストレージに保存される。既存のバージョンは変更しない。
+  - id: resolve-schema
+    label: Consumer が ID でスキーマを取得する
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§2" }]
     steps:
-      - links:
-          - propose
-          - check
-        note: v2 は currency に既定値を付けて追加する。新読者は旧データを読め、旧読者は新フィールドを無視して読める。
-        highlight:
-          - v1
-          - v2
-      - links:
-          - propose
-          - check
-        note: 既定値を外した v3 を提案する。v2 の writer が currency を書くため、v3 の reader は v2 データを読める。
-        blocks:
-          history:
-            - id: v1
-              label: v1 · id
-              k: 0
-            - id: v2
-              label: v2 · currency = JPY
-              k: 1
-          proposed:
-            - id: v3
-              label: v3 · currency 必須
-              k: 2
-          result:
-            - id: pass
-              label: BACKWARD · 通過
-              k: 1
-        highlight:
-          - v2
-          - v3
-          - pass
-      - links:
-          - check
-        note: BACKWARD_TRANSITIVE では v1 も比較する。v1 データには currency がなく、v3 の reader に既定値がないため拒否される。
-        blocks:
-          history:
-            - id: v1
-              label: v1 · id
-              k: 0
-            - id: v2
-              label: v2 · currency = JPY
-              k: 1
-          proposed:
-            - id: v3
-              label: v3 · currency 必須
-              k: 2
-          result:
-            - id: fail
-              label: BACKWARD_TRANSITIVE · 拒否
-              k: 2
-        highlight:
-          - v1
-          - v3
-          - fail
+      - links: [fetch]
+        note: Kafka のレコードに付いた contentId（または globalId）で、SerDes が API に問い合わせる。
+      - links: [write, persist]
+        note: Registry が ID に対応するバージョンの内容をストレージから読んで返す。
 requirements:
-  - {"id":"BR-01","kind":"rule","title":"古いイベントの読み取りを維持","text":"Kafka に残る各レコードを、書き込みに使ったスキーマで解釈できる。","links":["consume","by-id","resolve"],"evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§3"}]}
-  - {"id":"BR-02","kind":"rule","title":"登録時に運用上の互換性を検査","text":"更新順序と再読対象の履歴に必要な範囲で互換性を確認する。","links":["propose","check"],"evidence":[{"type":"doc","ref":"docs/reference-apicurio-registry.md#§5"}]}
+  - id: BR-01
+    kind: rule
+    title: 登録前にルールを通す
+    text: 新しいバージョンは、設定されたルールを通ったときだけ追加される。登録済みのバージョンは再検査されない。
+    links: [register, check]
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§4" }]
+  - id: BR-02
+    kind: rule
+    title: バージョンの内容は変更しない
+    text: 内容は不変で、同じ内容のバージョンは contentId を共有する。変更は新しいバージョンの追加で表す。
+    links: [write, persist]
+    evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§3" }]
 unknowns:
-  - {"id":"UNK-01","text":"実環境の ID の種別・配置、比較対象のバージョン、保持中の Kafka 履歴、互換性ルールの設定は未確認。","refs":["topic","versions","policy"]}
+  - id: UNK-01
+    text: ルールの保存先（テーブルやトピック上の表現）は、確認した公式資料では説明されていない。図ではストレージが保持するものとして描く。
+    refs: [rules, storage]
+  - id: UNK-02
+    text: 実装例の台数、ノードサイズ、ネットワーク経路、PostgreSQL の置き場所（クラスター内外）、Operator と Registry のバージョンの組み合わせは資料で指定されていない。
+    refs: [api, storage]
+gates: { maxDrift: 0, maxHigh: 0 }
 implementations:
-  - id: apicurio-postgres
-    label: Kafka・Apicurio Registry・PostgreSQL
-    description: Kafka Java クライアント用の Avro SerDes と、PostgreSQL を使う Apicurio Registry を分けて配置する例。
+  - id: apicurio-k8s-postgres
+    label: オンプレミス Kubernetes・Operator・PostgreSQL
+    description: 利用者のデータセンターの Kubernetes に Apicurio Registry Operator を置き、app と ui を展開し、PostgreSQL をストレージにする構成例。
     sources:
-      - title: Apicurio Registry 3.4 Kafka SerDes
-        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html
-      - title: Apicurio Registry 3.4 Schema Compatibility Modes
-        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html
-      - title: Apicurio Registry Docker Deployment
-        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html
-    nodes:
-      apicurio-postgres-client-host:
-        label: 自前 Linux クライアントホスト
-        kind: host
-        tier: kafka
-        x: 3
-        y: 0
-        description: Producer と Consumer の Java アプリを実行する。
-        evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§7}]
-      apicurio-postgres-kafka-host:
-        label: 自前 Kafka ブローカーホスト群
-        kind: host
-        tier: kafka
-        x: 8
-        y: 0
-        description: 利用者が Kafka ブローカーとトピックを運用する。
-        evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§7}]
-      apicurio-postgres-registry-host:
-        label: 自前 Docker 実行ホスト
-        kind: host
-        tier: registry
-        x: 6
-        y: 0
-        description: Registry と PostgreSQL コンテナーを運用する。
-        evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§7}]
-      apicurio-postgres-writer:
-        label: Java Kafka Producer（Avro Serializer）
-        kind: actor
-        tier: kafka
-        x: 2
-        y: 1.5
-        description: Registry からスキーマを解決し、Avro データと参照 ID を送る。
-        realizes:
-          - producer
-          - serialize
-        evidence:
-          - type: doc
-            ref: docs/reference-apicurio-registry.md#§7
-      apicurio-postgres-kafka:
-        label: Apache Kafka の注文トピック
-        kind: queue
-        tier: kafka
-        x: 8
-        y: 1.5
-        description: Avro メッセージを保持する。
-        realizes:
-          - topic
-        evidence:
-          - type: doc
-            ref: docs/reference-apicurio-registry.md#§7
-      apicurio-postgres-reader:
-        label: Java Kafka Consumer（Avro Deserializer）
-        kind: worker
-        tier: kafka
-        x: 10
-        y: 1.5
-        description: スキーマ参照を解決し、読取側スキーマで展開する。
-        realizes:
-          - deserialize
-          - app
-        evidence:
-          - type: doc
-            ref: docs/reference-apicurio-registry.md#§7
-      apicurio-postgres-publisher:
-        label: スキーマ登録用 REST クライアント
-        kind: actor
-        tier: registry
-        x: 1
-        y: 1.5
-        description: 変更候補を登録 API へ送る。
-        realizes:
-          - submitter
-        evidence:
-          - type: doc
-            ref: docs/reference-apicurio-registry.md#§7
-      apicurio-postgres-registry:
-        label: Apicurio Registry Server
-        kind: catalog
-        tier: registry
-        x: 5
-        y: 1.5
-        description: 互換性を評価してバージョンと内容 ID を解決する。
-        realizes:
-          - policy
-          - versions
-        evidence:
-          - type: doc
-            ref: docs/reference-apicurio-registry.md#§7
-      apicurio-postgres-postgres:
-        label: PostgreSQL（Registry の SQL ストレージ）
-        kind: service
-        tier: registry
-        x: 10
-        y: 1.5
-        description: スキーマ本文とレジストリの永続状態を保持する。
-        evidence:
-          - type: doc
-            ref: docs/reference-apicurio-registry.md#§7
-    links:
-      - {id: apicurio-postgres-client-writer, from: apicurio-postgres-client-host, to: apicurio-postgres-writer, label: Producer を実行}
-      - {id: apicurio-postgres-client-reader, from: apicurio-postgres-client-host, to: apicurio-postgres-reader, label: Consumer を実行}
-      - {id: apicurio-postgres-host-kafka, from: apicurio-postgres-kafka-host, to: apicurio-postgres-kafka, label: トピックを保持}
-      - {id: apicurio-postgres-host-registry, from: apicurio-postgres-registry-host, to: apicurio-postgres-registry, label: Registry を実行}
-      - {id: apicurio-postgres-host-db, from: apicurio-postgres-registry-host, to: apicurio-postgres-postgres, label: PostgreSQL を実行}
-      - id: apicurio-postgres-persist
-        from: apicurio-postgres-registry
-        to: apicurio-postgres-postgres
-        label: スキーマと対応する識別情報を保存
-        evidence:
-          - type: doc
-            ref: docs/reference-apicurio-registry.md#§7
-
-    layout2d:
-      tiers:
-        - {id: diagram, label: 実装構成, z: 0, size: [31, 17]}
-      nodes:
-        apicurio-postgres-client-host: {tier: diagram, x: 2, y: 2}
-        apicurio-postgres-writer: {tier: diagram, x: 2, y: 5}
-        apicurio-postgres-reader: {tier: diagram, x: 2, y: 8}
-        apicurio-postgres-kafka-host: {tier: diagram, x: 8, y: 2}
-        apicurio-postgres-kafka: {tier: diagram, x: 8, y: 5}
-        apicurio-postgres-registry-host: {tier: diagram, x: 14, y: 2}
-        apicurio-postgres-registry: {tier: diagram, x: 14, y: 5}
-        apicurio-postgres-postgres: {tier: diagram, x: 14, y: 8}
-        apicurio-postgres-publisher: {tier: diagram, x: 20, y: 2}
-      groups:
-        - {kind: nodegroup, label: "Java クライアント", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 12, nodes: [apicurio-postgres-client-host, apicurio-postgres-writer, apicurio-postgres-reader]}
-        - {kind: cluster, label: "Kafka ホスト群", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 9, nodes: [apicurio-postgres-kafka-host, apicurio-postgres-kafka]}
-        - {kind: nodegroup, label: "Registry Docker ホスト", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 12, nodes: [apicurio-postgres-registry-host, apicurio-postgres-registry, apicurio-postgres-postgres]}
-    layout3d:
-      tiers:
-        - {id: zone0, label: "Java クライアント", z: 0, origin: [0, 0], size: [5, 9]}
-        - {id: zone1, label: "Kafka ホスト群", z: 0, origin: [7, 0], size: [5, 6]}
-        - {id: zone2, label: "Registry Docker ホスト", z: 0, origin: [14, 0], size: [5, 9]}
-        - {id: zone3, label: "スキーマ登録者", z: 0, origin: [21, 0], size: [5, 5]}
-      nodes:
-        apicurio-postgres-client-host: {tier: zone0, x: 2, y: 1}
-        apicurio-postgres-writer: {tier: zone0, x: 2, y: 4}
-        apicurio-postgres-reader: {tier: zone0, x: 2, y: 7}
-        apicurio-postgres-kafka-host: {tier: zone1, x: 2, y: 1}
-        apicurio-postgres-kafka: {tier: zone1, x: 2, y: 4}
-        apicurio-postgres-registry-host: {tier: zone2, x: 2, y: 1}
-        apicurio-postgres-registry: {tier: zone2, x: 2, y: 4}
-        apicurio-postgres-postgres: {tier: zone2, x: 2, y: 7}
-        apicurio-postgres-publisher: {tier: zone3, x: 2, y: 1}
-      groups:
-        - {kind: nodegroup, label: "Java クライアント", tier: [zone0], nodes: [apicurio-postgres-client-host, apicurio-postgres-writer, apicurio-postgres-reader]}
-        - {kind: cluster, label: "Kafka ホスト群", tier: [zone1], nodes: [apicurio-postgres-kafka-host, apicurio-postgres-kafka]}
-        - {kind: nodegroup, label: "Registry Docker ホスト", tier: [zone2], nodes: [apicurio-postgres-registry-host, apicurio-postgres-registry, apicurio-postgres-postgres]}
-
-  - id: aws-eks-apicurio
-    label: "Amazon EKS 上の Apicurio Registry・RDS・MSK"
-    description: "EKS の EC2 ノードで Apicurio Registry Operator と Registry API を運用する。MSK は注文レコード、RDS PostgreSQL はスキーマの履歴を保持する。"
-    sources:
-      - {title: "Apicurio Registry Operator の PostgreSQL 構成", url: https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-deploying-registry-operator.html}
-      - {title: "Apicurio Registry の Java Kafka SerDes", url: https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-configuring-kafka-client-serdes.html}
-      - {title: "Apicurio Registry Operator の認証設定", url: https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-operator-config-reference.html}
-      - {title: "Amazon MSK への接続", url: https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html}
-      - {title: "EKS マネージドノードグループ", url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html}
+      - title: Deploying Apicurio Registry using the Operator
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-deploying-registry-operator.html
+      - title: Deploying Apicurio Registry for high availability
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html
+      - title: Installing Apicurio Registry storage on OpenShift
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html
+      - title: Introduction to Apicurio Registry
+        url: https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-the-registry.html
     tiers:
-      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
-      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
-      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
-    groups:
-      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
-      - {kind: cluster, label: "Amazon EKS クラスター", provider: k8s, tier: [runtime], nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer]}
-      - {kind: namespace, label: "Registry の名前空間", provider: k8s, tier: [runtime], nodes: [aws-eks-apicurio-operator, aws-eks-apicurio-registry]}
-      - {kind: vpc, label: "MSK と RDS の接続先", provider: aws, tier: [data], nodes: [aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
+      - { id: entry, label: 利用者, kind: origin, z: 2, size: [20, 4] }
+      - { id: cluster, label: Kubernetes クラスター, z: 1, size: [20, 8] }
+      - { id: data, label: データストア, z: 0, size: [20, 4] }
     nodes:
-      aws-eks-apicurio-author: {label: "スキーマの登録担当者", kind: actor, tier: entry, x: 1, y: 1.3, realizes: [submitter], description: "登録用クライアントから新しいスキーマを提出する。", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-idp: {label: "既存の Keycloak", kind: external, tier: entry, x: 1, y: 3.3, description: "Registry 向けのアクセストークンを発行する。", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-eks: {label: "EKS Kubernetes API", kind: service, tier: runtime, x: 1, y: 0.6, svc: eks, description: "Operator と ApicurioRegistry3 のリソースを受け入れる。", management: {type: shared, scope: "AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-nodes: {label: "EKS の EC2 ノード", kind: host, tier: runtime, x: 1, y: 4.9, svc: ec2, description: "Operator、Registry、Kafka クライアントの Pod を稼働させる。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループと更新を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-operator: {label: "Apicurio Registry Operator", kind: scheduler, tier: runtime, x: 5, y: 0.6, description: "カスタムリソースに従って Registry の Deployment を管理する。", management: {type: customer, scope: "利用者が Operator とカスタムリソースを管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-registry: {label: "Apicurio Registry API", kind: service, tier: runtime, x: 10, y: 0.6, realizes: [policy], description: "登録候補を互換性ルールで検証し、ID に対応するスキーマを提供する。", management: {type: customer, scope: "利用者が Registry と互換性ルール、認証を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-producer: {label: "Java Producer と Avro Serializer", kind: worker, tier: runtime, x: 6, y: 4.9, realizes: [producer, serialize], description: "スキーマ参照を解決し、Avro メッセージを MSK へ送る。", management: {type: customer, scope: "利用者が Producer と認証設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-consumer: {label: "Java Consumer と Avro Deserializer", kind: worker, tier: runtime, x: 13, y: 4.9, realizes: [deserialize, app], description: "記録された ID で writer schema を解決し、reader schema で読む。", management: {type: customer, scope: "利用者が Consumer と認証設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-topic: {label: "MSK の注文トピック", kind: queue, tier: data, x: 7, y: 1.5, svc: msk, realizes: [topic], description: "Avro レコードとスキーマ参照 ID を保持する。", management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      aws-eks-apicurio-versions: {label: "RDS PostgreSQL の Registry DB", kind: db, tier: data, x: 13, y: 1.5, svc: rds, realizes: [versions], description: "スキーマの版、内容、ID、ルールを永続化する。", management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者が DB と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
+      apicurio-k8s-admin:
+        label: 登録担当（クラスター外のクライアント）
+        kind: actor
+        tier: entry
+        x: 2
+        'y': 1.5
+        realizes: [admin]
+        description: Web UI、CLI、REST、Maven プラグインのいずれかでスキーマを登録する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+      apicurio-k8s-clients:
+        label: Kafka クライアント（クラスター外のアプリ）
+        kind: client
+        tier: entry
+        x: 8
+        'y': 1.5
+        realizes: [clients]
+        description: SerDes を組み込んだ Producer / Consumer。Registry の URL を apicurio.registry.url に設定する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+      apicurio-k8s-ingress:
+        label: Ingress（app と ui の host）
+        kind: gateway
+        tier: cluster
+        x: 2
+        'y': 4
+        svc: k8s:ingress
+        description: Operator が ingress.host から HTTP の Ingress を作る。TLS は利用者が別に用意する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+        management: { type: customer, scope: 利用者が Ingress コントローラーと TLS を運用する。 }
+      apicurio-k8s-cr:
+        label: ApicurioRegistry3 リソース
+        kind: file
+        tier: cluster
+        x: 2
+        'y': 1
+        description: "spec.app と spec.ui に replicas、ingress、storage（type: postgresql、sql.dataSource）を書く。"
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+        management: { type: customer, scope: 利用者が CR を管理する。 }
+      apicurio-k8s-operator:
+        label: Apicurio Registry Operator
+        kind: scheduler
+        tier: cluster
+        x: 6
+        'y': 1
+        svc: k8s:deployment
+        description: CR に従って app と ui の Deployment、Ingress、NetworkPolicy、PodDisruptionBudget などを作る。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+        management: { type: customer, scope: 利用者が Operator を導入し、更新する。 }
+      apicurio-k8s-app:
+        label: Registry app Pods
+        kind: service
+        tier: cluster
+        x: 8
+        'y': 4
+        svc: k8s:deployment
+        replicas: 3
+        realizes: [api, ccompat, rules, model]
+        description: REST API、Confluent 互換 API、ルール判定、バージョン管理を担う。app.replicas で台数を決める。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+        management: { type: customer, scope: 利用者が台数、ルール、認証を管理する。 }
+      apicurio-k8s-ui:
+        label: Registry ui Pods
+        kind: service
+        tier: cluster
+        x: 12
+        'y': 1
+        svc: k8s:deployment
+        replicas: 2
+        realizes: [ui]
+        description: Web コンソール。app とは別の Deployment で、ui.replicas で台数を決める。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+        management: { type: customer, scope: 利用者が台数を管理する。 }
+      apicurio-k8s-secret:
+        label: Secret（DB パスワード）
+        kind: file
+        tier: cluster
+        x: 12
+        'y': 4
+        description: sql.dataSource.password が name と key で参照する。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+        management: { type: customer, scope: 利用者が Secret を作成し、保護する。 }
+      apicurio-k8s-postgres:
+        label: PostgreSQL（利用者が用意）
+        kind: db
+        tier: data
+        x: 8
+        'y': 1.5
+        svc: onprem:db
+        replicas: 2
+        realizes: [storage]
+        description: バージョン、コンテンツ、ルールを保存する。複数レプリカの app には、DB のレプリケーションとフェイルオーバーが要る。
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+        management: { type: customer, scope: 利用者が DB の運用、バックアップ、フェイルオーバーを管理する。 }
     links:
-      - {id: aws-eks-apicurio-reader-result, from: aws-eks-apicurio-registry, to: aws-eks-apicurio-consumer, label: writer schema を返す, realizes: [by-id], replace: true}
-      - {id: aws-eks-apicurio-schedule, from: aws-eks-apicurio-eks, to: aws-eks-apicurio-nodes, label: "Pod を EC2 ノードへ配置", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      - {id: aws-eks-apicurio-reconcile, from: aws-eks-apicurio-operator, to: aws-eks-apicurio-registry, label: "Registry API の Deployment を管理", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      - {id: aws-eks-apicurio-auth, from: aws-eks-apicurio-idp, to: aws-eks-apicurio-registry, label: "OIDC トークンの検証情報を提供", evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      - {id: aws-eks-apicurio-request-writer, from: aws-eks-apicurio-versions, to: aws-eks-apicurio-registry, label: "writer schema の参照を取得", realizes: [writer-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      - {id: aws-eks-apicurio-schema-for-write, from: aws-eks-apicurio-registry, to: aws-eks-apicurio-producer, label: "writer schema の参照を返す", realizes: [writer-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      - {id: aws-eks-apicurio-request-reader, from: aws-eks-apicurio-consumer, to: aws-eks-apicurio-registry, label: "レコードの ID で writer schema を要求", realizes: [by-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-      - {id: aws-eks-apicurio-schema-for-read, from: aws-eks-apicurio-registry, to: aws-eks-apicurio-versions, label: "対応する writer schema を検索", realizes: [by-id], replace: true, evidence: [{type: doc, ref: docs/reference-apicurio-registry.md#§8}]}
-
+      - id: apicurio-k8s-admin-ingress
+        from: apicurio-k8s-admin
+        to: apicurio-k8s-ingress
+        label: 登録を送る
+        realizes: [register]
+        replace: true
+      - id: apicurio-k8s-clients-ingress
+        from: apicurio-k8s-clients
+        to: apicurio-k8s-ingress
+        label: ID でスキーマを要求
+        realizes: [fetch]
+        replace: true
+      - id: apicurio-k8s-ingress-app
+        from: apicurio-k8s-ingress
+        to: apicurio-k8s-app
+        label: HTTP を中継
+        realizes: [register, fetch]
+        replace: true
+      - id: apicurio-k8s-cr-operator
+        from: apicurio-k8s-cr
+        to: apicurio-k8s-operator
+        label: 望ましい構成を渡す
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+      - id: apicurio-k8s-operator-app
+        from: apicurio-k8s-operator
+        to: apicurio-k8s-app
+        label: Deployment を作成・管理
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+      - id: apicurio-k8s-operator-ui
+        from: apicurio-k8s-operator
+        to: apicurio-k8s-ui
+        label: Deployment を作成・管理
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+      - id: apicurio-k8s-secret-app
+        from: apicurio-k8s-secret
+        to: apicurio-k8s-app
+        label: DB パスワードを渡す
+        evidence: [{ type: doc, ref: "docs/reference-apicurio-registry.md#§7" }]
+    groups:
+      - kind: datacenter
+        label: 利用者のデータセンター
+        provider: onprem
+        tier: [cluster, data]
+        nodes: [apicurio-k8s-ingress, apicurio-k8s-cr, apicurio-k8s-operator, apicurio-k8s-app, apicurio-k8s-ui, apicurio-k8s-secret, apicurio-k8s-postgres]
+      - kind: cluster
+        label: Kubernetes クラスター
+        provider: k8s
+        tier: [cluster]
+        nodes: [apicurio-k8s-ingress, apicurio-k8s-cr, apicurio-k8s-operator, apicurio-k8s-app, apicurio-k8s-ui, apicurio-k8s-secret]
     layout2d:
       tiers:
-        - {id: diagram, label: 実装構成, z: 0, size: [31, 17]}
+        - { id: diagram, label: オンプレミスの Apicurio Registry, z: 0, size: [28, 13] }
       nodes:
-        aws-eks-apicurio-author: {tier: diagram, x: 2, y: 2}
-        aws-eks-apicurio-idp: {tier: diagram, x: 2, y: 5}
-        aws-eks-apicurio-eks: {tier: diagram, x: 8, y: 2}
-        aws-eks-apicurio-nodes: {tier: diagram, x: 14, y: 2}
-        aws-eks-apicurio-operator: {tier: diagram, x: 14, y: 5}
-        aws-eks-apicurio-registry: {tier: diagram, x: 14, y: 8}
-        aws-eks-apicurio-producer: {tier: diagram, x: 14, y: 11}
-        aws-eks-apicurio-consumer: {tier: diagram, x: 14, y: 14}
-        aws-eks-apicurio-topic: {tier: diagram, x: 20, y: 2}
-        aws-eks-apicurio-versions: {tier: diagram, x: 20, y: 5}
+        apicurio-k8s-admin: { tier: diagram, x: 1, y: 3 }
+        apicurio-k8s-clients: { tier: diagram, x: 1, y: 8 }
+        apicurio-k8s-ingress: { tier: diagram, x: 8, y: 5.5 }
+        apicurio-k8s-cr: { tier: diagram, x: 8, y: 1.5 }
+        apicurio-k8s-operator: { tier: diagram, x: 12.5, y: 1.5 }
+        apicurio-k8s-app: { tier: diagram, x: 12.5, y: 5.5 }
+        apicurio-k8s-ui: { tier: diagram, x: 17, y: 1.5 }
+        apicurio-k8s-secret: { tier: diagram, x: 17, y: 5.5 }
+        apicurio-k8s-postgres: { tier: diagram, x: 23, y: 5.5 }
       groups:
-        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [diagram], x0: 5, y0: 0, x1: 30, y1: 16, nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
-        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [diagram], x0: 12, y0: 0, x1: 22, y1: 16, nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
-        - {kind: cluster, label: "EKS ノード・Registry", tier: [diagram], x0: 12, y0: 0, x1: 16, y1: 18, nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer]}
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [diagram], x0: 5.5, y0: -0.6, x1: 26.5, y1: 9.5, nodes: [apicurio-k8s-ingress, apicurio-k8s-cr, apicurio-k8s-operator, apicurio-k8s-app, apicurio-k8s-ui, apicurio-k8s-secret, apicurio-k8s-postgres] }
+        - { kind: cluster, label: Kubernetes クラスター, provider: k8s, tier: [diagram], x0: 6.2, y0: 0.4, x1: 20.2, y1: 8.8, nodes: [apicurio-k8s-ingress, apicurio-k8s-cr, apicurio-k8s-operator, apicurio-k8s-app, apicurio-k8s-ui, apicurio-k8s-secret] }
     layout3d:
       tiers:
-        - {id: zone0, label: "利用者と既存 IdP", z: 0, origin: [0, 0], size: [5, 6]}
-        - {id: zone1, label: "EKS 制御プレーン", z: 0, origin: [7, 0], size: [5, 5]}
-        - {id: zone2, label: "EKS ノード・Registry", z: 0, origin: [14, 0], size: [5, 15]}
-        - {id: zone3, label: "MSK と RDS", z: 0, origin: [21, 0], size: [5, 6]}
+        - { id: zone0, label: 利用者（クラスター外）, kind: origin, z: 0, origin: [-6, 0], size: [4, 7] }
+        - { id: zone1, label: クラスターの制御と入口, z: 0, size: [5, 10] }
+        - { id: zone2, label: Registry の Pod, z: 0, origin: [7, 0], size: [5, 10] }
+        - { id: zone3, label: データストア, z: 0, origin: [14, 0], size: [5, 6] }
       nodes:
-        aws-eks-apicurio-author: {tier: zone0, x: 2, y: 1}
-        aws-eks-apicurio-idp: {tier: zone0, x: 2, y: 4}
-        aws-eks-apicurio-eks: {tier: zone1, x: 2, y: 1}
-        aws-eks-apicurio-nodes: {tier: zone2, x: 2, y: 1}
-        aws-eks-apicurio-operator: {tier: zone2, x: 2, y: 4}
-        aws-eks-apicurio-registry: {tier: zone2, x: 2, y: 7}
-        aws-eks-apicurio-producer: {tier: zone2, x: 2, y: 10}
-        aws-eks-apicurio-consumer: {tier: zone2, x: 2, y: 13}
-        aws-eks-apicurio-topic: {tier: zone3, x: 2, y: 1}
-        aws-eks-apicurio-versions: {tier: zone3, x: 2, y: 4}
+        apicurio-k8s-admin: { tier: zone0, x: 2, y: 1.5 }
+        apicurio-k8s-clients: { tier: zone0, x: 2, y: 5 }
+        apicurio-k8s-cr: { tier: zone1, x: 2, y: 1 }
+        apicurio-k8s-operator: { tier: zone1, x: 2, y: 4 }
+        apicurio-k8s-ingress: { tier: zone1, x: 2, y: 7.5 }
+        apicurio-k8s-app: { tier: zone2, x: 2, y: 4 }
+        apicurio-k8s-ui: { tier: zone2, x: 2, y: 1 }
+        apicurio-k8s-secret: { tier: zone2, x: 2, y: 7.5 }
+        apicurio-k8s-postgres: { tier: zone3, x: 2, y: 3 }
       groups:
-        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [zone1, zone2, zone3], nodes: [aws-eks-apicurio-eks, aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
-        - {kind: vpc, provider: aws, label: 利用者 VPC, tier: [zone2, zone3], nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer, aws-eks-apicurio-topic, aws-eks-apicurio-versions]}
-        - {kind: cluster, label: "EKS ノード・Registry", tier: [zone2], nodes: [aws-eks-apicurio-nodes, aws-eks-apicurio-operator, aws-eks-apicurio-registry, aws-eks-apicurio-producer, aws-eks-apicurio-consumer]}
-
-gates: {maxDrift: 0, maxHigh: 0}
-blocks:
-  - id: decode
-    title: Kafka レコードの ID で v1 を取得する
-    note: 図では contentId を使い、読み手が v2 の reader schema を指定する構成を想定。
-    legend:
-      "0": v1 の内容
-      "1": v2 のフィールド
-    lanes:
-      - id: registered
-        label: Registry
-        node: versions
-      - id: topic
-        label: Kafka 履歴
-        node: topic
-      - id: consumer
-        label: v2 Consumer
-        node: app
-    items:
-      registered:
-        - id: v1
-          label: v1 · id
-          k: 0
-        - id: v2
-          label: v2 · currency = JPY
-          k: 1
-      topic: []
-      consumer: []
-  - id: rules
-    title: 最新バージョンと履歴全体の互換性検査
-    note: v1 と v2 がともに比較対象として有効な場合の例。
-    legend:
-      "0": v1
-      "1": v2 または通過
-      "2": v3 または拒否
-    lanes:
-      - id: history
-        label: 登録済みの版
-        node: versions
-      - id: proposed
-        label: 登録候補
-        node: submitter
-      - id: result
-        label: 検査結果
-        node: policy
-    items:
-      history:
-        - id: v1
-          label: v1 · id
-          k: 0
-        - id: v2
-          label: v2 · currency = JPY
-          k: 1
-      proposed: []
-      result: []
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [zone1, zone2, zone3], nodes: [apicurio-k8s-ingress, apicurio-k8s-cr, apicurio-k8s-operator, apicurio-k8s-app, apicurio-k8s-ui, apicurio-k8s-secret, apicurio-k8s-postgres] }
+        - { kind: cluster, label: Kubernetes クラスター, provider: k8s, tier: [zone1, zone2], nodes: [apicurio-k8s-ingress, apicurio-k8s-cr, apicurio-k8s-operator, apicurio-k8s-app, apicurio-k8s-ui, apicurio-k8s-secret] }

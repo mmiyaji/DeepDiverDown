@@ -1,0 +1,339 @@
+{
+  "model": "risingwave-hummock-compaction",
+  "name": "RisingWave：Hummock ストレージとコンパクション",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "Compute（状態の書き込み）",
+      "status": "claim"
+    },
+    "buffer": {
+      "type": "node",
+      "label": "共有バッファ（メモリ）",
+      "status": "claim"
+    },
+    "l0": {
+      "type": "node",
+      "label": "L0（未ソートの SST）",
+      "status": "claim"
+    },
+    "levels": {
+      "type": "node",
+      "label": "L1 以上（ソート済みの SST）",
+      "status": "claim"
+    },
+    "objstore": {
+      "type": "node",
+      "label": "オブジェクトストレージ",
+      "status": "claim"
+    },
+    "meta": {
+      "type": "node",
+      "label": "Meta（コンパクションタスクの生成）",
+      "status": "claim"
+    },
+    "compactor": {
+      "type": "node",
+      "label": "Compactor",
+      "status": "claim"
+    },
+    "stall": {
+      "type": "node",
+      "label": "書き込み停止のしきい値",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "読み取り（Get・Iter）",
+      "status": "claim"
+    },
+    "cache": {
+      "type": "node",
+      "label": "ブロック・メタキャッシュ",
+      "status": "claim"
+    },
+    "flush": {
+      "type": "link",
+      "label": "Compute（状態の書き込み） → 共有バッファ（メモリ）",
+      "status": "claim"
+    },
+    "upload": {
+      "type": "link",
+      "label": "共有バッファ（メモリ） → L0（未ソートの SST）",
+      "status": "claim"
+    },
+    "compact-in": {
+      "type": "link",
+      "label": "L0（未ソートの SST） → Compactor",
+      "status": "claim"
+    },
+    "compact-out": {
+      "type": "link",
+      "label": "Compactor → L1 以上（ソート済みの SST）",
+      "status": "claim"
+    },
+    "task": {
+      "type": "link",
+      "label": "Meta（コンパクションタスクの生成） → Compactor",
+      "status": "claim"
+    },
+    "save-l0": {
+      "type": "link",
+      "label": "L0（未ソートの SST） → オブジェクトストレージ",
+      "status": "claim"
+    },
+    "save-lv": {
+      "type": "link",
+      "label": "L1 以上（ソート済みの SST） → オブジェクトストレージ",
+      "status": "claim"
+    },
+    "watch": {
+      "type": "link",
+      "label": "Meta（コンパクションタスクの生成） → 書き込み停止のしきい値",
+      "status": "claim"
+    },
+    "stop": {
+      "type": "link",
+      "label": "書き込み停止のしきい値 → Compute（状態の書き込み）",
+      "status": "claim"
+    },
+    "lookup": {
+      "type": "link",
+      "label": "読み取り（Get・Iter） → ブロック・メタキャッシュ",
+      "status": "claim"
+    },
+    "miss": {
+      "type": "link",
+      "label": "ブロック・メタキャッシュ → オブジェクトストレージ",
+      "status": "claim"
+    },
+    "lsm": {
+      "type": "scenario",
+      "label": "書き込みからコンパクションと読み取りまで"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "SST のファイル形式、層ごとのサイズ比、コンパクションの選択アルゴリズムは確認した資料に記載がない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Elastic disk cache は資料で有償機能（v2.3.0 で追加）とされている。自己運用版での利用条件は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "共有バッファと checkpoint の関係の細部（どの時点で SST が確定するか）は資料に記載が少なく、図は概略。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "実装例の台数・ノードサイズ・バージョン互換性は資料で指定されていない。"
+    },
+    "rw-aws-client": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "psql などの SQL クライアント",
+      "realizes": []
+    },
+    "rw-aws-eks": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Amazon EKS / Kubernetes API",
+      "realizes": []
+    },
+    "rw-aws-iam": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "IAM / サービスアカウント用ロール",
+      "realizes": []
+    },
+    "rw-aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "EC2 / EKS ノードグループ",
+      "realizes": []
+    },
+    "rw-aws-frontend": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Frontend Pod",
+      "realizes": []
+    },
+    "rw-aws-meta": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Meta Pod",
+      "realizes": [
+        "meta"
+      ]
+    },
+    "rw-aws-compute": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Compute Pod",
+      "realizes": [
+        "writer",
+        "buffer",
+        "reader",
+        "cache",
+        "stall"
+      ]
+    },
+    "rw-aws-compactor": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Compactor Pod",
+      "realizes": [
+        "compactor"
+      ]
+    },
+    "rw-aws-s3": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "Amazon S3（Hummock の state store）",
+      "realizes": [
+        "l0",
+        "levels",
+        "objstore"
+      ]
+    },
+    "rw-aws-rds": {
+      "type": "implementation",
+      "impl": "aws-eks",
+      "label": "RDS for PostgreSQL（meta store）",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-risingwave-hummock-compaction.md#§1": [
+      "model"
+    ],
+    "docs/reference-risingwave-hummock-compaction.md": [
+      "model",
+      "writer",
+      "buffer",
+      "l0",
+      "levels",
+      "objstore",
+      "meta",
+      "compactor",
+      "stall",
+      "reader",
+      "cache",
+      "flush",
+      "upload",
+      "compact-in",
+      "compact-out",
+      "task",
+      "save-l0",
+      "save-lv",
+      "watch",
+      "stop",
+      "lookup",
+      "miss",
+      "lsm",
+      "rw-aws-client",
+      "rw-aws-eks",
+      "rw-aws-iam",
+      "rw-aws-ec2",
+      "rw-aws-frontend",
+      "rw-aws-meta",
+      "rw-aws-compute",
+      "rw-aws-compactor",
+      "rw-aws-s3",
+      "rw-aws-rds"
+    ],
+    "docs/reference-risingwave-hummock-compaction.md#§3": [
+      "writer",
+      "buffer",
+      "l0",
+      "flush",
+      "upload",
+      "lsm"
+    ],
+    "docs/reference-risingwave-hummock-compaction.md#§6": [
+      "buffer",
+      "compactor",
+      "stall",
+      "watch",
+      "stop"
+    ],
+    "docs/reference-risingwave-hummock-compaction.md#§2": [
+      "l0",
+      "levels",
+      "objstore",
+      "save-l0",
+      "save-lv"
+    ],
+    "docs/reference-risingwave-hummock-compaction.md#§4": [
+      "levels",
+      "meta",
+      "compactor",
+      "compact-in",
+      "compact-out",
+      "task",
+      "lsm"
+    ],
+    "docs/reference-risingwave-hummock-compaction.md#§5": [
+      "reader",
+      "cache",
+      "lookup",
+      "miss",
+      "lsm"
+    ],
+    "docs/reference-risingwave-hummock-compaction.md#§7": [
+      "rw-aws-client",
+      "rw-aws-eks",
+      "rw-aws-iam",
+      "rw-aws-ec2",
+      "rw-aws-frontend",
+      "rw-aws-meta",
+      "rw-aws-compute",
+      "rw-aws-compactor",
+      "rw-aws-s3",
+      "rw-aws-rds"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "RisingWave",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "risingwave",
+    "objectives": [
+      "Hummock が行ベースの LSM で、永続コピーをオブジェクトストレージに置くことを説明する。",
+      "書き込み（共有バッファ→L0）、コンパクション（L0→L1 以上）、読み取り（キャッシュ→オブジェクトストレージ）の経路を追う。",
+      "コンパクションが遅れたときの兆候（L0 サブレベルの書き込み停止、削除印の滞留）を読み取る。"
+    ],
+    "sources": [
+      {
+        "title": "RisingWave · Storage overview",
+        "url": "https://docs.risingwave.com/store/overview"
+      },
+      {
+        "title": "RisingWave · Architecture",
+        "url": "https://docs.risingwave.com/get-started/architecture"
+      },
+      {
+        "title": "RisingWave · Data persistence",
+        "url": "https://docs.risingwave.com/reference/data-persistence"
+      },
+      {
+        "title": "RisingWave · Specific bottlenecks (compaction)",
+        "url": "https://docs.risingwave.com/performance/specific-bottlenecks"
+      },
+      {
+        "title": "RisingWave · Elastic disk cache",
+        "url": "https://docs.risingwave.com/get-started/disk-cache"
+      },
+      {
+        "title": "RisingWave · Hardware requirements",
+        "url": "https://docs.risingwave.com/deploy/hardware-requirements"
+      }
+    ]
+  }
+}

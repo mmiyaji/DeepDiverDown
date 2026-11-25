@@ -1,0 +1,245 @@
+{
+  "model": "kafka-log-segments",
+  "name": "Kafka：パーティションとログセグメント・offset",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "producer": {
+      "type": "node",
+      "label": "Producer",
+      "status": "claim"
+    },
+    "leader": {
+      "type": "node",
+      "label": "パーティションのリーダー Broker",
+      "status": "claim"
+    },
+    "active": {
+      "type": "node",
+      "label": "アクティブセグメント",
+      "status": "claim"
+    },
+    "closed": {
+      "type": "node",
+      "label": "閉じたセグメント",
+      "status": "claim"
+    },
+    "retention": {
+      "type": "node",
+      "label": "保持による削除",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "Consumer",
+      "status": "claim"
+    },
+    "offsets": {
+      "type": "node",
+      "label": "__consumer_offsets",
+      "status": "claim"
+    },
+    "append": {
+      "type": "link",
+      "label": "Producer → パーティションのリーダー Broker",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "パーティションのリーダー Broker → アクティブセグメント",
+      "status": "claim"
+    },
+    "roll": {
+      "type": "link",
+      "label": "アクティブセグメント → 閉じたセグメント",
+      "status": "claim"
+    },
+    "expire": {
+      "type": "link",
+      "label": "保持による削除 → 閉じたセグメント",
+      "status": "claim"
+    },
+    "lookup": {
+      "type": "link",
+      "label": "閉じたセグメント → パーティションのリーダー Broker",
+      "status": "claim"
+    },
+    "fetch": {
+      "type": "link",
+      "label": "パーティションのリーダー Broker → Consumer",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "Consumer → __consumer_offsets",
+      "status": "claim"
+    },
+    "kafka-log-lifecycle": {
+      "type": "scenario",
+      "label": "追記・読み出し・巻き戻し・削除"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": ".index・.timeindex のファイル形式と索引の間隔は、確認した Implementation のページに記載がない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "High Watermark という語の定義の出典は未確認。コミット済みの範囲は Design のページに基づく。"
+    },
+    "lseg-producer": {
+      "type": "implementation",
+      "impl": "onprem-log-dirs",
+      "label": "KafkaProducer",
+      "realizes": [
+        "producer"
+      ]
+    },
+    "lseg-consumer": {
+      "type": "implementation",
+      "impl": "onprem-log-dirs",
+      "label": "KafkaConsumer",
+      "realizes": [
+        "consumer"
+      ]
+    },
+    "lseg-host": {
+      "type": "implementation",
+      "impl": "onprem-log-dirs",
+      "label": "Linux Broker ホスト",
+      "realizes": []
+    },
+    "lseg-broker": {
+      "type": "implementation",
+      "impl": "onprem-log-dirs",
+      "label": "Kafka Broker プロセス",
+      "realizes": [
+        "leader",
+        "retention"
+      ]
+    },
+    "lseg-disk": {
+      "type": "implementation",
+      "impl": "onprem-log-dirs",
+      "label": "log.dirs のローカルディスク",
+      "realizes": [
+        "active",
+        "closed"
+      ]
+    },
+    "lseg-offsets": {
+      "type": "implementation",
+      "impl": "onprem-log-dirs",
+      "label": "Broker 上の __consumer_offsets",
+      "realizes": [
+        "offsets"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-kafka-log-segments.md#§1": [
+      "model"
+    ],
+    "docs/reference-kafka-log-segments.md": [
+      "model",
+      "producer",
+      "leader",
+      "active",
+      "closed",
+      "retention",
+      "consumer",
+      "offsets",
+      "append",
+      "write",
+      "roll",
+      "expire",
+      "lookup",
+      "fetch",
+      "commit",
+      "kafka-log-lifecycle",
+      "lseg-producer",
+      "lseg-consumer",
+      "lseg-host",
+      "lseg-broker",
+      "lseg-disk",
+      "lseg-offsets"
+    ],
+    "docs/reference-kafka-log-segments.md#§4": [
+      "producer",
+      "leader",
+      "active",
+      "append",
+      "write",
+      "kafka-log-lifecycle"
+    ],
+    "docs/reference-kafka-log-segments.md#§5": [
+      "leader",
+      "closed",
+      "consumer",
+      "lookup",
+      "fetch",
+      "kafka-log-lifecycle"
+    ],
+    "docs/reference-kafka-log-segments.md#§3": [
+      "active",
+      "closed",
+      "roll",
+      "kafka-log-lifecycle"
+    ],
+    "docs/reference-kafka-log-segments.md#§6": [
+      "retention",
+      "expire",
+      "kafka-log-lifecycle"
+    ],
+    "docs/reference-kafka-log-segments.md#§7": [
+      "consumer",
+      "offsets",
+      "commit",
+      "kafka-log-lifecycle"
+    ],
+    "docs/reference-kafka-log-segments.md#§2": [
+      "kafka-log-lifecycle"
+    ],
+    "docs/reference-kafka-log-segments.md#§8": [
+      "lseg-producer",
+      "lseg-consumer",
+      "lseg-host",
+      "lseg-broker",
+      "lseg-disk",
+      "lseg-offsets"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Kafka",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "kafka",
+    "objectives": [
+      "offset、LEO、コミット済みの範囲、Consumer の位置を区別する。",
+      "アクティブセグメントが閉じ、閉じたセグメントが保持設定で削除される流れを追う。",
+      "offset から該当セグメントを探して読む手順を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Kafka Log Implementation",
+        "url": "https://kafka.apache.org/44/implementation/log/"
+      },
+      {
+        "title": "Apache Kafka Design",
+        "url": "https://kafka.apache.org/44/design/design/"
+      },
+      {
+        "title": "Topic Configs",
+        "url": "https://kafka.apache.org/44/configuration/topic-configs/"
+      },
+      {
+        "title": "Broker Configs",
+        "url": "https://kafka.apache.org/44/configuration/broker-configs/"
+      }
+    ]
+  }
+}

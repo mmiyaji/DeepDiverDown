@@ -91,7 +91,7 @@
     {
       "id": "kafka",
       "name": "Apache Kafka の基本アーキテクチャ",
-      "description": "追記型の分散ログが、Producer の書き込みを受け、Broker 間で複製し、Consumer Group に読まれるまでを追うリファレンスです。",
+      "description": "追記型の分散ログが、Producer の書き込みを受け、Broker 間で複製し、Consumer Group に読まれるまでの主要な部品を示す。",
       "domain": "データ処理",
       "category": "ストリーム処理",
       "kind": "製品・技術のアーキテクチャ",
@@ -100,8 +100,8 @@
         "Apache"
       ],
       "objectives": [
-        "Topic、パーティション、Broker、Controller の役割を区別する。",
-        "書き込み、複製、ACK、読み出し、オフセットの保存を順に追う。",
+        "Topic、パーティション、Broker、KRaft Controller の役割を区別する。",
+        "書き込み、複製、読み出し、offset の保存、ログの保存先を順に追う。",
         "Broker 障害でパーティションのリーダーが切り替わる流れを理解する。"
       ],
       "documents": [
@@ -123,6 +123,10 @@
         {
           "title": "Producer Configs",
           "url": "https://kafka.apache.org/44/configuration/producer-configs/"
+        },
+        {
+          "title": "Consumer Configs",
+          "url": "https://kafka.apache.org/44/configuration/consumer-configs/"
         }
       ],
       "implementations": [
@@ -177,12 +181,186 @@
       ]
     },
     {
+      "id": "kafka-log-segments",
+      "name": "Kafka：パーティションとログセグメント・offset",
+      "description": "パーティションのログがセグメントファイルに追記され、offset で読まれ、セグメント単位で削除される流れを追う。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "offset、LEO、コミット済みの範囲、Consumer の位置を区別する。",
+        "アクティブセグメントが閉じ、閉じたセグメントが保持設定で削除される流れを追う。",
+        "offset から該当セグメントを探して読む手順を説明する。"
+      ],
+      "documents": [
+        "docs/reference-kafka-log-segments.md"
+      ],
+      "sources": [
+        {
+          "title": "Kafka Log Implementation",
+          "url": "https://kafka.apache.org/44/implementation/log/"
+        },
+        {
+          "title": "Apache Kafka Design",
+          "url": "https://kafka.apache.org/44/design/design/"
+        },
+        {
+          "title": "Topic Configs",
+          "url": "https://kafka.apache.org/44/configuration/topic-configs/"
+        },
+        {
+          "title": "Broker Configs",
+          "url": "https://kafka.apache.org/44/configuration/broker-configs/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem-log-dirs",
+          "label": "自前 Linux ホストのログディレクトリ",
+          "sources": [
+            {
+              "title": "Kafka Log Implementation",
+              "url": "https://kafka.apache.org/44/implementation/log/"
+            },
+            {
+              "title": "Topic Configs",
+              "url": "https://kafka.apache.org/44/configuration/topic-configs/"
+            },
+            {
+              "title": "Broker Configs",
+              "url": "https://kafka.apache.org/44/configuration/broker-configs/"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kafka-replication",
+      "name": "Kafka：レプリケーションと ISR・障害復旧",
+      "description": "リーダーとフォロワーの複製、ISR、acks、リーダー障害後の選出と再開を追う。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "リーダー、フォロワー、ISR、コミット済みの関係を説明する。",
+        "acks=all と min.insync.replicas が書き込み応答にどう効くかを追う。",
+        "リーダー障害から選出、再送、ISR 復帰までの流れを追う。"
+      ],
+      "documents": [
+        "docs/reference-kafka-replication.md"
+      ],
+      "sources": [
+        {
+          "title": "Apache Kafka Design",
+          "url": "https://kafka.apache.org/44/design/design/"
+        },
+        {
+          "title": "Producer Configs",
+          "url": "https://kafka.apache.org/44/configuration/producer-configs/"
+        },
+        {
+          "title": "Broker Configs",
+          "url": "https://kafka.apache.org/44/configuration/broker-configs/"
+        },
+        {
+          "title": "KRaft",
+          "url": "https://kafka.apache.org/44/operations/kraft/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-msk-fargate",
+          "label": "AWS（Amazon MSK と ECS on Fargate）",
+          "sources": [
+            {
+              "title": "MSK Provisioned クラスターの作成",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html"
+            },
+            {
+              "title": "Amazon MSK と KRaft",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/metadata-management.html"
+            },
+            {
+              "title": "MSK の IAM アクセス制御",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html"
+            },
+            {
+              "title": "Amazon ECS のサービス定義",
+              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kafka-consumer-groups",
+      "name": "Kafka：Consumer Group とリバランス",
+      "description": "Consumer Group がパーティションを分担し、メンバーの増減で担当を組み替え、コミット済み offset から再開する流れを追う。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "グループ内で 1 つのパーティションを 1 つの Consumer が読む規則を説明する。",
+        "Group Coordinator と __consumer_offsets の役割を区別する。",
+        "協調的な割り当てで、動かすパーティションだけが移ることを追う。"
+      ],
+      "documents": [
+        "docs/reference-kafka-consumer-groups.md"
+      ],
+      "sources": [
+        {
+          "title": "Apache Kafka Design",
+          "url": "https://kafka.apache.org/44/design/design/"
+        },
+        {
+          "title": "Consumer Configs",
+          "url": "https://kafka.apache.org/44/configuration/consumer-configs/"
+        },
+        {
+          "title": "Apache Kafka Protocol",
+          "url": "https://kafka.apache.org/44/design/protocol/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-msk-fargate-group",
+          "label": "AWS（Amazon MSK と ECS on Fargate）",
+          "sources": [
+            {
+              "title": "Amazon ECS のサービス定義",
+              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html"
+            },
+            {
+              "title": "MSK の IAM アクセス制御",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html"
+            },
+            {
+              "title": "MSK Provisioned クラスターの作成",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "kafka-connect",
-      "name": "Apache Kafka Connect の基本アーキテクチャ",
+      "name": "Kafka：Kafka Connect の Worker・Task とオフセット",
       "description": "外部DBの受注データが Source Connector、Kafka Topic、Sink Connector を経て保存先に届く流れを追います。",
       "domain": "データ処理",
       "category": "取り込み",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
         "Apache"
@@ -190,7 +368,8 @@
       "objectives": [
         "Connector と Worker、Source Task と Sink Task の役割を区別する。",
         "外部DBから Kafka を経由し、保存先に書き込まれる流れを追う。",
-        "Source 側と Sink 側で何の進捗を記録するかを理解する。"
+        "Source 側と Sink 側で何の進捗を記録するかを理解する。",
+        "分散モードの内部 Topic と、変換・エラー処理の設定を区別する。"
       ],
       "documents": [
         "docs/reference-kafka-connect.md"
@@ -712,7 +891,7 @@
     {
       "id": "flink",
       "name": "Apache Flink の基本アーキテクチャ",
-      "description": "Kafka のイベントをイベント時刻の窓で集計し、状態とチェックポイントから復旧する流れを追うリファレンスです。",
+      "description": "JobManager（Dispatcher・JobMaster・ResourceManager）、TaskManager のスロット、Source と Sink、状態バックエンド、チェックポイント保存先の役割と、ジョブが動いて復旧するまでの流れ。",
       "domain": "データ処理",
       "category": "ストリーム処理",
       "kind": "製品・技術のアーキテクチャ",
@@ -721,81 +900,357 @@
         "Apache"
       ],
       "objectives": [
-        "Source、ウォーターマーク、状態付き演算子、Sink の役割を区別する。",
-        "イベント時刻とウォーターマークで窓を閉じる流れを理解する。",
-        "チェックポイントから入力位置と演算子状態を復元する。"
+        "JobManager の 3 つの役割（Dispatcher・JobMaster・ResourceManager）と TaskManager のスロットを区別する。",
+        "Source・Operator・Sink のデータの流れと、状態・チェックポイントの置き場所を説明する。",
+        "Amazon Managed Service for Apache Flink と自前ホストの Standalone で、利用者が管理する範囲の違いを読む。"
       ],
       "documents": [
         "docs/reference-flink.md"
       ],
       "sources": [
         {
-          "title": "Stateful Stream Processing",
+          "title": "Flink · Flink Architecture",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/"
+        },
+        {
+          "title": "Flink · Overview (API layers)",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/overview/"
+        },
+        {
+          "title": "Flink · Stateful Stream Processing",
           "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/"
         },
         {
-          "title": "Timely Stream Processing",
-          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"
+          "title": "Flink · State Backends",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/"
+        },
+        {
+          "title": "Flink · Native Kubernetes",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+        },
+        {
+          "title": "Managed Service for Apache Flink · How it works",
+          "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html"
         }
       ],
       "implementations": [
         {
-          "id": "kafka-managed-state",
-          "label": "Flink・Kafka・永続チェックポイント",
+          "id": "msf",
+          "label": "Amazon Managed Service for Apache Flink と MSK",
           "sources": [
             {
-              "title": "Stateful Stream Processing",
-              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/"
+              "title": "Managed Service for Apache Flink · How it works",
+              "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html"
             },
             {
-              "title": "Timely Stream Processing",
-              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"
+              "title": "Managed Service for Apache Flink · Fault tolerance",
+              "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-fault.html"
             },
             {
-              "title": "Flink Checkpointing",
-              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/"
+              "title": "Managed Service for Apache Flink · Application scaling",
+              "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-scaling.html"
             },
             {
-              "title": "Flink State Backends",
-              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/"
-            },
-            {
-              "title": "Flink Standalone Deployment",
-              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/standalone/overview/"
+              "title": "Flink · Flink Architecture",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/"
             }
           ]
         },
         {
-          "id": "aws-emr-eks-flink",
-          "label": "Amazon EMR on EKS の Flink・MSK・S3",
+          "id": "standalone",
+          "label": "自前ホストの Standalone クラスタと Kafka・HDFS",
           "sources": [
             {
-              "title": "EMR on EKS で Flink アプリケーションを実行する",
-              "url": "https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-kubernetes-operator-run-application.html"
+              "title": "Flink · Standalone deployment",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/standalone/overview/"
             },
             {
-              "title": "EMR on EKS の Flink Operator を準備する",
-              "url": "https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-kubernetes-operator-setup.html"
+              "title": "Flink · Flink Architecture",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/"
             },
             {
-              "title": "EKS マネージドノードグループ",
-              "url": "https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html"
-            },
-            {
-              "title": "Flink の Kubernetes HA",
-              "url": "https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-using-ha.html"
-            },
-            {
-              "title": "Flink の状態バックエンド",
+              "title": "Flink · State Backends",
               "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/"
             },
             {
-              "title": "EKS VPC とサブネット",
-              "url": "https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html"
+              "title": "Flink · Kafka connector",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flink-job-graph-slots",
+      "name": "Flink：ジョブグラフ・Task とスロット",
+      "description": "データフローが JobGraph になり、Operator のチェーンが Task になって、TaskManager のスロットに並列の Subtask として置かれるまで。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "Operator・Task・Subtask・スロットを区別する。",
+        "Operator chaining とスロット共有が必要なスロット数をどう変えるかを説明する。",
+        "Application クラスタと Session クラスタの違いを、スロットの確保の時点で比べる。"
+      ],
+      "documents": [
+        "docs/reference-flink-job-graph-slots.md"
+      ],
+      "sources": [
+        {
+          "title": "Flink · Flink Architecture",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/"
+        },
+        {
+          "title": "Flink · Parallel Execution",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/execution/parallel/"
+        },
+        {
+          "title": "Flink · Native Kubernetes",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+        },
+        {
+          "title": "Amazon EKS managed node groups",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "eks-native",
+          "label": "EKS 上の Application モード（native Kubernetes）",
+          "sources": [
+            {
+              "title": "Flink · Native Kubernetes",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
             },
             {
-              "title": "MSK クライアントのアクセス",
-              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html"
+              "title": "Flink · Flink Architecture",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flink-event-time-windows",
+      "name": "Flink：イベント時刻とウォーターマーク・ウィンドウ",
+      "description": "イベントの時刻を基準に Watermark が進み、窓が確定して結果が出る流れと、遅れて届いたデータの扱い。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "イベント時刻と処理時刻を区別する。",
+        "Watermark が窓を確定させる条件と、並列入力での進み方（最小値）を説明する。",
+        "許容遅延と side output の役割を区別する。"
+      ],
+      "documents": [
+        "docs/reference-flink-event-time-windows.md"
+      ],
+      "sources": [
+        {
+          "title": "Flink · Timely Stream Processing",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"
+        },
+        {
+          "title": "Flink · Generating Watermarks",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/event-time/generating_watermarks/"
+        },
+        {
+          "title": "Flink · Windows",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/operators/windows/"
+        },
+        {
+          "title": "Flink · Kafka connector",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/"
+        },
+        {
+          "title": "Managed Service for Apache Flink · How it works",
+          "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "msf",
+          "label": "Amazon Managed Service for Apache Flink と MSK",
+          "sources": [
+            {
+              "title": "Managed Service for Apache Flink · How it works",
+              "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html"
+            },
+            {
+              "title": "Managed Service for Apache Flink · Application scaling",
+              "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-scaling.html"
+            },
+            {
+              "title": "Flink · Timely Stream Processing",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"
+            },
+            {
+              "title": "Flink · Kafka connector",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flink-state-checkpoint",
+      "name": "Flink：状態バックエンドとチェックポイント",
+      "description": "キー付き状態の置き場所（HashMap・RocksDB）、バリアによるチェックポイント、保存先、Source の再読と Sink のトランザクションによる exactly-once の範囲。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "状態バックエンドとチェックポイント保存先が別の設定であることを説明する。",
+        "バリアとアライメントで一貫したスナップショットができる流れを追う。",
+        "exactly-once がどこまで保証されるか（Source の再読・Sink のトランザクション）を説明する。"
+      ],
+      "documents": [
+        "docs/reference-flink-state-checkpoint.md"
+      ],
+      "sources": [
+        {
+          "title": "Flink · Stateful Stream Processing",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/"
+        },
+        {
+          "title": "Flink · State Backends",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/"
+        },
+        {
+          "title": "Flink · Checkpointing",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/"
+        },
+        {
+          "title": "Flink · Kafka connector",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/"
+        },
+        {
+          "title": "Flink · Parallel Execution",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/execution/parallel/"
+        },
+        {
+          "title": "Flink · Kubernetes HA Services",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "eks-rocksdb-s3",
+          "label": "EKS 上の Flink・RocksDB・S3・MSK",
+          "sources": [
+            {
+              "title": "Flink · State Backends",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/"
+            },
+            {
+              "title": "Flink · Checkpointing",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/"
+            },
+            {
+              "title": "Flink · Kafka connector",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/"
+            },
+            {
+              "title": "Flink · Native Kubernetes",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+            },
+            {
+              "title": "Flink · Kubernetes HA Services",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flink-kubernetes-operations",
+      "name": "Flink：Kubernetes 上の運用",
+      "description": "native Kubernetes の Application モード、Flink Kubernetes Operator、Kubernetes HA、チェックポイントからの再開をまとめて追う。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "JobManager Deployment と TaskManager Pod の作られ方を説明する。",
+        "Operator が宣言どおりに Flink クラスタを保つ役割を、Flink 本体の ResourceManager と区別する。",
+        "HA の ConfigMap と保存先、チェックポイントからの復旧を結び付ける。"
+      ],
+      "documents": [
+        "docs/reference-flink-kubernetes-operations.md"
+      ],
+      "sources": [
+        {
+          "title": "Flink · Native Kubernetes",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+        },
+        {
+          "title": "Flink Kubernetes Operator · Overview",
+          "url": "https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-stable/docs/concepts/overview/"
+        },
+        {
+          "title": "Flink · Kubernetes HA Services",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/"
+        },
+        {
+          "title": "Flink · Checkpointing",
+          "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/"
+        },
+        {
+          "title": "Amazon EKS managed node groups",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+        },
+        {
+          "title": "IAM roles for service accounts",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "eks-operator",
+          "label": "EKS 上の Flink Kubernetes Operator と S3",
+          "sources": [
+            {
+              "title": "Flink Kubernetes Operator · Overview",
+              "url": "https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-stable/docs/concepts/overview/"
+            },
+            {
+              "title": "Flink · Native Kubernetes",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+            },
+            {
+              "title": "Flink · Kubernetes HA Services",
+              "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
             }
           ]
         }
@@ -803,11 +1258,11 @@
     },
     {
       "id": "kafka-streams",
-      "name": "Apache Kafka Streams の基本アーキテクチャ",
-      "description": "Kafka Topic をアプリケーション内のトポロジーで処理し、状態ストアを changelog から復元する流れを追うリファレンスです。",
+      "name": "Kafka：Kafka Streams の Task と状態ストア",
+      "description": "入力パーティションが Task に割り当てられ、状態ストアの内容が changelog Topic で復旧されるまでを追う。",
       "domain": "データ処理",
       "category": "ストリーム処理",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
         "Apache"
@@ -815,7 +1270,8 @@
       "objectives": [
         "Topic パーティション、Task、Processor Topology の関係を理解する。",
         "集計状態を Local State Store に保持する流れを追う。",
-        "changelog Topic による状態復元と Task 再配置を理解する。"
+        "changelog Topic による状態復元と Task 再配置を理解する。",
+        "時刻の扱いと処理保証の設定が、状態と出力にどう効くかを区別する。"
       ],
       "documents": [
         "docs/reference-kafka-streams.md"
@@ -824,6 +1280,14 @@
         {
           "title": "Kafka Streams Architecture",
           "url": "https://kafka.apache.org/44/streams/architecture/"
+        },
+        {
+          "title": "Kafka Streams Core Concepts",
+          "url": "https://kafka.apache.org/44/streams/core-concepts/"
+        },
+        {
+          "title": "Configuring a Streams Application",
+          "url": "https://kafka.apache.org/44/streams/developer-guide/config-streams/"
         }
       ],
       "implementations": [
@@ -5187,8 +5651,8 @@
     },
     {
       "id": "apicurio-registry",
-      "name": "Apicurio Registry の Avro スキーマ管理と互換性",
-      "description": "Kafka 上の Avro メッセージを正しい writer schema で読み、スキーマ登録時の BACKWARD・FORWARD と履歴全体の検査を比較する。",
+      "name": "Apicurio Registry の基本アーキテクチャ",
+      "description": "REST API・Web コンソール・ルール・グループ/アーティファクト/バージョン・ストレージ・SerDes クライアントの役割と、スキーマの登録と取得の流れ。",
       "domain": "データ処理",
       "category": "ストリーム処理",
       "kind": "製品・技術のアーキテクチャ",
@@ -5197,73 +5661,179 @@
         "Apicurio"
       ],
       "objectives": [
-        "メッセージに付くスキーマ ID から実際の writer schema を取得する流れを説明する。",
-        "Avro の writer schema と reader schema の役割を区別する。",
-        "BACKWARD、FORWARD、FULL と transitive が検査する組み合わせを説明する。"
+        "REST API、Web コンソール、Confluent 互換 API、SerDes クライアントの入口を区別する。",
+        "グループ、アーティファクト、バージョン、コンテンツ、ID の関係を説明する。",
+        "ルールが新しいバージョンの受け入れ前に働くことと、ストレージの選択肢（H2・PostgreSQL・KafkaSQL）を説明する。"
       ],
       "documents": [
         "docs/reference-apicurio-registry.md"
       ],
       "sources": [
         {
-          "title": "Apicurio Registry 3.4 Kafka SerDes",
-          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html"
+          "title": "Introduction to Apicurio Registry",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-the-registry.html"
         },
         {
-          "title": "Apicurio Registry 3.4 Schema Compatibility Modes",
-          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html"
+          "title": "Apicurio Registry concepts and glossary",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html"
         },
         {
-          "title": "Apache Avro 1.12 Schema Resolution",
-          "url": "https://avro.apache.org/docs/1.12.0/specification/#schema-resolution"
+          "title": "Apicurio Registry content rules",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html"
         },
         {
-          "title": "Apicurio Registry 3.2 Concepts Glossary",
-          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.2.x/getting-started/assembly-registry-concepts-glossary.html"
+          "title": "Installing Apicurio Registry storage on OpenShift",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html"
+        },
+        {
+          "title": "Deploying Apicurio Registry for high availability",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html"
         }
       ],
       "implementations": [
         {
-          "id": "apicurio-postgres",
-          "label": "Kafka・Apicurio Registry・PostgreSQL",
+          "id": "apicurio-k8s-postgres",
+          "label": "オンプレミス Kubernetes・Operator・PostgreSQL",
           "sources": [
             {
-              "title": "Apicurio Registry 3.4 Kafka SerDes",
-              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html"
+              "title": "Deploying Apicurio Registry using the Operator",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-deploying-registry-operator.html"
             },
             {
-              "title": "Apicurio Registry 3.4 Schema Compatibility Modes",
+              "title": "Deploying Apicurio Registry for high availability",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html"
+            },
+            {
+              "title": "Installing Apicurio Registry storage on OpenShift",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html"
+            },
+            {
+              "title": "Introduction to Apicurio Registry",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-the-registry.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apicurio-registry-serdes-id",
+      "name": "Apicurio Registry：シリアライザーとスキーマ ID の受け渡し",
+      "description": "Serializer がアーティファクトの座標を決めて ID をレコードに付け、Deserializer がその ID から writer schema を取り出す流れ。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apicurio"
+      ],
+      "objectives": [
+        "Serializer が座標の決定、検索、登録、ID の書き込みを行う順序を説明する。",
+        "contentId と globalId、ペイロードとヘッダーの違いを区別する。",
+        "Deserializer が ID から writer schema を取得し、キャッシュと再試行、フォールバックを使う流れを追う。"
+      ],
+      "documents": [
+        "docs/reference-apicurio-registry-serdes-id.md"
+      ],
+      "sources": [
+        {
+          "title": "Validating Kafka messages using SerDes in Java clients",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-using-kafka-client-serdes.html"
+        },
+        {
+          "title": "Configuring Kafka SerDes in Java clients",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-configuring-kafka-client-serdes.html"
+        },
+        {
+          "title": "Apicurio Registry concepts and glossary",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html"
+        },
+        {
+          "title": "Installing Apicurio Registry storage on OpenShift",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "apicurio-serdes-k8s-kafkasql",
+          "label": "オンプレミス Kubernetes・Kafka・KafkaSQL",
+          "sources": [
+            {
+              "title": "Configuring Kafka SerDes in Java clients",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-configuring-kafka-client-serdes.html"
+            },
+            {
+              "title": "Installing Apicurio Registry storage on OpenShift",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-storage-openshift.html"
+            },
+            {
+              "title": "Deploying Apicurio Registry for high availability",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-high-availability.html"
+            },
+            {
+              "title": "Deploying Apicurio Registry using the Operator",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-deploying-registry-operator.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apicurio-registry-compatibility",
+      "name": "Apicurio Registry：互換性ルールとバージョン管理",
+      "description": "新しいバージョンの登録時に、ルールの優先順位、互換性モード、比較対象の版が検査結果を決める流れ。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apicurio"
+      ],
+      "objectives": [
+        "ルールがグローバル・グループ・アーティファクトの順に優先し、新しいバージョンの追加時に働くことを説明する。",
+        "BACKWARD、FORWARD、FULL と transitive が比べる版の範囲を区別する。",
+        "DISABLED と DEPRECATED の版が比較対象に入るかどうかを説明する。"
+      ],
+      "documents": [
+        "docs/reference-apicurio-registry-compatibility.md"
+      ],
+      "sources": [
+        {
+          "title": "Schema compatibility modes",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html"
+        },
+        {
+          "title": "Content rules",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html"
+        },
+        {
+          "title": "Content rule reference",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-rule-reference.html"
+        },
+        {
+          "title": "Concepts and glossary",
+          "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-concepts-glossary.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "apicurio-compat-k8s-postgres",
+          "label": "オンプレミス Kubernetes・PostgreSQL・CI",
+          "sources": [
+            {
+              "title": "Deploying Apicurio Registry using the Operator",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-deploying-registry-operator.html"
+            },
+            {
+              "title": "Content rules",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-intro-to-registry-rules.html"
+            },
+            {
+              "title": "Schema compatibility modes",
               "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-registry-compatibility-modes.html"
             },
             {
-              "title": "Apicurio Registry Docker Deployment",
-              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-installing-registry-docker.html"
-            }
-          ]
-        },
-        {
-          "id": "aws-eks-apicurio",
-          "label": "Amazon EKS 上の Apicurio Registry・RDS・MSK",
-          "sources": [
-            {
-              "title": "Apicurio Registry Operator の PostgreSQL 構成",
-              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-deploying-registry-operator.html"
-            },
-            {
-              "title": "Apicurio Registry の Java Kafka SerDes",
-              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-configuring-kafka-client-serdes.html"
-            },
-            {
-              "title": "Apicurio Registry Operator の認証設定",
-              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.1.x/getting-started/assembly-operator-config-reference.html"
-            },
-            {
-              "title": "Amazon MSK への接続",
-              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html"
-            },
-            {
-              "title": "EKS マネージドノードグループ",
-              "url": "https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html"
+              "title": "Apicurio Registry Maven plug-in",
+              "url": "https://www.apicur.io/registry/docs/apicurio-registry/3.4.x/getting-started/assembly-managing-registry-artifacts-maven.html"
             }
           ]
         }
@@ -10088,79 +10658,377 @@
     },
     {
       "id": "risingwave",
-      "name": "RisingWave のストリーミング SQL",
-      "description": "イベントを継続的に取り込み、SQL の結果と状態を更新して提供する。",
+      "name": "RisingWave の基本アーキテクチャ",
+      "description": "Frontend・Compute・Meta・Compactor の役割と、Hummock（オブジェクトストレージ上の LSM）、Source・Table・マテリアライズドビュー・Sink の関係。",
       "domain": "データ処理",
       "category": "ストリーム処理",
       "kind": "製品・技術のアーキテクチャ",
       "tags": [
         "OSS",
-        "調査候補"
+        "RisingWave"
       ],
       "objectives": [
-        "イベントを継続的に取り込み、SQL の結果と状態を更新して提供する。",
-        "機能配置と実装上の担い手を区別する。",
-        "保存先、権限、運用上の制約を確認する。"
+        "Frontend・Compute（Streaming）・Meta・Compactor の役割を区別する。",
+        "状態とマテリアライズドビューが Hummock を通じてオブジェクトストレージに置かれ、メタデータは meta store に置かれることを説明する。",
+        "Source・Table・マテリアライズドビュー・Sink のうち、どれが RisingWave 内にデータを持つかを区別する。"
       ],
       "documents": [
         "docs/reference-risingwave.md"
       ],
       "sources": [
         {
-          "title": "RisingWave",
-          "url": "https://github.com/risingwavelabs/risingwave"
+          "title": "RisingWave · Architecture",
+          "url": "https://docs.risingwave.com/get-started/architecture"
         },
         {
-          "title": "RisingWave documentation",
-          "url": "https://docs.risingwave.com/"
+          "title": "RisingWave · What is RisingWave",
+          "url": "https://docs.risingwave.com/get-started/intro"
+        },
+        {
+          "title": "RisingWave · Source, Table, MV, and Sink",
+          "url": "https://docs.risingwave.com/get-started/source-table-mv-sink"
+        },
+        {
+          "title": "RisingWave · Key concepts",
+          "url": "https://docs.risingwave.com/reference/key-concepts"
+        },
+        {
+          "title": "RisingWave · Storage overview",
+          "url": "https://docs.risingwave.com/store/overview"
+        },
+        {
+          "title": "RisingWave · Deploy on Kubernetes",
+          "url": "https://docs.risingwave.com/deploy/risingwave-kubernetes"
+        },
+        {
+          "title": "RisingWave · Docker Compose",
+          "url": "https://docs.risingwave.com/deploy/risingwave-docker-compose"
+        },
+        {
+          "title": "RisingWave · Hardware requirements",
+          "url": "https://docs.risingwave.com/deploy/hardware-requirements"
         }
       ],
       "implementations": [
         {
-          "id": "example",
-          "label": "RisingWave のストリーミング SQLの構成例",
+          "id": "aws-eks",
+          "label": "EKS 上の RisingWave・S3・RDS for PostgreSQL",
           "sources": [
             {
-              "title": "RisingWave",
-              "url": "https://github.com/risingwavelabs/risingwave"
+              "title": "RisingWave · Architecture",
+              "url": "https://docs.risingwave.com/get-started/architecture"
             },
             {
-              "title": "RisingWave documentation",
-              "url": "https://docs.risingwave.com/"
+              "title": "RisingWave · Storage overview",
+              "url": "https://docs.risingwave.com/store/overview"
+            },
+            {
+              "title": "RisingWave · Source, Table, MV, and Sink",
+              "url": "https://docs.risingwave.com/get-started/source-table-mv-sink"
+            },
+            {
+              "title": "RisingWave · Deploy on Kubernetes",
+              "url": "https://docs.risingwave.com/deploy/risingwave-kubernetes"
+            },
+            {
+              "title": "RisingWave · Hardware requirements",
+              "url": "https://docs.risingwave.com/deploy/hardware-requirements"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            },
+            {
+              "title": "Amazon RDS for PostgreSQL",
+              "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html"
             }
           ]
         },
         {
-          "id": "aws-eks-msk",
-          "label": "AWS：EKS・Amazon MSK・S3・RDS",
+          "id": "self-hosted-docker",
+          "label": "自社データセンターの Docker Compose（分散構成）",
           "sources": [
             {
-              "title": "RisingWave Helm deployment guide",
-              "url": "https://risingwave.com/blog/streaming-database-kubernetes-deployment-guide/"
+              "title": "RisingWave · Docker Compose",
+              "url": "https://docs.risingwave.com/deploy/risingwave-docker-compose"
             },
             {
-              "title": "RisingWave Helm chart values",
-              "url": "https://raw.githubusercontent.com/risingwavelabs/helm-charts/main/charts/risingwave/values.yaml"
+              "title": "RisingWave · Hardware requirements",
+              "url": "https://docs.risingwave.com/deploy/hardware-requirements"
             },
             {
-              "title": "RisingWave architecture design",
-              "url": "https://risingwavelabs.github.io/risingwave/design/architecture-design.html"
+              "title": "RisingWave · Architecture",
+              "url": "https://docs.risingwave.com/get-started/architecture"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "risingwave-incremental-mv",
+      "name": "RisingWave：マテリアライズドビューの増分更新",
+      "description": "CREATE MATERIALIZED VIEW が Fragment と Actor になり、バックフィルの後に入力の差分だけでビューを更新し続ける流れ。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "RisingWave"
+      ],
+      "objectives": [
+        "Source・Table・マテリアライズドビューのうち、状態を持つものを区別する。",
+        "SQL が Fragment と Actor に分かれ、Meta に配置されるまでを追う。",
+        "バックフィルと増分更新の 2 段階、および時間による状態の整理（Watermark・Temporal Filter）を説明する。"
+      ],
+      "documents": [
+        "docs/reference-risingwave-incremental-mv.md"
+      ],
+      "sources": [
+        {
+          "title": "RisingWave · CREATE MATERIALIZED VIEW",
+          "url": "https://docs.risingwave.com/sql/commands/sql-create-mv"
+        },
+        {
+          "title": "RisingWave · Key concepts",
+          "url": "https://docs.risingwave.com/reference/key-concepts"
+        },
+        {
+          "title": "RisingWave · Architecture",
+          "url": "https://docs.risingwave.com/get-started/architecture"
+        },
+        {
+          "title": "RisingWave · Source, Table, MV, and Sink",
+          "url": "https://docs.risingwave.com/get-started/source-table-mv-sink"
+        },
+        {
+          "title": "RisingWave · CREATE SOURCE vs CREATE TABLE",
+          "url": "https://docs.risingwave.com/ingestion/create-source-vs-create-table"
+        },
+        {
+          "title": "RisingWave · Watermarks",
+          "url": "https://docs.risingwave.com/processing/watermarks"
+        },
+        {
+          "title": "RisingWave · Temporal filters",
+          "url": "https://docs.risingwave.com/processing/sql/temporal-filters"
+        },
+        {
+          "title": "RisingWave · Specific bottlenecks (compaction)",
+          "url": "https://docs.risingwave.com/performance/specific-bottlenecks"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-eks",
+          "label": "EKS 上の RisingWave・S3・RDS for PostgreSQL",
+          "sources": [
+            {
+              "title": "RisingWave · CREATE MATERIALIZED VIEW",
+              "url": "https://docs.risingwave.com/sql/commands/sql-create-mv"
             },
             {
-              "title": "RisingWave Kafka source and MSK",
-              "url": "https://github.com/risingwavelabs/risingwave-docs/blob/main/integrations/sources/kafka.mdx"
+              "title": "RisingWave · Architecture",
+              "url": "https://docs.risingwave.com/get-started/architecture"
             },
             {
-              "title": "RisingWave license",
-              "url": "https://github.com/risingwavelabs/risingwave/blob/main/LICENSE"
+              "title": "RisingWave · Source, Table, MV, and Sink",
+              "url": "https://docs.risingwave.com/get-started/source-table-mv-sink"
             },
             {
-              "title": "EKS Control Plane",
-              "url": "https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html"
+              "title": "RisingWave · Deploy on Kubernetes",
+              "url": "https://docs.risingwave.com/deploy/risingwave-kubernetes"
             },
             {
-              "title": "EKS managed node groups",
+              "title": "RisingWave · Hardware requirements",
+              "url": "https://docs.risingwave.com/deploy/hardware-requirements"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
               "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            },
+            {
+              "title": "Amazon RDS for PostgreSQL",
+              "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "risingwave-hummock-compaction",
+      "name": "RisingWave：Hummock ストレージとコンパクション",
+      "description": "状態の書き込みが共有バッファから SST になり、LSM の層を Compactor が整理し、読み取りがキャッシュを経由してオブジェクトストレージに届く流れ。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "RisingWave"
+      ],
+      "objectives": [
+        "Hummock が行ベースの LSM で、永続コピーをオブジェクトストレージに置くことを説明する。",
+        "書き込み（共有バッファ→L0）、コンパクション（L0→L1 以上）、読み取り（キャッシュ→オブジェクトストレージ）の経路を追う。",
+        "コンパクションが遅れたときの兆候（L0 サブレベルの書き込み停止、削除印の滞留）を読み取る。"
+      ],
+      "documents": [
+        "docs/reference-risingwave-hummock-compaction.md"
+      ],
+      "sources": [
+        {
+          "title": "RisingWave · Storage overview",
+          "url": "https://docs.risingwave.com/store/overview"
+        },
+        {
+          "title": "RisingWave · Architecture",
+          "url": "https://docs.risingwave.com/get-started/architecture"
+        },
+        {
+          "title": "RisingWave · Data persistence",
+          "url": "https://docs.risingwave.com/reference/data-persistence"
+        },
+        {
+          "title": "RisingWave · Specific bottlenecks (compaction)",
+          "url": "https://docs.risingwave.com/performance/specific-bottlenecks"
+        },
+        {
+          "title": "RisingWave · Elastic disk cache",
+          "url": "https://docs.risingwave.com/get-started/disk-cache"
+        },
+        {
+          "title": "RisingWave · Hardware requirements",
+          "url": "https://docs.risingwave.com/deploy/hardware-requirements"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-eks",
+          "label": "EKS 上の RisingWave・S3・RDS for PostgreSQL",
+          "sources": [
+            {
+              "title": "RisingWave · Storage overview",
+              "url": "https://docs.risingwave.com/store/overview"
+            },
+            {
+              "title": "RisingWave · Specific bottlenecks (compaction)",
+              "url": "https://docs.risingwave.com/performance/specific-bottlenecks"
+            },
+            {
+              "title": "RisingWave · Elastic disk cache",
+              "url": "https://docs.risingwave.com/get-started/disk-cache"
+            },
+            {
+              "title": "RisingWave · Deploy on Kubernetes",
+              "url": "https://docs.risingwave.com/deploy/risingwave-kubernetes"
+            },
+            {
+              "title": "RisingWave · Hardware requirements",
+              "url": "https://docs.risingwave.com/deploy/hardware-requirements"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            },
+            {
+              "title": "Amazon RDS for PostgreSQL",
+              "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "risingwave-barrier-recovery",
+      "name": "RisingWave：バリアとチェックポイント・復旧",
+      "description": "Meta が注入する Barrier で全 Actor の状態を揃えて checkpoint を作り、障害時にそこから Actor を作り直す流れと、Sink への配信のタイミング。",
+      "domain": "データ処理",
+      "category": "ストリーム処理",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "RisingWave"
+      ],
+      "objectives": [
+        "Barrier と checkpoint の関係と、既定の間隔（barrier_interval_ms と checkpoint_frequency）を説明する。",
+        "メモリ上の未保存の状態が、checkpoint で Hummock に永続化されることを追う。",
+        "障害後の再開（checkpoint から Actor を作り直す）と、Sink の commit 間隔、Meta のバックアップを区別する。"
+      ],
+      "documents": [
+        "docs/reference-risingwave-barrier-recovery.md"
+      ],
+      "sources": [
+        {
+          "title": "RisingWave · Data persistence",
+          "url": "https://docs.risingwave.com/reference/data-persistence"
+        },
+        {
+          "title": "RisingWave · Architecture",
+          "url": "https://docs.risingwave.com/get-started/architecture"
+        },
+        {
+          "title": "RisingWave · Key concepts",
+          "url": "https://docs.risingwave.com/reference/key-concepts"
+        },
+        {
+          "title": "RisingWave · FAQ (using RisingWave)",
+          "url": "https://docs.risingwave.com/faq/faq-using-risingwave"
+        },
+        {
+          "title": "RisingWave · Sink data from RisingWave",
+          "url": "https://docs.risingwave.com/delivery/overview"
+        },
+        {
+          "title": "RisingWave · Meta backup",
+          "url": "https://docs.risingwave.com/operate/meta-backup"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-eks",
+          "label": "EKS 上の RisingWave・S3・RDS for PostgreSQL",
+          "sources": [
+            {
+              "title": "RisingWave · Data persistence",
+              "url": "https://docs.risingwave.com/reference/data-persistence"
+            },
+            {
+              "title": "RisingWave · Sink data from RisingWave",
+              "url": "https://docs.risingwave.com/delivery/overview"
+            },
+            {
+              "title": "RisingWave · Meta backup",
+              "url": "https://docs.risingwave.com/operate/meta-backup"
+            },
+            {
+              "title": "RisingWave · Deploy on Kubernetes",
+              "url": "https://docs.risingwave.com/deploy/risingwave-kubernetes"
+            },
+            {
+              "title": "RisingWave · Hardware requirements",
+              "url": "https://docs.risingwave.com/deploy/hardware-requirements"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            },
+            {
+              "title": "Amazon RDS for PostgreSQL",
+              "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html"
             }
           ]
         }

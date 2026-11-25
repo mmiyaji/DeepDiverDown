@@ -1,187 +1,661 @@
 name: Apache Flink の基本アーキテクチャ
-description: Kafka のイベントをイベント時刻の窓で集計し、状態とチェックポイントから復旧する流れを追うリファレンスです。
+description: JobManager（Dispatcher・JobMaster・ResourceManager）、TaskManager のスロット、Source と Sink、状態バックエンド、チェックポイント保存先の役割と、ジョブが動いて復旧するまでの流れ。
 reference:
   objectives:
-    - Source、ウォーターマーク、状態付き演算子、Sink の役割を区別する。
-    - イベント時刻とウォーターマークで窓を閉じる流れを理解する。
-    - チェックポイントから入力位置と演算子状態を復元する。
+    - JobManager の 3 つの役割（Dispatcher・JobMaster・ResourceManager）と TaskManager のスロットを区別する。
+    - Source・Operator・Sink のデータの流れと、状態・チェックポイントの置き場所を説明する。
+    - Amazon Managed Service for Apache Flink と自前ホストの Standalone で、利用者が管理する範囲の違いを読む。
   sources:
-    - {title: Stateful Stream Processing, url: "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/"}
-    - {title: Timely Stream Processing, url: "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"}
-sources: [docs/reference-flink.md]
-evidence: [{type: doc, ref: "docs/reference-flink.md#§1"}]
+    - title: Flink · Flink Architecture
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/
+    - title: Flink · Overview (API layers)
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/overview/
+    - title: Flink · Stateful Stream Processing
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/
+    - title: Flink · State Backends
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/
+    - title: Flink · Native Kubernetes
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/
+    - title: Managed Service for Apache Flink · How it works
+      url: https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html
+sources:
+  - docs/reference-flink.md
+evidence:
+  - type: doc
+    ref: docs/reference-flink.md#§1
 tiers:
-  - {id: flow, label: 入力と並列データフロー, kind: origin, z: 0, size: [12, 3]}
-  - {id: fault, label: 障害復旧, z: 1, origin: [0, 0], size: [18, 3]}
+  - id: control
+    label: クライアントと JobManager
+    z: 2
+    size:
+      - 22
+      - 3
+  - id: flow
+    label: データの流れ（TaskManager）
+    z: 1
+    size:
+      - 22
+      - 3
+  - id: fault
+    label: 状態とチェックポイント
+    z: 0
+    size:
+      - 22
+      - 3
 nodes:
-  source: {label: 再読できるイベント入力, kind: queue, tier: flow, x: 0, y: 1.5, description: 再読可能なイベントログから、イベントと読み取り位置を取得する。, evidence: [{type: doc, ref: docs/reference-flink.md#§2}]}
-  watermark: {label: イベント時刻の進捗生成, kind: service, tier: flow, x: 3, 'y': 1.5, description: イベント時刻の進行をウォーターマークで示す。, evidence: [{type: doc, ref: docs/reference-flink.md#§3}]}
-  operator: {parallel: 'N', label: 窓集計の実行, kind: worker, tier: flow, x: 7, 'y': 1.5, description: キーごとの窓状態を更新し、窓を閉じて結果を作る。, evidence: [{type: doc, ref: docs/reference-flink.md#§4}]}
-  sink: {label: 結果の出力先, kind: db, tier: flow, x: 11, 'y': 1.5, description: 窓集計の結果を下流システムへ書く。, evidence: [{type: doc, ref: docs/reference-flink.md#§6}]}
-  state: {partitions: 4, label: キー別の作業状態, kind: db, tier: fault, x: 7, y: 1.5, description: キーごとの状態を保持し、復旧用スナップショットの対象にする。, evidence: [{type: doc, ref: docs/reference-flink.md#§4}, {type: doc, ref: docs/reference-flink.md#§5}]}
-  checkpoint: {label: 永続チェックポイント, kind: db, tier: fault, x: 11, 'y': 1.5, description: 入力位置と演算子状態の一貫したスナップショット。, evidence: [{type: doc, ref: docs/reference-flink.md#§5}]}
+  client:
+    label: クライアント
+    kind: client
+    tier: control
+    x: 0
+    "y": 1.5
+    replicas: 2
+    description: アプリケーションのデータフローを組み立てて JobManager へ提出する。ランタイムの一部ではない。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+  dispatcher:
+    label: Dispatcher
+    kind: service
+    tier: control
+    x: 5
+    "y": 1.5
+    replicas: 1
+    description: 提出を受ける REST インターフェースと Web UI を持ち、ジョブごとに JobMaster を起動する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+  jobmaster:
+    label: JobMaster
+    kind: scheduler
+    tier: control
+    x: 10
+    "y": 1.5
+    replicas: 1
+    description: ジョブ 1 つの JobGraph の実行を管理する。チェックポイントの開始もここから行う。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+      - type: doc
+        ref: docs/reference-flink.md#§4
+  resourcemanager:
+    label: ResourceManager
+    kind: scheduler
+    tier: control
+    x: 16
+    "y": 1.5
+    replicas: 1
+    description: タスクスロットを含むリソースの割り当てと確保を担う。Standalone では既存の TaskManager のスロットを配るだけ。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+      - type: doc
+        ref: docs/reference-flink.md#§5
+  source:
+    label: Source（再読できる入力）
+    kind: queue
+    tier: flow
+    x: 1
+    "y": 1.5
+    replicas: 2
+    description: Kafka などから読み、読み取り位置をチェックポイントに残す。位置を巻き戻せる入力がチェックポイントからの再開に必要。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§3
+  operator:
+    label: TaskManager のスロットで動く Task
+    kind: worker
+    tier: flow
+    x: 6
+    "y": 1.5
+    parallel: "N"
+    slots: 2
+    description: TaskManager（JVM プロセス）がスロットで Task を並列に実行し、Task 間のデータを交換する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+      - type: doc
+        ref: docs/reference-flink.md#§3
+  exchange:
+    label: Task 間のデータ交換
+    kind: queue
+    tier: flow
+    x: 12
+    "y": 1.5
+    replicas: 2
+    description: keyBy などの再分配で、Task がバッファ経由でデータを受け渡す。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§3
+  sink:
+    label: Sink（出力先）
+    kind: queue
+    tier: flow
+    x: 17
+    "y": 1.5
+    replicas: 2
+    description: 集計結果を Kafka などの外部システムへ書く。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§3
+  state:
+    label: 状態バックエンド
+    kind: db
+    tier: fault
+    x: 9
+    "y": 1.5
+    partitions: 4
+    description: キー付き状態を持つ場所。HashMapStateBackend は JVM ヒープ、EmbeddedRocksDBStateBackend は TaskManager のローカルディスク。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§4
+  checkpoint:
+    label: チェックポイント保存先
+    kind: db
+    tier: fault
+    x: 17
+    "y": 1.5
+    replicas: 2
+    description: 完了したチェックポイントの状態と入力位置の置き場所。execution.checkpointing.dir に分散ファイルシステムのパスを指定する。状態バックエンドとは別に選ぶ。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§4
 links:
-  - {id: ingest, from: source, to: watermark, label: イベントを取り込む, evidence: [{type: doc, ref: "docs/reference-flink.md#§2"}]}
-  - {id: advance, from: watermark, to: operator, label: 時刻を進める, evidence: [{type: doc, ref: "docs/reference-flink.md#§3"}]}
-  - {id: aggregate, from: operator, to: state, label: 窓状態を更新, evidence: [{type: doc, ref: "docs/reference-flink.md#§4"}]}
-  - {id: emit, from: operator, to: sink, label: 窓結果を出力, evidence: [{type: doc, ref: "docs/reference-flink.md#§6"}]}
-  - {id: snapshot, from: operator, to: checkpoint, label: 状態と入力位置をスナップショット, evidence: [{type: doc, ref: "docs/reference-flink.md#§5"}]}
-  - {id: restore, from: checkpoint, to: operator, label: 最新成功点から復元, evidence: [{type: doc, ref: "docs/reference-flink.md#§6"}]}
+  - id: submit
+    from: client
+    to: dispatcher
+    label: データフローを提出
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+  - id: start
+    from: dispatcher
+    to: jobmaster
+    label: JobMaster を起動
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+  - id: request
+    from: jobmaster
+    to: resourcemanager
+    label: スロットを要求
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+  - id: deploy
+    from: jobmaster
+    to: operator
+    label: Task をデプロイ
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+  - id: allocate
+    from: resourcemanager
+    to: operator
+    label: スロットを確保
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§2
+  - id: ingest
+    from: source
+    to: operator
+    label: イベントを取り込む
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§3
+  - id: shuffle
+    from: operator
+    to: exchange
+    label: 再分配して渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§3
+  - id: emit
+    from: exchange
+    to: sink
+    label: 結果を出力
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§3
+  - id: aggregate
+    from: operator
+    to: state
+    label: キー別状態を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§4
+  - id: trigger
+    from: jobmaster
+    to: source
+    label: チェックポイントを開始（バリアを注入）
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§4
+  - id: snapshot
+    from: operator
+    to: checkpoint
+    label: 状態と入力位置を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§4
+  - id: restore
+    from: checkpoint
+    to: operator
+    label: 最新の完了点から復元
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§4
 scenarios:
-  - id: flink-window-recovery
-    label: イベント時刻の窓集計と復旧
-    evidence: [{type: doc, ref: "docs/reference-flink.md#§1"}, {type: doc, ref: "docs/reference-flink.md#§7"}]
+  - id: job-run
+    label: ジョブが提出されて動き出す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§6
     steps:
-      - {links: [ingest, advance], note: Source がイベントを読み、ウォーターマークでイベント時刻を進める。}
-      - {links: [aggregate], note: Window Operator がキー別の状態を更新する。}
-      - {links: [emit, snapshot], note: 窓結果を Sink へ送り、状態と入力位置をチェックポイントする。}
-      - {links: [restore], note: 障害時は最新成功チェックポイントから演算子を復元する。}
-
+      - links:
+          - submit
+          - start
+        note: クライアントがデータフローを Dispatcher に提出し、Dispatcher がジョブ用の JobMaster を起動する。
+      - links:
+          - request
+          - allocate
+        note: JobMaster が ResourceManager にスロットを要求し、TaskManager のスロットが確保される。
+      - links:
+          - deploy
+          - ingest
+        note: JobMaster が Task をスロットにデプロイし、Source から読んだイベントが Task へ流れる。
+      - links:
+          - shuffle
+          - aggregate
+          - emit
+        note: Task がキー別の状態を更新し、結果を Sink へ出す。
+  - id: checkpoint-recovery
+    label: チェックポイントと復旧
+    evidence:
+      - type: doc
+        ref: docs/reference-flink.md#§6
+    steps:
+      - links:
+          - trigger
+          - ingest
+        note: JobMaster がバリアを Source に注入し、バリアがイベントと一緒に流れる。
+      - links:
+          - aggregate
+          - snapshot
+        note: 各 Task が状態と入力位置をチェックポイント保存先へ書く。
+      - links:
+          - restore
+        note: 障害時は最新の完了したチェックポイントから状態と入力位置を戻して再開する。
+unknowns:
+  - id: UNK-01
+    text: Managed Service for Apache Flink の内部（JobManager・TaskManager の配置、状態バックエンド、チェックポイントの保存先）は、確認した資料に記載がない。図ではサービスの 1 部品として描く。
+    refs:
+      - jobmaster
+      - state
+      - checkpoint
+  - id: UNK-02
+    text: JobManager の高可用性（standby JobManager、ZooKeeper や Kubernetes による leader 選出）の構成は、この図では扱わない。Kubernetes HA は「Flink：Kubernetes 上の運用」で扱う。Standalone での HA の構成は未確認。
+    refs:
+      - jobmaster
+  - id: UNK-03
+    text: Standalone クラスタの起動スクリプト、設定ファイル、必要な Java のバージョンは、今回確認した資料の範囲では読めていない（Standalone の概要ページ未確認）。
+    refs:
+      - dispatcher
+      - operator
+  - id: UNK-04
+    text: Managed Service for Apache Flink が MSK と接続するネットワーク経路（VPC 設定など）は、今回確認した資料に記載がない。
+    refs:
+      - source
+      - sink
+gates:
+  maxDrift: 0
+  maxHigh: 4
 implementations:
-  - id: kafka-managed-state
-    label: "Flink・Kafka・永続チェックポイント"
-    description: "Kafka の時刻付きイベントをキー別の窓で集計する Flink ジョブ。選んだ状態バックエンドとチェックポイントの保存先は独立に指定する。"
+  - id: msf
+    label: Amazon Managed Service for Apache Flink と MSK
+    description: S3 のアプリケーションコードを Managed Service for Apache Flink で実行し、MSK の注文トピックを読んで別トピックへ書く構成例。
     sources:
-      - {title: Stateful Stream Processing, url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/}
-      - {title: Timely Stream Processing, url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/}
-      - {title: Flink Checkpointing, url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/}
-      - {title: Flink State Backends, url: https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/}
-      - {title: Flink Standalone Deployment, url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/standalone/overview/}
+      - title: Managed Service for Apache Flink · How it works
+        url: https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html
+      - title: Managed Service for Apache Flink · Fault tolerance
+        url: https://docs.aws.amazon.com/managed-flink/latest/java/how-fault.html
+      - title: Managed Service for Apache Flink · Application scaling
+        url: https://docs.aws.amazon.com/managed-flink/latest/java/how-scaling.html
+      - title: Flink · Flink Architecture
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/
     tiers:
-      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
-      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+      - id: entry
+        label: 利用者
+        kind: origin
+        z: 2
+        size:
+          - 16
+          - 3
+      - id: managed
+        label: Flink の実行（サービスが運用）
+        z: 1
+        size:
+          - 16
+          - 4
+      - id: data
+        label: 入出力・コード・ログ
+        z: 0
+        size:
+          - 16
+          - 4
     nodes:
-      kafka-managed-state-host: {label: 自前 Linux Flink ホスト群, kind: host, tier: processing, x: 3, y: 0, description: JobManager と TaskManager を稼働するホスト群。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
-      kafka-managed-state-hdfs: {label: 自前 HDFS クラスター, kind: host, tier: processing, x: 8, y: 0, description: NameNode と DataNode が永続チェックポイントを提供する。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
-      kafka-managed-state-source: {label: Kafka 注文トピック, kind: queue, tier: processing, x: 1, y: 1.15, realizes: [source], description: 自前 Kafka が入力イベントを保持し、TaskManager の KafkaSource が読み取る。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
-      kafka-managed-state-tasks: {label: TaskManager 上の時刻処理と Window Operator, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [watermark, operator], description: WatermarkStrategy と窓処理をフローの実行タスクに組み込む。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
-      kafka-managed-state-rocks: {label: EmbeddedRocksDBStateBackend, kind: db, tier: processing, x: 5, y: 1.15, realizes: [state], description: TaskManager のローカルディスクを利用し、キー別状態を持つ。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
-      kafka-managed-state-checkpoint: {label: HDFS のチェックポイントディレクトリー, kind: db, tier: processing, x: 5, y: 3.65, realizes: [checkpoint], description: ファイルシステム型のチェックポイント保存先にする。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
-      kafka-managed-state-out: {label: Kafka の出力トピック, kind: queue, tier: processing, x: 9, y: 1.15, realizes: [sink], description: KafkaSink で窓集計の結果を書き込む。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
-      kafka-managed-state-coordinator: {label: JobManager のチェックポイント調整, kind: service, tier: setup, x: 1, y: 1.5, description: チェックポイントを開始し、各タスクから完了確認を集める。, evidence: [{type: doc, ref: docs/reference-flink.md#§8}]}
+      msf-client:
+        label: AWS コンソール・CLI
+        kind: client
+        tier: entry
+        x: 1
+        "y": 1.5
+        realizes:
+          - client
+        description: CreateApplication と StartApplication でアプリケーションを作る。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+      msf-app:
+        label: Managed Service for Apache Flink アプリケーション
+        kind: service
+        tier: managed
+        x: 3
+        "y": 1.5
+        provider: aws
+        realizes:
+          - dispatcher
+          - jobmaster
+          - resourcemanager
+          - operator
+          - state
+          - exchange
+        description: S3 のコードを実行する。Parallelism と ParallelismPerKPU から KPU が決まる（1 KPU は 1 vCPU・4 GB）。JobManager・TaskManager の内部配置は公開資料で確認できない。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+        management:
+          type: shared
+          scope: AWS がサービスの実行基盤を運用し、利用者がアプリケーションコード・並列度・チェックポイント設定・権限を管理する。内部の JobManager・TaskManager の配置と操作範囲は確認した資料に記載がない。
+      msf-checkpoint:
+        label: チェックポイント・スナップショット（サービス管理）
+        kind: db
+        tier: managed
+        x: 11
+        "y": 1.5
+        provider: aws
+        realizes:
+          - checkpoint
+        description: 既定でチェックポイントが有効（間隔 60000 ms、最小間隔 5000 ms）。保存先と状態バックエンドは確認した資料に記載がない。スナップショットは利用者が作り、更新・スケール時はシステムスナップショットも作られる。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+        management:
+          type: shared
+          scope: AWS がサービスの実行基盤を運用し、利用者がアプリケーションコード・並列度・チェックポイント設定・権限を管理する。内部の JobManager・TaskManager の配置と操作範囲は確認した資料に記載がない。
+      msf-code:
+        label: S3 のアプリケーションコード
+        kind: db
+        tier: data
+        x: 1
+        "y": 1.5
+        svc: s3
+        description: 作成時に S3 のバケットとキーで JAR・ZIP を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がバケット・データ・権限を管理する。
+      msf-source:
+        label: MSK 注文トピック
+        kind: queue
+        tier: data
+        x: 6
+        "y": 1.5
+        svc: msk
+        realizes:
+          - source
+        description: KafkaSource が読むイベントを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+        management:
+          type: shared
+          scope: AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。
+      msf-sink:
+        label: MSK 集計トピック
+        kind: queue
+        tier: data
+        x: 11
+        "y": 1.5
+        svc: msk
+        realizes:
+          - sink
+        description: KafkaSink が結果を書く。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+        management:
+          type: shared
+          scope: AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。
+      msf-role:
+        label: IAM サービス実行ロール
+        kind: policy
+        tier: managed
+        x: 7
+        "y": 1.5
+        svc: iam
+        description: アプリケーションが S3 のコードや入出力へアクセスする権限（ServiceExecutionRole）。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+        management:
+          type: customer
+          scope: 利用者がロールとポリシーを設定する。
+      msf-logs:
+        label: CloudWatch Logs
+        kind: monitor
+        tier: data
+        x: 15
+        "y": 1.5
+        svc: cloudwatch
+        description: アプリケーションのログの出力先。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+        management:
+          type: shared
+          scope: AWS がログ基盤を運用し、利用者が保持設定と閲覧を管理する。
     links:
-      - {id: kafka-managed-state-host-jm, from: kafka-managed-state-host, to: kafka-managed-state-coordinator, label: JobManager を実行}
-      - {id: kafka-managed-state-host-tm, from: kafka-managed-state-host, to: kafka-managed-state-tasks, label: TaskManager を実行}
-      - {id: kafka-managed-state-hdfs-path, from: kafka-managed-state-hdfs, to: kafka-managed-state-checkpoint, label: 保存先を提供}
-      - {id: kafka-managed-state-coordinator-connection, from: kafka-managed-state-coordinator, to: kafka-managed-state-tasks, label: バリアによるスナップショットを調整}
-
-    layout2d:
-      tiers:
-        - {id: diagram, label: 実装構成, z: 0, size: [27, 13]}
-      nodes:
-        kafka-managed-state-source: {tier: diagram, x: 2, y: 3}
-        kafka-managed-state-out: {tier: diagram, x: 2, y: 8}
-        kafka-managed-state-host: {tier: diagram, x: 8, y: 2}
-        kafka-managed-state-coordinator: {tier: diagram, x: 8, y: 5}
-        kafka-managed-state-tasks: {tier: diagram, x: 12, y: 5}
-        kafka-managed-state-rocks: {tier: diagram, x: 12, y: 9}
-        kafka-managed-state-hdfs: {tier: diagram, x: 19, y: 3}
-        kafka-managed-state-checkpoint: {tier: diagram, x: 19, y: 7}
-      groups:
-        - {kind: cluster, label: "Flink Standalone", tier: [diagram], x0: 6, y0: 0, x1: 14, y1: 11, nodes: [kafka-managed-state-host, kafka-managed-state-coordinator, kafka-managed-state-tasks, kafka-managed-state-rocks]}
-        - {kind: cluster, label: "HDFS", tier: [diagram], x0: 16, y0: 1, x1: 22, y1: 9, nodes: [kafka-managed-state-hdfs, kafka-managed-state-checkpoint]}
-    layout3d:
-      tiers:
-        - {id: kafka, label: Kafka, z: 0, origin: [-5, 0], size: [3, 5]}
-        - {id: host, label: 自前 Linux ホスト, z: 0, size: [12, 5]}
-        - {id: app, label: Flink プロセス, z: 1, size: [12, 5]}
-        - {id: hdfs, label: HDFS, z: 0, origin: [16, 0], size: [7, 5]}
-      nodes:
-        kafka-managed-state-source: {tier: kafka, x: 1, y: 1}
-        kafka-managed-state-out: {tier: kafka, x: 1, y: 4}
-        kafka-managed-state-host: {tier: host, x: 5, y: 2}
-        kafka-managed-state-coordinator: {tier: app, x: 2, y: 2}
-        kafka-managed-state-tasks: {tier: app, x: 6, y: 2}
-        kafka-managed-state-rocks: {tier: app, x: 10, y: 2}
-        kafka-managed-state-hdfs: {tier: hdfs, x: 1, y: 2}
-        kafka-managed-state-checkpoint: {tier: hdfs, x: 5, y: 2}
-      groups:
-        - {kind: cluster, label: "Flink Standalone", tier: [host, app], nodes: [kafka-managed-state-host, kafka-managed-state-coordinator, kafka-managed-state-tasks, kafka-managed-state-rocks]}
-        - {kind: cluster, label: "HDFS", tier: [hdfs], nodes: [kafka-managed-state-hdfs, kafka-managed-state-checkpoint]}
-
-  - id: aws-emr-eks-flink
-    label: "Amazon EMR on EKS の Flink・MSK・S3"
-    description: "Flink Kubernetes Operator で EKS 上に Application モードの Flink ジョブを展開する例。MSK の受注を集計し、別のトピックへ出力する。"
-    sources:
-      - {title: "EMR on EKS で Flink アプリケーションを実行する", url: https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-kubernetes-operator-run-application.html}
-      - {title: "EMR on EKS の Flink Operator を準備する", url: https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-kubernetes-operator-setup.html}
-      - {title: "EKS マネージドノードグループ", url: https://docs.aws.amazon.com/eks/latest/userguide/create-managed-node-group.html}
-      - {title: "Flink の Kubernetes HA", url: https://docs.aws.amazon.com/emr/latest/EMR-on-EKS-DevelopmentGuide/jobruns-flink-using-ha.html}
-      - {title: "Flink の状態バックエンド", url: https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/}
-      - {title: "EKS VPC とサブネット", url: https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html}
-      - {title: "MSK クライアントのアクセス", url: https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html}
-    tiers:
-      - {id: entry, label: 投入元, kind: origin, z: 1, origin: [-5, 0], size: [3, 4]}
-      - {id: runtime, label: 管理と実行, z: 1, size: [17, 7]}
-      - {id: data, label: データと復旧, z: 0, size: [17, 5]}
+      - id: msf-load-code
+        from: msf-code
+        to: msf-app
+        label: コードを取得
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+      - id: msf-assume
+        from: msf-role
+        to: msf-app
+        label: 実行権限を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
+      - id: msf-log
+        from: msf-app
+        to: msf-logs
+        label: ログを出力
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§7
     groups:
-      - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [runtime, data], nodes: [aws-emr-eks-flink-control, aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state, aws-emr-eks-flink-source, aws-emr-eks-flink-sink, aws-emr-eks-flink-checkpoint, aws-emr-eks-flink-ha]}
-      - {kind: cluster, label: "Amazon EKS クラスター", provider: k8s, tier: [runtime], nodes: [aws-emr-eks-flink-control, aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state]}
-      - {kind: namespace, label: "Flink の実行名前空間", provider: k8s, tier: [runtime], nodes: [aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state]}
-      - {kind: vpc, label: "MSK ブローカーの VPC", provider: aws, tier: [data], nodes: [aws-emr-eks-flink-source, aws-emr-eks-flink-sink]}
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - managed
+          - data
+        nodes:
+          - msf-app
+          - msf-checkpoint
+          - msf-code
+          - msf-source
+          - msf-sink
+          - msf-role
+          - msf-logs
+  - id: standalone
+    label: 自前ホストの Standalone クラスタと Kafka・HDFS
+    description: 自前のサーバー群に Flink の JobManager・TaskManager を起動し、自前の Kafka を読み、HDFS にチェックポイントを置く構成例。
+    sources:
+      - title: Flink · Standalone deployment
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/standalone/overview/
+      - title: Flink · Flink Architecture
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/
+      - title: Flink · State Backends
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/
+      - title: Flink · Kafka connector
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/
+    tiers:
+      - id: entry
+        label: 運用者
+        kind: origin
+        z: 2
+        size:
+          - 16
+          - 3
+      - id: flink
+        label: Flink クラスタ
+        z: 1
+        size:
+          - 16
+          - 4
+      - id: data
+        label: 入出力・保存
+        z: 0
+        size:
+          - 16
+          - 4
     nodes:
-      aws-emr-eks-flink-kubectl: {label: "kubectl", kind: client, tier: entry, x: 1, y: 1.5, description: "FlinkDeployment を EKS の Kubernetes API に適用する。", evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-control: {label: "EKS Kubernetes API", kind: service, svc: eks, tier: runtime, x: 1, y: 1.5, description: "Kubernetes API で FlinkDeployment を受け付け、スケジューラーが Pod を配置する。", management: {type: shared, scope: "AWS が制御プレーンを運用し、利用者が Kubernetes API と設定を操作する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-operator: {label: "Flink Kubernetes Operator", kind: scheduler, tier: runtime, x: 5.5, y: 1.5, description: "FlinkDeployment を監視し、EMR ランタイムの Flink アプリケーションを管理する。", management: {type: customer, scope: "利用者が Operator と設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-capacity: {label: "EKS の EC2 ノード", kind: host, svc: ec2, tier: runtime, x: 14, y: 0.2, description: "Operator Pod と EMR ランタイムを使う Flink Pod を稼働させる。", management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループを管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-jobmanager: {label: "Flink JobManager Pod", kind: service, tier: runtime, x: 10, y: 1.5, description: "ジョブを調整し、チェックポイントを開始する。", management: {type: customer, scope: "利用者が Flink ジョブと設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-taskmanager: {label: "Flink TaskManager Pod", kind: worker, tier: runtime, x: 7, y: 5.2, realizes: [watermark, operator], parallel: N, description: "KafkaSource とウォーターマーク、キー別の窓集計を並列実行する。", management: {type: customer, scope: "利用者がジョブと並列度を管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-state: {label: "TaskManager の RocksDB", kind: db, tier: runtime, x: 12, y: 5.2, realizes: [state], description: "組み込みの RocksDB 状態バックエンドで、キー別の作業状態を保持する。", management: {type: customer, scope: "利用者が状態バックエンドを設定する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-source: {label: "MSK 注文トピック", kind: queue, tier: data, x: 1, y: 1.5, svc: msk, realizes: [source], description: "Flink KafkaSource が読み込むイベントを保持する。", management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-sink: {label: "MSK 集計トピック", kind: queue, tier: data, x: 6, y: 1.5, svc: msk, realizes: [sink], description: "同じ MSK クラスターの別トピックに集計結果を保持する。", management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-checkpoint: {label: "S3 チェックポイント", kind: db, tier: data, x: 11, y: 1.5, svc: s3, realizes: [checkpoint], description: "完了したチェックポイントの状態と入力位置を保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が復旧データと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      aws-emr-eks-flink-ha: {label: "S3 の HA メタデータ", kind: db, tier: data, x: 15, y: 1.5, svc: s3, description: "JobManager の切り替えに必要な Kubernetes HA のメタデータを保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が HA 設定と権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-    links:
-      - {id: aws-emr-eks-flink-apply, from: aws-emr-eks-flink-kubectl, to: aws-emr-eks-flink-control, label: "FlinkDeployment を適用", evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      - {id: aws-emr-eks-flink-watch, from: aws-emr-eks-flink-control, to: aws-emr-eks-flink-operator, label: "FlinkDeployment の変更を通知", evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      - {id: aws-emr-eks-flink-bind, from: aws-emr-eks-flink-control, to: aws-emr-eks-flink-capacity, label: "EC2 ノードに Pod を割り当て", evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      - {id: aws-emr-eks-flink-deploy, from: aws-emr-eks-flink-operator, to: aws-emr-eks-flink-jobmanager, label: "アプリケーションを展開", evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      - {id: aws-emr-eks-flink-assign, from: aws-emr-eks-flink-jobmanager, to: aws-emr-eks-flink-taskmanager, label: "タスクを割り当て", evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      - {id: aws-emr-eks-flink-trigger, from: aws-emr-eks-flink-jobmanager, to: aws-emr-eks-flink-taskmanager, label: "チェックポイントを開始", realizes: [snapshot], replace: true, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      - {id: aws-emr-eks-flink-persist, from: aws-emr-eks-flink-taskmanager, to: aws-emr-eks-flink-checkpoint, label: "状態と入力位置を保存", realizes: [snapshot], replace: true, evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-      - {id: aws-emr-eks-flink-keep-ha, from: aws-emr-eks-flink-jobmanager, to: aws-emr-eks-flink-ha, label: "HA メタデータを保持", evidence: [{type: doc, ref: docs/reference-flink.md#§9}]}
-
-    layout2d:
-      tiers:
-        - {id: diagram, label: 実装構成, z: 0, size: [29, 15]}
-      nodes:
-        aws-emr-eks-flink-kubectl: {tier: diagram, x: 1, y: 2}
-        aws-emr-eks-flink-control: {tier: diagram, x: 6, y: 13}
-        aws-emr-eks-flink-capacity: {tier: diagram, x: 11, y: 2}
-        aws-emr-eks-flink-operator: {tier: diagram, x: 6, y: 6}
-        aws-emr-eks-flink-jobmanager: {tier: diagram, x: 11, y: 6}
-        aws-emr-eks-flink-taskmanager: {tier: diagram, x: 16, y: 6}
-        aws-emr-eks-flink-state: {tier: diagram, x: 16, y: 10}
-        aws-emr-eks-flink-source: {tier: diagram, x: 21, y: 2}
-        aws-emr-eks-flink-sink: {tier: diagram, x: 21, y: 5}
-        aws-emr-eks-flink-checkpoint: {tier: diagram, x: 26, y: 8}
-        aws-emr-eks-flink-ha: {tier: diagram, x: 26, y: 11}
-      groups:
-        - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [diagram], x0: 3, y0: -0.5, x1: 28.5, y1: 15, nodes: [aws-emr-eks-flink-control, aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state, aws-emr-eks-flink-source, aws-emr-eks-flink-sink, aws-emr-eks-flink-checkpoint, aws-emr-eks-flink-ha]}
-        - {kind: vpc, label: "EKS ノードと MSK の利用者 VPC", provider: aws, tier: [diagram], x0: 3.5, y0: 0, x1: 23.5, y1: 11.7, nodes: [aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state, aws-emr-eks-flink-source, aws-emr-eks-flink-sink]}
-        - {kind: cluster, label: "EKS クラスター", provider: k8s, tier: [diagram], x0: 3.3, y0: 0.2, x1: 18.5, y1: 14.5, nodes: [aws-emr-eks-flink-control, aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state]}
-        - {kind: namespace, label: "Flink 名前空間", provider: k8s, tier: [diagram], x0: 3.6, y0: 4, x1: 18.4, y1: 11.4, nodes: [aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state]}
-    layout3d:
-      tiers:
-        - {id: entry, label: 投入元, kind: origin, z: 0, origin: [-5, 0], size: [3, 4]}
-        - {id: platform, label: EKS 実行基盤, z: 0, size: [16, 5]}
-        - {id: pods, label: Flink Pod, z: 1, size: [16, 5]}
-        - {id: msk, label: MSK, z: 0, origin: [20, 0], size: [3, 5]}
-        - {id: s3, label: S3, z: 0, origin: [27, 0], size: [3, 5]}
-      nodes:
-        aws-emr-eks-flink-kubectl: {tier: entry, x: 1, y: 1}
-        aws-emr-eks-flink-control: {tier: platform, x: 2, y: 2}
-        aws-emr-eks-flink-capacity: {tier: platform, x: 10, y: 2}
-        aws-emr-eks-flink-operator: {tier: pods, x: 2, y: 2}
-        aws-emr-eks-flink-jobmanager: {tier: pods, x: 6, y: 2}
-        aws-emr-eks-flink-taskmanager: {tier: pods, x: 10, y: 2}
-        aws-emr-eks-flink-state: {tier: pods, x: 14, y: 2}
-        aws-emr-eks-flink-source: {tier: msk, x: 1, y: 1}
-        aws-emr-eks-flink-sink: {tier: msk, x: 1, y: 4}
-        aws-emr-eks-flink-checkpoint: {tier: s3, x: 1, y: 1}
-        aws-emr-eks-flink-ha: {tier: s3, x: 1, y: 4}
-      groups:
-        - {kind: cloud, label: "AWS アカウント", provider: aws, tier: [platform, pods, msk, s3], nodes: [aws-emr-eks-flink-control, aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state, aws-emr-eks-flink-source, aws-emr-eks-flink-sink, aws-emr-eks-flink-checkpoint, aws-emr-eks-flink-ha]}
-        - {kind: cluster, label: "EKS クラスター", provider: k8s, tier: [platform, pods], nodes: [aws-emr-eks-flink-control, aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state]}
-        - {kind: namespace, label: "Flink 名前空間", provider: k8s, tier: [pods], nodes: [aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state]}
-        - {kind: vpc, label: "EKS ノードと MSK の利用者 VPC", provider: aws, tier: [platform, pods, msk], nodes: [aws-emr-eks-flink-capacity, aws-emr-eks-flink-operator, aws-emr-eks-flink-jobmanager, aws-emr-eks-flink-taskmanager, aws-emr-eks-flink-state, aws-emr-eks-flink-source, aws-emr-eks-flink-sink]}
+      standalone-client:
+        label: Flink CLI・Web UI
+        kind: client
+        tier: entry
+        x: 1
+        "y": 1.5
+        realizes:
+          - client
+        description: ジョブを JobManager に提出する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§8
+      standalone-jm:
+        label: JobManager プロセス
+        kind: service
+        tier: flink
+        x: 3
+        "y": 1.5
+        realizes:
+          - dispatcher
+          - jobmaster
+          - resourcemanager
+        description: Dispatcher・JobMaster・ResourceManager を持つ。Standalone の ResourceManager は既存の TaskManager のスロットだけを配る。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      standalone-tm:
+        label: TaskManager プロセス
+        kind: worker
+        tier: flink
+        x: 9
+        "y": 1.5
+        parallel: "N"
+        slots: 2
+        realizes:
+          - operator
+          - exchange
+        description: 複数ホストで Task を並列に実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      standalone-rocks:
+        label: RocksDB（TaskManager のローカルディスク）
+        kind: db
+        tier: flink
+        x: 14
+        "y": 1.5
+        realizes:
+          - state
+        description: EmbeddedRocksDBStateBackend がキー別状態を TaskManager のローカルディスクに置く。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      standalone-kafka-in:
+        label: Kafka 注文トピック
+        kind: queue
+        tier: data
+        x: 1
+        "y": 1.5
+        realizes:
+          - source
+        description: 自前の Kafka が入力イベントを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§8
+        management:
+          type: customer
+          scope: 利用者が Kafka クラスタを運用する。
+      standalone-kafka-out:
+        label: Kafka 集計トピック
+        kind: queue
+        tier: data
+        x: 6
+        "y": 1.5
+        realizes:
+          - sink
+        description: KafkaSink が結果を書く。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§8
+        management:
+          type: customer
+          scope: 利用者が Kafka クラスタを運用する。
+      standalone-hdfs:
+        label: HDFS のチェックポイントディレクトリ
+        kind: db
+        tier: data
+        x: 12
+        "y": 1.5
+        realizes:
+          - checkpoint
+        description: execution.checkpointing.dir に hdfs:// のパスを指定する（公式の例）。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink.md#§8
+        management:
+          type: customer
+          scope: 利用者が HDFS を運用する。
+    links: []
+    groups:
+      - kind: datacenter
+        label: 自前のデータセンター
+        provider: onprem
+        tier:
+          - flink
+          - data
+        nodes:
+          - standalone-jm
+          - standalone-tm
+          - standalone-rocks
+          - standalone-kafka-in
+          - standalone-kafka-out
+          - standalone-hdfs

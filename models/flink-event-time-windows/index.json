@@ -1,0 +1,212 @@
+{
+  "model": "flink-event-time-windows",
+  "name": "Flink：イベント時刻とウォーターマーク・ウィンドウ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "Kafka パーティション（時刻付きイベント）",
+      "status": "claim"
+    },
+    "wmgen": {
+      "type": "node",
+      "label": "WatermarkStrategy",
+      "status": "claim"
+    },
+    "window": {
+      "type": "node",
+      "label": "窓の割り当て（Window Operator）",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "窓ごとの状態",
+      "status": "claim"
+    },
+    "trigger": {
+      "type": "node",
+      "label": "Trigger（EventTimeTrigger）",
+      "status": "claim"
+    },
+    "late": {
+      "type": "node",
+      "label": "遅延データの side output",
+      "status": "claim"
+    },
+    "sink": {
+      "type": "node",
+      "label": "Sink（窓の結果）",
+      "status": "claim"
+    },
+    "ingest": {
+      "type": "link",
+      "label": "Kafka パーティション（時刻付きイベント） → WatermarkStrategy",
+      "status": "claim"
+    },
+    "advance": {
+      "type": "link",
+      "label": "WatermarkStrategy → 窓の割り当て（Window Operator）",
+      "status": "claim"
+    },
+    "accumulate": {
+      "type": "link",
+      "label": "窓の割り当て（Window Operator） → 窓ごとの状態",
+      "status": "claim"
+    },
+    "check": {
+      "type": "link",
+      "label": "窓の割り当て（Window Operator） → Trigger（EventTimeTrigger）",
+      "status": "claim"
+    },
+    "fire": {
+      "type": "link",
+      "label": "Trigger（EventTimeTrigger） → Sink（窓の結果）",
+      "status": "claim"
+    },
+    "late-out": {
+      "type": "link",
+      "label": "窓の割り当て（Window Operator） → 遅延データの side output",
+      "status": "claim"
+    },
+    "window-fire": {
+      "type": "scenario",
+      "label": "Watermark で窓が確定する"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Watermark の定期生成間隔の設定キー（pipeline.auto-watermark-interval）は、確認した資料では API 名（setAutoWatermarkInterval）しか読めていない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Flink SQL・Table API の窓テーブル値関数（TUMBLE など）と、DataStream API の窓の対応は扱っていない。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Managed Service for Apache Flink で RocksDB など状態バックエンドを利用者が選べるかは、確認した資料に記載がない。"
+    },
+    "msf-app": {
+      "type": "implementation",
+      "impl": "msf",
+      "label": "Managed Service for Apache Flink アプリケーション",
+      "realizes": [
+        "wmgen",
+        "window",
+        "state",
+        "trigger",
+        "late"
+      ]
+    },
+    "msf-source": {
+      "type": "implementation",
+      "impl": "msf",
+      "label": "MSK 注文トピック",
+      "realizes": [
+        "source"
+      ]
+    },
+    "msf-sink": {
+      "type": "implementation",
+      "impl": "msf",
+      "label": "MSK 集計トピック",
+      "realizes": [
+        "sink"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-flink-event-time-windows.md#§1": [
+      "model"
+    ],
+    "docs/reference-flink-event-time-windows.md": [
+      "model",
+      "source",
+      "wmgen",
+      "window",
+      "state",
+      "trigger",
+      "late",
+      "sink",
+      "ingest",
+      "advance",
+      "accumulate",
+      "check",
+      "fire",
+      "late-out",
+      "window-fire",
+      "msf-app",
+      "msf-source",
+      "msf-sink"
+    ],
+    "docs/reference-flink-event-time-windows.md#§2": [
+      "source"
+    ],
+    "docs/reference-flink-event-time-windows.md#§3": [
+      "source",
+      "wmgen",
+      "ingest",
+      "advance"
+    ],
+    "docs/reference-flink-event-time-windows.md#§4": [
+      "window",
+      "state",
+      "accumulate"
+    ],
+    "docs/reference-flink-event-time-windows.md#§5": [
+      "trigger",
+      "sink",
+      "check",
+      "fire"
+    ],
+    "docs/reference-flink-event-time-windows.md#§6": [
+      "late",
+      "late-out"
+    ],
+    "docs/reference-flink-event-time-windows.md#§7": [
+      "window-fire"
+    ],
+    "docs/reference-flink-event-time-windows.md#§8": [
+      "msf-app",
+      "msf-source",
+      "msf-sink"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Flink",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "flink",
+    "objectives": [
+      "イベント時刻と処理時刻を区別する。",
+      "Watermark が窓を確定させる条件と、並列入力での進み方（最小値）を説明する。",
+      "許容遅延と side output の役割を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Flink · Timely Stream Processing",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"
+      },
+      {
+        "title": "Flink · Generating Watermarks",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/event-time/generating_watermarks/"
+      },
+      {
+        "title": "Flink · Windows",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/operators/windows/"
+      },
+      {
+        "title": "Flink · Kafka connector",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/"
+      },
+      {
+        "title": "Managed Service for Apache Flink · How it works",
+        "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html"
+      }
+    ]
+  }
+}

@@ -1,0 +1,223 @@
+{
+  "model": "kafka-replication",
+  "name": "Kafka：レプリケーションと ISR・障害復旧",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "producer": {
+      "type": "node",
+      "label": "イベント送信元",
+      "status": "claim"
+    },
+    "controller": {
+      "type": "node",
+      "label": "クラスターのメタデータ管理",
+      "status": "claim"
+    },
+    "broker-1": {
+      "type": "node",
+      "label": "Broker 1 · P0 リーダー",
+      "status": "claim"
+    },
+    "broker-2": {
+      "type": "node",
+      "label": "Broker 2 · P0 フォロワー（ISR）",
+      "status": "claim"
+    },
+    "broker-3": {
+      "type": "node",
+      "label": "Broker 3 · P0 フォロワー",
+      "status": "claim"
+    },
+    "produce": {
+      "type": "link",
+      "label": "イベント送信元 → Broker 1 · P0 リーダー",
+      "status": "claim"
+    },
+    "replicate-2": {
+      "type": "link",
+      "label": "Broker 1 · P0 リーダー → Broker 2 · P0 フォロワー（ISR）",
+      "status": "claim"
+    },
+    "replicate-3": {
+      "type": "link",
+      "label": "Broker 1 · P0 リーダー → Broker 3 · P0 フォロワー",
+      "status": "claim"
+    },
+    "ack": {
+      "type": "link",
+      "label": "Broker 1 · P0 リーダー → イベント送信元",
+      "status": "claim"
+    },
+    "elect": {
+      "type": "link",
+      "label": "クラスターのメタデータ管理 → Broker 2 · P0 フォロワー（ISR）",
+      "status": "claim"
+    },
+    "retry": {
+      "type": "link",
+      "label": "イベント送信元 → Broker 2 · P0 フォロワー（ISR）",
+      "status": "claim"
+    },
+    "replicate-after": {
+      "type": "link",
+      "label": "Broker 2 · P0 フォロワー（ISR） → Broker 3 · P0 フォロワー",
+      "status": "claim"
+    },
+    "kafka-replicate": {
+      "type": "scenario",
+      "label": "複製と書き込み応答"
+    },
+    "kafka-failover": {
+      "type": "scenario",
+      "label": "Broker 障害とリーダー切り替え"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "replica.lag.time.max.ms と min.insync.replicas の既定値は、確認した Design のページに記載がない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "障害時のリーダー切り替えにかかる時間は未確認。"
+    },
+    "aws-repl-producer": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate",
+      "label": "Fargate タスク（Producer）",
+      "realizes": [
+        "producer"
+      ]
+    },
+    "aws-repl-b1": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate",
+      "label": "MSK ブローカー 1（P0 リーダー）",
+      "realizes": [
+        "broker-1"
+      ]
+    },
+    "aws-repl-b2": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate",
+      "label": "MSK ブローカー 2",
+      "realizes": [
+        "broker-2"
+      ]
+    },
+    "aws-repl-b3": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate",
+      "label": "MSK ブローカー 3",
+      "realizes": [
+        "broker-3"
+      ]
+    },
+    "aws-repl-controller": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate",
+      "label": "MSK 管理の KRaft Controller",
+      "realizes": [
+        "controller"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-kafka-replication.md#§1": [
+      "model"
+    ],
+    "docs/reference-kafka-replication.md": [
+      "model",
+      "producer",
+      "controller",
+      "broker-1",
+      "broker-2",
+      "broker-3",
+      "produce",
+      "replicate-2",
+      "replicate-3",
+      "ack",
+      "elect",
+      "retry",
+      "replicate-after",
+      "kafka-replicate",
+      "kafka-failover",
+      "aws-repl-producer",
+      "aws-repl-b1",
+      "aws-repl-b2",
+      "aws-repl-b3",
+      "aws-repl-controller"
+    ],
+    "docs/reference-kafka-replication.md#§2": [
+      "producer",
+      "broker-1",
+      "produce",
+      "kafka-replicate"
+    ],
+    "docs/reference-kafka-replication.md#§4": [
+      "producer",
+      "ack",
+      "kafka-replicate"
+    ],
+    "docs/reference-kafka-replication.md#§5": [
+      "controller",
+      "broker-2",
+      "elect",
+      "kafka-failover"
+    ],
+    "docs/reference-kafka-replication.md#§3": [
+      "broker-1",
+      "broker-2",
+      "broker-3",
+      "replicate-2",
+      "replicate-3",
+      "kafka-replicate"
+    ],
+    "docs/reference-kafka-replication.md#§6": [
+      "broker-3",
+      "retry",
+      "replicate-after",
+      "kafka-failover"
+    ],
+    "docs/reference-kafka-replication.md#§7": [
+      "aws-repl-producer",
+      "aws-repl-b1",
+      "aws-repl-b2",
+      "aws-repl-b3",
+      "aws-repl-controller"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Kafka",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "kafka",
+    "objectives": [
+      "リーダー、フォロワー、ISR、コミット済みの関係を説明する。",
+      "acks=all と min.insync.replicas が書き込み応答にどう効くかを追う。",
+      "リーダー障害から選出、再送、ISR 復帰までの流れを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Apache Kafka Design",
+        "url": "https://kafka.apache.org/44/design/design/"
+      },
+      {
+        "title": "Producer Configs",
+        "url": "https://kafka.apache.org/44/configuration/producer-configs/"
+      },
+      {
+        "title": "Broker Configs",
+        "url": "https://kafka.apache.org/44/configuration/broker-configs/"
+      },
+      {
+        "title": "KRaft",
+        "url": "https://kafka.apache.org/44/operations/kraft/"
+      }
+    ]
+  }
+}

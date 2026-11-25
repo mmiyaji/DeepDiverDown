@@ -2,319 +2,406 @@
   "model": "flink",
   "name": "Apache Flink の基本アーキテクチャ",
   "coverage": {
-    "covered": 9,
-    "total": 9
+    "covered": 8,
+    "total": 8
   },
   "byId": {
-    "source": {
+    "client": {
       "type": "node",
-      "label": "再読できるイベント入力",
+      "label": "クライアント",
       "status": "claim"
     },
-    "watermark": {
+    "dispatcher": {
       "type": "node",
-      "label": "イベント時刻の進捗生成",
+      "label": "Dispatcher",
+      "status": "claim"
+    },
+    "jobmaster": {
+      "type": "node",
+      "label": "JobMaster",
+      "status": "claim"
+    },
+    "resourcemanager": {
+      "type": "node",
+      "label": "ResourceManager",
+      "status": "claim"
+    },
+    "source": {
+      "type": "node",
+      "label": "Source（再読できる入力）",
       "status": "claim"
     },
     "operator": {
       "type": "node",
-      "label": "窓集計の実行",
+      "label": "TaskManager のスロットで動く Task",
+      "status": "claim"
+    },
+    "exchange": {
+      "type": "node",
+      "label": "Task 間のデータ交換",
       "status": "claim"
     },
     "sink": {
       "type": "node",
-      "label": "結果の出力先",
+      "label": "Sink（出力先）",
       "status": "claim"
     },
     "state": {
       "type": "node",
-      "label": "キー別の作業状態",
+      "label": "状態バックエンド",
       "status": "claim"
     },
     "checkpoint": {
       "type": "node",
-      "label": "永続チェックポイント",
+      "label": "チェックポイント保存先",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "クライアント → Dispatcher",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "Dispatcher → JobMaster",
+      "status": "claim"
+    },
+    "request": {
+      "type": "link",
+      "label": "JobMaster → ResourceManager",
+      "status": "claim"
+    },
+    "deploy": {
+      "type": "link",
+      "label": "JobMaster → TaskManager のスロットで動く Task",
+      "status": "claim"
+    },
+    "allocate": {
+      "type": "link",
+      "label": "ResourceManager → TaskManager のスロットで動く Task",
       "status": "claim"
     },
     "ingest": {
       "type": "link",
-      "label": "再読できるイベント入力 → イベント時刻の進捗生成",
+      "label": "Source（再読できる入力） → TaskManager のスロットで動く Task",
       "status": "claim"
     },
-    "advance": {
+    "shuffle": {
       "type": "link",
-      "label": "イベント時刻の進捗生成 → 窓集計の実行",
-      "status": "claim"
-    },
-    "aggregate": {
-      "type": "link",
-      "label": "窓集計の実行 → キー別の作業状態",
+      "label": "TaskManager のスロットで動く Task → Task 間のデータ交換",
       "status": "claim"
     },
     "emit": {
       "type": "link",
-      "label": "窓集計の実行 → 結果の出力先",
+      "label": "Task 間のデータ交換 → Sink（出力先）",
+      "status": "claim"
+    },
+    "aggregate": {
+      "type": "link",
+      "label": "TaskManager のスロットで動く Task → 状態バックエンド",
+      "status": "claim"
+    },
+    "trigger": {
+      "type": "link",
+      "label": "JobMaster → Source（再読できる入力）",
       "status": "claim"
     },
     "snapshot": {
       "type": "link",
-      "label": "窓集計の実行 → 永続チェックポイント",
+      "label": "TaskManager のスロットで動く Task → チェックポイント保存先",
       "status": "claim"
     },
     "restore": {
       "type": "link",
-      "label": "永続チェックポイント → 窓集計の実行",
+      "label": "チェックポイント保存先 → TaskManager のスロットで動く Task",
       "status": "claim"
     },
-    "flink-window-recovery": {
+    "job-run": {
       "type": "scenario",
-      "label": "イベント時刻の窓集計と復旧"
+      "label": "ジョブが提出されて動き出す"
     },
-    "kafka-managed-state-host": {
-      "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "自前 Linux Flink ホスト群",
-      "realizes": []
+    "checkpoint-recovery": {
+      "type": "scenario",
+      "label": "チェックポイントと復旧"
     },
-    "kafka-managed-state-hdfs": {
-      "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "自前 HDFS クラスター",
-      "realizes": []
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Managed Service for Apache Flink の内部（JobManager・TaskManager の配置、状態バックエンド、チェックポイントの保存先）は、確認した資料に記載がない。図ではサービスの 1 部品として描く。"
     },
-    "kafka-managed-state-source": {
+    "UNK-02": {
+      "type": "unknown",
+      "label": "JobManager の高可用性（standby JobManager、ZooKeeper や Kubernetes による leader 選出）の構成は、この図では扱わない。Kubernetes HA は「Flink：Kubernetes 上の運用」で扱う。Standalone での HA の構成は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Standalone クラスタの起動スクリプト、設定ファイル、必要な Java のバージョンは、今回確認した資料の範囲では読めていない（Standalone の概要ページ未確認）。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "Managed Service for Apache Flink が MSK と接続するネットワーク経路（VPC 設定など）は、今回確認した資料に記載がない。"
+    },
+    "msf-client": {
       "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "Kafka 注文トピック",
+      "impl": "msf",
+      "label": "AWS コンソール・CLI",
       "realizes": [
-        "source"
+        "client"
       ]
     },
-    "kafka-managed-state-tasks": {
+    "msf-app": {
       "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "TaskManager 上の時刻処理と Window Operator",
+      "impl": "msf",
+      "label": "Managed Service for Apache Flink アプリケーション",
       "realizes": [
-        "watermark",
-        "operator"
+        "dispatcher",
+        "jobmaster",
+        "resourcemanager",
+        "operator",
+        "state",
+        "exchange"
       ]
     },
-    "kafka-managed-state-rocks": {
+    "msf-checkpoint": {
       "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "EmbeddedRocksDBStateBackend",
-      "realizes": [
-        "state"
-      ]
-    },
-    "kafka-managed-state-checkpoint": {
-      "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "HDFS のチェックポイントディレクトリー",
+      "impl": "msf",
+      "label": "チェックポイント・スナップショット（サービス管理）",
       "realizes": [
         "checkpoint"
       ]
     },
-    "kafka-managed-state-out": {
+    "msf-code": {
       "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "Kafka の出力トピック",
-      "realizes": [
-        "sink"
-      ]
-    },
-    "kafka-managed-state-coordinator": {
-      "type": "implementation",
-      "impl": "kafka-managed-state",
-      "label": "JobManager のチェックポイント調整",
+      "impl": "msf",
+      "label": "S3 のアプリケーションコード",
       "realizes": []
     },
-    "aws-emr-eks-flink-kubectl": {
+    "msf-source": {
       "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "kubectl",
-      "realizes": []
-    },
-    "aws-emr-eks-flink-control": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "EKS Kubernetes API",
-      "realizes": []
-    },
-    "aws-emr-eks-flink-operator": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "Flink Kubernetes Operator",
-      "realizes": []
-    },
-    "aws-emr-eks-flink-capacity": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "EKS の EC2 ノード",
-      "realizes": []
-    },
-    "aws-emr-eks-flink-jobmanager": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "Flink JobManager Pod",
-      "realizes": []
-    },
-    "aws-emr-eks-flink-taskmanager": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "Flink TaskManager Pod",
-      "realizes": [
-        "watermark",
-        "operator"
-      ]
-    },
-    "aws-emr-eks-flink-state": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "TaskManager の RocksDB",
-      "realizes": [
-        "state"
-      ]
-    },
-    "aws-emr-eks-flink-source": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
+      "impl": "msf",
       "label": "MSK 注文トピック",
       "realizes": [
         "source"
       ]
     },
-    "aws-emr-eks-flink-sink": {
+    "msf-sink": {
       "type": "implementation",
-      "impl": "aws-emr-eks-flink",
+      "impl": "msf",
       "label": "MSK 集計トピック",
       "realizes": [
         "sink"
       ]
     },
-    "aws-emr-eks-flink-checkpoint": {
+    "msf-role": {
       "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "S3 チェックポイント",
+      "impl": "msf",
+      "label": "IAM サービス実行ロール",
+      "realizes": []
+    },
+    "msf-logs": {
+      "type": "implementation",
+      "impl": "msf",
+      "label": "CloudWatch Logs",
+      "realizes": []
+    },
+    "standalone-client": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "Flink CLI・Web UI",
+      "realizes": [
+        "client"
+      ]
+    },
+    "standalone-jm": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "JobManager プロセス",
+      "realizes": [
+        "dispatcher",
+        "jobmaster",
+        "resourcemanager"
+      ]
+    },
+    "standalone-tm": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "TaskManager プロセス",
+      "realizes": [
+        "operator",
+        "exchange"
+      ]
+    },
+    "standalone-rocks": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "RocksDB（TaskManager のローカルディスク）",
+      "realizes": [
+        "state"
+      ]
+    },
+    "standalone-kafka-in": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "Kafka 注文トピック",
+      "realizes": [
+        "source"
+      ]
+    },
+    "standalone-kafka-out": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "Kafka 集計トピック",
+      "realizes": [
+        "sink"
+      ]
+    },
+    "standalone-hdfs": {
+      "type": "implementation",
+      "impl": "standalone",
+      "label": "HDFS のチェックポイントディレクトリ",
       "realizes": [
         "checkpoint"
       ]
-    },
-    "aws-emr-eks-flink-ha": {
-      "type": "implementation",
-      "impl": "aws-emr-eks-flink",
-      "label": "S3 の HA メタデータ",
-      "realizes": []
     }
   },
   "byRef": {
     "docs/reference-flink.md#§1": [
-      "model",
-      "flink-window-recovery"
+      "model"
     ],
     "docs/reference-flink.md": [
       "model",
+      "client",
+      "dispatcher",
+      "jobmaster",
+      "resourcemanager",
       "source",
-      "watermark",
       "operator",
+      "exchange",
       "sink",
       "state",
       "checkpoint",
+      "submit",
+      "start",
+      "request",
+      "deploy",
+      "allocate",
       "ingest",
-      "advance",
-      "aggregate",
+      "shuffle",
       "emit",
+      "aggregate",
+      "trigger",
       "snapshot",
       "restore",
-      "flink-window-recovery",
-      "kafka-managed-state-host",
-      "kafka-managed-state-hdfs",
-      "kafka-managed-state-source",
-      "kafka-managed-state-tasks",
-      "kafka-managed-state-rocks",
-      "kafka-managed-state-checkpoint",
-      "kafka-managed-state-out",
-      "kafka-managed-state-coordinator",
-      "aws-emr-eks-flink-kubectl",
-      "aws-emr-eks-flink-control",
-      "aws-emr-eks-flink-operator",
-      "aws-emr-eks-flink-capacity",
-      "aws-emr-eks-flink-jobmanager",
-      "aws-emr-eks-flink-taskmanager",
-      "aws-emr-eks-flink-state",
-      "aws-emr-eks-flink-source",
-      "aws-emr-eks-flink-sink",
-      "aws-emr-eks-flink-checkpoint",
-      "aws-emr-eks-flink-ha"
+      "job-run",
+      "checkpoint-recovery",
+      "msf-client",
+      "msf-app",
+      "msf-checkpoint",
+      "msf-code",
+      "msf-source",
+      "msf-sink",
+      "msf-role",
+      "msf-logs",
+      "standalone-client",
+      "standalone-jm",
+      "standalone-tm",
+      "standalone-rocks",
+      "standalone-kafka-in",
+      "standalone-kafka-out",
+      "standalone-hdfs"
     ],
     "docs/reference-flink.md#§2": [
-      "source",
-      "ingest"
-    ],
-    "docs/reference-flink.md#§3": [
-      "watermark",
-      "advance"
+      "client",
+      "dispatcher",
+      "jobmaster",
+      "resourcemanager",
+      "operator",
+      "submit",
+      "start",
+      "request",
+      "deploy",
+      "allocate"
     ],
     "docs/reference-flink.md#§4": [
-      "operator",
+      "jobmaster",
       "state",
-      "aggregate"
-    ],
-    "docs/reference-flink.md#§6": [
-      "sink",
-      "emit",
+      "checkpoint",
+      "aggregate",
+      "trigger",
+      "snapshot",
       "restore"
     ],
     "docs/reference-flink.md#§5": [
-      "state",
-      "checkpoint",
-      "snapshot"
+      "resourcemanager"
+    ],
+    "docs/reference-flink.md#§3": [
+      "source",
+      "operator",
+      "exchange",
+      "sink",
+      "ingest",
+      "shuffle",
+      "emit"
+    ],
+    "docs/reference-flink.md#§6": [
+      "job-run",
+      "checkpoint-recovery"
     ],
     "docs/reference-flink.md#§7": [
-      "flink-window-recovery"
+      "msf-client",
+      "msf-app",
+      "msf-checkpoint",
+      "msf-code",
+      "msf-source",
+      "msf-sink",
+      "msf-role",
+      "msf-logs"
     ],
     "docs/reference-flink.md#§8": [
-      "kafka-managed-state-host",
-      "kafka-managed-state-hdfs",
-      "kafka-managed-state-source",
-      "kafka-managed-state-tasks",
-      "kafka-managed-state-rocks",
-      "kafka-managed-state-checkpoint",
-      "kafka-managed-state-out",
-      "kafka-managed-state-coordinator"
-    ],
-    "docs/reference-flink.md#§9": [
-      "aws-emr-eks-flink-kubectl",
-      "aws-emr-eks-flink-control",
-      "aws-emr-eks-flink-operator",
-      "aws-emr-eks-flink-capacity",
-      "aws-emr-eks-flink-jobmanager",
-      "aws-emr-eks-flink-taskmanager",
-      "aws-emr-eks-flink-state",
-      "aws-emr-eks-flink-source",
-      "aws-emr-eks-flink-sink",
-      "aws-emr-eks-flink-checkpoint",
-      "aws-emr-eks-flink-ha"
+      "standalone-client",
+      "standalone-jm",
+      "standalone-tm",
+      "standalone-rocks",
+      "standalone-kafka-in",
+      "standalone-kafka-out",
+      "standalone-hdfs"
     ]
   },
   "reference": {
-    "category": "ストリーム処理",
     "order": 20,
     "domain": "データ処理",
+    "category": "ストリーム処理",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "Apache Flink",
+    "role": "overview",
     "objectives": [
-      "Source、ウォーターマーク、状態付き演算子、Sink の役割を区別する。",
-      "イベント時刻とウォーターマークで窓を閉じる流れを理解する。",
-      "チェックポイントから入力位置と演算子状態を復元する。"
+      "JobManager の 3 つの役割（Dispatcher・JobMaster・ResourceManager）と TaskManager のスロットを区別する。",
+      "Source・Operator・Sink のデータの流れと、状態・チェックポイントの置き場所を説明する。",
+      "Amazon Managed Service for Apache Flink と自前ホストの Standalone で、利用者が管理する範囲の違いを読む。"
     ],
     "sources": [
       {
-        "title": "Stateful Stream Processing",
+        "title": "Flink · Flink Architecture",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/"
+      },
+      {
+        "title": "Flink · Overview (API layers)",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/overview/"
+      },
+      {
+        "title": "Flink · Stateful Stream Processing",
         "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/"
       },
       {
-        "title": "Timely Stream Processing",
-        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/time/"
+        "title": "Flink · State Backends",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/"
+      },
+      {
+        "title": "Flink · Native Kubernetes",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/"
+      },
+      {
+        "title": "Managed Service for Apache Flink · How it works",
+        "url": "https://docs.aws.amazon.com/managed-flink/latest/java/how-it-works.html"
       }
     ]
   }

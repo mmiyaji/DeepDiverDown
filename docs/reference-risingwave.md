@@ -1,54 +1,98 @@
-# RisingWave のストリーミング SQL
+# RisingWave の基本アーキテクチャ
 
-## 1. 対象
+docs.risingwave.com の公式ドキュメントを基準に、構成部品・データの流れ・実行場所を整理する。更新の仕組み、Hummock とコンパクション、Barrier と復旧は「仕組みの深掘り」の図で扱う。
 
-イベントを継続的に取り込み、SQL の結果と状態を更新して提供する。
+## 1. RisingWave の位置づけ
 
-## 2. 機能配置と処理
+RisingWave は、データベースやイベントストリームから継続的にデータを取り込み、SQL で増分処理して、新しい結果を低遅延で提供するシステムである。PostgreSQL のワイヤープロトコルに対応し、psql や各言語のドライバーで接続する。公式の紹介ページは Debezium・Kafka・Flink・サービング用 DB の組み合わせを 1 つで置き換えるものとして説明している（資料側の主張であり、本書では評価しない）。
 
-イベントをストリームから取り込み、SQL で継続的に処理する。実体化ビューを更新し、利用者が問い合わせる。処理状態は永続ストレージを利用する。
+マテリアライズドビューは入力の変化に合わせて自動で更新され、`REFRESH` に当たる操作はない。内部の状態とビューの結果はオブジェクトストレージに置く。
 
-## 3. 設計上の注意
+## 2. ノードの役割
 
-イベント時刻、遅延、再処理、保存期間、ソース・出力先の対応、運用負荷を確認する。
+資料は 4 種類のノードを挙げる。
 
-## 4. 実装例
+- **Frontend（Serving Node）**：ステートレスな PostgreSQL 互換ノード。クライアント接続を受け、SQL を解析・バインド・最適化する。バッチクエリは自分で実行し、ストリーミングクエリの計画は Meta へ渡す。軽い問い合わせ（点参照など）は local、結合や集約を含む問い合わせは distributed モードで動く。
+- **Compute（Streaming Node）**：ストリームグラフを実行し、集約や結合の状態を保つ。専用（Streaming のみ・Serving のみ）にも、両方を担う hybrid（既定）にもできる。
+- **Meta**：全データベースオブジェクトのメタデータを管理し、ストリーミングジョブを Compute に配置する。Barrier と checkpoint を起動し、障害時の復旧を扱い、コンパクションタスクを生成する。
+- **Compactor**：LSM ツリーのストレージをバックグラウンドで整理し、読み取りを速くして領域を回収する。
 
-Kafka のストリームから RisingWave が実体化ビューを更新し、SQL クライアントが問い合わせる自己運用例。オブジェクトストレージは S3 互換であり提供元は指定しない。
+規模の目安として、資料は Compute 対 Compactor を 2 対 1（書き込みが多い処理は 1 対 8 の場合もある）、Compute 対 Meta を 4 対 1 とする。
+
+## 3. Hummock・オブジェクトストレージ・meta store
+
+- **Hummock**：Table・マテリアライズドビュー・ストリーム処理の状態を持つ、行ベースの LSM ツリーのストレージエンジン。永続コピーを S3・GCS・Azure Blob などのオブジェクトストレージに置き、Compute 側にホットなデータをキャッシュする。ストレージと計算が分かれているため、ストレージを増やさずに Compute を増減できる。
+- **LSM ツリー**：書き込みはすべて追記で、削除は削除印（tombstone）で表す。新しいデータは L0 に入り、L1 以上でソートされる。詳細は「RisingWave：Hummock ストレージとコンパクション」で扱う。
+- **オブジェクトストレージ**：S3、GCS、Azure Blob、MinIO など。OpenDAL で抽象化している。
+- **meta store**：Meta がメタデータを保存する先で、PostgreSQL・MySQL・SQLite を選べる。Frontend はカタログを Meta から取得してローカルにキャッシュする。
+- 大量の全表走査は列指向の形式より不得手とされ、そのための列指向ストレージとして Iceberg の選択肢が案内されている。
+
+## 4. Source・Table・マテリアライズドビュー・Sink
+
+| 対象 | RisingWave 内のデータ | 問い合わせ |
+| --- | --- | --- |
+| Source（`CREATE SOURCE`） | 持たない。外部システムへの接続の定義だけ | Kafka・S3・Iceberg は直接可。CDC は不可 |
+| Table（`CREATE TABLE`、コネクタ付きも可） | 持つ。コネクタ付きではオフセット等も追跡する | 可 |
+| マテリアライズドビュー | 結果を持つ | 可 |
+| Sink（`CREATE SINK`） | 持たない。結果を外部へ継続的に配信する | 不可 |
+
+- CDC（PostgreSQL・MySQL など）は、更新と削除を正しく反映するために Table で取り込む。
+- Sink の入力は既存の Source・Table・マテリアライズドビューか、クエリである。資料は、マテリアライズドビューを Sink の上流にするのが通常で、Source を直接の上流にはできないと述べる。
+- これらは Streaming Job と呼ばれる継続的な SQL 処理である。
+
+## 5. データの流れ
+
+1. クライアントが SQL を Frontend に送る。
+2. バッチクエリは、Frontend が計画をフラグメントに分け、並列に実行して結果をまとめて返す。
+3. ストリーミングクエリは、Frontend が計画して Meta へ渡し、Meta が Actor を Compute に割り当てる。履歴のデータをバックフィルして上流に追いついた後、増分処理に進む。
+4. 更新はストリームグラフを流れ、マテリアライズドビューに反映される。`SELECT` は最新の結果を返す。
+5. Meta は既定で 1000 ms ごとに Barrier を送る。全 Compute が状態を保存して Barrier を集め終えると、一貫した checkpoint になる。
+6. 障害後は、Meta が最後の checkpoint から Actor を作り直す。Meta はコンパクションタスクを作り、Compactor に割り当てる。
+
+## 6. 動く場所
+
+- **Kubernetes**：RisingWave Operator がカスタムリソースを追加する（cert-manager が前提）。`spec.components` に meta・compute・compactor・frontend のノードグループを指定し、`spec.stateStore` にオブジェクトストレージ（S3・MinIO・GCS・Azure Blob・Alibaba OSS・HDFS など）を指定する。S3 では `useServiceAccount: true` でサービスアカウントの権限を使える。本番では CPU とメモリの requests と limits を同じにすることが推奨される。
+- **Docker Compose**：既定は 1 プロセスのオールインワンで、Frontend・Meta・Compute・Compactor がスレッドとして同居する。`docker-compose-distributed.yml` は各コンポーネントを別プロセスにし、MinIO を state store にする。meta store は PostgreSQL が既定。
+- **ハードウェア要件**：Compute は最小 2 コア・8 GiB（推奨 4 コア・16 GiB 以上）、Compactor・Meta・Frontend は最小 1 コア・4 GiB（推奨 2 コア・8 GiB 以上）。Meta は 2 台（主と副）を推奨。ストレージ性能は全体の性能に強く影響し、クラウドのオブジェクトストレージが推奨される。
+
+## 7. 実装例：AWS の EKS・S3・RDS for PostgreSQL
+
+EKS の EC2 マネージドノードグループに RisingWave Operator で Frontend・Meta・Compute・Compactor の Pod を配置する例。state store は S3（`spec.stateStore.s3` にバケットとリージョン、`useServiceAccount` でサービスアカウントの IAM ロール）、meta store は PostgreSQL（RDS for PostgreSQL を選んだ例）とする。Kafka と Sink の出力先は RisingWave の資料が提供元を指定しないため、実行場所を決めない外部システムとして描く。
 
 | 機能 | 担い手 |
-|---|---|
-| イベントの入力 | Kafka トピック |
-| 継続的な SQL 処理 | RisingWave ストリーム処理 |
-| 更新されるビュー | RisingWave 実体化ビュー |
-| 分析クライアント | SQL クライアント |
-| 処理状態の保存 | S3 互換オブジェクトストレージ |
+| --- | --- |
+| SQL クライアント | psql など。公開方式は Frontend の Service の種類（ClusterIP・NodePort・LoadBalancer）で選ぶ |
+| Frontend・Meta・Compute・Compactor | EKS の EC2 ノード上の各 Pod |
+| Hummock・マテリアライズドビュー | Amazon S3 のバケット（RisingWave が dataDirectory 配下に書く） |
+| meta store | RDS for PostgreSQL |
+| Source・Sink | 外部の Kafka と出力先（実行場所は未選定） |
+| AWS 権限 | サービスアカウントに対応する IAM ロール |
 
-利用者が RisingWave の実行ホスト、メタストアと処理設定を管理する。例では PostgreSQL をメタストアとして選び、Kafka と S3 互換ストレージの提供元・実行場所は未選定とする。S3 互換は Amazon S3 を意味しない。公式資料を組み合わせた未検証の例で、接続と復旧を導入時に検証する。
+AWS が EKS 制御プレーンと EC2・S3・RDS の基盤を運用する。利用者は Kubernetes API、ノードグループ、RisingWave の配置・設定・更新、データ、権限を管理する。RDS を meta store にすること、Amazon MSK を Kafka に使うこと、必要な IAM 権限の一覧は RisingWave の資料に記載がなく未確認。図は公式資料を組み合わせた代表例で、実動作は未検証。
 
-[RisingWave Helm chart values](https://raw.githubusercontent.com/risingwavelabs/helm-charts/main/charts/risingwave/values.yaml)、[RisingWave](https://github.com/risingwavelabs/risingwave)、[RisingWave documentation](https://docs.risingwave.com/)。
+## 8. 実装例：自社データセンターの Docker Compose（分散構成）
 
-## 5. 実装例：AWS の EKS・Amazon MSK・S3・RDS
+自社のサーバー上で `docker-compose-distributed.yml` の構成を使い、4 種のコンポーネントを別コンテナで動かす例。meta store は PostgreSQL（既定）、state store は MinIO（既定）である。
 
-公式 Helm チャートで RisingWave の Frontend、Compute、Meta、Compactor を Amazon EKS に配置する。Kafka の入力には Amazon MSK、Hummock の状態ストアには Amazon S3、Meta の PostgreSQL メタストアには RDS for PostgreSQL を使う。Helm の `stateStore` と `metaStore.postgresql` でそれぞれの接続先を指定する。
+| 機能 | 担い手 |
+| --- | --- |
+| Frontend・Meta・Compute・Compactor | Docker ホスト上の各コンテナ |
+| Hummock | MinIO（S3 互換） |
+| meta store | PostgreSQL |
+| Source・Sink | 外部の Kafka と出力先（実行場所は未選定） |
 
-| 機能配置 | 実装での担い手 |
-|---|---|
-| イベントの入力 | Amazon MSK の Kafka トピック |
-| 継続的な SQL 処理 | EKS の EC2 ノード上の RisingWave Compute |
-| 更新されるビュー | Compute が維持する Hummock 上の実体化ビュー |
-| 分析クライアント | SQL クライアントと RisingWave Frontend |
-| 処理状態の保存 | Amazon S3 上の Hummock |
-| クラスタ管理とメタデータ | RisingWave Meta と RDS for PostgreSQL。Compactor が S3 の SST を整理する |
+利用者がサーバー、Docker、PostgreSQL、MinIO の運用・冗長化・バックアップを管理する。資料の Docker Compose は導入の手順として書かれており、本番運用の構成として推奨されているかは未確認。ホストの台数と配置も資料で指定されていない。
 
-EKS の制御プレーンは AWS 管理 VPC にあり、利用者は Kubernetes API と公開設定を操作できるが、サーバーへ直接アクセスしない。MSK、S3、RDS は EKS クラスタ外の独立サービスである。AWS がサービス基盤を運用し、利用者がデータ、認証と設定を管理する。複数の資料を組み合わせた未検証の例で、対応版とネットワーク、復旧を導入時に確認する。
+## 公式資料
 
-MSK に合わせた認証とネットワーク接続を設定する。RDS に保存するのは RisingWave の管理メタデータで、実体化ビューの行は Hummock が管理する。AWS は Kubernetes と各マネージドサービスを提供し、Apache-2.0 の RisingWave の更新・設定・復旧は運用者が管理する。
-
-- [EKS Control Plane](https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html)
-- [RisingWave Helm deployment guide](https://risingwave.com/blog/streaming-database-kubernetes-deployment-guide/)
-- [RisingWave Helm chart values](https://raw.githubusercontent.com/risingwavelabs/helm-charts/main/charts/risingwave/values.yaml)
-- [RisingWave architecture design](https://risingwavelabs.github.io/risingwave/design/architecture-design.html)
-- [RisingWave Kafka source and MSK](https://github.com/risingwavelabs/risingwave-docs/blob/main/integrations/sources/kafka.mdx)
-- [RisingWave license](https://github.com/risingwavelabs/risingwave/blob/main/LICENSE)
-- [EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
+- [RisingWave · Architecture](https://docs.risingwave.com/get-started/architecture)
+- [RisingWave · What is RisingWave](https://docs.risingwave.com/get-started/intro)
+- [RisingWave · Source, Table, MV, and Sink](https://docs.risingwave.com/get-started/source-table-mv-sink)
+- [RisingWave · Key concepts](https://docs.risingwave.com/reference/key-concepts)
+- [RisingWave · Storage overview](https://docs.risingwave.com/store/overview)
+- [RisingWave · Deploy on Kubernetes](https://docs.risingwave.com/deploy/risingwave-kubernetes)
+- [RisingWave · Docker Compose](https://docs.risingwave.com/deploy/risingwave-docker-compose)
+- [RisingWave · Hardware requirements](https://docs.risingwave.com/deploy/hardware-requirements)
+- [Amazon EKS managed node groups](https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html)
+- [IAM roles for service accounts](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
+- [Amazon RDS for PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html)

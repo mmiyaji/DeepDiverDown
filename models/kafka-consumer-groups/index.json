@@ -1,0 +1,218 @@
+{
+  "model": "kafka-consumer-groups",
+  "name": "Kafka：Consumer Group とリバランス",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "topic": {
+      "type": "node",
+      "label": "Topic の 6 パーティション",
+      "status": "claim"
+    },
+    "consumer-1": {
+      "type": "node",
+      "label": "Consumer 1",
+      "status": "claim"
+    },
+    "consumer-2": {
+      "type": "node",
+      "label": "Consumer 2",
+      "status": "claim"
+    },
+    "consumer-3": {
+      "type": "node",
+      "label": "Consumer 3（途中参加）",
+      "status": "claim"
+    },
+    "coordinator": {
+      "type": "node",
+      "label": "Group Coordinator（Broker）",
+      "status": "claim"
+    },
+    "offsets": {
+      "type": "node",
+      "label": "__consumer_offsets",
+      "status": "claim"
+    },
+    "read-1": {
+      "type": "link",
+      "label": "Topic の 6 パーティション → Consumer 1",
+      "status": "claim"
+    },
+    "read-2": {
+      "type": "link",
+      "label": "Topic の 6 パーティション → Consumer 2",
+      "status": "claim"
+    },
+    "read-3": {
+      "type": "link",
+      "label": "Topic の 6 パーティション → Consumer 3（途中参加）",
+      "status": "claim"
+    },
+    "join": {
+      "type": "link",
+      "label": "Consumer 3（途中参加） → Group Coordinator（Broker）",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "Group Coordinator（Broker） → Consumer 2",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "Consumer 1 → Group Coordinator（Broker）",
+      "status": "claim"
+    },
+    "store": {
+      "type": "link",
+      "label": "Group Coordinator（Broker） → __consumer_offsets",
+      "status": "claim"
+    },
+    "kafka-rebalance": {
+      "type": "scenario",
+      "label": "Consumer の追加と離脱（リバランス）"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "consumer プロトコル（group.protocol=consumer）のリバランスの段階とブロッキングの有無は、確認した資料の範囲では扱っていない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "MSK のブローカー側のグループ設定の既定値は未確認。"
+    },
+    "aws-cg-ecs": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate-group",
+      "label": "Amazon ECS（購読サービス）",
+      "realizes": []
+    },
+    "aws-cg-c1": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate-group",
+      "label": "Fargate タスク（Consumer 1）",
+      "realizes": [
+        "consumer-1"
+      ]
+    },
+    "aws-cg-c2": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate-group",
+      "label": "Fargate タスク（Consumer 2）",
+      "realizes": [
+        "consumer-2"
+      ]
+    },
+    "aws-cg-c3": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate-group",
+      "label": "Fargate タスク（Consumer 3）",
+      "realizes": [
+        "consumer-3"
+      ]
+    },
+    "aws-cg-msk": {
+      "type": "implementation",
+      "impl": "aws-msk-fargate-group",
+      "label": "Amazon MSK ブローカー",
+      "realizes": [
+        "topic",
+        "coordinator",
+        "offsets"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-kafka-consumer-groups.md#§1": [
+      "model"
+    ],
+    "docs/reference-kafka-consumer-groups.md": [
+      "model",
+      "topic",
+      "consumer-1",
+      "consumer-2",
+      "consumer-3",
+      "coordinator",
+      "offsets",
+      "read-1",
+      "read-2",
+      "read-3",
+      "join",
+      "assign",
+      "commit",
+      "store",
+      "kafka-rebalance",
+      "aws-cg-ecs",
+      "aws-cg-c1",
+      "aws-cg-c2",
+      "aws-cg-c3",
+      "aws-cg-msk"
+    ],
+    "docs/reference-kafka-consumer-groups.md#§2": [
+      "topic",
+      "consumer-1",
+      "consumer-2",
+      "read-1",
+      "read-2",
+      "kafka-rebalance"
+    ],
+    "docs/reference-kafka-consumer-groups.md#§4": [
+      "consumer-1",
+      "coordinator",
+      "join",
+      "kafka-rebalance"
+    ],
+    "docs/reference-kafka-consumer-groups.md#§5": [
+      "consumer-3",
+      "assign",
+      "kafka-rebalance"
+    ],
+    "docs/reference-kafka-consumer-groups.md#§6": [
+      "coordinator",
+      "read-3",
+      "kafka-rebalance"
+    ],
+    "docs/reference-kafka-consumer-groups.md#§3": [
+      "offsets",
+      "commit",
+      "store"
+    ],
+    "docs/reference-kafka-consumer-groups.md#§7": [
+      "aws-cg-ecs",
+      "aws-cg-c1",
+      "aws-cg-c2",
+      "aws-cg-c3",
+      "aws-cg-msk"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Kafka",
+    "role": "internals",
+    "step": 3,
+    "detailOf": "kafka",
+    "objectives": [
+      "グループ内で 1 つのパーティションを 1 つの Consumer が読む規則を説明する。",
+      "Group Coordinator と __consumer_offsets の役割を区別する。",
+      "協調的な割り当てで、動かすパーティションだけが移ることを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Apache Kafka Design",
+        "url": "https://kafka.apache.org/44/design/design/"
+      },
+      {
+        "title": "Consumer Configs",
+        "url": "https://kafka.apache.org/44/configuration/consumer-configs/"
+      },
+      {
+        "title": "Apache Kafka Protocol",
+        "url": "https://kafka.apache.org/44/design/protocol/"
+      }
+    ]
+  }
+}

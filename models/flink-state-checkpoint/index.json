@@ -1,0 +1,278 @@
+{
+  "model": "flink-state-checkpoint",
+  "name": "Flink：状態バックエンドとチェックポイント",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "jm": {
+      "type": "node",
+      "label": "JobMaster（チェックポイントの調整）",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "チェックポイント保存先",
+      "status": "claim"
+    },
+    "source": {
+      "type": "node",
+      "label": "再読できる Source（Kafka）",
+      "status": "claim"
+    },
+    "operator": {
+      "type": "node",
+      "label": "キー付き Operator",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "キー別状態（状態バックエンド）",
+      "status": "claim"
+    },
+    "sink": {
+      "type": "node",
+      "label": "トランザクション付き Sink（Kafka）",
+      "status": "claim"
+    },
+    "trigger": {
+      "type": "link",
+      "label": "JobMaster（チェックポイントの調整） → 再読できる Source（Kafka）",
+      "status": "claim"
+    },
+    "barrier": {
+      "type": "link",
+      "label": "再読できる Source（Kafka） → キー付き Operator",
+      "status": "claim"
+    },
+    "update": {
+      "type": "link",
+      "label": "キー付き Operator → キー別状態（状態バックエンド）",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "link",
+      "label": "キー別状態（状態バックエンド） → チェックポイント保存先",
+      "status": "claim"
+    },
+    "ack": {
+      "type": "link",
+      "label": "キー付き Operator → JobMaster（チェックポイントの調整）",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "キー付き Operator → トランザクション付き Sink（Kafka）",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "JobMaster（チェックポイントの調整） → トランザクション付き Sink（Kafka）",
+      "status": "claim"
+    },
+    "restore": {
+      "type": "link",
+      "label": "チェックポイント保存先 → キー付き Operator",
+      "status": "claim"
+    },
+    "rewind": {
+      "type": "link",
+      "label": "チェックポイント保存先 → 再読できる Source（Kafka）",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "scenario",
+      "label": "チェックポイントが成立して復旧に使われる"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "チェックポイントの状態と HA メタデータを S3 に置く場合に必要な Flink のファイルシステム設定・プラグインは、確認した資料の範囲では読めていない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "ForSt 状態バックエンドは資料上で実験的とされており、今回の実装例では使わない。本番利用の可否は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "RocksDB のチューニング（メモリ配分・compaction）とチェックポイントの所要時間の見積もりは扱っていない。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "実装例の台数、ノードのディスク種別（EBS など）、バージョン互換性は資料で指定されていない。"
+    },
+    "eks-rocksdb-s3-api": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "EKS の Kubernetes API",
+      "realizes": []
+    },
+    "eks-rocksdb-s3-iam": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "IAM / Pod 用ロール",
+      "realizes": []
+    },
+    "eks-rocksdb-s3-jm": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "JobManager Pod",
+      "realizes": [
+        "jm"
+      ]
+    },
+    "eks-rocksdb-s3-tm": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "TaskManager Pods",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "eks-rocksdb-s3-rocks": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "RocksDB（ノードのローカルディスク）",
+      "realizes": [
+        "state"
+      ]
+    },
+    "eks-rocksdb-s3-ckpt": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "S3 のチェックポイントディレクトリ",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "eks-rocksdb-s3-in": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "MSK 注文トピック",
+      "realizes": [
+        "source"
+      ]
+    },
+    "eks-rocksdb-s3-out": {
+      "type": "implementation",
+      "impl": "eks-rocksdb-s3",
+      "label": "MSK 集計トピック",
+      "realizes": [
+        "sink"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-flink-state-checkpoint.md#§1": [
+      "model"
+    ],
+    "docs/reference-flink-state-checkpoint.md": [
+      "model",
+      "jm",
+      "storage",
+      "source",
+      "operator",
+      "state",
+      "sink",
+      "trigger",
+      "barrier",
+      "update",
+      "snapshot",
+      "ack",
+      "write",
+      "commit",
+      "restore",
+      "rewind",
+      "checkpoint",
+      "eks-rocksdb-s3-api",
+      "eks-rocksdb-s3-iam",
+      "eks-rocksdb-s3-jm",
+      "eks-rocksdb-s3-tm",
+      "eks-rocksdb-s3-rocks",
+      "eks-rocksdb-s3-ckpt",
+      "eks-rocksdb-s3-in",
+      "eks-rocksdb-s3-out"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§5": [
+      "jm",
+      "storage",
+      "snapshot"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§6": [
+      "source",
+      "sink",
+      "write",
+      "commit"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§4": [
+      "operator",
+      "trigger",
+      "barrier",
+      "ack"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§2": [
+      "state",
+      "update"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§3": [
+      "state"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§7": [
+      "restore",
+      "rewind"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§8": [
+      "checkpoint"
+    ],
+    "docs/reference-flink-state-checkpoint.md#§9": [
+      "eks-rocksdb-s3-api",
+      "eks-rocksdb-s3-iam",
+      "eks-rocksdb-s3-jm",
+      "eks-rocksdb-s3-tm",
+      "eks-rocksdb-s3-rocks",
+      "eks-rocksdb-s3-ckpt",
+      "eks-rocksdb-s3-in",
+      "eks-rocksdb-s3-out"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Flink",
+    "role": "internals",
+    "step": 3,
+    "detailOf": "flink",
+    "objectives": [
+      "状態バックエンドとチェックポイント保存先が別の設定であることを説明する。",
+      "バリアとアライメントで一貫したスナップショットができる流れを追う。",
+      "exactly-once がどこまで保証されるか（Source の再読・Sink のトランザクション）を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Flink · Stateful Stream Processing",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/"
+      },
+      {
+        "title": "Flink · State Backends",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/"
+      },
+      {
+        "title": "Flink · Checkpointing",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/"
+      },
+      {
+        "title": "Flink · Kafka connector",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/"
+      },
+      {
+        "title": "Flink · Parallel Execution",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/execution/parallel/"
+      },
+      {
+        "title": "Flink · Kubernetes HA Services",
+        "url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/"
+      }
+    ]
+  }
+}

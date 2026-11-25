@@ -1,0 +1,391 @@
+name: Flink：ジョブグラフ・Task とスロット
+description: データフローが JobGraph になり、Operator のチェーンが Task になって、TaskManager のスロットに並列の Subtask として置かれるまで。
+reference:
+  objectives:
+    - Operator・Task・Subtask・スロットを区別する。
+    - Operator chaining とスロット共有が必要なスロット数をどう変えるかを説明する。
+    - Application クラスタと Session クラスタの違いを、スロットの確保の時点で比べる。
+  sources:
+    - title: Flink · Flink Architecture
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/
+    - title: Flink · Parallel Execution
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/execution/parallel/
+    - title: Flink · Native Kubernetes
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/
+    - title: Amazon EKS managed node groups
+      url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+sources:
+  - docs/reference-flink-job-graph-slots.md
+evidence:
+  - type: doc
+    ref: docs/reference-flink-job-graph-slots.md#§1
+tiers:
+  - id: control
+    label: 提出と JobManager
+    z: 1
+    size:
+      - 24
+      - 3
+  - id: run
+    label: TaskManager のスロット
+    z: 0
+    size:
+      - 24
+      - 3
+nodes:
+  client:
+    label: クライアント
+    kind: client
+    tier: control
+    x: 0
+    "y": 1.5
+    replicas: 2
+    description: データフローを組み立て、JobGraph として提出する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§2
+  jobgraph:
+    label: JobGraph（Operator をつないだ並び）
+    kind: file
+    tier: control
+    x: 5
+    "y": 1.5
+    replicas: 2
+    description: Operator の連なり。並列度は Operator・実行環境・クライアント・システムの 4 段階で指定でき、Operator の指定が優先される。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§2
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§3
+  dispatcher:
+    label: Dispatcher
+    kind: service
+    tier: control
+    x: 10
+    "y": 1.5
+    replicas: 1
+    description: REST で提出を受け、ジョブごとに JobMaster を起動する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+  jobmaster:
+    label: JobMaster
+    kind: scheduler
+    tier: control
+    x: 15
+    "y": 1.5
+    replicas: 1
+    description: JobGraph の実行を管理し、Task をスロットへデプロイする。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+  resourcemanager:
+    label: ResourceManager
+    kind: scheduler
+    tier: control
+    x: 21
+    "y": 1.5
+    replicas: 1
+    description: スロットを含むリソースを確保する。Kubernetes では、Flink が Kubernetes API で TaskManager Pod を要求する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§6
+  tm:
+    label: TaskManager のスロット
+    kind: worker
+    tier: run
+    x: 4
+    "y": 1.5
+    parallel: "N"
+    slots: 2
+    description: 1 つの JVM が複数のスロットを持つ。スロットは管理メモリを分けるが CPU は分けない。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§4
+  subtask:
+    label: Task の Subtask（並列実行）
+    kind: worker
+    tier: run
+    x: 12
+    "y": 1.5
+    parallel: "N"
+    description: チェーンした Operator を 1 スレッドで動かす実行単位。並列度の数だけ Subtask ができる。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§3
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§4
+  exchange:
+    label: Task 間のデータ交換
+    kind: queue
+    tier: run
+    x: 20
+    "y": 1.5
+    replicas: 2
+    description: keyBy などの再分配で、Subtask 間がバッファ経由でデータを受け渡す。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§3
+links:
+  - id: build
+    from: client
+    to: jobgraph
+    label: データフローを JobGraph に
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§2
+  - id: submit
+    from: client
+    to: dispatcher
+    label: 提出
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+  - id: start
+    from: dispatcher
+    to: jobmaster
+    label: JobMaster を起動
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+  - id: request
+    from: jobmaster
+    to: resourcemanager
+    label: スロットを要求
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+  - id: allocate
+    from: resourcemanager
+    to: tm
+    label: スロットを確保
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+  - id: deploy
+    from: jobmaster
+    to: subtask
+    label: Subtask をデプロイ
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§5
+  - id: host
+    from: tm
+    to: subtask
+    label: スロットで実行
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§4
+  - id: shuffle
+    from: subtask
+    to: exchange
+    label: 再分配のデータを渡す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§3
+scenarios:
+  - id: slot-allocation
+    label: 提出からスロット上の実行まで
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-job-graph-slots.md#§7
+    steps:
+      - links:
+          - build
+          - submit
+        note: クライアントがデータフローを JobGraph にして提出する。
+      - links:
+          - start
+          - request
+        note: JobMaster が起動し、ResourceManager にスロットを要求する。
+      - links:
+          - allocate
+          - deploy
+        note: スロットが確保され、JobMaster が Subtask をデプロイする。
+      - links:
+          - host
+          - shuffle
+        note: Subtask はスロットで動き、再分配のデータをバッファ経由で渡す。
+unknowns:
+  - id: UNK-01
+    text: JobGraph から実行時の内部グラフ（ExecutionGraph）への展開や、スロット割り当てのアルゴリズムの詳細は、今回確認した資料の範囲では扱っていない。
+    refs:
+      - jobmaster
+  - id: UNK-02
+    text: Operator chaining を切る API（disableChaining など）と、スロット共有グループの指定方法は未確認。
+    refs:
+      - subtask
+  - id: UNK-03
+    text: スロット数（taskmanager.numberOfTaskSlots）の既定値は、確認した資料に記載がない。
+    refs:
+      - tm
+  - id: UNK-04
+    text: 実装例の台数・ノードサイズ・イメージの置き場所（コンテナレジストリ）は資料で指定されていない。
+    refs:
+      - tm
+gates:
+  maxDrift: 0
+  maxHigh: 3
+implementations:
+  - id: eks-native
+    label: EKS 上の Application モード（native Kubernetes）
+    description: Flink を EKS のノード上で Application モードの JobManager Pod と TaskManager Pod として動かす構成例。
+    sources:
+      - title: Flink · Native Kubernetes
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/
+      - title: Flink · Flink Architecture
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/flink-architecture/
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+    tiers:
+      - id: entry
+        label: 利用者
+        kind: origin
+        z: 2
+        size:
+          - 18
+          - 3
+      - id: ctl
+        label: EKS の管理
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: pods
+        label: Flink の Pod
+        z: 0
+        size:
+          - 18
+          - 4
+    nodes:
+      eks-native-cli:
+        label: Flink CLI
+        kind: client
+        tier: entry
+        x: 1
+        "y": 1.5
+        realizes:
+          - client
+        description: "--target kubernetes-application で提出する。"
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+      eks-native-api:
+        label: EKS の Kubernetes API
+        kind: service
+        tier: ctl
+        x: 3
+        "y": 1.5
+        svc: eks
+        description: Flink が Deployment・Pod・ConfigMap・Service を作成・削除する先。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+        management:
+          type: shared
+          scope: AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API とクラスタ設定を操作する。
+      eks-native-ec2:
+        label: EKS のノード（EC2）
+        kind: host
+        tier: ctl
+        x: 12
+        "y": 1.5
+        svc: ec2
+        description: JobManager と TaskManager の Pod を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+        management:
+          type: shared
+          scope: AWS が EC2 基盤を運用し、利用者がノードグループと更新を管理する。
+      eks-native-jm:
+        label: JobManager Pod
+        kind: service
+        tier: pods
+        x: 3
+        "y": 1.5
+        realizes:
+          - jobgraph
+          - dispatcher
+          - jobmaster
+          - resourcemanager
+        description: Deployment が再起動する。main() をクラスタ内で実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      eks-native-tm:
+        label: TaskManager Pods
+        kind: worker
+        tier: pods
+        x: 11
+        "y": 1.5
+        parallel: "N"
+        slots: 2
+        realizes:
+          - tm
+          - subtask
+          - exchange
+        description: ResourceManager が Kubernetes API で要求する。restart policy は never。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+    links:
+      - id: eks-native-rm-request
+        from: eks-native-jm
+        to: eks-native-api
+        label: TaskManager Pod を要求
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+      - id: eks-native-create-pod
+        from: eks-native-api
+        to: eks-native-tm
+        label: Pod を作成
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+      - id: eks-native-run-on
+        from: eks-native-ec2
+        to: eks-native-tm
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+      - id: eks-native-run-jm
+        from: eks-native-ec2
+        to: eks-native-jm
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-job-graph-slots.md#§8
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - ctl
+          - pods
+        nodes:
+          - eks-native-api
+          - eks-native-ec2
+          - eks-native-jm
+          - eks-native-tm
+      - kind: cluster
+        label: EKS クラスター
+        provider: k8s
+        tier:
+          - ctl
+          - pods
+        nodes:
+          - eks-native-api
+          - eks-native-ec2
+          - eks-native-jm
+          - eks-native-tm

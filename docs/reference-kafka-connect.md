@@ -1,6 +1,8 @@
-# Apache Kafka Connect の基本アーキテクチャ
+# Kafka：Kafka Connect の Worker・Task とオフセット
 
-## 1. Connector と Worker
+Apache Kafka 4.4 の公式ドキュメントを基準に、Kafka Connect が外部システムと Kafka の間でデータを移し、再開位置を保存する仕組みを追う。前提は「Apache Kafka の基本アーキテクチャ」。Connect は外部データの取り込み・書き出しの層で、Kafka Streams のような集計処理には使わない。
+
+## 1. Connector・Worker・Task
 
 Kafka Connect は Kafka と外部システムの間でデータを移動する。Connector は接続の設定と Task の作り方を定義し、Worker が Task を実行する。分散モードでは複数の Worker で Task を分担できる。図の Source Connector と Sink Connector は、それぞれの Task を含む役割として描く。Worker は実行基盤の代表点。
 
@@ -30,7 +32,20 @@ Source 側はソースをどこまで読んだかを記録する。分散モー�
 
 出典 [Kafka Connect User Guide](https://kafka.apache.org/44/kafka-connect/user-guide/)・[Debezium Connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
 
-## 6. 実装例：Kafka Connect Distributed と S3
+## 6. 分散モードの内部 Topic
+
+- Connect には単独（standalone）と分散（distributed）のモードがある。分散モードは Worker を増減でき、仕事を自動で分担する。単独モードは耐障害性がない。
+- 分散モードは `config.storage.topic`（コネクターと Task の設定）、`offset.storage.topic`（Source のオフセット）、`status.storage.topic`（状態）を使う。公式資料は、複製とログ圧縮を設定して手動で作ることを勧める。
+- `group.id` は Connect クラスターの名前で、Consumer Group の ID と重ならないようにする。`tasks.max` はコネクターが作る Task の上限。
+- コネクターの作成・変更・停止などは REST API（既定ポート 8083）で行う。コネクターのプラグインは `plugin.path` で指す。
+
+## 7. 変換とエラー処理
+
+- `key.converter` と `value.converter` が Kafka 上の形式（JSON、Avro など）を決める。コネクターとは独立なので、組み合わせは自由。
+- エラーは既定（`errors.tolerance=none`）では最初の失敗で止まる。`errors.tolerance=all` で許容し、`errors.deadletterqueue.topic.name` で失敗したレコードを別 Topic に送れる（Sink 側）。
+- 厳密に 1 回の扱いは、Sink は `consumer.isolation.level=read_committed` などコネクター側の作りに依存し、Source は 3.3.0 以降の分散モードで `exactly.once.source.support` を有効にする。
+
+## 8. 実装例：Kafka Connect Distributed と S3
 
 PostgreSQL の変更を Debezium で取り込み、Kafka Connect の分散ワーカー上の S3 Sink でバケットへ格納する例。ワーカー設定の内部トピックと業務イベントのトピックは用途が異なる。
 
@@ -55,7 +70,7 @@ PostgreSQL の変更を Debezium で取り込み、Kafka Connect の分散ワー
 - [Debezium Connector for PostgreSQL](https://debezium.io/documentation/reference/stable/connectors/postgresql.html)
 - [Confluent S3 Sink Connector](https://docs.confluent.io/kafka-connectors/s3-sink/current/overview.html)
 
-## 7. 実装例：AWS（MSK Connect と Amazon S3）
+## 9. 実装例：AWS（MSK Connect と Amazon S3）
 
 Source と Sink を、それぞれカスタムプラグインを指定した MSK Connect コネクターとして作成する。各コネクターは独自のワーカー容量を持ち、AWS がワーカーを管理する。
 
@@ -81,3 +96,14 @@ Source・Sink は同じ VPC のプライベートサブネットに作成され�
 - [MSK Connect の S3 接続の準備](https://docs.aws.amazon.com/msk/latest/developerguide/mkc-tutorial-setup.html)
 
 自前例の Linux ホスト、プロセス、設定、データとネットワークは利用者が管理する。ホスト配置や構成は公式機能を組み合わせた例であり、具体的な環境での接続、権限、障害復旧は未検証。
+
+## 未確認
+
+- 分散モードのリバランス（Worker の増減時に Task が止まるか）の詳細は、確認した User Guide のページに記載がない。
+- Debezium と Confluent S3 Sink の動作は各社の資料に依存し、Kafka の資料の範囲を超える。バージョン間の互換性は未確認。
+- MSK Connect のワーカー数の自動調整の詳細は未確認。
+
+## 公式資料
+
+- [Kafka Connect Overview](https://kafka.apache.org/44/kafka-connect/overview/)
+- [Kafka Connect User Guide](https://kafka.apache.org/44/kafka-connect/user-guide/)

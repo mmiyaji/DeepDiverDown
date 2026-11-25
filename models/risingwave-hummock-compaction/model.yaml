@@ -1,0 +1,685 @@
+name: RisingWave：Hummock ストレージとコンパクション
+description: 状態の書き込みが共有バッファから SST になり、LSM の層を Compactor が整理し、読み取りがキャッシュを経由してオブジェクトストレージに届く流れ。
+reference:
+  objectives:
+    - Hummock が行ベースの LSM で、永続コピーをオブジェクトストレージに置くことを説明する。
+    - 書き込み（共有バッファ→L0）、コンパクション（L0→L1 以上）、読み取り（キャッシュ→オブジェクトストレージ）の経路を追う。
+    - コンパクションが遅れたときの兆候（L0 サブレベルの書き込み停止、削除印の滞留）を読み取る。
+  sources:
+    - title: RisingWave · Storage overview
+      url: https://docs.risingwave.com/store/overview
+    - title: RisingWave · Architecture
+      url: https://docs.risingwave.com/get-started/architecture
+    - title: RisingWave · Data persistence
+      url: https://docs.risingwave.com/reference/data-persistence
+    - title: RisingWave · Specific bottlenecks (compaction)
+      url: https://docs.risingwave.com/performance/specific-bottlenecks
+    - title: RisingWave · Elastic disk cache
+      url: https://docs.risingwave.com/get-started/disk-cache
+    - title: RisingWave · Hardware requirements
+      url: https://docs.risingwave.com/deploy/hardware-requirements
+sources:
+  - docs/reference-risingwave-hummock-compaction.md
+evidence:
+  - type: doc
+    ref: docs/reference-risingwave-hummock-compaction.md#§1
+tiers:
+  - id: flow
+    label: Hummock の書き込み・整理・読み取り
+    z: 0
+    size:
+      - 26
+      - 10
+nodes:
+  writer:
+    label: Compute（状態の書き込み）
+    kind: worker
+    tier: flow
+    x: 0
+    'y': 1.5
+    parallel: 'N'
+    description: 演算子の状態の変更をメモリのバッファに溜め、checkpoint などで書き出す。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§3
+  buffer:
+    label: 共有バッファ（メモリ）
+    kind: cache
+    tier: flow
+    x: 6
+    'y': 1.5
+    description: 未保存の変更を持つ。上限に達すると状態の更新が待たされる。Uploader のメモリ上限の既定は 4GB。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§3
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§6
+  l0:
+    label: L0（未ソートの SST）
+    kind: file
+    tier: flow
+    x: 12
+    'y': 1.5
+    description: 書き込みはすべて追記で、削除は削除印（tombstone）として書く。新しいデータは L0 に入る。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§2
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§3
+  levels:
+    label: L1 以上（ソート済みの SST）
+    kind: file
+    tier: flow
+    x: 18
+    'y': 1.5
+    description: L1 からソートされる。更新が少ない（冷たい）データほど上位の層へ移る。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§2
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§4
+  objstore:
+    label: オブジェクトストレージ
+    kind: db
+    tier: flow
+    x: 18
+    'y': 5
+    description: SST の永続コピー。S3・GCS・Azure Blob・MinIO などを OpenDAL 経由で使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§2
+  meta:
+    label: Meta（コンパクションタスクの生成）
+    kind: scheduler
+    tier: flow
+    x: 12
+    'y': 8.5
+    replicas: 2
+    description: コンパクションタスクを作って Compactor に割り当て、完了後にメタデータを更新する。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§4
+  compactor:
+    label: Compactor
+    kind: worker
+    tier: flow
+    x: 18
+    'y': 8.5
+    parallel: 'N'
+    description: SST をマージして上位の層へ書き直す。主に CPU を使う。Compute と Compactor のコア数は 2 対 1 が目安。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§4
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§6
+  stall:
+    label: 書き込み停止のしきい値
+    kind: policy
+    tier: flow
+    x: 6
+    'y': 8.5
+    description: L0 のサブレベル数が上限を超えると書き込みを止める（例：301 が 300 を超過）。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§6
+  reader:
+    label: 読み取り（Get・Iter）
+    kind: worker
+    tier: flow
+    x: 0
+    'y': 5
+    parallel: 'N'
+    description: Get は点参照（ハッシュ集約など）、Iter は範囲走査（ハッシュ結合など）。削除印や古い版は Iter に影響する。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§5
+  cache:
+    label: ブロック・メタキャッシュ
+    kind: cache
+    tier: flow
+    x: 8
+    'y': 5
+    description: メモリのブロックキャッシュとメタキャッシュ。ローカルディスクの Elastic disk cache を中間に置くこともできる。
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§5
+links:
+  - id: flush
+    from: writer
+    to: buffer
+    label: 変更をバッファへ
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§3
+  - id: upload
+    from: buffer
+    to: l0
+    label: checkpoint で SST に書く
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§3
+  - id: compact-in
+    from: l0
+    to: compactor
+    label: L0 を読む
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§4
+  - id: compact-out
+    from: compactor
+    to: levels
+    label: マージして書き直す
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§4
+  - id: task
+    from: meta
+    to: compactor
+    label: タスクを割り当てる
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§4
+  - id: save-l0
+    from: l0
+    to: objstore
+    label: SST を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§2
+  - id: save-lv
+    from: levels
+    to: objstore
+    label: SST を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§2
+  - id: watch
+    from: meta
+    to: stall
+    label: L0 のサブレベル数を監視
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§6
+  - id: stop
+    from: stall
+    to: writer
+    label: しきい値超過で書き込みを止める
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§6
+  - id: lookup
+    from: reader
+    to: cache
+    label: ブロックを探す
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§5
+  - id: miss
+    from: cache
+    to: objstore
+    label: ミスしたら取得
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§5
+scenarios:
+  - id: lsm
+    label: 書き込みからコンパクションと読み取りまで
+    evidence:
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§3
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§4
+      - type: doc
+        ref: docs/reference-risingwave-hummock-compaction.md#§5
+    steps:
+      - links:
+          - flush
+          - upload
+        note: 変更はバッファに溜まり、checkpoint で SST として L0 に書かれる。
+      - links:
+          - save-l0
+        note: SST の永続コピーはオブジェクトストレージに置かれる。
+      - links:
+          - task
+          - compact-in
+          - compact-out
+          - save-lv
+        note: Meta のタスクで Compactor が L0 をマージし、上位の層へ書き直す。
+      - links:
+          - lookup
+          - miss
+        note: 読み取りはキャッシュを先に探し、なければオブジェクトストレージから取る。
+      - links:
+          - watch
+          - stop
+        note: コンパクションが追いつかず L0 のサブレベルが増えると、書き込みを止める。
+unknowns:
+  - id: UNK-01
+    text: SST のファイル形式、層ごとのサイズ比、コンパクションの選択アルゴリズムは確認した資料に記載がない。
+    refs:
+      - levels
+      - compactor
+  - id: UNK-02
+    text: Elastic disk cache は資料で有償機能（v2.3.0 で追加）とされている。自己運用版での利用条件は未確認。
+    refs:
+      - cache
+  - id: UNK-03
+    text: 共有バッファと checkpoint の関係の細部（どの時点で SST が確定するか）は資料に記載が少なく、図は概略。
+    refs:
+      - buffer
+  - id: UNK-04
+    text: 実装例の台数・ノードサイズ・バージョン互換性は資料で指定されていない。
+    refs:
+      - writer
+gates:
+  maxDrift: 0
+  maxHigh: 6
+implementations:
+  - id: aws-eks
+    label: EKS 上の RisingWave・S3・RDS for PostgreSQL
+    description: EKS の EC2 ノード上に RisingWave の Frontend・Meta・Compute・Compactor の Pod を置き、S3 を state store、RDS for PostgreSQL を meta store にする構成例。
+    sources:
+      - title: RisingWave · Storage overview
+        url: https://docs.risingwave.com/store/overview
+      - title: RisingWave · Specific bottlenecks (compaction)
+        url: https://docs.risingwave.com/performance/specific-bottlenecks
+      - title: RisingWave · Elastic disk cache
+        url: https://docs.risingwave.com/get-started/disk-cache
+      - title: RisingWave · Deploy on Kubernetes
+        url: https://docs.risingwave.com/deploy/risingwave-kubernetes
+      - title: RisingWave · Hardware requirements
+        url: https://docs.risingwave.com/deploy/hardware-requirements
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: IAM roles for service accounts
+        url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+      - title: Amazon RDS for PostgreSQL
+        url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_PostgreSQL.html
+    tiers:
+      - id: entry
+        label: 利用者・外部システム
+        kind: origin
+        z: 2
+        size:
+          - 18
+          - 3
+      - id: control-plane
+        label: AWS の管理・認証
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: processing
+        label: EKS の RisingWave 実行
+        z: 0
+        size:
+          - 18
+          - 3
+      - id: storage
+        label: 状態とメタデータの保存
+        z: -1
+        size:
+          - 18
+          - 3
+    nodes:
+      rw-aws-client:
+        label: psql などの SQL クライアント
+        kind: client
+        tier: entry
+        x: 1
+        'y': 1.5
+        description: PostgreSQL プロトコルで Frontend に接続する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-eks:
+        label: Amazon EKS / Kubernetes API
+        svc: eks
+        kind: service
+        tier: control-plane
+        x: 3
+        'y': 1.5
+        description: Kubernetes の制御プレーン。RisingWave Operator のカスタムリソースと Pod の配置を管理する。
+        management:
+          type: shared
+          scope: AWS が制御プレーンを運用し、利用者が Kubernetes API、Operator、クラスタ設定を操作する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-iam:
+        label: IAM / サービスアカウント用ロール
+        svc: iam
+        kind: policy
+        tier: control-plane
+        x: 9
+        'y': 1.5
+        description: state store の useServiceAccount を使い S3 へ届くための権限。必要な権限の一覧は資料で確認していない。
+        management:
+          type: customer
+          scope: 利用者がサービスアカウントと IAM ロール・ポリシーを設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-ec2:
+        label: EC2 / EKS ノードグループ
+        svc: ec2
+        kind: host
+        tier: processing
+        x: 15
+        'y': 1.5
+        description: マネージドノードグループの EC2 が RisingWave の Pod を実行する。
+        management:
+          type: shared
+          scope: AWS が EC2 基盤を運用し、利用者がノードグループ、台数、更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-frontend:
+        label: Frontend Pod
+        kind: service
+        tier: processing
+        x: 1
+        'y': 1.5
+        parallel: 'N'
+        description: SQL を受けて計画し、バッチクエリを実行する。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-meta:
+        label: Meta Pod
+        kind: service
+        tier: processing
+        x: 5
+        'y': 1.5
+        realizes:
+          - meta
+        description: コンパクションタスクの生成と割り当てを担う。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-compute:
+        label: Compute Pod
+        kind: worker
+        tier: processing
+        x: 9
+        'y': 1.5
+        parallel: 'N'
+        realizes:
+          - writer
+          - buffer
+          - reader
+          - cache
+          - stall
+        description: 共有バッファ、状態の読み書き、ブロックキャッシュを持つ。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-compactor:
+        label: Compactor Pod
+        kind: worker
+        tier: processing
+        x: 13
+        'y': 1.5
+        parallel: 'N'
+        realizes:
+          - compactor
+        description: S3 上の SST を読んでマージし、書き直す。
+        management:
+          type: customer
+          scope: 利用者が RisingWave の配置・設定・容量・更新を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-s3:
+        label: Amazon S3（Hummock の state store）
+        svc: s3
+        kind: db
+        tier: storage
+        x: 9
+        'y': 1.5
+        realizes:
+          - l0
+          - levels
+          - objstore
+        description: L0 と L1 以上の SST を保存する。
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がバケット、権限、データを管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      rw-aws-rds:
+        label: RDS for PostgreSQL（meta store）
+        svc: rds
+        kind: db
+        tier: storage
+        x: 3
+        'y': 1.5
+        description: メタデータの保存先。SST は保存しない。
+        management:
+          type: shared
+          scope: AWS がデータベース基盤を運用し、利用者がスキーマ、接続、バックアップ設定を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+    links:
+      - id: rw-aws-eks-ec2
+        from: rw-aws-eks
+        to: rw-aws-ec2
+        label: ノードグループに Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-ec2-fe
+        from: rw-aws-ec2
+        to: rw-aws-frontend
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-ec2-meta
+        from: rw-aws-ec2
+        to: rw-aws-meta
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-ec2-cn
+        from: rw-aws-ec2
+        to: rw-aws-compute
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-ec2-cp
+        from: rw-aws-ec2
+        to: rw-aws-compactor
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-iam-cn
+        from: rw-aws-iam
+        to: rw-aws-compute
+        label: S3 アクセス権を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-iam-cp
+        from: rw-aws-iam
+        to: rw-aws-compactor
+        label: S3 アクセス権を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-client-fe
+        from: rw-aws-client
+        to: rw-aws-frontend
+        label: SQL を送る
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-fe-cn
+        from: rw-aws-frontend
+        to: rw-aws-compute
+        label: バッチクエリを実行
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+      - id: rw-aws-meta-rds
+        from: rw-aws-meta
+        to: rw-aws-rds
+        label: メタデータを保存
+        evidence:
+          - type: doc
+            ref: docs/reference-risingwave-hummock-compaction.md#§7
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - control-plane
+          - processing
+          - storage
+        nodes:
+          - rw-aws-eks
+          - rw-aws-iam
+          - rw-aws-ec2
+          - rw-aws-frontend
+          - rw-aws-meta
+          - rw-aws-compute
+          - rw-aws-compactor
+          - rw-aws-s3
+          - rw-aws-rds
+      - kind: cluster
+        label: EKS クラスタ / RisingWave
+        tier:
+          - processing
+        nodes:
+          - rw-aws-frontend
+          - rw-aws-meta
+          - rw-aws-compute
+          - rw-aws-compactor
+          - rw-aws-ec2
+    layout2d:
+      tiers:
+        - id: diagram
+          label: AWS 上の RisingWave
+          z: 0
+          size:
+            - 26
+            - 13.5
+      nodes:
+        rw-aws-client:
+          tier: diagram
+          x: 1
+          'y': 2
+        rw-aws-eks:
+          tier: diagram
+          x: 4.5
+          'y': 2
+        rw-aws-iam:
+          tier: diagram
+          x: 4.5
+          'y': 6.5
+        rw-aws-ec2:
+          tier: diagram
+          x: 13
+          'y': 2
+        rw-aws-frontend:
+          tier: diagram
+          x: 8
+          'y': 6.5
+        rw-aws-meta:
+          tier: diagram
+          x: 11
+          'y': 6.5
+        rw-aws-compute:
+          tier: diagram
+          x: 14
+          'y': 6.5
+        rw-aws-compactor:
+          tier: diagram
+          x: 17.5
+          'y': 6.5
+        rw-aws-s3:
+          tier: diagram
+          x: 15
+          'y': 11
+        rw-aws-rds:
+          tier: diagram
+          x: 9
+          'y': 11
+      groups:
+        - kind: cloud
+          label: AWS アカウント
+          provider: aws
+          tier:
+            - diagram
+          x0: 2.8
+          y0: -0.3
+          x1: 22.3
+          y1: 12.8
+          nodes:
+            - rw-aws-eks
+            - rw-aws-iam
+            - rw-aws-ec2
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor
+            - rw-aws-s3
+            - rw-aws-rds
+        - kind: vpc
+          label: EKS ワーカーの利用者 VPC
+          provider: aws
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 0.7
+          x1: 20.5
+          y1: 8.8
+          nodes:
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor
+            - rw-aws-ec2
+        - kind: cluster
+          label: EKS クラスター（ワーカー側）
+          provider: k8s
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 0.7
+          x1: 20.5
+          y1: 8.8
+          nodes:
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor
+            - rw-aws-ec2
+        - kind: namespace
+          label: RisingWave 名前空間
+          provider: k8s
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 4.7
+          x1: 20.5
+          y1: 8.8
+          nodes:
+            - rw-aws-frontend
+            - rw-aws-meta
+            - rw-aws-compute
+            - rw-aws-compactor

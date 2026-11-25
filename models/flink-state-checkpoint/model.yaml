@@ -1,0 +1,418 @@
+name: Flink：状態バックエンドとチェックポイント
+description: キー付き状態の置き場所（HashMap・RocksDB）、バリアによるチェックポイント、保存先、Source の再読と Sink のトランザクションによる exactly-once の範囲。
+reference:
+  objectives:
+    - 状態バックエンドとチェックポイント保存先が別の設定であることを説明する。
+    - バリアとアライメントで一貫したスナップショットができる流れを追う。
+    - exactly-once がどこまで保証されるか（Source の再読・Sink のトランザクション）を説明する。
+  sources:
+    - title: Flink · Stateful Stream Processing
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/
+    - title: Flink · State Backends
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/
+    - title: Flink · Checkpointing
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/
+    - title: Flink · Kafka connector
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/
+    - title: Flink · Parallel Execution
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/execution/parallel/
+    - title: Flink · Kubernetes HA Services
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/
+sources:
+  - docs/reference-flink-state-checkpoint.md
+evidence:
+  - type: doc
+    ref: docs/reference-flink-state-checkpoint.md#§1
+tiers:
+  - id: control
+    label: チェックポイントの調整と保存先
+    z: 1
+    size:
+      - 28
+      - 3
+  - id: flow
+    label: データフローと状態
+    z: 0
+    size:
+      - 28
+      - 6
+nodes:
+  jm:
+    label: JobMaster（チェックポイントの調整）
+    kind: scheduler
+    tier: control
+    x: 6
+    "y": 1.5
+    replicas: 1
+    description: チェックポイントを開始し、完了を集める。間隔・タイムアウト・許容する失敗数を設定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§5
+  storage:
+    label: チェックポイント保存先
+    kind: db
+    tier: control
+    x: 22
+    "y": 1.5
+    replicas: 2
+    description: FileSystemCheckpointStorage（execution.checkpointing.dir を指定したときの既定）か JobManagerCheckpointStorage。保持するのは完了したチェックポイントの状態とメタデータ。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§5
+  source:
+    label: 再読できる Source（Kafka）
+    kind: queue
+    tier: flow
+    x: 0
+    "y": 1.5
+    partitions: 4
+    description: 読み取り位置（offset）を状態として持ち、巻き戻して再読できる。Kafka に commit する offset は監視用で、復旧には使わない。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§6
+  operator:
+    label: キー付き Operator
+    kind: worker
+    tier: flow
+    x: 8
+    "y": 1.5
+    parallel: "N"
+    description: バリアが全入力にそろうまで待ち（アライメント）、状態をスナップショットする。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§4
+  state:
+    label: キー別状態（状態バックエンド）
+    kind: db
+    tier: flow
+    x: 8
+    "y": 4.5
+    partitions: 4
+    description: HashMapStateBackend は JVM ヒープ上のオブジェクト。EmbeddedRocksDBStateBackend はローカルディスクのシリアライズ済みバイト列で、増分チェックポイントが使える。キーグループ単位で再配分される。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§2
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§3
+  sink:
+    label: トランザクション付き Sink（Kafka）
+    kind: queue
+    tier: flow
+    x: 17
+    "y": 1.5
+    replicas: 2
+    description: EXACTLY_ONCE では Kafka のトランザクションに書き、チェックポイントで確定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§6
+links:
+  - id: trigger
+    from: jm
+    to: source
+    label: バリアを注入
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§4
+  - id: barrier
+    from: source
+    to: operator
+    label: バリアとイベントを流す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§4
+  - id: update
+    from: operator
+    to: state
+    label: 状態を更新
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§2
+  - id: snapshot
+    from: state
+    to: storage
+    label: 状態を非同期に保存
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§5
+  - id: ack
+    from: operator
+    to: jm
+    label: スナップショット完了を通知
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§4
+  - id: write
+    from: operator
+    to: sink
+    label: 結果をトランザクションに書く
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§6
+  - id: commit
+    from: jm
+    to: sink
+    label: チェックポイント完了で確定
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§6
+  - id: restore
+    from: storage
+    to: operator
+    label: 最新の完了点から状態を復元
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§7
+  - id: rewind
+    from: storage
+    to: source
+    label: 入力位置を戻す
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§7
+scenarios:
+  - id: checkpoint
+    label: チェックポイントが成立して復旧に使われる
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-state-checkpoint.md#§8
+    steps:
+      - links:
+          - trigger
+          - barrier
+        note: JobMaster がバリアを Source に注入し、バリアがイベントを追い越さず流れる。
+      - links:
+          - update
+          - snapshot
+        note: Operator は全入力のバリアがそろってから状態を保存先へ書く。RocksDB なら増分で書ける。
+      - links:
+          - write
+          - ack
+          - commit
+        note: 全体の完了後に Sink のトランザクションが確定する。
+      - links:
+          - restore
+          - rewind
+        note: 障害時は最新の完了点から状態を戻し、Source を保存した位置から再読する。
+unknowns:
+  - id: UNK-01
+    text: チェックポイントの状態と HA メタデータを S3 に置く場合に必要な Flink のファイルシステム設定・プラグインは、確認した資料の範囲では読めていない。
+    refs:
+      - storage
+  - id: UNK-02
+    text: ForSt 状態バックエンドは資料上で実験的とされており、今回の実装例では使わない。本番利用の可否は未確認。
+    refs:
+      - state
+  - id: UNK-03
+    text: RocksDB のチューニング（メモリ配分・compaction）とチェックポイントの所要時間の見積もりは扱っていない。
+    refs:
+      - state
+  - id: UNK-04
+    text: 実装例の台数、ノードのディスク種別（EBS など）、バージョン互換性は資料で指定されていない。
+    refs:
+      - state
+      - storage
+gates:
+  maxDrift: 0
+  maxHigh: 3
+implementations:
+  - id: eks-rocksdb-s3
+    label: EKS 上の Flink・RocksDB・S3・MSK
+    description: EKS の Flink Pod が MSK を読み、RocksDB の状態を S3 のチェックポイントへ保存し、exactly-once で MSK へ書く構成例。
+    sources:
+      - title: Flink · State Backends
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/ops/state/state_backends/
+      - title: Flink · Checkpointing
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/
+      - title: Flink · Kafka connector
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/datastream/kafka/
+      - title: Flink · Native Kubernetes
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/
+      - title: Flink · Kubernetes HA Services
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/
+      - title: IAM roles for service accounts
+        url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+    tiers:
+      - id: ctl
+        label: EKS の管理と認証
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: pods
+        label: Flink の Pod
+        z: 0
+        size:
+          - 18
+          - 4
+      - id: data
+        label: 入出力・保存
+        z: -1
+        size:
+          - 18
+          - 3
+    nodes:
+      eks-rocksdb-s3-api:
+        label: EKS の Kubernetes API
+        kind: service
+        tier: ctl
+        x: 3
+        "y": 1.5
+        svc: eks
+        description: Pod の配置を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: shared
+          scope: AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API とクラスタ設定を操作する。
+      eks-rocksdb-s3-iam:
+        label: IAM / Pod 用ロール
+        kind: policy
+        tier: ctl
+        x: 12
+        "y": 1.5
+        svc: iam
+        description: サービスアカウントに対応するロールで S3 と MSK へのアクセスを付与する。必要な権限の中身は資料で指定されていない。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: customer
+          scope: 利用者がロールとポリシーを設定する。
+      eks-rocksdb-s3-jm:
+        label: JobManager Pod
+        kind: scheduler
+        tier: pods
+        x: 2
+        "y": 1.5
+        realizes:
+          - jm
+        description: チェックポイントを開始し、完了を集める。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      eks-rocksdb-s3-tm:
+        label: TaskManager Pods
+        kind: worker
+        tier: pods
+        x: 8
+        "y": 1.5
+        parallel: "N"
+        realizes:
+          - operator
+        description: Task を並列に実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      eks-rocksdb-s3-rocks:
+        label: RocksDB（ノードのローカルディスク）
+        kind: db
+        tier: pods
+        x: 14
+        "y": 1.5
+        realizes:
+          - state
+        description: EmbeddedRocksDBStateBackend がキー別状態を置く。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      eks-rocksdb-s3-ckpt:
+        label: S3 のチェックポイントディレクトリ
+        kind: db
+        tier: data
+        x: 8
+        "y": 1.5
+        svc: s3
+        realizes:
+          - storage
+        description: execution.checkpointing.dir に指定する保存先。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がバケット・データ・権限を管理する。
+      eks-rocksdb-s3-in:
+        label: MSK 注文トピック
+        kind: queue
+        tier: data
+        x: 2
+        "y": 1.5
+        svc: msk
+        realizes:
+          - source
+        description: KafkaSource が offset を管理しながら読む。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: shared
+          scope: AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。
+      eks-rocksdb-s3-out:
+        label: MSK 集計トピック
+        kind: queue
+        tier: data
+        x: 14
+        "y": 1.5
+        svc: msk
+        realizes:
+          - sink
+        description: KafkaSink の EXACTLY_ONCE ではトランザクション ID の接頭辞が必要。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+        management:
+          type: shared
+          scope: AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。
+    links:
+      - id: eks-rocksdb-s3-schedule
+        from: eks-rocksdb-s3-api
+        to: eks-rocksdb-s3-tm
+        label: Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+      - id: eks-rocksdb-s3-grant
+        from: eks-rocksdb-s3-iam
+        to: eks-rocksdb-s3-tm
+        label: S3・MSK へのアクセスを付与
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-state-checkpoint.md#§9
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - ctl
+          - pods
+          - data
+        nodes:
+          - eks-rocksdb-s3-api
+          - eks-rocksdb-s3-iam
+          - eks-rocksdb-s3-jm
+          - eks-rocksdb-s3-tm
+          - eks-rocksdb-s3-rocks
+          - eks-rocksdb-s3-ckpt
+          - eks-rocksdb-s3-in
+          - eks-rocksdb-s3-out
+      - kind: cluster
+        label: EKS クラスター
+        provider: k8s
+        tier:
+          - ctl
+          - pods
+        nodes:
+          - eks-rocksdb-s3-api
+          - eks-rocksdb-s3-jm
+          - eks-rocksdb-s3-tm
+          - eks-rocksdb-s3-rocks

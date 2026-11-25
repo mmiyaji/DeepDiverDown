@@ -1,0 +1,492 @@
+name: Flink：Kubernetes 上の運用
+description: native Kubernetes の Application モード、Flink Kubernetes Operator、Kubernetes HA、チェックポイントからの再開をまとめて追う。
+reference:
+  objectives:
+    - JobManager Deployment と TaskManager Pod の作られ方を説明する。
+    - Operator が宣言どおりに Flink クラスタを保つ役割を、Flink 本体の ResourceManager と区別する。
+    - HA の ConfigMap と保存先、チェックポイントからの復旧を結び付ける。
+  sources:
+    - title: Flink · Native Kubernetes
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/
+    - title: Flink Kubernetes Operator · Overview
+      url: https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-stable/docs/concepts/overview/
+    - title: Flink · Kubernetes HA Services
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/
+    - title: Flink · Checkpointing
+      url: https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/fault-tolerance/checkpointing/
+    - title: Amazon EKS managed node groups
+      url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+    - title: IAM roles for service accounts
+      url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+sources:
+  - docs/reference-flink-kubernetes-operations.md
+evidence:
+  - type: doc
+    ref: docs/reference-flink-kubernetes-operations.md#§1
+tiers:
+  - id: control
+    label: 宣言と制御
+    z: 1
+    size:
+      - 28
+      - 3
+  - id: run
+    label: Flink クラスタと復旧データ
+    z: 0
+    size:
+      - 28
+      - 6
+nodes:
+  client:
+    label: kubectl・Helm
+    kind: client
+    tier: control
+    x: 0
+    "y": 1.5
+    replicas: 2
+    description: Operator の導入と、Flink のカスタムリソースの適用に使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§4
+  api:
+    label: Kubernetes API
+    kind: service
+    tier: control
+    x: 7
+    "y": 1.5
+    replicas: 2
+    description: Flink と Operator が Deployment・Pod・ConfigMap・Service を作成・監視する窓口。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§2
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§4
+  operator:
+    label: Flink Kubernetes Operator
+    kind: scheduler
+    tier: control
+    x: 15
+    "y": 1.5
+    replicas: 2
+    description: 宣言されたアプリケーションを実際のクラスタに合わせ続ける。起動・停止・アップグレード・自動の再起動と復旧を管理する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§4
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§6
+  jm:
+    label: JobManager（Deployment）
+    kind: service
+    tier: run
+    x: 2
+    "y": 1.5
+    replicas: 2
+    description: "`kubernetes.cluster-id` の名前の Deployment で、restart policy は always。Application モードでは main() をここで実行する。"
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§2
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§3
+  tm:
+    label: TaskManager Pod
+    kind: worker
+    tier: run
+    x: 10
+    "y": 1.5
+    parallel: "N"
+    description: ResourceManager が Kubernetes API 経由で要求する。restart policy は never。遊休は resourcemanager.taskmanager-timeout で解放される。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§2
+  haconfig:
+    label: HA の ConfigMap
+    kind: catalog
+    tier: run
+    x: 18
+    "y": 1.5
+    replicas: 2
+    description: 復旧用メタデータへのポインタを持つ。owner reference が無いので、Deployment を消しても残る。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§5
+  hastore:
+    label: HA 保存先（high-availability.storageDir）
+    kind: db
+    tier: run
+    x: 25
+    "y": 1.5
+    replicas: 2
+    description: JobManager の復旧に要るメタデータ本体。s3:// や hdfs:// のパスを指定する。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§5
+  snap:
+    label: チェックポイント・セーブポイント
+    kind: db
+    tier: run
+    x: 25
+    "y": 4.5
+    replicas: 2
+    description: 再開の元になる状態。保持か削除かは externalized-checkpoint-retention で決まる。
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§6
+links:
+  - id: apply
+    from: client
+    to: api
+    label: リソースを適用
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§4
+  - id: watch
+    from: api
+    to: operator
+    label: 変更を通知
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§4
+  - id: create
+    from: operator
+    to: jm
+    label: Application クラスタを作成
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§4
+  - id: pod-request
+    from: jm
+    to: api
+    label: TaskManager Pod を要求
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§2
+  - id: pod-create
+    from: api
+    to: tm
+    label: Pod を作成
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§2
+  - id: assign
+    from: jm
+    to: tm
+    label: Task を割り当て
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§2
+  - id: leader
+    from: jm
+    to: haconfig
+    label: リーダーとポインタを記録
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§5
+  - id: persist
+    from: jm
+    to: hastore
+    label: 復旧用メタデータを保存
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§5
+  - id: checkpoint
+    from: tm
+    to: snap
+    label: 状態を保存
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§6
+  - id: recover
+    from: snap
+    to: jm
+    label: 最新の完了点から再開
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§6
+scenarios:
+  - id: deploy-recover
+    label: 適用から復旧まで
+    evidence:
+      - type: doc
+        ref: docs/reference-flink-kubernetes-operations.md#§7
+    steps:
+      - links:
+          - apply
+          - watch
+        note: カスタムリソースを適用すると、Operator がそれを検知する。
+      - links:
+          - create
+          - pod-request
+          - pod-create
+        note: Operator が Application クラスタを作り、JobManager が TaskManager Pod を要求する。
+      - links:
+          - assign
+          - leader
+          - persist
+        note: Task が割り当てられ、HA の情報が ConfigMap と保存先に残る。
+      - links:
+          - checkpoint
+          - recover
+        note: JobManager が失われても、HA の情報と最新のチェックポイントから再開する。
+unknowns:
+  - id: UNK-01
+    text: Flink のカスタムリソースの種類（FlinkDeployment・FlinkSessionJob）とアップグレードモード（stateless・last-state・savepoint）の名前と挙動は、確認した概要ページに明記がなく、未確認。
+    refs:
+      - operator
+  - id: UNK-02
+    text: Operator 自身が使う権限（RBAC）と Helm の値は確認していない。
+    refs:
+      - operator
+  - id: UNK-03
+    text: Kubernetes HA の leader 選出の仕組みは、確認した資料に記載がない。
+    refs:
+      - haconfig
+  - id: UNK-04
+    text: 実装例のイメージの置き場所（コンテナレジストリ）、台数、ノードサイズは資料で指定されていない。
+    refs:
+      - jm
+      - tm
+gates:
+  maxDrift: 0
+  maxHigh: 0
+implementations:
+  - id: eks-operator
+    label: EKS 上の Flink Kubernetes Operator と S3
+    description: EKS のノード上で Operator が Application クラスタを管理し、HA 保存先とチェックポイントを S3 に置く構成例。
+    sources:
+      - title: Flink Kubernetes Operator · Overview
+        url: https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-stable/docs/concepts/overview/
+      - title: Flink · Native Kubernetes
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/resource-providers/native_kubernetes/
+      - title: Flink · Kubernetes HA Services
+        url: https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/ha/kubernetes_ha/
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: IAM roles for service accounts
+        url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+    tiers:
+      - id: entry
+        label: 利用者
+        kind: origin
+        z: 2
+        size:
+          - 20
+          - 3
+      - id: ctl
+        label: EKS の管理と認証
+        z: 1
+        size:
+          - 20
+          - 3
+      - id: pods
+        label: Flink と Operator の Pod
+        z: 0
+        size:
+          - 20
+          - 4
+      - id: data
+        label: 復旧データ
+        z: -1
+        size:
+          - 20
+          - 3
+    nodes:
+      eks-operator-kubectl:
+        label: kubectl・Helm
+        kind: client
+        tier: entry
+        x: 1
+        "y": 1.5
+        realizes:
+          - client
+        description: Operator の導入とリソース適用を行う。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+      eks-operator-api:
+        label: EKS の Kubernetes API（HA ConfigMap を含む）
+        kind: service
+        tier: ctl
+        x: 3
+        "y": 1.5
+        svc: eks
+        realizes:
+          - api
+          - haconfig
+        description: リソースの受付先で、HA の ConfigMap もここに作られる。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: shared
+          scope: AWS が EKS 制御プレーンを運用し、利用者が Kubernetes API とクラスタ設定を操作する。
+      eks-operator-ec2:
+        label: EKS のノード（EC2）
+        kind: host
+        tier: ctl
+        x: 10
+        "y": 1.5
+        svc: ec2
+        description: Operator・JobManager・TaskManager の Pod を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: shared
+          scope: AWS が EC2 基盤を運用し、利用者がノードグループと更新を管理する。
+      eks-operator-iam:
+        label: IAM / Pod 用ロール
+        kind: policy
+        tier: ctl
+        x: 16
+        "y": 1.5
+        svc: iam
+        description: S3 へのアクセスを Pod に付与する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: customer
+          scope: 利用者がロールとポリシーを設定する。
+      eks-operator-operator:
+        label: Flink Kubernetes Operator Pod
+        kind: scheduler
+        tier: pods
+        x: 2
+        "y": 1.5
+        realizes:
+          - operator
+        description: カスタムリソースを監視する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      eks-operator-jm:
+        label: JobManager Pod
+        kind: service
+        tier: pods
+        x: 8
+        "y": 1.5
+        realizes:
+          - jm
+        description: standby を足すには kubernetes.jobmanager.replicas を 1 より大きくし、HA を有効にする。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      eks-operator-tm:
+        label: TaskManager Pods
+        kind: worker
+        tier: pods
+        x: 14
+        "y": 1.5
+        parallel: "N"
+        realizes:
+          - tm
+        description: Task を並列に実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: customer
+          scope: 利用者が Flink の設定・ジョブ・並列度と更新を管理する。
+      eks-operator-s3-ha:
+        label: S3 の HA 保存先
+        kind: db
+        tier: data
+        x: 3
+        "y": 1.5
+        svc: s3
+        realizes:
+          - hastore
+        description: high-availability.storageDir に指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がバケット・データ・権限を管理する。
+      eks-operator-s3-snap:
+        label: S3 のチェックポイント・セーブポイント
+        kind: db
+        tier: data
+        x: 12
+        "y": 1.5
+        svc: s3
+        realizes:
+          - snap
+        description: execution.checkpointing.dir の保存先。
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がバケット・データ・権限を管理する。
+    links:
+      - id: eks-operator-run-op
+        from: eks-operator-ec2
+        to: eks-operator-operator
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+      - id: eks-operator-run-jm
+        from: eks-operator-ec2
+        to: eks-operator-jm
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+      - id: eks-operator-run-tm
+        from: eks-operator-ec2
+        to: eks-operator-tm
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+      - id: eks-operator-grant
+        from: eks-operator-iam
+        to: eks-operator-jm
+        label: S3 へのアクセスを付与
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+      - id: eks-operator-grant-tm
+        from: eks-operator-iam
+        to: eks-operator-tm
+        label: S3 へのアクセスを付与
+        evidence:
+          - type: doc
+            ref: docs/reference-flink-kubernetes-operations.md#§8
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - ctl
+          - pods
+          - data
+        nodes:
+          - eks-operator-api
+          - eks-operator-ec2
+          - eks-operator-iam
+          - eks-operator-operator
+          - eks-operator-jm
+          - eks-operator-tm
+          - eks-operator-s3-ha
+          - eks-operator-s3-snap
+      - kind: cluster
+        label: EKS クラスター
+        provider: k8s
+        tier:
+          - ctl
+          - pods
+        nodes:
+          - eks-operator-api
+          - eks-operator-ec2
+          - eks-operator-operator
+          - eks-operator-jm
+          - eks-operator-tm
