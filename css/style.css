@@ -6,7 +6,7 @@
   --dark:#141414;--dark-l:#2b2b2b;--dark-r:#454545;
   --f:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,monospace;
-  --lbl-scale:1;--side:240px;--pane:380px;--head:56px;--screen-height:100vh;
+  --lbl-scale:1;--side:320px;--pane:380px;--head:56px;--screen-height:100vh;
   color-scheme:light;
 }
 @supports (height:100dvh){:root{--screen-height:100dvh}}
@@ -402,7 +402,7 @@ details.library>summary small{font:11px var(--mono);color:var(--mute)}
 .ref-compare-table tbody tr:hover{background:var(--grid)}
 .ref-compare-table th[scope="row"]{vertical-align:top}
 @media(max-width:620px){.ref-compare-options{grid-template-columns:1fr}.ref-compare-controls{position:static}.stage-head{flex-wrap:wrap}}
-#library .mitem[hidden],#reference-list details[hidden],.menu-list [hidden]{display:none!important}
+#library .mitem[hidden],#reference-list [hidden],.menu-list [hidden]{display:none!important}
 /* 並列表現（Executor・Worker・パーティションなど） */
 :root{--par:#0f7c8c}
 :root[data-theme="dark"]{--par:#4fc3d1}
@@ -585,10 +585,35 @@ a.b.drill{display:block;margin:.6em 0;text-align:center;text-decoration:none;fon
 .bm-sw.k0{--bc:#3f7fb5}.bm-sw.k1{--bc:#c08a2a}.bm-sw.k2{--bc:#4c9a5a}.bm-sw.k3{--bc:#9a4f97}.bm-sw.k4{--bc:#c4673a}.bm-sw.k5{--bc:#2f8f9c}.bm-sw.k6{--bc:#8a8170}.bm-sw.k7{--bc:#b0485a}
 
 /* リファレンスの階層とラベル */
-#reference-list details.ref-domain>summary{font-weight:700;font-size:12px;padding:6px 2px;border-bottom:1px solid var(--line)}
-#reference-list details.ref-kind{margin-left:6px}
-#reference-list details.ref-kind>summary{font-weight:600;font-size:11px;color:var(--mute);padding:5px 2px}
-#reference-list details.ref-kind>details.reference-category{margin-left:8px}
+/* サイドバー：左端に分野のレール、右にその分野のモデル一覧 */
+.sidebar{display:grid;grid-template-columns:64px minmax(0,1fr);padding:0;overflow:hidden}
+.lib-rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:var(--ink);overflow-y:auto}
+.rail-item{width:56px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:0;border-radius:8px;background:none;color:color-mix(in srgb,var(--bg) 70%,transparent);font:600 10px var(--f);cursor:pointer;padding:4px 2px;line-height:1.2;text-align:center}
+.rail-item svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.rail-item:hover{color:var(--bg);background:color-mix(in srgb,var(--bg) 12%,transparent)}
+.rail-item.on{color:var(--bg);background:color-mix(in srgb,var(--bg) 22%,transparent)}
+.rail-gap{flex-grow:1}
+.lib-panel{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+.lib-head{position:sticky;top:0;z-index:2;background:var(--panel);display:flex;flex-direction:column;gap:8px;padding:12px 12px 10px;border-bottom:1px solid var(--line)}
+.lib-title{display:flex;align-items:baseline;gap:6px}
+.lib-title strong{font:700 15px var(--f)}
+.lib-title small{color:var(--mute);font-size:12px}
+.lib-title .sidebar-close{margin-left:auto}
+#model-filter{width:100%;box-sizing:border-box}
+.lib-kinds{display:flex;gap:4px;flex-wrap:wrap}
+.lib-kinds button{font:600 11.5px var(--f);padding:3px 10px;border:1px solid var(--line);border-radius:12px;background:none;color:var(--fg);cursor:pointer}
+.lib-kinds button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lib-domain-h{display:none;margin:12px 12px 0}
+.lib-domain.show-h .lib-domain-h{display:block}
+.lib-kind-h{margin:12px 12px 2px;font:700 11px var(--f);color:var(--mute);letter-spacing:.06em}
+.lib-cat{padding:4px 8px}
+.lib-cat-h{display:block;padding:4px 4px 2px;font:600 12px var(--f);color:var(--fg)}
+.lib-cat-h small{color:var(--mute);font-weight:400}
+#library .mitem{border-radius:6px;border-left-width:0;padding:7px 8px}
+#library .mitem.on{background:color-mix(in srgb,var(--accent) 14%,var(--card));box-shadow:inset 3px 0 0 var(--accent)}
+#library .mitem.mdetail{margin-left:12px}
+.my-models{padding:8px}
+.lib-empty{padding:16px 12px}
 .mitem.mdetail{margin-left:14px;border-left:2px solid var(--line);padding-left:8px}
 .mdet{color:var(--mute);margin-right:4px}
 .mtags{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
@@ -632,13 +657,6 @@ body.dock-sized .view{min-height:160px}
 /* サイドバーの整理：サイドバーはモデル一覧だけ。図の表示は構成図のツールバーのプルダウンへ */
 .sidebar .library-section{border-top:0;margin-top:0}
 @media (min-width:901px){
-  .shell:has(>.sidebar #library:not([open])){--sidebar-track:42px}
-  .shell:has(>.sidebar #library:not([open])) .rz-side{display:none}
-  .sidebar:has(#library:not([open])) .library-section{padding:0 4px}
-  #library:not([open])>summary{justify-content:center;padding:8px 0}
-  #library:not([open])>summary h5{display:flex;align-items:center;gap:6px;writing-mode:vertical-rl;margin:0;font-size:12px}
-  #library:not([open])>summary h5::before{writing-mode:horizontal-tb}
-  #library:not([open])>summary small{display:none}
 }
 .my-models>summary,.tf-more>summary{cursor:pointer;list-style:none}
 .my-models>summary::-webkit-details-marker,.tf-more>summary::-webkit-details-marker{display:none}

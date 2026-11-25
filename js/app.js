@@ -612,19 +612,28 @@ function modelLink(entry) {
 }
 
 /* 開いている分類・スクロール位置・絞り込みは再描画しても保つ（切り替えのたびに畳まない） */
-const LIB_OPEN = new Set((() => { try { return JSON.parse(localStorage.getItem('ddd.libOpen') || '[]'); } catch { return []; } })());
 const LIB_FILTER = (() => { try { return JSON.parse(sessionStorage.getItem('ddd.libFilter')) || {}; } catch { return {}; } })();
 const LIB_TAGS = new Set(Array.isArray(LIB_FILTER.tags) ? LIB_FILTER.tags : []);
 const libraryFiltered = () => Boolean($('model-filter').value.trim() || LIB_TAGS.size);
+const LIB_SEL = (() => { try { return JSON.parse(sessionStorage.getItem('ddd.libSel')) || {}; } catch { return {}; } })();
+const KIND_SHORT = { '製品・技術のアーキテクチャ': '製品', '仕組みの深掘り': '仕組み', '設計パターン・ユースケース': 'パターン' };
+const MINE = '__mine';
+const RAIL_ICONS = {
+  'データ基盤': '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+  'コンテナ基盤': '<rect x="3" y="7" width="18" height="12" rx="1"/><path d="M7 7V4h10v3M9 11v4M15 11v4"/>',
+  '運用基盤': '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
+  [MINE]: '<path d="M4 20h16M6 16l9-9 3 3-9 9H6z"/>',
+};
+const railIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${RAIL_ICONS[k] || '<path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/>'}</svg>`;
+const railLabel = d => ({ 'データ基盤': 'データ', 'コンテナ基盤': 'コンテナ', '運用基盤': '運用' })[d] || d.replace(/基盤$/, '');
+function saveLibSel() { try { sessionStorage.setItem('ddd.libSel', JSON.stringify(LIB_SEL)); } catch {} }
 function renderLibrary() {
-  const aside = $('library').closest('aside'), top = aside?.scrollTop;
+  const panel = $('reference-list'), top = panel?.closest('.lib-panel')?.scrollTop;
   const mine = REGISTRY.filter(entry => !entry.reference);
   $('mlist').innerHTML = mine.map(modelLink).join('') + '<button class="b small" data-act="open">＋ YAML を開く</button>';
   $('my-count').textContent = mine.length;
-  if (!ENTRY.reference) $('my-models').open = true;
 
   const refs = REGISTRY.filter(r => r.reference);
-  $('reference-section').hidden = !refs.length;
   const tree = new Map(); // 領域 → 種別 → 分類 → 項目
   const put = (m, k) => m.get(k) || m.set(k, new Map()).get(k);
   for (const e of refs) {
@@ -634,29 +643,38 @@ function renderLibrary() {
   }
   const order = (list, pref) => [...list].sort((a, b) => (pref.indexOf(a[0]) + 1 || 99) - (pref.indexOf(b[0]) + 1 || 99));
   const ord = e => e.reference.order ?? Number.MAX_SAFE_INTEGER;
-  const has = list => list.some(e => e.id === KEY);
-  const box = (cls, key, label, count, inner, open) => `<details class="${cls}" data-cat="${esc(key)}"${open ? ' open' : ''}><summary>${esc(label)} <small>${count}</small></summary>${inner}</details>`;
-  $('reference-list').innerHTML = order(tree, REF_DOMAINS).map(([domain, kinds]) => {
-    const dAll = [...kinds.values()].flatMap(c => [...c.values()].flat());
-    return box('ref-domain', 'd:' + domain, domain, dAll.length, order(kinds, REF_KINDS).map(([kind, cats]) => {
-      const kAll = [...cats.values()].flat();
-      return box('ref-kind', `k:${domain}/${kind}`, kind, kAll.length, order(cats, REF_CATS).map(([cat, list]) => {
+  const domains = order(tree, REF_DOMAINS);
+  // 開いているモデルが変わったら、その分野を表示する
+  if (LIB_SEL.key !== KEY) { LIB_SEL.key = KEY; if (ENTRY.reference) LIB_SEL.domain = ENTRY.reference.domain || 'その他'; else if (!LIB_SEL.domain) LIB_SEL.domain = mine.length && !refs.length ? MINE : domains[0]?.[0]; }
+  if (LIB_SEL.domain !== MINE && !tree.has(LIB_SEL.domain)) LIB_SEL.domain = domains[0]?.[0] || MINE;
+  saveLibSel();
+
+  const count = d => [...d.values()].reduce((n, c) => n + [...c.values()].flat().length, 0);
+  const railBtn = (key, label, n) => `<button type="button" class="rail-item ${LIB_SEL.domain === key ? 'on' : ''}" data-lib-domain="${esc(key)}" aria-pressed="${LIB_SEL.domain === key}" title="${esc(key === MINE ? '自分の設計' : key)}（${n}）">${railIcon(key)}<span>${esc(label)}</span></button>`;
+  $('lib-rail').innerHTML = domains.map(([d, kinds]) => railBtn(d, railLabel(d), count(kinds))).join('')
+    + '<span class="rail-gap"></span>' + railBtn(MINE, '自分の設計', mine.length);
+
+  panel.innerHTML = domains.map(([domain, kinds]) => `<div class="lib-domain" data-domain="${esc(domain)}"><h5 class="lib-domain-h">${esc(domain)}</h5>${
+    order(kinds, REF_KINDS).map(([kind, cats]) => `<section class="lib-kind" data-kind="${esc(kind)}"><h6 class="lib-kind-h">${esc(KIND_SHORT[kind] || kind)}</h6>${
+      order(cats, REF_CATS).map(([cat, list]) => {
         const top = list.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf)).sort((a, b) => ord(a) - ord(b));
         const rows = top.flatMap(e => [e, ...list.filter(c => c.reference.detailOf === e.id).sort((a, b) => ord(a) - ord(b))]);
-        const key = `${domain}/${kind}/${cat}`;
-        return box('reference-category', key, cat, list.length, `<div class="mlist">${rows.map(modelLink).join('')}</div>`, LIB_OPEN.has(key) || has(list));
-      }).join(''), LIB_OPEN.has(`k:${domain}/${kind}`) || has(kAll));
-    }).join(''), LIB_OPEN.has('d:' + domain) || has(dAll));
-  }).join('');
+        return `<div class="lib-cat"><span class="lib-cat-h">${esc(cat)} <small>${list.length}</small></span><div class="mlist">${rows.map(modelLink).join('')}</div></div>`;
+      }).join('')}</section>`).join('')}</div>`).join('');
+
+  const kinds = REF_KINDS.filter(k => domains.some(([, ks]) => ks.has(k)));
+  if (LIB_SEL.kind && !kinds.includes(LIB_SEL.kind)) LIB_SEL.kind = '';
+  $('lib-kinds').innerHTML = ['', ...kinds].map(k => `<button type="button" class="${(LIB_SEL.kind || '') === k ? 'on' : ''}" data-lib-kind="${esc(k)}" aria-pressed="${(LIB_SEL.kind || '') === k}">${esc(k ? KIND_SHORT[k] || k : 'すべて')}</button>`).join('');
   renderTagFilter();
   $('model-filter').value = LIB_FILTER.query || '';
-  if (libraryFiltered()) $('library').open = true;
   filterLibrary();
-  if (aside) aside.scrollTop = top;
+  const scroller = panel.closest('.lib-panel');
+  if (scroller && top != null) scroller.scrollTop = top;
   const cur = $('library').querySelector('.mitem.on:not([hidden])');
-  if (cur && aside) { const r = cur.getBoundingClientRect(), a = aside.getBoundingClientRect(); if (r.top < a.top || r.bottom > a.bottom) cur.scrollIntoView({ block: 'nearest' }); }
+  if (cur && scroller) { const r = cur.getBoundingClientRect(), a = scroller.getBoundingClientRect(); if (r.top < a.top + 140 || r.bottom > a.bottom) cur.scrollIntoView({ block: 'center' }); }
 }
-function saveLibOpen() { try { localStorage.setItem('ddd.libOpen', JSON.stringify([...LIB_OPEN])); localStorage.setItem('ddd.libMain', $('library').open ? '1' : ''); } catch {} }
+function selectLibDomain(d) { LIB_SEL.domain = d; saveLibSel(); $('library').scrollTop = 0; renderLibrary(); }
+function selectLibKind(k) { LIB_SEL.kind = k; saveLibSel(); renderLibrary(); }
 function updateLibraryFilter() {
   try { sessionStorage.setItem('ddd.libFilter', JSON.stringify({ query: $('model-filter').value, tags: [...LIB_TAGS] })); } catch {}
   filterLibrary();
@@ -665,20 +683,28 @@ function updateLibraryFilter() {
 /* モデル一覧の絞り込み：一致したモデルのある分類だけ開く */
 function filterLibrary() {
   const s = $('model-filter').value.trim().toLowerCase(), tags = [...LIB_TAGS];
-  const active = libraryFiltered();
+  const active = libraryFiltered(), mineSel = LIB_SEL.domain === MINE;
   document.querySelectorAll('#library .mitem').forEach(a => {
     const own = (a.dataset.tags || '').split('|');
     const match = !s || a.textContent.toLowerCase().includes(s) || own.some(t => t.toLowerCase().includes(s));
     a.hidden = !match || !tags.every(t => own.includes(t));
   });
-  document.querySelectorAll('#reference-list details').forEach(d => {
-    const any = [...d.querySelectorAll('.mitem')].some(a => !a.hidden);
-    d.hidden = !any;
-    d.open = active ? any : LIB_OPEN.has(d.dataset.cat) || Boolean(d.querySelector('.mitem.on'));
+  // 検索・絞り込み中はすべての分野から探す。そうでなければ選んだ分野と種類だけ
+  document.querySelectorAll('#reference-list .lib-kind').forEach(k => { k.hidden = Boolean(LIB_SEL.kind) && k.dataset.kind !== LIB_SEL.kind; });
+  document.querySelectorAll('#reference-list .lib-cat, #reference-list .lib-kind').forEach(c => { if (!c.hidden) c.hidden = !c.querySelector('.mitem:not([hidden])'); });
+  document.querySelectorAll('#reference-list .lib-domain').forEach(d => {
+    d.hidden = (!active && d.dataset.domain !== LIB_SEL.domain) || (mineSel && !active) || !d.querySelector('.mitem:not([hidden])');
+    d.classList.toggle('show-h', active);
   });
-  if (active && $('mlist').querySelector('.mitem:not([hidden])')) $('my-models').open = true;
-  const n = document.querySelectorAll('#reference-list .mitem:not([hidden])').length;
-  $('tag-count').textContent = active ? `${n} 件` : '';
+  $('my-models').hidden = !(mineSel || (active && $('mlist').querySelector('.mitem:not([hidden])')));
+  $('lib-domain-name').textContent = mineSel ? '自分の設計' : active ? '検索結果' : (LIB_SEL.domain || 'モデル一覧');
+  const n = document.querySelectorAll('#library .lib-domain:not([hidden]) .lib-kind:not([hidden]) .mitem:not([hidden]), #my-models:not([hidden]) .mitem:not([hidden])').length;
+  $('lib-domain-count').textContent = n;
+  const empty = !n;
+  let note = $('reference-list').querySelector('.lib-empty');
+  if (empty && !note) $('reference-list').insertAdjacentHTML('beforeend', '<p class="lib-empty sub">該当するモデルはありません</p>');
+  else if (!empty && note) note.remove();
+  if ($('tag-count')) $('tag-count').textContent = '';
 }
 /* ラベル（提供形態・提供元）で絞り込む。複数選ぶとすべてを持つものだけ */
 const REF_DOMAINS = ['データ基盤', 'コンテナ基盤', '運用基盤'];
@@ -700,14 +726,11 @@ function renderTagFilter() {
   const delivery = DELIVERY.filter(t => count.has(t)), orgs = [...count.keys()].filter(t => !DELIVERY.includes(t)).sort((a, b) => count.get(b) - count.get(a) || a.localeCompare(b));
   const main = ['OSS', '商用サービス', 'クラウドマネージド', '概念', 'パターン'].filter(t => count.has(t));
   const more = [...delivery.filter(t => !main.includes(t)), ...orgs];
-  const moreOpen = more.some(t => LIB_TAGS.has(t)) || TF_MORE.open;
-  $('tag-filter').innerHTML = `<div class="tf-row">${main.map(chip).join('')}</div>
-    <details class="tf-more" ${moreOpen ? 'open' : ''}><summary>その他の提供形態・提供元で絞り込む <small>${more.length}</small></summary><div class="tf-row">${more.map(chip).join('')}</div></details>`;
-  $('tag-filter').querySelector('.tf-more').addEventListener('toggle', e => { TF_MORE.open = e.target.open; });
+  const extra = [...delivery.filter(t => !main.includes(t)), ...orgs].filter(t => LIB_TAGS.has(t));
+  $('tag-filter').innerHTML = `<div class="tf-row">${[...main, ...extra].map(chip).join('')}</div>`;
   $('tag-filter').insertAdjacentHTML('beforeend', `
     ${LIB_TAGS.size ? '<button type="button" class="b small" data-tag-clear>ラベルを解除</button>' : ''}<span id="tag-count" class="tf-count"></span>`);
 }
-const TF_MORE = { open: false };
 function toggleTag(t, only = false) {
   if (only) { LIB_TAGS.clear(); LIB_TAGS.add(t); } else LIB_TAGS.has(t) ? LIB_TAGS.delete(t) : LIB_TAGS.add(t);
   renderTagFilter(); updateLibraryFilter();
@@ -716,7 +739,6 @@ function toggleTag(t, only = false) {
 function pickModel() {
   if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open');
   else document.body.classList.remove('nav-closed');
-  $('library').open = true;
   $('model-filter').focus();
   $('model-filter').select();
 }
@@ -1607,7 +1629,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-tag]'); if (t) return toggleTag(t.dataset.tag);
   if (e.target.closest('[data-tag-clear]')) { LIB_TAGS.clear(); renderTagFilter(); return updateLibraryFilter(); }
   const o = e.target.closest('[data-tag-only]');
-  if (o) { $('library').open = true; document.body.classList.remove('nav-closed'); if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open'); toggleTag(o.dataset.tagOnly, true); }
+  if (o) { document.body.classList.remove('nav-closed'); if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open'); toggleTag(o.dataset.tagOnly, true); }
 });
 $('model-filter').addEventListener('keydown', e => {
   if (e.key === 'Enter') { const a = [...document.querySelectorAll('#library .mitem')].find(x => !x.hidden); if (a) location.hash = a.getAttribute('href'); }
@@ -1663,13 +1685,8 @@ $('viewer-title').textContent = M.name;
   if (p) { up.href = `#/m/${encodeURIComponent(p.id)}/struct${back.node ? '?s=' + encodeURIComponent(back.node) : ''}`; up.textContent = `↑ ${p.name}`; up.title = '上位の図に戻る'; up.onclick = e => { e.preventDefault(); transitionTo(up.getAttribute('href'), 'out'); }; }
 }
 setDimension(st.dimension, false);
-try { if (localStorage.getItem('ddd.libMain')) $('library').open = true; } catch {}
-$('library').addEventListener('toggle', e => {
-  if (PREVIEW) return;
-  const d = e.target;
-  if (d.dataset?.cat && !libraryFiltered()) { d.open ? LIB_OPEN.add(d.dataset.cat) : LIB_OPEN.delete(d.dataset.cat); }
-  saveLibOpen();
-}, true);
+$('lib-rail').addEventListener('click', e => { const b = e.target.closest('[data-lib-domain]'); if (b) selectLibDomain(b.dataset.libDomain); });
+$('lib-kinds').addEventListener('click', e => { const b = e.target.closest('[data-lib-kind]'); if (b) selectLibKind(b.dataset.libKind); });
 document.addEventListener('click', e => {
   const a = e.target.closest?.('a[data-drill]'); if (!a) return;
   e.preventDefault(); drillInto(a.dataset.drill);

@@ -5,7 +5,7 @@ const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}');
 const save = v => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch { /* 保存できなくても動かす */ } };
 
 const SPECS = {
-  side: { cssVar: '--side', min: 180, max: () => Math.min(520, innerWidth * 0.4), axis: 'x', sign: 1, label: 'サイドバーの幅' },
+  side: { cssVar: '--side', min: 260, max: () => Math.min(520, innerWidth * 0.4), axis: 'x', sign: 1, label: 'サイドバーの幅' },
   pane: { cssVar: '--pane', min: 280, max: () => Math.min(900, innerWidth * 0.6), axis: 'x', sign: -1, label: '詳細パネルの幅' },
   dock: { cssVar: '--dock', min: 120, max: () => Math.max(160, (document.querySelector('.stage')?.clientHeight || innerHeight) - 200), axis: 'y', sign: -1, label: '見取り図の高さ' },
 };
