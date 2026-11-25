@@ -11,7 +11,9 @@ import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz3';
-import { productOf, shortName } from './products.js?v=2';
+import { productName, isConcept, shortName } from './products.js?v=3';
+import { CATEGORY_INFO } from './categories.js?v=1';
+import { drawThumbnail } from './home-thumbnail.js';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 
 const $ = id => document.getElementById(id);
@@ -24,6 +26,12 @@ if (!S.sidebar) document.body.classList.add('nav-closed');
 
 function parseRoute() {
   const h = location.hash.slice(1);
+  const c = h.match(/^\/c\/([^/?]+)\/([^/?]+)/);
+  if (c) {
+    const dec = x => { try { return decodeURIComponent(x); } catch { return x; } };
+    let last = ''; try { last = sessionStorage.getItem('ddd.lastModel') || ''; } catch {}
+    return { id: last, mode: null, q: {}, cat: { domain: dec(c[1]), category: dec(c[2]) } };
+  }
   const m = h.match(/^\/m\/([^/?]+)(?:\/([^/?]+))?(?:\?(.*))?$/);
   const encodedId = m?.[1] ?? h.split('?')[0]; // 旧形式 #ec-shop も受け付ける
   let id = encodedId;
@@ -167,8 +175,13 @@ function routeHash(withView) {
   const s = q.toString();
   return `#/m/${encodeURIComponent(KEY)}/${st.mode}${s ? '?' + s : ''}`;
 }
-const syncUrl = () => history.replaceState(null, '', routeHash(false));
-addEventListener('hashchange', () => { if (parseRoute().id !== KEY || parseRoute().q.v) location.reload(); });
+const syncUrl = () => { if (parseRoute().cat) return; history.replaceState(null, '', routeHash(false)); }; // 分類ページの URL は書き換えない
+addEventListener('hashchange', () => {
+  const r = parseRoute();
+  if (r.cat) return showCategoryPage(r.cat);
+  hideCategoryPage();
+  if (r.id !== KEY || r.q.v) location.reload();
+});
 
 /* ================= ビュー（論理 / サービス / ネットワーク） =================
  * 解析・モードの状態は物理モデル（allNodes / allLinks）で計算し、描画だけ VW() の部品に写す */
@@ -662,26 +675,22 @@ function renderLibrary() {
     const top = sorted.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf));
     return top.flatMap(e => [e, ...sorted.filter(c => c.reference.detailOf === e.id)]);
   };
-  const leaf = (e, prod) => modelLink(e, prod ? shortName(e.name, prod) : undefined);
+  const catLink = (domain, cat, n, extra = '') => `<a class="lib-cat-h ${LIB_SEL.cat === domain + '/' + cat ? 'on' : ''}" href="#/c/${encodeURIComponent(domain)}/${encodeURIComponent(cat)}" title="${esc(cat)} の製品一覧を開く"><span>${esc(cat)}${extra}</span><small>${n}</small></a>`;
   panel.innerHTML = domains.map(([domain, kinds]) => {
-    const all = [...kinds.values()].flatMap(c => [...c.values()].flat());
-    const prods = new Map();
-    for (const e of all) { const p = productOf(e.id); if (p) (prods.get(p) || prods.set(p, []).get(p)).push(e); }
-    // 製品は、いちばん基本の図（種類の順・並び順で先頭）の分類に置く
-    const byCat = new Map(), add = (cat, item) => (byCat.get(cat) || byCat.set(cat, []).get(cat)).push(item);
-    for (const [p, list] of prods) add(leaves(list)[0].reference.category || 'その他', { prod: p, list });
-    for (const e of all) if (!productOf(e.id)) add(e.reference.category || 'その他', { entry: e });
-    return `<div class="lib-domain" data-domain="${esc(domain)}"><h5 class="lib-domain-h">${esc(domain)}</h5>${
-      order(byCat, REF_CATS).map(([cat, items]) => {
-        const n = items.reduce((s, i) => s + (i.list ? i.list.length : 1), 0);
-        const sortKey = i => i.list ? i.prod : i.entry.name;
-        const rows = items.sort((a, b) => (b.list ? 1 : 0) - (a.list ? 1 : 0) || sortKey(a).localeCompare(sortKey(b), 'ja')).map(i => {
-          if (!i.list || i.list.length === 1) return leaf(i.entry || i.list[0]);
-          const open = LIB_PROD_OPEN.has(i.prod) || i.list.some(e => e.id === KEY);
-          return `<details class="lib-prod" data-prod="${esc(i.prod)}"${open ? ' open' : ''}><summary><span>${esc(i.prod)}</span><small>${i.list.length}</small></summary><div class="mlist">${leaves(i.list).map(e => leaf(e, i.prod)).join('')}</div></details>`;
-        }).join('');
-        return `<div class="lib-cat"><span class="lib-cat-h"><span>${esc(cat)}</span><small>${n}</small></span><div class="mlist">${rows}</div></div>`;
-      }).join('')}</div>`;
+    const groups = libraryGroups([...kinds.values()].flatMap(c => [...c.values()].flat()));
+    const section = (items, concept) => order(items, REF_CATS).map(([cat, list]) => {
+      const n = list.reduce((s, g) => s + g.list.length, 0);
+      const rows = list.map(g => {
+        if (concept) return leaves(g.list).map(e => modelLink(e)).join('');
+        const ls = leaves(g.list);
+        if (ls.length === 1) return modelLink(ls[0], g.name);
+        const open = LIB_PROD_OPEN.has(g.name) || ls.some(e => e.id === KEY);
+        const items = ls.map((e, i) => modelLink(e, (i === 0 ? '概要　' : `${i}. `) + shortName(e.name, g.name))).join('');
+        return `<details class="lib-prod" data-prod="${esc(g.name)}"${open ? ' open' : ''}><summary><span>${esc(g.name)}</span><small>${ls.length}</small></summary><div class="mlist">${items}</div></details>`;
+      }).join('');
+      return `<div class="lib-cat">${catLink(domain, cat, n)}<div class="mlist">${rows}</div></div>`;
+    }).join('');
+    return `<div class="lib-domain" data-domain="${esc(domain)}"><h5 class="lib-domain-h">${esc(domain)}</h5>${section(groups.products, false)}${groups.concepts.size ? `<h6 class="lib-section-h">仕組みとパターン</h6>${section(groups.concepts, true)}` : ''}</div>`;
   }).join('');
 
   const kinds = REF_KINDS.filter(k => domains.some(([, ks]) => ks.has(k)));
@@ -694,6 +703,65 @@ function renderLibrary() {
   if (scroller && top != null) scroller.scrollTop = top;
   const cur = $('library').querySelector('.mitem.on:not([hidden])');
   if (cur && scroller) { const r = cur.getBoundingClientRect(), a = scroller.getBoundingClientRect(); if (r.top < a.top + 140 || r.bottom > a.bottom) cur.scrollIntoView({ block: 'center' }); }
+}
+function libraryGroups(all) {
+  const byId = new Map(all.map(e => [e.id, e]));
+  const root = e => { let r = e, seen = 0; while (r.reference.detailOf && byId.has(r.reference.detailOf) && seen++ < 5) r = byId.get(r.reference.detailOf); return r; };
+  const products = new Map(), concepts = new Map(), prodIndex = new Map();
+  const put = (m, cat, name) => { const c = m.get(cat) || m.set(cat, []).get(cat); let g = c.find(x => x.name === name); if (!g) c.push(g = { name, list: [] }); return g; };
+  for (const e of all) {
+    const r = root(e);
+    if (isConcept(r)) { put(concepts, e.reference.category || 'その他', e.reference.category || 'その他').list.push(e); continue; }
+    const name = productName(r);
+    if (!prodIndex.has(name)) prodIndex.set(name, r);
+    // 製品は、いちばん基本の図の分類に置く
+    const base = prodIndex.get(name);
+    put(products, base.reference.category || 'その他', name).list.push(e);
+  }
+  for (const list of products.values()) list.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  return { products, concepts };
+}
+let CAT_INDEX = null;
+async function researchIndex() {
+  if (!CAT_INDEX) CAT_INDEX = fetch('models/research-index.json', { cache: 'no-cache' }).then(r => r.json()).then(d => new Map((d.entries || []).map(e => [e.id, e]))).catch(() => new Map());
+  return CAT_INDEX;
+}
+const thumbObserver = new IntersectionObserver(items => {
+  for (const it of items) {
+    if (!it.isIntersecting) continue;
+    thumbObserver.unobserve(it.target);
+    fetch(`models/${encodeURIComponent(it.target.dataset.modelId)}/model.yaml`, { cache: 'no-cache' }).then(r => r.text())
+      .then(raw => { it.target.textContent = ''; drawThumbnail(it.target, Layout.apply(jsyaml.load(raw))); })
+      .catch(() => { it.target.textContent = 'プレビューなし'; });
+  }
+}, { rootMargin: '150px' });
+async function showCategoryPage({ domain, category }) {
+  document.body.classList.add('cat-mode');
+  LIB_SEL.cat = domain + '/' + category; LIB_SEL.domain = domain; saveLibSel(); renderLibrary();
+  const page = $('cat-page'), idx = await researchIndex();
+  const refs = REGISTRY.filter(r => r.reference && (r.reference.domain || 'その他') === domain);
+  const { products, concepts } = libraryGroups(refs);
+  const prods = products.get(category) || [], cons = concepts.get(category) || [];
+  const delivery = e => (e.tags || []).find(t => DELIVERY.includes(t)) || '';
+  const card = (e, title, n) => {
+    const info = idx.get(e.id) || {};
+    return `<a class="cat-card" href="#/m/${encodeURIComponent(e.id)}/struct"><div class="cat-card-title"><h3>${esc(title)}</h3><p>${esc(info.description || '')}</p></div><div class="cat-thumb" data-model-id="${esc(e.id)}" aria-hidden="true">構成図を読み込み中…</div><div class="cat-card-meta">${delivery(e) ? `<span class="mtag mini ${TAG_KIND(delivery(e))}">${esc(delivery(e))}</span>` : ''}<span>図 ${n}</span><span class="cat-open">開く →</span></div></a>`;
+  };
+  const first = g => [...g.list].sort((a, b) => (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)))[0];
+  page.innerHTML = `<div class="cat-inner"><p class="cat-eyebrow">${esc(domain)}</p><h1>${esc(category)}</h1><p class="cat-lead">${esc(CATEGORY_INFO[category] || '')}</p>
+    ${prods.length ? `<h2>製品 <small>${prods.length}</small></h2><div class="cat-grid">${prods.map(g => card(first(g), g.name, g.list.length)).join('')}</div>` : ''}
+    ${cons.length ? `<h2>仕組みとパターン <small>${cons.reduce((s, g) => s + g.list.length, 0)}</small></h2><div class="cat-grid">${cons.flatMap(g => g.list).map(e => card(e, e.name, 1)).join('')}</div>` : ''}
+    ${!prods.length && !cons.length ? '<p class="sub">この分類にはまだ図がありません。</p>' : ''}</div>`;
+  page.hidden = false; page.scrollTop = 0;
+  page.querySelectorAll('.cat-thumb').forEach(t => thumbObserver.observe(t));
+  document.title = `${category} — DeepDiverDown`;
+  if (matchMedia('(max-width:1279px)').matches) document.body.classList.remove('nav-open');
+}
+function hideCategoryPage() {
+  if (!document.body.classList.contains('cat-mode')) return;
+  document.body.classList.remove('cat-mode'); $('cat-page').hidden = true;
+  delete LIB_SEL.cat; saveLibSel(); renderLibrary();
+  document.title = `${M.name} — DeepDiverDown`;
 }
 function selectLibDomain(d) { LIB_SEL.domain = d; saveLibSel(); $('lib-scroll').scrollTop = 0; renderLibrary(); }
 function selectLibKind(k) { LIB_SEL.kind = k; saveLibSel(); renderLibrary(); }
@@ -1762,7 +1830,9 @@ if (PREVIEW) {
     if (next) { compared = next; revealRole(); drawScene(); }
   });
 }
+try { sessionStorage.setItem('ddd.lastModel', KEY); } catch {}
 renderLibrary();
+if (ROUTE.cat) showCategoryPage(ROUTE.cat);
 scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();
 if (initialSelection && Object.hasOwn(VW().nodes, initialSelection)) st.sel = resolveSel(initialSelection);
