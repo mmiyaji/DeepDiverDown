@@ -11,6 +11,7 @@ import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz3';
+import { productOf, shortName } from './products.js?v=2';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 
 const $ = id => document.getElementById(id);
@@ -599,15 +600,15 @@ function renderFlowControls() {
 }
 
 /* ================= サイドバー ================= */
-function modelLink(entry) {
+function modelLink(entry, label) {
   const selected = entry.id === KEY;
   const marker = entry.design ? '設計案' : entry.local ? 'ローカル' : '';
   const coverage = COV.total ? Math.round(COV.covered / COV.total * 100) : 100;
   const detail = selected && !entry.reference
     ? `<span class="tag ${GATES.pass ? 'ok' : 'high'}">${GATES.pass ? '合格' : '不合格'}</span> 網羅 ${coverage}%` : '';
   const tags = entry.tags || [], sub = entry.reference?.detailOf;
-  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" class="mitem ${selected ? 'on' : ''} ${sub ? 'mdetail' : ''}" data-tags="${esc(tags.join('|'))}" title="${esc([entry.name, tags.join('・')].filter(Boolean).join('\n'))}" ${selected ? 'aria-current="page"' : ''}>
-    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc((selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}${tags.length ? (t => ` <span class="mtag mini ${TAG_KIND(t)}">${esc(t)}</span>`)(tags.find(t => DELIVERY.includes(t)) || tags[0]) : ''}</span>
+  return `<a href="#/m/${encodeURIComponent(entry.id)}/struct" data-kind="${esc(entry.reference?.kind || '')}" class="mitem ${selected ? 'on' : ''} ${sub ? 'mdetail' : ''}" data-tags="${esc(tags.join('|'))}" title="${esc([entry.name, tags.join('・')].filter(Boolean).join('\n'))}" ${selected ? 'aria-current="page"' : ''}>
+    <span class="mname">${sub ? '<span class="mdet" aria-label="詳細図">▸</span>' : ''}${esc(typeof label === 'string' ? label : (selected && M.name) || entry.name || entry.id)}${marker ? ` <small class="loc">${marker}</small>` : ''}${tags.length ? (t => ` <span class="mtag mini ${TAG_KIND(t)}">${esc(t)}</span>`)(tags.find(t => DELIVERY.includes(t)) || tags[0]) : ''}</span>
     ${detail ? `<span class="mmeta">${detail}</span>` : ''}</a>`;
 }
 
@@ -618,6 +619,7 @@ const libraryFiltered = () => Boolean($('model-filter').value.trim() || LIB_TAGS
 const LIB_SEL = (() => { try { return JSON.parse(sessionStorage.getItem('ddd.libSel')) || {}; } catch { return {}; } })();
 const KIND_SHORT = { '製品・技術のアーキテクチャ': '製品', '仕組みの深掘り': '仕組み', '設計パターン・ユースケース': 'パターン' };
 const MINE = '__mine';
+const LIB_PROD_OPEN = new Set((() => { try { return JSON.parse(sessionStorage.getItem('ddd.libProd')) || []; } catch { return []; } })());
 const RAIL_ICONS = {
   'データ基盤': '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
   'コンテナ基盤': '<rect x="3" y="7" width="18" height="12" rx="1"/><path d="M7 7V4h10v3M9 11v4M15 11v4"/>',
@@ -654,13 +656,33 @@ function renderLibrary() {
   $('lib-rail').innerHTML = domains.map(([d, kinds]) => railBtn(d, railLabel(d), count(kinds))).join('')
     + '<span class="rail-gap"></span>' + railBtn(MINE, '自分の設計', mine.length);
 
-  panel.innerHTML = domains.map(([domain, kinds]) => `<div class="lib-domain" data-domain="${esc(domain)}"><h5 class="lib-domain-h">${esc(domain)}</h5>${
-    order(kinds, REF_KINDS).map(([kind, cats]) => `<section class="lib-kind" data-kind="${esc(kind)}"><h6 class="lib-kind-h">${esc(KIND_SHORT[kind] || kind)}</h6>${
-      order(cats, REF_CATS).map(([cat, list]) => {
-        const top = list.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf)).sort((a, b) => ord(a) - ord(b));
-        const rows = top.flatMap(e => [e, ...list.filter(c => c.reference.detailOf === e.id).sort((a, b) => ord(a) - ord(b))]);
-        return `<div class="lib-cat"><span class="lib-cat-h"><span>${esc(cat)}</span><small>${list.length}</small></span><div class="mlist">${rows.map(modelLink).join('')}</div></div>`;
-      }).join('')}</section>`).join('')}</div>`).join('');
+  const kindIdx = e => (REF_KINDS.indexOf(e.reference.kind) + 1 || 9) * 1e6 + Math.min(ord(e), 999999);
+  const leaves = list => {
+    const sorted = [...list].sort((a, b) => kindIdx(a) - kindIdx(b));
+    const top = sorted.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf));
+    return top.flatMap(e => [e, ...sorted.filter(c => c.reference.detailOf === e.id)]);
+  };
+  const leaf = (e, prod) => modelLink(e, prod ? shortName(e.name, prod) : undefined);
+  panel.innerHTML = domains.map(([domain, kinds]) => {
+    const all = [...kinds.values()].flatMap(c => [...c.values()].flat());
+    const prods = new Map();
+    for (const e of all) { const p = productOf(e.id); if (p) (prods.get(p) || prods.set(p, []).get(p)).push(e); }
+    // 製品は、いちばん基本の図（種類の順・並び順で先頭）の分類に置く
+    const byCat = new Map(), add = (cat, item) => (byCat.get(cat) || byCat.set(cat, []).get(cat)).push(item);
+    for (const [p, list] of prods) add(leaves(list)[0].reference.category || 'その他', { prod: p, list });
+    for (const e of all) if (!productOf(e.id)) add(e.reference.category || 'その他', { entry: e });
+    return `<div class="lib-domain" data-domain="${esc(domain)}"><h5 class="lib-domain-h">${esc(domain)}</h5>${
+      order(byCat, REF_CATS).map(([cat, items]) => {
+        const n = items.reduce((s, i) => s + (i.list ? i.list.length : 1), 0);
+        const sortKey = i => i.list ? i.prod : i.entry.name;
+        const rows = items.sort((a, b) => (b.list ? 1 : 0) - (a.list ? 1 : 0) || sortKey(a).localeCompare(sortKey(b), 'ja')).map(i => {
+          if (!i.list || i.list.length === 1) return leaf(i.entry || i.list[0]);
+          const open = LIB_PROD_OPEN.has(i.prod) || i.list.some(e => e.id === KEY);
+          return `<details class="lib-prod" data-prod="${esc(i.prod)}"${open ? ' open' : ''}><summary><span>${esc(i.prod)}</span><small>${i.list.length}</small></summary><div class="mlist">${leaves(i.list).map(e => leaf(e, i.prod)).join('')}</div></details>`;
+        }).join('');
+        return `<div class="lib-cat"><span class="lib-cat-h"><span>${esc(cat)}</span><small>${n}</small></span><div class="mlist">${rows}</div></div>`;
+      }).join('')}</div>`;
+  }).join('');
 
   const kinds = REF_KINDS.filter(k => domains.some(([, ks]) => ks.has(k)));
   if (LIB_SEL.kind && !kinds.includes(LIB_SEL.kind)) LIB_SEL.kind = '';
@@ -686,19 +708,24 @@ function filterLibrary() {
   const active = libraryFiltered(), mineSel = LIB_SEL.domain === MINE;
   document.querySelectorAll('#library .mitem').forEach(a => {
     const own = (a.dataset.tags || '').split('|');
-    const match = !s || a.textContent.toLowerCase().includes(s) || own.some(t => t.toLowerCase().includes(s));
+    const match = !s || (a.textContent + ' ' + (a.title || '')).toLowerCase().includes(s) || own.some(t => t.toLowerCase().includes(s));
     a.hidden = !match || !tags.every(t => own.includes(t));
   });
   // 検索・絞り込み中はすべての分野から探す。そうでなければ選んだ分野と種類だけ
-  document.querySelectorAll('#reference-list .lib-kind').forEach(k => { k.hidden = Boolean(LIB_SEL.kind) && k.dataset.kind !== LIB_SEL.kind; });
-  document.querySelectorAll('#reference-list .lib-cat, #reference-list .lib-kind').forEach(c => { if (!c.hidden) c.hidden = !c.querySelector('.mitem:not([hidden])'); });
+  if (LIB_SEL.kind) document.querySelectorAll('#reference-list .mitem').forEach(a => { if (a.dataset.kind !== LIB_SEL.kind) a.hidden = true; });
+  document.querySelectorAll('#reference-list .lib-prod').forEach(p => {
+    p.hidden = !p.querySelector('.mitem:not([hidden])');
+    if (active) p.open = !p.hidden; else p.open = LIB_PROD_OPEN.has(p.dataset.prod) || Boolean(p.querySelector('.mitem.on'));
+    const n = p.querySelectorAll('.mitem:not([hidden])').length; p.querySelector('summary small').textContent = n;
+  });
+  document.querySelectorAll('#reference-list .lib-cat').forEach(c => { c.hidden = !c.querySelector('.mitem:not([hidden])'); });
   document.querySelectorAll('#reference-list .lib-domain').forEach(d => {
     d.hidden = (!active && d.dataset.domain !== LIB_SEL.domain) || (mineSel && !active) || !d.querySelector('.mitem:not([hidden])');
     d.classList.toggle('show-h', active);
   });
   $('my-models').hidden = !(mineSel || (active && $('mlist').querySelector('.mitem:not([hidden])')));
   $('lib-domain-name').textContent = mineSel ? '自分の設計' : active ? '検索結果' : (LIB_SEL.domain || 'モデル一覧');
-  const n = document.querySelectorAll('#library .lib-domain:not([hidden]) .lib-kind:not([hidden]) .mitem:not([hidden]), #my-models:not([hidden]) .mitem:not([hidden])').length;
+  const n = document.querySelectorAll('#library .lib-domain:not([hidden]) .mitem:not([hidden]), #my-models:not([hidden]) .mitem:not([hidden])').length;
   $('lib-domain-count').textContent = n;
   const empty = !n;
   let note = $('reference-list').querySelector('.lib-empty');
@@ -1691,6 +1718,13 @@ $('viewer-title').textContent = M.name;
   if (p) { up.href = `#/m/${encodeURIComponent(p.id)}/struct${back.node ? '?s=' + encodeURIComponent(back.node) : ''}`; up.textContent = `↑ ${p.name}`; up.title = '上位の図に戻る'; up.onclick = e => { e.preventDefault(); transitionTo(up.getAttribute('href'), 'out'); }; }
 }
 setDimension(st.dimension, false);
+// 製品の開閉は、人が見出しを押したときだけ覚える（検索で自動に開いたものは覚えない）
+$('reference-list').addEventListener('click', e => {
+  const sum = e.target.closest('.lib-prod>summary'); if (!sum || libraryFiltered()) return;
+  const p = sum.parentElement;
+  !p.open ? LIB_PROD_OPEN.add(p.dataset.prod) : LIB_PROD_OPEN.delete(p.dataset.prod);
+  try { sessionStorage.setItem('ddd.libProd', JSON.stringify([...LIB_PROD_OPEN])); } catch {}
+});
 $('lib-rail').addEventListener('click', e => { const b = e.target.closest('[data-lib-domain]'); if (b) selectLibDomain(b.dataset.libDomain); });
 $('lib-active').addEventListener('click', e => { const b = e.target.closest('[data-lib-kind]'); if (b) selectLibKind(''); });
 $('lib-kinds').addEventListener('click', e => { const b = e.target.closest('[data-lib-kind]'); if (b) selectLibKind(b.dataset.libKind); });
