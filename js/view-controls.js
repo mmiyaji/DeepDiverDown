@@ -9,6 +9,7 @@
     toggle.querySelector('span').textContent = expanded ? '元に戻す' : '最大化';
     toggle.title = expanded ? '構成図を元の表示に戻す' : '構成図を画面内で最大化';
     nav.disabled = expanded;
+    const bbMax = document.getElementById('bb-max'); bbMax.setAttribute('aria-pressed', expanded); bbMax.querySelector('span').textContent = expanded ? '戻す' : '全画面';
   });
 })();
 
@@ -32,7 +33,8 @@
   const panel = document.getElementById('panel');
   const toggle = document.getElementById('detail-toggle');
   const close = document.getElementById('detail-close');
-  const compact = matchMedia('(max-width:900px)');
+  const compact = matchMedia('(max-width:1279px)');
+  const bb = document.getElementById('bb-detail');
   let userOpen;
 
   function render() {
@@ -42,7 +44,22 @@
     toggle.setAttribute('aria-expanded', open);
     toggle.classList.toggle('on', open);
     toggle.title = open ? '詳細パネルを閉じる' : '詳細パネルを開く';
+    bb.setAttribute('aria-pressed', open); bb.classList.toggle('on', open);
+    document.body.classList.toggle('detail-open', open && compact.matches);
+    if (open && compact.matches) document.body.classList.remove('nav-open');
   }
+  const setOpen = v => { userOpen = v; render(); if (v && compact.matches) panel.focus({ preventScroll: true }); };
+  bb.addEventListener('click', () => setOpen(panel.hidden));
+  // 引き出しの外（暗幕）を押したら閉じる。一覧を開くときは詳細を閉じる
+  document.querySelector('.scrim').addEventListener('click', e => {
+    if (document.body.classList.contains('detail-open')) { e.stopPropagation(); setOpen(false); }
+  }, true);
+  document.addEventListener('click', e => {
+    if (e.target.closest?.('[data-act="nav"]') && compact.matches && !document.body.classList.contains('nav-open') && !panel.hidden) { userOpen = false; render(); }
+  }, true);
+  new MutationObserver(() => {
+    document.querySelectorAll('.bottombar [data-act="nav"]').forEach(b => b.classList.toggle('on', document.body.classList.contains('nav-open')));
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   toggle.addEventListener('click', () => {
     userOpen = panel.hidden;
@@ -66,3 +83,5 @@
   compact.addEventListener('change', render);
   render();
 })();
+
+document.getElementById('bb-max').addEventListener('click', e => { e.stopPropagation(); document.querySelector('[data-act="maximize-view"]').click(); });

@@ -10,7 +10,7 @@ import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDE
 import * as L from './loader.js?v=nc1';
 import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
-import { initResize } from './resize.js?v=rz2';
+import { initResize } from './resize.js?v=rz3';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 
 const $ = id => document.getElementById(id);
@@ -737,7 +737,7 @@ function toggleTag(t, only = false) {
 }
 /* モデルを選ぶ（Ctrl+K・ヘッダーのモデル名）：サイドバーのモデル一覧を開いて絞り込み欄へ */
 function pickModel() {
-  if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open');
+  if (matchMedia('(max-width:1279px)').matches) document.body.classList.add('nav-open');
   else document.body.classList.remove('nav-closed');
   $('model-filter').focus();
   $('model-filter').select();
@@ -1544,7 +1544,8 @@ document.addEventListener('click', e => {
     if (a === 'help') return openHelp(false);
     if (a === 'settings') return openSettings();
     if (a === 'nav') {
-      if (matchMedia('(max-width:900px)').matches) return document.body.classList.toggle('nav-open'); // 狭い画面は引き出しの開閉のみ
+      if (t.classList.contains('scrim')) return document.body.classList.remove('nav-open'); // 暗幕は閉じるだけ
+      if (matchMedia('(max-width:1279px)').matches) return document.body.classList.toggle('nav-open'); // 狭い画面は引き出しの開閉のみ
       S.sidebar = !document.body.classList.toggle('nav-closed'); return saveSettings(S);
     }
     if (a === 'reload') return location.reload();
@@ -1629,7 +1630,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-tag]'); if (t) return toggleTag(t.dataset.tag);
   if (e.target.closest('[data-tag-clear]')) { LIB_TAGS.clear(); renderTagFilter(); return updateLibraryFilter(); }
   const o = e.target.closest('[data-tag-only]');
-  if (o) { document.body.classList.remove('nav-closed'); if (matchMedia('(max-width:900px)').matches) document.body.classList.add('nav-open'); toggleTag(o.dataset.tagOnly, true); }
+  if (o) { document.body.classList.remove('nav-closed'); if (matchMedia('(max-width:1279px)').matches) document.body.classList.add('nav-open'); toggleTag(o.dataset.tagOnly, true); }
 });
 $('model-filter').addEventListener('keydown', e => {
   if (e.key === 'Enter') { const a = [...document.querySelectorAll('#library .mitem')].find(x => !x.hidden); if (a) location.hash = a.getAttribute('href'); }
