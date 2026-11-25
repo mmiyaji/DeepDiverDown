@@ -777,6 +777,8 @@ async function showCategoryPage({ domain, category }) {
   page.querySelectorAll('.cat-thumb').forEach(t => thumbObserver.observe(t));
   loadCategoryCompare(category);
   document.title = `${category} — DeepDiverDown`;
+  // ヘッダーの題名も分類ページに合わせる（裏で読み込んだ図の名前を出さない）
+  $('mtitle').textContent = `${domain} › ${category}`; $('mparent').hidden = true;
   if (matchMedia('(max-width:1279px)').matches) document.body.classList.remove('nav-open');
 }
 function miniMarkdown(md) {
@@ -813,6 +815,7 @@ function hideCategoryPage() {
   document.body.classList.remove('cat-mode'); $('cat-page').hidden = true;
   delete LIB_SEL.cat; saveLibSel(); renderLibrary();
   document.title = `${M.name} — DeepDiverDown`;
+  $('mtitle').textContent = M.name; $('mparent').hidden = !$('mparent').getAttribute('href');
 }
 function selectLibDomain(d) { LIB_SEL.domain = d; saveLibSel(); $('lib-scroll').scrollTop = 0; renderLibrary(); }
 function selectLibKind(k) { LIB_SEL.kind = k; saveLibSel(); renderLibrary(); }
