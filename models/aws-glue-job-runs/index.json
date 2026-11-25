@@ -1,0 +1,303 @@
+{
+  "model": "aws-glue-job-runs",
+  "name": "AWS Glue：ジョブの実行とワーカー",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "trigger": {
+      "type": "node",
+      "label": "実行の起動要求",
+      "status": "claim"
+    },
+    "script": {
+      "type": "node",
+      "label": "スクリプトと実行設定",
+      "status": "claim"
+    },
+    "runmgr": {
+      "type": "node",
+      "label": "ジョブ実行の管理",
+      "status": "claim"
+    },
+    "driver": {
+      "type": "node",
+      "label": "Spark ドライバー",
+      "status": "claim"
+    },
+    "executors": {
+      "type": "node",
+      "label": "Spark Executor（ワーカー）",
+      "status": "claim"
+    },
+    "bookmark": {
+      "type": "node",
+      "label": "ジョブブックマーク",
+      "status": "claim"
+    },
+    "source": {
+      "type": "node",
+      "label": "入力データ",
+      "status": "claim"
+    },
+    "target": {
+      "type": "node",
+      "label": "出力先",
+      "status": "claim"
+    },
+    "logs": {
+      "type": "node",
+      "label": "ログと指標",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "実行の起動要求 → ジョブ実行の管理",
+      "status": "claim"
+    },
+    "config": {
+      "type": "link",
+      "label": "スクリプトと実行設定 → ジョブ実行の管理",
+      "status": "claim"
+    },
+    "launch": {
+      "type": "link",
+      "label": "ジョブ実行の管理 → Spark ドライバー",
+      "status": "claim"
+    },
+    "dispatch": {
+      "type": "link",
+      "label": "Spark ドライバー → Spark Executor（ワーカー）",
+      "status": "claim"
+    },
+    "bm-load": {
+      "type": "link",
+      "label": "ジョブブックマーク → Spark ドライバー",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "入力データ → Spark Executor（ワーカー）",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "Spark Executor（ワーカー） → 出力先",
+      "status": "claim"
+    },
+    "bm-commit": {
+      "type": "link",
+      "label": "Spark ドライバー → ジョブブックマーク",
+      "status": "claim"
+    },
+    "log-driver": {
+      "type": "link",
+      "label": "Spark ドライバー → ログと指標",
+      "status": "claim"
+    },
+    "log-exec": {
+      "type": "link",
+      "label": "Spark Executor（ワーカー） → ログと指標",
+      "status": "claim"
+    },
+    "run-and-bookmark": {
+      "type": "scenario",
+      "label": "起動から次回の増分読み取りまで"
+    },
+    "driver-placement": {
+      "type": "unknown",
+      "label": "ドライバーが載るワーカーの割り当て方と起動時間は未確認。"
+    },
+    "bookmark-store": {
+      "type": "unknown",
+      "label": "ブックマークの保存場所は Glue のサービス内で、利用者が直接参照する場所は未確認。"
+    },
+    "aws-trigger": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue Trigger または手動実行",
+      "realizes": [
+        "trigger"
+      ]
+    },
+    "aws-script": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon S3（スクリプト）",
+      "realizes": [
+        "script"
+      ]
+    },
+    "aws-role": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue の IAM 実行ロール",
+      "realizes": []
+    },
+    "aws-bookmark": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue ジョブブックマーク",
+      "realizes": [
+        "bookmark"
+      ]
+    },
+    "aws-runmgr": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue ジョブ実行（Job Run）",
+      "realizes": [
+        "runmgr"
+      ]
+    },
+    "aws-source": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon S3（入力）",
+      "realizes": [
+        "source"
+      ]
+    },
+    "aws-target": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon S3（出力）",
+      "realizes": [
+        "target"
+      ]
+    },
+    "aws-logs": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Amazon CloudWatch Logs と指標",
+      "realizes": [
+        "logs"
+      ]
+    },
+    "aws-driver": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Spark ドライバー",
+      "realizes": [
+        "driver"
+      ]
+    },
+    "aws-executors": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "Glue ワーカー（G.1X）上の Executor",
+      "realizes": [
+        "executors"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-aws-glue-job-runs.md#§1": [
+      "model"
+    ],
+    "docs/reference-aws-glue-job-runs.md": [
+      "model",
+      "trigger",
+      "script",
+      "runmgr",
+      "driver",
+      "executors",
+      "bookmark",
+      "source",
+      "target",
+      "logs",
+      "start",
+      "config",
+      "launch",
+      "dispatch",
+      "bm-load",
+      "read",
+      "write",
+      "bm-commit",
+      "log-driver",
+      "log-exec",
+      "run-and-bookmark",
+      "aws-trigger",
+      "aws-script",
+      "aws-role",
+      "aws-bookmark",
+      "aws-runmgr",
+      "aws-source",
+      "aws-target",
+      "aws-logs",
+      "aws-driver",
+      "aws-executors"
+    ],
+    "docs/reference-aws-glue-job-runs.md#§6": [
+      "model",
+      "run-and-bookmark"
+    ],
+    "docs/reference-aws-glue-job-runs.md#§8": [
+      "model",
+      "run-and-bookmark"
+    ],
+    "docs/reference-aws-glue-job-runs.md#§2": [
+      "trigger",
+      "script",
+      "runmgr",
+      "source",
+      "target",
+      "start",
+      "config",
+      "read",
+      "write"
+    ],
+    "docs/reference-aws-glue-job-runs.md#§3": [
+      "driver",
+      "executors",
+      "launch",
+      "dispatch"
+    ],
+    "docs/reference-aws-glue-job-runs.md#§4": [
+      "bookmark",
+      "bm-load",
+      "bm-commit"
+    ],
+    "docs/reference-aws-glue-job-runs.md#§5": [
+      "logs",
+      "log-driver",
+      "log-exec"
+    ],
+    "docs/reference-aws-glue-job-runs.md#§7": [
+      "aws-trigger",
+      "aws-script",
+      "aws-role",
+      "aws-bookmark",
+      "aws-runmgr",
+      "aws-source",
+      "aws-target",
+      "aws-logs",
+      "aws-driver",
+      "aws-executors"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "変換とオーケストレーション",
+    "kind": "仕組みの深掘り",
+    "role": "internals",
+    "product": "AWS Glue",
+    "step": 1,
+    "detailOf": "aws-glue",
+    "objectives": [
+      "ワーカータイプと台数が DPU とメモリ・CPU に対応することを区別する。",
+      "ジョブブックマークが読み取り済みの入力だけを記録し、出力を管理しないことを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Configuring job properties for Spark jobs in AWS Glue",
+        "url": "https://docs.aws.amazon.com/glue/latest/dg/add-job.html"
+      },
+      {
+        "title": "Tracking processed data using job bookmarks",
+        "url": "https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html"
+      }
+    ]
+  }
+}

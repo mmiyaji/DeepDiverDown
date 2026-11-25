@@ -1,0 +1,265 @@
+{
+  "model": "apache-airflow-deferrable-triggerer",
+  "name": "Apache Airflow：Deferrable タスクと Triggerer",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "first-run": {
+      "type": "node",
+      "label": "最初の実行（Worker）",
+      "status": "claim"
+    },
+    "meta": {
+      "type": "node",
+      "label": "メタデータ DB",
+      "status": "claim"
+    },
+    "triggerer": {
+      "type": "node",
+      "label": "Triggerer",
+      "status": "claim"
+    },
+    "trigger": {
+      "type": "node",
+      "label": "Trigger の非同期処理",
+      "status": "claim"
+    },
+    "external": {
+      "type": "node",
+      "label": "待機対象の外部システム",
+      "status": "claim"
+    },
+    "scheduler": {
+      "type": "node",
+      "label": "Scheduler",
+      "status": "claim"
+    },
+    "executor": {
+      "type": "node",
+      "label": "Executor",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "node",
+      "label": "再開した実行（Worker）",
+      "status": "claim"
+    },
+    "defer": {
+      "type": "link",
+      "label": "最初の実行（Worker） → メタデータ DB",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "メタデータ DB → Triggerer",
+      "status": "claim"
+    },
+    "run-trigger": {
+      "type": "link",
+      "label": "Triggerer → Trigger の非同期処理",
+      "status": "claim"
+    },
+    "poll": {
+      "type": "link",
+      "label": "Trigger の非同期処理 → 待機対象の外部システム",
+      "status": "claim"
+    },
+    "event": {
+      "type": "link",
+      "label": "Trigger の非同期処理 → メタデータ DB",
+      "status": "claim"
+    },
+    "wake": {
+      "type": "link",
+      "label": "メタデータ DB → Scheduler",
+      "status": "claim"
+    },
+    "resubmit": {
+      "type": "link",
+      "label": "Scheduler → Executor",
+      "status": "claim"
+    },
+    "assign-worker": {
+      "type": "link",
+      "label": "Executor → 再開した実行（Worker）",
+      "status": "claim"
+    },
+    "finish": {
+      "type": "link",
+      "label": "再開した実行（Worker） → メタデータ DB",
+      "status": "claim"
+    },
+    "defer-and-resume": {
+      "type": "scenario",
+      "label": "待機の引き渡しから再開まで"
+    },
+    "unk-ver": {
+      "type": "unknown",
+      "label": "再開時の経路（API Server 経由の有無など）はバージョン依存で未確認。"
+    },
+    "unk-cap": {
+      "type": "unknown",
+      "label": "1 つの Triggerer が扱える Trigger 数は設定（既定 1000 は取得時点の記述）で、実機の上限は未検証。"
+    },
+    "unk-ha": {
+      "type": "unknown",
+      "label": "Triggerer 停止時の再割り当てにかかる時間は未検証。"
+    },
+    "af-worker1": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Celery Worker（最初の実行）",
+      "realizes": [
+        "first-run"
+      ]
+    },
+    "af-worker2": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Celery Worker（再開）",
+      "realizes": [
+        "resume"
+      ]
+    },
+    "af-db": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PostgreSQL メタデータ DB",
+      "realizes": [
+        "meta"
+      ]
+    },
+    "af-triggerer": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Airflow Triggerer",
+      "realizes": [
+        "triggerer",
+        "trigger"
+      ]
+    },
+    "af-target": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "待機対象の外部システム",
+      "realizes": [
+        "external"
+      ]
+    },
+    "af-scheduler": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Airflow Scheduler と CeleryExecutor",
+      "realizes": [
+        "scheduler",
+        "executor"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-apache-airflow-deferrable-triggerer.md#§1": [
+      "model"
+    ],
+    "docs/reference-apache-airflow-deferrable-triggerer.md": [
+      "model",
+      "first-run",
+      "meta",
+      "triggerer",
+      "trigger",
+      "external",
+      "scheduler",
+      "executor",
+      "resume",
+      "defer",
+      "assign",
+      "run-trigger",
+      "poll",
+      "event",
+      "wake",
+      "resubmit",
+      "assign-worker",
+      "finish",
+      "defer-and-resume",
+      "af-worker1",
+      "af-worker2",
+      "af-db",
+      "af-triggerer",
+      "af-target",
+      "af-scheduler"
+    ],
+    "docs/reference-apache-airflow-deferrable-triggerer.md#§6": [
+      "model"
+    ],
+    "docs/reference-apache-airflow-deferrable-triggerer.md#§2": [
+      "first-run",
+      "meta",
+      "defer",
+      "defer-and-resume"
+    ],
+    "docs/reference-apache-airflow-deferrable-triggerer.md#§3": [
+      "triggerer",
+      "trigger",
+      "external",
+      "assign",
+      "run-trigger",
+      "poll",
+      "event"
+    ],
+    "docs/reference-apache-airflow-deferrable-triggerer.md#§5": [
+      "triggerer",
+      "trigger",
+      "external",
+      "assign",
+      "run-trigger",
+      "poll",
+      "event"
+    ],
+    "docs/reference-apache-airflow-deferrable-triggerer.md#§4": [
+      "scheduler",
+      "executor",
+      "resume",
+      "wake",
+      "resubmit",
+      "assign-worker",
+      "finish"
+    ],
+    "docs/reference-apache-airflow-deferrable-triggerer.md#§7": [
+      "af-worker1",
+      "af-worker2",
+      "af-db",
+      "af-triggerer",
+      "af-target",
+      "af-scheduler"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "変換とオーケストレーション",
+    "kind": "仕組みの深掘り",
+    "role": "internals",
+    "product": "Apache Airflow",
+    "step": 2,
+    "detailOf": "apache-airflow",
+    "objectives": [
+      "defer() で Worker から Triggerer へ待機が移る流れを追う。",
+      "待機中に Worker スロットを占有しない点を確かめる。",
+      "TriggerEvent から next_method の再開までを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Deferring Operators and Triggers",
+        "url": "https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html"
+      },
+      {
+        "title": "Airflow Tasks",
+        "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html"
+      },
+      {
+        "title": "Airflow Scheduler",
+        "url": "https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/scheduler.html"
+      }
+    ]
+  }
+}

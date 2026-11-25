@@ -1,0 +1,80 @@
+name: Apache Airflow：Scheduler と Executor のタスク実行
+description: Scheduler が DAG Run を作り、実行可能な Task Instance を Executor 経由で Worker に渡し、状態をメタデータ DB に残す。
+parent: {model: apache-airflow, node: scheduler}
+reference:
+  objectives:
+    - DAG Run と Task Instance の状態遷移を追う。
+    - Scheduler、Executor、Worker の役割を分ける。
+    - 状態がメタデータ DB に書かれる経路を確かめる。
+  sources:
+    - {title: Airflow Scheduler, url: https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/scheduler.html}
+    - {title: Airflow Tasks, url: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html}
+    - {title: Airflow Architecture Overview, url: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html}
+sources: [docs/reference-apache-airflow-scheduler-executor.md]
+evidence: [{type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§1"}, {type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§6"}]
+tiers: [{id: flow, label: スケジュールから実行と状態保存まで, z: 0, size: [24, 9]}]
+nodes:
+  meta: {label: メタデータ DB, kind: db, tier: flow, x: 8, y: 7, description: シリアライズ済み DAG、DAG Run、Task Instance の状態を保持する。, evidence: &ev2 [{type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§2"}]}
+  run-create: {label: DAG Run の作成, kind: service, tier: flow, x: 0, y: 2, description: タイムテーブルに従い、新しい DAG Run を作る。, evidence: *ev2}
+  ti-select: {label: 実行可能な Task Instance の選定, kind: service, tier: flow, x: 8, y: 2, description: 依存関係、プール、並行数の上限を見て scheduled にする。, evidence: &ev3 [{type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§3"}]}
+  executor: {label: Executor, kind: worker, tier: flow, x: 16, y: 2, description: 選定済みの Task Instance を受け取り、実行方式に応じて配る。, evidence: *ev3}
+  queue: {label: 実行依頼の待ち行列, kind: queue, tier: flow, x: 16, y: 5, description: Executor の種類によっては存在する。種類は構成に依存する。, evidence: &ev4 [{type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§4"}]}
+  worker: {label: Worker, kind: worker, tier: flow, x: 20, y: 7, description: Task Instance を実行し、状態を報告する。, evidence: *ev4}
+  api: {label: 状態の受け口, kind: service, tier: flow, x: 14, y: 8, description: Worker からの状態報告をメタデータ DB に書き込む。, evidence: &ev5 [{type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§5"}]}
+links:
+  - {id: read-dag, from: meta, to: run-create, label: シリアライズ済み DAG を読む, evidence: *ev2}
+  - {id: create-run, from: run-create, to: meta, label: DAG Run を記録, evidence: *ev2}
+  - {id: read-state, from: meta, to: ti-select, label: Run と Task Instance の状態を読む, evidence: *ev3}
+  - {id: mark-scheduled, from: ti-select, to: meta, label: scheduled を記録, evidence: *ev3}
+  - {id: submit, from: ti-select, to: executor, label: Task Instance を提出, evidence: *ev3}
+  - {id: enqueue, from: executor, to: queue, label: 実行依頼を送る, evidence: *ev4}
+  - {id: pull, from: queue, to: worker, label: 実行依頼を取得, evidence: *ev4}
+  - {id: report, from: worker, to: api, label: running と結果を報告, evidence: *ev5}
+  - {id: persist, from: api, to: meta, label: 状態を保存, evidence: *ev5}
+scenarios:
+  - id: schedule-and-run
+    label: DAG Run の作成から Task の完了まで
+    evidence: [{type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§3"}]
+    steps:
+      - {links: [read-dag, create-run], note: Scheduler が定義を読み、DAG Run を作る。}
+      - {links: [read-state, mark-scheduled, submit], note: 依存関係と上限を満たす Task Instance を scheduled にして Executor へ提出する。}
+      - {links: [enqueue, pull], note: Executor が実行依頼を Worker に届ける。}
+      - {links: [report, persist], note: Worker が running と success または failed を報告し、DB に保存される。}
+unknowns:
+  - {id: unk-ver, text: 状態名と書き込み経路は安定版ドキュメントに合わせた。Airflow 2 系との差は未確認。, refs: [report, persist]}
+  - {id: unk-exec, text: Executor が完了を Scheduler に返す内部経路は未確認。, refs: [executor, worker]}
+  - {id: unk-run, text: 実機での Task 数・Worker 台数・遅延は未検証。, refs: [submit, pull]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem
+    label: 自前の Celery Executor と Redis
+    description: 自前 Linux 上の Airflow Scheduler が CeleryExecutor で Redis に実行依頼を送り、Celery Worker が取得する。状態は API Server 経由で PostgreSQL に保存する。
+    sources:
+      - {title: Airflow Scheduler, url: https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/scheduler.html}
+      - {title: Airflow Celery Executor, url: https://airflow.apache.org/docs/apache-airflow-providers-celery/stable/celery_executor.html}
+      - {title: Airflow Architecture Overview, url: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html}
+    tiers: &t2d [{id: diagram, label: Airflow の実行経路, z: 0, size: [25, 11]}]
+    nodes:
+      af-db: {label: PostgreSQL メタデータ DB, svc: postgresql:server, kind: db, tier: diagram, x: 4, y: 7, realizes: [meta], description: DAG Run と Task Instance の状態を保存する。, evidence: &ei [{type: doc, ref: "docs/reference-apache-airflow-scheduler-executor.md#§7"}]}
+      af-scheduler: {label: Airflow Scheduler, kind: service, tier: diagram, x: 4, y: 2.5, realizes: [run-create, ti-select], description: DAG Run の作成と Task Instance の選定を行う。, evidence: *ei}
+      af-executor: {label: CeleryExecutor, kind: worker, tier: diagram, x: 11, y: 2.5, realizes: [executor], description: Scheduler プロセス内で実行依頼を Redis に送る。, evidence: *ei}
+      af-redis: {label: Redis Celery ブローカー, kind: queue, tier: diagram, x: 11, y: 6, realizes: [queue], description: 実行依頼を保持する。, evidence: *ei}
+      af-worker: {label: Celery Worker, kind: worker, tier: diagram, x: 18, y: 4, realizes: [worker], parallel: N, description: キューから取得した Task Instance を実行する。, evidence: *ei}
+      af-api: {label: Airflow API Server（Execution API）, kind: service, tier: diagram, x: 18, y: 8, realizes: [api], description: Worker の状態報告を受けて DB に書き込む。, evidence: *ei}
+    links: []
+    groups: &g2d
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: diagram, x0: -0.5, y0: -0.25, x1: 24.5, y1: 10.5, nodes: &env [af-db, af-scheduler, af-executor, af-redis, af-worker, af-api]}
+    layout2d: {tiers: *t2d, nodes: {}, groups: *g2d}
+    layout3d:
+      tiers:
+        - {id: app, label: Airflow プロセス, z: 1, size: [22, 8]}
+        - {id: store, label: 状態とキュー, z: 0, size: [22, 8]}
+      nodes:
+        af-scheduler: {tier: app, x: 3, y: 2}
+        af-executor: {tier: app, x: 9, y: 2}
+        af-worker: {tier: app, x: 15, y: 2}
+        af-api: {tier: app, x: 19, y: 5}
+        af-db: {tier: store, x: 3, y: 5}
+        af-redis: {tier: store, x: 11, y: 5}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: [app, store], nodes: *env}

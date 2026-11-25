@@ -1,0 +1,91 @@
+name: AWS Glue：ジョブの実行とワーカー
+description: ジョブ実行の起動からワーカーの割り当て、ブックマークの更新、結果とログの出力までを追う。
+parent: {model: aws-glue, node: job}
+reference:
+  objectives:
+    - ワーカータイプと台数が DPU とメモリ・CPU に対応することを区別する。
+    - ジョブブックマークが読み取り済みの入力だけを記録し、出力を管理しないことを追う。
+  sources:
+    - {title: Configuring job properties for Spark jobs in AWS Glue, url: https://docs.aws.amazon.com/glue/latest/dg/add-job.html}
+    - {title: Tracking processed data using job bookmarks, url: https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html}
+sources: [docs/reference-aws-glue-job-runs.md]
+evidence: [{type: doc, ref: "docs/reference-aws-glue-job-runs.md#§1"}, {type: doc, ref: "docs/reference-aws-glue-job-runs.md#§6"}, {type: doc, ref: "docs/reference-aws-glue-job-runs.md#§8"}]
+tiers: [{id: flow, label: ジョブ実行の流れ, z: 0, size: [24, 10]}]
+nodes:
+  trigger: {label: 実行の起動要求, kind: service, tier: flow, x: 0, y: 1, description: オンデマンド・スケジュール・イベントなどでジョブ実行を要求する。, evidence: &run [{type: doc, ref: "docs/reference-aws-glue-job-runs.md#§2"}]}
+  script: {label: スクリプトと実行設定, kind: file, tier: flow, x: 0, y: 5, description: S3 上のスクリプトのパス、ワーカータイプ、ワーカー数、ブックマーク、リトライ回数、タイムアウトを持つ。, evidence: *run}
+  runmgr: {label: ジョブ実行の管理, kind: service, tier: flow, x: 8, y: 3, description: 設定に従って実行を開始し、状態を保持する。, evidence: *run}
+  driver: {label: Spark ドライバー, kind: worker, tier: flow, x: 14, y: 0, description: スクリプトを実行し、タスクを Executor に配る。ドライバーがどのワーカーに載るかは未確認。, evidence: &workers [{type: doc, ref: "docs/reference-aws-glue-job-runs.md#§3"}]}
+  executors: {label: Spark Executor（ワーカー）, kind: worker, tier: flow, x: 14, y: 6, description: ワーカー 1 台に Executor 1 個。台数とスペックはワーカータイプと台数で決まる。, evidence: *workers}
+  bookmark: {label: ジョブブックマーク, kind: db, tier: flow, x: 8, y: 8, description: ジョブ単位で、入力の処理済み位置を記録する。, evidence: &bm [{type: doc, ref: "docs/reference-aws-glue-job-runs.md#§4"}]}
+  source: {label: 入力データ, kind: external, tier: flow, x: 21, y: 2, evidence: *run}
+  target: {label: 出力先, kind: db, shape3D: crate, tier: flow, x: 21, y: 7, evidence: *run}
+  logs: {label: ログと指標, kind: monitor, tier: flow, x: 14, y: 9.5, description: 実行状態、ログ、指標を保持する。, evidence: &obs [{type: doc, ref: "docs/reference-aws-glue-job-runs.md#§5"}]}
+links:
+  - {id: start, from: trigger, to: runmgr, label: ジョブ実行を要求, evidence: *run}
+  - {id: config, from: script, to: runmgr, label: スクリプトと設定を渡す, evidence: *run}
+  - {id: launch, from: runmgr, to: driver, label: ワーカーを確保して起動, evidence: *workers}
+  - {id: dispatch, from: driver, to: executors, label: タスクを配る, evidence: *workers}
+  - {id: bm-load, from: bookmark, to: driver, label: 前回の状態を取得, evidence: *bm}
+  - {id: read, from: source, to: executors, label: 入力を読む, evidence: *run}
+  - {id: write, from: executors, to: target, label: 結果を書く, evidence: *run}
+  - {id: bm-commit, from: driver, to: bookmark, label: 完了時に状態を保存, evidence: *bm}
+  - {id: log-driver, from: driver, to: logs, label: ログと指標を出力, evidence: *obs}
+  - {id: log-exec, from: executors, to: logs, label: ログと指標を出力, evidence: *obs}
+scenarios:
+  - id: run-and-bookmark
+    label: 起動から次回の増分読み取りまで
+    evidence: [{type: doc, ref: "docs/reference-aws-glue-job-runs.md#§6"}, {type: doc, ref: "docs/reference-aws-glue-job-runs.md#§8"}]
+    steps:
+      - {links: [start, config, launch], note: 起動要求と設定からジョブ実行が始まり、ワーカーが確保される。}
+      - {links: [bm-load, dispatch, read, write], note: 前回のブックマークを取得し、Executor が未処理の入力を読んで出力先へ書く。}
+      - {links: [bm-commit, log-driver, log-exec], note: 成功時にブックマークが進み、ログと指標が出力される。次回は新しい入力だけを読む。}
+unknowns:
+  - {id: driver-placement, text: ドライバーが載るワーカーの割り当て方と起動時間は未確認。, refs: [launch]}
+  - {id: bookmark-store, text: ブックマークの保存場所は Glue のサービス内で、利用者が直接参照する場所は未確認。, refs: [bm-load, bm-commit]}
+implementations:
+  - id: aws
+    label: AWS Glue の Spark ジョブ（S3 入力・S3 出力）
+    description: Glue の Spark ジョブを G.1X ワーカー N 台で実行する例。ブックマークを有効にして S3 の新しいファイルだけを読み、Parquet を別のプレフィックスへ書く。ワーカーは Glue がサービス側で確保する。
+    sources:
+      - {title: Configuring job properties for Spark jobs in AWS Glue, url: https://docs.aws.amazon.com/glue/latest/dg/add-job.html}
+      - {title: Tracking processed data using job bookmarks, url: https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html}
+      - {title: AWS Glue How it works, url: https://docs.aws.amazon.com/glue/latest/dg/how-it-works.html}
+      - {title: Logging and monitoring in AWS Glue, url: https://docs.aws.amazon.com/glue/latest/dg/logging-and-monitoring.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers: &tiers2d [{id: diagram, label: Glue ジョブ実行, z: 0, size: [28, 12]}]
+    nodes:
+      aws-trigger: {label: Glue Trigger または手動実行, svc: glue, kind: workflow, tier: diagram, x: 2, y: 2, realizes: [trigger], description: オンデマンド・スケジュール・イベントでジョブ実行を要求する。, management: {type: shared, scope: "AWS operates the service; customer configures triggers and starts."}, evidence: &impl [{type: doc, ref: "docs/reference-aws-glue-job-runs.md#§7"}]}
+      aws-script: {label: Amazon S3（スクリプト）, svc: s3, kind: file, tier: diagram, x: 7, y: 2, realizes: [script], description: ジョブの ScriptLocation にあるスクリプト。ワーカータイプ・台数・ブックマーク設定はジョブ定義が持つ。, management: {type: customer, scope: "Customer manages script content and access."}, evidence: *impl}
+      aws-role: {label: Glue の IAM 実行ロール, svc: iam, kind: policy, tier: diagram, x: 12, y: 2, description: ジョブが S3 とログ出力先へアクセスする権限を付与する。, management: {type: customer, scope: "Customer manages IAM permissions and trust."}, evidence: *impl}
+      aws-bookmark: {label: Glue ジョブブックマーク, svc: glue, kind: db, tier: diagram, x: 17, y: 2, realizes: [bookmark], description: ジョブ名ごとの状態。S3 入力は最終更新時刻で新規ファイルを判定する。出力先は追跡しない。, management: {type: shared, scope: "AWS stores bookmark state; customer enables, pauses, rewinds or resets it."}, evidence: *impl}
+      aws-runmgr: {label: Glue ジョブ実行（Job Run）, svc: glue, kind: service, tier: diagram, x: 22, y: 2, realizes: [runmgr], description: ジョブ定義に従って実行を開始し、状態を保持する。リトライ回数とタイムアウトはジョブ定義で指定する。, management: {type: shared, scope: "AWS operates job run management; customer defines job settings."}, evidence: *impl}
+      aws-source: {label: Amazon S3（入力）, svc: s3, kind: db, tier: diagram, x: 2, y: 6, realizes: [source], management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: *impl}
+      aws-target: {label: Amazon S3（出力）, svc: s3, kind: db, tier: diagram, x: 7, y: 6, realizes: [target], management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: *impl}
+      aws-logs: {label: Amazon CloudWatch Logs と指標, svc: cloudwatch, kind: monitor, tier: diagram, x: 12, y: 6, realizes: [logs], description: 継続的ログを有効にすると実行中にログが出る。無効なら完了後に確認できる。ジョブ指標はジョブ設定で有効にする。, management: {type: shared, scope: "AWS operates CloudWatch; customer manages logging settings and access."}, evidence: *impl}
+      aws-driver: {label: Spark ドライバー, svc: glue, kind: worker, tier: diagram, x: 17, y: 6, realizes: [driver], description: Glue が確保する実行環境で Spark スクリプトを実行する。載るワーカーの詳細は未確認。, management: {type: aws, scope: "AWS provisions and operates the job infrastructure; customer cannot access it directly."}, evidence: *impl}
+      aws-executors: {label: Glue ワーカー（G.1X）上の Executor, svc: glue, kind: worker, tier: diagram, x: 22, y: 6, realizes: [executors], description: G.1X は 1 DPU（4 vCPU・16 GB）で Executor 1 個。台数はジョブ設定の Number of workers で指定する。, management: {type: aws, scope: "AWS provisions workers; customer selects worker type and number."}, evidence: *impl}
+    links:
+      - {id: aws-role-run, from: aws-role, to: aws-runmgr, label: 実行権限を渡す, evidence: *impl}
+    groups: &groups2d
+      - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと Glue の設定, tier: diagram, nodes: [aws-trigger, aws-script, aws-role, aws-bookmark, aws-runmgr, aws-source, aws-target, aws-logs]}
+      - {kind: cloud, provider: aws, label: Glue が管理するジョブ実行基盤, tier: diagram, nodes: [aws-driver, aws-executors]}
+    layout2d: {tiers: *tiers2d, nodes: {}, groups: *groups2d}
+    layout3d:
+      tiers:
+        - {id: runtime, label: Glue が管理するジョブ実行基盤, z: 0, size: [5, 6]}
+        - {id: account, label: 利用者のアカウントと Glue API, z: 0, origin: [8, 0], size: [20, 6]}
+      nodes:
+        aws-trigger: {tier: account, x: 2, y: 1}
+        aws-script: {tier: account, x: 6, y: 1}
+        aws-role: {tier: account, x: 10, y: 1}
+        aws-bookmark: {tier: account, x: 14, y: 1}
+        aws-runmgr: {tier: account, x: 18, y: 1}
+        aws-source: {tier: account, x: 2, y: 4}
+        aws-target: {tier: account, x: 6, y: 4}
+        aws-logs: {tier: account, x: 10, y: 4}
+        aws-driver: {tier: runtime, x: 2.5, y: 1.5}
+        aws-executors: {tier: runtime, x: 2.5, y: 4.5}
+      groups:
+        - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと Glue の設定, tier: account, nodes: [aws-trigger, aws-script, aws-role, aws-bookmark, aws-runmgr, aws-source, aws-target, aws-logs]}
+        - {kind: cloud, provider: aws, label: Glue が管理するジョブ実行基盤, tier: runtime, nodes: [aws-driver, aws-executors]}

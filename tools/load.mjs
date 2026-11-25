@@ -26,7 +26,10 @@ export function readModel(file) {
 }
 
 export function loadModels(only) {
-  const reg = JSON.parse(fs.readFileSync(path.join(ROOT, 'models/registry.json'), 'utf8'));
+  const base = JSON.parse(fs.readFileSync(path.join(ROOT, 'models/registry.json'), 'utf8'));
+  // 作業中の図を registry に入れる前に点検できるよう、EXTRA_REGISTRY（registry と同じ形式の JSON）の項目も読む
+  const extra = process.env.EXTRA_REGISTRY ? JSON.parse(fs.readFileSync(process.env.EXTRA_REGISTRY, 'utf8')) : [];
+  const reg = [...base, ...extra.filter(e => !base.some(b => b.id === e.id))];
   return reg.filter(r => !only || only.includes(r.id)).map(r => {
     const dir = path.join(ROOT, 'models', r.id);
     const model = readModel(path.join(dir, 'model.yaml'));

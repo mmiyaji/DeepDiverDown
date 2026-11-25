@@ -15875,6 +15875,562 @@
           ]
         }
       ]
+    },
+    {
+      "id": "dbt-compile-run-order",
+      "name": "dbt：解析・コンパイルと実行順序",
+      "description": "プロジェクトを解析して依存グラフを作り、モデルごとの SQL をウェアハウスへ投げる。データの処理はウェアハウス側で行う。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "商用サービスあり",
+        "dbt Labs"
+      ],
+      "objectives": [
+        "ref と source から manifest と依存グラフができる流れを追う。",
+        "materialization ごとに、dbt が生成する SQL が変わることを区別する。",
+        "dbt が SQL を送る側で、行の処理はウェアハウスが担うことを確かめる。"
+      ],
+      "documents": [
+        "docs/reference-dbt-compile-run-order.md"
+      ],
+      "sources": [
+        {
+          "title": "About dbt compile command",
+          "url": "https://docs.getdbt.com/reference/commands/compile"
+        },
+        {
+          "title": "Manifest JSON file",
+          "url": "https://docs.getdbt.com/reference/artifacts/manifest-json"
+        },
+        {
+          "title": "Materializations",
+          "url": "https://docs.getdbt.com/docs/build/materializations"
+        },
+        {
+          "title": "ref function",
+          "url": "https://docs.getdbt.com/reference/dbt-jinja-functions/ref"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "core-postgres",
+          "label": "自前 CI の dbt Core と PostgreSQL",
+          "sources": [
+            {
+              "title": "Connect Postgres to dbt",
+              "url": "https://docs.getdbt.com/docs/local/connect-data-platform/postgres-setup"
+            },
+            {
+              "title": "Manifest JSON file",
+              "url": "https://docs.getdbt.com/reference/artifacts/manifest-json"
+            },
+            {
+              "title": "Materializations",
+              "url": "https://docs.getdbt.com/docs/build/materializations"
+            },
+            {
+              "title": "About dbt compile command",
+              "url": "https://docs.getdbt.com/reference/commands/compile"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dbt-incremental-snapshots",
+      "name": "dbt：増分モデルとスナップショット",
+      "description": "増分モデルは前回以降の行だけをウェアハウス内で既存表へ取り込み、snapshot は変更を検出して履歴行を持つ。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "商用サービスあり",
+        "dbt Labs"
+      ],
+      "objectives": [
+        "is_incremental と unique_key、incremental_strategy が決める SQL を区別する。",
+        "snapshot の timestamp 戦略と check 戦略の変更検出の違いを追う。",
+        "差分の判定と書き込みをウェアハウスが実行することを確かめる。"
+      ],
+      "documents": [
+        "docs/reference-dbt-incremental-snapshots.md"
+      ],
+      "sources": [
+        {
+          "title": "Incremental models",
+          "url": "https://docs.getdbt.com/docs/build/incremental-models"
+        },
+        {
+          "title": "About incremental strategy",
+          "url": "https://docs.getdbt.com/docs/build/incremental-strategy"
+        },
+        {
+          "title": "Snapshots",
+          "url": "https://docs.getdbt.com/docs/build/snapshots"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "core-postgres",
+          "label": "自前 CI の dbt Core と PostgreSQL",
+          "sources": [
+            {
+              "title": "Connect Postgres to dbt",
+              "url": "https://docs.getdbt.com/docs/local/connect-data-platform/postgres-setup"
+            },
+            {
+              "title": "Incremental models",
+              "url": "https://docs.getdbt.com/docs/build/incremental-models"
+            },
+            {
+              "title": "Snapshots",
+              "url": "https://docs.getdbt.com/docs/build/snapshots"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apache-airflow-scheduler-executor",
+      "name": "Apache Airflow：Scheduler と Executor のタスク実行",
+      "description": "Scheduler が DAG Run を作り、実行可能な Task Instance を Executor 経由で Worker に渡し、状態をメタデータ DB に残す。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "DAG Run と Task Instance の状態遷移を追う。",
+        "Scheduler、Executor、Worker の役割を分ける。",
+        "状態がメタデータ DB に書かれる経路を確かめる。"
+      ],
+      "documents": [
+        "docs/reference-apache-airflow-scheduler-executor.md"
+      ],
+      "sources": [
+        {
+          "title": "Airflow Scheduler",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/scheduler.html"
+        },
+        {
+          "title": "Airflow Tasks",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html"
+        },
+        {
+          "title": "Airflow Architecture Overview",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem",
+          "label": "自前の Celery Executor と Redis",
+          "sources": [
+            {
+              "title": "Airflow Scheduler",
+              "url": "https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/scheduler.html"
+            },
+            {
+              "title": "Airflow Celery Executor",
+              "url": "https://airflow.apache.org/docs/apache-airflow-providers-celery/stable/celery_executor.html"
+            },
+            {
+              "title": "Airflow Architecture Overview",
+              "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apache-airflow-deferrable-triggerer",
+      "name": "Apache Airflow：Deferrable タスクと Triggerer",
+      "description": "Deferrable オペレーターが待機を Triggerer に渡して Worker スロットを空け、完了イベントで Worker に戻る。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "defer() で Worker から Triggerer へ待機が移る流れを追う。",
+        "待機中に Worker スロットを占有しない点を確かめる。",
+        "TriggerEvent から next_method の再開までを追う。"
+      ],
+      "documents": [
+        "docs/reference-apache-airflow-deferrable-triggerer.md"
+      ],
+      "sources": [
+        {
+          "title": "Deferring Operators and Triggers",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html"
+        },
+        {
+          "title": "Airflow Tasks",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html"
+        },
+        {
+          "title": "Airflow Scheduler",
+          "url": "https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/scheduler.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem",
+          "label": "自前の Celery Executor・Triggerer・PostgreSQL",
+          "sources": [
+            {
+              "title": "Deferring Operators and Triggers",
+              "url": "https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html"
+            },
+            {
+              "title": "Airflow Celery Executor",
+              "url": "https://airflow.apache.org/docs/apache-airflow-providers-celery/stable/celery_executor.html"
+            },
+            {
+              "title": "Airflow Architecture Overview",
+              "url": "https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aws-glue-job-runs",
+      "name": "AWS Glue：ジョブの実行とワーカー",
+      "description": "ジョブ実行の起動からワーカーの割り当て、ブックマークの更新、結果とログの出力までを追う。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド",
+        "AWS"
+      ],
+      "objectives": [
+        "ワーカータイプと台数が DPU とメモリ・CPU に対応することを区別する。",
+        "ジョブブックマークが読み取り済みの入力だけを記録し、出力を管理しないことを追う。"
+      ],
+      "documents": [
+        "docs/reference-aws-glue-job-runs.md"
+      ],
+      "sources": [
+        {
+          "title": "Configuring job properties for Spark jobs in AWS Glue",
+          "url": "https://docs.aws.amazon.com/glue/latest/dg/add-job.html"
+        },
+        {
+          "title": "Tracking processed data using job bookmarks",
+          "url": "https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws",
+          "label": "AWS Glue の Spark ジョブ（S3 入力・S3 出力）",
+          "sources": [
+            {
+              "title": "Configuring job properties for Spark jobs in AWS Glue",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/add-job.html"
+            },
+            {
+              "title": "Tracking processed data using job bookmarks",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html"
+            },
+            {
+              "title": "AWS Glue How it works",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/how-it-works.html"
+            },
+            {
+              "title": "Logging and monitoring in AWS Glue",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/logging-and-monitoring.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "aws-glue-catalog-crawlers",
+      "name": "AWS Glue：Data Catalog とクローラー",
+      "description": "クローラーがスキーマを推論して Data Catalog にテーブルとパーティションを登録し、Athena・EMR・Glue ジョブが参照する流れを追う。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド",
+        "AWS"
+      ],
+      "objectives": [
+        "クローラーが分類、スキーマ推論、テーブル・パーティションの登録を順に行うことを追う。",
+        "Data Catalog が実データを持たず、定義だけを複数のエンジンへ提供することを区別する。"
+      ],
+      "documents": [
+        "docs/reference-aws-glue-catalog-crawlers.md"
+      ],
+      "sources": [
+        {
+          "title": "Using crawlers to populate the Data Catalog",
+          "url": "https://docs.aws.amazon.com/glue/latest/dg/add-crawler.html"
+        },
+        {
+          "title": "Tracking processed data using job bookmarks",
+          "url": "https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws",
+          "label": "AWS Glue クローラーで S3 の CSV を登録",
+          "sources": [
+            {
+              "title": "Using crawlers to populate the Data Catalog",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/add-crawler.html"
+            },
+            {
+              "title": "AWS Glue components",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/components-overview.html"
+            },
+            {
+              "title": "Crawler prerequisites",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/crawler-prereqs.html"
+            },
+            {
+              "title": "Tracking processed data using job bookmarks",
+              "url": "https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "azure-data-factory-pipeline-runs",
+      "name": "Azure Data Factory：パイプライン実行と Integration Runtime",
+      "description": "トリガーが起こしたパイプライン実行のアクティビティを、Integration Runtime の種類ごとに割り当てる。制御フローとデータ移動の経路を分けて追う。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド",
+        "Microsoft Azure"
+      ],
+      "objectives": [
+        "トリガーからパイプライン実行、アクティビティまでの制御の流れを追う。",
+        "Azure・セルフホステッド・Azure-SSIS の Integration Runtime が担う処理を区別する。",
+        "制御フローの経路と、データが通る経路を分けて読む。"
+      ],
+      "documents": [
+        "docs/reference-azure-data-factory-pipeline-runs.md"
+      ],
+      "sources": [
+        {
+          "title": "Pipeline execution and triggers in Azure Data Factory",
+          "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-pipeline-execution-triggers"
+        },
+        {
+          "title": "Integration runtime in Azure Data Factory",
+          "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime"
+        },
+        {
+          "title": "Create a self-hosted integration runtime",
+          "url": "https://learn.microsoft.com/en-us/azure/data-factory/create-self-hosted-integration-runtime"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "azure-hybrid",
+          "label": "ADF と Azure IR・セルフホステッド IR・Azure-SSIS IR",
+          "sources": [
+            {
+              "title": "Pipeline execution and triggers in Azure Data Factory",
+              "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-pipeline-execution-triggers"
+            },
+            {
+              "title": "Integration runtime in Azure Data Factory",
+              "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime"
+            },
+            {
+              "title": "Create a self-hosted integration runtime",
+              "url": "https://learn.microsoft.com/en-us/azure/data-factory/create-self-hosted-integration-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "azure-data-factory-mapping-data-flow",
+      "name": "Azure Data Factory：Mapping Data Flow の実行",
+      "description": "Data Flow アクティビティが Azure IR のコンピューティング設定に従って Spark クラスターを用意し、ソースから変換、シンクまでを実行する。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド",
+        "Microsoft Azure"
+      ],
+      "objectives": [
+        "Data Flow アクティビティと Azure IR のコンピューティング設定の関係を追う。",
+        "Spark クラスターの起動と TTL による再利用を区別する。",
+        "ソース、変換、シンクの実行順とデータの出入りを読む。"
+      ],
+      "documents": [
+        "docs/reference-azure-data-factory-mapping-data-flow.md"
+      ],
+      "sources": [
+        {
+          "title": "Mapping data flows in Azure Data Factory",
+          "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-overview"
+        },
+        {
+          "title": "Mapping data flow performance and tuning guide",
+          "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-performance"
+        },
+        {
+          "title": "Data Flow activity in Azure Data Factory",
+          "url": "https://learn.microsoft.com/en-us/azure/data-factory/control-flow-execute-data-flow-activity"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "azure",
+          "label": "ADF の Azure IR と ADLS Gen2",
+          "sources": [
+            {
+              "title": "Mapping data flows in Azure Data Factory",
+              "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-overview"
+            },
+            {
+              "title": "Mapping data flow performance and tuning guide",
+              "url": "https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-performance"
+            },
+            {
+              "title": "Data Flow activity in Azure Data Factory",
+              "url": "https://learn.microsoft.com/en-us/azure/data-factory/control-flow-execute-data-flow-activity"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "google-cloud-dataflow-job-optimization",
+      "name": "Google Cloud Dataflow：ジョブの最適化とワーカー",
+      "description": "Beam パイプラインが実行グラフになり、Dataflow サービスが検証・最適化したジョブをワーカーで実行するまでを追う。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド",
+        "Google Cloud",
+        "Apache Beam ベース"
+      ],
+      "objectives": [
+        "手元で実行グラフを作る段階と、サービス側で最適化する段階を区別する。",
+        "ステップの融合で中間の PCollection が省かれる点を追う。"
+      ],
+      "documents": [
+        "docs/reference-google-cloud-dataflow-job-optimization.md"
+      ],
+      "sources": [
+        {
+          "title": "Dataflow pipeline lifecycle",
+          "url": "https://docs.cloud.google.com/dataflow/docs/pipeline-lifecycle"
+        },
+        {
+          "title": "Dataflow documentation",
+          "url": "https://cloud.google.com/dataflow/docs/overview"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "gcp",
+          "label": "Java Beam ジョブを Dataflow へ投入（Google Cloud）",
+          "sources": [
+            {
+              "title": "Dataflow pipeline lifecycle",
+              "url": "https://docs.cloud.google.com/dataflow/docs/pipeline-lifecycle"
+            },
+            {
+              "title": "Dataflow documentation",
+              "url": "https://cloud.google.com/dataflow/docs/overview"
+            },
+            {
+              "title": "Dataflow のワーカーとステージング",
+              "url": "https://docs.cloud.google.com/dataflow/docs/request-quotas"
+            },
+            {
+              "title": "Dataflow monitoring interface",
+              "url": "https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "google-cloud-dataflow-streaming-engine",
+      "name": "Google Cloud Dataflow：Streaming Engine とオートスケーリング",
+      "description": "ストリーミングジョブの処理をワーカー VM からサービス側へ移す Streaming Engine と、ワーカー数を増減するオートスケーリングの関係を追う。",
+      "domain": "データ処理",
+      "category": "変換とオーケストレーション",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド",
+        "Google Cloud",
+        "Apache Beam ベース"
+      ],
+      "objectives": [
+        "ワーカー VM で動く処理と、Streaming Engine がサービス側で動かす処理を区別する。",
+        "オートスケーリングがワーカー数を変える入力と、Dataflow Shuffle との違いを読む。"
+      ],
+      "documents": [
+        "docs/reference-google-cloud-dataflow-streaming-engine.md"
+      ],
+      "sources": [
+        {
+          "title": "Dataflow Streaming Engine",
+          "url": "https://docs.cloud.google.com/dataflow/docs/streaming-engine"
+        },
+        {
+          "title": "Dataflow Horizontal Autoscaling",
+          "url": "https://docs.cloud.google.com/dataflow/docs/horizontal-autoscaling"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "gcp",
+          "label": "Streaming Engine を有効にした Java ストリーミングジョブ（Google Cloud）",
+          "sources": [
+            {
+              "title": "Dataflow Streaming Engine",
+              "url": "https://docs.cloud.google.com/dataflow/docs/streaming-engine"
+            },
+            {
+              "title": "Dataflow Horizontal Autoscaling",
+              "url": "https://docs.cloud.google.com/dataflow/docs/horizontal-autoscaling"
+            },
+            {
+              "title": "Dataflow documentation",
+              "url": "https://cloud.google.com/dataflow/docs/overview"
+            },
+            {
+              "title": "Dataflow monitoring interface",
+              "url": "https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf"
+            }
+          ]
+        }
+      ]
     }
   ],
   "history": [

@@ -1,0 +1,81 @@
+name: Apache Airflow：Deferrable タスクと Triggerer
+description: Deferrable オペレーターが待機を Triggerer に渡して Worker スロットを空け、完了イベントで Worker に戻る。
+parent: {model: apache-airflow, node: worker}
+reference:
+  objectives:
+    - defer() で Worker から Triggerer へ待機が移る流れを追う。
+    - 待機中に Worker スロットを占有しない点を確かめる。
+    - TriggerEvent から next_method の再開までを追う。
+  sources:
+    - {title: Deferring Operators and Triggers, url: https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html}
+    - {title: Airflow Tasks, url: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/tasks.html}
+    - {title: Airflow Scheduler, url: https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/scheduler.html}
+sources: [docs/reference-apache-airflow-deferrable-triggerer.md]
+evidence: [{type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§1"}, {type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§6"}]
+tiers: [{id: flow, label: 待機の引き渡しと再開, z: 0, size: [24, 9]}]
+nodes:
+  first-run: {label: 最初の実行（Worker）, kind: worker, tier: flow, x: 0, y: 1, description: オペレーターが defer() を呼んで終了し、Worker スロットを手放す。, evidence: &ev2 [{type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§2"}]}
+  meta: {label: メタデータ DB, kind: db, tier: flow, x: 8, y: 4, description: deferred の Task Instance と Trigger、完了イベントを保持する。, evidence: *ev2}
+  triggerer: {label: Triggerer, kind: service, tier: flow, x: 16, y: 1, description: 1 つの asyncio イベントループで多数の Trigger を動かす。, evidence: &ev3 [{type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§3"}, {type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§5"}]}
+  trigger: {label: Trigger の非同期処理, kind: worker, tier: flow, x: 20, y: 4, description: 待機条件を await で確認し、成立したら TriggerEvent を yield する。, evidence: *ev3}
+  external: {label: 待機対象の外部システム, kind: external, tier: flow, x: 20, y: 8, description: ジョブ、ファイル、API など、完了を待つ対象。, evidence: *ev3}
+  scheduler: {label: Scheduler, kind: service, tier: flow, x: 8, y: 8, description: イベント済みの Task Instance を再スケジュールする。, evidence: &ev4 [{type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§4"}]}
+  executor: {label: Executor, kind: worker, tier: flow, x: 4, y: 6, description: 再開する Task Instance を Worker に配る。, evidence: *ev4}
+  resume: {label: 再開した実行（Worker）, kind: worker, tier: flow, x: 0, y: 4, description: next_method をイベント付きで呼び、戻れば Task が完了する。, evidence: *ev4}
+links:
+  - {id: defer, from: first-run, to: meta, label: deferred と Trigger を記録, evidence: *ev2}
+  - {id: assign, from: meta, to: triggerer, label: Trigger を取得, evidence: *ev3}
+  - {id: run-trigger, from: triggerer, to: trigger, label: asyncio で実行, evidence: *ev3}
+  - {id: poll, from: trigger, to: external, label: 完了を非同期に確認, evidence: *ev3}
+  - {id: event, from: trigger, to: meta, label: TriggerEvent を記録, evidence: *ev3}
+  - {id: wake, from: meta, to: scheduler, label: イベント済みの Task Instance を読む, evidence: *ev4}
+  - {id: resubmit, from: scheduler, to: executor, label: 再度提出, evidence: *ev4}
+  - {id: assign-worker, from: executor, to: resume, label: 実行を割り当て, evidence: *ev4}
+  - {id: finish, from: resume, to: meta, label: 完了状態を記録, evidence: *ev4}
+scenarios:
+  - id: defer-and-resume
+    label: 待機の引き渡しから再開まで
+    evidence: [{type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§2"}]
+    steps:
+      - {links: [defer], note: オペレーターが defer() を呼び、Worker スロットを手放して deferred になる。}
+      - {links: [assign, run-trigger, poll], note: Triggerer が Trigger を asyncio で動かし、待機対象を確認する。}
+      - {links: [event, wake], note: 条件が成立すると TriggerEvent が記録され、Scheduler が拾う。}
+      - {links: [resubmit, assign-worker, finish], note: Worker で next_method が呼ばれ、戻ると Task が完了する。}
+unknowns:
+  - {id: unk-ver, text: 再開時の経路（API Server 経由の有無など）はバージョン依存で未確認。, refs: [event, finish]}
+  - {id: unk-cap, text: 1 つの Triggerer が扱える Trigger 数は設定（既定 1000 は取得時点の記述）で、実機の上限は未検証。, refs: [assign, run-trigger]}
+  - {id: unk-ha, text: Triggerer 停止時の再割り当てにかかる時間は未検証。, refs: [assign]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem
+    label: 自前の Celery Executor・Triggerer・PostgreSQL
+    description: 自前 Linux 上で Scheduler、Celery Worker、Triggerer を別プロセスで動かす。deferred の状態と TriggerEvent は PostgreSQL を介して共有する。
+    sources:
+      - {title: Deferring Operators and Triggers, url: https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/deferring.html}
+      - {title: Airflow Celery Executor, url: https://airflow.apache.org/docs/apache-airflow-providers-celery/stable/celery_executor.html}
+      - {title: Airflow Architecture Overview, url: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/overview.html}
+    tiers: &t2d [{id: diagram, label: Deferrable タスクの実行経路, z: 0, size: [25, 11]}]
+    nodes:
+      af-worker1: {label: Celery Worker（最初の実行）, kind: worker, tier: diagram, x: 4, y: 2, realizes: [first-run], parallel: N, description: defer() の呼び出しまで実行し、スロットを手放す。, evidence: &ei [{type: doc, ref: "docs/reference-apache-airflow-deferrable-triggerer.md#§7"}]}
+      af-worker2: {label: Celery Worker（再開）, kind: worker, tier: diagram, x: 4, y: 7, realizes: [resume], parallel: N, description: next_method を呼んで Task を終える。, evidence: *ei}
+      af-db: {label: PostgreSQL メタデータ DB, svc: postgresql:server, kind: db, tier: diagram, x: 11, y: 4.5, realizes: [meta], description: deferred の状態、Trigger、TriggerEvent を保存する。, evidence: *ei}
+      af-triggerer: {label: Airflow Triggerer, kind: service, tier: diagram, x: 18, y: 2, realizes: [triggerer, trigger], description: asyncio のイベントループで Trigger を動かす。, evidence: *ei}
+      af-target: {label: 待機対象の外部システム, kind: external, tier: diagram, x: 18, y: 8, realizes: [external], description: 運用者の環境にある待機対象。, evidence: *ei}
+      af-scheduler: {label: Airflow Scheduler と CeleryExecutor, kind: service, tier: diagram, x: 11, y: 9, realizes: [scheduler, executor], description: イベント済みの Task Instance を再度 Worker に送る。, evidence: *ei}
+    links: []
+    groups: &g2d
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: diagram, x0: -0.5, y0: -0.25, x1: 24.5, y1: 10.8, nodes: &env [af-worker1, af-worker2, af-db, af-triggerer, af-target, af-scheduler]}
+    layout2d: {tiers: *t2d, nodes: {}, groups: *g2d}
+    layout3d:
+      tiers:
+        - {id: app, label: Airflow プロセス, z: 1, size: [22, 8]}
+        - {id: store, label: 状態と待機対象, z: 0, size: [22, 8]}
+      nodes:
+        af-worker1: {tier: app, x: 3, y: 2}
+        af-worker2: {tier: app, x: 3, y: 6}
+        af-scheduler: {tier: app, x: 10, y: 6}
+        af-triggerer: {tier: app, x: 17, y: 2}
+        af-db: {tier: store, x: 10, y: 3}
+        af-target: {tier: store, x: 17, y: 5}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: [app, store], nodes: *env}

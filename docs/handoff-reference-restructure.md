@@ -23,6 +23,7 @@
 | バッチ・SQL エンジン | Spark・Trino・DuckDB・ClickHouse の図と比較表を点検。`docs/category-batch-sql.md` |
 | ストリーム処理 | Kafka・Flink・RisingWave・Apicurio Registry・Spark の図と比較表を点検。`docs/category-stream.md` |
 | 取り込み | Debezium・Airbyte・Fivetran・PostgreSQL の概要と詳細図を整理。比較表は `docs/category-ingestion.md` |
+| 変換とオーケストレーション | dbt・Apache Airflow・AWS Glue・Azure Data Factory・Google Cloud Dataflow の概要と仕組み図（各 2 つ）を整理。比較表は `docs/category-transform.md` |
 | クラウド分析基盤 | Databricks と Snowflake の関連図を同じ製品に整理。ほかの製品は未点検 |
 | ほかの分類 | 未着手の図がある。古い図は `js/products.js` で製品を推定している |
 

@@ -1,0 +1,98 @@
+name: dbt：増分モデルとスナップショット
+description: 増分モデルは前回以降の行だけをウェアハウス内で既存表へ取り込み、snapshot は変更を検出して履歴行を持つ。
+parent: {model: dbt, node: compute}
+reference:
+  objectives:
+    - is_incremental と unique_key、incremental_strategy が決める SQL を区別する。
+    - snapshot の timestamp 戦略と check 戦略の変更検出の違いを追う。
+    - 差分の判定と書き込みをウェアハウスが実行することを確かめる。
+  sources:
+    - {title: Incremental models, url: https://docs.getdbt.com/docs/build/incremental-models}
+    - {title: About incremental strategy, url: https://docs.getdbt.com/docs/build/incremental-strategy}
+    - {title: Snapshots, url: https://docs.getdbt.com/docs/build/snapshots}
+sources: [docs/reference-dbt-incremental-snapshots.md]
+evidence: [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§1"}, {type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§6"}, {type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§8"}]
+tiers:
+  - {id: dbt, label: dbt の制御プロセス, z: 1, size: [24, 6]}
+  - {id: wh, label: ウェアハウス（SQL とデータ）, z: 0, size: [24, 8]}
+nodes:
+  inc-model: {label: 増分モデルの SQL, kind: file, tier: dbt, x: 2, y: 1, description: is_incremental() の分岐、unique_key、incremental_strategy を設定に持つ。, evidence: &inc [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§2"}]}
+  inc-compile: {label: 増分用 SQL の生成, kind: worker, tier: dbt, x: 8, y: 1, description: 表の有無と --full-refresh の有無を見て、全件か差分かを選び、戦略に合う文を組み立てる。, evidence: *inc}
+  snap-def: {label: snapshot の定義, kind: file, tier: dbt, x: 14, y: 1, description: strategy（timestamp または check）、unique_key、updated_at または check_cols を持つ。, evidence: &snap [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§4"}]}
+  snap-compile: {label: snapshot 用 SQL の生成, kind: worker, tier: dbt, x: 20, y: 1, description: 戦略に応じた変更検出の SQL と、履歴行の更新・追加の文を組み立てる。, evidence: *snap}
+  engine: {label: ウェアハウスの SQL 実行, kind: service, tier: wh, x: 11, y: 1.5, description: 受け取った SQL で差分を判定し、行を書き込む。dbt はこの処理を行わない。, evidence: &exec [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§3"}]}
+  source-table: {label: 上流の表, kind: db, tier: wh, x: 2, y: 1.5, evidence: *exec}
+  inc-table: {label: 増分モデルの表, kind: db, tier: wh, x: 4, y: 5.5, description: 前回までの結果を保持し、差分の行が追加または更新される。, evidence: *exec}
+  snap-source: {label: 履歴対象の表, kind: db, tier: wh, x: 18, y: 1.5, evidence: &snapexec [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§5"}]}
+  snap-table: {label: snapshot の表, kind: db, tier: wh, x: 18, y: 5.5, description: 行の版ごとに dbt_valid_from と dbt_valid_to を持つ。現在の版は dbt_valid_to が空である。, evidence: *snapexec}
+links:
+  - {id: define-inc, from: inc-model, to: inc-compile, label: モデルと設定を渡す, evidence: *inc}
+  - {id: send-inc, from: inc-compile, to: engine, label: 増分の文を送る, evidence: *inc}
+  - {id: read-new, from: source-table, to: engine, label: 前回以降の行を読む, evidence: *exec}
+  - {id: check-target, from: inc-table, to: engine, label: 既存の行と照合, evidence: *exec}
+  - {id: merge-rows, from: engine, to: inc-table, label: 行を追加・更新, evidence: *exec}
+  - {id: define-snap, from: snap-def, to: snap-compile, label: 定義を渡す, evidence: *snap}
+  - {id: send-snap, from: snap-compile, to: engine, label: 変更検出の文を送る, evidence: *snap}
+  - {id: read-current, from: snap-source, to: engine, label: 現在の行を読む, evidence: *snapexec}
+  - {id: compare-history, from: snap-table, to: engine, label: 現在の版と比較, evidence: *snapexec}
+  - {id: write-history, from: engine, to: snap-table, label: 旧版を閉じ新版を追加, evidence: *snapexec}
+scenarios:
+  - id: incremental-run
+    label: 増分モデルの 2 回目の実行
+    evidence: [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§3"}]
+    steps:
+      - {links: [define-inc, send-inc], note: 表が既にあるので、差分用の分岐を使った文を送る。}
+      - {links: [read-new, check-target, merge-rows], note: ウェアハウスが前回以降の行を読み、戦略に従って既存表へ書き込む。}
+  - id: snapshot-run
+    label: snapshot の実行
+    evidence: [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§5"}]
+    steps:
+      - {links: [define-snap, send-snap], note: 戦略に合う変更検出の文を送る。}
+      - {links: [read-current, compare-history, write-history], note: ウェアハウスが現在の行と履歴を比べ、変わった行の旧版を閉じて新版を追加する。}
+unknowns:
+  - {id: unverified, text: 実環境での差分の行数、戦略ごとの実行時間、遅れて届く行の扱いは未検証。, refs: [read-new, write-history]}
+implementations:
+  - id: core-postgres
+    label: 自前 CI の dbt Core と PostgreSQL
+    description: セルフホストの CI ランナーで dbt Core を動かし、dbt-postgres が増分モデルと snapshot の SQL を PostgreSQL へ送る。差分の判定と書き込みは PostgreSQL サーバーが担う。
+    sources:
+      - {title: Connect Postgres to dbt, url: https://docs.getdbt.com/docs/local/connect-data-platform/postgres-setup}
+      - {title: Incremental models, url: https://docs.getdbt.com/docs/build/incremental-models}
+      - {title: Snapshots, url: https://docs.getdbt.com/docs/build/snapshots}
+    tiers: &cp-tiers [{id: diagram, label: CI ランナーと PostgreSQL, z: 0, size: [26, 12]}]
+    nodes:
+      ci-inc-sql: {label: 増分モデルのファイル, kind: file, tier: diagram, x: 2, y: 2, realizes: [inc-model], evidence: &cp [{type: doc, ref: "docs/reference-dbt-incremental-snapshots.md#§7"}]}
+      ci-snap-sql: {label: snapshot の定義ファイル, kind: file, tier: diagram, x: 2, y: 6, realizes: [snap-def], evidence: *cp}
+      ci-dbt: {label: dbt Core と dbt-postgres, kind: worker, tier: diagram, x: 8, y: 4, realizes: [inc-compile, snap-compile], description: 設定から差分用の文と snapshot の文を組み立て、接続先へ送る。, evidence: *cp}
+      pg-engine: {label: PostgreSQL サーバー, svc: postgresql:server, kind: db, tier: diagram, x: 15, y: 4, realizes: [engine], description: 差分の判定と行の書き込みを実行する。, evidence: *cp}
+      pg-source: {label: 上流のスキーマ, kind: db, tier: diagram, x: 15, y: 0.5, realizes: [source-table, snap-source], evidence: *cp}
+      pg-inc: {label: 増分モデルの表, kind: db, tier: diagram, x: 20, y: 8.5, realizes: [inc-table], evidence: *cp}
+      pg-snap: {label: snapshot の表, kind: db, tier: diagram, x: 23.5, y: 4, realizes: [snap-table], evidence: *cp}
+    links:
+      - {id: ci-define-inc, from: ci-inc-sql, to: ci-dbt, label: モデルと設定を渡す, realizes: [define-inc], replace: true}
+      - {id: ci-define-snap, from: ci-snap-sql, to: ci-dbt, label: 定義を渡す, realizes: [define-snap], replace: true}
+      - {id: ci-send, from: ci-dbt, to: pg-engine, label: 増分と snapshot の SQL を送る, realizes: [send-inc, send-snap], replace: true}
+      - {id: ci-read, from: pg-source, to: pg-engine, label: 上流の行を読む, realizes: [read-new, read-current], replace: true}
+      - {id: ci-check-inc, from: pg-inc, to: pg-engine, label: 既存の行と照合, realizes: [check-target], replace: true}
+      - {id: ci-write-inc, from: pg-engine, to: pg-inc, label: 行を追加・更新, realizes: [merge-rows], replace: true}
+      - {id: ci-compare, from: pg-snap, to: pg-engine, label: 現在の版と比較, realizes: [compare-history], replace: true}
+      - {id: ci-write-snap, from: pg-engine, to: pg-snap, label: 旧版を閉じ新版を追加, realizes: [write-history], replace: true}
+    groups: &cp-groups
+      - {kind: datacenter, provider: onprem, label: 自前の CI ランナー, tier: diagram, x0: 0.5, y0: 0.5, x1: 11.5, y1: 9, nodes: [ci-inc-sql, ci-snap-sql, ci-dbt]}
+      - {kind: datacenter, provider: onprem, label: 自前の PostgreSQL サーバー, tier: diagram, x0: 13.5, y0: -0.5, x1: 25.5, y1: 11.5, nodes: [pg-engine, pg-source, pg-inc, pg-snap]}
+    layout2d: {tiers: *cp-tiers, nodes: {}, groups: *cp-groups}
+    layout3d:
+      tiers:
+        - {id: ci, label: CI ランナー, z: 0, size: [9, 9]}
+        - {id: db, label: PostgreSQL サーバー, z: 0, origin: [11, 0], size: [12, 10]}
+      nodes:
+        ci-inc-sql: {tier: ci, x: 2, y: 1.5}
+        ci-snap-sql: {tier: ci, x: 2, y: 6.5}
+        ci-dbt: {tier: ci, x: 6, y: 4}
+        pg-engine: {tier: db, x: 5, y: 4}
+        pg-source: {tier: db, x: 5, y: 1}
+        pg-inc: {tier: db, x: 2.5, y: 7.5}
+        pg-snap: {tier: db, x: 8.5, y: 7.5}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前の CI ランナー, tier: ci, nodes: [ci-inc-sql, ci-snap-sql, ci-dbt]}
+        - {kind: datacenter, provider: onprem, label: 自前の PostgreSQL サーバー, tier: db, nodes: [pg-engine, pg-source, pg-inc, pg-snap]}

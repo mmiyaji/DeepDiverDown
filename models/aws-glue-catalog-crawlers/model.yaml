@@ -1,0 +1,88 @@
+name: AWS Glue：Data Catalog とクローラー
+description: クローラーがスキーマを推論して Data Catalog にテーブルとパーティションを登録し、Athena・EMR・Glue ジョブが参照する流れを追う。
+parent: {model: aws-glue, node: catalog}
+reference:
+  objectives:
+    - クローラーが分類、スキーマ推論、テーブル・パーティションの登録を順に行うことを追う。
+    - Data Catalog が実データを持たず、定義だけを複数のエンジンへ提供することを区別する。
+  sources:
+    - {title: Using crawlers to populate the Data Catalog, url: https://docs.aws.amazon.com/glue/latest/dg/add-crawler.html}
+    - {title: Tracking processed data using job bookmarks, url: https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html}
+sources: [docs/reference-aws-glue-catalog-crawlers.md]
+evidence: [{type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§1"}, {type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§6"}, {type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§7"}, {type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§9"}]
+tiers: [{id: flow, label: スキーマ推論から参照まで, z: 0, size: [24, 10]}]
+nodes:
+  schedule: {label: クローラーの起動, kind: service, tier: flow, x: 0, y: 0, description: オンデマンドまたはスケジュールで起動する。, evidence: &crawl [{type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§2"}]}
+  source: {label: クロール対象のデータ, kind: external, tier: flow, x: 0, y: 5, description: Include path で指定したフォルダー階層のファイル。, evidence: *crawl}
+  crawler: {label: クローラー, kind: worker, tier: flow, x: 7, y: 2.5, description: データを走査し、形式とスキーマを推論し、テーブルとパーティションにまとめる。, evidence: *crawl}
+  classifier: {label: 分類器（Classifier）, kind: worker, tier: flow, x: 7, y: 7, description: 指定順に試し、最初に形式を認識した分類器でスキーマを作る。, evidence: &cls [{type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§3"}]}
+  table: {label: テーブル定義, kind: table, tier: flow, x: 14, y: 1, description: スキーマ、データの場所、classification を持つ。実データは持たない。, evidence: &cat [{type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§4"}]}
+  partitions: {label: パーティション, kind: table, tier: flow, x: 14, y: 5, description: フォルダー階層から作るパーティションキーと値。, evidence: *cat}
+  athena: {label: SQL クエリエンジン, kind: service, tier: flow, x: 21, y: 0, description: テーブル定義を参照して S3 のデータへ SQL を実行する。, evidence: &use [{type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§5"}]}
+  emr: {label: Spark・Hive クラスター, kind: host, tier: flow, x: 21, y: 4, description: テーブル定義を参照する。参照方式は未確認。, evidence: *use}
+  jobs: {label: ETL ジョブ, kind: worker, tier: flow, x: 21, y: 8, description: テーブルをソースやターゲットとして使い、パーティションを絞って読む。, evidence: *use}
+links:
+  - {id: run, from: schedule, to: crawler, label: クロールを起動, evidence: *crawl}
+  - {id: scan, from: source, to: crawler, label: ファイルを走査, evidence: *crawl}
+  - {id: classify, from: crawler, to: classifier, label: データを判定に渡す, evidence: *cls}
+  - {id: infer, from: classifier, to: crawler, label: 形式とスキーマを返す, evidence: *cls}
+  - {id: put-table, from: crawler, to: table, label: テーブルを作成・更新, evidence: *cat}
+  - {id: put-partition, from: crawler, to: partitions, label: パーティションを追加, evidence: *cat}
+  - {id: to-athena, from: table, to: athena, label: 定義を参照, evidence: *use}
+  - {id: to-emr, from: table, to: emr, label: 定義を参照, evidence: *use}
+  - {id: to-jobs, from: table, to: jobs, label: ソース・ターゲット定義を参照, evidence: *use}
+  - {id: prune, from: partitions, to: jobs, label: 対象パーティションを絞る, evidence: *use}
+scenarios:
+  - id: crawl-and-query
+    label: クロールから参照まで
+    evidence: [{type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§6"}]
+    steps:
+      - {links: [run, scan, classify, infer], note: クローラーが対象を走査し、分類器が形式とスキーマを返す。}
+      - {links: [put-table, put-partition], note: スキーマからテーブルを作り、フォルダー階層からパーティションを追加する。}
+      - {links: [to-athena, to-emr, to-jobs, prune], note: 各エンジンが同じテーブル定義を参照し、ジョブはパーティションを絞って読む。}
+unknowns:
+  - {id: emr-access, text: EMR から Data Catalog を参照する設定と権限は、この資料では確認していない。, refs: [to-emr]}
+  - {id: schema-change, text: スキーマ変更時の更新・削除ポリシーとクロール所要時間は未確認。, refs: [put-table, put-partition]}
+implementations:
+  - id: aws
+    label: AWS Glue クローラーで S3 の CSV を登録
+    description: S3 の raw プレフィックスをクローラーで走査し、Data Catalog にテーブルとパーティションを登録する。Athena、EMR、Glue ジョブが同じ定義を参照する例。
+    sources:
+      - {title: Using crawlers to populate the Data Catalog, url: https://docs.aws.amazon.com/glue/latest/dg/add-crawler.html}
+      - {title: AWS Glue components, url: https://docs.aws.amazon.com/glue/latest/dg/components-overview.html}
+      - {title: Crawler prerequisites, url: https://docs.aws.amazon.com/glue/latest/dg/crawler-prereqs.html}
+      - {title: Tracking processed data using job bookmarks, url: https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers: &tiers2d [{id: diagram, label: クローラーと Data Catalog, z: 0, size: [28, 12]}]
+    nodes:
+      aws-schedule: {label: Glue クローラーのスケジュール, svc: glue, kind: workflow, tier: diagram, x: 2, y: 2, realizes: [schedule], description: オンデマンド実行またはスケジュールでクローラーを起動する。, management: {type: shared, scope: "AWS operates the service; customer configures schedule and starts."}, evidence: &impl [{type: doc, ref: "docs/reference-aws-glue-catalog-crawlers.md#§8"}]}
+      aws-source: {label: Amazon S3（raw プレフィックス）, svc: s3, kind: db, tier: diagram, x: 7, y: 2, realizes: [source], management: {type: shared, scope: "AWS operates S3; customer manages data and access."}, evidence: *impl}
+      aws-role: {label: Glue の IAM ロール, svc: iam, kind: policy, tier: diagram, x: 12, y: 2, description: クローラーが S3 を読み、Data Catalog を更新する権限を付与する。, management: {type: customer, scope: "Customer manages IAM permissions and trust."}, evidence: *impl}
+      aws-crawler: {label: Glue Crawler, svc: glue, kind: worker, tier: diagram, x: 17, y: 2, realizes: [crawler], description: Include path を走査し、テーブルとパーティションにまとめる。, management: {type: shared, scope: "AWS operates crawler infrastructure; customer configures crawler targets and policies."}, evidence: *impl}
+      aws-classifier: {label: Glue の分類器（組み込みとカスタム）, svc: glue, kind: worker, tier: diagram, x: 22, y: 2, realizes: [classifier], description: カスタム分類器は利用者がコードを書き、指定順に試す。該当しなければ組み込み分類器を使う。, management: {type: shared, scope: "AWS provides built-in classifiers; customer writes and orders custom classifiers."}, evidence: *impl}
+      aws-table: {label: Data Catalog のテーブル, svc: glue, kind: table, tier: diagram, x: 2, y: 6, realizes: [table], description: データベースに属し、S3 の場所とスキーマと classification を持つ。, management: {type: shared, scope: "AWS operates the catalog; customer manages definitions and permissions."}, evidence: *impl}
+      aws-partitions: {label: Data Catalog のパーティション, svc: glue, kind: table, tier: diagram, x: 7, y: 6, realizes: [partitions], description: year=2019/month=Jan のようなフォルダー階層から作る。, management: {type: shared, scope: "AWS operates the catalog; customer manages definitions and permissions."}, evidence: *impl}
+      aws-athena: {label: Amazon Athena, svc: athena, kind: service, tier: diagram, x: 12, y: 6, realizes: [athena], description: テーブルは S3 プレフィックスに対応する。同じプレフィックスにスキーマが異なるファイルがあると結果が空になりうる。, management: {type: shared, scope: "AWS operates Athena; customer manages queries, data and access."}, evidence: *impl}
+      aws-emr: {label: Amazon EMR クラスター, svc: emr, kind: host, tier: diagram, x: 17, y: 6, realizes: [emr], description: Data Catalog の定義を参照する構成。参照設定はこの資料では未確認。, management: {type: shared, scope: "AWS operates EMR service; customer configures cluster and access."}, evidence: *impl}
+      aws-job: {label: Glue Spark ETL ジョブ, svc: glue, kind: worker, tier: diagram, x: 22, y: 6, realizes: [jobs], description: Catalog のテーブルをソースやターゲットに使う。実行基盤は Glue が確保する。, management: {type: shared, scope: "AWS provisions job infrastructure; customer manages job code, settings and permissions."}, evidence: *impl}
+    links:
+      - {id: aws-role-crawl, from: aws-role, to: aws-crawler, label: S3 と Catalog への権限を付与, evidence: *impl}
+    groups: &groups2d
+      - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと Glue・分析サービス, tier: diagram, nodes: [aws-schedule, aws-source, aws-role, aws-crawler, aws-classifier, aws-table, aws-partitions, aws-athena, aws-emr, aws-job]}
+    layout2d: {tiers: *tiers2d, nodes: {}, groups: *groups2d}
+    layout3d:
+      tiers:
+        - {id: account, label: 利用者のアカウントと AWS サービス, z: 0, size: [24, 6]}
+      nodes:
+        aws-schedule: {tier: account, x: 2, y: 1}
+        aws-source: {tier: account, x: 6, y: 1}
+        aws-role: {tier: account, x: 10, y: 1}
+        aws-crawler: {tier: account, x: 14, y: 1}
+        aws-classifier: {tier: account, x: 18, y: 1}
+        aws-table: {tier: account, x: 2, y: 4}
+        aws-partitions: {tier: account, x: 6, y: 4}
+        aws-athena: {tier: account, x: 10, y: 4}
+        aws-emr: {tier: account, x: 14, y: 4}
+        aws-job: {tier: account, x: 18, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと Glue・分析サービス, tier: account, nodes: [aws-schedule, aws-source, aws-role, aws-crawler, aws-classifier, aws-table, aws-partitions, aws-athena, aws-emr, aws-job]}

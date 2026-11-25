@@ -49,4 +49,5 @@ export const CATEGORY_DOCS = {
   '取り込み': 'ingestion',
   'バッチ・SQL エンジン': 'batch-sql',
   'ストリーム処理': 'stream',
+  '変換とオーケストレーション': 'transform',
 };

@@ -1,0 +1,87 @@
+name: Azure Data Factory：パイプライン実行と Integration Runtime
+description: トリガーが起こしたパイプライン実行のアクティビティを、Integration Runtime の種類ごとに割り当てる。制御フローとデータ移動の経路を分けて追う。
+parent: {model: azure-data-factory, node: ir}
+reference:
+  objectives:
+    - トリガーからパイプライン実行、アクティビティまでの制御の流れを追う。
+    - Azure・セルフホステッド・Azure-SSIS の Integration Runtime が担う処理を区別する。
+    - 制御フローの経路と、データが通る経路を分けて読む。
+  sources:
+    - {title: Pipeline execution and triggers in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-pipeline-execution-triggers}
+    - {title: Integration runtime in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime}
+    - {title: Create a self-hosted integration runtime, url: https://learn.microsoft.com/en-us/azure/data-factory/create-self-hosted-integration-runtime}
+sources: [docs/reference-azure-data-factory-pipeline-runs.md]
+evidence: [{type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§1"}, {type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§6"}, {type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§8"}]
+tiers:
+  - {id: control, label: 制御フロー（起動とアクティビティの割り当て）, z: 1, size: [24, 4]}
+  - {id: data, label: データ移動（Integration Runtime とデータストア）, z: 0, size: [24, 9]}
+nodes:
+  trigger: {label: トリガー, kind: service, tier: control, x: 0, y: 2, description: スケジュールやイベントなどの条件でパイプライン実行を開始する。, evidence: &trg [{type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§2"}]}
+  pipeline: {label: パイプライン実行, kind: workflow, tier: control, x: 6, y: 2, description: 1 回の起動ごとに実行 ID を持ち、アクティビティを依存関係に従って進める。, evidence: *trg}
+  control: {label: 制御アクティビティ, kind: service, tier: control, x: 12, y: 0, description: 依存条件、分岐、繰り返しなど、次に起動するアクティビティを決める。, evidence: &act [{type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§3"}]}
+  copy: {label: コピーアクティビティ, kind: worker, tier: control, x: 12, y: 3, description: データ移動のアクティビティ。入出力の Linked Service が指す Integration Runtime に割り当てられる。, evidence: *act}
+  linked: {label: Linked Service の IR 指定, kind: catalog, tier: control, x: 18, y: 3, description: 接続先ごとに、どの Integration Runtime で到達するかを指定する。, evidence: &ir [{type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§4"}]}
+  ir-azure: {label: Azure IR, kind: worker, tier: data, x: 8, y: 1, description: パブリックに到達できるデータストア間のコピーと、Data Flow の実行を担う。, evidence: *ir}
+  ir-shir: {label: セルフホステッド IR, kind: worker, tier: data, x: 8, y: 4.5, description: 利用者が用意したマシンで動き、私設ネットワーク内のデータストアへ到達する。, evidence: *ir}
+  ir-ssis: {label: Azure-SSIS IR, kind: worker, tier: data, x: 8, y: 8, description: SSIS パッケージを実行する専用の Azure VM のクラスター。, evidence: *ir}
+  store-cloud: {label: クラウドのデータストア, kind: db, tier: data, x: 18, y: 1, evidence: &data [{type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§5"}]}
+  store-private: {label: 私設ネットワーク内のデータストア, kind: db, tier: data, x: 2, y: 4.5, evidence: *data}
+links:
+  - {id: start-run, from: trigger, to: pipeline, label: パイプライン実行を開始, evidence: *trg}
+  - {id: evaluate, from: pipeline, to: control, label: 依存条件を評価, evidence: *act}
+  - {id: dispatch-copy, from: control, to: copy, label: コピーを起動, evidence: *act}
+  - {id: resolve-ir, from: linked, to: copy, label: 接続先の IR を解決, evidence: *ir}
+  - {id: assign-azure, from: copy, to: ir-azure, label: クラウド間のコピーを割り当て, evidence: *ir}
+  - {id: assign-shir, from: copy, to: ir-shir, label: 私設側のコピーを割り当て, evidence: *ir}
+  - {id: assign-ssis, from: pipeline, to: ir-ssis, label: SSIS パッケージの実行を割り当て, evidence: *ir}
+  - {id: move-cloud, from: ir-azure, to: store-cloud, label: クラウド側を読み書き, evidence: *data}
+  - {id: read-private, from: store-private, to: ir-shir, label: 私設側のデータを読む, evidence: *data}
+  - {id: write-cloud, from: ir-shir, to: store-cloud, label: クラウド側へ書く, evidence: *data}
+scenarios:
+  - id: hybrid-copy
+    label: 私設ネットワークからクラウドへのコピー
+    evidence: [{type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§6"}, {type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§8"}]
+    steps:
+      - {links: [start-run, evaluate, dispatch-copy], note: トリガーがパイプライン実行を開始し、制御アクティビティが依存条件を満たしたコピーを起動する。}
+      - {links: [resolve-ir, assign-shir], note: Linked Service の指定からセルフホステッド IR を選び、コピーを割り当てる。}
+      - {links: [read-private, write-cloud], note: セルフホステッド IR が私設側を読み、クラウドのストアへ書く。}
+      - {links: [assign-azure, move-cloud], note: クラウド間のコピーは Azure IR が担当する。}
+unknowns:
+  - {id: unverified, text: 割り当ての内部方式、実行の並列度、IR のネットワーク経路と料金は未確認。, refs: [assign-azure, assign-shir, assign-ssis]}
+  - {id: ssis-data, text: Azure-SSIS IR からデータストアへの経路は図に描かない。, refs: [assign-ssis]}
+implementations:
+  - id: azure-hybrid
+    label: ADF と Azure IR・セルフホステッド IR・Azure-SSIS IR
+    description: Azure の Data Factory が実行を管理し、クラウド側は Azure IR、自前ネットワーク側は利用者が用意したマシン上のセルフホステッド IR がコピーを担う。SSIS パッケージは Azure-SSIS IR で動かす。
+    sources:
+      - {title: Pipeline execution and triggers in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-pipeline-execution-triggers}
+      - {title: Integration runtime in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime}
+      - {title: Create a self-hosted integration runtime, url: https://learn.microsoft.com/en-us/azure/data-factory/create-self-hosted-integration-runtime}
+    tiers: &tiers2d [{id: diagram, label: ADF と 2 つの稼働環境, z: 0, size: [26, 13]}]
+    nodes:
+      adf-factory: {label: ADF のトリガーとパイプライン, svc: azure:datafactory, kind: workflow, tier: diagram, x: 3, y: 3, realizes: [trigger, pipeline, control, linked], description: トリガー、パイプライン実行、制御アクティビティ、Linked Service の定義を持つ。実行基盤は Microsoft が運用し、利用者は定義と IR の指定を管理する。, evidence: &impl [{type: doc, ref: "docs/reference-azure-data-factory-pipeline-runs.md#§7"}]}
+      adf-copy: {label: ADF のコピーアクティビティ, svc: azure:datafactory, kind: worker, tier: diagram, x: 3, y: 8, realizes: [copy], evidence: *impl}
+      azure-ir: {label: Azure IR, svc: azure:datafactory, kind: worker, tier: diagram, x: 9, y: 2, realizes: [ir-azure], description: Microsoft が運用するコンピューティングでコピーを実行する。利用者はリージョンなどの IR 設定を指定する。, evidence: *impl}
+      ssis-ir: {label: Azure-SSIS IR, svc: azure:datafactory, kind: worker, tier: diagram, x: 9, y: 11, realizes: [ir-ssis], description: 利用者がノード数とサイズを指定する SSIS 用 VM クラスター。, evidence: *impl}
+      blob: {label: Azure Blob Storage, svc: azure:storage, kind: db, tier: diagram, x: 15, y: 2, realizes: [store-cloud], evidence: *impl}
+      shir: {label: セルフホステッド IR のマシン, kind: host, tier: diagram, x: 20, y: 6, realizes: [ir-shir], description: 利用者が用意したマシンに IR ソフトウェアを入れて動かす。, evidence: *impl}
+      onprem-db: {label: 社内のデータベース, kind: db, tier: diagram, x: 24, y: 10, realizes: [store-private], evidence: *impl}
+    groups: &groups2d
+      - {kind: cloud, label: Azure サブスクリプション, provider: azure, tier: diagram, x0: 0, y0: 0, x1: 17.5, y1: 12.5, nodes: &azenv [adf-factory, adf-copy, azure-ir, ssis-ir, blob]}
+      - {kind: datacenter, provider: onprem, label: 自前ネットワーク, tier: diagram, x0: 18, y0: 4, x1: 26, y1: 12.5, nodes: &openv [shir, onprem-db]}
+    layout2d: {tiers: *tiers2d, nodes: {}, groups: *groups2d}
+    layout3d:
+      tiers:
+        - {id: azure, label: Azure, z: 0, size: [17, 11]}
+        - {id: onprem, label: 自前ネットワーク, z: 0, origin: [20, 0], size: [7, 9]}
+      nodes:
+        adf-factory: {tier: azure, x: 2, y: 2}
+        adf-copy: {tier: azure, x: 2, y: 6.5}
+        azure-ir: {tier: azure, x: 8, y: 2}
+        ssis-ir: {tier: azure, x: 8, y: 8}
+        blob: {tier: azure, x: 14, y: 2}
+        shir: {tier: onprem, x: 3, y: 2}
+        onprem-db: {tier: onprem, x: 3, y: 6.5}
+      groups:
+        - {kind: cloud, label: Azure サブスクリプション, provider: azure, tier: [azure], nodes: *azenv}
+        - {kind: datacenter, provider: onprem, label: 自前ネットワーク, tier: [onprem], nodes: *openv}

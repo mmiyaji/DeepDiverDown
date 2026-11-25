@@ -1,0 +1,79 @@
+name: Google Cloud Dataflow：Streaming Engine とオートスケーリング
+description: ストリーミングジョブの処理をワーカー VM からサービス側へ移す Streaming Engine と、ワーカー数を増減するオートスケーリングの関係を追う。
+parent: {model: google-cloud-dataflow, node: workers}
+reference:
+  objectives:
+    - ワーカー VM で動く処理と、Streaming Engine がサービス側で動かす処理を区別する。
+    - オートスケーリングがワーカー数を変える入力と、Dataflow Shuffle との違いを読む。
+  sources:
+    - {title: Dataflow Streaming Engine, url: "https://docs.cloud.google.com/dataflow/docs/streaming-engine"}
+    - {title: Dataflow Horizontal Autoscaling, url: "https://docs.cloud.google.com/dataflow/docs/horizontal-autoscaling"}
+sources: [docs/reference-google-cloud-dataflow-streaming-engine.md]
+evidence: [{type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§1"}, {type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§6"}, {type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§3"}, {type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§8"}, {type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§5"}]
+tiers:
+  - {id: flow, label: ストリーミング処理とスケーリング, z: 0, size: [22, 8]}
+nodes:
+  source: {label: ストリームの入力, kind: queue, tier: flow, x: 0, y: 3, evidence: &s2 [{type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§2"}]}
+  workers: {label: ワーカー VM, parallel: 'N', kind: worker, tier: flow, x: 7, y: 3, description: ユーザーコードを実行する。Streaming Engine を使うと CPU、メモリ、Persistent Disk の使用量が減る。, evidence: *s2}
+  engine: {label: Streaming Engine, kind: service, tier: flow, x: 7, y: 0, description: パイプライン実行の一部をワーカー VM からサービス側のバックエンドへ移す。, evidence: *s2}
+  autoscaler: {label: オートスケーラー, kind: service, tier: flow, x: 14, y: 0, description: 負荷に応じてワーカー数を増減する。, evidence: &s4 [{type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§4"}]}
+  sink: {label: 出力先, kind: table, tier: flow, x: 14, y: 3, evidence: *s2}
+  monitor: {label: ジョブの監視, kind: monitor, tier: flow, x: 20, y: 3, evidence: *s4}
+links:
+  - {id: read, from: source, to: workers, label: 入力を読む, evidence: *s2}
+  - {id: offload, from: workers, to: engine, label: 処理をサービス側へ委ねる, evidence: *s2}
+  - {id: return, from: engine, to: workers, label: 結果を返す, evidence: *s2}
+  - {id: write, from: workers, to: sink, label: 結果を書き込む, evidence: *s2}
+  - {id: backlog, from: source, to: autoscaler, label: バックログを参照, evidence: *s4}
+  - {id: cpu, from: workers, to: autoscaler, label: CPU 使用率を通知, evidence: *s4}
+  - {id: scale, from: autoscaler, to: workers, label: ワーカー数を増減, evidence: *s4}
+  - {id: observe, from: workers, to: monitor, label: 指標を表示, evidence: *s4}
+scenarios:
+  - id: streaming-scale
+    label: ストリーミングジョブの処理とスケール
+    evidence: [{type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§6"}]
+    steps:
+      - {links: [read, offload, return, write], note: ワーカー VM が入力を読み、Streaming Engine と分担して処理して結果を書く。}
+      - {links: [backlog, cpu, scale], note: オートスケーラーが負荷の指標を見てワーカー数を変える。}
+      - {links: [observe], note: ジョブの状態と指標を監視画面で確認する。}
+unknowns:
+  - {id: unverified-split, text: Streaming Engine がサービス側へ移す処理の内訳（状態、タイマー、シャッフル）は、取得した公式ページに個別の記述がなく未確認。, refs: [offload, return]}
+  - {id: unverified-backlog, text: Pub/Sub 入力でオートスケーラーが参照するバックログの詳細は未確認。, refs: [backlog]}
+implementations:
+  - id: gcp
+    label: Streaming Engine を有効にした Java ストリーミングジョブ（Google Cloud）
+    description: Pub/Sub から読む Java の Beam ストリーミングジョブを Streaming Engine 有効で実行する。Dataflow 管理の Compute Engine ワーカーが処理し、BigQuery へ書く。
+    sources:
+      - {title: Dataflow Streaming Engine, url: "https://docs.cloud.google.com/dataflow/docs/streaming-engine"}
+      - {title: Dataflow Horizontal Autoscaling, url: "https://docs.cloud.google.com/dataflow/docs/horizontal-autoscaling"}
+      - {title: Dataflow documentation, url: "https://cloud.google.com/dataflow/docs/overview"}
+      - {title: Dataflow monitoring interface, url: "https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf"}
+    tiers: &se-tiers [{id: diagram, label: Google Cloud の実装構成, z: 0, size: [24, 12]}]
+    nodes:
+      gcp-pubsub: {label: Pub/Sub サブスクリプション, svc: "gcp:pubsub", kind: queue, tier: diagram, x: 6, y: 4, realizes: [source], description: 利用者がトピック・サブスクリプションと権限を設定する。, evidence: &s7 [{type: doc, ref: "docs/reference-google-cloud-dataflow-streaming-engine.md#§7"}]}
+      gcp-workers: {label: Compute Engine（Dataflow 管理ワーカー）, svc: "gcp:gce", kind: worker, tier: diagram, x: 11, y: 7, realizes: [workers], description: Dataflow が管理する VM でユーザーコードを実行する。利用者はジョブ設定、サービスアカウント、ネットワークを指定する。, evidence: *s7}
+      gcp-engine: {label: Streaming Engine（Dataflow サービスのバックエンド）, svc: "gcp:dataflow", kind: service, tier: diagram, x: 11, y: 3, realizes: [engine], description: Dataflow サービス側で動く。利用者はジョブ起動時に有効にするパラメーターを指定する。内部構成は公開されていないため描かない。, evidence: *s7}
+      gcp-autoscaler: {label: Dataflow のオートスケーリング, svc: "gcp:dataflow", kind: service, tier: diagram, x: 17, y: 3, realizes: [autoscaler], description: Streaming Engine のジョブでは水平オートスケーリングが既定で有効。最大ワーカー数と遅延ティアは利用者が設定できる。, evidence: *s7}
+      gcp-bigquery: {label: BigQuery のテーブル, svc: "gcp:bigquery", kind: table, tier: diagram, x: 17, y: 7, realizes: [sink], description: 利用者がテーブルと権限を管理する。, evidence: *s7}
+      gcp-monitor: {label: Dataflow のジョブ監視画面, kind: monitor, tier: diagram, x: 21, y: 10, realizes: [monitor], description: ジョブの状態と指標を確認する。, evidence: *s7}
+    links: []
+    groups: &se-groups
+      - {kind: cloud, label: Google Cloud プロジェクト（サービスの論理的所属）, provider: gcp, tier: diagram, x0: 3.5, y0: 1, x1: 23.8, y1: 11.8, nodes: &se-env [gcp-pubsub, gcp-workers, gcp-engine, gcp-autoscaler, gcp-bigquery, gcp-monitor]}
+      - {kind: vpc, label: ワーカーの利用者 VPC・サブネット, provider: gcp, tier: diagram, x0: 8.3, y0: 5.4, x1: 13.8, y1: 9, nodes: [gcp-workers]}
+    layout2d: {tiers: *se-tiers, nodes: {}, groups: *se-groups}
+    layout3d:
+      tiers:
+        - {id: data, label: Pub/Sub と BigQuery, z: 0, size: [9, 5]}
+        - {id: worker, label: ワーカー VM, z: 0, origin: [10, 0], size: [4, 5]}
+        - {id: service, label: Dataflow サービス側, z: 0, origin: [15, 0], size: [9, 5]}
+        - {id: ops, label: 監視, z: 0, origin: [25, 0], size: [4, 5]}
+      nodes:
+        gcp-pubsub: {tier: data, x: 2, y: 1}
+        gcp-bigquery: {tier: data, x: 6, y: 3}
+        gcp-workers: {tier: worker, x: 2, y: 2}
+        gcp-engine: {tier: service, x: 2, y: 2}
+        gcp-autoscaler: {tier: service, x: 7, y: 2}
+        gcp-monitor: {tier: ops, x: 2, y: 2}
+      groups:
+        - {kind: cloud, label: Google Cloud プロジェクト（サービスの論理的所属）, provider: gcp, tier: [data, worker, service, ops], nodes: *se-env}
+        - {kind: vpc, label: ワーカーの利用者 VPC・サブネット, provider: gcp, tier: [worker], nodes: [gcp-workers]}

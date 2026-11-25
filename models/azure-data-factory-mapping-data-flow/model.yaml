@@ -1,0 +1,83 @@
+name: Azure Data Factory：Mapping Data Flow の実行
+description: Data Flow アクティビティが Azure IR のコンピューティング設定に従って Spark クラスターを用意し、ソースから変換、シンクまでを実行する。
+parent: {model: azure-data-factory, node: flow}
+reference:
+  objectives:
+    - Data Flow アクティビティと Azure IR のコンピューティング設定の関係を追う。
+    - Spark クラスターの起動と TTL による再利用を区別する。
+    - ソース、変換、シンクの実行順とデータの出入りを読む。
+  sources:
+    - {title: Mapping data flows in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-overview}
+    - {title: Mapping data flow performance and tuning guide, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-performance}
+    - {title: Data Flow activity in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/control-flow-execute-data-flow-activity}
+sources: [docs/reference-azure-data-factory-mapping-data-flow.md]
+evidence: [{type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§1"}, {type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§6"}, {type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§8"}]
+tiers:
+  - {id: setup, label: 設定とクラスターの用意, z: 1, size: [24, 5]}
+  - {id: run, label: Spark 上の実行, z: 0, size: [24, 8]}
+nodes:
+  activity: {label: Data Flow アクティビティ, kind: workflow, tier: setup, x: 0, y: 2, description: パイプライン内で Data Flow を実行する。使う Azure IR を指定する。, evidence: &act [{type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§2"}]}
+  definition: {label: Data Flow の定義, kind: catalog, tier: setup, x: 0, y: 4.5, description: ソース、変換、シンクをつないだ変換グラフ。, evidence: *act}
+  ir: {label: Azure IR のコンピューティング設定, kind: service, tier: setup, x: 8, y: 2, description: コンピューティングの種類、コア数、TTL を持つ。, evidence: &cfg [{type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§3"}]}
+  cluster: {label: Spark クラスター, kind: worker, tier: run, x: 8, y: 4, description: ADF が管理する。設定に従って起動し、TTL の間は次の実行で再利用できる。, evidence: &spark [{type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§4"}]}
+  store-in: {label: 入力のデータストア, kind: db, tier: run, x: 0, y: 7, evidence: &io [{type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§5"}]}
+  source: {label: ソース変換, kind: worker, tier: run, x: 8, y: 7, description: 入力データストアからデータを読み込む。, evidence: *io}
+  transform: {label: 変換, kind: worker, tier: run, x: 14, y: 7, description: フィルター、結合、集計、派生列などを適用する。, evidence: *io}
+  sink: {label: シンク変換, kind: worker, tier: run, x: 20, y: 7, description: 変換後のデータを出力先へ書く。, evidence: *io}
+  store-out: {label: 出力のデータストア, kind: db, tier: run, x: 20, y: 4, evidence: *io}
+links:
+  - {id: reference-flow, from: activity, to: definition, label: 実行する定義を参照, evidence: *act}
+  - {id: select-ir, from: activity, to: ir, label: 使う IR を指定, evidence: *cfg}
+  - {id: provision, from: ir, to: cluster, label: 設定に従い起動、TTL 内は再利用, evidence: *spark}
+  - {id: submit-graph, from: definition, to: cluster, label: 変換グラフを Spark 実行へ渡す, evidence: *spark}
+  - {id: run-source, from: cluster, to: source, label: ソースの読み込みを実行, evidence: *spark}
+  - {id: read-input, from: store-in, to: source, label: 入力データを読む, evidence: *io}
+  - {id: to-transform, from: source, to: transform, label: 行を変換へ渡す, evidence: *io}
+  - {id: to-sink, from: transform, to: sink, label: 変換結果をシンクへ渡す, evidence: *io}
+  - {id: write-output, from: sink, to: store-out, label: 出力先へ書く, evidence: *io}
+scenarios:
+  - id: data-flow-run
+    label: Data Flow アクティビティの実行
+    evidence: [{type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§6"}, {type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§8"}]
+    steps:
+      - {links: [reference-flow, select-ir], note: アクティビティが Data Flow の定義と使う Azure IR を指定する。}
+      - {links: [provision, submit-graph], note: IR のコンピューティング設定でクラスターを起動する。TTL 内の既存クラスターがあれば再利用し、変換グラフを渡す。}
+      - {links: [run-source, read-input, to-transform, to-sink], note: Spark がソースを読み、変換を適用してシンクへ渡す。}
+      - {links: [write-output], note: シンクが出力先のデータストアへ書く。}
+unknowns:
+  - {id: unverified, text: クラスターの起動時間、再利用の判定条件、Spark への変換方式の詳細は未確認。, refs: [provision, submit-graph]}
+  - {id: sizing, text: コア数、TTL、パーティション数の最適値は未確認。データ量と変換内容による。, refs: [select-ir]}
+implementations:
+  - id: azure
+    label: ADF の Azure IR と ADLS Gen2
+    description: Azure IR のコンピューティング設定で ADF 管理の Spark クラスターを起動し、ADLS Gen2 の raw を読み、変換して curated に書く。
+    sources:
+      - {title: Mapping data flows in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-overview}
+      - {title: Mapping data flow performance and tuning guide, url: https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-performance}
+      - {title: Data Flow activity in Azure Data Factory, url: https://learn.microsoft.com/en-us/azure/data-factory/control-flow-execute-data-flow-activity}
+    tiers: &tiers2d [{id: diagram, label: ADF と ADLS Gen2, z: 0, size: [26, 12]}]
+    nodes:
+      adf-pipeline: {label: ADF パイプラインと Data Flow の定義, svc: azure:datafactory, kind: workflow, tier: diagram, x: 3, y: 3, realizes: [activity, definition], description: Data Flow アクティビティと、変換グラフの定義を持つ。, evidence: &impl [{type: doc, ref: "docs/reference-azure-data-factory-mapping-data-flow.md#§7"}]}
+      azure-ir: {label: Azure IR（Data Flow のコンピューティング設定）, svc: azure:datafactory, kind: service, tier: diagram, x: 3, y: 8, realizes: [ir], description: 利用者がコンピューティングの種類、コア数、TTL を指定する。, evidence: *impl}
+      spark: {label: ADF 管理の Spark クラスター, svc: azure:datafactory, kind: worker, tier: diagram, x: 10, y: 6, realizes: [cluster], description: Microsoft が運用する。内部ホストへ利用者は直接アクセスしない。, evidence: *impl}
+      flow-run: {label: ソース・変換・シンク, svc: azure:datafactory, kind: worker, tier: diagram, x: 15.5, y: 6, realizes: [source, transform, sink], description: Spark 上で実行する Data Flow の各段。, evidence: *impl}
+      adls-raw: {label: ADLS Gen2（raw）, svc: azure:storage, kind: db, tier: diagram, x: 21, y: 3, realizes: [store-in], evidence: *impl}
+      adls-curated: {label: ADLS Gen2（curated）, svc: azure:storage, kind: db, tier: diagram, x: 21, y: 9, realizes: [store-out], evidence: *impl}
+    groups: &groups2d
+      - {kind: cloud, label: Azure サブスクリプション, provider: azure, tier: diagram, x0: 0, y0: 0, x1: 25, y1: 11.5, nodes: &azenv [adf-pipeline, azure-ir, spark, flow-run, adls-raw, adls-curated]}
+      - {kind: cluster, label: Data Factory（ADF 管理の実行）, provider: azure, tier: diagram, x0: 0.5, y0: 1.2, x1: 18.5, y1: 10.8, nodes: [adf-pipeline, azure-ir, spark, flow-run]}
+    layout2d: {tiers: *tiers2d, nodes: {}, groups: *groups2d}
+    layout3d:
+      tiers:
+        - {id: adf, label: Data Factory, z: 0, size: [8, 9]}
+        - {id: sparkt, label: 管理 Spark, z: 0, origin: [10, 0], size: [8, 9]}
+        - {id: storage, label: Azure Storage, z: 0, origin: [20, 0], size: [5, 9]}
+      nodes:
+        adf-pipeline: {tier: adf, x: 3, y: 2}
+        azure-ir: {tier: adf, x: 3, y: 6.5}
+        spark: {tier: sparkt, x: 3, y: 2}
+        flow-run: {tier: sparkt, x: 3, y: 6.5}
+        adls-raw: {tier: storage, x: 2, y: 2}
+        adls-curated: {tier: storage, x: 2, y: 6.5}
+      groups:
+        - {kind: cloud, label: Azure サブスクリプション, provider: azure, tier: [adf, sparkt, storage], nodes: *azenv}

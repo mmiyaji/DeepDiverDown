@@ -1,0 +1,87 @@
+name: Google Cloud Dataflow：ジョブの最適化とワーカー
+description: Beam パイプラインが実行グラフになり、Dataflow サービスが検証・最適化したジョブをワーカーで実行するまでを追う。
+parent: {model: google-cloud-dataflow, node: runner}
+reference:
+  objectives:
+    - 手元で実行グラフを作る段階と、サービス側で最適化する段階を区別する。
+    - ステップの融合で中間の PCollection が省かれる点を追う。
+  sources:
+    - {title: Dataflow pipeline lifecycle, url: "https://docs.cloud.google.com/dataflow/docs/pipeline-lifecycle"}
+    - {title: Dataflow documentation, url: "https://cloud.google.com/dataflow/docs/overview"}
+sources: [docs/reference-google-cloud-dataflow-job-optimization.md]
+evidence: [{type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§1"}, {type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§6"}, {type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§8"}]
+tiers:
+  - {id: submit, label: 投入元とジョブ作成, z: 1, size: [22, 4]}
+  - {id: run, label: 最適化と実行, z: 0, size: [22, 5]}
+nodes:
+  code: {label: パイプラインのコード, kind: client, tier: submit, x: 0, y: 1.5, description: Beam SDK で入力・変換・出力を記述する。, evidence: &g1 [{type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§2"}]}
+  graph: {label: 実行グラフ, kind: service, tier: submit, x: 5, y: 1.5, description: 起動したマシンでコードを実行して作る。DoFn の中身はここでは実行しない。, evidence: *g1}
+  staging: {label: 依存ファイルの置き場, kind: file, tier: submit, x: 5, y: 3.5, description: ジョブが使う依存ファイルを置く。, evidence: *g1}
+  job: {label: 検証済みジョブ, kind: service, tier: submit, x: 10, y: 1.5, description: サービスが JSON のグラフを検証して作る。投入元にはジョブ ID が返る。, evidence: &g3 [{type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§3"}]}
+  optimizer: {label: グラフの最適化, kind: service, tier: run, x: 10, y: 1, description: ステップの融合と、集計前の部分的な結合を行う。, evidence: &g4 [{type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§4"}]}
+  stages: {label: 融合後のステージ, kind: service, tier: run, x: 15, y: 1, description: 複数のステップを 1 つにまとめた実行単位。, evidence: *g4}
+  workers: {label: ワーカー, parallel: 'N', kind: worker, tier: run, x: 15, y: 3.5, description: ステージの処理を、ワーカー間とスレッド間で並列に実行する。, evidence: &g5 [{type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§5"}]}
+  sink: {label: 出力先, kind: table, tier: run, x: 20, y: 3.5, evidence: *g5}
+  monitor: {label: ジョブの監視, kind: monitor, tier: run, x: 20, y: 1, description: ジョブ ID を使って状態を確認する。, evidence: *g5}
+links:
+  - {id: build, from: code, to: graph, label: 実行グラフを構築, evidence: *g1}
+  - {id: stage-files, from: code, to: staging, label: 依存ファイルを配置, evidence: *g1}
+  - {id: submit-job, from: graph, to: job, label: JSON で投入, evidence: *g3}
+  - {id: optimize, from: job, to: optimizer, label: 検証後に最適化, evidence: *g4}
+  - {id: fuse, from: optimizer, to: stages, label: ステップを融合, evidence: *g4}
+  - {id: assign, from: stages, to: workers, label: 処理を割り当て, evidence: *g5}
+  - {id: fetch, from: workers, to: staging, label: 依存ファイルを取得, evidence: *g5}
+  - {id: write, from: workers, to: sink, label: 結果を書き込む, evidence: *g5}
+  - {id: observe, from: job, to: monitor, label: ジョブ ID で状態を参照, evidence: *g3}
+scenarios:
+  - id: submit-and-run
+    label: コードからジョブの実行まで
+    evidence: [{type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§6"}]
+    steps:
+      - {links: [build, stage-files], note: 手元で実行グラフを作り、依存ファイルを置く。}
+      - {links: [submit-job, optimize], note: グラフを JSON でサービスへ送り、検証後にジョブとして最適化する。}
+      - {links: [fuse, assign, fetch], note: ステップを融合したステージを、ワーカーに割り当てる。}
+      - {links: [write, observe], note: 結果を書き込み、ジョブ ID で状態を確認する。}
+unknowns:
+  - {id: unverified-fusion, text: どのステップが実際に融合されるかは、グラフの形に依存し、公式資料の範囲では未確認。, refs: [optimize, fuse]}
+  - {id: unverified-assign, text: ステージをワーカーへ割り当てる内部の仕組みと、ワーカー VM の起動の詳細は公開資料で確認できていない。, refs: [assign]}
+implementations:
+  - id: gcp
+    label: Java Beam ジョブを Dataflow へ投入（Google Cloud）
+    description: 開発端末から Java の Beam ジョブを Dataflow Runner で投入する。Dataflow サービスが検証・最適化し、Dataflow 管理の Compute Engine ワーカーで実行して BigQuery へ書く。
+    sources:
+      - {title: Dataflow pipeline lifecycle, url: "https://docs.cloud.google.com/dataflow/docs/pipeline-lifecycle"}
+      - {title: Dataflow documentation, url: "https://cloud.google.com/dataflow/docs/overview"}
+      - {title: Dataflow のワーカーとステージング, url: "https://docs.cloud.google.com/dataflow/docs/request-quotas"}
+      - {title: Dataflow monitoring interface, url: "https://cloud.google.com/dataflow/docs/guides/using-monitoring-intf"}
+    tiers: &opt-tiers [{id: diagram, label: Google Cloud の実装構成, z: 0, size: [24, 12]}]
+    nodes:
+      gcp-client: {label: Java Beam SDK の実行環境, kind: client, tier: diagram, x: 1, y: 4, realizes: [code, graph], description: 開発端末でコードを実行して実行グラフを作り、Dataflow Runner で投入する。, evidence: &g8 [{type: doc, ref: "docs/reference-google-cloud-dataflow-job-optimization.md#§7"}]}
+      gcp-stage: {label: Cloud Storage（ステージング）, svc: "gcp:gcs", kind: file, tier: diagram, x: 6, y: 9, realizes: [staging], description: 依存ファイルのステージングと一時領域に使う。, evidence: *g8}
+      gcp-dataflow: {label: Dataflow サービス, svc: "gcp:dataflow", kind: service, tier: diagram, x: 7, y: 4, realizes: [job, optimizer, stages], description: Google が運用する。グラフの検証、最適化、ステージの管理を行う。利用者はジョブの投入・監視・停止を API や画面から操作する。, evidence: *g8}
+      gcp-workers: {label: Compute Engine（Dataflow 管理ワーカー）, svc: "gcp:gce", kind: worker, tier: diagram, x: 13, y: 7, realizes: [workers], description: Dataflow が管理する VM でステージの処理を実行する。利用者はジョブ設定、サービスアカウント、ネットワークを指定する。, evidence: *g8}
+      gcp-bigquery: {label: BigQuery のテーブル, svc: "gcp:bigquery", kind: table, tier: diagram, x: 19, y: 7, realizes: [sink], description: 利用者がテーブルと権限を管理する。, evidence: *g8}
+      gcp-monitor: {label: Dataflow のジョブ監視画面, kind: monitor, tier: diagram, x: 19, y: 3, realizes: [monitor], description: ジョブの状態とステージの指標を確認する。, evidence: *g8}
+    links:
+      - {id: gcp-submit, from: gcp-client, to: gcp-dataflow, label: ジョブを投入, realizes: [submit-job], evidence: *g8}
+      - {id: gcp-stage-put, from: gcp-client, to: gcp-stage, label: 依存ファイルをステージング, realizes: [stage-files], evidence: *g8}
+    groups: &opt-groups
+      - {kind: cloud, label: Google Cloud プロジェクト（サービスの論理的所属）, provider: gcp, tier: diagram, x0: 4.5, y0: 1.5, x1: 23.5, y1: 11.5, nodes: &opt-env [gcp-dataflow, gcp-stage, gcp-workers, gcp-bigquery, gcp-monitor]}
+      - {kind: vpc, label: ワーカーの利用者 VPC・サブネット, provider: gcp, tier: diagram, x0: 10.5, y0: 5.2, x1: 16, y1: 9, nodes: [gcp-workers]}
+    layout2d: {tiers: *opt-tiers, nodes: {}, groups: *opt-groups}
+    layout3d:
+      tiers:
+        - {id: client, label: 開発端末, kind: origin, z: 0, origin: [-5, 0], size: [3, 4]}
+        - {id: service, label: Dataflow サービスとステージング, z: 0, size: [9, 5]}
+        - {id: worker, label: ワーカー VM, z: 0, origin: [12, 0], size: [4, 5]}
+        - {id: data, label: BigQuery と監視, z: 0, origin: [20, 0], size: [9, 5]}
+      nodes:
+        gcp-client: {tier: client, x: 1, y: 2}
+        gcp-dataflow: {tier: service, x: 2, y: 2}
+        gcp-stage: {tier: service, x: 7, y: 2}
+        gcp-workers: {tier: worker, x: 2, y: 2}
+        gcp-bigquery: {tier: data, x: 2, y: 2}
+        gcp-monitor: {tier: data, x: 7, y: 2}
+      groups:
+        - {kind: cloud, label: Google Cloud プロジェクト（サービスの論理的所属）, provider: gcp, tier: [service, worker, data], nodes: *opt-env}
+        - {kind: vpc, label: ワーカーの利用者 VPC・サブネット, provider: gcp, tier: [worker], nodes: [gcp-workers]}
