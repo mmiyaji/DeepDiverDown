@@ -16,6 +16,7 @@
     databricks: { label: 'Databricks', color: '#FF3621' },
     snowflake: { label: 'Snowflake', color: '#29B5E8' },
     fabric: { label: 'Microsoft Fabric', color: '#16847A' },
+    clickhouse: { label: 'ClickHouse Cloud', color: '#6d6a63' },
     purview: { label: 'Microsoft Purview', color: '#6B4DB5' },
     datadog: { label: 'Datadog', color: '#632CA6' },
     newrelic: { label: 'New Relic', color: '#008C86' },

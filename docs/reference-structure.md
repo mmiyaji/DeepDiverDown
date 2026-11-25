@@ -54,3 +54,7 @@
 ## 分類ページの「違い」
 
 分類ごとに `docs/category-<slug>.md` を置き、その分類の製品を同じ観点で比べる表を書く。観点は分類ごとに決める（バッチ・SQL エンジンなら、実行モデル・スケール・ストレージとの関係・得意な処理・運用形態）。
+
+## 実装例の稼働環境
+
+すべての実装例は、利用者・外部クライアント以外の部品を稼働環境の枠（クラウドは `kind: cloud` と `provider`、自前の拠点や手元の PC は `kind: datacenter` と `provider: onprem`）に入れる。2D・3D の表示用の `groups` にも同じ枠を置く。`node tools/audit-provider-boundaries.mjs <id>` で点検し、`product` を書いたリファレンスはテストでも確かめる。

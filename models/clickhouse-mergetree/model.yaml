@@ -232,6 +232,8 @@ implementations:
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [processing, setup], nodes: [mergetree-host, mergetree-server, mergetree-data, mergetree-merge, mergetree-system]}
     nodes:
       mergetree-host: {label: 自前 Linux サーバー, kind: host, tier: processing, x: 3, y: 0, description: 利用者が ClickHouse Server とローカルファイルシステムを運用する。, evidence: [{type: doc, ref: docs/reference-clickhouse-mergetree.md#§6}]}
       mergetree-insert: {label: clickhouse-client から INSERT, kind: client, tier: processing, x: 1, y: 1.15, realizes: [insert], description: バッチ単位で注文を投入する。, evidence: [{type: doc, ref: docs/reference-clickhouse-mergetree.md#§6}]}
@@ -246,7 +248,7 @@ implementations:
       - {id: mergetree-system-connection, from: mergetree-system, to: mergetree-server, label: パートの状態を観測}
     layout2d:
       tiers:
-        - {id: diagram, label: 自前 ClickHouse, z: 0, size: [20, 12]}
+        - {id: diagram, label: 自前 ClickHouse, z: 0, size: [21, 13]}
       nodes:
         mergetree-insert: {tier: diagram, x: 2, y: 2}
         mergetree-result: {tier: diagram, x: 2, y: 8}
@@ -256,6 +258,7 @@ implementations:
         mergetree-data: {tier: diagram, x: 17, y: 3}
         mergetree-system: {tier: diagram, x: 13, y: 10}
       groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [diagram], x0: 4.5, y0: -1.3, x1: 20.3, y1: 12.5, nodes: [mergetree-host, mergetree-server, mergetree-data, mergetree-merge, mergetree-system]}
         - {kind: nodegroup, label: 自前 Linux サーバー, tier: [diagram], x0: 5.3, y0: -0.5, x1: 19.5, y1: 11.7, nodes: [mergetree-host, mergetree-server, mergetree-merge, mergetree-data, mergetree-system]}
     layout3d:
       tiers:
@@ -271,6 +274,7 @@ implementations:
         mergetree-merge: {tier: process, x: 6, y: 2}
         mergetree-system: {tier: process, x: 10, y: 2}
       groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [host, process], nodes: [mergetree-host, mergetree-server, mergetree-data, mergetree-merge, mergetree-system]}
         - {kind: nodegroup, label: 自前 Linux サーバー, tier: [host, process], nodes: [mergetree-host, mergetree-server, mergetree-merge, mergetree-data, mergetree-system]}
   - id: aws-ec2-mergetree
     label: AWS（ClickHouse on EC2・Amazon EBS）

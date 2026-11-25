@@ -167,6 +167,8 @@ implementations:
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    groups:
+      - {kind: datacenter, label: 利用者の PC / サーバー, provider: onprem, tier: [processing, setup], nodes: [python-parquet-host, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}
     nodes:
       python-parquet-host: {label: 自前 Python 実行ホスト, kind: host, tier: processing, x: 3, y: 0, description: 利用者が Python プロセスとローカルファイルシステムを管理する。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§7}]}
       python-parquet-client: {label: Python の DuckDB 接続, kind: client, tier: processing, x: 1, y: 1.15, realizes: [query], description: duckdb.connect で作った接続から SQL を実行する。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§7}]}
@@ -179,7 +181,7 @@ implementations:
       - {id: python-parquet-metadata-connection, from: python-parquet-metadata, to: python-parquet-client, label: ファイル内統計を調べる}
     layout2d:
       tiers:
-        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 20]}
       nodes:
         python-parquet-host: {tier: diagram, x: 2, y: 2}
         python-parquet-client: {tier: diagram, x: 2, y: 5}
@@ -187,6 +189,7 @@ implementations:
         python-parquet-parquet: {tier: diagram, x: 2, y: 11}
         python-parquet-metadata: {tier: diagram, x: 2, y: 14}
       groups:
+        - {kind: datacenter, label: 利用者の PC / サーバー, provider: onprem, tier: [diagram], x0: -0.8, y0: -0.8, x1: 4.8, y1: 18.8, nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}
         - {kind: nodegroup, label: "自前ホスト", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 18, nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}
     layout3d:
       tiers:
@@ -198,4 +201,5 @@ implementations:
         python-parquet-parquet: {tier: zone0, x: 2, y: 10}
         python-parquet-metadata: {tier: zone0, x: 2, y: 13}
       groups:
+        - {kind: datacenter, label: 利用者の PC / サーバー, provider: onprem, tier: [zone0], nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}
         - {kind: nodegroup, label: "自前ホスト", tier: [zone0], nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}

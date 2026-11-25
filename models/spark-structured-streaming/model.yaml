@@ -50,6 +50,8 @@ implementations:
     tiers:
       - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
       - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [processing, setup], nodes: [kafka-parquet-master, kafka-parquet-host, kafka-parquet-hdfs, kafka-parquet-source, kafka-parquet-driver, kafka-parquet-executors, kafka-parquet-parquet, kafka-parquet-checkpoint, kafka-parquet-module]}
     nodes:
       kafka-parquet-master: {label: Spark Standalone Master, kind: service, tier: processing, x: 1, y: 0, description: Worker を登録し Executor の資源を割り当てる。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-host: {label: 自前 Linux Worker ホスト群, kind: host, tier: processing, x: 5, y: 0, description: Spark Worker と cluster モードの Driver・Executor JVM を実行する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
@@ -72,7 +74,7 @@ implementations:
 
     layout2d:
       tiers:
-        - {id: diagram, label: 自前運用のストリーミング構成, z: 0, size: [23, 12]}
+        - {id: diagram, label: 自前運用のストリーミング構成, z: 0, size: [25, 13]}
       nodes:
         kafka-parquet-source: {tier: diagram, x: 2, y: 3}
         kafka-parquet-master: {tier: diagram, x: 7, y: 2}
@@ -84,6 +86,7 @@ implementations:
         kafka-parquet-checkpoint: {tier: diagram, x: 17.5, y: 6}
         kafka-parquet-parquet: {tier: diagram, x: 21, y: 6}
       groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [diagram], x0: 0.5, y0: -1.3, x1: 24.3, y1: 12.4, nodes: [kafka-parquet-master, kafka-parquet-host, kafka-parquet-hdfs, kafka-parquet-source, kafka-parquet-driver, kafka-parquet-executors, kafka-parquet-parquet, kafka-parquet-checkpoint, kafka-parquet-module]}
         - {kind: cluster, label: Spark Standalone クラスター, tier: [diagram], x0: 4.5, y0: -0.5, x1: 14.5, y1: 11.6, nodes: [kafka-parquet-master, kafka-parquet-host, kafka-parquet-driver, kafka-parquet-executors, kafka-parquet-module]}
         - {kind: cluster, label: HDFS クラスター, tier: [diagram], x0: 14.8, y0: -0.5, x1: 23.5, y1: 8.5, nodes: [kafka-parquet-hdfs, kafka-parquet-checkpoint, kafka-parquet-parquet]}
     layout3d:
@@ -103,6 +106,7 @@ implementations:
         kafka-parquet-checkpoint: {tier: hdfs, x: 5, y: 1.5}
         kafka-parquet-parquet: {tier: hdfs, x: 9, y: 1.5}
       groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [kafka, hosts, app, hdfs], nodes: [kafka-parquet-master, kafka-parquet-host, kafka-parquet-hdfs, kafka-parquet-source, kafka-parquet-driver, kafka-parquet-executors, kafka-parquet-parquet, kafka-parquet-checkpoint, kafka-parquet-module]}
         - {kind: cluster, label: Spark Standalone クラスター, tier: [hosts, app], nodes: [kafka-parquet-master, kafka-parquet-host, kafka-parquet-driver, kafka-parquet-executors, kafka-parquet-module]}
         - {kind: cluster, label: HDFS クラスター, tier: [hdfs], nodes: [kafka-parquet-hdfs, kafka-parquet-checkpoint, kafka-parquet-parquet]}
 

@@ -160,6 +160,7 @@ implementations:
       - {id: servers, label: ClickHouse Server のホスト, z: 1, size: [22, 7]}
       - {id: keeperhosts, label: ClickHouse Keeper のホスト, z: 0, size: [22, 4]}
     groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers, keeperhosts], nodes: [sm-server, sm-distributed, sm-replica, sm-parts, sm-keeper, sm-config]}
       - {kind: cluster, label: 自前運用のクラスター, tier: [servers, keeperhosts], nodes: [sm-server, sm-distributed, sm-replica, sm-parts, sm-keeper, sm-config]}
     nodes:
       sm-client: {label: clickhouse-client, kind: client, tier: access, x: 1, y: 3, realizes: [client], description: クラスターのいずれかの Server へ SQL を送る。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
@@ -183,7 +184,7 @@ implementations:
       - {id: compute, label: ClickHouse Cloud のサービス（計算）, z: 1, size: [22, 7]}
       - {id: shared, label: 共有ストレージと調整, z: 0, size: [22, 5]}
     groups:
-      - {kind: cloud, label: ClickHouse Cloud, tier: [compute, shared], nodes: [cl-compute, cl-smt, cl-object, cl-keeper]}
+      - {kind: cloud, label: ClickHouse Cloud, provider: clickhouse, tier: [compute, shared], nodes: [cl-compute, cl-smt, cl-object, cl-keeper]}
     nodes:
       cl-client: {label: SQL クライアント, kind: client, tier: access, x: 1, y: 3, realizes: [client], description: サービスの URL へ接続して SQL を送る。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
       cl-compute: {label: 計算ノード（レプリカ）, kind: service, tier: compute, x: 2, y: 3, realizes: [planner, scan, engine, distributed], description: SQL を処理する。レプリカ数を増やして水平に拡張でき、Cloud ではシャードを足さずに拡張できる。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
