@@ -1,0 +1,614 @@
+name: Trino：プッシュダウンと Dynamic Filtering
+description: Connector へのプッシュダウンと、結合のビルド側から作る dynamic filter が、読むデータと Split を減らす流れを追う。
+reference:
+  objectives:
+    - 述語・射影・集約・結合・LIMIT・Top-N のプッシュダウンの違いを説明する。
+    - Dynamic filter がビルド側から作られ、スキャンと Split 列挙に適用される流れを追う。
+    - どちらも Connector の対応に依存することを理解する。
+  sources:
+    - title: Trino · Pushdown
+      url: https://trino.io/docs/current/optimizer/pushdown.html
+    - title: Trino · Dynamic filtering
+      url: https://trino.io/docs/current/admin/dynamic-filtering.html
+    - title: Trino · Cost-based optimizations
+      url: https://trino.io/docs/current/optimizer/cost-based-optimizations.html
+    - title: Trino · Iceberg connector
+      url: https://trino.io/docs/current/connector/iceberg.html
+sources:
+  - docs/reference-trino-pushdown-dynamic-filtering.md
+evidence:
+  - { type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§1" }
+tiers:
+  - id: flow
+    label: 計画時の絞り込みと実行時の絞り込み
+    z: 0
+    size: [28, 7]
+nodes:
+  sql:
+    label: SQL（WHERE・列・LIMIT・集約・結合）
+    kind: client
+    tier: flow
+    x: 0
+    'y': 1.5
+    replicas: 2
+    description: 絞り込みや集約を含むクエリ。
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§1" }]
+  optimizer:
+    label: オプティマイザー
+    kind: service
+    tier: flow
+    x: 5
+    'y': 1.5
+    replicas: 1
+    description: プッシュダウンを試し、結合の順序と方式を選び、dynamic filter を計画に加える。
+    evidence:
+      - { type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§2" }
+      - { type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§3" }
+  stats:
+    label: テーブル統計
+    kind: table
+    tier: flow
+    x: 5
+    'y': 5
+    replicas: 2
+    description: Connector が返す統計。結合の順序とビルド側の選択に使う。なければ AUTOMATIC でも ELIMINATE_CROSS_JOINS に戻る。
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§3" }]
+  connector:
+    label: Connector
+    kind: service
+    tier: flow
+    x: 11
+    'y': 1.5
+    replicas: 2
+    description: 押し込まれた条件を受け入れるか決める。対応は Connector ごとに異なる。
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§3" }]
+  splits:
+    label: Split 列挙（Coordinator）
+    kind: scheduler
+    tier: flow
+    x: 11
+    'y': 5
+    replicas: 1
+    description: dynamic filter で、読む必要のない Split を除く（Hive Connector では dynamic partition pruning）。
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§5" }]
+  source:
+    label: データソース
+    kind: db
+    tier: flow
+    x: 17
+    'y': 5
+    replicas: 2
+    description: 押し込まれた述語・列・集約などを処理する。ORC・Parquet では stripe や row group も除外できる。
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§2" }]
+  scan:
+    label: プローブ側のスキャン
+    kind: worker
+    tier: flow
+    x: 17
+    'y': 1.5
+    parallel: 'N'
+    description: 絞り込んだデータを読み、dynamic filter を適用する。
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§5" }]
+  build:
+    label: 結合のビルド側
+    kind: worker
+    tier: flow
+    x: 23
+    'y': 5
+    parallel: 'N'
+    description: 右側のテーブルを処理しながら、結合キーの候補値を集める。
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§4" }]
+  dfilter:
+    label: Dynamic filter
+    kind: policy
+    tier: flow
+    x: 23
+    'y': 1.5
+    replicas: 2
+    description: 実行時に作る条件。値の集合、または上限を超えたら列ごとの最小値と最大値。
+    evidence:
+      - { type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§4" }
+      - { type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§6" }
+links:
+  - id: plan
+    from: sql
+    to: optimizer
+    label: 計画を作る
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§2" }]
+  - id: use-stats
+    from: stats
+    to: optimizer
+    label: 結合の順序とビルド側を選ぶ
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§3" }]
+  - id: push
+    from: optimizer
+    to: connector
+    label: 述語・列・LIMIT などの押し込みを試す
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§2" }]
+  - id: narrow
+    from: connector
+    to: source
+    label: データソース側で絞る
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§2" }]
+  - id: scan-read
+    from: source
+    to: scan
+    label: 絞った行・列を返す
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§2" }]
+  - id: collect-keys
+    from: build
+    to: dfilter
+    label: 結合キーの値を集める
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§4" }]
+  - id: apply-scan
+    from: dfilter
+    to: scan
+    label: プローブ側のスキャンに適用
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§5" }]
+  - id: prune-splits
+    from: dfilter
+    to: splits
+    label: Coordinator が Split を絞る
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§5" }]
+  - id: assign
+    from: splits
+    to: scan
+    label: 残った Split を割り当てる
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§5" }]
+scenarios:
+  - id: join-with-filter
+    label: 絞り込みのある結合クエリ
+    evidence: [{ type: doc, ref: "docs/reference-trino-pushdown-dynamic-filtering.md#§4" }]
+    steps:
+      - links: [plan, use-stats]
+        note: 統計から結合の順序とビルド側を選び、計画を作る。
+      - links: [push, narrow, scan-read]
+        note: Connector が受け入れた述語・列・LIMIT などをデータソース側で処理し、絞ったデータを読む。
+      - links: [collect-keys]
+        note: ビルド側を処理しながら結合キーの候補値を集める。
+      - links: [apply-scan, prune-splits, assign]
+        note: 集めた条件をプローブ側のスキャンに適用し、Coordinator は読まない Split を除いて残りを割り当てる。
+unknowns:
+  - id: UNK-01
+    text: Iceberg 以外の Connector ごとの対応範囲と、Iceberg Connector のプッシュダウン対応の詳細は確認していない。
+    refs: [connector]
+  - id: UNK-02
+    text: 結合のプッシュダウンの成功条件と性能への影響は Connector とデータソースに依存し、個別には確認していない。
+    refs: [optimizer, source]
+gates: { maxDrift: 0, maxHigh: 2 }
+implementations:
+  - id: trino-iceberg
+    label: EKS 上の Trino・Glue Catalog・S3
+    description: EKS の EC2 ノード上で Trino Coordinator / Worker を実行し、Glue Data Catalog と S3 上の Iceberg を読む構成例。
+    sources:
+      - title: Trino · Concepts
+        url: https://trino.io/docs/current/overview/concepts.html
+      - title: Trino · Iceberg connector
+        url: https://trino.io/docs/current/connector/iceberg.html
+      - title: Trino file system support
+        url: https://trino.io/docs/current/object-storage/file-system-s3.html
+      - title: Trino on Kubernetes with Helm
+        url: https://trino.io/docs/current/installation/kubernetes.html
+      - title: Amazon EKS managed node groups
+        url: https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+      - title: IAM roles for service accounts
+        url: https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+    tiers:
+      - id: entry
+        label: 利用者
+        kind: origin
+        z: 2
+        size:
+          - 18
+          - 3
+      - id: control-plane
+        label: AWS の管理・認証
+        z: 1
+        size:
+          - 18
+          - 3
+      - id: processing
+        label: EKS の Trino 実行
+        z: 0
+        size:
+          - 18
+          - 3
+      - id: storage
+        label: テーブルの保存
+        z: -1
+        size:
+          - 18
+          - 3
+    nodes:
+      trino-iceberg-client:
+        label: Trino CLI
+        kind: client
+        tier: entry
+        x: 1
+        'y': 1.5
+        realizes:
+          - sql
+        description: SQL を送り、結果を取得する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+      trino-iceberg-coordinator:
+        label: Trino Coordinator Pod
+        kind: service
+        tier: processing
+        x: 3
+        'y': 1.5
+        realizes:
+          - optimizer
+          - splits
+          - connector
+          - dfilter
+        description: Iceberg Connector とカタログ設定を持つ Coordinator が Glue に問い合わせ、分散クエリを計画する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+        management:
+          type: customer
+          scope: 利用者が Trino とカタログ設定、SQL アクセスを管理する。
+      trino-iceberg-workers:
+        label: Trino Worker Pods
+        kind: worker
+        tier: processing
+        x: 9
+        'y': 1.5
+        realizes:
+          - scan
+          - build
+          - connector
+          - dfilter
+        description: EC2 ノード上の Worker Pod が S3 のファイルを並列に読み、集計する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+        management:
+          type: customer
+          scope: 利用者が Trino の配置、容量と更新を管理する。
+      trino-iceberg-data:
+        label: S3 / Iceberg テーブル
+        kind: db
+        tier: storage
+        x: 9
+        'y': 1.5
+        svc: s3
+        realizes:
+          - source
+          - stats
+        description: スナップショットが参照する物理ファイルを保持する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+        management:
+          type: shared
+          scope: AWS が S3 基盤を運用し、利用者がデータと権限を管理する。
+      trino-iceberg-glue:
+        label: AWS Glue Data Catalog
+        kind: catalog
+        tier: control-plane
+        x: 3
+        'y': 1.5
+        description: テーブルのメタデータ位置を提供する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+        svc: glue
+        management:
+          type: shared
+          scope: AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。
+      trino-iceberg-eks:
+        label: Amazon EKS / Kubernetes API
+        svc: eks
+        kind: service
+        tier: control-plane
+        x: 9
+        'y': 1.5
+        description: Kubernetes の制御プレーンが Trino の Pod 配置を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+        management:
+          type: shared
+          scope: AWS が制御プレーンを運用し、利用者が Kubernetes API とクラスタ設定を操作する。
+      trino-iceberg-ec2:
+        label: EC2 / EKS ノードグループ
+        svc: ec2
+        kind: host
+        tier: processing
+        x: 15
+        'y': 1.5
+        description: マネージドノードグループの EC2 が Coordinator と Worker の Pod を実行する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+        management:
+          type: shared
+          scope: AWS が EC2 基盤を運用し、利用者がノードグループと更新を管理する。
+      trino-iceberg-iam:
+        label: IAM / Pod 用ロール
+        svc: iam
+        kind: policy
+        tier: control-plane
+        x: 15
+        'y': 1.5
+        description: サービスアカウントに対応する IAM ロールで Glue と S3 へのアクセス権を付与する。
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+        management:
+          type: customer
+          scope: 利用者がサービスアカウントと IAM ロール・ポリシーを設定する。
+    links:
+      - id: trino-host-coordinator
+        from: trino-iceberg-ec2
+        to: trino-iceberg-coordinator
+        label: Coordinator Pod を実行
+      - id: trino-glue
+        from: trino-iceberg-coordinator
+        to: trino-iceberg-glue
+        label: テーブル情報を取得
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+      - id: trino-eks-schedule
+        from: trino-iceberg-eks
+        to: trino-iceberg-workers
+        label: Worker Pod を配置
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+      - id: trino-ec2-runtime
+        from: trino-iceberg-ec2
+        to: trino-iceberg-workers
+        label: Pod を実行
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+      - id: trino-iam-role
+        from: trino-iceberg-iam
+        to: trino-iceberg-coordinator
+        label: AWS アクセス権を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+      - id: trino-iam-workers
+        from: trino-iceberg-iam
+        to: trino-iceberg-workers
+        label: S3 読み取り権限を付与
+        evidence:
+          - type: doc
+            ref: docs/reference-trino-pushdown-dynamic-filtering.md#§7
+    groups:
+      - kind: cloud
+        label: AWS アカウント
+        provider: aws
+        tier:
+          - control-plane
+          - processing
+          - storage
+        nodes:
+          - trino-iceberg-glue
+          - trino-iceberg-eks
+          - trino-iceberg-iam
+          - trino-iceberg-coordinator
+          - trino-iceberg-workers
+          - trino-iceberg-ec2
+          - trino-iceberg-data
+      - kind: cluster
+        label: EKS クラスタ / Trino
+        tier:
+          - processing
+        nodes:
+          - trino-iceberg-coordinator
+          - trino-iceberg-workers
+          - trino-iceberg-ec2
+    layout2d:
+      tiers:
+        - id: diagram
+          label: AWS 上の Trino
+          z: 0
+          size:
+            - 25
+            - 13
+      nodes:
+        trino-iceberg-client:
+          tier: diagram
+          x: 1
+          'y': 2
+        trino-iceberg-eks:
+          tier: diagram
+          x: 4.5
+          'y': 2
+        trino-iceberg-ec2:
+          tier: diagram
+          x: 11
+          'y': 2
+        trino-iceberg-coordinator:
+          tier: diagram
+          x: 9
+          'y': 6
+        trino-iceberg-workers:
+          tier: diagram
+          x: 13
+          'y': 6
+        trino-iceberg-iam:
+          tier: diagram
+          x: 7
+          'y': 10
+        trino-iceberg-glue:
+          tier: diagram
+          x: 19
+          'y': 3
+        trino-iceberg-data:
+          tier: diagram
+          x: 19
+          'y': 8
+      groups:
+        - kind: cloud
+          label: AWS アカウント
+          provider: aws
+          tier:
+            - diagram
+          x0: 2.8
+          y0: -0.3
+          x1: 22
+          y1: 12
+          nodes:
+            - trino-iceberg-eks
+            - trino-iceberg-ec2
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers
+            - trino-iceberg-iam
+            - trino-iceberg-glue
+            - trino-iceberg-data
+        - kind: vpc
+          label: EKS ワーカーの利用者 VPC
+          provider: aws
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 0.7
+          x1: 15.5
+          y1: 8.5
+          nodes:
+            - trino-iceberg-ec2
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers
+        - kind: cluster
+          label: EKS クラスター（ワーカー側）
+          provider: k8s
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 0.7
+          x1: 15.5
+          y1: 8.5
+          nodes:
+            - trino-iceberg-ec2
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers
+        - kind: namespace
+          label: Trino 名前空間
+          provider: k8s
+          tier:
+            - diagram
+          x0: 6.8
+          y0: 4.2
+          x1: 15.5
+          y1: 8.5
+          nodes:
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers
+    layout3d:
+      tiers:
+        - id: client
+          label: Trino CLI
+          kind: origin
+          z: 0
+          origin:
+            - -5
+            - 0
+          size:
+            - 3
+            - 5
+        - id: platform
+          label: EKS 実行ノード
+          z: 0
+          size:
+            - 10
+            - 5
+        - id: pods
+          label: Trino Pods
+          z: 1
+          size:
+            - 10
+            - 5
+        - id: services
+          label: AWS 管理サービス
+          z: 0
+          origin:
+            - 14
+            - 0
+          size:
+            - 16
+            - 5
+      nodes:
+        trino-iceberg-client:
+          tier: client
+          x: 1
+          'y': 2
+        trino-iceberg-ec2:
+          tier: platform
+          x: 5
+          'y': 2
+        trino-iceberg-coordinator:
+          tier: pods
+          x: 2
+          'y': 2
+        trino-iceberg-workers:
+          tier: pods
+          x: 7
+          'y': 2
+        trino-iceberg-eks:
+          tier: services
+          x: 2
+          'y': 2
+        trino-iceberg-iam:
+          tier: services
+          x: 6
+          'y': 2
+        trino-iceberg-glue:
+          tier: services
+          x: 10
+          'y': 2
+        trino-iceberg-data:
+          tier: services
+          x: 14
+          'y': 2
+      groups:
+        - kind: cloud
+          label: AWS アカウント
+          provider: aws
+          tier:
+            - platform
+            - pods
+            - services
+          nodes:
+            - trino-iceberg-eks
+            - trino-iceberg-ec2
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers
+            - trino-iceberg-iam
+            - trino-iceberg-glue
+            - trino-iceberg-data
+        - kind: vpc
+          label: EKS ワーカーの利用者 VPC
+          provider: aws
+          tier:
+            - platform
+            - pods
+          nodes:
+            - trino-iceberg-ec2
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers
+        - kind: cluster
+          label: EKS クラスター（ワーカー側）
+          provider: k8s
+          tier:
+            - platform
+            - pods
+          nodes:
+            - trino-iceberg-ec2
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers
+        - kind: namespace
+          label: Trino 名前空間
+          provider: k8s
+          tier:
+            - pods
+          nodes:
+            - trino-iceberg-coordinator
+            - trino-iceberg-workers

@@ -1,12 +1,19 @@
-name: Trino の分散クエリアーキテクチャ
-description: SQL クライアントの受注集計を Trino が計画し、Iceberg テーブルを並列に読んで結果を返します。
+name: Trino の基本アーキテクチャ
+description: Coordinator・Worker・カタログ・Connector・クライアントの役割と、SQL が結果になるまでのデータの流れ。
 reference:
   objectives:
-    - Stage、Task、Split の関係を区別する。
-    - Connector で読み出したデータが Exchange を経て返る流れを追う。
+    - Coordinator と Worker の役割を区別する。
+    - カタログ、Connector、メタストア、データソースの関係を説明する。
+    - SQL が計画され、Worker が読み、結果が返るまでの流れを追う。
   sources:
+    - title: Trino · Use cases
+      url: https://trino.io/docs/current/overview/use-cases.html
     - title: Trino · Concepts
       url: https://trino.io/docs/current/overview/concepts.html
+    - title: Trino · Deploying Trino
+      url: https://trino.io/docs/current/installation/deployment.html
+    - title: Trino · Client protocol
+      url: https://trino.io/docs/current/client/client-protocol.html
     - title: Trino · Iceberg connector
       url: https://trino.io/docs/current/connector/iceberg.html
 sources:
@@ -16,154 +23,152 @@ evidence:
     ref: docs/reference-trino.md#§1
 tiers:
   - id: flow
-    label: データと処理
+    label: クエリの流れ
     z: 0
-    size:
-      - 16
-      - 5
-groups:
-  - kind: parallel
-    label: Split ごとに Worker が並列実行
-    tier: flow
-    nodes:
-      - scan
-      - reduce
+    size: [20, 6]
 nodes:
   client:
-    label: SQL クライアント
+    label: クライアント（CLI・JDBC など）
     kind: client
     tier: flow
     x: 0
-    'y': 1
-    description: 受注明細を日別に集計する SQL を送る。
+    'y': 1.5
+    replicas: 2
+    description: SQL を Coordinator に送り、結果を受け取る。
     evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§1
-  control:
-    label: SQL の計画と調整
+      - { type: doc, ref: "docs/reference-trino.md#§4" }
+  coordinator:
+    label: Coordinator
     kind: service
     tier: flow
-    x: 4
-    'y': 1
-    description: 分散計画と Task の実行を調整する。
+    x: 5
+    'y': 1.5
+    replicas: 1
+    description: SQL を解析して計画を作り、Worker を管理して実行を調整する。クライアントの接続先。
     evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§1
-  connector:
-    label: 外部テーブルのメタデータ解決
-    kind: service
-    tier: flow
-    x: 9
-    'y': 0
-    description: カタログとテーブルメタデータから Split を列挙する。
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§2
-  scan:
-    parallel: 'N'
-    label: 分割データの読取タスク
+      - { type: doc, ref: "docs/reference-trino.md#§2" }
+  worker:
+    label: Worker
     kind: worker
     tier: flow
-    x: 8
-    'y': 4
-    description: 担当 Split を読み、部分集計する。
+    x: 10
+    'y': 1.5
+    parallel: 'N'
+    description: Task を実行してデータを処理する。起動時に Coordinator へ登録し、ハートビートを送る。
     evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§3
-  data:
-    partitions: 6
-    label: Iceberg テーブルのデータファイル
+      - { type: doc, ref: "docs/reference-trino.md#§2" }
+      - { type: doc, ref: "docs/reference-trino.md#§5" }
+  catalog:
+    label: カタログ設定
+    kind: file
+    tier: flow
+    x: 5
+    'y': 4.5
+    replicas: 2
+    description: etc/catalog/<名前>.properties。connector.name と接続情報を持つ。
+    evidence:
+      - { type: doc, ref: "docs/reference-trino.md#§3" }
+  connector:
+    label: Connector
+    kind: service
+    tier: flow
+    x: 10
+    'y': 4.5
+    replicas: 2
+    description: データソースへのアダプター（Coordinator と各 Worker が読み込む）。メタデータ、Split、データの読み出しを担う。
+    evidence:
+      - { type: doc, ref: "docs/reference-trino.md#§3" }
+  metastore:
+    label: メタストア
+    kind: catalog
+    tier: flow
+    x: 16
+    'y': 0.5
+    replicas: 2
+    description: テーブルの定義とメタデータの位置を持つ。Iceberg Connector は Hive metastore・Glue・JDBC・REST などを選ぶ。
+    evidence:
+      - { type: doc, ref: "docs/reference-trino.md#§3" }
+  source:
+    label: データソース
     kind: db
     tier: flow
-    x: 13
-    'y': 4
-    description: 受注明細のファイルを保持する。
+    x: 16
+    'y': 4.5
+    replicas: 2
+    description: Trino の外にあるデータ。オブジェクトストレージや RDB など。
     evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§2
-  reduce:
-    parallel: 'N'
-    label: 集約タスク
-    kind: worker
-    tier: flow
-    x: 4
-    'y': 4
-    description: Exchange で受け取った部分集計を統合する。
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§3
+      - { type: doc, ref: "docs/reference-trino.md#§1" }
 links:
   - id: submit
     from: client
-    to: control
+    to: coordinator
     label: SQL を送る
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§1
-  - id: resolve
-    from: control
-    to: connector
-    label: テーブルを解決して分割候補を列挙
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§2
+    sync: true
+    timeoutMs: 60000
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§4" }]
+  - id: register
+    from: worker
+    to: coordinator
+    label: 登録とハートビート
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§2" }]
   - id: assign
-    from: control
-    to: scan
-    label: 読取単位とタスクを割り当てる
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§1
+    from: coordinator
+    to: worker
+    label: Task と Split を割り当てる
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§4" }]
+  - id: configure
+    from: catalog
+    to: connector
+    label: Connector を構成
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§3" }]
+  - id: resolve
+    from: connector
+    to: metastore
+    label: テーブルのメタデータを解決
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§3" }]
+  - id: list-splits
+    from: connector
+    to: source
+    label: メタデータを読み Split を列挙
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§4" }]
   - id: read
-    from: data
-    to: scan
-    label: 対象のデータ範囲を読む
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§3
-  - id: exchange
-    from: scan
-    to: reduce
-    label: 中間の集約結果を送る
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§3
+    from: worker
+    to: source
+    label: Split のデータを読む
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§4" }]
   - id: collect
-    from: reduce
-    to: control
-    label: 集計結果を返す
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§3
+    from: worker
+    to: coordinator
+    label: 結果を渡す
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§4" }]
   - id: return
-    from: control
+    from: coordinator
     to: client
-    label: 結果を取得
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§3
+    label: 結果を返す
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§4" }]
 scenarios:
-  - id: orders-by-date
-    label: Iceberg の受注明細を日別集計
-    evidence:
-      - type: doc
-        ref: docs/reference-trino.md#§1
+  - id: query-flow
+    label: SQL が結果になるまで
+    evidence: [{ type: doc, ref: "docs/reference-trino.md#§4" }]
     steps:
-      - links:
-          - submit
-          - resolve
-        note: Coordinator が SQL を解析し、Iceberg テーブルと読み取り対象の Split を解決する。
-      - links:
-          - assign
-          - read
-        note: Worker が担当 Split を読み、並列に部分集計する。
-      - links:
-          - exchange
-        note: 別 Stage の Task が Exchange 経由で部分集計を受け取り、日別にまとめる。
-      - links:
-          - collect
-          - return
-        note: Coordinator が最終結果を取得し、クライアントに返す。
+      - links: [register]
+        note: Worker は起動時に Coordinator の discovery へ登録し、ハートビートで登録を保つ。
+      - links: [submit, configure]
+        note: クライアントが SQL を送る。Coordinator はカタログ設定で構成された Connector を使う。
+      - links: [resolve, list-splits]
+        note: Connector がメタデータを解決し、読み取り単位（Split）を列挙する。
+      - links: [assign, read]
+        note: Coordinator が Worker に Task と Split を割り当て、Worker が Connector を通してデータを読む。
+      - links: [collect, return]
+        note: 結果が Coordinator 経由でクライアントに返る（direct protocol の場合）。
+gates: { maxDrift: 0, maxHigh: 1 }   # Coordinator 1 台構成（公式の構成どおり）の指摘のみ許容
+unknowns:
+  - id: UNK-01
+    text: Coordinator の冗長化（複数台構成）は今回確認した資料の範囲では記載を確認していない。図では 1 台とする。
+    refs: [coordinator]
+  - id: UNK-02
+    text: 実装例の台数、ノードサイズ、ネットワーク経路、Trino・EKS のバージョン互換性は資料で指定されていない。
+    refs: [coordinator, worker]
 implementations:
   - id: trino-iceberg
     label: EKS 上の Trino・Glue Catalog・S3
@@ -219,7 +224,7 @@ implementations:
         description: SQL を送り、結果を取得する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
       trino-iceberg-coordinator:
         label: Trino Coordinator Pod
         kind: service
@@ -227,12 +232,13 @@ implementations:
         x: 3
         'y': 1.5
         realizes:
-          - control
+          - coordinator
+          - catalog
           - connector
-        description: Iceberg Connector を備えた Coordinator が Glue に問い合わせ、分散クエリを計画する。
+        description: Iceberg Connector とカタログ設定を持つ Coordinator が Glue に問い合わせ、分散クエリを計画する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
         management: {type: customer, scope: "利用者が Trino とカタログ設定、SQL アクセスを管理する。"}
       trino-iceberg-workers:
         label: Trino Worker Pods
@@ -241,12 +247,12 @@ implementations:
         x: 9
         'y': 1.5
         realizes:
-          - scan
-          - reduce
+          - worker
+          - connector
         description: EC2 ノード上の Worker Pod が S3 のファイルを並列に読み、集計する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
         management: {type: customer, scope: "利用者が Trino の配置、容量と更新を管理する。"}
       trino-iceberg-data:
         label: S3 / Iceberg テーブル
@@ -256,11 +262,11 @@ implementations:
         'y': 1.5
         svc: s3
         realizes:
-          - data
+          - source
         description: スナップショットが参照する物理ファイルを保持する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
         management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}
       trino-iceberg-glue:
         label: AWS Glue Data Catalog
@@ -271,8 +277,10 @@ implementations:
         description: テーブルのメタデータ位置を提供する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
         svc: glue
+        realizes:
+          - metastore
         management: {type: shared, scope: "AWS が Glue 基盤を運用し、利用者がカタログと権限を管理する。"}
       trino-iceberg-eks:
         label: Amazon EKS / Kubernetes API
@@ -284,7 +292,7 @@ implementations:
         description: Kubernetes の制御プレーンが Trino の Pod 配置を管理する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
         management: {type: shared, scope: "AWS が制御プレーンを運用し、利用者が Kubernetes API とクラスタ設定を操作する。"}
       trino-iceberg-ec2:
         label: EC2 / EKS ノードグループ
@@ -296,7 +304,7 @@ implementations:
         description: マネージドノードグループの EC2 が Coordinator と Worker の Pod を実行する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
         management: {type: shared, scope: "AWS が EC2 基盤を運用し、利用者がノードグループと更新を管理する。"}
       trino-iceberg-iam:
         label: IAM / Pod 用ロール
@@ -308,10 +316,9 @@ implementations:
         description: サービスアカウントに対応する IAM ロールで Glue と S3 へのアクセス権を付与する。
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
         management: {type: customer, scope: "利用者がサービスアカウントと IAM ロール・ポリシーを設定する。"}
     links:
-      - {id: trino-metadata, from: trino-iceberg-coordinator, to: trino-iceberg-data, label: Iceberg メタデータを読む}
       - {id: trino-host-coordinator, from: trino-iceberg-ec2, to: trino-iceberg-coordinator, label: Coordinator Pod を実行}
       - id: trino-glue
         from: trino-iceberg-coordinator
@@ -319,35 +326,35 @@ implementations:
         label: テーブル情報を取得
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
       - id: trino-eks-schedule
         from: trino-iceberg-eks
         to: trino-iceberg-workers
         label: Worker Pod を配置
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
       - id: trino-ec2-runtime
         from: trino-iceberg-ec2
         to: trino-iceberg-workers
         label: Pod を実行
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
       - id: trino-iam-role
         from: trino-iceberg-iam
         to: trino-iceberg-coordinator
         label: AWS アクセス権を付与
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
       - id: trino-iam-workers
         from: trino-iceberg-iam
         to: trino-iceberg-workers
         label: S3 読み取り権限を付与
         evidence:
           - type: doc
-            ref: docs/reference-trino.md#§4
+            ref: docs/reference-trino.md#§6
     groups:
       - kind: cloud
         label: AWS アカウント

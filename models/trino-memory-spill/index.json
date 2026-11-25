@@ -1,0 +1,242 @@
+{
+  "model": "trino-memory-spill",
+  "name": "Trino：メモリ管理とスピル",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "op": {
+      "type": "node",
+      "label": "Operator（結合・集約・ソート・ウィンドウ）",
+      "status": "claim"
+    },
+    "usermem": {
+      "type": "node",
+      "label": "ユーザーメモリ（追跡対象）",
+      "status": "claim"
+    },
+    "limits": {
+      "type": "node",
+      "label": "メモリ上限",
+      "status": "claim"
+    },
+    "killer": {
+      "type": "node",
+      "label": "低メモリ時のクエリ終了",
+      "status": "claim"
+    },
+    "revocable": {
+      "type": "node",
+      "label": "取り消し可能メモリ",
+      "status": "claim"
+    },
+    "spill": {
+      "type": "node",
+      "label": "スピル先（ローカルディスク）",
+      "status": "claim"
+    },
+    "alloc": {
+      "type": "link",
+      "label": "Operator（結合・集約・ソート・ウィンドウ） → ユーザーメモリ（追跡対象）",
+      "status": "claim"
+    },
+    "alloc-revocable": {
+      "type": "link",
+      "label": "Operator（結合・集約・ソート・ウィンドウ） → 取り消し可能メモリ",
+      "status": "claim"
+    },
+    "check-user": {
+      "type": "link",
+      "label": "ユーザーメモリ（追跡対象） → メモリ上限",
+      "status": "claim"
+    },
+    "check-total": {
+      "type": "link",
+      "label": "取り消し可能メモリ → メモリ上限",
+      "status": "claim"
+    },
+    "kill": {
+      "type": "link",
+      "label": "メモリ上限 → 低メモリ時のクエリ終了",
+      "status": "claim"
+    },
+    "spill-write": {
+      "type": "link",
+      "label": "取り消し可能メモリ → スピル先（ローカルディスク）",
+      "status": "claim"
+    },
+    "unspill": {
+      "type": "link",
+      "label": "スピル先（ローカルディスク） → Operator（結合・集約・ソート・ウィンドウ）",
+      "status": "claim"
+    },
+    "memory-pressure": {
+      "type": "scenario",
+      "label": "メモリを使い切りそうなクエリ"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "メモリマネージャーが取り消しを始める閾値（memory-revoking-threshold と memory-revoking-target）の既定値と挙動は、確認した資料に記載がない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "取り消し可能メモリがどの上限に数えられるかの詳細は query.max-total-memory 以外を確認していない。"
+    },
+    "trino-iceberg-client": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino CLI",
+      "realizes": []
+    },
+    "trino-iceberg-coordinator": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Coordinator Pod",
+      "realizes": [
+        "killer",
+        "limits"
+      ]
+    },
+    "trino-iceberg-workers": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Worker Pods",
+      "realizes": [
+        "op",
+        "usermem",
+        "revocable",
+        "limits"
+      ]
+    },
+    "trino-iceberg-data": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "S3 / Iceberg テーブル",
+      "realizes": []
+    },
+    "trino-iceberg-glue": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "AWS Glue Data Catalog",
+      "realizes": []
+    },
+    "trino-iceberg-eks": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Amazon EKS / Kubernetes API",
+      "realizes": []
+    },
+    "trino-iceberg-ec2": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "EC2 / EKS ノードグループ",
+      "realizes": [
+        "spill"
+      ]
+    },
+    "trino-iceberg-iam": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "IAM / Pod 用ロール",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-trino-memory-spill.md#§1": [
+      "model",
+      "op"
+    ],
+    "docs/reference-trino-memory-spill.md": [
+      "model",
+      "op",
+      "usermem",
+      "limits",
+      "killer",
+      "revocable",
+      "spill",
+      "alloc",
+      "alloc-revocable",
+      "check-user",
+      "check-total",
+      "kill",
+      "spill-write",
+      "unspill",
+      "memory-pressure",
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue",
+      "trino-iceberg-eks",
+      "trino-iceberg-ec2",
+      "trino-iceberg-iam"
+    ],
+    "docs/reference-trino-memory-spill.md#§2": [
+      "usermem",
+      "limits",
+      "alloc",
+      "check-user"
+    ],
+    "docs/reference-trino-memory-spill.md#§5": [
+      "killer",
+      "kill"
+    ],
+    "docs/reference-trino-memory-spill.md#§3": [
+      "revocable",
+      "alloc-revocable",
+      "check-total",
+      "memory-pressure"
+    ],
+    "docs/reference-trino-memory-spill.md#§4": [
+      "spill",
+      "spill-write",
+      "unspill"
+    ],
+    "docs/reference-trino-memory-spill.md#§6": [
+      "spill"
+    ],
+    "docs/reference-trino-memory-spill.md#§7": [
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue",
+      "trino-iceberg-eks",
+      "trino-iceberg-ec2",
+      "trino-iceberg-iam"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "Trino",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "trino",
+    "objectives": [
+      "ユーザーメモリの上限（クラスタ全体・ノードごと・ヒープの余白）を区別する。",
+      "取り消し可能メモリがスピルの対象になる流れを説明する。",
+      "スピルできる Operator と、スピルしても成功が保証されない点を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Trino · Resource management properties",
+        "url": "https://trino.io/docs/current/admin/properties-resource-management.html"
+      },
+      {
+        "title": "Trino · Spilling to disk",
+        "url": "https://trino.io/docs/current/admin/spill.html"
+      },
+      {
+        "title": "Trino · Spilling properties",
+        "url": "https://trino.io/docs/current/admin/properties-spilling.html"
+      },
+      {
+        "title": "Trino · Query management properties",
+        "url": "https://trino.io/docs/current/admin/properties-query-management.html"
+      }
+    ]
+  }
+}

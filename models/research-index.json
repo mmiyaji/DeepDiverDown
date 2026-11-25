@@ -347,11 +347,11 @@
     },
     {
       "id": "spark-structured-streaming",
-      "name": "Apache Spark Structured Streaming の基本アーキテクチャ",
+      "name": "Spark Structured Streaming：マイクロバッチ・状態・復旧",
       "description": "Kafka のイベントをマイクロバッチで窓集計し、チェックポイントから再開する流れを追うリファレンスです。",
       "domain": "データ処理",
       "category": "ストリーム処理",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
         "Apache"
@@ -489,7 +489,7 @@
     },
     {
       "id": "spark-celeborn-shuffle",
-      "name": "Spark と Celeborn：リモートシャッフルの内部",
+      "name": "Spark：Celeborn によるリモートシャッフル",
       "description": "Spark の map 出力を別の Worker 群に保存し、partition 別に読み戻す仕組みと復旧を追う。",
       "domain": "データ処理",
       "category": "分散実行と保守",
@@ -605,11 +605,11 @@
     },
     {
       "id": "spark-streaming",
-      "name": "Apache Spark Streaming（DStreams）の基本アーキテクチャ",
+      "name": "Spark Streaming（DStreams）：旧 API のバッチ間隔処理と復旧",
       "description": "StreamingContext が入力を RDD の列として処理し、チェックポイントから復旧する旧 API の流れを追うリファレンスです。",
       "domain": "データ処理",
       "category": "ストリーム処理",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
         "Apache"
@@ -2470,8 +2470,8 @@
     },
     {
       "id": "trino",
-      "name": "Trino の分散クエリアーキテクチャ",
-      "description": "SQL クライアントの受注集計を Trino が計画し、Iceberg テーブルを並列に読んで結果を返します。",
+      "name": "Trino の基本アーキテクチャ",
+      "description": "Coordinator・Worker・カタログ・Connector・クライアントの役割と、SQL が結果になるまでのデータの流れ。",
       "domain": "データ処理",
       "category": "バッチ・SQL エンジン",
       "kind": "製品・技術のアーキテクチャ",
@@ -2480,16 +2480,247 @@
         "Trino Software Foundation"
       ],
       "objectives": [
-        "Stage、Task、Split の関係を区別する。",
-        "Connector で読み出したデータが Exchange を経て返る流れを追う。"
+        "Coordinator と Worker の役割を区別する。",
+        "カタログ、Connector、メタストア、データソースの関係を説明する。",
+        "SQL が計画され、Worker が読み、結果が返るまでの流れを追う。"
       ],
       "documents": [
         "docs/reference-trino.md"
       ],
       "sources": [
         {
+          "title": "Trino · Use cases",
+          "url": "https://trino.io/docs/current/overview/use-cases.html"
+        },
+        {
           "title": "Trino · Concepts",
           "url": "https://trino.io/docs/current/overview/concepts.html"
+        },
+        {
+          "title": "Trino · Deploying Trino",
+          "url": "https://trino.io/docs/current/installation/deployment.html"
+        },
+        {
+          "title": "Trino · Client protocol",
+          "url": "https://trino.io/docs/current/client/client-protocol.html"
+        },
+        {
+          "title": "Trino · Iceberg connector",
+          "url": "https://trino.io/docs/current/connector/iceberg.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "trino-iceberg",
+          "label": "EKS 上の Trino・Glue Catalog・S3",
+          "sources": [
+            {
+              "title": "Trino · Concepts",
+              "url": "https://trino.io/docs/current/overview/concepts.html"
+            },
+            {
+              "title": "Trino · Iceberg connector",
+              "url": "https://trino.io/docs/current/connector/iceberg.html"
+            },
+            {
+              "title": "Trino file system support",
+              "url": "https://trino.io/docs/current/object-storage/file-system-s3.html"
+            },
+            {
+              "title": "Trino on Kubernetes with Helm",
+              "url": "https://trino.io/docs/current/installation/kubernetes.html"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trino-query-execution",
+      "name": "Trino：Stage・Task・Split と Exchange",
+      "description": "SQL が分散計画の Stage に分かれ、Task・Split・Driver として Worker で実行され、Exchange で受け渡される流れを追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Trino Software Foundation"
+      ],
+      "objectives": [
+        "Statement、Query、Stage、Task、Split、Driver、Operator、Exchange を区別する。",
+        "Stage は計画の単位で、実行するのは Task だと説明する。",
+        "Split が末端の Stage の読み取り単位で、中間の Stage は Exchange から読むことを追う。"
+      ],
+      "documents": [
+        "docs/reference-trino-query-execution.md"
+      ],
+      "sources": [
+        {
+          "title": "Trino · Concepts",
+          "url": "https://trino.io/docs/current/overview/concepts.html"
+        },
+        {
+          "title": "Trino · EXPLAIN",
+          "url": "https://trino.io/docs/current/sql/explain.html"
+        },
+        {
+          "title": "Trino · Task properties",
+          "url": "https://trino.io/docs/current/admin/properties-task.html"
+        },
+        {
+          "title": "Trino · Query management properties",
+          "url": "https://trino.io/docs/current/admin/properties-query-management.html"
+        },
+        {
+          "title": "Trino · Cost-based optimizations",
+          "url": "https://trino.io/docs/current/optimizer/cost-based-optimizations.html"
+        },
+        {
+          "title": "Trino · Iceberg connector",
+          "url": "https://trino.io/docs/current/connector/iceberg.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "trino-iceberg",
+          "label": "EKS 上の Trino・Glue Catalog・S3",
+          "sources": [
+            {
+              "title": "Trino · Concepts",
+              "url": "https://trino.io/docs/current/overview/concepts.html"
+            },
+            {
+              "title": "Trino · Iceberg connector",
+              "url": "https://trino.io/docs/current/connector/iceberg.html"
+            },
+            {
+              "title": "Trino file system support",
+              "url": "https://trino.io/docs/current/object-storage/file-system-s3.html"
+            },
+            {
+              "title": "Trino on Kubernetes with Helm",
+              "url": "https://trino.io/docs/current/installation/kubernetes.html"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trino-memory-spill",
+      "name": "Trino：メモリ管理とスピル",
+      "description": "Operator のメモリがどう数えられ、上限を超えたときに終了されるか、スピルでディスクへ逃がすかを追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Trino Software Foundation"
+      ],
+      "objectives": [
+        "ユーザーメモリの上限（クラスタ全体・ノードごと・ヒープの余白）を区別する。",
+        "取り消し可能メモリがスピルの対象になる流れを説明する。",
+        "スピルできる Operator と、スピルしても成功が保証されない点を説明する。"
+      ],
+      "documents": [
+        "docs/reference-trino-memory-spill.md"
+      ],
+      "sources": [
+        {
+          "title": "Trino · Resource management properties",
+          "url": "https://trino.io/docs/current/admin/properties-resource-management.html"
+        },
+        {
+          "title": "Trino · Spilling to disk",
+          "url": "https://trino.io/docs/current/admin/spill.html"
+        },
+        {
+          "title": "Trino · Spilling properties",
+          "url": "https://trino.io/docs/current/admin/properties-spilling.html"
+        },
+        {
+          "title": "Trino · Query management properties",
+          "url": "https://trino.io/docs/current/admin/properties-query-management.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "trino-iceberg",
+          "label": "EKS 上の Trino・Glue Catalog・S3",
+          "sources": [
+            {
+              "title": "Trino · Concepts",
+              "url": "https://trino.io/docs/current/overview/concepts.html"
+            },
+            {
+              "title": "Trino · Iceberg connector",
+              "url": "https://trino.io/docs/current/connector/iceberg.html"
+            },
+            {
+              "title": "Trino file system support",
+              "url": "https://trino.io/docs/current/object-storage/file-system-s3.html"
+            },
+            {
+              "title": "Trino on Kubernetes with Helm",
+              "url": "https://trino.io/docs/current/installation/kubernetes.html"
+            },
+            {
+              "title": "Amazon EKS managed node groups",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html"
+            },
+            {
+              "title": "IAM roles for service accounts",
+              "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trino-pushdown-dynamic-filtering",
+      "name": "Trino：プッシュダウンと Dynamic Filtering",
+      "description": "Connector へのプッシュダウンと、結合のビルド側から作る dynamic filter が、読むデータと Split を減らす流れを追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Trino Software Foundation"
+      ],
+      "objectives": [
+        "述語・射影・集約・結合・LIMIT・Top-N のプッシュダウンの違いを説明する。",
+        "Dynamic filter がビルド側から作られ、スキャンと Split 列挙に適用される流れを追う。",
+        "どちらも Connector の対応に依存することを理解する。"
+      ],
+      "documents": [
+        "docs/reference-trino-pushdown-dynamic-filtering.md"
+      ],
+      "sources": [
+        {
+          "title": "Trino · Pushdown",
+          "url": "https://trino.io/docs/current/optimizer/pushdown.html"
+        },
+        {
+          "title": "Trino · Dynamic filtering",
+          "url": "https://trino.io/docs/current/admin/dynamic-filtering.html"
+        },
+        {
+          "title": "Trino · Cost-based optimizations",
+          "url": "https://trino.io/docs/current/optimizer/cost-based-optimizations.html"
         },
         {
           "title": "Trino · Iceberg connector",
@@ -4155,11 +4386,96 @@
     },
     {
       "id": "clickhouse",
-      "name": "ClickHouse の MergeTree：疎インデックスとパートのマージ",
-      "description": "直近 7 日の注文を例に、月パーティションと疎主インデックスで読む範囲を絞り、バックグラウンドマージでパートが置き換わる流れを追う。",
+      "name": "ClickHouse の基本アーキテクチャ",
+      "description": "SQL を受けるサーバー、ベクトル化された列指向の実行、テーブルエンジン、MergeTree の保存、Distributed とシャード・レプリカ、Keeper による調整までを一枚で見る。",
       "domain": "データ処理",
       "category": "バッチ・SQL エンジン",
       "kind": "製品・技術のアーキテクチャ",
+      "tags": [
+        "OSS",
+        "ClickHouse"
+      ],
+      "objectives": [
+        "クエリ処理、テーブルエンジン、ストレージの役割を区別する。",
+        "MergeTree が不変のパートとして保存し、疎主インデックスで読む範囲を絞ることを説明する。",
+        "シャード（分散）とレプリカ（複製）の違いと、Distributed テーブル・ReplicatedMergeTree・Keeper の役割を説明する。",
+        "自前運用のクラスターと ClickHouse Cloud で、保存と複製の担い手がどう変わるかを比べる。"
+      ],
+      "documents": [
+        "docs/reference-clickhouse.md"
+      ],
+      "sources": [
+        {
+          "title": "ClickHouse アーキテクチャ概説（学術論文の解説）",
+          "url": "https://clickhouse.com/docs/academic_overview"
+        },
+        {
+          "title": "ClickHouse MergeTree table engine",
+          "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree"
+        },
+        {
+          "title": "ClickHouse Distributed table engine",
+          "url": "https://clickhouse.com/docs/engines/table-engines/special/distributed"
+        },
+        {
+          "title": "ClickHouse データレプリケーション",
+          "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"
+        },
+        {
+          "title": "ClickHouse Keeper",
+          "url": "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"
+        },
+        {
+          "title": "ClickHouse の水平スケール",
+          "url": "https://clickhouse.com/docs/architecture/horizontal-scaling"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "self-managed",
+          "label": "自前運用クラスター（Linux ホストの Server と Keeper）",
+          "sources": [
+            {
+              "title": "ClickHouse の水平スケール",
+              "url": "https://clickhouse.com/docs/architecture/horizontal-scaling"
+            },
+            {
+              "title": "ClickHouse の複製",
+              "url": "https://clickhouse.com/docs/architecture/replication"
+            },
+            {
+              "title": "ClickHouse Keeper",
+              "url": "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"
+            },
+            {
+              "title": "ClickHouse データレプリケーション",
+              "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"
+            }
+          ]
+        },
+        {
+          "id": "cloud",
+          "label": "ClickHouse Cloud（計算とオブジェクトストレージの分離）",
+          "sources": [
+            {
+              "title": "ClickHouse Cloud のアーキテクチャ",
+              "url": "https://clickhouse.com/docs/cloud/reference/architecture"
+            },
+            {
+              "title": "SharedMergeTree",
+              "url": "https://clickhouse.com/docs/cloud/reference/shared-merge-tree"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clickhouse-mergetree",
+      "name": "ClickHouse：MergeTree のパートと疎インデックス",
+      "description": "直近 7 日の注文を例に、月パーティションと疎主インデックスで読む範囲を絞り、バックグラウンドマージでパートが置き換わる流れを追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
         "ClickHouse"
@@ -4170,7 +4486,7 @@
         "パートのマージが物理配置とクエリ結果に与える影響を説明する。"
       ],
       "documents": [
-        "docs/reference-clickhouse.md"
+        "docs/reference-clickhouse-mergetree.md"
       ],
       "sources": [
         {
@@ -4230,12 +4546,370 @@
       ]
     },
     {
+      "id": "clickhouse-replication",
+      "name": "ClickHouse：レプリケーションと Keeper",
+      "description": "ReplicatedMergeTree が、INSERT を受けたレプリカから他のレプリカへデータを複製し、マージを同じ手順で実行し、その調整を ClickHouse Keeper に任せる流れを追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "ClickHouse"
+      ],
+      "objectives": [
+        "ReplicatedMergeTree のテーブルが Keeper 上のパスとレプリカ名で識別されることを説明する。",
+        "INSERT は受けたレプリカにまず書かれ、非同期に他のレプリカへ複製されることを追う。",
+        "マージが各レプリカで同じ手順で行われ、結果が転送されないことを説明する。",
+        "Keeper が使えないとき、複製表と SELECT がどうなるかを区別する。"
+      ],
+      "documents": [
+        "docs/reference-clickhouse-replication.md"
+      ],
+      "sources": [
+        {
+          "title": "ClickHouse データレプリケーション",
+          "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"
+        },
+        {
+          "title": "ClickHouse の複製（シャードとレプリカの構成例）",
+          "url": "https://clickhouse.com/docs/architecture/replication"
+        },
+        {
+          "title": "ClickHouse Keeper",
+          "url": "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"
+        },
+        {
+          "title": "ClickHouse アーキテクチャ概説（学術論文の解説）",
+          "url": "https://clickhouse.com/docs/academic_overview"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "self-managed",
+          "label": "自前運用（Linux ホストの Server 2 台と Keeper）",
+          "sources": [
+            {
+              "title": "ClickHouse の複製（シャードとレプリカの構成例）",
+              "url": "https://clickhouse.com/docs/architecture/replication"
+            },
+            {
+              "title": "ClickHouse データレプリケーション",
+              "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"
+            },
+            {
+              "title": "ClickHouse Keeper",
+              "url": "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clickhouse-distributed-query",
+      "name": "ClickHouse：Distributed テーブルとシャード越えのクエリ",
+      "description": "Distributed テーブルがクラスター定義に従って各シャードへ SELECT と INSERT を振り分け、結果を集約する流れと、レプリカの選び方を追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "ClickHouse"
+      ],
+      "objectives": [
+        "Distributed テーブル自身はデータを持たず、クラスター定義を介してシャードを使うことを説明する。",
+        "SELECT が全シャードで並列に実行され、集約が一部シャード側で行えることを追う。",
+        "INSERT の分散キー、シャードの重み、バックグラウンド送信を説明する。",
+        "internal_replication とレプリカの選択（load_balancing）が、複製表との組み合わせでどう効くかを区別する。"
+      ],
+      "documents": [
+        "docs/reference-clickhouse-distributed-query.md"
+      ],
+      "sources": [
+        {
+          "title": "ClickHouse Distributed table engine",
+          "url": "https://clickhouse.com/docs/engines/table-engines/special/distributed"
+        },
+        {
+          "title": "ClickHouse の水平スケール（シャードの構成例）",
+          "url": "https://clickhouse.com/docs/architecture/horizontal-scaling"
+        },
+        {
+          "title": "ClickHouse の複製（シャードとレプリカの構成例）",
+          "url": "https://clickhouse.com/docs/architecture/replication"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "self-managed",
+          "label": "自前運用（2 シャード x 各 2 レプリカの Server と Keeper）",
+          "sources": [
+            {
+              "title": "ClickHouse の水平スケール（シャードの構成例）",
+              "url": "https://clickhouse.com/docs/architecture/horizontal-scaling"
+            },
+            {
+              "title": "ClickHouse の複製（シャードとレプリカの構成例）",
+              "url": "https://clickhouse.com/docs/architecture/replication"
+            },
+            {
+              "title": "ClickHouse Distributed table engine",
+              "url": "https://clickhouse.com/docs/engines/table-engines/special/distributed"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "duckdb",
-      "name": "DuckDB の Parquet 読み取り：列投影と行グループの除外",
-      "description": "直近 7 日の注文を例に、フッターの列統計、投影とフィルタのプッシュダウン、物理計画の読み方を追う。",
+      "name": "DuckDB の基本アーキテクチャ",
+      "description": "アプリのプロセスに組み込む分析 SQL エンジン。クライアント API、解析と最適化、ベクトル化実行、ストレージ、外部ファイルの関係を追う。",
       "domain": "データ処理",
       "category": "バッチ・SQL エンジン",
       "kind": "製品・技術のアーキテクチャ",
+      "tags": [
+        "OSS",
+        "DuckDB"
+      ],
+      "objectives": [
+        "組み込み型で、アプリと同じプロセスで動くことを説明する。",
+        "SQL が解析・最適化・実行を通って結果になる流れを追う。",
+        "データベースファイルと外部ファイル（Parquet・S3）の使い分けを区別する。"
+      ],
+      "documents": [
+        "docs/reference-duckdb.md"
+      ],
+      "sources": [
+        {
+          "title": "Why DuckDB",
+          "url": "https://duckdb.org/why_duckdb"
+        },
+        {
+          "title": "DuckDB Internals Overview",
+          "url": "https://duckdb.org/docs/2.0/internals/overview.html"
+        },
+        {
+          "title": "DuckDB Concurrency",
+          "url": "https://duckdb.org/docs/2.0/connect/concurrency.html"
+        },
+        {
+          "title": "DuckDB Python API",
+          "url": "https://duckdb.org/docs/2.0/clients/python/overview.html"
+        },
+        {
+          "title": "DuckDB Storage Format",
+          "url": "https://duckdb.org/docs/2.0/internals/storage.html"
+        },
+        {
+          "title": "DuckDB Core Extensions",
+          "url": "https://duckdb.org/docs/2.0/core_extensions/overview.html"
+        },
+        {
+          "title": "DuckDB HTTP(S) Support",
+          "url": "https://duckdb.org/docs/2.0/core_extensions/httpfs/https.html"
+        },
+        {
+          "title": "DuckDB S3 API Support",
+          "url": "https://duckdb.org/docs/2.0/core_extensions/httpfs/s3api.html"
+        },
+        {
+          "title": "Memory Management in DuckDB",
+          "url": "https://duckdb.org/2024/07/09/memory-management.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "python-local",
+          "label": "Python に組み込む DuckDB（ローカル）",
+          "sources": [
+            {
+              "title": "DuckDB Python API",
+              "url": "https://duckdb.org/docs/2.0/clients/python/overview.html"
+            },
+            {
+              "title": "DuckDB Concurrency",
+              "url": "https://duckdb.org/docs/2.0/connect/concurrency.html"
+            },
+            {
+              "title": "DuckDB Parquet Overview",
+              "url": "https://duckdb.org/docs/2.0/data/parquet/overview.html"
+            }
+          ]
+        },
+        {
+          "id": "aws-fargate-duckdb",
+          "label": "AWS（DuckDB on Fargate・Amazon S3）",
+          "sources": [
+            {
+              "title": "DuckDB S3 API Support",
+              "url": "https://duckdb.org/docs/1.5/core_extensions/httpfs/s3api"
+            },
+            {
+              "title": "DuckDB AWS extension",
+              "url": "https://duckdb.org/docs/extensions/aws"
+            },
+            {
+              "title": "AWS SDK のコンテナ認証プロバイダー",
+              "url": "https://docs.aws.amazon.com/sdkref/latest/guide/feature-container-credentials.html"
+            },
+            {
+              "title": "ECS タスク IAM ロール",
+              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html"
+            },
+            {
+              "title": "ECS の Fargate タスク定義",
+              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "duckdb-vectorized-execution",
+      "name": "DuckDB：ベクトル化実行と並列処理",
+      "description": "DataChunk が演算子の木を流れる仕組みと、行グループ単位・スレッドごとの集計による並列化を追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "DuckDB"
+      ],
+      "objectives": [
+        "DataChunk とベクトルの形式、標準のベクトルサイズを説明する。",
+        "ブロッキング演算子と、そうでない演算子の違いを区別する。",
+        "行グループ単位の並列化と、スレッドごとの集計を統合する流れを追う。"
+      ],
+      "documents": [
+        "docs/reference-duckdb-vectorized-execution.md"
+      ],
+      "sources": [
+        {
+          "title": "DuckDB Internals Overview",
+          "url": "https://duckdb.org/docs/2.0/internals/overview.html"
+        },
+        {
+          "title": "DuckDB Vector",
+          "url": "https://duckdb.org/docs/2.0/internals/vector.html"
+        },
+        {
+          "title": "How to Tune Workloads",
+          "url": "https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html"
+        },
+        {
+          "title": "Parallel Grouped Aggregation in DuckDB",
+          "url": "https://duckdb.org/2022/03/07/aggregate-hashtable.html"
+        },
+        {
+          "title": "Order Preservation",
+          "url": "https://duckdb.org/docs/2.0/sql/dialect/order_preservation.html"
+        },
+        {
+          "title": "Design and Implementation of DuckDB Internals",
+          "url": "https://duckdb.org/library/design-and-implementation-of-duckdb-internals/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "python-local",
+          "label": "Python に組み込む DuckDB（ローカル）",
+          "sources": [
+            {
+              "title": "DuckDB Python API",
+              "url": "https://duckdb.org/docs/2.0/clients/python/overview.html"
+            },
+            {
+              "title": "How to Tune Workloads",
+              "url": "https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html"
+            },
+            {
+              "title": "DuckDB Internals Overview",
+              "url": "https://duckdb.org/docs/2.0/internals/overview.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "duckdb-storage-memory",
+      "name": "DuckDB：ストレージ形式とメモリ管理",
+      "description": "単一ファイルの行グループと列セグメント、圧縮、WAL と checkpoint、バッファマネージャーと一時ファイルへの書き出しを追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "DuckDB"
+      ],
+      "objectives": [
+        "データベースファイルの行グループ・列セグメント・ブロックの関係を説明する。",
+        "WAL と checkpoint による書き込みの流れを追う。",
+        "メモリ上限を超えたときに何が起きるかを区別する。"
+      ],
+      "documents": [
+        "docs/reference-duckdb-storage-memory.md"
+      ],
+      "sources": [
+        {
+          "title": "DuckDB Storage Format",
+          "url": "https://duckdb.org/docs/2.0/internals/storage.html"
+        },
+        {
+          "title": "DuckDB ATTACH",
+          "url": "https://duckdb.org/docs/2.0/sql/statements/attach.html"
+        },
+        {
+          "title": "DuckDB CHECKPOINT",
+          "url": "https://duckdb.org/docs/2.0/sql/statements/checkpoint.html"
+        },
+        {
+          "title": "Configuration",
+          "url": "https://duckdb.org/docs/2.0/configuration/overview.html"
+        },
+        {
+          "title": "Lightweight Compression in DuckDB",
+          "url": "https://duckdb.org/2022/10/28/lightweight-compression.html"
+        },
+        {
+          "title": "Memory Management in DuckDB",
+          "url": "https://duckdb.org/2024/07/09/memory-management.html"
+        },
+        {
+          "title": "How to Tune Workloads",
+          "url": "https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "python-local",
+          "label": "Python に組み込む DuckDB（ローカルディスク）",
+          "sources": [
+            {
+              "title": "DuckDB Python API",
+              "url": "https://duckdb.org/docs/2.0/clients/python/overview.html"
+            },
+            {
+              "title": "DuckDB Storage Format",
+              "url": "https://duckdb.org/docs/2.0/internals/storage.html"
+            },
+            {
+              "title": "DuckDB CHECKPOINT",
+              "url": "https://duckdb.org/docs/2.0/sql/statements/checkpoint.html"
+            },
+            {
+              "title": "Memory Management in DuckDB",
+              "url": "https://duckdb.org/2024/07/09/memory-management.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "duckdb-parquet-scan",
+      "name": "DuckDB：Parquet スキャンと行グループの除外",
+      "description": "直近 7 日の注文を例に、フッターの列統計、投影とフィルタのプッシュダウン、物理計画の読み方を追う。",
+      "domain": "データ処理",
+      "category": "バッチ・SQL エンジン",
+      "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
         "DuckDB"
@@ -4246,9 +4920,17 @@
         "EXPLAIN、EXPLAIN ANALYZE、parquet_metadata から得られる情報を区別する。"
       ],
       "documents": [
-        "docs/reference-duckdb.md"
+        "docs/reference-duckdb-parquet-scan.md"
       ],
       "sources": [
+        {
+          "title": "DuckDB Parquet Overview",
+          "url": "https://duckdb.org/docs/2.0/data/parquet/overview.html"
+        },
+        {
+          "title": "DuckDB Parquet Tips",
+          "url": "https://duckdb.org/docs/2.0/data/parquet/tips.html"
+        },
         {
           "title": "DuckDB Reading and Writing Parquet Files",
           "url": "https://duckdb.org/docs/data/parquet"
@@ -4290,32 +4972,6 @@
             {
               "title": "DuckDB Python API",
               "url": "https://duckdb.org/docs/stable/clients/python/overview"
-            }
-          ]
-        },
-        {
-          "id": "aws-fargate-duckdb",
-          "label": "AWS（DuckDB on Fargate・Amazon S3）",
-          "sources": [
-            {
-              "title": "DuckDB S3 API Support",
-              "url": "https://duckdb.org/docs/1.5/core_extensions/httpfs/s3api"
-            },
-            {
-              "title": "DuckDB AWS extension",
-              "url": "https://duckdb.org/docs/extensions/aws"
-            },
-            {
-              "title": "AWS SDK のコンテナ認証プロバイダー",
-              "url": "https://docs.aws.amazon.com/sdkref/latest/guide/feature-container-credentials.html"
-            },
-            {
-              "title": "ECS タスク IAM ロール",
-              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html"
-            },
-            {
-              "title": "ECS の Fargate タスク定義",
-              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html"
             }
           ]
         }
@@ -13359,7 +14015,7 @@
     },
     {
       "id": "spark-datasource-v2-iceberg",
-      "name": "Spark Data Source V2：Iceberg の読み書き",
+      "name": "Spark：Data Source V2 と Iceberg の読み書き",
       "description": "Spark とテーブルコネクターが pushdown、入力分割、書き込みと commit を調整する。",
       "domain": "データ処理",
       "category": "バッチ・SQL エンジン",
@@ -13417,7 +14073,7 @@
       "name": "Spark UI：実行計画と性能診断",
       "description": "SQL 演算子、Job、Stage、Task、Executor の観測値から遅延要因を追う。",
       "domain": "データ処理",
-      "category": "バッチ・SQL エンジン",
+      "category": "分散実行と保守",
       "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
@@ -13469,7 +14125,7 @@
     },
     {
       "id": "spark-gluten-velox",
-      "name": "Apache Gluten：Spark と Velox の列指向実行",
+      "name": "Spark Gluten：Velox による列指向ネイティブ実行",
       "description": "Spark の物理計画を Substrait に変換し、対応する演算をネイティブ実行する。",
       "domain": "データ処理",
       "category": "バッチ・SQL エンジン",
@@ -13523,7 +14179,7 @@
       "name": "Spark Connect：クライアントと Driver の分離",
       "description": "クライアントが未解決計画を送信し、Spark Server が実行して Arrow バッチを返す。",
       "domain": "データ処理",
-      "category": "バッチ・SQL エンジン",
+      "category": "分散実行と保守",
       "kind": "仕組みの深掘り",
       "tags": [
         "OSS",
@@ -13574,7 +14230,7 @@
       "name": "Spark：メモリ・spill とファイル書き込み",
       "description": "Executor の execution / storage メモリ、spill、partition と出力ファイルの関係を追う。",
       "domain": "データ処理",
-      "category": "バッチ・SQL エンジン",
+      "category": "分散実行と保守",
       "kind": "仕組みの深掘り",
       "tags": [
         "OSS",

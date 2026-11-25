@@ -1,0 +1,271 @@
+{
+  "model": "duckdb-parquet-scan",
+  "name": "DuckDB：Parquet スキャンと行グループの除外",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "query": {
+      "type": "node",
+      "label": "検索 SQL と計画の確認",
+      "status": "claim"
+    },
+    "optimizer": {
+      "type": "node",
+      "label": "読取の最適化",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "Parquet スキャン",
+      "status": "claim"
+    },
+    "project": {
+      "type": "node",
+      "label": "結果の投影",
+      "status": "claim"
+    },
+    "profile": {
+      "type": "node",
+      "label": "実行時の観測",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "node",
+      "label": "フッター統計",
+      "status": "claim"
+    },
+    "groups": {
+      "type": "node",
+      "label": "行グループ",
+      "status": "claim"
+    },
+    "columns": {
+      "type": "node",
+      "label": "列チャンク",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "検索 SQL と計画の確認 → 読取の最適化",
+      "status": "claim"
+    },
+    "push": {
+      "type": "link",
+      "label": "読取の最適化 → Parquet スキャン",
+      "status": "claim"
+    },
+    "metadata": {
+      "type": "link",
+      "label": "フッター統計 → Parquet スキャン",
+      "status": "claim"
+    },
+    "skip": {
+      "type": "link",
+      "label": "Parquet スキャン → 行グループ",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "列チャンク → Parquet スキャン",
+      "status": "claim"
+    },
+    "return": {
+      "type": "link",
+      "label": "Parquet スキャン → 結果の投影",
+      "status": "claim"
+    },
+    "inspect": {
+      "type": "link",
+      "label": "読取の最適化 → 検索 SQL と計画の確認",
+      "status": "claim"
+    },
+    "measure": {
+      "type": "link",
+      "label": "Parquet スキャン → 実行時の観測",
+      "status": "claim"
+    },
+    "read-week": {
+      "type": "scenario",
+      "label": "顧客 42 に必要な列と行グループを読む"
+    },
+    "inspect-plan": {
+      "type": "scenario",
+      "label": "物理計画と実行結果を読み分ける"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "必要な注文列を取得",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "読み取り判断の根拠を追う",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実ファイルの統計の有無、除外した行グループ数、物理計画の表示、実行時間は未確認。"
+    },
+    "python-parquet-host": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "自前 Python 実行ホスト",
+      "realizes": []
+    },
+    "python-parquet-client": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "Python の DuckDB 接続",
+      "realizes": [
+        "query"
+      ]
+    },
+    "python-parquet-engine": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "同じプロセスの DuckDB エンジン",
+      "realizes": [
+        "optimizer",
+        "scan",
+        "project",
+        "profile"
+      ]
+    },
+    "python-parquet-parquet": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "ローカルの orders.parquet",
+      "realizes": [
+        "footer",
+        "groups",
+        "columns"
+      ]
+    },
+    "python-parquet-metadata": {
+      "type": "implementation",
+      "impl": "python-parquet",
+      "label": "parquet_metadata の診断用 SQL",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-duckdb-parquet-scan.md#§1": [
+      "model"
+    ],
+    "docs/reference-duckdb-parquet-scan.md": [
+      "model",
+      "query",
+      "optimizer",
+      "scan",
+      "project",
+      "profile",
+      "footer",
+      "groups",
+      "columns",
+      "submit",
+      "push",
+      "metadata",
+      "skip",
+      "read",
+      "return",
+      "inspect",
+      "measure",
+      "read-week",
+      "inspect-plan",
+      "BR-01",
+      "BR-02",
+      "python-parquet-host",
+      "python-parquet-client",
+      "python-parquet-engine",
+      "python-parquet-parquet",
+      "python-parquet-metadata"
+    ],
+    "docs/reference-duckdb-parquet-scan.md#§2": [
+      "model",
+      "query",
+      "optimizer",
+      "submit",
+      "push"
+    ],
+    "docs/reference-duckdb-parquet-scan.md#§3": [
+      "model",
+      "scan",
+      "project",
+      "footer",
+      "groups",
+      "columns",
+      "metadata",
+      "skip",
+      "read",
+      "return",
+      "read-week",
+      "BR-01"
+    ],
+    "docs/reference-duckdb-parquet-scan.md#§4": [
+      "model",
+      "profile",
+      "inspect",
+      "measure",
+      "inspect-plan",
+      "BR-02"
+    ],
+    "docs/reference-duckdb-parquet-scan.md#§5": [
+      "model"
+    ],
+    "docs/reference-duckdb-parquet-scan.md#§6": [
+      "model"
+    ],
+    "docs/reference-duckdb-parquet-scan.md#§7": [
+      "python-parquet-host",
+      "python-parquet-client",
+      "python-parquet-engine",
+      "python-parquet-parquet",
+      "python-parquet-metadata"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "DuckDB",
+    "role": "internals",
+    "step": 3,
+    "detailOf": "duckdb",
+    "order": 53,
+    "objectives": [
+      "列投影とフィルタのプッシュダウンが減らす読み取りを説明する。",
+      "行グループごとの min/max で除外できる範囲と、行の評価が必要な範囲を追う。",
+      "EXPLAIN、EXPLAIN ANALYZE、parquet_metadata から得られる情報を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "DuckDB Parquet Overview",
+        "url": "https://duckdb.org/docs/2.0/data/parquet/overview.html"
+      },
+      {
+        "title": "DuckDB Parquet Tips",
+        "url": "https://duckdb.org/docs/2.0/data/parquet/tips.html"
+      },
+      {
+        "title": "DuckDB Reading and Writing Parquet Files",
+        "url": "https://duckdb.org/docs/data/parquet"
+      },
+      {
+        "title": "DuckDB Querying Parquet Metadata",
+        "url": "https://duckdb.org/docs/current/data/parquet/metadata"
+      },
+      {
+        "title": "DuckDB EXPLAIN",
+        "url": "https://duckdb.org/docs/stable/guides/meta/explain"
+      },
+      {
+        "title": "DuckDB Profiling",
+        "url": "https://duckdb.org/docs/current/dev/profiling"
+      }
+    ]
+  }
+}

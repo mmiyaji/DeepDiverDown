@@ -12,7 +12,7 @@ import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz3';
 import { productOf, productName, isConcept, shortName, PRODUCT_ALSO } from './products.js?v=4';
-import { CATEGORY_INFO } from './categories.js?v=1';
+import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=2';
 import { drawThumbnail } from './home-thumbnail.js';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 
@@ -675,7 +675,7 @@ function renderLibrary() {
   $('lib-rail').innerHTML = domains.map(([d, kinds]) => railBtn(d, railLabel(d), count(kinds))).join('')
     + '<span class="rail-gap"></span>' + railBtn(MINE, '自分の設計', mine.length);
 
-  const kindIdx = e => (REF_KINDS.indexOf(e.reference.kind) + 1 || 9) * 1e6 + Math.min(ord(e), 999999);
+  const kindIdx = e => e.reference.role === 'overview' ? 0 : e.reference.step != null ? 5e5 + e.reference.step : (REF_KINDS.indexOf(e.reference.kind) + 1 || 9) * 1e6 + Math.min(ord(e), 999999);
   const leaves = list => {
     const sorted = [...list].sort((a, b) => kindIdx(a) - kindIdx(b));
     const top = sorted.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf));
@@ -691,7 +691,7 @@ function renderLibrary() {
         const ls = leaves(g.list);
         if (g.all.length === 1) return modelLink(ls[0], g.name);
         const open = LIB_PROD_OPEN.has(g.name) || ls.some(e => e.id === KEY);
-        const items = ls.map((e, i) => modelLink(e, (i === 0 ? '概要　' : `${i}. `) + shortName(e.name, g.name))).join('');
+        const items = ls.map((e, i) => modelLink(e, (i === 0 ? '概要　' : `${e.reference.step ?? i}. `) + shortName(e.name, g.name))).join('');
         const more = g.all.length - ls.length;
         return `<details class="lib-prod" data-prod="${esc(g.name)}" data-total="${g.all.length}"${open ? ' open' : ''}><summary><span>${esc(g.name)}</span><small>${ls.length}${more ? ` / ${g.all.length}` : ''}</small></summary><div class="mlist">${items}${more ? `<a class="lib-more" href="#/m/${encodeURIComponent(g.overview.id)}/struct" data-prod-all="${esc(g.name)}">ほかの分類の図 ${more} 件</a>` : ''}</div></details>`;
       }).join('');
@@ -717,20 +717,20 @@ function libraryGroups(all) {
   const concepts = new Map(), prods = new Map();
   for (const e of all) {
     const r = root(e);
-    if (isConcept(r)) {
+    if (e.reference.role === 'concept' || (!e.reference.product && isConcept(r))) {
       const cat = e.reference.category || 'その他', c = concepts.get(cat) || concepts.set(cat, [{ name: cat, list: [] }]).get(cat);
       c[0].list.push(e); continue;
     }
-    const name = productOf(e.id) || productName(r);
+    const name = e.reference.product || productOf(e.id) || productName(r);
     (prods.get(name) || prods.set(name, []).get(name)).push(e);
   }
   const products = new Map();
   for (const [name, list] of prods) {
-    const ordered = [...list].sort((a, b) => (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)));
+    const ordered = [...list].sort((a, b) => (a.reference.role === 'overview' ? -1 : 0) - (b.reference.role === 'overview' ? -1 : 0) || (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)));
     const overview = ordered[0];
     // 追加で載せる分類は、同じ分野にあるものだけ（分野をまたいで紛れ込ませない）
     const domain = overview.reference.domain || 'その他';
-    const also = (PRODUCT_ALSO[name] || []).filter(c => REGISTRY.some(r => r.reference?.category === c && (r.reference.domain || 'その他') === domain));
+    const also = [...(PRODUCT_ALSO[name] || []), ...list.flatMap(e => e.reference.also || [])].filter(c => REGISTRY.some(r => r.reference?.category === c && (r.reference.domain || 'その他') === domain));
     const cats = new Set([...list.map(e => e.reference.category || 'その他'), ...also]);
     for (const cat of cats) {
       // その分類では、概要の図と、その分類に属する図だけを見せる
@@ -771,11 +771,42 @@ async function showCategoryPage({ domain, category }) {
   page.innerHTML = `<div class="cat-inner"><p class="cat-eyebrow">${esc(domain)}</p><h1>${esc(category)}</h1><p class="cat-lead">${esc(CATEGORY_INFO[category] || '')}</p>
     ${prods.length ? `<h2>製品 <small>${prods.length}</small></h2><div class="cat-grid">${prods.map(g => card(g.overview, g.name, g.list.length === g.all.length ? g.all.length : `${g.list.length}（全 ${g.all.length}）`)).join('')}</div>` : ''}
     ${cons.length ? `<h2>仕組みとパターン <small>${cons.reduce((s, g) => s + g.list.length, 0)}</small></h2><div class="cat-grid">${cons.flatMap(g => g.list).map(e => card(e, e.name, 1)).join('')}</div>` : ''}
+    <section id="cat-compare" class="cat-compare" hidden></section>
     ${!prods.length && !cons.length ? '<p class="sub">この分類にはまだ図がありません。</p>' : ''}</div>`;
   page.hidden = false; page.scrollTop = 0;
   page.querySelectorAll('.cat-thumb').forEach(t => thumbObserver.observe(t));
+  loadCategoryCompare(category);
   document.title = `${category} — DeepDiverDown`;
   if (matchMedia('(max-width:1279px)').matches) document.body.classList.remove('nav-open');
+}
+function miniMarkdown(md) {
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const out = [], lines = md.replace(/\r/g, '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/^#\s/.test(l)) continue; // 先頭の題名は分類ページの見出しと重なる
+    if (/^#{2,3}\s/.test(l)) { out.push(`<h3>${inline(l.replace(/^#+\s*/, ''))}</h3>`); continue; }
+    if (/^\|/.test(l)) {
+      const rows = []; while (i < lines.length && /^\|/.test(lines[i])) rows.push(lines[i++]); i--;
+      const cells = r => r.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const body = rows.filter((r, k) => k !== 1 || !/^[|\s:-]+$/.test(r));
+      out.push(`<div class="cat-table-wrap"><table class="cat-table"><thead><tr>${cells(body[0]).map(c => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.slice(1).map(r => `<tr>${cells(r).map((c, k) => k ? `<td>${inline(c)}</td>` : `<th scope="row">${inline(c)}</th>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if (/^- /.test(l)) { const items = []; while (i < lines.length && /^- /.test(lines[i])) items.push(lines[i++].slice(2)); i--; out.push(`<ul>${items.map(t => `<li>${inline(t)}</li>`).join('')}</ul>`); continue; }
+    if (l.trim()) out.push(`<p>${inline(l)}</p>`);
+  }
+  return out.join('');
+}
+async function loadCategoryCompare(category) {
+  const slug = CATEGORY_DOCS[category], box = $('cat-compare');
+  if (!slug || !box) return;
+  try {
+    const r = await fetch(`docs/category-${slug}.md`, { cache: 'no-cache' });
+    if (!r.ok) return;
+    box.innerHTML = `<h2>違い</h2>${miniMarkdown(await r.text())}`;
+    box.hidden = false;
+  } catch {}
 }
 function hideCategoryPage() {
   if (!document.body.classList.contains('cat-mode')) return;

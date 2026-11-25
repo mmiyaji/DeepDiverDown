@@ -1,0 +1,242 @@
+name: DuckDB：ベクトル化実行と並列処理
+description: DataChunk が演算子の木を流れる仕組みと、行グループ単位・スレッドごとの集計による並列化を追う。
+reference:
+  objectives: [DataChunk とベクトルの形式、標準のベクトルサイズを説明する。, ブロッキング演算子と、そうでない演算子の違いを区別する。, 行グループ単位の並列化と、スレッドごとの集計を統合する流れを追う。]
+  sources:
+  - {title: DuckDB Internals Overview, url: 'https://duckdb.org/docs/2.0/internals/overview.html'}
+  - {title: DuckDB Vector, url: 'https://duckdb.org/docs/2.0/internals/vector.html'}
+  - {title: How to Tune Workloads, url: 'https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html'}
+  - {title: Parallel Grouped Aggregation in DuckDB, url: 'https://duckdb.org/2022/03/07/aggregate-hashtable.html'}
+  - {title: Order Preservation, url: 'https://duckdb.org/docs/2.0/sql/dialect/order_preservation.html'}
+  - {title: Design and Implementation of DuckDB Internals, url: 'https://duckdb.org/library/design-and-implementation-of-duckdb-internals/'}
+sources: [docs/reference-duckdb-vectorized-execution.md]
+evidence:
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§1}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§2}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§3}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§4}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§5}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§7}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§8}
+- {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§9}
+tiers:
+- id: flow
+  label: 実行エンジンのデータの流れ
+  z: 0
+  size: [23, 8]
+nodes:
+  plan:
+    label: 物理演算子の木
+    kind: service
+    tier: flow
+    x: 1
+    y: 1.5
+    description: 物理プランジェネレーターが作る。プッシュ型のベクトル化モデルで実行する。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§4}
+  store:
+    label: 行グループ（入力）
+    kind: db
+    tier: flow
+    x: 1
+    y: 5
+    description: テーブルは既定 122,880 行の行グループに分かれ、並列化の単位になる。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+  scan:
+    label: スキャン
+    kind: worker
+    tier: flow
+    x: 6
+    y: 5
+    description: 行グループを読む。スレッドごとに別の行グループを担当できる。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+    parallel: N
+  vectors:
+    label: ベクトル（Flat・Constant・Dictionary・Sequence）
+    kind: file
+    tier: flow
+    x: 11
+    y: 5
+    description: 1 列分の値。形式により圧縮したまま持てる。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§3}
+  chunk:
+    label: DataChunk（標準 2,048 タプル）
+    kind: file
+    tier: flow
+    x: 16
+    y: 5
+    description: 複数のベクトルをまとめた単位。演算子の間はこの単位で渡す。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§2}
+  ops:
+    label: フィルタ・射影など
+    kind: worker
+    tier: flow
+    x: 16
+    y: 1.5
+    description: 入力を順に処理できる演算子。DataChunk を受けて次へ渡す。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§5}
+    parallel: N
+  local:
+    label: スレッドごとの集計テーブル
+    kind: worker
+    tier: flow
+    x: 11
+    y: 1.5
+    description: 各スレッドが自分のハッシュテーブルを作り、グループのハッシュで分割する。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+    parallel: N
+  merge:
+    label: パーティションの統合
+    kind: worker
+    tier: flow
+    x: 6
+    y: 1.5
+    description: パーティションをワーカーに割り当て、並列に統合する。出力の前に入力全体が必要なブロッキング演算子。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§5}
+    parallel: N
+  out:
+    label: 結果
+    kind: client
+    tier: flow
+    x: 21
+    y: 1.5
+    description: クライアントへ返す結果。順序は preserve_insertion_order などに従う。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§7}
+links:
+- id: start
+  from: plan
+  to: scan
+  label: 実行を開始
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§4}
+- id: read
+  from: store
+  to: scan
+  label: 行グループを読む
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+- id: expand
+  from: scan
+  to: vectors
+  label: 列を Vector に展開
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§3}
+- id: bundle
+  from: vectors
+  to: chunk
+  label: Vector を束ねる
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§2}
+- id: push
+  from: chunk
+  to: ops
+  label: DataChunk を押し出す
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§4}
+- id: feed
+  from: ops
+  to: local
+  label: 行を集計に渡す
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+- id: combine
+  from: local
+  to: merge
+  label: パーティションを統合
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+- id: emit
+  from: merge
+  to: out
+  label: 結果を返す
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§7}
+scenarios:
+- id: agg
+  label: GROUP BY 集計の流れ
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§6}
+  steps:
+  - links: [start, read]
+    note: 行グループ単位でスキャンを並列に開始する。k スレッドを活かすには k 個以上の行グループが必要。
+  - links: [expand, bundle]
+    note: 列を Vector に展開し、標準 2,048 タプルの DataChunk にまとめる。
+  - links: [push, feed]
+    note: フィルタなどを通した DataChunk を、各スレッドの集計テーブルへ渡す。
+  - links: [combine, emit]
+    note: パーティションごとに統合し、結果を返す。出力順は保証されない。
+unknowns:
+- id: UNK-01
+  text: パイプラインの分割、スレッドへの仕事の割り当て、ベクトル形式を選ぶ条件の内部実装は、公式資料で確認できていない。
+  refs: [plan, scan, vectors]
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+- id: python-local
+  label: Python に組み込む DuckDB（ローカル）
+  description: Python プロセス内の DuckDB が、ローカルのデータベースファイルに対して集計を並列実行する例。
+  sources:
+  - {title: DuckDB Python API, url: 'https://duckdb.org/docs/2.0/clients/python/overview.html'}
+  - {title: How to Tune Workloads, url: 'https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html'}
+  - {title: DuckDB Internals Overview, url: 'https://duckdb.org/docs/2.0/internals/overview.html'}
+  tiers:
+  - id: host
+    label: 自前ホスト
+    z: 0
+    size: [6, 13]
+  groups:
+  - kind: nodegroup
+    label: 自前ホスト
+    tier: [host]
+    nodes: [vx-host, vx-python, vx-engine, vx-db]
+  nodes:
+    vx-host:
+      label: 自前 Python 実行ホスト
+      kind: host
+      tier: host
+      x: 2
+      y: 1
+      description: 利用者が Python プロセスとローカルファイルシステムを管理する。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§9}
+    vx-python:
+      label: Python プログラムと duckdb パッケージ
+      kind: client
+      tier: host
+      x: 2
+      y: 4
+      description: 集計 SQL を実行し、結果を受け取る。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§9}
+      realizes: [out]
+    vx-engine:
+      label: 同じプロセスの DuckDB 実行エンジン
+      kind: worker
+      tier: host
+      x: 2
+      y: 7
+      description: 行グループ単位でスキャンを並列化し、スレッドごとの集計を統合する。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§9}
+      realizes: [plan, scan, vectors, chunk, ops, local, merge]
+    vx-db:
+      label: ローカルの DB ファイル
+      kind: db
+      tier: host
+      x: 2
+      y: 10
+      description: 行グループに分かれたテーブルを保持する。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-vectorized-execution.md#§9}
+      realizes: [store]
+  links:
+  - {id: vx-db-from-host, from: vx-host, to: vx-db, label: ローカルファイルを提供}
+  - {id: vx-python-run, from: vx-host, to: vx-python, label: Python を実行}

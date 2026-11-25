@@ -1,4 +1,4 @@
-# Spark Data Source V2：Iceberg の読み書き
+# Spark：Data Source V2 と Iceberg の読み書き
 
 ## 1. 対象と前提
 

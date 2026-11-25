@@ -1,89 +1,87 @@
-# ClickHouse の MergeTree：疎インデックスとパートのマージ
+# ClickHouse の基本アーキテクチャ
 
-## 1. 題材と範囲
+## 1. 対象と読み方
 
-架空の注文データを、月単位のパーティションを持つ ClickHouse の `MergeTree` テーブルに格納する。日付の範囲を 2026-01-25 以上、2026-02-01 未満の 7 日間に固定し、顧客 42 の注文番号と金額を取得する。[DuckDB の教材](reference-duckdb.md) は、同じ条件を Parquet ファイルに適用する。図のパートと境界は仕組みを表すための例で、実行結果や計測値は含まない。
+ClickHouse は列指向の分析用データベース。この図は初めて学ぶ人向けに、SQL を受ける層、テーブルエンジン、保存、複数サーバーへの分散と複製を一枚で示す。構成は説明用で、実環境の計測値は含まない。
 
-## 2. INSERT から不変のパートへ
+仕組みは次の順で掘り下げる。
 
-```sql
-CREATE TABLE orders (
-  order_id UInt64,
-  order_date Date,
-  customer_id UInt64,
-  amount Decimal(12, 2)
-)
-ENGINE = MergeTree
-PARTITION BY toYYYYMM(order_date)
-ORDER BY (customer_id, order_date);
-```
+1. [MergeTree のパートと疎インデックス](reference-clickhouse-mergetree.md)：保存の単位と読む範囲の絞り込み
+2. [レプリケーションと Keeper](reference-clickhouse-replication.md)：同じデータを複数サーバーに持つ仕組み
+3. [Distributed テーブルとシャード越えのクエリ](reference-clickhouse-distributed-query.md)：複数シャードを 1 つの表として読む仕組み
 
-入力行を月で分け、月ごとに `(customer_id, order_date)` 順のパートを作る。パートは列データ、疎主インデックス、マークを備えた不変の単位。独立した INSERT から同じ月に複数のパートができ得る。ここでは `PRIMARY KEY` を省略しているため、ソートキーを主キーに使う。通常の `MergeTree` の主キーに行の一意性制約はない。
+## 2. クエリ処理の層
 
-## 3. 日付と顧客による候補の絞り込み
+エンジンは大きく、クエリ処理、ストレージ、外部との統合の三層に分かれる。ユーザーのセッションやクライアントのプロトコルを扱うアクセス層がある。ClickHouse は C++ で書かれ、依存のない単一の静的リンクのバイナリとして配布される。クライアントは SQL を送り、結果を受け取る。
 
-```sql
-SELECT order_id, amount
-FROM orders
-WHERE order_date >= toDate('2026-01-25')
-  AND order_date < toDate('2026-02-01')
-  AND customer_id = 42;
-```
+## 3. ベクトル化された列指向の実行
 
-月の条件から 1 月のパートを候補とする。パート内のグラニュールは隣接する行のまとまりで、疎主インデックスには各グラニュールの先頭のキーを保持する。先頭キー列の顧客を等値で指定し、その顧客内の日付範囲を絞る。図ではパート A の境界が (42, 2026-01-01) と (42, 2026-01-20)。最初のグラニュールは期間外で、二つ目は候補に残る。パート B は (42, 2026-01-25) から始まるグラニュールを候補とし、(43, 2026-01-01) から始まるグラニュールを顧客の条件で除外する。マークで必要な列データの位置を探し、候補グラニュールの行に述語を評価する。境界付近には条件外の行も入り得る。
+実行モデルは MonetDB/X100 に似たベクトル化で、演算子は 1 行ずつでなく複数行のまとまり（データチャンク）を一度に渡す。これで仮想関数呼び出しのコストを抑える。保存の形式は厳密に列指向。必要に応じたコード生成（コンパイル）も併用する。
 
-## 4. 同じ月のパートをマージする
+## 4. テーブルエンジン
 
-バックグラウンドタスクは、同じパーティション内から条件に合うパートを選ぶ。図では 1 月の A と B をキー順にマージし、出力 M に新しいグラニュール境界と索引を作る。新しいパートが有効になり、入力パートは非アクティブになる。2 月の C は別のマージの対象となる。通常の `MergeTree` はマージで重複キーの行も保持し、対象クエリに対して同じ行の集合を返す。返却順が必要な場合は、SELECT 側の `ORDER BY` で指定する。
+テーブルごとにエンジンを選び、データの保存、読み取り、複製、分散の方法を決める。この図では次の 3 種類を扱う。
 
-## 5. 計画と保存状態で確認する
+- `MergeTree` 系：ローカルのディスクにパートとして保存する。
+- `ReplicatedMergeTree`：`MergeTree` に複製を加える。
+- `Distributed`：データを持たず、複数シャードへの窓口になる。
 
-SELECT の先頭に `EXPLAIN indexes = 1` を付け、`ReadFromMergeTree` の索引別の `Parts` と `Granules` を読む。ClickHouse 25.9 以降の診断では公式資料に従い、SELECT 末尾の `SETTINGS use_query_condition_cache = 0, use_skip_indexes_on_data_read = 0` も確認する。パートの状態を追うときは `system.parts` の `partition`、`name`、`active`、`rows`、`marks` を見る。索引適用後の候補数、実際に読み取ったデータ量、返却行数はそれぞれ異なる指標。
+## 5. MergeTree ストレージ
 
-## 6. 公式資料
+`MergeTree` のテーブルは、不変のパートの集まり。INSERT のたびに新しいパートができ、バックグラウンドで小さいパートがより大きいパートにマージされる。パートは主キー順に並び、行はグラニュール（既定 8192 行）にまとまる。インデックスは疎で、各グラニュールの先頭行のキーだけを持つ。クエリは `PARTITION BY` による除外と、この疎主インデックスで読む範囲を絞る。主キーに一意性の制約はない。詳細は [MergeTree のパートと疎インデックス](reference-clickhouse-mergetree.md)。
 
-- [ClickHouse MergeTree table engine](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
-- [ClickHouse EXPLAIN](https://clickhouse.com/docs/reference/statements/explain)
-- [ClickHouse system.parts](https://clickhouse.com/docs/operations/system-tables/parts)
+## 6. シャードと Distributed テーブル
 
-## 8. 実装例：AWS（ClickHouse on EC2・Amazon EBS）
+シャードはデータを分けて持つ単位。1 つのシャードは 1 台以上のレプリカからなる。クラスターの構成は設定の `remote_servers` に書く。`Distributed` テーブルはクラスター名、データベース、テーブル、必要に応じて分散キーを指定して作る。SELECT は全シャードへ送られ、読み取りは自動的に並列化される。集約は一部を遠隔のサーバーで行い、途中の集約状態を依頼元へ返せる。INSERT には分散キーが要る（シャードが 1 つの場合などを除く）。書き込みは既定でローカルに保存され、バックグラウンドでシャードへ送られる。詳細は [Distributed テーブルとシャード越えのクエリ](reference-clickhouse-distributed-query.md)。
 
-Linux の Amazon EC2 インスタンス1台に OSS の ClickHouse Server を導入する。同じ可用性ゾーンの Amazon EBS ボリュームをマウントし、ClickHouse のデータディレクトリをそのファイルシステム上に置く。表定義とクエリは §7 と同じものを使う。
+## 7. レプリカと ClickHouse Keeper
+
+`ReplicatedMergeTree` は複数のレプリカが同じデータを持つ。INSERT と ALTER は利用できるどのサーバーにも送れ、まずローカルに書き、あとからほかのレプリカへ複製する（非同期のマルチマスター）。複製の調整にはレプリカのメタデータを保持する ClickHouse Keeper を使う。Keeper は Raft で合意し、ZooKeeper のクライアントから使える。高可用性のため 3 台以上を推奨し、本番では専用ホストを勧める。Keeper がなければ複製表は作れず、既存の複製表は読み取り専用になる。SELECT は Keeper を使わない。詳細は [レプリケーションと Keeper](reference-clickhouse-replication.md)。
+
+## 8. 実装例：自前運用クラスター（Linux ホストの Server と Keeper）
+
+利用者が Linux ホストに ClickHouse Server と Keeper を導入する代表例。公式の手順（シャードの例と、レプリカの例）を組み合わせた説明用の構成で、実在の導入事例や動作検証済みの構成ではない。
 
 | 機能 | 担い手 |
-|---|---|
-| 入力と結果表示 | 許可した接続元の `clickhouse-client` |
-| SQL 計画と列スキャン | EC2 上の ClickHouse Server |
-| バックグラウンドマージ | ClickHouse Server の MergeTree エンジン |
-| パート、索引、マークの保存 | EBS 上のデータディレクトリ |
-| プルーニングとパートの観測 | ClickHouse の `EXPLAIN indexes = 1` と `system.parts` |
+| --- | --- |
+| SQL クライアント | `clickhouse-client` |
+| SQL の解析と計画、列処理、テーブルエンジン | 各ホストの `clickhouse-server` |
+| Distributed テーブル | Server 上の `Distributed` エンジンの表 |
+| シャード内のレプリカ | `ReplicatedMergeTree` の表（`shard`、`replica` のマクロで識別） |
+| パート | 各ホストのローカルディスク |
+| ClickHouse Keeper | 3 台以上（公式の例は 3 台。本番では専用ホスト推奨） |
 
-OS と ClickHouse の更新、バックアップ、復旧は運用者が管理する。EBS はローカルファイルシステムのブロックストレージを提供する。月別パートの選択とマージは ClickHouse が実行する。
+加わる部品は設定ファイル。`remote_servers` でクラスターを定義し（`ON CLUSTER` の分散 DDL のひな形にもなる）、`macros` に `shard` と `replica` を書き、`zookeeper` に Keeper の接続先を書く。レプリカを持つシャードでは `internal_replication` を `true` にして、Distributed からの書き込みを 1 つのレプリカだけにする。運用者が OS、更新、バックアップ、容量を管理する。公式の例はシャードだけ、レプリカだけの構成で、両方を組み合わせた構成とサイズは各自で設計する。Kubernetes 上の構成は未確認。
 
-- [ClickHouse の Debian・Ubuntu 導入](https://clickhouse.com/docs/get-started/setup/self-managed/debian-ubuntu)
-- [ClickHouse MergeTree](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
-- [Amazon EBS ボリュームのアタッチ](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html)
+- [ClickHouse の水平スケール](https://clickhouse.com/docs/architecture/horizontal-scaling)
+- [ClickHouse の複製](https://clickhouse.com/docs/architecture/replication)
+- [ClickHouse Keeper](https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper)
 
-## 7. 実装例：単一 ClickHouse サーバーの MergeTree
+## 9. 実装例：ClickHouse Cloud
 
-架空の注文を `PARTITION BY toYYYYMM(order_date)` と `ORDER BY (customer_id, order_date)` の MergeTree に格納する例。クライアントとサーバー、およびディスク上の物理部品を分けて示す。
+ClickHouse Cloud ではデータをオブジェクトストレージに置き、計算が自動でスケールする。Cloud の MergeTree 系の表は、ReplicatedMergeTree に代わる SharedMergeTree で動く。メタデータを全サーバーにコピーする必要がなく、レプリカは共有ストレージと Keeper を通じて、非同期でリーダーなしに調整する。シャードを増やさずに多数のレプリカへ拡張できる。複数の計算ノードグループが同じオブジェクトストレージを共有することもできる（計算と計算の分離）。
 
-| 機能 | 実装での担い手 | 配置・設定 |
-| --- | --- | --- |
-| 注文データの取り込み元 | clickhouse-client から INSERT | バッチ単位で注文を投入する。 |
-| SQL の読取計画、候補範囲の列スキャン | ClickHouse Server の SELECT と MergeTree 読取 | 疎索引を調べて読み取り候補を絞る。 |
-| 月パーティション、データパート、疎主インデックスとマーク | MergeTree の月別パートとマーク | 各パートに列データ、疎主索引とマークを持つ。 |
-| 同じパーティション内のデータ統合 | MergeTree のバックグラウンドマージ | 同一パーティションの入力パートを統合する。 |
-| 注文別の金額 | clickhouse-client の注文結果 | 条件に合う行を表示する。 |
+| 機能 | 担い手 |
+| --- | --- |
+| SQL クライアント | サービスの URL へ接続するクライアント |
+| SQL の処理、テーブルエンジン | 計算ノード（レプリカ） |
+| 複製のエンジン | SharedMergeTree |
+| パート | オブジェクトストレージ（サービスごとに分離） |
+| 調整 | ClickHouse Keeper |
 
-実装で加わる部品を以下に示す。
+Cloud の内部の制御系の構成は公開資料で確認できていないため、図には描かない。ストレージ分離の仕方はクラウドごとに異なる（AWS は共有バケット内のサービスごとのプレフィックス、GCP はバケット、Azure はコンテナ）。
 
-- system.parts。active、rows、marks などを調べられるシステムテーブル。
+- [ClickHouse Cloud のアーキテクチャ](https://clickhouse.com/docs/cloud/reference/architecture)
+- [SharedMergeTree](https://clickhouse.com/docs/cloud/reference/shared-merge-tree)
 
-公式資料
+## 公式資料
 
-- [ClickHouse MergeTree table engine](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree)
-- [ClickHouse EXPLAIN](https://clickhouse.com/docs/reference/statements/explain)
-- [ClickHouse system.parts](https://clickhouse.com/docs/operations/system-tables/parts)
-
-自前例は利用者が Linux サーバーとローカルファイルシステムを管理する。AWS 例では AWS が EC2・EBS の基盤を運用し、利用者が OS、ClickHouse、データ、アクセス権、バックアップと復旧を管理する。単一サーバー構成にレプリカや可用性を仮定しない。各例は公式資料を組み合わせた代表構成で、接続経路・実機動作は未検証。
+- [ClickHouse アーキテクチャ概説](https://clickhouse.com/docs/academic_overview)
+- [ClickHouse MergeTree table engine](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree)
+- [ClickHouse Distributed table engine](https://clickhouse.com/docs/engines/table-engines/special/distributed)
+- [ClickHouse データレプリケーション](https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication)
+- [ClickHouse Keeper](https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper)
+- [ClickHouse の水平スケール](https://clickhouse.com/docs/architecture/horizontal-scaling)
+- [ClickHouse の複製](https://clickhouse.com/docs/architecture/replication)
+- [ClickHouse Cloud のアーキテクチャ](https://clickhouse.com/docs/cloud/reference/architecture)
+- [SharedMergeTree](https://clickhouse.com/docs/cloud/reference/shared-merge-tree)

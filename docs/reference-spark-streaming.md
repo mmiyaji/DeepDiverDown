@@ -1,4 +1,4 @@
-# Apache Spark Streaming（DStreams）の基本アーキテクチャ
+# Spark Streaming（DStreams）：旧 API のバッチ間隔処理と復旧
 
 ## 1. 読み方と範囲
 

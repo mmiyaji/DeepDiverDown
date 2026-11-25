@@ -1,0 +1,243 @@
+{
+  "model": "clickhouse-replication",
+  "name": "ClickHouse：レプリケーションと Keeper",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "INSERT を送るクライアント",
+      "status": "claim"
+    },
+    "replica-a": {
+      "type": "node",
+      "label": "レプリカ A（書き込みを受けた側）",
+      "status": "claim"
+    },
+    "replica-b": {
+      "type": "node",
+      "label": "レプリカ B",
+      "status": "claim"
+    },
+    "keeper": {
+      "type": "node",
+      "label": "ClickHouse Keeper",
+      "status": "claim"
+    },
+    "merge": {
+      "type": "node",
+      "label": "各レプリカのマージ",
+      "status": "claim"
+    },
+    "insert": {
+      "type": "link",
+      "label": "INSERT を送るクライアント → レプリカ A（書き込みを受けた側）",
+      "status": "claim"
+    },
+    "record": {
+      "type": "link",
+      "label": "レプリカ A（書き込みを受けた側） → ClickHouse Keeper",
+      "status": "claim"
+    },
+    "notify": {
+      "type": "link",
+      "label": "ClickHouse Keeper → レプリカ B",
+      "status": "claim"
+    },
+    "copy": {
+      "type": "link",
+      "label": "レプリカ A（書き込みを受けた側） → レプリカ B",
+      "status": "claim"
+    },
+    "plan-merge": {
+      "type": "link",
+      "label": "ClickHouse Keeper → 各レプリカのマージ",
+      "status": "claim"
+    },
+    "merge-a": {
+      "type": "link",
+      "label": "各レプリカのマージ → レプリカ A（書き込みを受けた側）",
+      "status": "claim"
+    },
+    "merge-b": {
+      "type": "link",
+      "label": "各レプリカのマージ → レプリカ B",
+      "status": "claim"
+    },
+    "replicate-insert": {
+      "type": "scenario",
+      "label": "INSERT を複製する"
+    },
+    "merge-sync": {
+      "type": "scenario",
+      "label": "マージを全レプリカで揃える"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "複製の調整は Keeper に依存",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "マージ結果は転送しない",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境の Keeper の台数、レプリカ数、複製の遅れは未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Keeper 内のノード構成と、更新の取り込みの詳しい手順は公式資料の範囲で確認していない。"
+    },
+    "sr-client": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "clickhouse-client",
+      "realizes": [
+        "client"
+      ]
+    },
+    "sr-a": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "ホスト 1：ReplicatedMergeTree",
+      "realizes": [
+        "replica-a"
+      ]
+    },
+    "sr-b": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "ホスト 2：ReplicatedMergeTree",
+      "realizes": [
+        "replica-b"
+      ]
+    },
+    "sr-merge": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "各 Server のバックグラウンドマージ",
+      "realizes": [
+        "merge"
+      ]
+    },
+    "sr-keeper": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "ClickHouse Keeper（3 台）",
+      "realizes": [
+        "keeper"
+      ]
+    },
+    "sr-macros": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "設定ファイル（macros・zookeeper）",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-clickhouse-replication.md#§1": [
+      "model"
+    ],
+    "docs/reference-clickhouse-replication.md": [
+      "model",
+      "client",
+      "replica-a",
+      "replica-b",
+      "keeper",
+      "merge",
+      "insert",
+      "record",
+      "notify",
+      "copy",
+      "plan-merge",
+      "merge-a",
+      "merge-b",
+      "replicate-insert",
+      "merge-sync",
+      "BR-01",
+      "BR-02",
+      "sr-client",
+      "sr-a",
+      "sr-b",
+      "sr-merge",
+      "sr-keeper",
+      "sr-macros"
+    ],
+    "docs/reference-clickhouse-replication.md#§2": [
+      "model",
+      "replica-b"
+    ],
+    "docs/reference-clickhouse-replication.md#§3": [
+      "model",
+      "client",
+      "replica-a",
+      "insert",
+      "record",
+      "copy",
+      "replicate-insert"
+    ],
+    "docs/reference-clickhouse-replication.md#§4": [
+      "model",
+      "merge",
+      "plan-merge",
+      "merge-a",
+      "merge-b",
+      "merge-sync",
+      "BR-02"
+    ],
+    "docs/reference-clickhouse-replication.md#§5": [
+      "model",
+      "keeper",
+      "notify",
+      "BR-01"
+    ],
+    "docs/reference-clickhouse-replication.md#§6": [
+      "sr-client",
+      "sr-a",
+      "sr-b",
+      "sr-merge",
+      "sr-keeper",
+      "sr-macros"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "ClickHouse",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "clickhouse",
+    "objectives": [
+      "ReplicatedMergeTree のテーブルが Keeper 上のパスとレプリカ名で識別されることを説明する。",
+      "INSERT は受けたレプリカにまず書かれ、非同期に他のレプリカへ複製されることを追う。",
+      "マージが各レプリカで同じ手順で行われ、結果が転送されないことを説明する。",
+      "Keeper が使えないとき、複製表と SELECT がどうなるかを区別する。"
+    ],
+    "sources": [
+      {
+        "title": "ClickHouse データレプリケーション",
+        "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"
+      },
+      {
+        "title": "ClickHouse の複製（シャードとレプリカの構成例）",
+        "url": "https://clickhouse.com/docs/architecture/replication"
+      },
+      {
+        "title": "ClickHouse Keeper",
+        "url": "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"
+      },
+      {
+        "title": "ClickHouse アーキテクチャ概説（学術論文の解説）",
+        "url": "https://clickhouse.com/docs/academic_overview"
+      }
+    ]
+  }
+}

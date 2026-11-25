@@ -1,328 +1,194 @@
-name: "ClickHouse の MergeTree：疎インデックスとパートのマージ"
-description: "直近 7 日の注文を例に、月パーティションと疎主インデックスで読む範囲を絞り、バックグラウンドマージでパートが置き換わる流れを追う。"
+name: "ClickHouse の基本アーキテクチャ"
+description: "SQL を受けるサーバー、ベクトル化された列指向の実行、テーブルエンジン、MergeTree の保存、Distributed とシャード・レプリカ、Keeper による調整までを一枚で見る。"
 reference:
   objectives:
-    - パーティション、パート、グラニュール、マークの関係を説明する。
-    - パートの候補選択と疎主インデックスによるグラニュールの絞り込みを追う。
-    - パートのマージが物理配置とクエリ結果に与える影響を説明する。
+    - クエリ処理、テーブルエンジン、ストレージの役割を区別する。
+    - MergeTree が不変のパートとして保存し、疎主インデックスで読む範囲を絞ることを説明する。
+    - シャード（分散）とレプリカ（複製）の違いと、Distributed テーブル・ReplicatedMergeTree・Keeper の役割を説明する。
+    - 自前運用のクラスターと ClickHouse Cloud で、保存と複製の担い手がどう変わるかを比べる。
   sources:
+    - title: ClickHouse アーキテクチャ概説（学術論文の解説）
+      url: https://clickhouse.com/docs/academic_overview
     - title: ClickHouse MergeTree table engine
-      url: https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree
-    - title: ClickHouse EXPLAIN
-      url: https://clickhouse.com/docs/reference/statements/explain
-    - title: ClickHouse system.parts
-      url: https://clickhouse.com/docs/operations/system-tables/parts
+      url: https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree
+    - title: ClickHouse Distributed table engine
+      url: https://clickhouse.com/docs/engines/table-engines/special/distributed
+    - title: ClickHouse データレプリケーション
+      url: https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication
+    - title: ClickHouse Keeper
+      url: https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper
+    - title: ClickHouse の水平スケール
+      url: https://clickhouse.com/docs/architecture/horizontal-scaling
 sources: ["docs/reference-clickhouse.md"]
 evidence:
-  - {"type":"doc","ref":"docs/reference-clickhouse.md#§1"}
-  - {"type":"doc","ref":"docs/reference-clickhouse.md#§2"}
-  - {"type":"doc","ref":"docs/reference-clickhouse.md#§3"}
-  - {"type":"doc","ref":"docs/reference-clickhouse.md#§4"}
-  - {"type":"doc","ref":"docs/reference-clickhouse.md#§5"}
-  - {"type":"doc","ref":"docs/reference-clickhouse.md#§6"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§1"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§2"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§3"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§4"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§5"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§6"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§7"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§8"}
+  - {type: doc, ref: "docs/reference-clickhouse.md#§9"}
 tiers:
-  - {"id":"engine","label":"書き込みとクエリ","z":1,"origin":[0,0],"size":[15,3]}
-  - {"id":"storage","label":"MergeTree の保存単位","z":0,"origin":[0,0],"size":[15,3]}
+  - {id: query, label: クエリ処理, z: 1, size: [22, 7]}
+  - {id: storage, label: ストレージ・複製・分散, z: 0, size: [22, 7]}
 nodes:
-  insert: {label: 注文データの取り込み元, kind: actor, tier: engine, x: 1, 'y': 1.5, description: 注文のバッチを書き込む。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§2}]}
-  planner: {label: SQL の読取計画, kind: service, tier: engine, x: 5, 'y': 1.5, description: 日付と顧客の述語から候補範囲を計画する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§3}, {type: doc, ref: docs/reference-clickhouse.md#§5}]}
-  scan: {label: 候補範囲の列スキャン, kind: worker, tier: engine, x: 9, 'y': 1.5, description: 候補グラニュールの必要列を読み、行の述語を評価する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§3}]}
-  result: {"label":"注文別の金額","kind":"external","tier":"engine","x":14,"y":1.5,"description":"条件を満たす注文の order_id と amount を返す。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§1"}]}
-  partition: {label: 月パーティション, kind: db, tier: storage, x: 1, y: 1.5, description: パートを注文日の月によって分ける。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§2}]}
-  parts: {"label":"データパート","kind":"db","tier":"storage","x":5,"y":1.5,"description":"並べ替え済みの列データとインデックスを備えた不変の単位。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
-  granules: {"label":"疎主インデックスとマーク","kind":"segment","tier":"storage","x":9,"y":1.5,"description":"グラニュール境界のキーと列データ上の位置を使い、読む範囲を決める。","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
-  merger: {label: 同じパーティション内のデータ統合, kind: worker, tier: storage, x: 14, 'y': 1.5, description: 同じパーティションの選択されたパートを新しいパートにまとめる。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§4}]}
+  client:
+    label: SQL クライアント
+    kind: client
+    tier: query
+    x: 1
+    y: 3
+    description: SQL を送り、結果を受け取る。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§2"}]
+  planner:
+    label: SQL の解析と計画
+    kind: service
+    tier: query
+    x: 6
+    y: 3
+    replicas: 2
+    description: クライアントからの接続を受け、SQL を実行できる形にする。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§2"}]
+  scan:
+    label: ベクトル化された列処理
+    kind: worker
+    tier: query
+    x: 12
+    y: 3
+    replicas: 2
+    description: 複数行のまとまり（チャンク）を単位に、列ごとのデータを処理する。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§3"}]
+  engine:
+    label: テーブルエンジン
+    kind: service
+    tier: query
+    x: 17
+    y: 3
+    replicas: 2
+    description: テーブルごとに、データの保存・読み取り・複製・分散の方法を決める。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§4"}]
+  granules:
+    label: MergeTree のパートと疎主インデックス
+    kind: db
+    tier: storage
+    x: 17
+    y: 3
+    replicas: 2
+    description: 行を主キー順に並べた不変のパートとして保存し、グラニュール単位の疎なインデックスで読む範囲を絞る。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§5"}]
+  distributed:
+    label: Distributed テーブル
+    kind: service
+    tier: storage
+    x: 1
+    y: 3
+    replicas: 2
+    description: データを持たず、クラスター定義に従って各シャードへ問い合わせ・書き込みを振り分ける。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§6"}]
+  replicated:
+    label: シャード内のレプリカ（ReplicatedMergeTree）
+    kind: db
+    tier: storage
+    x: 8
+    y: 3
+    replicas: 2
+    description: 同じシャードの複数サーバーが同じデータを持つ。どのレプリカにも書き込める。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§7"}]
+  keeper:
+    label: ClickHouse Keeper
+    kind: catalog
+    tier: storage
+    x: 13
+    y: 3
+    replicas: 3
+    description: レプリケーションの調整に使うレプリカのメタデータとログを保持する。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§7"}]
 links:
-  - {"id":"store","from":"insert","to":"partition","label":"月ごとに行を振り分ける","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
-  - {"id":"sort","from":"partition","to":"parts","label":"ソート済みパートを作る","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§2"}]}
-  - {"id":"partition-prune","from":"planner","to":"partition","label":"対象月の候補を選ぶ","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
-  - {"id":"index-prune","from":"planner","to":"granules","label":"疎インデックスを探索する","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
-  - {"id":"read","from":"granules","to":"scan","label":"候補の列データを読む","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
-  - {"id":"return","from":"scan","to":"result","label":"条件を満たす行を返す","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
-  - {"id":"pick","from":"parts","to":"merger","label":"同じ月のパートを選ぶ","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
-  - {"id":"replace","from":"merger","to":"parts","label":"新しいパートを有効にする","evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
+  - {id: sql, from: client, to: planner, label: SQL を送る, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§2"}]}
+  - {id: open-table, from: planner, to: engine, label: テーブルのエンジンに読み書きを依頼, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§4"}]}
+  - {id: read-local, from: engine, to: granules, label: パートから必要な列を読む, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§5"}]}
+  - {id: chunks, from: granules, to: scan, label: 列データをチャンクで渡す, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§3"}]}
+  - {id: return, from: scan, to: client, label: 結果を返す, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§2"}]}
+  - {id: to-distributed, from: engine, to: distributed, label: Distributed の表は各シャードへ回す, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§6"}]}
+  - {id: to-replica, from: distributed, to: replicated, label: 各シャードの 1 レプリカへ送る, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§6"}]}
+  - {id: replica-store, from: replicated, to: granules, label: ローカルのパートとして保存, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§7"}]}
+  - {id: coordinate, from: replicated, to: keeper, label: 更新の記録と同期を調整, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§7"}]}
 scenarios:
-  - id: query-week
-    label: 直近 7 日から顧客 42 を探す
-    visual: tree
-    evidence:
-      - type: doc
-        ref: docs/reference-clickhouse.md#§3
+  - id: local-select
+    label: 1 台のテーブルを読む
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§5"}]
     steps:
-      - links:
-          - partition-prune
-        note: 1 月 25 日から 2 月 1 日未満のため、12 月と 2 月の枝を除外する。
-        prune:
-          - dec
-          - feb
-      - links:
-          - index-prune
-        note: 1 月の各パートで疎主インデックスを調べ、対象の日付と顧客を含み得るグラニュールを残す。
-        prune:
-          - a-older
-          - b-other
-      - links:
-          - read
-          - return
-        note: マークで列データの読み取り位置を決め、候補の行に日付と顧客の条件を適用する。
-        read:
-          - a-match
-          - b-match
-  - id: merge-parts
-    label: 1 月の二つのパートをマージする
-    visual: merge
-    evidence:
-      - type: doc
-        ref: docs/reference-clickhouse.md#§4
+      - {links: [sql], note: クライアントが SQL を送る。}
+      - {links: [open-table], note: 計画した読み取りを、テーブルのエンジン（MergeTree）に依頼する。}
+      - {links: [read-local], note: 疎主インデックスで候補を絞り、必要な列だけ読む。}
+      - {links: [chunks, return], note: 複数行のチャンクを単位に処理し、結果を返す。}
+  - id: cluster-select
+    label: Distributed テーブルで全シャードを読む
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§6"}]
     steps:
-      - links:
-          - store
-          - sort
-        note: 1 月への二つの INSERT で、独立して並べ替えた A と B ができる。
-        highlight:
-          - part-a
-          - part-b
-      - links:
-          - pick
-        note: バックグラウンドタスクが同じ月の A と B を選ぶ。2 月の C は別のパーティションに属する。
-        highlight:
-          - part-a
-          - part-b
-      - links:
-          - replace
-        note: 二つの入力をキー順にマージし、新しいパート M のグラニュール境界と索引を作る。
-        blocks:
-          january:
-            - id: part-m
-              label: パート M
-              k: 2
-              from:
-                - part-a
-                - part-b
-          february:
-            - id: part-c
-              label: パート C
-              k: 1
-        highlight:
-          - part-m
+      - {links: [sql, open-table], note: Distributed の表への SELECT を、エンジンに依頼する。}
+      - {links: [to-distributed, to-replica], note: 各シャードで利用できる 1 レプリカを選び、問い合わせを送る。}
+      - {links: [replica-store, read-local], note: 各レプリカが自分のパートを読む。}
+      - {links: [chunks, return], note: 結果を集約して返す。集約は一部をシャード側で行える。}
+  - id: replicated-insert
+    label: レプリカへの書き込みと複製
+    evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§7"}]
+    steps:
+      - {links: [replica-store], note: 書き込みを受けたレプリカが、先に自分のパートとして保存する。}
+      - {links: [coordinate], note: 更新を Keeper の調整に記録し、ほかのレプリカが取り込む。}
 requirements:
-  - {"id":"BR-01","kind":"usecase","title":"対象期間の注文を返す","text":"日付と顧客の条件を満たす注文だけを返す。","links":["read","return"],"evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§3"}]}
-  - {"id":"BR-02","kind":"rule","title":"同じ月で物理配置を整理","text":"選択されたパートを同じ月の中でまとめ、注文行を保持する。","links":["pick","replace"],"evidence":[{"type":"doc","ref":"docs/reference-clickhouse.md#§4"}]}
+  - {id: BR-01, kind: usecase, title: 全シャードを 1 つの表として検索, text: Distributed テーブルへの SELECT が各シャードを読み、結果を返す。, scenario: cluster-select, links: [to-distributed, to-replica, return], evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§6"}]}
+  - {id: BR-02, kind: rule, title: 複製の調整は Keeper に任せる, text: レプリケーションされた表のメタデータの調整に Keeper を使う。, links: [coordinate], evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§7"}]}
 unknowns:
-  - {"id":"UNK-01","text":"実環境のパート数、グラニュール境界、索引による除外数、マージの時期は未確認。","refs":["parts","granules","merger"]}
+  - {id: UNK-01, text: 実環境のシャード数・レプリカ数・Keeper の台数・パート数は未確認。, refs: [distributed, replicated, keeper, granules]}
+  - {id: UNK-02, text: Kubernetes 上での運用は、この図では検証していない。, refs: [replicated, keeper]}
+  - {id: UNK-03, text: ClickHouse Cloud の内部の制御系の構成は公開資料で確認できていない。, refs: [engine]}
 gates: {maxDrift: 0, maxHigh: 0}
-treeLayout:
-  title: 月パーティションからグラニュールまで
-  levels:
-    - テーブル
-    - 月
-    - パート
-    - 候補グラニュール
-  note: 説明用の配置。各葉はグラニュールの例。
-  root:
-    id: orders
-    label: orders
-    kind: meta
-    node: partition
-    children:
-      - id: dec
-        label: 2025-12
-        kind: snapshot
-        node: partition
-        children:
-          - id: dec-part
-            label: パート D
-            kind: manifest
-            node: parts
-            children:
-              - id: dec-granule
-                label: 期間外
-                kind: data
-                node: granules
-      - id: jan
-        label: 2026-01
-        kind: snapshot
-        node: partition
-        children:
-          - id: a
-            label: パート A
-            kind: manifest
-            node: parts
-            children:
-              - id: a-older
-                label: 期間外
-                kind: data
-                node: granules
-                description: 先頭キーは (42, 2026-01-01)。次のグラニュールの先頭は (42, 2026-01-20) で、期間より前にある。
-              - id: a-match
-                label: 顧客 42 の候補
-                kind: data
-                node: granules
-                description: 先頭キーは (42, 2026-01-20)。対象期間に重なる可能性がある。
-          - id: b
-            label: パート B
-            kind: manifest
-            node: parts
-            children:
-              - id: b-match
-                label: 顧客 42 の候補
-                kind: data
-                node: granules
-                description: 先頭キーは (42, 2026-01-25)。顧客 42 と対象期間に合う行を含む。
-              - id: b-other
-                label: 顧客範囲外
-                kind: data
-                node: granules
-                description: 先頭キーは (43, 2026-01-01)。顧客 42 はソート順でこの境界より前にある。
-      - id: feb
-        label: 2026-02
-        kind: snapshot
-        node: partition
-        children:
-          - id: feb-part
-            label: パート C
-            kind: manifest
-            node: parts
-            children:
-              - id: feb-granule
-                label: 期間外
-                kind: data
-                node: granules
-  unit: 図中のグラニュール
-blocks:
-  id: merge
-  title: 月パーティション内のバックグラウンドマージ
-  note: 塊は説明用のデータパート。
-  legend:
-    "0": 1 月の入力
-    "1": 2 月のパート
-    "2": 1 月の出力
-  lanes:
-    - id: january
-      label: 2026-01
-      node: parts
-    - id: february
-      label: 2026-02
-      node: partition
-  items:
-    january:
-      - id: part-a
-        label: パート A
-        k: 0
-      - id: part-b
-        label: パート B
-        k: 0
-    february:
-      - id: part-c
-        label: パート C
-        k: 1
-
 implementations:
-  - id: mergetree
-    label: "単一 ClickHouse サーバーの MergeTree"
-    description: "架空の注文を `PARTITION BY toYYYYMM(order_date)` と `ORDER BY (customer_id, order_date)` の MergeTree に格納する例。クライアントとサーバー、およびディスク上の物理部品を分けて示す。"
+  - id: self-managed
+    label: 自前運用クラスター（Linux ホストの Server と Keeper）
+    description: 利用者が Linux ホストに ClickHouse Server と ClickHouse Keeper を導入し、シャードとレプリカを設定ファイルで定義する代表例。
     sources:
-      - {title: ClickHouse の Debian・Ubuntu 導入, url: https://clickhouse.com/docs/get-started/setup/self-managed/debian-ubuntu}
-      - {title: ClickHouse MergeTree table engine, url: https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree}
-      - {title: ClickHouse EXPLAIN, url: https://clickhouse.com/docs/reference/statements/explain}
-      - {title: ClickHouse system.parts, url: https://clickhouse.com/docs/operations/system-tables/parts}
+      - {title: ClickHouse の水平スケール, url: "https://clickhouse.com/docs/architecture/horizontal-scaling"}
+      - {title: ClickHouse の複製, url: "https://clickhouse.com/docs/architecture/replication"}
+      - {title: ClickHouse Keeper, url: "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"}
+      - {title: ClickHouse データレプリケーション, url: "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"}
     tiers:
-      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
-      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
-    nodes:
-      mergetree-host: {label: 自前 Linux サーバー, kind: host, tier: processing, x: 3, y: 0, description: 利用者が ClickHouse Server とローカルファイルシステムを運用する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
-      mergetree-insert: {label: clickhouse-client から INSERT, kind: client, tier: processing, x: 1, y: 1.15, realizes: [insert], description: バッチ単位で注文を投入する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
-      mergetree-server: {label: ClickHouse Server の SELECT と MergeTree 読取, kind: service, tier: processing, x: 1, y: 3.65, realizes: [planner, scan], description: 疎索引を調べて読み取り候補を絞る。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
-      mergetree-data: {label: MergeTree の月別パートとマーク, kind: db, tier: processing, x: 5, y: 1.15, realizes: [partition, parts, granules], description: 各パートに列データ、疎主索引とマークを持つ。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
-      mergetree-merge: {label: MergeTree のバックグラウンドマージ, kind: worker, tier: processing, x: 5, y: 3.65, realizes: [merger], description: 同一パーティションの入力パートを統合する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
-      mergetree-result: {label: clickhouse-client の注文結果, kind: external, tier: processing, x: 9, y: 1.15, realizes: [result], description: 条件に合う行を表示する。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
-      mergetree-system: {label: system.parts, kind: table, tier: setup, x: 1, y: 1.5, description: active、rows、marks などを調べられるシステムテーブル。, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§7}]}
-    links:
-      - {id: mergetree-host-run, from: mergetree-host, to: mergetree-server, label: ClickHouse を実行}
-      - {id: mergetree-host-storage, from: mergetree-host, to: mergetree-data, label: データディレクトリを提供}
-      - {id: mergetree-system-connection, from: mergetree-system, to: mergetree-server, label: パートの状態を観測}
-    layout2d:
-      tiers:
-        - {id: diagram, label: 自前 ClickHouse, z: 0, size: [20, 12]}
-      nodes:
-        mergetree-insert: {tier: diagram, x: 2, y: 2}
-        mergetree-result: {tier: diagram, x: 2, y: 8}
-        mergetree-host: {tier: diagram, x: 8, y: 2}
-        mergetree-server: {tier: diagram, x: 8, y: 6}
-        mergetree-merge: {tier: diagram, x: 13, y: 6}
-        mergetree-data: {tier: diagram, x: 17, y: 3}
-        mergetree-system: {tier: diagram, x: 13, y: 10}
-      groups:
-        - {kind: nodegroup, label: 自前 Linux サーバー, tier: [diagram], x0: 5.3, y0: -0.5, x1: 19.5, y1: 11.7, nodes: [mergetree-host, mergetree-server, mergetree-merge, mergetree-data, mergetree-system]}
-    layout3d:
-      tiers:
-        - {id: clients, label: クライアント, kind: origin, z: 0, origin: [-5, 0], size: [3, 7]}
-        - {id: host, label: Linux サーバー, z: 0, size: [12, 5]}
-        - {id: process, label: ClickHouse Server, z: 1, size: [12, 5]}
-      nodes:
-        mergetree-insert: {tier: clients, x: 1, y: 1}
-        mergetree-result: {tier: clients, x: 1, y: 5}
-        mergetree-host: {tier: host, x: 2, y: 2}
-        mergetree-data: {tier: host, x: 8, y: 2}
-        mergetree-server: {tier: process, x: 2, y: 2}
-        mergetree-merge: {tier: process, x: 6, y: 2}
-        mergetree-system: {tier: process, x: 10, y: 2}
-      groups:
-        - {kind: nodegroup, label: 自前 Linux サーバー, tier: [host, process], nodes: [mergetree-host, mergetree-server, mergetree-merge, mergetree-data, mergetree-system]}
-  - id: aws-ec2-mergetree
-    label: AWS（ClickHouse on EC2・Amazon EBS）
-    description: 自主管理の ClickHouse Server が EC2 上で MergeTree の読取とバックグラウンドマージを行う例。
-    sources:
-      - {title: ClickHouse の Debian・Ubuntu 導入, url: https://clickhouse.com/docs/get-started/setup/self-managed/debian-ubuntu}
-      - {title: ClickHouse MergeTree, url: https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree}
-      - {title: Amazon EBS ボリュームのアタッチ, url: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-attaching-volume.html}
-    tiers:
-      - {id: entry, label: SQL クライアント, z: 0, size: [5, 5]}
-      - {id: process, label: EC2 上の ClickHouse Server, z: 1, size: [21, 5]}
-      - {id: storage, label: データボリューム, z: 0, size: [21, 4]}
+      - {id: access, label: クライアント, z: 0, origin: [-6, 0], size: [4, 7]}
+      - {id: servers, label: ClickHouse Server のホスト, z: 1, size: [22, 7]}
+      - {id: keeperhosts, label: ClickHouse Keeper のホスト, z: 0, size: [22, 4]}
     groups:
-      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [process, storage], nodes: [aws-ec2, aws-server, aws-merge, aws-ebs, aws-parts]}
-      - {kind: cluster, label: 単一 EC2 インスタンス, tier: process, nodes: [aws-ec2, aws-server, aws-merge]}
+      - {kind: cluster, label: 自前運用のクラスター, tier: [servers, keeperhosts], nodes: [sm-server, sm-distributed, sm-replica, sm-parts, sm-keeper, sm-config]}
     nodes:
-      aws-client: {label: "clickhouse-client（投入と結果表示）", kind: client, tier: entry, x: 2, y: 2, realizes: [insert, result], description: "許可された接続元から INSERT と SELECT を実行する。", evidence: [{type: doc, ref: docs/reference-clickhouse.md#§8}]}
-      aws-ec2: {label: "Amazon EC2（Linux）", svc: ec2, kind: host, tier: process, x: 2, y: 2, description: "利用者管理の ClickHouse Server を実行する。", management: {type: shared, scope: "AWS が EC2 の物理基盤を運用し、利用者が OS とインスタンスを管理する。"}, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§8}]}
-      aws-server: {label: "ClickHouse Server（SQL・MergeTree 読取）", kind: service, tier: process, x: 9, y: 1.5, realizes: [planner, scan], description: "クエリ計画を作り、選択された列データを読む。", management: {type: customer, scope: "利用者が ClickHouse の設定、更新とアクセスを管理する。"}, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§8}]}
-      aws-merge: {label: "MergeTree バックグラウンドマージ", kind: worker, tier: process, x: 16, y: 1.5, realizes: [merger], description: "同じ月の不変なパートを新しいパートへ書き換える。", management: {type: customer, scope: "利用者が MergeTree の設定と運用を管理する。"}, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§8}]}
-      aws-ebs: {label: "Amazon EBS（データボリューム）", svc: ebs, kind: db, tier: storage, x: 3, y: 1.5, description: "ClickHouse のデータディレクトリを保存するブロックデバイス。", management: {type: shared, scope: "AWS が EBS 基盤を運用し、利用者がボリュームとバックアップを管理する。"}, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§8}]}
-      aws-parts: {label: "EBS 上の MergeTree のデータパート", kind: file, tier: storage, x: 12, y: 1.5, realizes: [partition, parts, granules], description: "月別パート、各パートの列ファイル、疎主インデックスとマークを保持する。", management: {type: customer, scope: "利用者がデータ、権限と復旧を管理する。"}, evidence: [{type: doc, ref: docs/reference-clickhouse.md#§8}]}
+      sm-client: {label: clickhouse-client, kind: client, tier: access, x: 1, y: 3, realizes: [client], description: クラスターのいずれかの Server へ SQL を送る。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
+      sm-server: {label: clickhouse-server（SQL 計画・列処理・エンジン）, kind: service, tier: servers, x: 2, y: 3, realizes: [planner, scan, engine], description: 各ホストで SQL を計画し、ベクトル化して実行する。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
+      sm-distributed: {label: Distributed テーブル, kind: service, tier: servers, x: 8, y: 1.5, realizes: [distributed], description: remote_servers に定義したクラスターの各シャードへ振り分ける。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
+      sm-replica: {label: ReplicatedMergeTree のレプリカ, kind: db, tier: servers, x: 8, y: 4.5, realizes: [replicated], description: マクロの shard と replica で識別される各ホストのローカルテーブル。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
+      sm-parts: {label: ホストのローカルディスク上のパート, kind: file, tier: servers, x: 15, y: 4.5, realizes: [granules], description: 各レプリカが自分のディスクにパートを持つ。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
+      sm-keeper: {label: ClickHouse Keeper（3 台以上を推奨）, kind: catalog, tier: keeperhosts, x: 8, y: 1.5, realizes: [keeper], description: Raft で合意し、レプリカのメタデータを保持する。本番では専用ホストを推奨。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
+      sm-config: {label: 設定ファイル（remote_servers・macros・zookeeper）, kind: policy, tier: servers, x: 15, y: 1.5, description: クラスター定義、shard と replica のマクロ、Keeper の接続先を指定する。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§8"}]}
     links:
-      - {id: aws-run, from: aws-ec2, to: aws-server, label: ClickHouse Server を起動}
-      - {id: aws-attach, from: aws-ec2, to: aws-ebs, label: データボリュームをマウント}
-      - {id: aws-insert, from: aws-client, to: aws-server, label: INSERT バッチを送る, realizes: [store], replace: true}
-      - {id: aws-write, from: aws-server, to: aws-parts, label: 月別パートを作成, realizes: [store, sort], replace: true}
-      - {id: aws-select, from: aws-client, to: aws-server, label: SELECT と EXPLAIN を送る}
-
-    layout2d:
-      tiers:
-        - {id: diagram, label: EC2 上の ClickHouse, z: 0, size: [22, 12]}
-      nodes:
-        aws-client: {tier: diagram, x: 1, y: 3}
-        aws-ec2: {tier: diagram, x: 7, y: 2}
-        aws-server: {tier: diagram, x: 7, y: 6}
-        aws-merge: {tier: diagram, x: 12, y: 6}
-        aws-ebs: {tier: diagram, x: 17, y: 2}
-        aws-parts: {tier: diagram, x: 17, y: 6}
-      groups:
-        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 4, y0: -0.5, x1: 20.5, y1: 10, nodes: [aws-ec2, aws-server, aws-merge, aws-ebs, aws-parts]}
-        - {kind: vpc, label: EC2 の利用者 VPC, provider: aws, tier: [diagram], x0: 4.5, y0: -0.1, x1: 14.7, y1: 8.5, nodes: [aws-ec2, aws-server, aws-merge]}
-        - {kind: nodegroup, label: 単一 EC2 インスタンス, tier: [diagram], x0: 4.7, y0: 0.1, x1: 14.5, y1: 8.3, nodes: [aws-ec2, aws-server, aws-merge]}
-    layout3d:
-      tiers:
-        - {id: client, label: SQL クライアント, kind: origin, z: 0, origin: [-5, 0], size: [3, 5]}
-        - {id: platform, label: EC2 と EBS, z: 0, size: [12, 5]}
-        - {id: process, label: ClickHouse Server, z: 1, size: [12, 5]}
-      nodes:
-        aws-client: {tier: client, x: 1, y: 2}
-        aws-ec2: {tier: platform, x: 2, y: 2}
-        aws-ebs: {tier: platform, x: 7, y: 2}
-        aws-parts: {tier: platform, x: 11, y: 2}
-        aws-server: {tier: process, x: 2, y: 2}
-        aws-merge: {tier: process, x: 7, y: 2}
-      groups:
-        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [platform, process], nodes: [aws-ec2, aws-server, aws-merge, aws-ebs, aws-parts]}
-        - {kind: vpc, label: EC2 の利用者 VPC, provider: aws, tier: [platform, process], nodes: [aws-ec2, aws-server, aws-merge]}
+      - {id: sm-use-config, from: sm-config, to: sm-server, label: クラスター構成を読み込む}
+      - {id: sm-keeper-conn, from: sm-server, to: sm-keeper, label: Keeper のクライアントポートへ接続}
+  - id: cloud
+    label: ClickHouse Cloud（計算とオブジェクトストレージの分離）
+    description: ClickHouse Cloud のサービスで、SharedMergeTree が共有のオブジェクトストレージを使い、計算ノードを増減する構成。公開資料にある範囲だけを描く。
+    sources:
+      - {title: ClickHouse Cloud のアーキテクチャ, url: "https://clickhouse.com/docs/cloud/reference/architecture"}
+      - {title: SharedMergeTree, url: "https://clickhouse.com/docs/cloud/reference/shared-merge-tree"}
+    tiers:
+      - {id: access, label: クライアント, z: 0, origin: [-6, 0], size: [4, 7]}
+      - {id: compute, label: ClickHouse Cloud のサービス（計算）, z: 1, size: [22, 7]}
+      - {id: shared, label: 共有ストレージと調整, z: 0, size: [22, 5]}
+    groups:
+      - {kind: cloud, label: ClickHouse Cloud, tier: [compute, shared], nodes: [cl-compute, cl-smt, cl-object, cl-keeper]}
+    nodes:
+      cl-client: {label: SQL クライアント, kind: client, tier: access, x: 1, y: 3, realizes: [client], description: サービスの URL へ接続して SQL を送る。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
+      cl-compute: {label: 計算ノード（レプリカ）, kind: service, tier: compute, x: 2, y: 3, realizes: [planner, scan, engine, distributed], description: SQL を処理する。レプリカ数を増やして水平に拡張でき、Cloud ではシャードを足さずに拡張できる。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
+      cl-smt: {label: SharedMergeTree, kind: service, tier: compute, x: 10, y: 3, realizes: [replicated], description: ReplicatedMergeTree に代わる Cloud のエンジン。レプリカ間は共有ストレージと Keeper を通じて非同期に調整する。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
+      cl-object: {label: オブジェクトストレージ, kind: db, tier: shared, x: 3, y: 2, realizes: [granules], description: データを保存する。サービスごとに分離される。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
+      cl-keeper: {label: ClickHouse Keeper, kind: catalog, tier: shared, x: 12, y: 2, realizes: [keeper], description: SharedMergeTree のレプリカが調整に使う。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
+    links:
+      - {id: cl-shared-read, from: cl-compute, to: cl-object, label: 共有ストレージから読み書き}

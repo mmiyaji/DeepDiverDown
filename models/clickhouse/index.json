@@ -1,335 +1,368 @@
 {
   "model": "clickhouse",
-  "name": "ClickHouse の MergeTree：疎インデックスとパートのマージ",
+  "name": "ClickHouse の基本アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
-    "insert": {
+    "client": {
       "type": "node",
-      "label": "注文データの取り込み元",
+      "label": "SQL クライアント",
       "status": "claim"
     },
     "planner": {
       "type": "node",
-      "label": "SQL の読取計画",
+      "label": "SQL の解析と計画",
       "status": "claim"
     },
     "scan": {
       "type": "node",
-      "label": "候補範囲の列スキャン",
+      "label": "ベクトル化された列処理",
       "status": "claim"
     },
-    "result": {
+    "engine": {
       "type": "node",
-      "label": "注文別の金額",
-      "status": "claim"
-    },
-    "partition": {
-      "type": "node",
-      "label": "月パーティション",
-      "status": "claim"
-    },
-    "parts": {
-      "type": "node",
-      "label": "データパート",
+      "label": "テーブルエンジン",
       "status": "claim"
     },
     "granules": {
       "type": "node",
-      "label": "疎主インデックスとマーク",
+      "label": "MergeTree のパートと疎主インデックス",
       "status": "claim"
     },
-    "merger": {
+    "distributed": {
       "type": "node",
-      "label": "同じパーティション内のデータ統合",
+      "label": "Distributed テーブル",
       "status": "claim"
     },
-    "store": {
-      "type": "link",
-      "label": "注文データの取り込み元 → 月パーティション",
+    "replicated": {
+      "type": "node",
+      "label": "シャード内のレプリカ（ReplicatedMergeTree）",
       "status": "claim"
     },
-    "sort": {
-      "type": "link",
-      "label": "月パーティション → データパート",
+    "keeper": {
+      "type": "node",
+      "label": "ClickHouse Keeper",
       "status": "claim"
     },
-    "partition-prune": {
+    "sql": {
       "type": "link",
-      "label": "SQL の読取計画 → 月パーティション",
+      "label": "SQL クライアント → SQL の解析と計画",
       "status": "claim"
     },
-    "index-prune": {
+    "open-table": {
       "type": "link",
-      "label": "SQL の読取計画 → 疎主インデックスとマーク",
+      "label": "SQL の解析と計画 → テーブルエンジン",
       "status": "claim"
     },
-    "read": {
+    "read-local": {
       "type": "link",
-      "label": "疎主インデックスとマーク → 候補範囲の列スキャン",
+      "label": "テーブルエンジン → MergeTree のパートと疎主インデックス",
+      "status": "claim"
+    },
+    "chunks": {
+      "type": "link",
+      "label": "MergeTree のパートと疎主インデックス → ベクトル化された列処理",
       "status": "claim"
     },
     "return": {
       "type": "link",
-      "label": "候補範囲の列スキャン → 注文別の金額",
+      "label": "ベクトル化された列処理 → SQL クライアント",
       "status": "claim"
     },
-    "pick": {
+    "to-distributed": {
       "type": "link",
-      "label": "データパート → 同じパーティション内のデータ統合",
+      "label": "テーブルエンジン → Distributed テーブル",
       "status": "claim"
     },
-    "replace": {
+    "to-replica": {
       "type": "link",
-      "label": "同じパーティション内のデータ統合 → データパート",
+      "label": "Distributed テーブル → シャード内のレプリカ（ReplicatedMergeTree）",
       "status": "claim"
     },
-    "query-week": {
-      "type": "scenario",
-      "label": "直近 7 日から顧客 42 を探す"
+    "replica-store": {
+      "type": "link",
+      "label": "シャード内のレプリカ（ReplicatedMergeTree） → MergeTree のパートと疎主インデックス",
+      "status": "claim"
     },
-    "merge-parts": {
+    "coordinate": {
+      "type": "link",
+      "label": "シャード内のレプリカ（ReplicatedMergeTree） → ClickHouse Keeper",
+      "status": "claim"
+    },
+    "local-select": {
       "type": "scenario",
-      "label": "1 月の二つのパートをマージする"
+      "label": "1 台のテーブルを読む"
+    },
+    "cluster-select": {
+      "type": "scenario",
+      "label": "Distributed テーブルで全シャードを読む"
+    },
+    "replicated-insert": {
+      "type": "scenario",
+      "label": "レプリカへの書き込みと複製"
     },
     "BR-01": {
       "type": "requirement",
       "kind": "usecase",
-      "label": "対象期間の注文を返す",
+      "label": "全シャードを 1 つの表として検索",
       "status": "claim"
     },
     "BR-02": {
       "type": "requirement",
       "kind": "rule",
-      "label": "同じ月で物理配置を整理",
+      "label": "複製の調整は Keeper に任せる",
       "status": "claim"
     },
     "UNK-01": {
       "type": "unknown",
-      "label": "実環境のパート数、グラニュール境界、索引による除外数、マージの時期は未確認。"
+      "label": "実環境のシャード数・レプリカ数・Keeper の台数・パート数は未確認。"
     },
-    "mergetree-host": {
-      "type": "implementation",
-      "impl": "mergetree",
-      "label": "自前 Linux サーバー",
-      "realizes": []
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Kubernetes 上での運用は、この図では検証していない。"
     },
-    "mergetree-insert": {
+    "UNK-03": {
+      "type": "unknown",
+      "label": "ClickHouse Cloud の内部の制御系の構成は公開資料で確認できていない。"
+    },
+    "sm-client": {
       "type": "implementation",
-      "impl": "mergetree",
-      "label": "clickhouse-client から INSERT",
+      "impl": "self-managed",
+      "label": "clickhouse-client",
       "realizes": [
-        "insert"
+        "client"
       ]
     },
-    "mergetree-server": {
+    "sm-server": {
       "type": "implementation",
-      "impl": "mergetree",
-      "label": "ClickHouse Server の SELECT と MergeTree 読取",
+      "impl": "self-managed",
+      "label": "clickhouse-server（SQL 計画・列処理・エンジン）",
       "realizes": [
         "planner",
-        "scan"
+        "scan",
+        "engine"
       ]
     },
-    "mergetree-data": {
+    "sm-distributed": {
       "type": "implementation",
-      "impl": "mergetree",
-      "label": "MergeTree の月別パートとマーク",
+      "impl": "self-managed",
+      "label": "Distributed テーブル",
       "realizes": [
-        "partition",
-        "parts",
+        "distributed"
+      ]
+    },
+    "sm-replica": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "ReplicatedMergeTree のレプリカ",
+      "realizes": [
+        "replicated"
+      ]
+    },
+    "sm-parts": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "ホストのローカルディスク上のパート",
+      "realizes": [
         "granules"
       ]
     },
-    "mergetree-merge": {
+    "sm-keeper": {
       "type": "implementation",
-      "impl": "mergetree",
-      "label": "MergeTree のバックグラウンドマージ",
+      "impl": "self-managed",
+      "label": "ClickHouse Keeper（3 台以上を推奨）",
       "realizes": [
-        "merger"
+        "keeper"
       ]
     },
-    "mergetree-result": {
+    "sm-config": {
       "type": "implementation",
-      "impl": "mergetree",
-      "label": "clickhouse-client の注文結果",
-      "realizes": [
-        "result"
-      ]
-    },
-    "mergetree-system": {
-      "type": "implementation",
-      "impl": "mergetree",
-      "label": "system.parts",
+      "impl": "self-managed",
+      "label": "設定ファイル（remote_servers・macros・zookeeper）",
       "realizes": []
     },
-    "aws-client": {
+    "cl-client": {
       "type": "implementation",
-      "impl": "aws-ec2-mergetree",
-      "label": "clickhouse-client（投入と結果表示）",
+      "impl": "cloud",
+      "label": "SQL クライアント",
       "realizes": [
-        "insert",
-        "result"
+        "client"
       ]
     },
-    "aws-ec2": {
+    "cl-compute": {
       "type": "implementation",
-      "impl": "aws-ec2-mergetree",
-      "label": "Amazon EC2（Linux）",
-      "realizes": []
-    },
-    "aws-server": {
-      "type": "implementation",
-      "impl": "aws-ec2-mergetree",
-      "label": "ClickHouse Server（SQL・MergeTree 読取）",
+      "impl": "cloud",
+      "label": "計算ノード（レプリカ）",
       "realizes": [
         "planner",
-        "scan"
+        "scan",
+        "engine",
+        "distributed"
       ]
     },
-    "aws-merge": {
+    "cl-smt": {
       "type": "implementation",
-      "impl": "aws-ec2-mergetree",
-      "label": "MergeTree バックグラウンドマージ",
+      "impl": "cloud",
+      "label": "SharedMergeTree",
       "realizes": [
-        "merger"
+        "replicated"
       ]
     },
-    "aws-ebs": {
+    "cl-object": {
       "type": "implementation",
-      "impl": "aws-ec2-mergetree",
-      "label": "Amazon EBS（データボリューム）",
-      "realizes": []
-    },
-    "aws-parts": {
-      "type": "implementation",
-      "impl": "aws-ec2-mergetree",
-      "label": "EBS 上の MergeTree のデータパート",
+      "impl": "cloud",
+      "label": "オブジェクトストレージ",
       "realizes": [
-        "partition",
-        "parts",
         "granules"
+      ]
+    },
+    "cl-keeper": {
+      "type": "implementation",
+      "impl": "cloud",
+      "label": "ClickHouse Keeper",
+      "realizes": [
+        "keeper"
       ]
     }
   },
   "byRef": {
     "docs/reference-clickhouse.md#§1": [
-      "model",
-      "result"
+      "model"
     ],
     "docs/reference-clickhouse.md": [
       "model",
-      "insert",
+      "client",
       "planner",
       "scan",
-      "result",
-      "partition",
-      "parts",
+      "engine",
       "granules",
-      "merger",
-      "store",
-      "sort",
-      "partition-prune",
-      "index-prune",
-      "read",
+      "distributed",
+      "replicated",
+      "keeper",
+      "sql",
+      "open-table",
+      "read-local",
+      "chunks",
       "return",
-      "pick",
-      "replace",
-      "query-week",
-      "merge-parts",
+      "to-distributed",
+      "to-replica",
+      "replica-store",
+      "coordinate",
+      "local-select",
+      "cluster-select",
+      "replicated-insert",
       "BR-01",
       "BR-02",
-      "mergetree-host",
-      "mergetree-insert",
-      "mergetree-server",
-      "mergetree-data",
-      "mergetree-merge",
-      "mergetree-result",
-      "mergetree-system",
-      "aws-client",
-      "aws-ec2",
-      "aws-server",
-      "aws-merge",
-      "aws-ebs",
-      "aws-parts"
+      "sm-client",
+      "sm-server",
+      "sm-distributed",
+      "sm-replica",
+      "sm-parts",
+      "sm-keeper",
+      "sm-config",
+      "cl-client",
+      "cl-compute",
+      "cl-smt",
+      "cl-object",
+      "cl-keeper"
     ],
     "docs/reference-clickhouse.md#§2": [
       "model",
-      "insert",
-      "partition",
-      "parts",
-      "store",
-      "sort"
+      "client",
+      "planner",
+      "sql",
+      "return"
     ],
     "docs/reference-clickhouse.md#§3": [
       "model",
-      "planner",
       "scan",
-      "granules",
-      "partition-prune",
-      "index-prune",
-      "read",
-      "return",
-      "query-week",
-      "BR-01"
+      "chunks"
     ],
     "docs/reference-clickhouse.md#§4": [
       "model",
-      "merger",
-      "pick",
-      "replace",
-      "merge-parts",
-      "BR-02"
+      "engine",
+      "open-table"
     ],
     "docs/reference-clickhouse.md#§5": [
       "model",
-      "planner"
+      "granules",
+      "read-local",
+      "local-select"
     ],
     "docs/reference-clickhouse.md#§6": [
-      "model"
+      "model",
+      "distributed",
+      "to-distributed",
+      "to-replica",
+      "cluster-select",
+      "BR-01"
     ],
     "docs/reference-clickhouse.md#§7": [
-      "mergetree-host",
-      "mergetree-insert",
-      "mergetree-server",
-      "mergetree-data",
-      "mergetree-merge",
-      "mergetree-result",
-      "mergetree-system"
+      "model",
+      "replicated",
+      "keeper",
+      "replica-store",
+      "coordinate",
+      "replicated-insert",
+      "BR-02"
     ],
     "docs/reference-clickhouse.md#§8": [
-      "aws-client",
-      "aws-ec2",
-      "aws-server",
-      "aws-merge",
-      "aws-ebs",
-      "aws-parts"
+      "model",
+      "sm-client",
+      "sm-server",
+      "sm-distributed",
+      "sm-replica",
+      "sm-parts",
+      "sm-keeper",
+      "sm-config"
+    ],
+    "docs/reference-clickhouse.md#§9": [
+      "model",
+      "cl-client",
+      "cl-compute",
+      "cl-smt",
+      "cl-object",
+      "cl-keeper"
     ]
   },
   "reference": {
-    "category": "バッチ・SQL エンジン",
-    "order": 40,
     "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "ClickHouse",
+    "role": "overview",
     "objectives": [
-      "パーティション、パート、グラニュール、マークの関係を説明する。",
-      "パートの候補選択と疎主インデックスによるグラニュールの絞り込みを追う。",
-      "パートのマージが物理配置とクエリ結果に与える影響を説明する。"
+      "クエリ処理、テーブルエンジン、ストレージの役割を区別する。",
+      "MergeTree が不変のパートとして保存し、疎主インデックスで読む範囲を絞ることを説明する。",
+      "シャード（分散）とレプリカ（複製）の違いと、Distributed テーブル・ReplicatedMergeTree・Keeper の役割を説明する。",
+      "自前運用のクラスターと ClickHouse Cloud で、保存と複製の担い手がどう変わるかを比べる。"
     ],
     "sources": [
       {
+        "title": "ClickHouse アーキテクチャ概説（学術論文の解説）",
+        "url": "https://clickhouse.com/docs/academic_overview"
+      },
+      {
         "title": "ClickHouse MergeTree table engine",
-        "url": "https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree"
+        "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree"
       },
       {
-        "title": "ClickHouse EXPLAIN",
-        "url": "https://clickhouse.com/docs/reference/statements/explain"
+        "title": "ClickHouse Distributed table engine",
+        "url": "https://clickhouse.com/docs/engines/table-engines/special/distributed"
       },
       {
-        "title": "ClickHouse system.parts",
-        "url": "https://clickhouse.com/docs/operations/system-tables/parts"
+        "title": "ClickHouse データレプリケーション",
+        "url": "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"
+      },
+      {
+        "title": "ClickHouse Keeper",
+        "url": "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"
+      },
+      {
+        "title": "ClickHouse の水平スケール",
+        "url": "https://clickhouse.com/docs/architecture/horizontal-scaling"
       }
     ]
   }

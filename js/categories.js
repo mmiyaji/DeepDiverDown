@@ -43,3 +43,8 @@ export const CATEGORY_INFO = {
   '自動運転・車載ソフトウェア': '車両の中で動くソフトウェアの層と、自動運転の処理です。',
   'エッジコンピューティング': '現場の機器の近くで処理し、クラウドと連携する仕組みです。',
 };
+
+// 「違い」の比較表を置いた分類（docs/category-<slug>.md）
+export const CATEGORY_DOCS = {
+  'バッチ・SQL エンジン': 'batch-sql',
+};

@@ -1,4 +1,4 @@
-# Apache Spark Structured Streaming の基本アーキテクチャ
+# Spark Structured Streaming：マイクロバッチ・状態・復旧
 
 ## 1. 読み方と範囲
 

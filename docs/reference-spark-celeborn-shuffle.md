@@ -1,4 +1,4 @@
-# Spark と Apache Celeborn のリモートシャッフル
+# Spark：Celeborn によるリモートシャッフル
 
 ## 1. 対象と位置付け
 

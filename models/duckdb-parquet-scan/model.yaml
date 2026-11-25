@@ -1,0 +1,201 @@
+name: "DuckDB：Parquet スキャンと行グループの除外"
+description: "直近 7 日の注文を例に、フッターの列統計、投影とフィルタのプッシュダウン、物理計画の読み方を追う。"
+reference:
+  objectives:
+    - 列投影とフィルタのプッシュダウンが減らす読み取りを説明する。
+    - 行グループごとの min/max で除外できる範囲と、行の評価が必要な範囲を追う。
+    - EXPLAIN、EXPLAIN ANALYZE、parquet_metadata から得られる情報を区別する。
+  sources:
+    - title: DuckDB Parquet Overview
+      url: https://duckdb.org/docs/2.0/data/parquet/overview.html
+    - title: DuckDB Parquet Tips
+      url: https://duckdb.org/docs/2.0/data/parquet/tips.html
+    - title: DuckDB Reading and Writing Parquet Files
+      url: https://duckdb.org/docs/data/parquet
+    - title: DuckDB Querying Parquet Metadata
+      url: https://duckdb.org/docs/current/data/parquet/metadata
+    - title: DuckDB EXPLAIN
+      url: https://duckdb.org/docs/stable/guides/meta/explain
+    - title: DuckDB Profiling
+      url: https://duckdb.org/docs/current/dev/profiling
+sources: ["docs/reference-duckdb-parquet-scan.md"]
+evidence:
+  - {"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§1"}
+  - {"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§2"}
+  - {"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}
+  - {"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§4"}
+  - {"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§5"}
+  - {"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§6"}
+tiers:
+  - {"id":"engine","label":"DuckDB の物理計画","z":1,"origin":[0,0],"size":[16,3]}
+  - {"id":"parquet","label":"orders.parquet","z":0,"origin":[2,0],"size":[12,3]}
+nodes:
+  query: {label: 検索 SQL と計画の確認, kind: actor, tier: engine, x: 1, 'y': 1.5, description: 直近 7 日・顧客 42 のクエリを実行または計画する。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§2}]}
+  optimizer: {label: 読取の最適化, kind: service, tier: engine, x: 4, 'y': 1.5, description: 必要列と押し込める述語をスキャンへ渡す。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§2}]}
+  scan: {"label":"Parquet スキャン","kind":"worker","tier":"engine","x":8,"y":1.5,"description":"候補グループの列チャンクを読み、押し込まれた条件を行単位で評価する。","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  project: {"label":"結果の投影","kind":"worker","tier":"engine","x":12,"y":1.5,"description":"注文番号と金額を返す。","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  profile: {label: 実行時の観測, kind: external, tier: engine, x: 15, 'y': 1.5, description: 実行した物理演算子と行数・時間を表示する。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§4}]}
+  footer: {"label":"フッター統計","kind":"segment","tier":"parquet","x":3,"y":1.5,"description":"行グループ内の列チャンクの位置と利用可能な統計を持つ。","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  groups: {"label":"行グループ","kind":"segment","tier":"parquet","x":7,"y":1.5,"description":"同じ行範囲について、列ごとのチャンクを束ねる。","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  columns: {"label":"列チャンク","kind":"segment","tier":"parquet","x":11,"y":1.5,"description":"各行グループの選択列・条件列を物理的に保持する。","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+links:
+  - {"id":"submit","from":"query","to":"optimizer","label":"SQL を計画する","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§2"}]}
+  - {"id":"push","from":"optimizer","to":"scan","label":"必要列と述語を渡す","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§2"}]}
+  - {"id":"metadata","from":"footer","to":"scan","label":"利用可能な列統計を参照","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  - {"id":"skip","from":"scan","to":"groups","label":"条件に合い得るグループを選ぶ","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  - {"id":"read","from":"columns","to":"scan","label":"候補グループの必要列を読む","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  - {"id":"return","from":"scan","to":"project","label":"条件を満たした行を返す","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  - {"id":"inspect","from":"optimizer","to":"query","label":"物理計画を確認","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§4"}]}
+  - {"id":"measure","from":"scan","to":"profile","label":"実行した演算子を記録","evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§4"}]}
+scenarios:
+  - id: read-week
+    label: 顧客 42 に必要な列と行グループを読む
+    visual: grid
+    evidence:
+      - type: doc
+        ref: docs/reference-duckdb-parquet-scan.md#§3
+    steps:
+      - links:
+          - submit
+          - push
+        note: 出力列は order_id と amount。述語が参照する 2 列もスキャンに必要で、notes は不要。
+        prune:
+          - col:notes
+      - links:
+          - metadata
+          - skip
+        note: G0 は日付の最大値が期間より前。G2 は customer_id の最小値が 100 なので、両方を除外する。
+        prune:
+          - row:g0
+          - row:g2
+      - links:
+          - read
+          - return
+        note: G1 の必要列を参照して残った行の条件を評価し、注文番号と金額を返す。
+        read:
+          - g1:order_id
+          - g1:amount
+          - g1:order_date
+          - g1:customer_id
+  - id: inspect-plan
+    label: 物理計画と実行結果を読み分ける
+    visual: grid
+    evidence:
+      - type: doc
+        ref: docs/reference-duckdb-parquet-scan.md#§4
+    steps:
+      - links:
+          - submit
+          - inspect
+        note: EXPLAIN のスキャンで投影列とフィルタを確認する。出力の行数は推定値。
+        prune:
+          - col:notes
+      - links:
+          - metadata
+        note: parquet_metadata で日付と顧客の min/max を見て、除外できるグループの根拠を確かめる。
+        prune:
+          - row:g0
+          - row:g2
+      - links:
+          - measure
+          - return
+        note: EXPLAIN ANALYZE でクエリを実行し、演算子を通過した行数と実行時間を調べる。
+        read:
+          - g1:order_id
+          - g1:amount
+          - g1:order_date
+          - g1:customer_id
+requirements:
+  - {"id":"BR-01","kind":"usecase","title":"必要な注文列を取得","text":"条件に合う注文の番号と金額を返す。","links":["push","return"],"evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§3"}]}
+  - {"id":"BR-02","kind":"rule","title":"読み取り判断の根拠を追う","text":"列統計、計画の推定、実行時の指標を照合できる。","links":["metadata","inspect","measure"],"evidence":[{"type":"doc","ref":"docs/reference-duckdb-parquet-scan.md#§4"}]}
+unknowns:
+  - {"id":"UNK-01","text":"実ファイルの統計の有無、除外した行グループ数、物理計画の表示、実行時間は未確認。","refs":["footer","groups","profile"]}
+gates: {maxDrift: 0, maxHigh: 0}
+grid:
+  title: 行グループ単位の除外と列投影
+  rowLabel: 行グループ
+  colLabel: 列チャンク
+  unit: " 単位"
+  node: columns
+  rows:
+    - id: g0
+      label: G0 · 日付範囲外
+    - id: g1
+      label: G1 · 候補
+    - id: g2
+      label: G2 · 顧客範囲外
+  cols:
+    - id: order_date
+      label: order_date
+    - id: customer_id
+      label: customer_id
+    - id: order_id
+      label: order_id
+    - id: amount
+      label: amount
+    - id: notes
+      label: notes
+  values:
+    - - 1
+      - 1
+      - 1
+      - 1
+      - 1
+    - - 1
+      - 1
+      - 1
+      - 1
+      - 1
+    - - 1
+      - 1
+      - 1
+      - 1
+      - 1
+  cellNote: 1 マスは 1 列チャンク。各マスの重みを 1 とした説明用の図。
+  note: 図の割合はチャンク数に基づく。ディスク I/O 量や実測バイト数は含まない。
+
+implementations:
+  - id: python-parquet
+    label: "Python に組み込む DuckDB と Parquet"
+    description: "Python プロセス内の DuckDB がローカルの orders.parquet を直接読む例。必要な列と行グループを絞り、データの読取と性能の観測は同じ埋め込みエンジンで行う。"
+    sources:
+      - {title: DuckDB Reading and Writing Parquet Files, url: https://duckdb.org/docs/data/parquet}
+      - {title: DuckDB Querying Parquet Metadata, url: https://duckdb.org/docs/current/data/parquet/metadata}
+      - {title: DuckDB EXPLAIN, url: https://duckdb.org/docs/stable/guides/meta/explain}
+      - {title: DuckDB Profiling, url: https://duckdb.org/docs/current/dev/profiling}
+      - {title: DuckDB Python API, url: https://duckdb.org/docs/stable/clients/python/overview}
+    tiers:
+      - {id: processing, label: データの処理と保存, z: 0, size: [14, 5]}
+      - {id: setup, label: 実行に必要な設定・成果物, z: 1, size: [14, 3]}
+    nodes:
+      python-parquet-host: {label: 自前 Python 実行ホスト, kind: host, tier: processing, x: 3, y: 0, description: 利用者が Python プロセスとローカルファイルシステムを管理する。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§7}]}
+      python-parquet-client: {label: Python の DuckDB 接続, kind: client, tier: processing, x: 1, y: 1.15, realizes: [query], description: duckdb.connect で作った接続から SQL を実行する。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§7}]}
+      python-parquet-engine: {label: 同じプロセスの DuckDB エンジン, kind: worker, tier: processing, x: 1, y: 3.65, realizes: [optimizer, scan, project, profile], description: read_parquet へ述語と列要求を渡し、EXPLAIN ANALYZE で実行を観測する。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§7}]}
+      python-parquet-parquet: {label: ローカルの orders.parquet, kind: file, tier: processing, x: 5, y: 1.15, realizes: [footer, groups, columns], description: フッターと列チャンクを持ち、直接読み取れる。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§7}]}
+      python-parquet-metadata: {label: parquet_metadata の診断用 SQL, kind: file, tier: setup, x: 1, y: 1.5, description: 日付と顧客 ID の min/max を確認して候補グループの説明に使う。, evidence: [{type: doc, ref: docs/reference-duckdb-parquet-scan.md#§7}]}
+    links:
+      - {id: python-parquet-host-python, from: python-parquet-host, to: python-parquet-client, label: Python を実行}
+      - {id: python-parquet-host-files, from: python-parquet-host, to: python-parquet-parquet, label: ローカルファイルを提供}
+      - {id: python-parquet-metadata-connection, from: python-parquet-metadata, to: python-parquet-client, label: ファイル内統計を調べる}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+      nodes:
+        python-parquet-host: {tier: diagram, x: 2, y: 2}
+        python-parquet-client: {tier: diagram, x: 2, y: 5}
+        python-parquet-engine: {tier: diagram, x: 2, y: 8}
+        python-parquet-parquet: {tier: diagram, x: 2, y: 11}
+        python-parquet-metadata: {tier: diagram, x: 2, y: 14}
+      groups:
+        - {kind: nodegroup, label: "自前ホスト", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 18, nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}
+    layout3d:
+      tiers:
+        - {id: zone0, label: "自前ホスト", z: 0, origin: [0, 0], size: [5, 15]}
+      nodes:
+        python-parquet-host: {tier: zone0, x: 2, y: 1}
+        python-parquet-client: {tier: zone0, x: 2, y: 4}
+        python-parquet-engine: {tier: zone0, x: 2, y: 7}
+        python-parquet-parquet: {tier: zone0, x: 2, y: 10}
+        python-parquet-metadata: {tier: zone0, x: 2, y: 13}
+      groups:
+        - {kind: nodegroup, label: "自前ホスト", tier: [zone0], nodes: [python-parquet-host, python-parquet-client, python-parquet-engine, python-parquet-parquet, python-parquet-metadata]}

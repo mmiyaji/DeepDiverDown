@@ -1,0 +1,337 @@
+{
+  "model": "clickhouse-mergetree",
+  "name": "ClickHouse：MergeTree のパートと疎インデックス",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "insert": {
+      "type": "node",
+      "label": "注文データの取り込み元",
+      "status": "claim"
+    },
+    "planner": {
+      "type": "node",
+      "label": "SQL の読取計画",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "候補範囲の列スキャン",
+      "status": "claim"
+    },
+    "result": {
+      "type": "node",
+      "label": "注文別の金額",
+      "status": "claim"
+    },
+    "partition": {
+      "type": "node",
+      "label": "月パーティション",
+      "status": "claim"
+    },
+    "parts": {
+      "type": "node",
+      "label": "データパート",
+      "status": "claim"
+    },
+    "granules": {
+      "type": "node",
+      "label": "疎主インデックスとマーク",
+      "status": "claim"
+    },
+    "merger": {
+      "type": "node",
+      "label": "同じパーティション内のデータ統合",
+      "status": "claim"
+    },
+    "store": {
+      "type": "link",
+      "label": "注文データの取り込み元 → 月パーティション",
+      "status": "claim"
+    },
+    "sort": {
+      "type": "link",
+      "label": "月パーティション → データパート",
+      "status": "claim"
+    },
+    "partition-prune": {
+      "type": "link",
+      "label": "SQL の読取計画 → 月パーティション",
+      "status": "claim"
+    },
+    "index-prune": {
+      "type": "link",
+      "label": "SQL の読取計画 → 疎主インデックスとマーク",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "疎主インデックスとマーク → 候補範囲の列スキャン",
+      "status": "claim"
+    },
+    "return": {
+      "type": "link",
+      "label": "候補範囲の列スキャン → 注文別の金額",
+      "status": "claim"
+    },
+    "pick": {
+      "type": "link",
+      "label": "データパート → 同じパーティション内のデータ統合",
+      "status": "claim"
+    },
+    "replace": {
+      "type": "link",
+      "label": "同じパーティション内のデータ統合 → データパート",
+      "status": "claim"
+    },
+    "query-week": {
+      "type": "scenario",
+      "label": "直近 7 日から顧客 42 を探す"
+    },
+    "merge-parts": {
+      "type": "scenario",
+      "label": "1 月の二つのパートをマージする"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "対象期間の注文を返す",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "同じ月で物理配置を整理",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境のパート数、グラニュール境界、索引による除外数、マージの時期は未確認。"
+    },
+    "mergetree-host": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "自前 Linux サーバー",
+      "realizes": []
+    },
+    "mergetree-insert": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "clickhouse-client から INSERT",
+      "realizes": [
+        "insert"
+      ]
+    },
+    "mergetree-server": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "ClickHouse Server の SELECT と MergeTree 読取",
+      "realizes": [
+        "planner",
+        "scan"
+      ]
+    },
+    "mergetree-data": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "MergeTree の月別パートとマーク",
+      "realizes": [
+        "partition",
+        "parts",
+        "granules"
+      ]
+    },
+    "mergetree-merge": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "MergeTree のバックグラウンドマージ",
+      "realizes": [
+        "merger"
+      ]
+    },
+    "mergetree-result": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "clickhouse-client の注文結果",
+      "realizes": [
+        "result"
+      ]
+    },
+    "mergetree-system": {
+      "type": "implementation",
+      "impl": "mergetree",
+      "label": "system.parts",
+      "realizes": []
+    },
+    "aws-client": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "clickhouse-client（投入と結果表示）",
+      "realizes": [
+        "insert",
+        "result"
+      ]
+    },
+    "aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "Amazon EC2（Linux）",
+      "realizes": []
+    },
+    "aws-server": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "ClickHouse Server（SQL・MergeTree 読取）",
+      "realizes": [
+        "planner",
+        "scan"
+      ]
+    },
+    "aws-merge": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "MergeTree バックグラウンドマージ",
+      "realizes": [
+        "merger"
+      ]
+    },
+    "aws-ebs": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "Amazon EBS（データボリューム）",
+      "realizes": []
+    },
+    "aws-parts": {
+      "type": "implementation",
+      "impl": "aws-ec2-mergetree",
+      "label": "EBS 上の MergeTree のデータパート",
+      "realizes": [
+        "partition",
+        "parts",
+        "granules"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-clickhouse-mergetree.md#§1": [
+      "model",
+      "result"
+    ],
+    "docs/reference-clickhouse-mergetree.md": [
+      "model",
+      "insert",
+      "planner",
+      "scan",
+      "result",
+      "partition",
+      "parts",
+      "granules",
+      "merger",
+      "store",
+      "sort",
+      "partition-prune",
+      "index-prune",
+      "read",
+      "return",
+      "pick",
+      "replace",
+      "query-week",
+      "merge-parts",
+      "BR-01",
+      "BR-02",
+      "mergetree-host",
+      "mergetree-insert",
+      "mergetree-server",
+      "mergetree-data",
+      "mergetree-merge",
+      "mergetree-result",
+      "mergetree-system",
+      "aws-client",
+      "aws-ec2",
+      "aws-server",
+      "aws-merge",
+      "aws-ebs",
+      "aws-parts"
+    ],
+    "docs/reference-clickhouse-mergetree.md#§2": [
+      "model",
+      "insert",
+      "partition",
+      "parts",
+      "store",
+      "sort"
+    ],
+    "docs/reference-clickhouse-mergetree.md#§3": [
+      "model",
+      "planner",
+      "scan",
+      "granules",
+      "partition-prune",
+      "index-prune",
+      "read",
+      "return",
+      "query-week",
+      "BR-01"
+    ],
+    "docs/reference-clickhouse-mergetree.md#§4": [
+      "model",
+      "merger",
+      "pick",
+      "replace",
+      "merge-parts",
+      "BR-02"
+    ],
+    "docs/reference-clickhouse-mergetree.md#§5": [
+      "model",
+      "planner"
+    ],
+    "docs/reference-clickhouse-mergetree.md#§6": [
+      "model",
+      "mergetree-host",
+      "mergetree-insert",
+      "mergetree-server",
+      "mergetree-data",
+      "mergetree-merge",
+      "mergetree-result",
+      "mergetree-system"
+    ],
+    "docs/reference-clickhouse-mergetree.md#§7": [
+      "aws-client",
+      "aws-ec2",
+      "aws-server",
+      "aws-merge",
+      "aws-ebs",
+      "aws-parts"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "ClickHouse",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "clickhouse",
+    "objectives": [
+      "パーティション、パート、グラニュール、マークの関係を説明する。",
+      "パートの候補選択と疎主インデックスによるグラニュールの絞り込みを追う。",
+      "パートのマージが物理配置とクエリ結果に与える影響を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "ClickHouse MergeTree table engine",
+        "url": "https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree"
+      },
+      {
+        "title": "ClickHouse EXPLAIN",
+        "url": "https://clickhouse.com/docs/reference/statements/explain"
+      },
+      {
+        "title": "ClickHouse system.parts",
+        "url": "https://clickhouse.com/docs/operations/system-tables/parts"
+      }
+    ]
+  }
+}

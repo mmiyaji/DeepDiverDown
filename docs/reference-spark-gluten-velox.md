@@ -1,4 +1,4 @@
-# Apache Gluten：Spark と Velox の列指向実行
+# Spark Gluten：Velox による列指向ネイティブ実行
 
 ## 1. 対象と前提
 

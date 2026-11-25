@@ -1,0 +1,283 @@
+{
+  "model": "trino-pushdown-dynamic-filtering",
+  "name": "Trino：プッシュダウンと Dynamic Filtering",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "sql": {
+      "type": "node",
+      "label": "SQL（WHERE・列・LIMIT・集約・結合）",
+      "status": "claim"
+    },
+    "optimizer": {
+      "type": "node",
+      "label": "オプティマイザー",
+      "status": "claim"
+    },
+    "stats": {
+      "type": "node",
+      "label": "テーブル統計",
+      "status": "claim"
+    },
+    "connector": {
+      "type": "node",
+      "label": "Connector",
+      "status": "claim"
+    },
+    "splits": {
+      "type": "node",
+      "label": "Split 列挙（Coordinator）",
+      "status": "claim"
+    },
+    "source": {
+      "type": "node",
+      "label": "データソース",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "プローブ側のスキャン",
+      "status": "claim"
+    },
+    "build": {
+      "type": "node",
+      "label": "結合のビルド側",
+      "status": "claim"
+    },
+    "dfilter": {
+      "type": "node",
+      "label": "Dynamic filter",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "link",
+      "label": "SQL（WHERE・列・LIMIT・集約・結合） → オプティマイザー",
+      "status": "claim"
+    },
+    "use-stats": {
+      "type": "link",
+      "label": "テーブル統計 → オプティマイザー",
+      "status": "claim"
+    },
+    "push": {
+      "type": "link",
+      "label": "オプティマイザー → Connector",
+      "status": "claim"
+    },
+    "narrow": {
+      "type": "link",
+      "label": "Connector → データソース",
+      "status": "claim"
+    },
+    "scan-read": {
+      "type": "link",
+      "label": "データソース → プローブ側のスキャン",
+      "status": "claim"
+    },
+    "collect-keys": {
+      "type": "link",
+      "label": "結合のビルド側 → Dynamic filter",
+      "status": "claim"
+    },
+    "apply-scan": {
+      "type": "link",
+      "label": "Dynamic filter → プローブ側のスキャン",
+      "status": "claim"
+    },
+    "prune-splits": {
+      "type": "link",
+      "label": "Dynamic filter → Split 列挙（Coordinator）",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "Split 列挙（Coordinator） → プローブ側のスキャン",
+      "status": "claim"
+    },
+    "join-with-filter": {
+      "type": "scenario",
+      "label": "絞り込みのある結合クエリ"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Iceberg 以外の Connector ごとの対応範囲と、Iceberg Connector のプッシュダウン対応の詳細は確認していない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "結合のプッシュダウンの成功条件と性能への影響は Connector とデータソースに依存し、個別には確認していない。"
+    },
+    "trino-iceberg-client": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino CLI",
+      "realizes": [
+        "sql"
+      ]
+    },
+    "trino-iceberg-coordinator": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Coordinator Pod",
+      "realizes": [
+        "optimizer",
+        "splits",
+        "connector",
+        "dfilter"
+      ]
+    },
+    "trino-iceberg-workers": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Worker Pods",
+      "realizes": [
+        "scan",
+        "build",
+        "connector",
+        "dfilter"
+      ]
+    },
+    "trino-iceberg-data": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "S3 / Iceberg テーブル",
+      "realizes": [
+        "source",
+        "stats"
+      ]
+    },
+    "trino-iceberg-glue": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "AWS Glue Data Catalog",
+      "realizes": []
+    },
+    "trino-iceberg-eks": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Amazon EKS / Kubernetes API",
+      "realizes": []
+    },
+    "trino-iceberg-ec2": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "EC2 / EKS ノードグループ",
+      "realizes": []
+    },
+    "trino-iceberg-iam": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "IAM / Pod 用ロール",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-trino-pushdown-dynamic-filtering.md#§1": [
+      "model",
+      "sql"
+    ],
+    "docs/reference-trino-pushdown-dynamic-filtering.md": [
+      "model",
+      "sql",
+      "optimizer",
+      "stats",
+      "connector",
+      "splits",
+      "source",
+      "scan",
+      "build",
+      "dfilter",
+      "plan",
+      "use-stats",
+      "push",
+      "narrow",
+      "scan-read",
+      "collect-keys",
+      "apply-scan",
+      "prune-splits",
+      "assign",
+      "join-with-filter",
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue",
+      "trino-iceberg-eks",
+      "trino-iceberg-ec2",
+      "trino-iceberg-iam"
+    ],
+    "docs/reference-trino-pushdown-dynamic-filtering.md#§2": [
+      "optimizer",
+      "source",
+      "plan",
+      "push",
+      "narrow",
+      "scan-read"
+    ],
+    "docs/reference-trino-pushdown-dynamic-filtering.md#§3": [
+      "optimizer",
+      "stats",
+      "connector",
+      "use-stats"
+    ],
+    "docs/reference-trino-pushdown-dynamic-filtering.md#§5": [
+      "splits",
+      "scan",
+      "apply-scan",
+      "prune-splits",
+      "assign"
+    ],
+    "docs/reference-trino-pushdown-dynamic-filtering.md#§4": [
+      "build",
+      "dfilter",
+      "collect-keys",
+      "join-with-filter"
+    ],
+    "docs/reference-trino-pushdown-dynamic-filtering.md#§6": [
+      "dfilter"
+    ],
+    "docs/reference-trino-pushdown-dynamic-filtering.md#§7": [
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue",
+      "trino-iceberg-eks",
+      "trino-iceberg-ec2",
+      "trino-iceberg-iam"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "Trino",
+    "role": "internals",
+    "step": 3,
+    "detailOf": "trino",
+    "objectives": [
+      "述語・射影・集約・結合・LIMIT・Top-N のプッシュダウンの違いを説明する。",
+      "Dynamic filter がビルド側から作られ、スキャンと Split 列挙に適用される流れを追う。",
+      "どちらも Connector の対応に依存することを理解する。"
+    ],
+    "sources": [
+      {
+        "title": "Trino · Pushdown",
+        "url": "https://trino.io/docs/current/optimizer/pushdown.html"
+      },
+      {
+        "title": "Trino · Dynamic filtering",
+        "url": "https://trino.io/docs/current/admin/dynamic-filtering.html"
+      },
+      {
+        "title": "Trino · Cost-based optimizations",
+        "url": "https://trino.io/docs/current/optimizer/cost-based-optimizations.html"
+      },
+      {
+        "title": "Trino · Iceberg connector",
+        "url": "https://trino.io/docs/current/connector/iceberg.html"
+      }
+    ]
+  }
+}

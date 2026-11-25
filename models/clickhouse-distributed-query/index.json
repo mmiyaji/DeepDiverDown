@@ -1,0 +1,294 @@
+{
+  "model": "clickhouse-distributed-query",
+  "name": "ClickHouse：Distributed テーブルとシャード越えのクエリ",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "distributed": {
+      "type": "node",
+      "label": "Distributed テーブル",
+      "status": "claim"
+    },
+    "cluster-config": {
+      "type": "node",
+      "label": "remote_servers のクラスター定義",
+      "status": "claim"
+    },
+    "aggregate": {
+      "type": "node",
+      "label": "結果の集約",
+      "status": "claim"
+    },
+    "send-queue": {
+      "type": "node",
+      "label": "ローカルの送信待ちデータ",
+      "status": "claim"
+    },
+    "shard-1": {
+      "type": "node",
+      "label": "シャード 1 のレプリカ",
+      "status": "claim"
+    },
+    "shard-2": {
+      "type": "node",
+      "label": "シャード 2 のレプリカ",
+      "status": "claim"
+    },
+    "query": {
+      "type": "link",
+      "label": "SQL クライアント → Distributed テーブル",
+      "status": "claim"
+    },
+    "topology": {
+      "type": "link",
+      "label": "remote_servers のクラスター定義 → Distributed テーブル",
+      "status": "claim"
+    },
+    "fan-1": {
+      "type": "link",
+      "label": "Distributed テーブル → シャード 1 のレプリカ",
+      "status": "claim"
+    },
+    "fan-2": {
+      "type": "link",
+      "label": "Distributed テーブル → シャード 2 のレプリカ",
+      "status": "claim"
+    },
+    "partial-1": {
+      "type": "link",
+      "label": "シャード 1 のレプリカ → 結果の集約",
+      "status": "claim"
+    },
+    "partial-2": {
+      "type": "link",
+      "label": "シャード 2 のレプリカ → 結果の集約",
+      "status": "claim"
+    },
+    "answer": {
+      "type": "link",
+      "label": "結果の集約 → SQL クライアント",
+      "status": "claim"
+    },
+    "stage": {
+      "type": "link",
+      "label": "Distributed テーブル → ローカルの送信待ちデータ",
+      "status": "claim"
+    },
+    "ship-1": {
+      "type": "link",
+      "label": "ローカルの送信待ちデータ → シャード 1 のレプリカ",
+      "status": "claim"
+    },
+    "ship-2": {
+      "type": "link",
+      "label": "ローカルの送信待ちデータ → シャード 2 のレプリカ",
+      "status": "claim"
+    },
+    "select-all": {
+      "type": "scenario",
+      "label": "全シャードを読む"
+    },
+    "insert-sharded": {
+      "type": "scenario",
+      "label": "分散キーで書き込む"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "全シャードを 1 つの表として読む",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "複製表の書き込みは 1 レプリカだけ",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境のシャード数、重み、分散キー、送信待ちの滞留量は未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "遠隔シャードでの部分集約が適用される条件の詳細は、公式資料の範囲で確認していない。"
+    },
+    "sd-client": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "clickhouse-client",
+      "realizes": [
+        "client"
+      ]
+    },
+    "sd-distributed": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "Distributed エンジンの表",
+      "realizes": [
+        "distributed"
+      ]
+    },
+    "sd-config": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "設定ファイル（remote_servers）",
+      "realizes": [
+        "cluster-config"
+      ]
+    },
+    "sd-aggregate": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "同じ Server の集約処理",
+      "realizes": [
+        "aggregate"
+      ]
+    },
+    "sd-queue": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "ローカルディスクの送信待ち",
+      "realizes": [
+        "send-queue"
+      ]
+    },
+    "sd-shard1": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "シャード 1 の ReplicatedMergeTree（2 レプリカ）",
+      "realizes": [
+        "shard-1"
+      ]
+    },
+    "sd-shard2": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "シャード 2 の ReplicatedMergeTree（2 レプリカ）",
+      "realizes": [
+        "shard-2"
+      ]
+    },
+    "sd-keeper": {
+      "type": "implementation",
+      "impl": "self-managed",
+      "label": "ClickHouse Keeper（3 台）",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-clickhouse-distributed-query.md#§1": [
+      "model"
+    ],
+    "docs/reference-clickhouse-distributed-query.md": [
+      "model",
+      "client",
+      "distributed",
+      "cluster-config",
+      "aggregate",
+      "send-queue",
+      "shard-1",
+      "shard-2",
+      "query",
+      "topology",
+      "fan-1",
+      "fan-2",
+      "partial-1",
+      "partial-2",
+      "answer",
+      "stage",
+      "ship-1",
+      "ship-2",
+      "select-all",
+      "insert-sharded",
+      "BR-01",
+      "BR-02",
+      "sd-client",
+      "sd-distributed",
+      "sd-config",
+      "sd-aggregate",
+      "sd-queue",
+      "sd-shard1",
+      "sd-shard2",
+      "sd-keeper"
+    ],
+    "docs/reference-clickhouse-distributed-query.md#§2": [
+      "model",
+      "distributed",
+      "cluster-config",
+      "query",
+      "topology"
+    ],
+    "docs/reference-clickhouse-distributed-query.md#§3": [
+      "model",
+      "client",
+      "aggregate",
+      "shard-1",
+      "shard-2",
+      "fan-1",
+      "fan-2",
+      "partial-1",
+      "partial-2",
+      "answer",
+      "select-all",
+      "BR-01"
+    ],
+    "docs/reference-clickhouse-distributed-query.md#§4": [
+      "model",
+      "send-queue",
+      "stage",
+      "ship-1",
+      "ship-2",
+      "insert-sharded"
+    ],
+    "docs/reference-clickhouse-distributed-query.md#§5": [
+      "model",
+      "BR-02"
+    ],
+    "docs/reference-clickhouse-distributed-query.md#§6": [
+      "sd-client",
+      "sd-distributed",
+      "sd-config",
+      "sd-aggregate",
+      "sd-queue",
+      "sd-shard1",
+      "sd-shard2",
+      "sd-keeper"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "ClickHouse",
+    "role": "internals",
+    "step": 3,
+    "detailOf": "clickhouse",
+    "objectives": [
+      "Distributed テーブル自身はデータを持たず、クラスター定義を介してシャードを使うことを説明する。",
+      "SELECT が全シャードで並列に実行され、集約が一部シャード側で行えることを追う。",
+      "INSERT の分散キー、シャードの重み、バックグラウンド送信を説明する。",
+      "internal_replication とレプリカの選択（load_balancing）が、複製表との組み合わせでどう効くかを区別する。"
+    ],
+    "sources": [
+      {
+        "title": "ClickHouse Distributed table engine",
+        "url": "https://clickhouse.com/docs/engines/table-engines/special/distributed"
+      },
+      {
+        "title": "ClickHouse の水平スケール（シャードの構成例）",
+        "url": "https://clickhouse.com/docs/architecture/horizontal-scaling"
+      },
+      {
+        "title": "ClickHouse の複製（シャードとレプリカの構成例）",
+        "url": "https://clickhouse.com/docs/architecture/replication"
+      }
+    ]
+  }
+}

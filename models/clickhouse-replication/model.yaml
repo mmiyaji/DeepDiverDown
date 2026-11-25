@@ -1,0 +1,127 @@
+name: "ClickHouse：レプリケーションと Keeper"
+description: "ReplicatedMergeTree が、INSERT を受けたレプリカから他のレプリカへデータを複製し、マージを同じ手順で実行し、その調整を ClickHouse Keeper に任せる流れを追う。"
+parent:
+  model: clickhouse
+  node: replicated
+reference:
+  objectives:
+    - ReplicatedMergeTree のテーブルが Keeper 上のパスとレプリカ名で識別されることを説明する。
+    - INSERT は受けたレプリカにまず書かれ、非同期に他のレプリカへ複製されることを追う。
+    - マージが各レプリカで同じ手順で行われ、結果が転送されないことを説明する。
+    - Keeper が使えないとき、複製表と SELECT がどうなるかを区別する。
+  sources:
+    - title: ClickHouse データレプリケーション
+      url: https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication
+    - title: ClickHouse の複製（シャードとレプリカの構成例）
+      url: https://clickhouse.com/docs/architecture/replication
+    - title: ClickHouse Keeper
+      url: https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper
+    - title: ClickHouse アーキテクチャ概説（学術論文の解説）
+      url: https://clickhouse.com/docs/academic_overview
+sources: ["docs/reference-clickhouse-replication.md"]
+evidence:
+  - {type: doc, ref: "docs/reference-clickhouse-replication.md#§1"}
+  - {type: doc, ref: "docs/reference-clickhouse-replication.md#§2"}
+  - {type: doc, ref: "docs/reference-clickhouse-replication.md#§3"}
+  - {type: doc, ref: "docs/reference-clickhouse-replication.md#§4"}
+  - {type: doc, ref: "docs/reference-clickhouse-replication.md#§5"}
+tiers:
+  - {id: replicas, label: 同じシャードのレプリカ, z: 1, size: [20, 7]}
+  - {id: coordination, label: 調整, z: 0, size: [20, 7]}
+nodes:
+  client:
+    label: INSERT を送るクライアント
+    kind: client
+    tier: replicas
+    x: 1
+    y: 3
+    description: どのレプリカにも INSERT や ALTER を送れる。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§3"}]
+  replica-a:
+    label: レプリカ A（書き込みを受けた側）
+    kind: db
+    tier: replicas
+    x: 8
+    y: 1.5
+    replicas: 2
+    description: 受けたデータをまず自分のパートとして書く。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§3"}]
+  replica-b:
+    label: レプリカ B
+    kind: db
+    tier: replicas
+    x: 8
+    y: 4.5
+    replicas: 2
+    description: 同じシャードの別サーバー。同じテーブルのパスと、自分だけのレプリカ名を持つ。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§2"}]
+  keeper:
+    label: ClickHouse Keeper
+    kind: catalog
+    tier: coordination
+    x: 4
+    y: 3
+    replicas: 3
+    description: レプリカのメタデータと更新の記録を持ち、レプリカ間の調整に使う。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§5"}]
+  merge:
+    label: 各レプリカのマージ
+    kind: worker
+    tier: coordination
+    x: 14
+    y: 3
+    replicas: 2
+    description: 同じ手順で全レプリカがマージする。マージ後のパートは転送しない。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§4"}]
+links:
+  - {id: insert, from: client, to: replica-a, label: INSERT を送る, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§3"}]}
+  - {id: record, from: replica-a, to: keeper, label: 更新を Keeper に記録, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§3"}]}
+  - {id: notify, from: keeper, to: replica-b, label: 更新をレプリカに伝える, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§5"}]}
+  - {id: copy, from: replica-a, to: replica-b, label: 挿入されたデータを複製, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§3"}]}
+  - {id: plan-merge, from: keeper, to: merge, label: マージの実行を調整, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§4"}]}
+  - {id: merge-a, from: merge, to: replica-a, label: 自分のパートをマージ, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§4"}]}
+  - {id: merge-b, from: merge, to: replica-b, label: 同じ手順でマージ, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§4"}]}
+scenarios:
+  - id: replicate-insert
+    label: INSERT を複製する
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§3"}]
+    steps:
+      - {links: [insert], note: クライアントがレプリカ A に INSERT を送る。レプリカ B に送ってもよい。}
+      - {links: [record], note: レプリカ A がローカルに書き、更新を Keeper に記録する。}
+      - {links: [notify, copy], note: レプリカ B が更新を知り、挿入データを取り込む。新しいデータが見えるまでに遅れがある。}
+  - id: merge-sync
+    label: マージを全レプリカで揃える
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§4"}]
+    steps:
+      - {links: [plan-merge], note: マージの実行を Keeper を介して調整する。}
+      - {links: [merge-a, merge-b], note: 各レプリカが同じようにマージする。結果のデータはネットワークで送らない。}
+requirements:
+  - {id: BR-01, kind: rule, title: 複製の調整は Keeper に依存, text: 複製表の作成と書き込みには Keeper の設定が必要で、なければ読み取り専用になる。, links: [record, notify], evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§5"}]}
+  - {id: BR-02, kind: rule, title: マージ結果は転送しない, text: 元のデータだけをネットワークで送り、マージは各レプリカで同じように行う。, links: [copy, merge-a, merge-b], evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§4"}]}
+unknowns:
+  - {id: UNK-01, text: 実環境の Keeper の台数、レプリカ数、複製の遅れは未確認。, refs: [keeper, replica-a, replica-b]}
+  - {id: UNK-02, text: Keeper 内のノード構成と、更新の取り込みの詳しい手順は公式資料の範囲で確認していない。, refs: [record, notify]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: self-managed
+    label: 自前運用（Linux ホストの Server 2 台と Keeper）
+    description: 同じシャードのレプリカ 2 台と、専用の Keeper を、利用者が Linux ホストで運用する代表例。
+    sources:
+      - {title: ClickHouse の複製（シャードとレプリカの構成例）, url: "https://clickhouse.com/docs/architecture/replication"}
+      - {title: ClickHouse データレプリケーション, url: "https://clickhouse.com/docs/engines/table-engines/mergetree-family/replication"}
+      - {title: ClickHouse Keeper, url: "https://clickhouse.com/docs/guides/sre/keeper/clickhouse-keeper"}
+    tiers:
+      - {id: access, label: クライアント, z: 0, origin: [-6, 0], size: [4, 7]}
+      - {id: servers, label: ClickHouse Server のホスト, z: 1, size: [20, 7]}
+      - {id: keeperhosts, label: ClickHouse Keeper のホスト, z: 0, size: [20, 5]}
+    groups:
+      - {kind: nodegroup, label: 自前運用のクラスター, tier: [servers, keeperhosts], nodes: [sr-a, sr-b, sr-keeper, sr-macros]}
+    nodes:
+      sr-client: {label: clickhouse-client, kind: client, tier: access, x: 1, y: 3, realizes: [client], description: いずれかの Server へ INSERT を送る。, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§6"}]}
+      sr-a: {label: ホスト 1：ReplicatedMergeTree, kind: db, tier: servers, x: 8, y: 1.5, realizes: [replica-a], description: マクロの replica が 01 のレプリカ。, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§6"}]}
+      sr-b: {label: ホスト 2：ReplicatedMergeTree, kind: db, tier: servers, x: 8, y: 4.5, realizes: [replica-b], description: マクロの replica が 02 のレプリカ。, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§6"}]}
+      sr-merge: {label: 各 Server のバックグラウンドマージ, kind: worker, tier: servers, x: 14, y: 3, realizes: [merge], description: 各ホストが同じ手順でマージする。, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§6"}]}
+      sr-keeper: {label: ClickHouse Keeper（3 台）, kind: catalog, tier: keeperhosts, x: 6, y: 2, realizes: [keeper], description: Raft で合意し、複製のメタデータを保持する。, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§6"}]}
+      sr-macros: {label: 設定ファイル（macros・zookeeper）, kind: policy, tier: servers, x: 14, y: 0.5, description: shard と replica のマクロ、Keeper の接続先を各ホストに書く。, evidence: [{type: doc, ref: "docs/reference-clickhouse-replication.md#§6"}]}
+    links:
+      - {id: sr-use-config, from: sr-macros, to: sr-a, label: 識別名と Keeper の接続先を読み込む}

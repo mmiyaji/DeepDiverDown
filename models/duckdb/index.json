@@ -1,155 +1,179 @@
 {
   "model": "duckdb",
-  "name": "DuckDB の Parquet 読み取り：列投影と行グループの除外",
+  "name": "DuckDB の基本アーキテクチャ",
   "coverage": {
-    "covered": 8,
-    "total": 8
+    "covered": 9,
+    "total": 9
   },
   "byId": {
-    "query": {
+    "app": {
       "type": "node",
-      "label": "検索 SQL と計画の確認",
+      "label": "アプリケーション",
       "status": "claim"
     },
-    "optimizer": {
+    "clientapi": {
       "type": "node",
-      "label": "読取の最適化",
+      "label": "クライアント API",
       "status": "claim"
     },
-    "scan": {
+    "parser": {
       "type": "node",
-      "label": "Parquet スキャン",
+      "label": "パーサーとバインダー",
       "status": "claim"
     },
-    "project": {
+    "planner": {
       "type": "node",
-      "label": "結果の投影",
+      "label": "論理プランナーとオプティマイザ",
       "status": "claim"
     },
-    "profile": {
+    "physical": {
       "type": "node",
-      "label": "実行時の観測",
+      "label": "物理演算子の実行",
       "status": "claim"
     },
-    "footer": {
+    "buffer": {
       "type": "node",
-      "label": "フッター統計",
+      "label": "バッファマネージャー",
       "status": "claim"
     },
-    "groups": {
+    "ext": {
       "type": "node",
-      "label": "行グループ",
+      "label": "拡張（parquet・httpfs）",
       "status": "claim"
     },
-    "columns": {
+    "dbfile": {
       "type": "node",
-      "label": "列チャンク",
+      "label": "データベースファイル",
       "status": "claim"
     },
-    "submit": {
+    "wal": {
+      "type": "node",
+      "label": "WAL",
+      "status": "claim"
+    },
+    "remote": {
+      "type": "node",
+      "label": "外部ファイル（Parquet・CSV・S3）",
+      "status": "claim"
+    },
+    "call": {
       "type": "link",
-      "label": "検索 SQL と計画の確認 → 読取の最適化",
+      "label": "アプリケーション → クライアント API",
       "status": "claim"
     },
-    "push": {
+    "parse": {
       "type": "link",
-      "label": "読取の最適化 → Parquet スキャン",
+      "label": "クライアント API → パーサーとバインダー",
       "status": "claim"
     },
-    "metadata": {
+    "plan": {
       "type": "link",
-      "label": "フッター統計 → Parquet スキャン",
+      "label": "パーサーとバインダー → 論理プランナーとオプティマイザ",
       "status": "claim"
     },
-    "skip": {
+    "exec": {
       "type": "link",
-      "label": "Parquet スキャン → 行グループ",
+      "label": "論理プランナーとオプティマイザ → 物理演算子の実行",
+      "status": "claim"
+    },
+    "result": {
+      "type": "link",
+      "label": "物理演算子の実行 → アプリケーション",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "列チャンク → Parquet スキャン",
+      "label": "データベースファイル → バッファマネージャー",
       "status": "claim"
     },
-    "return": {
+    "supply": {
       "type": "link",
-      "label": "Parquet スキャン → 結果の投影",
+      "label": "バッファマネージャー → 物理演算子の実行",
       "status": "claim"
     },
-    "inspect": {
+    "log": {
       "type": "link",
-      "label": "読取の最適化 → 検索 SQL と計画の確認",
+      "label": "物理演算子の実行 → WAL",
       "status": "claim"
     },
-    "measure": {
+    "checkpoint": {
       "type": "link",
-      "label": "Parquet スキャン → 実行時の観測",
+      "label": "WAL → データベースファイル",
       "status": "claim"
     },
-    "read-week": {
+    "load": {
+      "type": "link",
+      "label": "拡張（parquet・httpfs） → 物理演算子の実行",
+      "status": "claim"
+    },
+    "extread": {
+      "type": "link",
+      "label": "外部ファイル（Parquet・CSV・S3） → 拡張（parquet・httpfs）",
+      "status": "claim"
+    },
+    "local": {
       "type": "scenario",
-      "label": "顧客 42 に必要な列と行グループを読む"
+      "label": "データベースファイルへの問い合わせ"
     },
-    "inspect-plan": {
+    "s3": {
       "type": "scenario",
-      "label": "物理計画と実行結果を読み分ける"
+      "label": "S3 の Parquet を検索"
     },
-    "BR-01": {
-      "type": "requirement",
-      "kind": "usecase",
-      "label": "必要な注文列を取得",
-      "status": "claim"
-    },
-    "BR-02": {
-      "type": "requirement",
-      "kind": "rule",
-      "label": "読み取り判断の根拠を追う",
-      "status": "claim"
+    "write": {
+      "type": "scenario",
+      "label": "書き込みと checkpoint"
     },
     "UNK-01": {
       "type": "unknown",
-      "label": "実ファイルの統計の有無、除外した行グループ数、物理計画の表示、実行時間は未確認。"
+      "label": "パイプラインへの分割やスレッドの割り当てなど、実行エンジンの内部実装は公式資料で確認できていない。"
     },
-    "python-parquet-host": {
+    "UNK-02": {
+      "type": "unknown",
+      "label": "S3 の取得量と応答時間は、ファイルの構成・ネットワーク・設定に依存し、一般には示せない。"
+    },
+    "local-host": {
       "type": "implementation",
-      "impl": "python-parquet",
+      "impl": "python-local",
       "label": "自前 Python 実行ホスト",
       "realizes": []
     },
-    "python-parquet-client": {
+    "local-python": {
       "type": "implementation",
-      "impl": "python-parquet",
-      "label": "Python の DuckDB 接続",
+      "impl": "python-local",
+      "label": "Python プログラムと duckdb パッケージ",
       "realizes": [
-        "query"
+        "app",
+        "clientapi"
       ]
     },
-    "python-parquet-engine": {
+    "local-engine": {
       "type": "implementation",
-      "impl": "python-parquet",
+      "impl": "python-local",
       "label": "同じプロセスの DuckDB エンジン",
       "realizes": [
-        "optimizer",
-        "scan",
-        "project",
-        "profile"
+        "parser",
+        "planner",
+        "physical",
+        "buffer",
+        "ext"
       ]
     },
-    "python-parquet-parquet": {
+    "local-db": {
       "type": "implementation",
-      "impl": "python-parquet",
+      "impl": "python-local",
+      "label": "ローカルの analytics.duckdb と WAL",
+      "realizes": [
+        "dbfile",
+        "wal"
+      ]
+    },
+    "local-parquet": {
+      "type": "implementation",
+      "impl": "python-local",
       "label": "ローカルの orders.parquet",
       "realizes": [
-        "footer",
-        "groups",
-        "columns"
+        "remote"
       ]
-    },
-    "python-parquet-metadata": {
-      "type": "implementation",
-      "impl": "python-parquet",
-      "label": "parquet_metadata の診断用 SQL",
-      "realizes": []
     },
     "aws-operator": {
       "type": "implementation",
@@ -180,7 +204,8 @@
       "impl": "aws-fargate-duckdb",
       "label": "Python スクリプト",
       "realizes": [
-        "query"
+        "app",
+        "clientapi"
       ]
     },
     "aws-engine": {
@@ -188,10 +213,11 @@
       "impl": "aws-fargate-duckdb",
       "label": "DuckDB（Python と同じプロセス）",
       "realizes": [
-        "optimizer",
-        "scan",
-        "project",
-        "profile"
+        "parser",
+        "planner",
+        "physical",
+        "buffer",
+        "ext"
       ]
     },
     "aws-ecr": {
@@ -205,9 +231,16 @@
       "impl": "aws-fargate-duckdb",
       "label": "Amazon S3（orders.parquet）",
       "realizes": [
-        "footer",
-        "groups",
-        "columns"
+        "remote"
+      ]
+    },
+    "aws-memdb": {
+      "type": "implementation",
+      "impl": "aws-fargate-duckdb",
+      "label": "インメモリのデータベース（永続ファイルなし）",
+      "realizes": [
+        "dbfile",
+        "wal"
       ]
     }
   },
@@ -217,31 +250,35 @@
     ],
     "docs/reference-duckdb.md": [
       "model",
-      "query",
-      "optimizer",
-      "scan",
-      "project",
-      "profile",
-      "footer",
-      "groups",
-      "columns",
-      "submit",
-      "push",
-      "metadata",
-      "skip",
+      "app",
+      "clientapi",
+      "parser",
+      "planner",
+      "physical",
+      "buffer",
+      "ext",
+      "dbfile",
+      "wal",
+      "remote",
+      "call",
+      "parse",
+      "plan",
+      "exec",
+      "result",
       "read",
-      "return",
-      "inspect",
-      "measure",
-      "read-week",
-      "inspect-plan",
-      "BR-01",
-      "BR-02",
-      "python-parquet-host",
-      "python-parquet-client",
-      "python-parquet-engine",
-      "python-parquet-parquet",
-      "python-parquet-metadata",
+      "supply",
+      "log",
+      "checkpoint",
+      "load",
+      "extread",
+      "local",
+      "s3",
+      "write",
+      "local-host",
+      "local-python",
+      "local-engine",
+      "local-db",
+      "local-parquet",
       "aws-operator",
       "aws-task-role",
       "aws-ecs",
@@ -249,51 +286,61 @@
       "aws-python",
       "aws-engine",
       "aws-ecr",
-      "aws-s3"
+      "aws-s3",
+      "aws-memdb"
     ],
     "docs/reference-duckdb.md#§2": [
       "model",
-      "query",
-      "optimizer",
-      "submit",
-      "push"
+      "app",
+      "clientapi",
+      "call",
+      "result"
     ],
     "docs/reference-duckdb.md#§3": [
       "model",
-      "scan",
-      "project",
-      "footer",
-      "groups",
-      "columns",
-      "metadata",
-      "skip",
-      "read",
-      "return",
-      "read-week",
-      "BR-01"
+      "parser",
+      "planner",
+      "parse",
+      "plan"
     ],
     "docs/reference-duckdb.md#§4": [
       "model",
-      "profile",
-      "inspect",
-      "measure",
-      "inspect-plan",
-      "BR-02"
+      "physical",
+      "exec"
     ],
     "docs/reference-duckdb.md#§5": [
-      "model"
+      "model",
+      "buffer",
+      "dbfile",
+      "wal",
+      "read",
+      "supply",
+      "log",
+      "checkpoint",
+      "local",
+      "write"
     ],
     "docs/reference-duckdb.md#§6": [
-      "model"
+      "model",
+      "ext",
+      "remote",
+      "load",
+      "extread",
+      "s3"
     ],
     "docs/reference-duckdb.md#§7": [
-      "python-parquet-host",
-      "python-parquet-client",
-      "python-parquet-engine",
-      "python-parquet-parquet",
-      "python-parquet-metadata"
+      "model"
     ],
     "docs/reference-duckdb.md#§8": [
+      "model",
+      "local-host",
+      "local-python",
+      "local-engine",
+      "local-db",
+      "local-parquet"
+    ],
+    "docs/reference-duckdb.md#§9": [
+      "model",
       "aws-operator",
       "aws-task-role",
       "aws-ecs",
@@ -301,35 +348,58 @@
       "aws-python",
       "aws-engine",
       "aws-ecr",
-      "aws-s3"
+      "aws-s3",
+      "aws-memdb"
     ]
   },
   "reference": {
-    "category": "バッチ・SQL エンジン",
-    "order": 50,
     "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "DuckDB",
+    "role": "overview",
+    "order": 50,
     "objectives": [
-      "列投影とフィルタのプッシュダウンが減らす読み取りを説明する。",
-      "行グループごとの min/max で除外できる範囲と、行の評価が必要な範囲を追う。",
-      "EXPLAIN、EXPLAIN ANALYZE、parquet_metadata から得られる情報を区別する。"
+      "組み込み型で、アプリと同じプロセスで動くことを説明する。",
+      "SQL が解析・最適化・実行を通って結果になる流れを追う。",
+      "データベースファイルと外部ファイル（Parquet・S3）の使い分けを区別する。"
     ],
     "sources": [
       {
-        "title": "DuckDB Reading and Writing Parquet Files",
-        "url": "https://duckdb.org/docs/data/parquet"
+        "title": "Why DuckDB",
+        "url": "https://duckdb.org/why_duckdb"
       },
       {
-        "title": "DuckDB Querying Parquet Metadata",
-        "url": "https://duckdb.org/docs/current/data/parquet/metadata"
+        "title": "DuckDB Internals Overview",
+        "url": "https://duckdb.org/docs/2.0/internals/overview.html"
       },
       {
-        "title": "DuckDB EXPLAIN",
-        "url": "https://duckdb.org/docs/stable/guides/meta/explain"
+        "title": "DuckDB Concurrency",
+        "url": "https://duckdb.org/docs/2.0/connect/concurrency.html"
       },
       {
-        "title": "DuckDB Profiling",
-        "url": "https://duckdb.org/docs/current/dev/profiling"
+        "title": "DuckDB Python API",
+        "url": "https://duckdb.org/docs/2.0/clients/python/overview.html"
+      },
+      {
+        "title": "DuckDB Storage Format",
+        "url": "https://duckdb.org/docs/2.0/internals/storage.html"
+      },
+      {
+        "title": "DuckDB Core Extensions",
+        "url": "https://duckdb.org/docs/2.0/core_extensions/overview.html"
+      },
+      {
+        "title": "DuckDB HTTP(S) Support",
+        "url": "https://duckdb.org/docs/2.0/core_extensions/httpfs/https.html"
+      },
+      {
+        "title": "DuckDB S3 API Support",
+        "url": "https://duckdb.org/docs/2.0/core_extensions/httpfs/s3api.html"
+      },
+      {
+        "title": "Memory Management in DuckDB",
+        "url": "https://duckdb.org/2024/07/09/memory-management.html"
       }
     ]
   }

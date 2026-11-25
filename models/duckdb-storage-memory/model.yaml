@@ -1,0 +1,288 @@
+name: DuckDB：ストレージ形式とメモリ管理
+description: 単一ファイルの行グループと列セグメント、圧縮、WAL と checkpoint、バッファマネージャーと一時ファイルへの書き出しを追う。
+reference:
+  objectives: [データベースファイルの行グループ・列セグメント・ブロックの関係を説明する。, WAL と checkpoint による書き込みの流れを追う。, メモリ上限を超えたときに何が起きるかを区別する。]
+  sources:
+  - {title: DuckDB Storage Format, url: 'https://duckdb.org/docs/2.0/internals/storage.html'}
+  - {title: DuckDB ATTACH, url: 'https://duckdb.org/docs/2.0/sql/statements/attach.html'}
+  - {title: DuckDB CHECKPOINT, url: 'https://duckdb.org/docs/2.0/sql/statements/checkpoint.html'}
+  - {title: Configuration, url: 'https://duckdb.org/docs/2.0/configuration/overview.html'}
+  - {title: Lightweight Compression in DuckDB, url: 'https://duckdb.org/2022/10/28/lightweight-compression.html'}
+  - {title: Memory Management in DuckDB, url: 'https://duckdb.org/2024/07/09/memory-management.html'}
+  - {title: How to Tune Workloads, url: 'https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html'}
+sources: [docs/reference-duckdb-storage-memory.md]
+evidence:
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§1}
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§2}
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§3}
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§4}
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§5}
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§6}
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§7}
+- {type: doc, ref: docs/reference-duckdb-storage-memory.md#§8}
+tiers:
+- id: mem
+  label: メモリ
+  z: 1
+  size: [20, 4]
+- id: disk
+  label: ディスク
+  z: 0
+  size: [20, 7]
+nodes:
+  query:
+    label: 実行エンジン
+    kind: service
+    tier: mem
+    x: 1
+    y: 1.5
+    description: クエリを実行し、データを読み書きする。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§5}
+  buffer:
+    label: バッファマネージャー
+    kind: cache
+    tier: mem
+    x: 8
+    y: 1.5
+    description: 永続ストレージのページをキャッシュする。中間結果と同じメモリ上限（既定は RAM の 80%）を共有する。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§5}
+  inter:
+    label: クエリの中間結果
+    kind: file
+    tier: mem
+    x: 15
+    y: 1.5
+    description: 集計や結合の途中のデータ。上限を超えると一時ファイルへ書き出す。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§6}
+  wal:
+    label: WAL
+    kind: file
+    tier: disk
+    x: 1
+    y: 1.5
+    description: 書き込みを先に記録する先行書き込みログ。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§4}
+  ckpt:
+    label: checkpoint
+    kind: service
+    tier: disk
+    x: 6
+    y: 1.5
+    description: WAL の内容をデータベースファイルへ反映し、削除行の領域を回収する。WAL が 16 MiB（既定）になると自動で実行する。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§4}
+  dbfile:
+    label: データベースファイル
+    kind: db
+    tier: disk
+    x: 11
+    y: 1.5
+    description: 単一ファイル。ヘッダーを持ち、固定サイズのブロック（既定 256 KiB）で扱う。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§2}
+  rowgroup:
+    label: 行グループ
+    kind: segment
+    tier: disk
+    x: 11
+    y: 4.5
+    description: 水平分割の単位。既定 122,880 行。圧縮と並列処理の基準。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§2}
+  seg:
+    label: 列セグメント（軽量圧縮）
+    kind: segment
+    tier: disk
+    x: 16
+    y: 4.5
+    description: 行グループ内の列ごとの区画。セグメントごとに圧縮方式を選ぶ。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§3}
+  temp:
+    label: 一時ディレクトリ
+    kind: file
+    tier: disk
+    x: 16
+    y: 1.5
+    description: 既定は <DB ファイル名>.tmp。上限は空きディスクの 90%。
+    evidence:
+    - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§6}
+links:
+- id: write
+  from: query
+  to: wal
+  label: 書き込みを記録
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§4}
+- id: trigger
+  from: wal
+  to: ckpt
+  label: しきい値で起動
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§4}
+- id: flush
+  from: ckpt
+  to: dbfile
+  label: ファイルへ反映
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§4}
+- id: split
+  from: dbfile
+  to: rowgroup
+  label: 行グループに分ける
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§2}
+- id: cols
+  from: rowgroup
+  to: seg
+  label: 列ごとに区切る
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§3}
+- id: load
+  from: dbfile
+  to: buffer
+  label: ブロックを読み込む
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§5}
+- id: serve
+  from: buffer
+  to: query
+  label: ページを供給
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§5}
+- id: build
+  from: query
+  to: inter
+  label: 中間結果を作る
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§6}
+- id: spill
+  from: inter
+  to: temp
+  label: 上限超過で書き出す
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§6}
+- id: reload
+  from: temp
+  to: query
+  label: 読み戻す
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§6}
+scenarios:
+- id: write
+  label: 書き込みと checkpoint
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§4}
+  steps:
+  - links: [write]
+    note: 変更をまず WAL に記録する。
+  - links: [trigger, flush]
+    note: WAL が既定 16 MiB に達する、または CHECKPOINT 文で、データベースファイルへ反映する。
+- id: read
+  label: 読み取りとキャッシュ
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§5}
+  steps:
+  - links: [load, serve]
+    note: ブロックをバッファマネージャーに読み込んでキャッシュし、次のクエリでも再利用する。
+- id: spill
+  label: メモリに収まらない処理
+  evidence:
+  - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§6}
+  steps:
+  - links: [build]
+    note: 集計や結合の中間結果を作る。
+  - links: [spill, reload]
+    note: メモリ上限を超えると一時ファイルへ書き出し、必要なときに読み戻す。
+unknowns:
+- id: UNK-01
+  text: WAL の形式とファイル名、checkpoint でいつ圧縮方式を選ぶか、バッファマネージャーの追い出し方針は、公式資料で確認できていない。
+  refs: [wal, ckpt, buffer]
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+- id: python-local
+  label: Python に組み込む DuckDB（ローカルディスク）
+  description: Python プロセス内の DuckDB が、ローカルのデータベースファイル・WAL・一時ディレクトリを使う例。
+  sources:
+  - {title: DuckDB Python API, url: 'https://duckdb.org/docs/2.0/clients/python/overview.html'}
+  - {title: DuckDB Storage Format, url: 'https://duckdb.org/docs/2.0/internals/storage.html'}
+  - {title: DuckDB CHECKPOINT, url: 'https://duckdb.org/docs/2.0/sql/statements/checkpoint.html'}
+  - {title: Memory Management in DuckDB, url: 'https://duckdb.org/2024/07/09/memory-management.html'}
+  tiers:
+  - id: host
+    label: 自前ホスト
+    z: 0
+    size: [6, 19]
+  groups:
+  - kind: nodegroup
+    label: 自前ホスト
+    tier: [host]
+    nodes: [st-host, st-python, st-engine, st-db, st-wal, st-temp]
+  nodes:
+    st-host:
+      label: 自前 Python 実行ホスト
+      kind: host
+      tier: host
+      x: 2
+      y: 1
+      description: 利用者が Python プロセスとローカルディスクを管理する。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§8}
+    st-python:
+      label: Python プログラムと duckdb パッケージ
+      kind: client
+      tier: host
+      x: 2
+      y: 4
+      description: 更新と検索の SQL を発行する。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§8}
+    st-engine:
+      label: 同じプロセスの DuckDB エンジン
+      kind: worker
+      tier: host
+      x: 2
+      y: 7
+      description: ページのキャッシュ、中間結果、checkpoint を同じプロセスで扱う。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§8}
+      realizes: [query, buffer, inter, ckpt]
+    st-db:
+      label: ローカルの analytics.duckdb
+      kind: db
+      tier: host
+      x: 2
+      y: 10
+      description: 単一ファイルに行グループと列セグメントを保存する。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§8}
+      realizes: [dbfile, rowgroup, seg]
+    st-wal:
+      label: ローカルの WAL
+      kind: file
+      tier: host
+      x: 2
+      y: 13
+      description: 書き込みを先に記録する。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§8}
+      realizes: [wal]
+    st-temp:
+      label: 一時ディレクトリ（analytics.duckdb.tmp）
+      kind: file
+      tier: host
+      x: 2
+      y: 16
+      description: メモリ上限を超えた中間結果を書き出す。
+      evidence:
+      - {type: doc, ref: docs/reference-duckdb-storage-memory.md#§8}
+      realizes: [temp]
+  links:
+  - {id: st-db-from-host, from: st-host, to: st-db, label: ローカルファイルを提供}
+  - {id: st-wal-from-host, from: st-host, to: st-wal, label: ローカルファイルを提供}
+  - {id: st-temp-from-host, from: st-host, to: st-temp, label: ローカルファイルを提供}
+  - {id: st-python-run, from: st-host, to: st-python, label: Python を実行}

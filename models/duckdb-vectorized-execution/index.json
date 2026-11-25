@@ -1,0 +1,256 @@
+{
+  "model": "duckdb-vectorized-execution",
+  "name": "DuckDB：ベクトル化実行と並列処理",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "plan": {
+      "type": "node",
+      "label": "物理演算子の木",
+      "status": "claim"
+    },
+    "store": {
+      "type": "node",
+      "label": "行グループ（入力）",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "スキャン",
+      "status": "claim"
+    },
+    "vectors": {
+      "type": "node",
+      "label": "ベクトル（Flat・Constant・Dictionary・Sequence）",
+      "status": "claim"
+    },
+    "chunk": {
+      "type": "node",
+      "label": "DataChunk（標準 2,048 タプル）",
+      "status": "claim"
+    },
+    "ops": {
+      "type": "node",
+      "label": "フィルタ・射影など",
+      "status": "claim"
+    },
+    "local": {
+      "type": "node",
+      "label": "スレッドごとの集計テーブル",
+      "status": "claim"
+    },
+    "merge": {
+      "type": "node",
+      "label": "パーティションの統合",
+      "status": "claim"
+    },
+    "out": {
+      "type": "node",
+      "label": "結果",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "物理演算子の木 → スキャン",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "行グループ（入力） → スキャン",
+      "status": "claim"
+    },
+    "expand": {
+      "type": "link",
+      "label": "スキャン → ベクトル（Flat・Constant・Dictionary・Sequence）",
+      "status": "claim"
+    },
+    "bundle": {
+      "type": "link",
+      "label": "ベクトル（Flat・Constant・Dictionary・Sequence） → DataChunk（標準 2,048 タプル）",
+      "status": "claim"
+    },
+    "push": {
+      "type": "link",
+      "label": "DataChunk（標準 2,048 タプル） → フィルタ・射影など",
+      "status": "claim"
+    },
+    "feed": {
+      "type": "link",
+      "label": "フィルタ・射影など → スレッドごとの集計テーブル",
+      "status": "claim"
+    },
+    "combine": {
+      "type": "link",
+      "label": "スレッドごとの集計テーブル → パーティションの統合",
+      "status": "claim"
+    },
+    "emit": {
+      "type": "link",
+      "label": "パーティションの統合 → 結果",
+      "status": "claim"
+    },
+    "agg": {
+      "type": "scenario",
+      "label": "GROUP BY 集計の流れ"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "パイプラインの分割、スレッドへの仕事の割り当て、ベクトル形式を選ぶ条件の内部実装は、公式資料で確認できていない。"
+    },
+    "vx-host": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "自前 Python 実行ホスト",
+      "realizes": []
+    },
+    "vx-python": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "Python プログラムと duckdb パッケージ",
+      "realizes": [
+        "out"
+      ]
+    },
+    "vx-engine": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "同じプロセスの DuckDB 実行エンジン",
+      "realizes": [
+        "plan",
+        "scan",
+        "vectors",
+        "chunk",
+        "ops",
+        "local",
+        "merge"
+      ]
+    },
+    "vx-db": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "ローカルの DB ファイル",
+      "realizes": [
+        "store"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-duckdb-vectorized-execution.md#§1": [
+      "model"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md": [
+      "model",
+      "plan",
+      "store",
+      "scan",
+      "vectors",
+      "chunk",
+      "ops",
+      "local",
+      "merge",
+      "out",
+      "start",
+      "read",
+      "expand",
+      "bundle",
+      "push",
+      "feed",
+      "combine",
+      "emit",
+      "agg",
+      "vx-host",
+      "vx-python",
+      "vx-engine",
+      "vx-db"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§2": [
+      "model",
+      "chunk",
+      "bundle"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§3": [
+      "model",
+      "vectors",
+      "expand"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§4": [
+      "model",
+      "plan",
+      "start",
+      "push"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§5": [
+      "model",
+      "ops",
+      "merge"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§6": [
+      "model",
+      "store",
+      "scan",
+      "local",
+      "read",
+      "feed",
+      "combine",
+      "agg"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§7": [
+      "model",
+      "out",
+      "emit"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§8": [
+      "model"
+    ],
+    "docs/reference-duckdb-vectorized-execution.md#§9": [
+      "model",
+      "vx-host",
+      "vx-python",
+      "vx-engine",
+      "vx-db"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "DuckDB",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "duckdb",
+    "order": 51,
+    "objectives": [
+      "DataChunk とベクトルの形式、標準のベクトルサイズを説明する。",
+      "ブロッキング演算子と、そうでない演算子の違いを区別する。",
+      "行グループ単位の並列化と、スレッドごとの集計を統合する流れを追う。"
+    ],
+    "sources": [
+      {
+        "title": "DuckDB Internals Overview",
+        "url": "https://duckdb.org/docs/2.0/internals/overview.html"
+      },
+      {
+        "title": "DuckDB Vector",
+        "url": "https://duckdb.org/docs/2.0/internals/vector.html"
+      },
+      {
+        "title": "How to Tune Workloads",
+        "url": "https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html"
+      },
+      {
+        "title": "Parallel Grouped Aggregation in DuckDB",
+        "url": "https://duckdb.org/2022/03/07/aggregate-hashtable.html"
+      },
+      {
+        "title": "Order Preservation",
+        "url": "https://duckdb.org/docs/2.0/sql/dialect/order_preservation.html"
+      },
+      {
+        "title": "Design and Implementation of DuckDB Internals",
+        "url": "https://duckdb.org/library/design-and-implementation-of-duckdb-internals/"
+      }
+    ]
+  }
+}

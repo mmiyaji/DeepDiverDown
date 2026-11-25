@@ -1,0 +1,287 @@
+{
+  "model": "trino-query-execution",
+  "name": "Trino：Stage・Task・Split と Exchange",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "stmt": {
+      "type": "node",
+      "label": "クライアント（Statement）",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "node",
+      "label": "分散計画（Stage の木）",
+      "status": "claim"
+    },
+    "sched": {
+      "type": "node",
+      "label": "Coordinator のスケジューラ",
+      "status": "claim"
+    },
+    "connector": {
+      "type": "node",
+      "label": "Connector",
+      "status": "claim"
+    },
+    "source": {
+      "type": "node",
+      "label": "データソース",
+      "status": "claim"
+    },
+    "leaf": {
+      "type": "node",
+      "label": "末端 Stage の Task",
+      "status": "claim"
+    },
+    "driver": {
+      "type": "node",
+      "label": "Driver と Operator",
+      "status": "claim"
+    },
+    "exchange": {
+      "type": "node",
+      "label": "Exchange（出力バッファ）",
+      "status": "claim"
+    },
+    "mid": {
+      "type": "node",
+      "label": "中間・ルート Stage の Task",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "クライアント（Statement） → 分散計画（Stage の木）",
+      "status": "claim"
+    },
+    "schedule": {
+      "type": "link",
+      "label": "分散計画（Stage の木） → Coordinator のスケジューラ",
+      "status": "claim"
+    },
+    "list-splits": {
+      "type": "link",
+      "label": "Coordinator のスケジューラ → Connector",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "Coordinator のスケジューラ → 末端 Stage の Task",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "データソース → 末端 Stage の Task",
+      "status": "claim"
+    },
+    "run": {
+      "type": "link",
+      "label": "末端 Stage の Task → Driver と Operator",
+      "status": "claim"
+    },
+    "write-buffer": {
+      "type": "link",
+      "label": "末端 Stage の Task → Exchange（出力バッファ）",
+      "status": "claim"
+    },
+    "exchange-read": {
+      "type": "link",
+      "label": "Exchange（出力バッファ） → 中間・ルート Stage の Task",
+      "status": "claim"
+    },
+    "result": {
+      "type": "link",
+      "label": "中間・ルート Stage の Task → クライアント（Statement）",
+      "status": "claim"
+    },
+    "stages": {
+      "type": "scenario",
+      "label": "1 つのクエリが Stage と Task になる"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Split の数や割り当ての細かいアルゴリズム、Driver 数の自動調整の詳細は今回確認した資料の範囲では扱っていない。"
+    },
+    "trino-iceberg-client": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino CLI",
+      "realizes": [
+        "stmt"
+      ]
+    },
+    "trino-iceberg-coordinator": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Coordinator Pod",
+      "realizes": [
+        "plan",
+        "sched",
+        "connector"
+      ]
+    },
+    "trino-iceberg-workers": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Trino Worker Pods",
+      "realizes": [
+        "leaf",
+        "driver",
+        "exchange",
+        "mid",
+        "connector"
+      ]
+    },
+    "trino-iceberg-data": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "S3 / Iceberg テーブル",
+      "realizes": [
+        "source"
+      ]
+    },
+    "trino-iceberg-glue": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "AWS Glue Data Catalog",
+      "realizes": []
+    },
+    "trino-iceberg-eks": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "Amazon EKS / Kubernetes API",
+      "realizes": []
+    },
+    "trino-iceberg-ec2": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "EC2 / EKS ノードグループ",
+      "realizes": []
+    },
+    "trino-iceberg-iam": {
+      "type": "implementation",
+      "impl": "trino-iceberg",
+      "label": "IAM / Pod 用ロール",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-trino-query-execution.md#§1": [
+      "model"
+    ],
+    "docs/reference-trino-query-execution.md": [
+      "model",
+      "stmt",
+      "plan",
+      "sched",
+      "connector",
+      "source",
+      "leaf",
+      "driver",
+      "exchange",
+      "mid",
+      "submit",
+      "schedule",
+      "list-splits",
+      "assign",
+      "read",
+      "run",
+      "write-buffer",
+      "exchange-read",
+      "result",
+      "stages",
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue",
+      "trino-iceberg-eks",
+      "trino-iceberg-ec2",
+      "trino-iceberg-iam"
+    ],
+    "docs/reference-trino-query-execution.md#§2": [
+      "stmt"
+    ],
+    "docs/reference-trino-query-execution.md#§3": [
+      "plan",
+      "mid",
+      "submit",
+      "schedule",
+      "result",
+      "stages"
+    ],
+    "docs/reference-trino-query-execution.md#§4": [
+      "sched",
+      "connector",
+      "source",
+      "list-splits",
+      "assign",
+      "read"
+    ],
+    "docs/reference-trino-query-execution.md#§7": [
+      "sched"
+    ],
+    "docs/reference-trino-query-execution.md#§5": [
+      "leaf",
+      "driver",
+      "run"
+    ],
+    "docs/reference-trino-query-execution.md#§6": [
+      "exchange",
+      "write-buffer",
+      "exchange-read"
+    ],
+    "docs/reference-trino-query-execution.md#§8": [
+      "trino-iceberg-client",
+      "trino-iceberg-coordinator",
+      "trino-iceberg-workers",
+      "trino-iceberg-data",
+      "trino-iceberg-glue",
+      "trino-iceberg-eks",
+      "trino-iceberg-ec2",
+      "trino-iceberg-iam"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "Trino",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "trino",
+    "objectives": [
+      "Statement、Query、Stage、Task、Split、Driver、Operator、Exchange を区別する。",
+      "Stage は計画の単位で、実行するのは Task だと説明する。",
+      "Split が末端の Stage の読み取り単位で、中間の Stage は Exchange から読むことを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Trino · Concepts",
+        "url": "https://trino.io/docs/current/overview/concepts.html"
+      },
+      {
+        "title": "Trino · EXPLAIN",
+        "url": "https://trino.io/docs/current/sql/explain.html"
+      },
+      {
+        "title": "Trino · Task properties",
+        "url": "https://trino.io/docs/current/admin/properties-task.html"
+      },
+      {
+        "title": "Trino · Query management properties",
+        "url": "https://trino.io/docs/current/admin/properties-query-management.html"
+      },
+      {
+        "title": "Trino · Cost-based optimizations",
+        "url": "https://trino.io/docs/current/optimizer/cost-based-optimizations.html"
+      },
+      {
+        "title": "Trino · Iceberg connector",
+        "url": "https://trino.io/docs/current/connector/iceberg.html"
+      }
+    ]
+  }
+}

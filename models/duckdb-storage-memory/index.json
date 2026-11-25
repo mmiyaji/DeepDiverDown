@@ -1,0 +1,288 @@
+{
+  "model": "duckdb-storage-memory",
+  "name": "DuckDB：ストレージ形式とメモリ管理",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "query": {
+      "type": "node",
+      "label": "実行エンジン",
+      "status": "claim"
+    },
+    "buffer": {
+      "type": "node",
+      "label": "バッファマネージャー",
+      "status": "claim"
+    },
+    "inter": {
+      "type": "node",
+      "label": "クエリの中間結果",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "WAL",
+      "status": "claim"
+    },
+    "ckpt": {
+      "type": "node",
+      "label": "checkpoint",
+      "status": "claim"
+    },
+    "dbfile": {
+      "type": "node",
+      "label": "データベースファイル",
+      "status": "claim"
+    },
+    "rowgroup": {
+      "type": "node",
+      "label": "行グループ",
+      "status": "claim"
+    },
+    "seg": {
+      "type": "node",
+      "label": "列セグメント（軽量圧縮）",
+      "status": "claim"
+    },
+    "temp": {
+      "type": "node",
+      "label": "一時ディレクトリ",
+      "status": "claim"
+    },
+    "write": {
+      "type": "scenario",
+      "label": "書き込みと checkpoint",
+      "status": "claim"
+    },
+    "trigger": {
+      "type": "link",
+      "label": "WAL → checkpoint",
+      "status": "claim"
+    },
+    "flush": {
+      "type": "link",
+      "label": "checkpoint → データベースファイル",
+      "status": "claim"
+    },
+    "split": {
+      "type": "link",
+      "label": "データベースファイル → 行グループ",
+      "status": "claim"
+    },
+    "cols": {
+      "type": "link",
+      "label": "行グループ → 列セグメント（軽量圧縮）",
+      "status": "claim"
+    },
+    "load": {
+      "type": "link",
+      "label": "データベースファイル → バッファマネージャー",
+      "status": "claim"
+    },
+    "serve": {
+      "type": "link",
+      "label": "バッファマネージャー → 実行エンジン",
+      "status": "claim"
+    },
+    "build": {
+      "type": "link",
+      "label": "実行エンジン → クエリの中間結果",
+      "status": "claim"
+    },
+    "spill": {
+      "type": "scenario",
+      "label": "メモリに収まらない処理",
+      "status": "claim"
+    },
+    "reload": {
+      "type": "link",
+      "label": "一時ディレクトリ → 実行エンジン",
+      "status": "claim"
+    },
+    "read": {
+      "type": "scenario",
+      "label": "読み取りとキャッシュ"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "WAL の形式とファイル名、checkpoint でいつ圧縮方式を選ぶか、バッファマネージャーの追い出し方針は、公式資料で確認できていない。"
+    },
+    "st-host": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "自前 Python 実行ホスト",
+      "realizes": []
+    },
+    "st-python": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "Python プログラムと duckdb パッケージ",
+      "realizes": []
+    },
+    "st-engine": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "同じプロセスの DuckDB エンジン",
+      "realizes": [
+        "query",
+        "buffer",
+        "inter",
+        "ckpt"
+      ]
+    },
+    "st-db": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "ローカルの analytics.duckdb",
+      "realizes": [
+        "dbfile",
+        "rowgroup",
+        "seg"
+      ]
+    },
+    "st-wal": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "ローカルの WAL",
+      "realizes": [
+        "wal"
+      ]
+    },
+    "st-temp": {
+      "type": "implementation",
+      "impl": "python-local",
+      "label": "一時ディレクトリ（analytics.duckdb.tmp）",
+      "realizes": [
+        "temp"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-duckdb-storage-memory.md#§1": [
+      "model"
+    ],
+    "docs/reference-duckdb-storage-memory.md": [
+      "model",
+      "query",
+      "buffer",
+      "inter",
+      "wal",
+      "ckpt",
+      "dbfile",
+      "rowgroup",
+      "seg",
+      "temp",
+      "write",
+      "trigger",
+      "flush",
+      "split",
+      "cols",
+      "load",
+      "serve",
+      "build",
+      "spill",
+      "reload",
+      "read",
+      "st-host",
+      "st-python",
+      "st-engine",
+      "st-db",
+      "st-wal",
+      "st-temp"
+    ],
+    "docs/reference-duckdb-storage-memory.md#§2": [
+      "model",
+      "dbfile",
+      "rowgroup",
+      "split"
+    ],
+    "docs/reference-duckdb-storage-memory.md#§3": [
+      "model",
+      "seg",
+      "cols"
+    ],
+    "docs/reference-duckdb-storage-memory.md#§4": [
+      "model",
+      "wal",
+      "ckpt",
+      "write",
+      "trigger",
+      "flush"
+    ],
+    "docs/reference-duckdb-storage-memory.md#§5": [
+      "model",
+      "query",
+      "buffer",
+      "load",
+      "serve",
+      "read"
+    ],
+    "docs/reference-duckdb-storage-memory.md#§6": [
+      "model",
+      "inter",
+      "temp",
+      "build",
+      "spill",
+      "reload"
+    ],
+    "docs/reference-duckdb-storage-memory.md#§7": [
+      "model"
+    ],
+    "docs/reference-duckdb-storage-memory.md#§8": [
+      "model",
+      "st-host",
+      "st-python",
+      "st-engine",
+      "st-db",
+      "st-wal",
+      "st-temp"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "バッチ・SQL エンジン",
+    "kind": "仕組みの深掘り",
+    "product": "DuckDB",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "duckdb",
+    "order": 52,
+    "objectives": [
+      "データベースファイルの行グループ・列セグメント・ブロックの関係を説明する。",
+      "WAL と checkpoint による書き込みの流れを追う。",
+      "メモリ上限を超えたときに何が起きるかを区別する。"
+    ],
+    "sources": [
+      {
+        "title": "DuckDB Storage Format",
+        "url": "https://duckdb.org/docs/2.0/internals/storage.html"
+      },
+      {
+        "title": "DuckDB ATTACH",
+        "url": "https://duckdb.org/docs/2.0/sql/statements/attach.html"
+      },
+      {
+        "title": "DuckDB CHECKPOINT",
+        "url": "https://duckdb.org/docs/2.0/sql/statements/checkpoint.html"
+      },
+      {
+        "title": "Configuration",
+        "url": "https://duckdb.org/docs/2.0/configuration/overview.html"
+      },
+      {
+        "title": "Lightweight Compression in DuckDB",
+        "url": "https://duckdb.org/2022/10/28/lightweight-compression.html"
+      },
+      {
+        "title": "Memory Management in DuckDB",
+        "url": "https://duckdb.org/2024/07/09/memory-management.html"
+      },
+      {
+        "title": "How to Tune Workloads",
+        "url": "https://duckdb.org/docs/2.0/guides/performance/how_to_tune_workloads.html"
+      }
+    ]
+  }
+}

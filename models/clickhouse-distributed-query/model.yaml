@@ -1,0 +1,148 @@
+name: "ClickHouse：Distributed テーブルとシャード越えのクエリ"
+description: "Distributed テーブルがクラスター定義に従って各シャードへ SELECT と INSERT を振り分け、結果を集約する流れと、レプリカの選び方を追う。"
+parent:
+  model: clickhouse
+  node: distributed
+reference:
+  objectives:
+    - Distributed テーブル自身はデータを持たず、クラスター定義を介してシャードを使うことを説明する。
+    - SELECT が全シャードで並列に実行され、集約が一部シャード側で行えることを追う。
+    - INSERT の分散キー、シャードの重み、バックグラウンド送信を説明する。
+    - internal_replication とレプリカの選択（load_balancing）が、複製表との組み合わせでどう効くかを区別する。
+  sources:
+    - title: ClickHouse Distributed table engine
+      url: https://clickhouse.com/docs/engines/table-engines/special/distributed
+    - title: ClickHouse の水平スケール（シャードの構成例）
+      url: https://clickhouse.com/docs/architecture/horizontal-scaling
+    - title: ClickHouse の複製（シャードとレプリカの構成例）
+      url: https://clickhouse.com/docs/architecture/replication
+sources: ["docs/reference-clickhouse-distributed-query.md"]
+evidence:
+  - {type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§1"}
+  - {type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§2"}
+  - {type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}
+  - {type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§4"}
+  - {type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§5"}
+tiers:
+  - {id: entry, label: Distributed テーブルのあるサーバー, z: 1, size: [22, 7]}
+  - {id: shards, label: シャード, z: 0, size: [22, 8]}
+nodes:
+  client:
+    label: SQL クライアント
+    kind: client
+    tier: entry
+    x: 1
+    y: 3
+    description: Distributed テーブルに SELECT や INSERT を送る。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]
+  distributed:
+    label: Distributed テーブル
+    kind: service
+    tier: entry
+    x: 7
+    y: 3
+    replicas: 2
+    description: データを持たず、クラスター名とテーブル名で各シャードの表を指す。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§2"}]
+  cluster-config:
+    label: remote_servers のクラスター定義
+    kind: policy
+    tier: entry
+    x: 13
+    y: 1
+    replicas: 2
+    description: シャードとレプリカのホスト、ポート、重みなどを持つ設定。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§2"}]
+  aggregate:
+    label: 結果の集約
+    kind: worker
+    tier: entry
+    x: 13
+    y: 5
+    replicas: 2
+    description: 各シャードの結果や途中の集約状態をまとめる。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]
+  send-queue:
+    label: ローカルの送信待ちデータ
+    kind: queue
+    tier: entry
+    x: 18
+    y: 3
+    replicas: 2
+    description: INSERT のブロックを、まずローカルのファイルシステムに書く。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§4"}]
+  shard-1:
+    label: シャード 1 のレプリカ
+    kind: db
+    tier: shards
+    x: 7
+    y: 1.5
+    replicas: 2
+    description: 同じデータを持つ 1 台以上のサーバー。読み取りでは 1 台が選ばれる。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]
+  shard-2:
+    label: シャード 2 のレプリカ
+    kind: db
+    tier: shards
+    x: 7
+    y: 5.5
+    replicas: 2
+    description: 別のデータを持つシャード。
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]
+links:
+  - {id: query, from: client, to: distributed, label: SELECT / INSERT を送る, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§2"}]}
+  - {id: topology, from: cluster-config, to: distributed, label: 送り先のシャードを定める, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§2"}]}
+  - {id: fan-1, from: distributed, to: shard-1, label: 1 レプリカを選んで問い合わせ, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]}
+  - {id: fan-2, from: distributed, to: shard-2, label: 1 レプリカを選んで問い合わせ, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]}
+  - {id: partial-1, from: shard-1, to: aggregate, label: 結果や集約状態を返す, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]}
+  - {id: partial-2, from: shard-2, to: aggregate, label: 結果や集約状態を返す, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]}
+  - {id: answer, from: aggregate, to: client, label: 結果を返す, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]}
+  - {id: stage, from: distributed, to: send-queue, label: INSERT をローカルに書く, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§4"}]}
+  - {id: ship-1, from: send-queue, to: shard-1, label: 分散キーと重みに従い送る, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§4"}]}
+  - {id: ship-2, from: send-queue, to: shard-2, label: 分散キーと重みに従い送る, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§4"}]}
+scenarios:
+  - id: select-all
+    label: 全シャードを読む
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]
+    steps:
+      - {links: [query, topology], note: Distributed テーブルが、クラスター定義から送り先のシャードを知る。}
+      - {links: [fan-1, fan-2], note: 各シャードで 1 レプリカを選び、並列に問い合わせる。接続に失敗すると次のレプリカを試す。}
+      - {links: [partial-1, partial-2, answer], note: 結果や途中の集約状態を集めて返す。集約の一部はシャード側で行える。}
+  - id: insert-sharded
+    label: 分散キーで書き込む
+    evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§4"}]
+    steps:
+      - {links: [query, stage], note: 既定ではブロックをまずローカルに書く。}
+      - {links: [ship-1, ship-2], note: バックグラウンドで、分散キーとシャードの重みに従って各シャードへ送る。}
+requirements:
+  - {id: BR-01, kind: usecase, title: 全シャードを 1 つの表として読む, text: Distributed テーブルへの SELECT が全シャードへ送られ、並列に読まれる。, scenario: select-all, links: [fan-1, fan-2, answer], evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§3"}]}
+  - {id: BR-02, kind: rule, title: 複製表の書き込みは 1 レプリカだけ, text: Replicated*MergeTree が各シャードのテーブルなら internal_replication を true にし、書き込みを 1 つの健全なレプリカにだけ送る。, links: [ship-1, ship-2], evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§5"}]}
+unknowns:
+  - {id: UNK-01, text: 実環境のシャード数、重み、分散キー、送信待ちの滞留量は未確認。, refs: [distributed, shard-1, shard-2, send-queue]}
+  - {id: UNK-02, text: 遠隔シャードでの部分集約が適用される条件の詳細は、公式資料の範囲で確認していない。, refs: [partial-1, partial-2]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: self-managed
+    label: 自前運用（2 シャード x 各 2 レプリカの Server と Keeper）
+    description: Distributed テーブルを置く Server と、各シャードのレプリカ、Keeper を利用者が Linux ホストで運用する代表例。
+    sources:
+      - {title: ClickHouse の水平スケール（シャードの構成例）, url: "https://clickhouse.com/docs/architecture/horizontal-scaling"}
+      - {title: ClickHouse の複製（シャードとレプリカの構成例）, url: "https://clickhouse.com/docs/architecture/replication"}
+      - {title: ClickHouse Distributed table engine, url: "https://clickhouse.com/docs/engines/table-engines/special/distributed"}
+    tiers:
+      - {id: access, label: クライアント, z: 0, origin: [-6, 0], size: [4, 7]}
+      - {id: servers, label: ClickHouse Server のホスト, z: 1, size: [22, 8]}
+      - {id: keeperhosts, label: ClickHouse Keeper のホスト, z: 0, size: [22, 4]}
+    groups:
+      - {kind: nodegroup, label: 自前運用のクラスター, tier: [servers, keeperhosts], nodes: [sd-distributed, sd-config, sd-aggregate, sd-queue, sd-shard1, sd-shard2, sd-keeper]}
+    nodes:
+      sd-client: {label: clickhouse-client, kind: client, tier: access, x: 1, y: 3, realizes: [client], description: Distributed テーブルのあるホストへ SQL を送る。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+      sd-distributed: {label: Distributed エンジンの表, kind: service, tier: servers, x: 2, y: 3, realizes: [distributed], description: クラスター名を指定して各シャードの表を指す。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+      sd-config: {label: 設定ファイル（remote_servers）, kind: policy, tier: servers, x: 8, y: 0.5, realizes: [cluster-config], description: 各シャードのレプリカのホストと TCP ポートを書く。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+      sd-aggregate: {label: 同じ Server の集約処理, kind: worker, tier: servers, x: 8, y: 6.5, realizes: [aggregate], description: 各シャードの結果や途中の集約状態をまとめる。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+      sd-queue: {label: ローカルディスクの送信待ち, kind: file, tier: servers, x: 2, y: 6.5, realizes: [send-queue], description: INSERT のブロックを先にローカルに書く。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+      sd-shard1: {label: シャード 1 の ReplicatedMergeTree（2 レプリカ）, kind: db, tier: servers, x: 14, y: 2, realizes: [shard-1], description: internal_replication を true にし、書き込みを 1 レプリカにだけ送る。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+      sd-shard2: {label: シャード 2 の ReplicatedMergeTree（2 レプリカ）, kind: db, tier: servers, x: 14, y: 5.5, realizes: [shard-2], description: シャード 1 とは別のデータを持つ。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+      sd-keeper: {label: ClickHouse Keeper（3 台）, kind: catalog, tier: keeperhosts, x: 14, y: 1.5, description: 各シャードのレプリカの複製を調整する。, evidence: [{type: doc, ref: "docs/reference-clickhouse-distributed-query.md#§6"}]}
+    links:
+      - {id: sd-replicate, from: sd-shard1, to: sd-keeper, label: 複製の調整}
