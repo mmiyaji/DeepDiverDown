@@ -38,12 +38,12 @@ Dataflow Runner は Beam グラフを Dataflow ジョブとして実行する。
 
 ## 8. 実装例：Pub/Sub → Dataflow（Beam）→ BigQuery
 
-Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例。Pub/Sub から読み、BigQuery に出力するパイプラインを専用ワーカーサービスアカウントで実行する。
+Apache Beam SDK で定義した注文のウィンドウ集計を Dataflow に投入する例。Pub/Sub から読み、BigQuery に出力するパイプラインを専用ワーカーサービスアカウントで実行する。
 
 | 機能 | 実装での担い手 | 配置・設定 |
 | --- | --- | --- |
 | 注文イベントの入力 | Pub/Sub サブスクリプション | 注文トピックから Dataflow ジョブへ配信する。 |
-| 処理グラフの定義、分散データの集合、キー付けと時間窓の集計 | Beam SDK の Pipeline・PCollection・Transform | イベント検証、イベント時刻の窓、キーごとの集計を処理グラフとして記述する。 |
+| 処理グラフの定義、分散データの集合、キー付けと時間ウィンドウの集計 | Beam SDK の Pipeline・PCollection・Transform | イベント検証、イベント時刻のウィンドウ、キーごとの集計を処理グラフとして記述する。 |
 | 処理グラフの実行調整、分散タスクの実行基盤 | Dataflow Runner と管理ワーカー | Beam グラフをストリーミングジョブとして分散実行する。 |
 | 分析用テーブル | BigQuery の集計テーブル | BigQueryIO でスキーマに合わせて書き込む。 |
 | ジョブの監視 | Dataflow Monitoring | ステージ指標とジョブの状態を確認する。 |
@@ -52,7 +52,7 @@ Apache Beam SDK で定義した注文の窓集計を Dataflow に投入する例
 
 - ワーカーサービスアカウント。Pub/Sub の読み取り、対象 BigQuery への書き込み、実行に必要な権限を割り当てる。
 
-開発端末で Java 向け Beam SDK のジョブを Dataflow Runner で送信する。依存 JAR のステージングと一時ファイルには Cloud Storage を使う。Dataflow が管理する Compute Engine ワーカーで `PubsubIO` の入力を窓ごとに集計し、`BigQueryIO` の Storage Write API で BigQuery のテーブルへ書く。ジョブのステージと処理状況は Dataflow の監視画面で確認する。
+開発端末で Java 向け Beam SDK のジョブを Dataflow Runner で送信する。依存 JAR のステージングと一時ファイルには Cloud Storage を使う。Dataflow が管理する Compute Engine ワーカーで `PubsubIO` の入力をウィンドウごとに集計し、`BigQueryIO` の Storage Write API で BigQuery のテーブルへ書く。ジョブのステージと処理状況は Dataflow の監視画面で確認する。
 
 - [Dataflow のワーカーとステージング](https://docs.cloud.google.com/dataflow/docs/request-quotas)
 - [Dataflow から BigQuery へのストリーミング書き込み](https://docs.cloud.google.com/dataflow/docs/guides/write-to-bigquery)

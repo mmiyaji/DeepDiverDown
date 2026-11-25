@@ -4,7 +4,7 @@ Flink の stable 版ドキュメント（nightlies.apache.org）を基準に、�
 
 ## 1. Flink の位置づけ
 
-Flink は、無限（unbounded）と有限（bounded）のデータストリームを状態付きで処理する分散処理エンジン。API は 4 層に分かれる。最下層の ProcessFunction は状態と時刻のコールバックを細かく制御する。DataStream API は変換・結合・窓・状態の部品を持ち、多くのアプリケーションがここで書かれる。Table API は宣言的な関係演算、SQL はその最上位で、クエリを書く。
+Flink は、無限（unbounded）と有限（bounded）のデータストリームを状態付きで処理する分散処理エンジン。API は 4 層に分かれる。最下層の ProcessFunction は状態と時刻のコールバックを細かく制御する。DataStream API は変換・結合・ウィンドウ・状態の部品を持ち、多くのアプリケーションがここで書かれる。Table API は宣言的な関係演算、SQL はその最上位で、クエリを書く。
 
 ## 2. JobManager と TaskManager
 

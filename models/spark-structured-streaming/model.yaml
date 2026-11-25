@@ -1,8 +1,8 @@
 name: Spark Structured Streaming：マイクロバッチ・状態・復旧
-description: Kafka のイベントをマイクロバッチで窓集計し、チェックポイントから再開する流れを追うリファレンスです。
+description: Kafka のイベントをマイクロバッチでウィンドウ集計し、チェックポイントから再開する流れを追うリファレンスです。
 reference:
   objectives:
-    - Kafka Source、ストリームクエリ、窓集計、Sink の役割を区別する。
+    - Kafka Source、ストリームクエリ、ウィンドウ集計、Sink の役割を区別する。
     - ウォーターマークとチェックポイントが遅延データと障害復旧に果たす役割を理解する。
     - マイクロバッチの入力範囲から出力までを追う。
   sources:
@@ -17,30 +17,30 @@ nodes:
   kafka: {label: ストリーム入力, kind: queue, tier: processing, x: 0, y: 1.5, description: 再読可能な入力からイベントと読み取り位置を取得する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§2}]}
   driver: {drill: spark-streaming-execution-modes, label: クエリの調整プロセス, kind: service, tier: processing, x: 4, 'y': 0.8, description: ストリームクエリとトリガーを調整する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§4}]}
   executor: {parallel: 'N', slots: 4, label: 分散タスクの実行担当, kind: worker, tier: processing, x: 8, 'y': 1.5, description: 入力パーティションをマイクロバッチとして並列処理する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§3}]}
-  state: {drill: databricks-streaming-state-internals,label: 時間窓ごとの状態, kind: db, tier: processing, x: 8, 'y': 2.7, description: 窓集計の中間状態を保持する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§4}]}
+  state: {drill: databricks-streaming-state-internals,label: 時間ウィンドウごとの状態, kind: db, tier: processing, x: 8, 'y': 2.7, description: ウィンドウ集計の中間状態を保持する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§4}]}
   sink: {label: 集計結果の出力先, kind: db, tier: processing, x: 12, 'y': 1.5, description: 集計結果をファイルやテーブルへ書き込む。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§5}]}
   checkpoint: {label: 進捗と状態の復旧領域, kind: db, tier: recovery, x: 8, 'y': 1.5, description: 入力範囲と処理進捗を保存し、障害後の再開に使う。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§6}]}
 links:
   - {id: read, from: kafka, to: driver, label: イベントを読む, evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§2"}]}
   - {id: schedule, from: driver, to: executor, label: マイクロバッチを実行, evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§3"}]}
-  - {id: aggregate, from: executor, to: state, label: 窓集計を更新, evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§3"}]}
+  - {id: aggregate, from: executor, to: state, label: ウィンドウ集計を更新, evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§3"}]}
   - {id: write, from: state, to: sink, label: 集計結果を出力, evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§5"}]}
   - {id: save, from: executor, to: checkpoint, label: 進捗を記録, evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§6"}]}
   - {id: resume, from: checkpoint, to: driver, label: チェックポイントから再開, evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§6"}]}
 scenarios:
   - id: structured-window-recovery
-    label: Kafka から窓集計・再開
+    label: Kafka からウィンドウ集計・再開
     evidence: [{type: doc, ref: "docs/reference-spark-structured-streaming.md#§1"}, {type: doc, ref: "docs/reference-spark-structured-streaming.md#§7"}]
     steps:
       - {links: [read], note: Kafka Source が受注イベントを読む。}
-      - {links: [schedule, aggregate], note: トリガーごとに入力を処理し、窓状態を更新する。}
+      - {links: [schedule, aggregate], note: トリガーごとに入力を処理し、ウィンドウ状態を更新する。}
       - {links: [write, save], note: 集計結果を出力し、進捗をチェックポイントへ保存する。}
       - {links: [resume], note: 障害後は保存済み進捗からクエリを再開する。}
 
 implementations:
   - id: kafka-parquet
     label: "Structured Streaming・Kafka・Parquet"
-    description: "Kafka の注文イベントを窓で集計し、確定した集計行を Parquet に保存するマイクロバッチの例。出力先とクエリ固有のチェックポイント先は別パスにする。"
+    description: "Kafka の注文イベントをウィンドウで集計し、確定した集計行を Parquet に保存するマイクロバッチの例。出力先とクエリ固有のチェックポイント先は別パスにする。"
     sources:
       - {title: Structured Streaming Programming Guide, url: https://spark.apache.org/docs/latest/streaming/index.html}
       - {title: Structured Streaming Getting Started, url: https://spark.apache.org/docs/latest/streaming/getting-started.html}
@@ -58,8 +58,8 @@ implementations:
       kafka-parquet-hdfs: {label: 自前 HDFS クラスター, kind: host, tier: processing, x: 9, y: 0, description: 別ホスト群の NameNode と DataNode で出力とチェックポイントを提供する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-source: {label: Kafka orders トピック, kind: queue, tier: processing, x: 1, y: 1.15, realizes: [kafka], description: Spark Kafka ソースが分割ごとの読み取り位置を管理する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-driver: {label: Spark Driver のストリーミングクエリ, kind: service, tier: processing, x: 1, y: 3.65, realizes: [driver], description: クエリのトリガーごとにマイクロバッチを起動する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
-      kafka-parquet-executors: {label: Executor JVM の窓集計と State Store, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [executor, state], description: ウィンドウとキーに対応する状態をタスクで更新する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
-      kafka-parquet-parquet: {label: 共有ファイルシステムの Parquet 出力, kind: db, tier: processing, x: 5, y: 3.65, realizes: [sink], description: ウォーターマークで確定した窓結果を Append モードで保存する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
+      kafka-parquet-executors: {label: Executor JVM のウィンドウ集計と State Store, kind: worker, tier: processing, x: 5, y: 1.15, realizes: [executor, state], description: ウィンドウとキーに対応する状態をタスクで更新する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
+      kafka-parquet-parquet: {label: 共有ファイルシステムの Parquet 出力, kind: db, tier: processing, x: 5, y: 3.65, realizes: [sink], description: ウォーターマークで確定したウィンドウ結果を Append モードで保存する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-checkpoint: {label: クエリ固有の checkpointLocation, kind: db, tier: processing, x: 9, y: 1.15, realizes: [checkpoint], description: クエリ進捗と状態ストアの復旧に必要なデータを保持する。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
       kafka-parquet-module: {label: Spark SQL 用 Kafka コネクター, kind: file, tier: setup, x: 1, y: 1.5, description: Spark と Scala に合う Kafka コネクターをアプリケーションに組み込む。, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§8}]}
     links:
@@ -131,10 +131,10 @@ implementations:
       aws-emr-serverless-cli: {label: "運用者の AWS CLI", kind: client, tier: entry, x: 1, y: 1.5, description: "対象アプリケーションを指定してジョブを投入する。", evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
       aws-emr-serverless-manager: {label: "EMR Serverless Spark", kind: service, tier: runtime, x: 1, y: 1.5, svc: emr, description: "Driver と Executor のワーカーを確保し、失敗したジョブを再試行する。", management: {type: shared, scope: "AWS がサービス基盤を運用し、利用者がアプリケーションとジョブを設定する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
       aws-emr-serverless-driver: {label: "Spark Driver ワーカー", kind: service, tier: runtime, x: 6, y: 1.5, realizes: [driver], description: "Kafka のオフセットから入力範囲を決め、マイクロバッチを起動する。", management: {type: shared, scope: "AWS がワーカーを運用し、利用者がクエリとジョブ設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
-      aws-emr-serverless-executor: {label: "Executor と State Store", kind: worker, tier: runtime, x: 11, y: 1.5, realizes: [executor, state], parallel: N, description: "割り当てられた Kafka パーティションを読み、窓状態を更新する。", management: {type: shared, scope: "AWS がワーカーを運用し、利用者が処理と状態の設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-executor: {label: "Executor と State Store", kind: worker, tier: runtime, x: 11, y: 1.5, realizes: [executor, state], parallel: N, description: "割り当てられた Kafka パーティションを読み、ウィンドウ状態を更新する。", management: {type: shared, scope: "AWS がワーカーを運用し、利用者が処理と状態の設定を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
       aws-emr-serverless-eni: {label: "ワーカーの VPC 接続", kind: gateway, tier: runtime, x: 9, y: 4.7, description: "設定したサブネットに作成した ENI を介して MSK に接続する。", management: {type: aws, scope: "AWS が接続用 ENI を管理し、利用者がサブネットとセキュリティグループを指定する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
       aws-emr-serverless-msk: {label: "Amazon MSK 注文トピック", kind: queue, tier: runtime, x: 14, y: 4.7, svc: msk, realizes: [kafka], description: "注文イベントを再読可能な Kafka パーティションに保存する。", management: {type: shared, scope: "AWS が MSK 基盤を運用し、利用者がトピックとアクセス権を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
-      aws-emr-serverless-out: {label: "S3 の Parquet 出力", kind: db, tier: data, x: 13, y: 1.5, svc: s3, realizes: [sink], description: "確定した窓集計結果を出力用プレフィックスに保存する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
+      aws-emr-serverless-out: {label: "S3 の Parquet 出力", kind: db, tier: data, x: 13, y: 1.5, svc: s3, realizes: [sink], description: "確定したウィンドウ集計結果を出力用プレフィックスに保存する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
       aws-emr-serverless-checkpoint: {label: "S3 チェックポイント", kind: db, tier: data, x: 7, y: 1.5, svc: s3, realizes: [checkpoint], description: "クエリ固有のプレフィックスに進捗と復旧用の状態を保持する。", management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者が復旧データと権限を管理する。"}, evidence: [{type: doc, ref: docs/reference-spark-structured-streaming.md#§9}]}
     links:
       - {id: aws-emr-serverless-role-use, from: aws-emr-serverless-manager, to: aws-emr-serverless-role, label: ジョブ実行ロールを使用}

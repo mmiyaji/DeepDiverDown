@@ -18,7 +18,7 @@ const EXPLANATIONS = [
   {
     ids: ['kafka-streams', 'flink'],
     summary: 'どちらも状態を持つストリーム処理を扱います。図では Kafka Streams の変更ログと、Flink のチェックポイントを使った復旧を比較できます。',
-    points: ['Kafka Streams はアプリケーション内の処理トポロジーとローカル状態ストアを使います。', 'Flink の例はイベント時刻とウォーターマークで窓を進め、状態と入力位置をチェックポイントから復元します。'],
+    points: ['Kafka Streams はアプリケーション内の処理トポロジーとローカル状態ストアを使います。', 'Flink の例はイベント時刻とウォーターマークでウィンドウを進め、状態と入力位置をチェックポイントから復元します。'],
   },
   {
     ids: ['kafka-connect', 'airbyte'],

@@ -42,7 +42,7 @@
 |---|---|---|
 | Spark Structured Streaming | Kafka から読み、マイクロバッチでウィンドウ集計し、出力後にチェックポイントから再開する | [Structured Streaming](https://spark.apache.org/docs/latest/streaming/index.html) |
 | Spark Streaming（DStreams） | 旧 API の StreamingContext が入力を RDD の列として処理する。既存構成の読解と Structured Streaming との比較に使う | [Spark Streaming](https://spark.apache.org/docs/latest/streaming-programming-guide.html) |
-| Apache Flink | イベント時刻とウォーターマークで集計窓を進め、障害後にチェックポイントから演算子の状態を復元する | [Flink・Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/) |
+| Apache Flink | イベント時刻とウォーターマークで集計ウィンドウを進め、障害後にチェックポイントから演算子の状態を復元する | [Flink・Stateful Stream Processing](https://nightlies.apache.org/flink/flink-docs-stable/docs/concepts/stateful-stream-processing/) |
 | Kafka Streams | アプリケーション内の処理トポロジーが Kafka Topic を読み、状態ストアを更新し、changelog から状態を復元する | [Kafka Streams Architecture](https://kafka.apache.org/44/streams/architecture/) |
 
 Kafka Connect は Kafka と外部システムの間でデータを運ぶ。Kafka Streams はアプリケーション側でデータを変換・集計する。Debezium はデータベースの変更を捕捉し、Kafka Connect を使う構成を取れる。 [Kafka Connect](https://kafka.apache.org/44/kafka-connect/overview/)・[Kafka Streams](https://kafka.apache.org/44/streams/architecture/)・[Debezium](https://debezium.io/documentation/reference/stable/architecture.html)
