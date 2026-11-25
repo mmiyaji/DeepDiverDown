@@ -705,6 +705,11 @@ function filterLibrary() {
   if (empty && !note) $('reference-list').insertAdjacentHTML('beforeend', '<p class="lib-empty sub">該当するモデルはありません</p>');
   else if (!empty && note) note.remove();
   if ($('tag-count')) $('tag-count').textContent = '';
+  // 使っている絞り込み条件だけを検索欄の下に小さく出す
+  const conds = [...(LIB_SEL.kind ? [[KIND_SHORT[LIB_SEL.kind] || LIB_SEL.kind, 'data-lib-kind=""']] : []), ...tags.map(t => [t, `data-tag="${esc(t)}"`])];
+  $('lib-filter-n').hidden = !conds.length; $('lib-filter-n').textContent = conds.length;
+  $('lib-active').hidden = !conds.length;
+  $('lib-active').innerHTML = conds.map(([label, attr]) => `<button type="button" class="lib-cond" ${attr} aria-label="${esc(label)} の条件を外す">${esc(label)} <span aria-hidden="true">×</span></button>`).join('');
 }
 /* ラベル（提供形態・提供元）で絞り込む。複数選ぶとすべてを持つものだけ */
 const REF_DOMAINS = ['データ基盤', 'コンテナ基盤', '運用基盤'];
@@ -1687,6 +1692,7 @@ $('viewer-title').textContent = M.name;
 }
 setDimension(st.dimension, false);
 $('lib-rail').addEventListener('click', e => { const b = e.target.closest('[data-lib-domain]'); if (b) selectLibDomain(b.dataset.libDomain); });
+$('lib-active').addEventListener('click', e => { const b = e.target.closest('[data-lib-kind]'); if (b) selectLibKind(''); });
 $('lib-kinds').addEventListener('click', e => { const b = e.target.closest('[data-lib-kind]'); if (b) selectLibKind(b.dataset.libKind); });
 document.addEventListener('click', e => {
   const a = e.target.closest?.('a[data-drill]'); if (!a) return;
