@@ -1,6 +1,6 @@
 {
   "model": "debezium",
-  "name": "Debezium の CDC アーキテクチャ",
+  "name": "Debezium の基本アーキテクチャ",
   "coverage": {
     "covered": 8,
     "total": 8
@@ -13,7 +13,7 @@
     },
     "logical": {
       "type": "node",
-      "label": "論理レプリケーション",
+      "label": "変更ログの公開",
       "status": "claim"
     },
     "connector": {
@@ -48,12 +48,12 @@
     },
     "repl": {
       "type": "link",
-      "label": "変更元の注文 DB → 論理レプリケーション",
+      "label": "変更元の注文 DB → 変更ログの公開",
       "status": "claim"
     },
     "capture": {
       "type": "link",
-      "label": "論理レプリケーション → CDC コネクター",
+      "label": "変更ログの公開 → CDC コネクター",
       "status": "claim"
     },
     "execute": {
@@ -83,11 +83,11 @@
     },
     "initial-cdc": {
       "type": "scenario",
-      "label": "初回同期から継続CDC"
+      "label": "初回同期から継続配信"
     },
     "restart": {
       "type": "scenario",
-      "label": "Connector再起動"
+      "label": "コネクターの再起動"
     },
     "BR-01": {
       "type": "requirement",
@@ -108,13 +108,13 @@
     "aws-connect-eni": {
       "type": "implementation",
       "impl": "aws",
-      "label": "MSK Connect 接続用 ENI",
+      "label": "Connect 用 ENI",
       "realizes": []
     },
     "aws-lambda-eni": {
       "type": "implementation",
       "impl": "aws",
-      "label": "Lambda Hyperplane ENI",
+      "label": "Lambda 用 ENI",
       "realizes": []
     },
     "aws-rds": {
@@ -129,7 +129,7 @@
     "aws-connector": {
       "type": "implementation",
       "impl": "aws",
-      "label": "MSK Connect（Debezium タスク）",
+      "label": "Debezium Source Task",
       "realizes": [
         "connector"
       ]
@@ -137,7 +137,7 @@
     "aws-msk": {
       "type": "implementation",
       "impl": "aws",
-      "label": "Amazon MSK（CDC トピック・オフセット）",
+      "label": "Amazon MSK",
       "realizes": [
         "topic",
         "offset"
@@ -146,13 +146,13 @@
     "aws-event-source": {
       "type": "implementation",
       "impl": "aws",
-      "label": "Lambda（イベントソースマッピング）",
+      "label": "Lambda マッピング",
       "realizes": []
     },
     "aws-lambda": {
       "type": "implementation",
       "impl": "aws",
-      "label": "Lambda（変更処理関数）",
+      "label": "Lambda 関数",
       "realizes": [
         "consumer"
       ]
@@ -160,7 +160,7 @@
     "aws-worker": {
       "type": "implementation",
       "impl": "aws",
-      "label": "MSK Connect（ワーカー管理）",
+      "label": "MSK Connect Worker",
       "realizes": [
         "worker"
       ]
@@ -168,19 +168,19 @@
     "aws-plugin": {
       "type": "implementation",
       "impl": "aws",
-      "label": "S3（プラグインの zip）",
+      "label": "Amazon S3",
       "realizes": []
     },
     "aws-secrets": {
       "type": "implementation",
       "impl": "aws",
-      "label": "Secrets Manager（DB 認証情報）",
+      "label": "Secrets Manager",
       "realizes": []
     },
     "aws-logs": {
       "type": "implementation",
       "impl": "aws",
-      "label": "CloudWatch Logs（ワーカーのログ）",
+      "label": "CloudWatch Logs",
       "realizes": []
     }
   },
@@ -274,10 +274,12 @@
     "order": 20,
     "domain": "データ処理",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "Debezium",
+    "role": "overview",
     "objectives": [
       "初期スナップショットと変更ログ捕捉を区別する。",
-      "Source Connector、Kafka Topic、下流 Consumer の役割を追う。",
-      "オフセットから再開する前提を理解する。"
+      "コネクターの実行基盤とイベント配信先を区別する。",
+      "保存したオフセットから再開する条件を確認する。"
     ],
     "sources": [
       {

@@ -1,7 +1,7 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
 import { Scene3D } from './scene3d.js?v=perf9';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=perf9';
-import { implementation3D, platformFootprint } from './implementation-3d.js';
+import { implementation3D, platformFootprint, platformNeedsMemberBounds } from './implementation-3d.js?v=platform-boundary1';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
 import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=performance-compare1';
 import { NODE_KINDS, nodeShape } from './node-kinds.js';
@@ -12,11 +12,15 @@ import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz3';
 import { productOf, productName, isConcept, shortName, PRODUCT_ALSO } from './products.js?v=4';
-import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=3';
+import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=ingestion1';
 import { drawThumbnail } from './home-thumbnail.js';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 
 const $ = id => document.getElementById(id);
+// 一覧のスクロールは内側の領域で行う。古いブラウザーでも外枠の横ずれを戻す。
+const sidebar = $('sidebar');
+sidebar.addEventListener('scroll', () => { if (sidebar.scrollLeft) sidebar.scrollLeft = 0; });
+sidebar.scrollLeft = 0;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* ================= 設定・ルーティング・データ読込 ================= */
@@ -455,6 +459,7 @@ function projectState(ns, ls) {
   for (const [vid, parts] of Object.entries(P.from)) {
     const s = nsV[vid] = Views.mergeNode(parts.map(p => ns[p]));
     const n = P.nodes[vid];
+    if (n.impl) s.badge = Views.implementationBadge(s.badge, n.replicas);
     if (st.view === 'network' && s.badge?.tone === 'replicas' && n.replicas < 99) s.badge = { text: `${n.replicas}台`, tone: 'replicas' }; // AZ ごとの台数
     if (parts.length > 1 && !s.badge) s.badge = { text: `${parts.length} ${n.impl ? '機能' : '部品'}` };
     if (st.sel && (vid === st.sel || parts.includes(st.sel))) s.outline = true;
@@ -519,17 +524,17 @@ function drawScene() {
       y: f.y, origin: t.kind === 'origin', label: t.label });
   }
   const labeled = new Set();
-  // In the stack view the cloud is one shared footprint beneath the layers,
+  // In the stack view the platform is one shared footprint beneath the layers,
   // rather than a separate cloud rectangle on every floor.
   if (P.platformStack && st.dimension === '3') for (const gr of P.groups || []) {
-    if (gr.kind !== 'cloud' || !showGroup(gr, legendCurrent())) continue;
-    const members = Object.entries(N).filter(([id, n]) => visible(n) && (!gr.nodes || gr.nodes.includes(id)));
+    if (!['cloud', 'datacenter'].includes(gr.kind) || !showGroup(gr, legendCurrent())) continue;
+    const members = Object.entries(N).filter(([id, n]) => visible(n) && (gr.nodes ? gr.nodes.includes(id) : [].concat(gr.tier).includes(n.tier)));
     if (!members.length) continue;
     const points = members.map(([, n]) => W(n.x, n.y, n.tier));
     const ys = points.map(p => p[1]);
     const floors = [...new Set(members.map(([, n]) => n.tier))].map(t => plan.floors.get(t)).filter(Boolean);
-    const multiplePlatforms = (P.groups || []).filter(g => g.kind === 'cloud').length > 1;
-    const [left, right, back, front] = platformFootprint(points, floors, multiplePlatforms);
+    const memberBounds = platformNeedsMemberBounds(P.groups || [], members, Object.entries(N).filter(([, n]) => visible(n)));
+    const [left, right, back, front] = platformFootprint(points, floors, memberBounds);
     const bottom = Math.min(...ys) - 0.18, top = Math.max(...ys) + 2.1;
     const provider = Catalog.PROVIDERS[gr.provider];
     const pts = [[left, back], [right, back], [right, front], [left, front]];
@@ -539,7 +544,7 @@ function drawScene() {
   }
   for (const gr of P.groups || []) for (const t of [].concat(gr.tier)) {
     if (!showGroup(gr, legendCurrent())) continue;
-    if (P.platformStack && st.dimension === '3' && gr.kind === 'cloud') continue;
+    if (P.platformStack && st.dimension === '3' && ['cloud', 'datacenter'].includes(gr.kind)) continue;
     if (st.hidden.has(t) || !P.tiers.some(x => x.id === t)) continue;
     let { x0, y0, x1, y1 } = gr;
     if (![x0, y0, x1, y1].every(Number.isFinite)) {
@@ -785,7 +790,9 @@ async function showCategoryPage({ domain, category }) {
   if (matchMedia('(max-width:1279px)').matches) document.body.classList.remove('nav-open');
 }
 function miniMarkdown(md) {
-  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/\[([^\]]+)\]\(index\.html#\/m\/([a-z0-9-]+)\/struct\)/g, '<a href="#/m/$2/struct">$1</a>');
   const out = [], lines = md.replace(/\r/g, '').split('\n');
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];

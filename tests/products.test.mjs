@@ -27,3 +27,22 @@ test('表にない製品は図の名前から製品名を取り、概念・パ�
   assert.equal(isConcept({ id: 'dwh-star-schema', name: 'DWH', tags: [] }), true);
   assert.equal(isConcept({ id: 'trino', name: 'Trino', tags: ['OSS'] }), false);
 });
+
+test('Databricks の状態管理図は同製品の概要につながる', async () => {
+  const fs = await import('node:fs');
+  const entries = JSON.parse(fs.readFileSync(new URL('../models/registry.json', import.meta.url), 'utf8'));
+  const overview = entries.find(e => e.id === 'databricks');
+  const detail = entries.find(e => e.id === 'databricks-streaming-state-internals');
+  assert.equal(overview.reference.role, 'overview');
+  assert.equal(detail.reference.detailOf, overview.id);
+  assert.equal(detail.reference.role, 'internals');
+  assert.equal(detail.reference.product, overview.reference.product);
+  assert.equal(detail.reference.domain, overview.reference.domain);
+  assert.equal(detail.reference.category, overview.reference.category);
+  const { default: yaml } = await import('js-yaml');
+  const load = id => yaml.load(fs.readFileSync(new URL(`../models/${id}/model.yaml`, import.meta.url), 'utf8'));
+  const parent = load('databricks'), child = load('databricks-streaming-state-internals');
+  assert.deepEqual(child.parent, { model: overview.id, node: 'transform' });
+  assert.equal(parent.nodes.transform.drill, detail.id);
+  assert.notEqual(load('spark-structured-streaming').nodes.state.drill, detail.id);
+});

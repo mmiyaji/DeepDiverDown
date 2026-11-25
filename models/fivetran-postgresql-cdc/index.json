@@ -1,0 +1,219 @@
+{
+  "model": "fivetran-postgresql-cdc",
+  "name": "Fivetran：初回同期と PostgreSQL の WAL",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "同期対象テーブル",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "変更ログと保持位置",
+      "status": "claim"
+    },
+    "initial": {
+      "type": "node",
+      "label": "初回同期",
+      "status": "claim"
+    },
+    "incremental": {
+      "type": "node",
+      "label": "増分同期",
+      "status": "claim"
+    },
+    "cursor": {
+      "type": "node",
+      "label": "同期の進捗位置",
+      "status": "claim"
+    },
+    "target": {
+      "type": "node",
+      "label": "同期先テーブル",
+      "status": "claim"
+    },
+    "historical-read": {
+      "type": "link",
+      "label": "同期対象テーブル → 初回同期",
+      "status": "claim"
+    },
+    "initial-load": {
+      "type": "link",
+      "label": "初回同期 → 同期先テーブル",
+      "status": "claim"
+    },
+    "read-changes": {
+      "type": "link",
+      "label": "変更ログと保持位置 → 増分同期",
+      "status": "claim"
+    },
+    "change-load": {
+      "type": "link",
+      "label": "増分同期 → 同期先テーブル",
+      "status": "claim"
+    },
+    "remember": {
+      "type": "link",
+      "label": "増分同期 → 同期の進捗位置",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "link",
+      "label": "同期の進捗位置 → 増分同期",
+      "status": "claim"
+    },
+    "initial-to-cdc": {
+      "type": "scenario",
+      "label": "履歴のロードから増分反映へ"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "cursor の保存先、コミット順序、失敗時の再試行の細かい境界は公式資料で未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "実際の負荷とネットワーク設定に応じた WAL 保持の監視しきい値は未確認。"
+    },
+    "cdc-rds": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "Amazon RDS for PostgreSQL",
+      "realizes": [
+        "source"
+      ]
+    },
+    "cdc-wal": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "WAL・論理スロット",
+      "realizes": [
+        "log"
+      ]
+    },
+    "cdc-connection": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "Fivetran PostgreSQL 接続",
+      "realizes": [
+        "initial",
+        "incremental"
+      ]
+    },
+    "cdc-cursor": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "接続の進捗位置",
+      "realizes": [
+        "cursor"
+      ]
+    },
+    "cdc-compute": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "Snowflake Warehouse",
+      "realizes": []
+    },
+    "cdc-table": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "同期先の注文テーブル",
+      "realizes": [
+        "target"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-fivetran-postgresql-cdc.md#§1": [
+      "model",
+      "source",
+      "initial",
+      "historical-read",
+      "initial-load"
+    ],
+    "docs/reference-fivetran-postgresql-cdc.md": [
+      "model",
+      "source",
+      "log",
+      "initial",
+      "incremental",
+      "cursor",
+      "target",
+      "historical-read",
+      "initial-load",
+      "read-changes",
+      "change-load",
+      "remember",
+      "resume",
+      "initial-to-cdc",
+      "cdc-rds",
+      "cdc-wal",
+      "cdc-connection",
+      "cdc-cursor",
+      "cdc-compute",
+      "cdc-table"
+    ],
+    "docs/reference-fivetran-postgresql-cdc.md#§2": [
+      "log",
+      "incremental",
+      "read-changes"
+    ],
+    "docs/reference-fivetran-postgresql-cdc.md#§3": [
+      "cursor",
+      "target",
+      "change-load",
+      "remember",
+      "resume"
+    ],
+    "docs/reference-fivetran-postgresql-cdc.md#§4": [
+      "initial-to-cdc"
+    ],
+    "docs/reference-fivetran-postgresql-cdc.md#§5": [
+      "cdc-rds",
+      "cdc-wal",
+      "cdc-connection",
+      "cdc-cursor",
+      "cdc-compute",
+      "cdc-table"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "取り込み",
+    "kind": "仕組みの深掘り",
+    "product": "Fivetran",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "fivetran",
+    "objectives": [
+      "履歴を読む初回同期と、変更ログを読む増分同期を区別する。",
+      "Publication、レプリケーションスロット、cursor の役割を区別する。",
+      "同期が止まったときの WAL 保持と再同期の関係を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Sync Overview",
+        "url": "https://fivetran.com/docs/core-concepts/syncoverview"
+      },
+      {
+        "title": "Fivetran Glossary",
+        "url": "https://fivetran.com/docs/getting-started/glossary#cursor"
+      },
+      {
+        "title": "Fivetran PostgreSQL Connector",
+        "url": "https://fivetran.com/docs/connectors/databases/postgresql"
+      },
+      {
+        "title": "PostgreSQL Connector Setup Guide",
+        "url": "https://fivetran.com/docs/connectors/databases/postgresql/setup-guide"
+      },
+      {
+        "title": "Amazon RDS for PostgreSQL · Logical replication",
+        "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html"
+      }
+    ]
+  }
+}

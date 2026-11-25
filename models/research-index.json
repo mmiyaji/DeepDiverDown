@@ -295,6 +295,14 @@
             {
               "title": "Amazon ECS のサービス定義",
               "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html"
+            },
+            {
+              "title": "Fargate タスクのネットワーク",
+              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+            },
+            {
+              "title": "MSK Provisioned への接続",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html"
             }
           ]
         }
@@ -349,6 +357,14 @@
             {
               "title": "MSK Provisioned クラスターの作成",
               "url": "https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html"
+            },
+            {
+              "title": "Fargate タスクのネットワーク",
+              "url": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html"
+            },
+            {
+              "title": "MSK Provisioned への接続",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html"
             }
           ]
         }
@@ -449,8 +465,8 @@
     },
     {
       "id": "debezium",
-      "name": "Debezium の CDC アーキテクチャ",
-      "description": "PostgreSQL の初期スナップショットと変更ログを CDC イベントとして Kafka へ届ける流れを追います。",
+      "name": "Debezium の基本アーキテクチャ",
+      "description": "既存行と変更ログを CDC イベントとして配信し、保存したオフセットから再開する。",
       "domain": "データ処理",
       "category": "取り込み",
       "kind": "製品・技術のアーキテクチャ",
@@ -459,8 +475,8 @@
       ],
       "objectives": [
         "初期スナップショットと変更ログ捕捉を区別する。",
-        "Source Connector、Kafka Topic、下流 Consumer の役割を追う。",
-        "オフセットから再開する前提を理解する。"
+        "コネクターの実行基盤とイベント配信先を区別する。",
+        "保存したオフセットから再開する条件を確認する。"
       ],
       "documents": [
         "docs/reference-debezium.md"
@@ -478,7 +494,7 @@
       "implementations": [
         {
           "id": "aws",
-          "label": "AWS",
+          "label": "RDS・MSK Connect・Amazon MSK・Lambda",
           "sources": [
             {
               "title": "Working with logical replication（Amazon RDS for PostgreSQL）",
@@ -495,6 +511,18 @@
             {
               "title": "MSK Connect のワーカー",
               "url": "https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-workers.html"
+            },
+            {
+              "title": "MSK Connect の容量モード",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-capacity.html"
+            },
+            {
+              "title": "MSK Connect のサービス実行ロール",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-service-execution-role.html"
+            },
+            {
+              "title": "Debezium PostgreSQL Connector",
+              "url": "https://debezium.io/documentation/reference/3.7/connectors/postgresql.html"
             },
             {
               "title": "MSK Connect のプラグイン",
@@ -519,6 +547,110 @@
             {
               "title": "Lambda の MSK イベントソースのネットワーク",
               "url": "https://docs.aws.amazon.com/lambda/latest/dg/with-msk-cluster-network.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "debezium-snapshot-streaming",
+      "name": "Debezium：初期スナップショットと変更ストリーム",
+      "description": "最初に確保したログ位置から変更ストリームへ切り替え、スナップショット中の変更も取り込む。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS"
+      ],
+      "objectives": [
+        "初期スナップショットの読み取り位置と完了記録を区別する。",
+        "既存行の読み取りと変更ストリームへの切り替えを追う。"
+      ],
+      "documents": [
+        "docs/reference-debezium-snapshot-streaming.md"
+      ],
+      "sources": [
+        {
+          "title": "Debezium PostgreSQL Connector",
+          "url": "https://debezium.io/documentation/reference/3.7/connectors/postgresql.html"
+        },
+        {
+          "title": "Debezium Architecture",
+          "url": "https://debezium.io/documentation/reference/3.7/architecture.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem",
+          "label": "自前の PostgreSQL・Kafka Connect・Kafka",
+          "sources": [
+            {
+              "title": "Debezium PostgreSQL Connector",
+              "url": "https://debezium.io/documentation/reference/3.7/connectors/postgresql.html"
+            },
+            {
+              "title": "Debezium Architecture",
+              "url": "https://debezium.io/documentation/reference/3.7/architecture.html"
+            },
+            {
+              "title": "Kafka Connect User Guide",
+              "url": "https://kafka.apache.org/44/kafka-connect/user-guide/"
+            },
+            {
+              "title": "PostgreSQL Logical Replication Architecture",
+              "url": "https://www.postgresql.org/docs/18/logical-replication-architecture.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "debezium-offset-recovery",
+      "name": "Debezium：オフセットと再起動時の再送",
+      "description": "変更イベントの発行位置と記録済みオフセットの差から、異常終了後に再送される範囲を追う。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS"
+      ],
+      "objectives": [
+        "ソースオフセットと下流の購読位置を区別する。",
+        "ワーカーの異常終了後に同じ変更が発行される条件を確認する。"
+      ],
+      "documents": [
+        "docs/reference-debezium-offset-recovery.md"
+      ],
+      "sources": [
+        {
+          "title": "Debezium PostgreSQL Connector",
+          "url": "https://debezium.io/documentation/reference/3.7/connectors/postgresql.html"
+        },
+        {
+          "title": "Kafka Connect User Guide",
+          "url": "https://kafka.apache.org/44/kafka-connect/user-guide/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem",
+          "label": "自前 PostgreSQL・分散 Kafka Connect・Kafka",
+          "sources": [
+            {
+              "title": "Debezium PostgreSQL Connector",
+              "url": "https://debezium.io/documentation/reference/3.7/connectors/postgresql.html"
+            },
+            {
+              "title": "Kafka Connect User Guide",
+              "url": "https://kafka.apache.org/44/kafka-connect/user-guide/"
+            },
+            {
+              "title": "PostgreSQL Logical Decoding Concepts",
+              "url": "https://www.postgresql.org/docs/18/logicaldecoding-explanation.html"
+            },
+            {
+              "title": "PostgreSQL Logical Replication Architecture",
+              "url": "https://www.postgresql.org/docs/18/logical-replication-architecture.html"
             }
           ]
         }
@@ -777,6 +909,18 @@
             {
               "title": "Spark Standalone Mode",
               "url": "https://spark.apache.org/docs/4.3.0/spark-standalone.html"
+            },
+            {
+              "title": "Spark のクラスターモード",
+              "url": "https://spark.apache.org/docs/4.3.0/cluster-overview.html"
+            },
+            {
+              "title": "Structured Streaming のチェックポイント",
+              "url": "https://spark.apache.org/docs/4.3.0/streaming/apis-on-dataframes-and-datasets.html#recovering-from-failures-with-checkpointing"
+            },
+            {
+              "title": "Structured Streaming の Kafka コネクター",
+              "url": "https://spark.apache.org/docs/4.3.0/streaming/structured-streaming-kafka-integration.html"
             }
           ]
         }
@@ -2145,7 +2289,7 @@
     },
     {
       "id": "snowflake",
-      "name": "Snowflake のクラウドデータ基盤アーキテクチャ",
+      "name": "Snowflake の基本アーキテクチャ",
       "description": "ストレージ、仮想ウェアハウス、クラウドサービスを分離し、取り込み、SQL、ガバナンス、復旧、共有を追う。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
@@ -2196,7 +2340,7 @@
     },
     {
       "id": "databricks",
-      "name": "Databricks レイクハウス参照アーキテクチャ",
+      "name": "Databricks の基本アーキテクチャ",
       "description": "取り込み、Delta テーブルの整備、Unity Catalog、Databricks SQL、共有、機械学習の役割を追う。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
@@ -2384,7 +2528,7 @@
       "implementations": [
         {
           "id": "builder-postgres",
-          "label": "Airbyte Connector Builder と PostgreSQL",
+          "label": "自前 Kubernetes の Connector Builder と PostgreSQL",
           "sources": [
             {
               "title": "Airbyte Protocol",
@@ -2409,6 +2553,18 @@
             {
               "title": "Airbyte Postgres Destination",
               "url": "https://docs.airbyte.com/integrations/destinations/postgres"
+            },
+            {
+              "title": "Connector Builder",
+              "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview"
+            },
+            {
+              "title": "Airbyte プラットフォーム構成",
+              "url": "https://docs.airbyte.com/platform/understanding-airbyte/high-level-view"
+            },
+            {
+              "title": "Airbyte 設定 DB",
+              "url": "https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections"
             }
           ]
         },
@@ -2439,6 +2595,147 @@
             {
               "title": "Postgres Destination",
               "url": "https://docs.airbyte.com/integrations/destinations/postgres"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "airbyte-postgres-cdc",
+      "name": "Airbyte：PostgreSQL の初回スナップショットと CDC",
+      "description": "初回の表読み取りから論理変更ログの読み取りに移り、確定済みの位置から次の同期を再開する。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "商用サービスあり",
+        "Airbyte"
+      ],
+      "objectives": [
+        "初回スナップショットとログ読み取りを区別する",
+        "publication・slot と同期 State の担当を区別する"
+      ],
+      "documents": [
+        "docs/reference-airbyte-postgres-cdc.md"
+      ],
+      "sources": [
+        {
+          "title": "Airbyte Postgres Source",
+          "url": "https://docs.airbyte.com/integrations/sources/postgres"
+        },
+        {
+          "title": "Airbyte CDC",
+          "url": "https://docs.airbyte.com/platform/understanding-airbyte/cdc"
+        },
+        {
+          "title": "Airbyte Protocol",
+          "url": "https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol"
+        },
+        {
+          "title": "PostgreSQL Logical Replication",
+          "url": "https://www.postgresql.org/docs/current/logical-replication.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "self-managed-postgres",
+          "label": "自前 Kubernetes の Airbyte と PostgreSQL",
+          "sources": [
+            {
+              "title": "Airbyte Postgres Source",
+              "url": "https://docs.airbyte.com/integrations/sources/postgres"
+            },
+            {
+              "title": "Airbyte Postgres Destination",
+              "url": "https://docs.airbyte.com/integrations/destinations/postgres"
+            },
+            {
+              "title": "Airbyte CDC",
+              "url": "https://docs.airbyte.com/platform/understanding-airbyte/cdc"
+            },
+            {
+              "title": "Airbyte プラットフォーム構成",
+              "url": "https://docs.airbyte.com/platform/understanding-airbyte/high-level-view"
+            },
+            {
+              "title": "Airbyte 設定 DB",
+              "url": "https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections"
+            },
+            {
+              "title": "Deploy Airbyte",
+              "url": "https://docs.airbyte.com/platform/deploying-airbyte"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "airbyte-connector-builder",
+      "name": "Airbyte：Connector Builder の宣言・試し読み・公開",
+      "description": "HTTP API の認証とページングを宣言し、試し読みを経てワークスペースに公開する。同期ジョブは確定済みのカーソルから再開する。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "商用サービスあり",
+        "Airbyte"
+      ],
+      "objectives": [
+        "宣言の作成と試し読みの流れを追う",
+        "公開済みコネクターと接続・実行時の資格情報を区別する",
+        "HTTP API のカーソルから再開する流れを追う"
+      ],
+      "documents": [
+        "docs/reference-airbyte-connector-builder.md"
+      ],
+      "sources": [
+        {
+          "title": "Airbyte Connector Builder",
+          "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview"
+        },
+        {
+          "title": "Airbyte Connector Builder Tutorial",
+          "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/tutorial"
+        },
+        {
+          "title": "Incremental Sync",
+          "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync"
+        },
+        {
+          "title": "Airbyte Protocol",
+          "url": "https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "kubernetes-http-postgres",
+          "label": "自前 Kubernetes の Connector Builder と PostgreSQL",
+          "sources": [
+            {
+              "title": "Airbyte Connector Builder",
+              "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview"
+            },
+            {
+              "title": "Airbyte Connector Builder Tutorial",
+              "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/tutorial"
+            },
+            {
+              "title": "Incremental Sync",
+              "url": "https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync"
+            },
+            {
+              "title": "Airbyte プラットフォーム構成",
+              "url": "https://docs.airbyte.com/platform/understanding-airbyte/high-level-view"
+            },
+            {
+              "title": "Airbyte Postgres Destination",
+              "url": "https://docs.airbyte.com/integrations/destinations/postgres"
+            },
+            {
+              "title": "Airbyte 設定 DB",
+              "url": "https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections"
             }
           ]
         }
@@ -2484,11 +2781,93 @@
       "implementations": [
         {
           "id": "postgres-snowflake",
-          "label": "RDS PostgreSQL → Fivetran SaaS → Snowflake",
+          "label": "RDS for PostgreSQL・Fivetran SaaS・Snowflake",
           "sources": [
             {
-              "title": "Get Started with Fivetran",
-              "url": "https://fivetran.com/docs/getting-started/quickstart"
+              "title": "PostgreSQL Connector Setup Guide",
+              "url": "https://fivetran.com/docs/connectors/databases/postgresql/setup-guide"
+            },
+            {
+              "title": "Amazon RDS for PostgreSQL · Logical replication",
+              "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html"
+            },
+            {
+              "title": "Snowflake Destination Setup Guide",
+              "url": "https://fivetran.com/docs/destinations/snowflake/setup-guide"
+            },
+            {
+              "title": "Fivetran Transformations for dbt",
+              "url": "https://fivetran.com/docs/transformations/dbt"
+            },
+            {
+              "title": "Transformations for dbt Setup Guide",
+              "url": "https://fivetran.com/docs/transformations/dbt/setup-guide"
+            },
+            {
+              "title": "GitHub Docs · Managing deploy keys",
+              "url": "https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fivetran-postgresql-cdc",
+      "name": "Fivetran：初回同期と PostgreSQL の WAL",
+      "description": "初回同期で履歴を取り込み、論理レプリケーションで変更を読み、次回の同期に進むまで。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "商用サービス",
+        "Fivetran"
+      ],
+      "objectives": [
+        "履歴を読む初回同期と、変更ログを読む増分同期を区別する。",
+        "Publication、レプリケーションスロット、cursor の役割を区別する。",
+        "同期が止まったときの WAL 保持と再同期の関係を説明する。"
+      ],
+      "documents": [
+        "docs/reference-fivetran-postgresql-cdc.md"
+      ],
+      "sources": [
+        {
+          "title": "Sync Overview",
+          "url": "https://fivetran.com/docs/core-concepts/syncoverview"
+        },
+        {
+          "title": "Fivetran Glossary",
+          "url": "https://fivetran.com/docs/getting-started/glossary#cursor"
+        },
+        {
+          "title": "Fivetran PostgreSQL Connector",
+          "url": "https://fivetran.com/docs/connectors/databases/postgresql"
+        },
+        {
+          "title": "PostgreSQL Connector Setup Guide",
+          "url": "https://fivetran.com/docs/connectors/databases/postgresql/setup-guide"
+        },
+        {
+          "title": "Amazon RDS for PostgreSQL · Logical replication",
+          "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "postgres-snowflake",
+          "label": "RDS for PostgreSQL の WAL を Snowflake に同期",
+          "sources": [
+            {
+              "title": "Fivetran PostgreSQL Connector",
+              "url": "https://fivetran.com/docs/connectors/databases/postgresql"
+            },
+            {
+              "title": "PostgreSQL Connector Setup Guide",
+              "url": "https://fivetran.com/docs/connectors/databases/postgresql/setup-guide"
+            },
+            {
+              "title": "Amazon RDS for PostgreSQL · Logical replication",
+              "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html"
             },
             {
               "title": "Sync Overview",
@@ -2496,31 +2875,85 @@
             },
             {
               "title": "Fivetran Glossary",
-              "url": "https://fivetran.com/docs/getting-started/glossary"
+              "url": "https://fivetran.com/docs/getting-started/glossary#cursor"
             },
             {
-              "title": "Supported Destinations",
-              "url": "https://fivetran.com/docs/destinations"
+              "title": "Snowflake Destination Setup Guide",
+              "url": "https://fivetran.com/docs/destinations/snowflake/setup-guide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fivetran-dbt-integrated-scheduling",
+      "name": "Fivetran：ロード後の dbt と連動スケジュール",
+      "description": "取り込みの成功を待ってホスト型 dbt ジョブを起動し、変換 SQL を同期先で実行する流れ。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "商用サービス",
+        "Fivetran"
+      ],
+      "objectives": [
+        "ロード、ジョブの起動、変換 SQL の実行場所を区別する。",
+        "同期と変換の依存関係が実行順に与える影響を説明する。",
+        "プロジェクトの読取権限と、同期先に対する変換の権限を区別する。"
+      ],
+      "documents": [
+        "docs/reference-fivetran-dbt-integrated-scheduling.md"
+      ],
+      "sources": [
+        {
+          "title": "Fivetran Transformations for dbt",
+          "url": "https://fivetran.com/docs/transformations/dbt"
+        },
+        {
+          "title": "Fivetran Transformation Scheduling",
+          "url": "https://fivetran.com/docs/transformations/transformation-scheduling"
+        },
+        {
+          "title": "Transformations for dbt Setup Guide",
+          "url": "https://fivetran.com/docs/transformations/dbt/setup-guide"
+        },
+        {
+          "title": "GitHub Docs · Managing deploy keys",
+          "url": "https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys"
+        },
+        {
+          "title": "Snowflake Destination Setup Guide",
+          "url": "https://fivetran.com/docs/destinations/snowflake/setup-guide"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "postgres-snowflake",
+          "label": "RDS・Fivetran SaaS・GitHub.com・Snowflake",
+          "sources": [
+            {
+              "title": "PostgreSQL Connector Setup Guide",
+              "url": "https://fivetran.com/docs/connectors/databases/postgresql/setup-guide"
             },
             {
-              "title": "Fivetran PostgreSQL Connector",
-              "url": "https://fivetran.com/docs/connectors/databases/postgresql"
-            },
-            {
-              "title": "Fivetran Snowflake destination",
-              "url": "https://fivetran.com/docs/destinations/snowflake"
+              "title": "Snowflake Destination Setup Guide",
+              "url": "https://fivetran.com/docs/destinations/snowflake/setup-guide"
             },
             {
               "title": "Fivetran Transformations for dbt",
               "url": "https://fivetran.com/docs/transformations/dbt"
             },
             {
-              "title": "PostgreSQL setup guide",
-              "url": "https://fivetran.com/docs/connectors/databases/postgresql/setup-guide"
+              "title": "Transformations for dbt Setup Guide",
+              "url": "https://fivetran.com/docs/transformations/dbt/setup-guide"
             },
             {
-              "title": "Snowflake destination setup",
-              "url": "https://fivetran.com/docs/destinations/snowflake/setup-guide"
+              "title": "Fivetran Transformation Scheduling",
+              "url": "https://fivetran.com/docs/transformations/transformation-scheduling"
+            },
+            {
+              "title": "GitHub Docs · Managing deploy keys",
+              "url": "https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys"
             }
           ]
         }
@@ -5550,6 +5983,96 @@
       ]
     },
     {
+      "id": "postgresql",
+      "name": "PostgreSQL の基本アーキテクチャ",
+      "description": "SQL を処理する接続ごとのプロセスと、テーブル・先行書き込みログ・変更配信の関係を追う。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "製品・技術のアーキテクチャ",
+      "tags": [
+        "OSS",
+        "PostgreSQL"
+      ],
+      "objectives": [
+        "接続の受付と SQL を実行するプロセスの役割を区別する。",
+        "共有バッファー、データファイル、先行書き込みログの関係を説明する。",
+        "コミット済み変更を論理レプリケーションで配信する経路を追う。"
+      ],
+      "documents": [
+        "docs/reference-postgresql.md"
+      ],
+      "sources": [
+        {
+          "title": "PostgreSQL 18 Architectural Fundamentals",
+          "url": "https://www.postgresql.org/docs/18/tutorial-arch.html"
+        },
+        {
+          "title": "PostgreSQL 18 Write-Ahead Logging",
+          "url": "https://www.postgresql.org/docs/18/wal-intro.html"
+        },
+        {
+          "title": "PostgreSQL 18 Logical Replication Architecture",
+          "url": "https://www.postgresql.org/docs/18/logical-replication-architecture.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem",
+          "label": "自前 Linux ホストの PostgreSQL 18",
+          "sources": [
+            {
+              "title": "PostgreSQL 18 Architectural Fundamentals",
+              "url": "https://www.postgresql.org/docs/18/tutorial-arch.html"
+            },
+            {
+              "title": "PostgreSQL 18 pg_ctl",
+              "url": "https://www.postgresql.org/docs/18/app-pg-ctl.html"
+            },
+            {
+              "title": "PostgreSQL 18 pg_hba.conf",
+              "url": "https://www.postgresql.org/docs/18/auth-pg-hba-conf.html"
+            },
+            {
+              "title": "PostgreSQL 18 Password Authentication",
+              "url": "https://www.postgresql.org/docs/18/auth-password.html"
+            },
+            {
+              "title": "PostgreSQL 18 Secure TCP/IP Connections",
+              "url": "https://www.postgresql.org/docs/18/ssl-tcp.html"
+            },
+            {
+              "title": "PostgreSQL 18 Database File Layout",
+              "url": "https://www.postgresql.org/docs/18/storage-file-layout.html"
+            },
+            {
+              "title": "PostgreSQL 18 Resource Consumption",
+              "url": "https://www.postgresql.org/docs/18/runtime-config-resource.html"
+            },
+            {
+              "title": "PostgreSQL 18 WAL Configuration",
+              "url": "https://www.postgresql.org/docs/18/wal-configuration.html"
+            },
+            {
+              "title": "PostgreSQL 18 Logical Replication Architecture",
+              "url": "https://www.postgresql.org/docs/18/logical-replication-architecture.html"
+            },
+            {
+              "title": "PostgreSQL 18 Logical Replication Security",
+              "url": "https://www.postgresql.org/docs/18/logical-replication-security.html"
+            },
+            {
+              "title": "PostgreSQL 18 Logical Replication Settings",
+              "url": "https://www.postgresql.org/docs/18/logical-replication-config.html"
+            },
+            {
+              "title": "PostgreSQL 18 Logical Streaming Replication Protocol",
+              "url": "https://www.postgresql.org/docs/18/protocol-logical-replication.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "postgresql-logical-decoding",
       "name": "PostgreSQL の論理デコーディング：WAL・スロット・再開",
       "description": "コミット済みの注文更新が WAL から CDC イベントに変わる過程と、スロット・コネクタの進捗から再開する条件を追う。",
@@ -5644,6 +6167,88 @@
             {
               "title": "Amazon RDS の CloudWatch メトリクス",
               "url": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "postgresql-snapshot-handoff",
+      "name": "PostgreSQL：スナップショットと変更配信の引き継ぎ",
+      "description": "同じ境界に対応するスナップショットと配信開始位置を使い、初回コピーから変更ストリームへ移る条件を追う。",
+      "domain": "データ処理",
+      "category": "取り込み",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "PostgreSQL"
+      ],
+      "objectives": [
+        "初回コピーの可視性と変更配信の開始位置がどう対応するかを説明する。",
+        "別の SQL トランザクションにスナップショットを渡せる条件を確認する。",
+        "コピーの完了後に同じ論理スロットを使う理由を説明する。"
+      ],
+      "documents": [
+        "docs/reference-postgresql-snapshot-handoff.md"
+      ],
+      "sources": [
+        {
+          "title": "PostgreSQL 18 Exported Snapshots",
+          "url": "https://www.postgresql.org/docs/18/logicaldecoding-explanation.html#LOGICALDECODING-EXPORTED-SNAPSHOTS"
+        },
+        {
+          "title": "PostgreSQL 18 Streaming Replication Protocol",
+          "url": "https://www.postgresql.org/docs/18/protocol-replication.html"
+        },
+        {
+          "title": "PostgreSQL 18 SET TRANSACTION",
+          "url": "https://www.postgresql.org/docs/18/sql-set-transaction.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem",
+          "label": "PostgreSQL 18・pg_dump・論理配信クライアント",
+          "sources": [
+            {
+              "title": "PostgreSQL 18 Exported Snapshots",
+              "url": "https://www.postgresql.org/docs/18/logicaldecoding-explanation.html#LOGICALDECODING-EXPORTED-SNAPSHOTS"
+            },
+            {
+              "title": "PostgreSQL 18 Streaming Replication Protocol",
+              "url": "https://www.postgresql.org/docs/18/protocol-replication.html"
+            },
+            {
+              "title": "PostgreSQL 18 SET TRANSACTION",
+              "url": "https://www.postgresql.org/docs/18/sql-set-transaction.html"
+            },
+            {
+              "title": "PostgreSQL 18 pg_dump",
+              "url": "https://www.postgresql.org/docs/18/app-pgdump.html"
+            },
+            {
+              "title": "PostgreSQL 18 libpq Connection Control",
+              "url": "https://www.postgresql.org/docs/18/libpq-connect.html"
+            },
+            {
+              "title": "PostgreSQL 18 Logical Streaming Replication Protocol",
+              "url": "https://www.postgresql.org/docs/18/protocol-logical-replication.html"
+            },
+            {
+              "title": "PostgreSQL 18 Logical Replication Security",
+              "url": "https://www.postgresql.org/docs/18/logical-replication-security.html"
+            },
+            {
+              "title": "PostgreSQL 18 pg_hba.conf",
+              "url": "https://www.postgresql.org/docs/18/auth-pg-hba-conf.html"
+            },
+            {
+              "title": "PostgreSQL 18 Password Authentication",
+              "url": "https://www.postgresql.org/docs/18/auth-password.html"
+            },
+            {
+              "title": "PostgreSQL 18 Replication Slots",
+              "url": "https://www.postgresql.org/docs/18/view-pg-replication-slots.html"
             }
           ]
         }
@@ -7165,11 +7770,11 @@
     },
     {
       "id": "snowflake-ingestion-cdc",
-      "name": "Snowflake の取り込みと増分処理",
+      "name": "Snowflake：取り込みと増分処理",
       "description": "注文ファイルと行ストリームの取り込みから、Streams／Tasks または Dynamic Tables で増分を整える。",
-      "domain": "データ処理",
-      "category": "取り込み",
-      "kind": "製品・技術のアーキテクチャ",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Snowflake"
@@ -7227,6 +7832,18 @@
             {
               "title": "Snowpipe Streaming SDK の接続と認証",
               "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-configurations"
+            },
+            {
+              "title": "Snowpipe Streaming のアクセス制御",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-access-control"
+            },
+            {
+              "title": "Named Channels とオフセットトークン",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-channels"
+            },
+            {
+              "title": "Snowpipe Streaming の PIPE 定義",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-pipe-object"
             },
             {
               "title": "Dynamic Table 更新用 Warehouse",
@@ -10757,6 +11374,10 @@
               "url": "https://docs.risingwave.com/deploy/risingwave-docker-compose"
             },
             {
+              "title": "RisingWave · docker-compose-distributed.yml",
+              "url": "https://github.com/risingwavelabs/risingwave/blob/main/docker/docker-compose-distributed.yml"
+            },
+            {
               "title": "RisingWave · Hardware requirements",
               "url": "https://docs.risingwave.com/deploy/hardware-requirements"
             },
@@ -14205,19 +14826,19 @@
     },
     {
       "id": "snowflake-snowpipe-streaming-internals",
-      "name": "Snowpipe Streaming：バッファからテーブルへの取り込み",
-      "description": "高性能アーキテクチャで受信、バッファ、サーバーレスジョブ、pre-clustering を追う。2025年の記事を基にした論理図。",
-      "domain": "データ処理",
-      "category": "取り込み",
+      "name": "Snowflake：Snowpipe Streaming の受信と取り込み",
+      "description": "高性能アーキテクチャの公開資料に基づき、受信した行がバッファとサーバーレスジョブを経てテーブルに反映されるまでを追う。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
       "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Snowflake"
       ],
       "objectives": [
-        "高性能アーキテクチャで受信、バッファ、サーバーレスジョブ、pre-clustering を追う。2025年の記事を基にした論理図。",
-        "SDK または REST から行を受信して認証し、バッファに振り分ける。",
-        "負荷を観測し、Assigner が振り分け先を調整する。"
+        "受信、バッファ、サーバーレスジョブの役割を区別する。",
+        "利用者が設定する PIPE と取り込み処理の関係を説明する。",
+        "取り込み時の処理とコミット後の SQL 照会を区別する。"
       ],
       "documents": [
         "docs/reference-snowflake-snowpipe-streaming-internals.md"
@@ -14243,23 +14864,39 @@
       "implementations": [
         {
           "id": "snowflake",
-          "label": "Snowflake の実装例",
+          "label": "注文イベントを Snowpipe Streaming で取り込み、SQL で読む",
           "sources": [
             {
-              "title": "次世代 Snowpipe Streaming の内部構造",
+              "title": "Snowpipe Streaming engineering architecture",
               "url": "https://www.snowflake.com/en/blog/engineering/next-gen-snowpipe-streaming-architecture/"
             },
             {
-              "title": "Snowpipe Streaming の現行仕様",
-              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
+              "title": "The PIPE object",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-pipe-object"
             },
             {
-              "title": "Kafka から Iceberg へ",
-              "url": "https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/"
+              "title": "CREATE PIPE",
+              "url": "https://docs.snowflake.com/en/sql-reference/sql/create-pipe"
             },
             {
-              "title": "取り込み設計と性能",
-              "url": "https://www.snowflake.com/en/blog/engineering/efficient-snowflake-ingestion-query-ready/"
+              "title": "Snowpipe Streaming access control",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-access-control"
+            },
+            {
+              "title": "Snowpipe Streaming configuration",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-configurations"
+            },
+            {
+              "title": "Snowpipe Streaming with Iceberg tables",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-iceberg"
+            },
+            {
+              "title": "Named Channels and exactly-once delivery",
+              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-channels"
+            },
+            {
+              "title": "Overview of warehouses",
+              "url": "https://docs.snowflake.com/en/user-guide/warehouses-overview"
             }
           ]
         }
@@ -14269,8 +14906,8 @@
       "id": "databricks-streaming-state-internals",
       "name": "Databricks：RocksDB 状態とチェックポイント",
       "description": "状態付き Structured Streaming の RocksDB、差分チェックポイント、障害復旧を追う。",
-      "domain": "データ処理",
-      "category": "ストリーム処理",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
       "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
@@ -14304,10 +14941,6 @@
         {
           "title": "Databricks コンピュート",
           "url": "https://docs.databricks.com/aws/en/compute/"
-        },
-        {
-          "title": "Unity Catalog 管理ストレージ",
-          "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
         }
       ],
       "implementations": [
@@ -14332,12 +14965,36 @@
               "url": "https://docs.databricks.com/aws/en/structured-streaming/async-checkpointing"
             },
             {
-              "title": "Databricks コンピュート",
-              "url": "https://docs.databricks.com/aws/en/compute/"
+              "title": "Databricks on AWS のアーキテクチャ",
+              "url": "https://docs.databricks.com/aws/en/getting-started/high-level-architecture"
             },
             {
-              "title": "Unity Catalog 管理ストレージ",
-              "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
+              "title": "クラシックコンピュートの設定",
+              "url": "https://docs.databricks.com/aws/en/compute/configure"
+            },
+            {
+              "title": "本番向け Structured Streaming のジョブ設定",
+              "url": "https://docs.databricks.com/aws/en/structured-streaming/production"
+            },
+            {
+              "title": "Lakeflow Jobs の継続実行",
+              "url": "https://docs.databricks.com/aws/en/jobs/continuous"
+            },
+            {
+              "title": "Apache Kafka への接続",
+              "url": "https://docs.databricks.com/aws/en/connect/streaming/kafka"
+            },
+            {
+              "title": "Spark Structured Streaming の Kafka コネクター",
+              "url": "https://spark.apache.org/docs/latest/streaming/structured-streaming-kafka-integration.html"
+            },
+            {
+              "title": "Delta テーブルのストリーミング書き込み",
+              "url": "https://docs.databricks.com/aws/en/structured-streaming/delta-lake"
+            },
+            {
+              "title": "Amazon S3 の責任共有モデル",
+              "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/security.html"
             }
           ]
         }
@@ -14677,10 +15334,10 @@
     },
     {
       "id": "snowflake-kafka-iceberg-streaming",
-      "name": "Kafka から Snowflake 管理 Iceberg への取り込み",
+      "name": "Snowflake：Kafka から管理 Iceberg への取り込み",
       "description": "Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。",
-      "domain": "データ処理",
-      "category": "取り込み",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
       "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
@@ -14689,7 +15346,7 @@
       "objectives": [
         "Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。",
         "既存 Kafka と Connect からイベントを送信する。",
-        "PIPE で検証・対応する変換を行い、失敗は設定したログで確認する。"
+        "取り込みと検証の役割を追い、拒否された行の保存先を確認する。"
       ],
       "documents": [
         "docs/reference-snowflake-kafka-iceberg-streaming.md"
@@ -14706,6 +15363,10 @@
         {
           "title": "Snowpipe Streaming",
           "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
+        },
+        {
+          "title": "Kafka Connector の Iceberg 取り込み",
+          "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg"
         }
       ],
       "implementations": [
@@ -14724,6 +15385,18 @@
             {
               "title": "Snowpipe Streaming",
               "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
+            },
+            {
+              "title": "Kafka Connector の設定と認証",
+              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/setup-kafka"
+            },
+            {
+              "title": "Iceberg テーブルのストレージ",
+              "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-storage"
+            },
+            {
+              "title": "Kafka Connector の Iceberg 取り込み",
+              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg"
             }
           ]
         }

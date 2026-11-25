@@ -1,4 +1,4 @@
-# Kafka から Snowflake 管理 Iceberg への取り込み
+# Snowflake：Kafka から管理 Iceberg への取り込み
 
 ## 1. 対象と前提
 
@@ -10,7 +10,7 @@ Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg �
 - **イベントログ**：イベントをトピックに保持する。
 - **外部の接続処理**：トピックを購読し、Snowpipe Streaming を使って対象表に送信する。
 - **取り込みと検証**：受信し PIPE の定義に従って検証や対応する変換を行う。
-- **エラーの確認**：サーバー側で拒否された行は設定したエラーログで確認する。
+- **行エラーの記録**：行エラーの記録を有効にした場合に、取り込み中に拒否された行を保持する。
 - **テーブル書き込み**：受信データから Iceberg 互換のデータファイルとメタデータを作る。
 - **Iceberg メタデータ**：スナップショットやファイルの情報を保持する。
 - **データファイル**：Parquet データを保持し、管理テーブルの compaction がファイル配置を保守する。
@@ -19,7 +19,7 @@ Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg �
 ## 3. 処理の流れ
 
 1. 既存 Kafka と Connect からイベントを送信する。
-2. PIPE で検証・対応する変換を行い、失敗は設定したログで確認する。
+2. PIPE で検証と変換を行う。取り込み中に拒否された行はエラーテーブルで確認する。
 3. Snowflake が管理 Iceberg のファイルとメタデータを作り、SQL で参照する。
 
 Snowflake Connector for Kafka v4 は既存 Kafka Connect ランタイム上で動き、Snowpipe Streaming に取り込みを委ねる。Snowflake は管理 Iceberg テーブルの Parquet とメタデータ、compaction を管理する。サーバー側の検証エラーと、レコード変換時に Kafka Connect 側で起きるエラーは発生場所が異なる。
@@ -30,22 +30,26 @@ Snowflake Connector for Kafka v4 は既存 Kafka Connect ランタイム上で�
 
 ## 5. 実装例
 
-既存の Kafka と Kafka Connect を利用者が運用し、Snowflake Connector v4 から Snowflake 管理 Iceberg テーブルへ取り込む公式記事の構成。Snowflake が取り込みと管理表のファイル・メタデータを保守する。Kafka や Connect の基盤は既存環境であり所在を推測しない。
+この例では、利用者が管理するデータセンターの別々の Linux ホストで Kafka と Kafka Connect を運用する。Snowflake Connector v4 はサーバー側検証を使い、事前作成した Snowflake 管理 Iceberg テーブルにイベントを追記する。`EXTERNAL_VOLUME = SNOWFLAKE_MANAGED` で Snowflake 提供のストレージを選び、テーブルで `ERROR_LOGGING = TRUE` を設定する。図の Snowflake アカウント枠はサービスとファイルの論理的な所属を示す。コネクター用の Snowflake ユーザーとロールには、対象テーブルへの取り込みに必要な権限を与える。認証方式は鍵ペアを選ぶ。ホストの配置は説明用の仮定である。鍵管理、ネットワーク経路、コネクターと Kafka のバージョンの組み合わせは未検証である。
 
 | 機能 | 担い手 |
 | --- | --- |
 | イベント送信元 | 注文アプリケーション |
 | イベントログ | 既存 Kafka トピック |
 | 外部の接続処理 | Kafka Connect と Snowflake Connector v4 |
-| 取り込みと検証 | Snowpipe Streaming と PIPE |
-| エラーの確認 | Snowflake のエラーログ |
+| 取り込みと検証 | Snowpipe Streaming と、利用者が設定する名前付き PIPE |
+| 行エラーの記録 | Snowflake のエラーテーブル |
 | テーブル書き込み | Snowflake 管理 Iceberg の書き込み |
 | Iceberg メタデータ | 管理 Iceberg メタデータ |
 | データファイル | 管理 Iceberg の Parquet |
-| SQL による参照 | Snowflake SQL |
+| SQL による参照 | SQL 利用者が送るクエリを Snowflake Warehouse で実行 |
 
 ## 公式資料
 
 - [Kafka topics を Iceberg に取り込む](https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/)
 - [Snowflake Connector for Kafka](https://docs.snowflake.com/en/user-guide/kafka-connector)
 - [Snowpipe Streaming](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview)
+
+- [Kafka Connector の設定と認証](https://docs.snowflake.com/en/user-guide/kafka-connector/setup-kafka)
+- [Iceberg テーブルのストレージ](https://docs.snowflake.com/en/user-guide/tables-iceberg-storage)
+- [Kafka Connector の Iceberg 取り込み](https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg)

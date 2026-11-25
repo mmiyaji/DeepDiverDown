@@ -51,7 +51,7 @@ for (const { id, model } of loadModels()) {
       if (service.icon && (!icon || !fs.existsSync(path.join(ROOT, icon)))) {
         missingIcons++; missing.push(nodeId + ': アイコン未配置 ' + service.id);
       }
-      if (!['aws', 'gcp', 'azure', 'oci', 'databricks', 'snowflake', 'fabric', 'purview'].includes(service.provider) || service.id === 'aws:github') continue;
+      if (!['aws', 'gcp', 'azure', 'oci', 'databricks', 'snowflake', 'fabric', 'purview', 'fivetran', 'github'].includes(service.provider) || service.id === 'aws:github') continue;
       const inBoundary = groups.some(group => group.kind === 'cloud' &&
         (group.provider === service.provider || (!group.provider && group.label?.toLowerCase().includes(service.provider))) &&
         (!group.tier || [].concat(group.tier).includes(node.tier)) && (!group.nodes || group.nodes.includes(nodeId)));

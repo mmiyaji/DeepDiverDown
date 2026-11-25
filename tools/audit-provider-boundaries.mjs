@@ -4,7 +4,7 @@
 import { loadAnalyze, loadModels } from './load.mjs';
 
 // 提供元の領域として枠で囲むべき提供元（オンプレや Kubernetes 自体は対象外）
-export const BOUNDARY_PROVIDERS = new Set(['aws', 'gcp', 'azure', 'oci', 'cloudflare', 'databricks', 'snowflake', 'fabric']);
+export const BOUNDARY_PROVIDERS = new Set(['aws', 'gcp', 'azure', 'oci', 'cloudflare', 'databricks', 'snowflake', 'fabric', 'fivetran', 'github']);
 
 export function providerBoundaryIssues(model, Catalog) {
   const issues = [];

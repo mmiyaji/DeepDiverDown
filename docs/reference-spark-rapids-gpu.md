@@ -38,14 +38,16 @@ GPU 対応状況、Spark・CUDA・ドライバーの互換性は対象リリー�
 
 ## 4. 実装例：Spark Standalone
 
-自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。図中の対応は以下の通り。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
+自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
 
-- SQL / DataFrame：クラスター外のクライアント・ストレージ等。
-- Spark 物理計画：Spark Driver 側。
-- RAPIDS plugin：Spark Executor 側。
-- GPU と device memory：Spark Executor 側。
-- CPU fallback：Spark Executor 側。
-- CPU / GPU データ転送：Spark Executor 側。
-- 結果と診断：クラスター外のクライアント・ストレージ等。
+| 機能配置 | 実装例の部品 |
+| --- | --- |
+| SQL / DataFrame | SQL / DataFrame |
+| Spark 物理計画 | Driver：Spark 物理計画 |
+| RAPIDS plugin | Executor：RAPIDS plugin |
+| GPU と device memory | Executor：GPU と device memory |
+| CPU fallback | Executor：CPU fallback |
+| CPU / GPU データ転送 | Executor：CPU / GPU データ転送 |
+| 結果と診断 | 結果と診断 |
 
 公式資料：[RAPIDS Accelerator Overview](https://docs.nvidia.com/spark-rapids/user-guide/24.12/getting-started/overview.html)、[RAPIDS Accelerator FAQ](https://docs.nvidia.com/spark-rapids/user-guide/24.12/faq.html)、[Spark Resource Configuration](https://spark.apache.org/docs/4.3.0/configuration.html)。

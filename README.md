@@ -147,7 +147,9 @@ node tools/fetch-provider-icons.mjs
 npm run icons
 ```
 
-Oracle Cloud のアイコンは同じコマンドで公式の SVG 配布物から取得します。一部のサービス固有アイコンは配布物で確認できず、略称表示になります。Cloudflare の製品アイコンも公式リポジトリから取得します。
+Oracle Cloud のアイコンは同じコマンドで公式の SVG 配布物から取得します。一部のサービス固有アイコンは配布物で確認できず、略称表示になります。Cloudflare の製品アイコンも公式リポジトリから取得します。 Fivetran・GitHub・PostgreSQL は公式ブランド素材の配布元を確認していますが、このサイトでの取得・利用条件は未確認のため、略称で表示します。
+
+Airbyte のロゴの利用条件は未確認です。Airbyte Server、Connector Builder、各コネクターは略称と汎用記号で表示します。図の実行環境は Kubernetes や AWS などの枠で示します。[Airbyte Media Kit](https://airbyte.com/company/press)
 
 Snowflake の Warehouse、Task、Pipe、Stream、Database、Dynamic Tables、Horizon、Cortex などのアイコンは、公式ブランドガイドの PowerPoint テンプレートから変換します。変換には Windows と Microsoft PowerPoint が必要です。PowerPoint を使用中の場合は他のプレゼンテーションを保護するため変換を省略します。変換できない場合は Snowflake の製品ロゴを表示します。
 

@@ -4,9 +4,8 @@
 
 ## ブランチと公開
 
-- 作業ブランチは `feature/design-tune`（Cloudflare 公開版 = origin/main の 961d156 から作成）。既定ブランチへ直接コミットしない。push・マージ・公開はユーザーの許可を得てから。
+- 作業ブランチは `feature/design-tune`（origin/main の c3b7b7b を起点とする作業）。既定ブランチへ直接コミットしない。push・マージ・公開はユーザーの許可を得てから。
 - コミットの種類は add / update / fix / refactor。Co-Authored-By は付けない。日本語で簡潔に答える。
-- 改善案は番号付きで出し、ユーザーに選んでもらってから実装する。
 - 確認用サーバー：`python -m http.server 8131 --bind 0.0.0.0`（D:\git\DeepDiverDown）。URL は http://192.168.11.34:8131/index.html 。ユーザーは iPad の Chrome でも見る（Safari と同じエンジン。CSS の新機能は効かないことがある）。
 
 ## 決まったこと（画面）
@@ -21,18 +20,20 @@
 
 | 分類 | 状態 |
 | --- | --- |
-| バッチ・SQL エンジン（Spark・Trino・DuckDB・ClickHouse） | 済。比較表 docs/category-batch-sql.md |
-| ストリーム処理（Kafka・Flink・RisingWave・Apicurio Registry、Spark の streaming 3 つ） | 済。比較表 docs/category-stream.md |
-| ほかの分類 | 未着手。古い図は推定（js/products.js）で製品に振り分けて表示している |
+| バッチ・SQL エンジン | Spark・Trino・DuckDB・ClickHouse の図と比較表を点検。`docs/category-batch-sql.md` |
+| ストリーム処理 | Kafka・Flink・RisingWave・Apicurio Registry・Spark の図と比較表を点検。`docs/category-stream.md` |
+| 取り込み | Debezium・Airbyte・Fivetran・PostgreSQL の概要と詳細図を整理。比較表は `docs/category-ingestion.md` |
+| クラウド分析基盤 | Databricks と Snowflake の関連図を同じ製品に整理。ほかの製品は未点検 |
+| ほかの分類 | 未着手の図がある。古い図は `js/products.js` で製品を推定している |
 
-未確認のまま残っている点：新しい図の 2D・3D の配置と見た目（画面の撮影ができず確認していない）。ユーザーに見てもらうか、Browser の操作で確認する。
+バッチ・SQL とストリーム処理の対象はデスクトップの 2D・3D を確認した。3D の初期表示では重なりを避けるため一部ラベルが非表示になる。物理 iPad の Safari と、すべてのカメラ角度は未確認。取り込み分類は追加図の 2D・3D と選択を確認し、変更したモデルの提供元境界点検を通過した。モデル点検には台数未記載の警告が残る。
 
 ## 作業の約束（トークンを節約する）
 
-- 取りまとめ役は Sonnet。調査・作図は Sonnet のエージェント、枠の追加のような機械的修正は Haiku。1 エージェント 1 製品。
+- 必要に応じて作業を分担し、変更箇所の重複を避ける。
 - 1 製品あたり概要 1 つ＋仕組み 2〜3 つまで。
 - エージェントの作業用ファイルは `scratchpad/<製品名>/` に分け、共有フォルダで上書きし合わない。
-- エージェントには registry.json・js/・css/・tests/ を触らせない。登録内容は JSON で受け取り、取りまとめ役が反映して `node tools/build-index.mjs`。
+- 複数人で作業する場合は registry や共通コードの編集担当を決め、最後に `node tools/build-index.mjs` を実行する。
 - 完了条件：`node tools/gates.mjs <id>`（台数の警告以外は合格）、`node tools/audit-provider-boundaries.mjs <id>`（問題なし）、`npm test`（全件合格）、分類ページで確認。
 - 比較表は取りまとめ役が書き、`js/categories.js` の `CATEGORY_DOCS` に登録する。書き方は reference-structure.md の「比較表」と「文章の書き方」に従う（特徴の行、太字は違いの語だけ、AI っぽい文を避ける）。
 - ファイル編集は CRLF に注意。node スクリプトで編集するときは `\r\n` を考慮し、正規表現の `\` がシェルで消えないよう、スクリプトは Write で作ってから実行する。

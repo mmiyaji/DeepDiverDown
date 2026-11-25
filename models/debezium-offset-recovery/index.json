@@ -1,0 +1,226 @@
+{
+  "model": "debezium-offset-recovery",
+  "name": "Debezium：オフセットと再起動時の再送",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "logs": {
+      "type": "node",
+      "label": "変更ログ",
+      "status": "claim"
+    },
+    "runtime": {
+      "type": "node",
+      "label": "コネクター実行基盤",
+      "status": "claim"
+    },
+    "task": {
+      "type": "node",
+      "label": "変更捕捉タスク",
+      "status": "claim"
+    },
+    "events": {
+      "type": "node",
+      "label": "発行済みイベント",
+      "status": "claim"
+    },
+    "offsets": {
+      "type": "node",
+      "label": "記録済みソースオフセット",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "下流の購読処理",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "変更ログ → 変更捕捉タスク",
+      "status": "claim"
+    },
+    "publish": {
+      "type": "link",
+      "label": "変更捕捉タスク → 発行済みイベント",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "変更捕捉タスク → 記録済みソースオフセット",
+      "status": "claim"
+    },
+    "restart": {
+      "type": "link",
+      "label": "コネクター実行基盤 → 変更捕捉タスク",
+      "status": "claim"
+    },
+    "restore": {
+      "type": "link",
+      "label": "記録済みソースオフセット → 変更捕捉タスク",
+      "status": "claim"
+    },
+    "repeat": {
+      "type": "link",
+      "label": "変更ログ → 変更捕捉タスク",
+      "status": "claim"
+    },
+    "replay": {
+      "type": "link",
+      "label": "変更捕捉タスク → 発行済みイベント",
+      "status": "claim"
+    },
+    "consume": {
+      "type": "link",
+      "label": "発行済みイベント → 下流の購読処理",
+      "status": "claim"
+    },
+    "restart-after-crash": {
+      "type": "scenario",
+      "label": "オフセット保存前にワーカーが異常終了"
+    },
+    "unverified": {
+      "type": "unknown",
+      "label": "実測の再開時間・重複件数・WAL 保持容量は未確認。"
+    },
+    "pg-slot": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "論理スロットと WAL",
+      "realizes": [
+        "logs"
+      ]
+    },
+    "pg-server": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PostgreSQL サーバー",
+      "realizes": []
+    },
+    "connect-workers": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "分散 Kafka Connect Worker 群",
+      "realizes": [
+        "runtime"
+      ]
+    },
+    "dbz-task": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Debezium PostgreSQL Source Task",
+      "realizes": [
+        "task"
+      ]
+    },
+    "kafka-events": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Kafka の CDC トピック",
+      "realizes": [
+        "events"
+      ]
+    },
+    "kafka-offsets": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Kafka のソースオフセットトピック",
+      "realizes": [
+        "offsets"
+      ]
+    },
+    "consumer-app": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "下流の Kafka Consumer",
+      "realizes": [
+        "consumer"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-debezium-offset-recovery.md#§1": [
+      "model"
+    ],
+    "docs/reference-debezium-offset-recovery.md": [
+      "model",
+      "logs",
+      "runtime",
+      "task",
+      "events",
+      "offsets",
+      "consumer",
+      "read",
+      "publish",
+      "commit",
+      "restart",
+      "restore",
+      "repeat",
+      "replay",
+      "consume",
+      "restart-after-crash",
+      "pg-slot",
+      "pg-server",
+      "connect-workers",
+      "dbz-task",
+      "kafka-events",
+      "kafka-offsets",
+      "consumer-app"
+    ],
+    "docs/reference-debezium-offset-recovery.md#§5": [
+      "model"
+    ],
+    "docs/reference-debezium-offset-recovery.md#§2": [
+      "logs",
+      "runtime",
+      "task",
+      "events",
+      "offsets",
+      "consumer",
+      "read",
+      "publish",
+      "commit",
+      "restart",
+      "restore",
+      "repeat",
+      "replay",
+      "consume"
+    ],
+    "docs/reference-debezium-offset-recovery.md#§3": [
+      "restart-after-crash"
+    ],
+    "docs/reference-debezium-offset-recovery.md#§4": [
+      "pg-slot",
+      "pg-server",
+      "connect-workers",
+      "dbz-task",
+      "kafka-events",
+      "kafka-offsets",
+      "consumer-app"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "取り込み",
+    "kind": "仕組みの深掘り",
+    "product": "Debezium",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "debezium",
+    "objectives": [
+      "ソースオフセットと下流の購読位置を区別する。",
+      "ワーカーの異常終了後に同じ変更が発行される条件を確認する。"
+    ],
+    "sources": [
+      {
+        "title": "Debezium PostgreSQL Connector",
+        "url": "https://debezium.io/documentation/reference/3.7/connectors/postgresql.html"
+      },
+      {
+        "title": "Kafka Connect User Guide",
+        "url": "https://kafka.apache.org/44/kafka-connect/user-guide/"
+      }
+    ]
+  }
+}

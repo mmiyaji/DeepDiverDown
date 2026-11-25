@@ -212,10 +212,15 @@
       dim: s.every(x => x.dim), ghost: s.every(x => x.ghost), heat: heats.length ? Math.max(...heats) : undefined, h: hs.length ? Math.max(...hs) : undefined,
     };
   }
+  // 実装部品の台数は実装例に指定された値だけを使う。機能配置の台数は移さない。
+  function implementationBadge(badge, replicas) {
+    if (badge && badge.tone !== 'replicas') return badge;
+    return replicas > 1 && replicas < 99 ? { text: `${replicas}台`, tone: 'replicas' } : undefined;
+  }
   function mergeLink(states) {
     const s = states.filter(Boolean), on = s.find(x => x.on);
     return on ? { ...on, packets: s.some(x => x.packets) } : { dim: s.length > 0 && s.every(x => x.dim), dashed: s.find(x => x.dashed)?.dashed };
   }
 
-  window.Views = { VIEWS, available, info, implOf, project, mergeNode, mergeLink, isInfra };
+  window.Views = { VIEWS, available, info, implOf, project, mergeNode, mergeLink, implementationBadge, isInfra };
 })();

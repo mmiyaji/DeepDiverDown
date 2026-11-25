@@ -69,7 +69,7 @@ Operator の CR では `spec.app.storage.type` に `postgresql`、`mysql`、`kaf
 
 | 機能 | 担い手 |
 | --- | --- |
-| 登録担当（Web UI・CLI・REST・Maven） | クラスターの外のクライアント |
+| 登録担当 | クラスター外から Web コンソール、CLI、REST API、Maven プラグインで接続 |
 | Kafka クライアント | クラスターの外のアプリケーション |
 | REST API・ccompat API・ルール・情報モデル | Registry の app Pod（Deployment） |
 | Web コンソール | Registry の ui Pod（Deployment） |

@@ -1,0 +1,278 @@
+name: "Fivetran：ロード後の dbt と連動スケジュール"
+description: "取り込みの成功を待ってホスト型 dbt ジョブを起動し、変換 SQL を同期先で実行する流れ。"
+parent: {model: fivetran, node: transform}
+reference:
+  objectives:
+    - "ロード、ジョブの起動、変換 SQL の実行場所を区別する。"
+    - "同期と変換の依存関係が実行順に与える影響を説明する。"
+    - "プロジェクトの読取権限と、同期先に対する変換の権限を区別する。"
+  sources:
+    - {title: "Fivetran Transformations for dbt", url: https://fivetran.com/docs/transformations/dbt}
+    - {title: "Fivetran Transformation Scheduling", url: https://fivetran.com/docs/transformations/transformation-scheduling}
+    - {title: "Transformations for dbt Setup Guide", url: https://fivetran.com/docs/transformations/dbt/setup-guide}
+    - {title: "GitHub Docs · Managing deploy keys", url: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys}
+    - {title: "Snowflake Destination Setup Guide", url: https://fivetran.com/docs/destinations/snowflake/setup-guide}
+sources: [docs/reference-fivetran-dbt-integrated-scheduling.md]
+evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§1"}]
+tiers:
+  - {id: flow, label: "取り込み結果からマートを作る", z: 0, size: [35, 14]}
+nodes:
+  source:
+    label: "同期元の注文テーブル"
+    kind: table
+    tier: flow
+    x: 2
+    y: 3
+    description: "注文データを取り込み側へ渡す。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§1"}]
+  sync:
+    label: "取り込み接続"
+    kind: worker
+    tier: flow
+    x: 8
+    y: 3
+    description: "同期元を読み、未加工のテーブルにロードする。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§1"}]
+  raw:
+    label: "未加工の注文テーブル"
+    kind: table
+    tier: flow
+    x: 23
+    y: 3
+    description: "SQL の入力になる。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§1"}]
+  schedule:
+    label: "同期と変換の実行順"
+    kind: scheduler
+    tier: flow
+    x: 8
+    y: 9
+    description: "関連する上流の同期を待ち、成功後に変換を起動する。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§3"}]
+  project:
+    label: "変換プロジェクト"
+    kind: file
+    tier: flow
+    x: 15
+    y: 12
+    description: "変換モデルとソーステーブルの参照を保持する。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§2"}]
+  runner:
+    label: "変換ジョブ"
+    kind: worker
+    tier: flow
+    x: 15
+    y: 6
+    description: "取得した定義を使い、データベースに実行する SQL を送る。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§2"}]
+  compute:
+    label: "同期先の SQL 計算資源"
+    kind: service
+    tier: flow
+    x: 23
+    y: 9
+    description: "未加工テーブルを読み、クエリで出力テーブルを作る。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§4"}]
+  mart:
+    label: "分析用の注文マート"
+    kind: table
+    tier: flow
+    x: 32
+    y: 9
+    description: "変換された注文データを保持する。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§4"}]
+links:
+  - {id: extract, from: source, to: sync, label: "注文データを渡す", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§1"}]}
+  - {id: load, from: sync, to: raw, label: "未加工テーブルを更新", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§1"}]}
+  - {id: sync-success, from: sync, to: schedule, label: "同期の成功を伝える", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§3"}]}
+  - {id: launch, from: schedule, to: runner, label: "関連する同期の成功後に起動", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§3"}]}
+  - {id: clone, from: runner, to: project, label: "変換プロジェクトを取得", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§2"}]}
+  - {id: send-sql, from: runner, to: compute, label: "生成した SQL を送る", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§4"}]}
+  - {id: read-raw, from: raw, to: compute, label: "未加工の注文データを読む", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§4"}]}
+  - {id: write-mart, from: compute, to: mart, label: "注文マートを作成", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§4"}]}
+scenarios:
+  - id: integrated-run
+    label: "関連する同期の成功後に変換"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§3"}]
+    steps:
+      - {links: [extract, load], note: "注文データを同期先に書き込む。"}
+      - {links: [sync-success, launch], note: "関連する同期が成功した後にジョブを起動する。"}
+      - {links: [send-sql, read-raw, write-mart], note: "同期先の計算資源が SQL を実行し、マートを作る。"}
+unknowns:
+  - {id: UNK-01, text: "対象環境のリージョン、パイプラインの待ち時間、ジョブや Warehouse のサイズは未確認。", refs: [launch, compute]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: postgres-snowflake
+    label: "RDS・Fivetran SaaS・GitHub.com・Snowflake"
+    description: "RDS for PostgreSQL の注文を Snowflake に同期する。Fivetran が GitHub.com から dbt プロジェクトを取得し、Snowflake で注文マートを作る構成例。"
+    sources:
+      - {title: "PostgreSQL Connector Setup Guide", url: https://fivetran.com/docs/connectors/databases/postgresql/setup-guide}
+      - {title: "Snowflake Destination Setup Guide", url: https://fivetran.com/docs/destinations/snowflake/setup-guide}
+      - {title: "Fivetran Transformations for dbt", url: https://fivetran.com/docs/transformations/dbt}
+      - {title: "Transformations for dbt Setup Guide", url: https://fivetran.com/docs/transformations/dbt/setup-guide}
+      - {title: "Fivetran Transformation Scheduling", url: https://fivetran.com/docs/transformations/transformation-scheduling}
+      - {title: "GitHub Docs · Managing deploy keys", url: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys}
+    tiers:
+      - {id: aws, label: "利用者の AWS アカウント", z: 0, origin: [0, 0], size: [6, 9]}
+      - {id: fivetran, label: "Fivetran の接続とジョブ", z: 0, origin: [10, 0], size: [10, 9]}
+      - {id: snowflake, label: "Snowflake のデータと実行", z: 0, origin: [25, 0], size: [12, 9]}
+      - {id: github, label: "dbt プロジェクトの保管", z: 0, origin: [10, -8], size: [10, 5]}
+    nodes:
+      dbt-rds:
+        label: "Amazon RDS for PostgreSQL"
+        kind: db
+        svc: rds
+        tier: aws
+        x: 3
+        y: 3
+        realizes: [source]
+        description: "注文テーブルと論理レプリケーションの変更を提供する。"
+        management: {type: shared, scope: "AWS が RDS 基盤を運用する。利用者が TLS、ソースユーザー、論理レプリケーション、同期対象の権限を設定する。"}
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-connection:
+        label: "PostgreSQL 接続"
+        kind: worker
+        svc: fivetran:platform
+        tier: fivetran
+        x: 2.5
+        y: 2
+        realizes: [sync]
+        description: "TLS で RDS に接続し、注文テーブルの履歴と増分を Snowflake に同期する。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-schedule:
+        label: "Integrated scheduling"
+        kind: scheduler
+        provider: fivetran
+        tier: fivetran
+        x: 7.5
+        y: 2
+        realizes: [schedule]
+        description: "この例では同じ Destination に属する PostgreSQL 接続の成功を待つ。上流同期が失敗したとき、下流の連動変換は実行しない。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-runner:
+        label: "ホスト型 dbt ジョブ"
+        kind: worker
+        provider: fivetran
+        tier: fivetran
+        x: 5
+        y: 6.5
+        realizes: [runner]
+        description: "Fivetran の実行環境でプロジェクトを取得し、dbt コマンドを実行する。生成した SQL は Snowflake に送る。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-raw:
+        label: "Snowflake の RAW テーブル"
+        kind: table
+        provider: snowflake
+        tier: snowflake
+        x: 3
+        y: 2.5
+        realizes: [raw]
+        description: "Fivetran が同期した注文の行を保持する。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-warehouse:
+        label: "Snowflake Warehouse"
+        kind: service
+        svc: snowflake:warehouse
+        tier: snowflake
+        x: 3
+        y: 6.5
+        realizes: [compute]
+        description: "SQL の実行に使う計算資源。モデルの入力を読み、出力テーブルへ書き込む。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-mart:
+        label: "注文マート"
+        kind: table
+        provider: snowflake
+        tier: snowflake
+        x: 8.5
+        y: 6.5
+        realizes: [mart]
+        description: "変換後の SQL の結果を Snowflake にマテリアライズする。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-role:
+        label: "Snowflake ユーザーとロール"
+        kind: policy
+        provider: snowflake
+        tier: snowflake
+        x: 8.5
+        y: 2.5
+        description: "Fivetran の Destination に設定したキーペアに対応する公開鍵を専用サービスユーザーに置く。変換の入力を読む権限と出力の作成権限を設定する。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-github:
+        label: "GitHub.com"
+        kind: service
+        svc: github:platform
+        tier: github
+        x: 2.5
+        y: 2
+        description: "リポジトリへの SSH アクセスを Deploy key で許可する。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+      dbt-project:
+        label: "dbt プロジェクト"
+        kind: file
+        provider: github
+        tier: github
+        x: 7.5
+        y: 2
+        realizes: [project]
+        description: "GitHub.com のリポジトリに dbt_project.yml とモデルを置く。Fivetran 用の Deploy key は読み取り専用とする。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]
+    links:
+      - {id: dbt-connect, from: dbt-connection, to: dbt-rds, label: "専用の PostgreSQL ユーザーで TLS 接続", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-history, from: dbt-rds, to: dbt-connection, label: "注文の履歴と変更を渡す", realizes: [extract], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-load, from: dbt-connection, to: dbt-warehouse, label: "キーペア認証してロード", realizes: [load], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-write-raw, from: dbt-warehouse, to: dbt-raw, label: "RAW テーブルに反映", realizes: [load], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-sync-success, from: dbt-connection, to: dbt-schedule, label: "同期の成功を伝える", realizes: [sync-success], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-launch, from: dbt-schedule, to: dbt-runner, label: "dbt ジョブを起動", realizes: [launch], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-ssh, from: dbt-runner, to: dbt-github, label: "Deploy key で SSH 接続", realizes: [clone], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-read-repo, from: dbt-github, to: dbt-project, label: "対象リポジトリの読取を許可", realizes: [clone], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-auth, from: dbt-runner, to: dbt-role, label: "Destination の認証設定を使用", evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-sql, from: dbt-runner, to: dbt-warehouse, label: "変換 SQL を送る", realizes: [send-sql], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-read-raw, from: dbt-raw, to: dbt-warehouse, label: "未加工の注文データを読む", realizes: [read-raw], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+      - {id: dbt-write-mart, from: dbt-warehouse, to: dbt-mart, label: "注文マートを作成", realizes: [write-mart], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-dbt-integrated-scheduling.md#§5"}]}
+    groups:
+      - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [aws], nodes: [dbt-rds]}
+      - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [fivetran], nodes: [dbt-connection, dbt-schedule, dbt-runner]}
+      - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [snowflake], nodes: [dbt-raw, dbt-warehouse, dbt-mart, dbt-role]}
+      - {kind: cloud, provider: github, label: "GitHub.com", tier: [github], nodes: [dbt-github, dbt-project]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: "同期の成功を起点に Snowflake で変換", z: 0, size: [39, 19]}
+      nodes:
+        dbt-rds: {tier: diagram, x: 3.5, y: 3.2}
+        dbt-connection: {tier: diagram, x: 11.5, y: 3.2}
+        dbt-schedule: {tier: diagram, x: 16.5, y: 3.2}
+        dbt-runner: {tier: diagram, x: 14, y: 8.4}
+        dbt-raw: {tier: diagram, x: 25, y: 3.2}
+        dbt-warehouse: {tier: diagram, x: 25, y: 8.4}
+        dbt-mart: {tier: diagram, x: 33, y: 8.4}
+        dbt-role: {tier: diagram, x: 33, y: 3.2}
+        dbt-github: {tier: diagram, x: 12, y: 14.8}
+        dbt-project: {tier: diagram, x: 18.5, y: 14.8}
+      groups:
+        - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [diagram], x0: 0.3, y0: 0.8, x1: 6.8, y1: 10.6, nodes: [dbt-rds]}
+        - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [diagram], x0: 8.1, y0: 0.8, x1: 20.3, y1: 10.6, nodes: [dbt-connection, dbt-schedule, dbt-runner]}
+        - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [diagram], x0: 22, y0: 0.8, x1: 36.6, y1: 10.6, nodes: [dbt-raw, dbt-warehouse, dbt-mart, dbt-role]}
+        - {kind: cloud, provider: github, label: "GitHub.com", tier: [diagram], x0: 8.6, y0: 12.2, x1: 21.6, y1: 17.4, nodes: [dbt-github, dbt-project]}
+    layout3d:
+      tiers:
+        - {id: aws, label: "利用者の AWS アカウント", z: 0, origin: [0, 0], size: [6, 9]}
+        - {id: fivetran, label: "Fivetran の接続とジョブ", z: 0, origin: [10, 0], size: [10, 9]}
+        - {id: snowflake, label: "Snowflake のデータと実行", z: 0, origin: [25, 0], size: [12, 9]}
+        - {id: github, label: "dbt プロジェクトの保管", z: 0, origin: [10, -8], size: [10, 5]}
+      nodes:
+        dbt-rds: {tier: aws, x: 3, y: 3}
+        dbt-connection: {tier: fivetran, x: 2.5, y: 2}
+        dbt-schedule: {tier: fivetran, x: 7.5, y: 2}
+        dbt-runner: {tier: fivetran, x: 5, y: 6.5}
+        dbt-raw: {tier: snowflake, x: 3, y: 2.5}
+        dbt-warehouse: {tier: snowflake, x: 3, y: 6.5}
+        dbt-mart: {tier: snowflake, x: 8.5, y: 6.5}
+        dbt-role: {tier: snowflake, x: 8.5, y: 2.5}
+        dbt-github: {tier: github, x: 2.5, y: 2}
+        dbt-project: {tier: github, x: 7.5, y: 2}
+      groups:
+        - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [aws], nodes: [dbt-rds]}
+        - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [fivetran], nodes: [dbt-connection, dbt-schedule, dbt-runner]}
+        - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [snowflake], nodes: [dbt-raw, dbt-warehouse, dbt-mart, dbt-role]}
+        - {kind: cloud, provider: github, label: "GitHub.com", tier: [github], nodes: [dbt-github, dbt-project]}

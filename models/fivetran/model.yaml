@@ -71,6 +71,7 @@ nodes:
       - type: doc
         ref: docs/reference-fivetran.md#§2
   incremental:
+    drill: fivetran-postgresql-cdc
     label: 更新分の同期
     kind: service
     tier: flow
@@ -100,6 +101,7 @@ nodes:
       - type: doc
         ref: docs/reference-fivetran.md#§3
   transform:
+    drill: fivetran-dbt-integrated-scheduling
     label: ロード後の SQL 変換
     kind: service
     tier: operation
@@ -252,196 +254,188 @@ gates:
   maxHigh: 0
 implementations:
   - id: postgres-snowflake
-    label: RDS PostgreSQL → Fivetran SaaS → Snowflake
-    description: RDS PostgreSQL から Fivetran の SaaS 接続で Snowflake に同期し、Snowflake Warehouse で変換する例。
+    label: "RDS for PostgreSQL・Fivetran SaaS・Snowflake"
+    description: "Amazon RDS for PostgreSQL から Snowflake に注文データを同期する。Fivetran が GitHub.com の dbt プロジェクトを取得し、Snowflake でマートを作る例。"
     sources:
-      - title: Get Started with Fivetran
-        url: https://fivetran.com/docs/getting-started/quickstart
-      - title: Sync Overview
-        url: https://fivetran.com/docs/core-concepts/syncoverview
-      - title: Fivetran Glossary
-        url: https://fivetran.com/docs/getting-started/glossary
-      - title: Supported Destinations
-        url: https://fivetran.com/docs/destinations
-      - title: Fivetran PostgreSQL Connector
-        url: https://fivetran.com/docs/connectors/databases/postgresql
-      - title: Fivetran Snowflake destination
-        url: https://fivetran.com/docs/destinations/snowflake
-      - title: Fivetran Transformations for dbt
-        url: https://fivetran.com/docs/transformations/dbt
-      - title: PostgreSQL setup guide
-        url: https://fivetran.com/docs/connectors/databases/postgresql/setup-guide
-      - title: Snowflake destination setup
-        url: https://fivetran.com/docs/destinations/snowflake/setup-guide
+      - {title: "PostgreSQL Connector Setup Guide", url: https://fivetran.com/docs/connectors/databases/postgresql/setup-guide}
+      - {title: "Amazon RDS for PostgreSQL · Logical replication", url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html}
+      - {title: "Snowflake Destination Setup Guide", url: https://fivetran.com/docs/destinations/snowflake/setup-guide}
+      - {title: "Fivetran Transformations for dbt", url: https://fivetran.com/docs/transformations/dbt}
+      - {title: "Transformations for dbt Setup Guide", url: https://fivetran.com/docs/transformations/dbt/setup-guide}
+      - {title: "GitHub Docs · Managing deploy keys", url: https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys}
     tiers:
-      - id: setup
-        label: 接続と変換の設定
-        z: 1
-        size:
-          - 25
-          - 3
-      - id: processing
-        label: 同期と分析
-        z: 0
-        size:
-          - 25
-          - 3
+      - {id: aws, label: "利用者の AWS アカウント", z: 0, origin: [0, 0], size: [6, 9]}
+      - {id: fivetran, label: "Fivetran の接続とジョブ", z: 0, origin: [10, 0], size: [9, 9]}
+      - {id: snowflake, label: "Snowflake のデータと実行", z: 0, origin: [22, 0], size: [12, 9]}
+      - {id: github, label: "dbt プロジェクトの保管", z: 0, origin: [10, -8], size: [9, 5]}
     nodes:
-      postgres-snowflake-runner:
-        label: Fivetran のホスト型 dbt 実行
-        kind: worker
-        tier: processing
-        x: 4
-        y: 0
-        description: Fivetran が dbt を実行し、生成した SQL を Snowflake へ送る。
-        evidence: [{type: doc, ref: docs/reference-fivetran.md#§6}]
       postgres-snowflake-pg:
-        label: Amazon RDS for PostgreSQL
+        label: "Amazon RDS for PostgreSQL"
         kind: db
-        tier: processing
-        x: 0
-        'y': 1.5
-        realizes:
-          - source
-        description: RDS の PostgreSQL が注文テーブルと変更を提供する。
-        evidence:
-          - type: doc
-            ref: docs/reference-fivetran.md#§6
         svc: rds
-        management: {type: shared, scope: "AWS が RDS 基盤を運用し、利用者が DB・レプリケーションと権限を設定する。"}
-      postgres-snowflake-connection:
-        label: Fivetran SaaS / PostgreSQL 接続
-        kind: service
-        tier: processing
-        x: 4
-        'y': 1.5
-        realizes:
-          - connector
-          - initial
-          - incremental
-          - cursor
-        description: Fivetran が接続を運用し、初回・増分同期と進捗を管理する。
-        evidence:
-          - type: doc
-            ref: docs/reference-fivetran.md#§6
-      postgres-snowflake-snowflake:
-        svc: snowflake:platform
-        label: Snowflake / RAW テーブル
-        kind: db
-        tier: processing
-        x: 8
-        'y': 1.5
-        realizes:
-          - destination
-        description: 同期されたデータを RAW テーブルとして保持する。
-        evidence:
-          - type: doc
-            ref: docs/reference-fivetran.md#§6
+        tier: aws
+        x: 3
+        y: 3
+        realizes: [source]
+        description: "主インスタンスの注文テーブルを初回同期の入力にし、変更を WAL に記録する。"
+        management: {type: shared, scope: "AWS が RDS の基盤を運用する。利用者がテーブル・論理レプリケーション・TLS・ソース権限を設定する。"}
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
       postgres-snowflake-publication:
-        label: PostgreSQL の論理レプリケーション設定
+        label: "Publication とスロット"
         kind: policy
-        tier: setup
-        x: 0
-        'y': 1.5
-        description: 同期テーブルを公開し、コネクターが対象の変更を受け取れるようにする。
-        evidence:
-          - type: doc
-            ref: docs/reference-fivetran.md#§6
-      postgres-snowflake-dbt:
-        label: Git の dbt プロジェクト
-        kind: file
-        tier: setup
-        x: 12
-        'y': 1.5
-        description: 同期後に変換を実行する場合のモデル定義を保持する。
-        evidence:
-          - type: doc
-            ref: docs/reference-fivetran.md#§6
-      postgres-snowflake-warehouse:
-        label: Snowflake / 実行 Warehouse
-        svc: snowflake:warehouse
-        kind: service
-        tier: processing
-        x: 12
-        'y': 1.5
-        description: ロードと SQL 変換の処理能力を提供する。
-        realizes:
-          - transform
-        evidence:
-          - type: doc
-            ref: docs/reference-fivetran.md#§6
-    links:
-      - id: postgres-snowflake-publication-connection
-        from: postgres-snowflake-publication
-        to: postgres-snowflake-pg
-        label: 公開テーブルとスロットを設定
-      - id: postgres-snowflake-dbt-connection
-        from: postgres-snowflake-dbt
-        to: postgres-snowflake-runner
-        label: dbt プロジェクトを読み込む
-      - {id: postgres-snowflake-runner-sql, from: postgres-snowflake-runner, to: postgres-snowflake-warehouse, label: 変換 SQL を実行}
-      - {id: postgres-snowflake-runner-trigger, from: postgres-snowflake-connection, to: postgres-snowflake-runner, label: 同期後に変換を起動}
-      - id: postgres-snowflake-load-compute
-        from: postgres-snowflake-connection
-        to: postgres-snowflake-warehouse
-        label: ロード用 Warehouse を利用
-        evidence:
-          - type: doc
-            ref: docs/reference-fivetran.md#§6
-    groups:
-      - kind: cloud
         provider: aws
-        label: AWS アカウント
-        tier:
-          - processing
-        nodes:
-          - postgres-snowflake-pg
-      - kind: cloud
-        label: Fivetran SaaS
-        tier:
-          - processing
-        nodes:
-          - postgres-snowflake-connection
-          - postgres-snowflake-runner
-      - kind: cloud
+        tier: aws
+        x: 3
+        y: 6.5
+        description: "Publication で対象テーブルを選び、pgoutput の論理レプリケーションスロットを使う。"
+        management: {type: customer, scope: "利用者が RDS 上の publication とスロットを設定する。"}
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-connection:
+        label: "PostgreSQL 接続"
+        kind: service
+        svc: fivetran:platform
+        tier: fivetran
+        x: 3.5
+        y: 2.5
+        realizes: [connector, initial, incremental]
+        description: "Fivetran が初回・増分同期と進捗を管理する。RDS に TLS で接続し、Snowflake では専用ユーザーのキーペア認証を使う。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-cursor:
+        label: "同期の進捗位置"
+        kind: db
+        provider: fivetran
+        tier: fivetran
+        x: 7
+        y: 5.2
+        realizes: [cursor]
+        description: "増分同期を再開する WAL の位置を記録する。Fivetran の内部の保存先は未確認。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-runner:
+        label: "ホスト型 dbt ジョブ"
+        kind: worker
+        provider: fivetran
+        tier: fivetran
+        x: 2.2
+        y: 6.5
+        description: "Fivetran が dbt CLI の実行環境を用意する。取得したプロジェクトを使い、生成された SQL を Snowflake に送る。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-snowflake:
+        label: "Snowflake の RAW テーブル"
+        kind: table
         provider: snowflake
-        label: Snowflake アカウント
-        tier:
-          - processing
-        nodes:
-          - postgres-snowflake-snowflake
-          - postgres-snowflake-warehouse
-
+        tier: snowflake
+        x: 3
+        y: 2.5
+        realizes: [destination]
+        description: "同期された注文データを保持する。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-warehouse:
+        label: "Snowflake Warehouse"
+        kind: service
+        svc: snowflake:warehouse
+        tier: snowflake
+        x: 3
+        y: 6.5
+        realizes: [transform]
+        description: "同じ例のロードと SQL 変換で使う計算資源。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-mart:
+        label: "注文マート"
+        kind: table
+        provider: snowflake
+        tier: snowflake
+        x: 8.5
+        y: 6.5
+        description: "dbt モデルが生成する分析用の出力テーブル。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-role:
+        label: "Snowflake ユーザーとロール"
+        kind: policy
+        provider: snowflake
+        tier: snowflake
+        x: 8.5
+        y: 2.5
+        description: "専用サービスユーザーの公開鍵とロールを Snowflake 内に設定する。ロールに Warehouse 利用権限と対象スキーマの権限を与える。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-git:
+        label: "GitHub.com"
+        kind: service
+        svc: github:platform
+        tier: github
+        x: 2
+        y: 2
+        description: "Fivetran の公開鍵を読み取り専用の Deploy key として対象リポジトリに登録する。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+      postgres-snowflake-dbt:
+        label: "dbt プロジェクト"
+        kind: file
+        provider: github
+        tier: github
+        x: 6.5
+        y: 2
+        description: "注文マートのモデルを含む GitHub.com のリポジトリ。利用者がコードとリポジトリへのアクセスを管理する。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]
+    links:
+      - {id: postgres-snowflake-publication-pg, from: postgres-snowflake-publication, to: postgres-snowflake-pg, label: "公開テーブルとスロットを設定", evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-rds-request, from: postgres-snowflake-connection, to: postgres-snowflake-pg, label: "TLS で接続して注文データを読む", evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-history, from: postgres-snowflake-pg, to: postgres-snowflake-connection, label: "選択テーブルの履歴を渡す", realizes: [extract, historical], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-changes, from: postgres-snowflake-pg, to: postgres-snowflake-connection, label: "WAL の変更を渡す", realizes: [changes], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-save-cursor, from: postgres-snowflake-connection, to: postgres-snowflake-cursor, label: "同期の進捗を記録", realizes: [position], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§3"}]}
+      - {id: postgres-snowflake-resume-cursor, from: postgres-snowflake-cursor, to: postgres-snowflake-connection, label: "次回の増分開始位置を渡す", realizes: [resume], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§3"}]}
+      - {id: postgres-snowflake-load-auth, from: postgres-snowflake-connection, to: postgres-snowflake-role, label: "専用ユーザーのキーペアで認証", evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-load-compute, from: postgres-snowflake-connection, to: postgres-snowflake-warehouse, label: "Warehouse を使ってロード", realizes: [load, load-incremental], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-load-data, from: postgres-snowflake-warehouse, to: postgres-snowflake-snowflake, label: "RAW テーブルに反映", realizes: [load, load-incremental], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-runner-trigger, from: postgres-snowflake-connection, to: postgres-snowflake-runner, label: "関連する同期の成功後にジョブを起動", realizes: [transform-link], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-git-fetch, from: postgres-snowflake-runner, to: postgres-snowflake-git, label: "Deploy key でプロジェクトを取得", evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-git-repo, from: postgres-snowflake-git, to: postgres-snowflake-dbt, label: "対象リポジトリの読み取りを許可", evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-runner-sql, from: postgres-snowflake-runner, to: postgres-snowflake-warehouse, label: "dbt が生成した SQL を送る", realizes: [transform-link], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-read-raw, from: postgres-snowflake-snowflake, to: postgres-snowflake-warehouse, label: "RAW テーブルを読む", realizes: [transform-link], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+      - {id: postgres-snowflake-write-mart, from: postgres-snowflake-warehouse, to: postgres-snowflake-mart, label: "注文マートを作成", realizes: [transform-link], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran.md#§6"}]}
+    groups:
+      - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [aws], nodes: [postgres-snowflake-pg, postgres-snowflake-publication]}
+      - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [fivetran], nodes: [postgres-snowflake-connection, postgres-snowflake-runner, postgres-snowflake-cursor]}
+      - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [snowflake], nodes: [postgres-snowflake-snowflake, postgres-snowflake-warehouse, postgres-snowflake-mart, postgres-snowflake-role]}
+      - {kind: cloud, provider: github, label: "GitHub.com", tier: [github], nodes: [postgres-snowflake-git, postgres-snowflake-dbt]}
     layout2d:
       tiers:
-        - {id: diagram, label: サービス別の実装構成, z: 0, size: [22, 12]}
+        - {id: diagram, label: "RDS から Snowflake への同期と変換", z: 0, size: [36, 16]}
       nodes:
-        postgres-snowflake-pg: {tier: diagram, x: 2, y: 3}
-        postgres-snowflake-publication: {tier: diagram, x: 2, y: 7}
-        postgres-snowflake-connection: {tier: diagram, x: 8, y: 3}
-        postgres-snowflake-runner: {tier: diagram, x: 8, y: 7}
-        postgres-snowflake-dbt: {tier: diagram, x: 14, y: 10}
-        postgres-snowflake-snowflake: {tier: diagram, x: 18, y: 3}
-        postgres-snowflake-warehouse: {tier: diagram, x: 18, y: 7}
+        postgres-snowflake-pg: {tier: diagram, x: 3.5, y: 3.2}
+        postgres-snowflake-publication: {tier: diagram, x: 3.5, y: 7.3}
+        postgres-snowflake-connection: {tier: diagram, x: 10.8, y: 3.2}
+        postgres-snowflake-runner: {tier: diagram, x: 10.8, y: 7.3}
+        postgres-snowflake-cursor: {tier: diagram, x: 15.5, y: 7.3}
+        postgres-snowflake-snowflake: {tier: diagram, x: 22, y: 3.2}
+        postgres-snowflake-warehouse: {tier: diagram, x: 22, y: 7.3}
+        postgres-snowflake-mart: {tier: diagram, x: 29.5, y: 7.3}
+        postgres-snowflake-role: {tier: diagram, x: 29.5, y: 3.2}
+        postgres-snowflake-git: {tier: diagram, x: 10.3, y: 12.7}
+        postgres-snowflake-dbt: {tier: diagram, x: 16, y: 12.7}
       groups:
-        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 9, nodes: [postgres-snowflake-pg, postgres-snowflake-publication]}
-        - {kind: cloud, label: Fivetran SaaS, tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 9, nodes: [postgres-snowflake-connection, postgres-snowflake-runner]}
-        - {kind: cloud, label: Snowflake アカウント, provider: snowflake, tier: [diagram], x0: 16, y0: 0, x1: 20, y1: 9, nodes: [postgres-snowflake-snowflake, postgres-snowflake-warehouse]}
+        - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [diagram], x0: 0.2, y0: 0.6, x1: 6.9, y1: 9.6, nodes: [postgres-snowflake-pg, postgres-snowflake-publication]}
+        - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [diagram], x0: 8.2, y0: 0.6, x1: 17.6, y1: 9.6, nodes: [postgres-snowflake-connection, postgres-snowflake-runner, postgres-snowflake-cursor]}
+        - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [diagram], x0: 18, y0: 0.6, x1: 33.6, y1: 9.6, nodes: [postgres-snowflake-snowflake, postgres-snowflake-warehouse, postgres-snowflake-mart, postgres-snowflake-role]}
+        - {kind: cloud, provider: github, label: "GitHub.com", tier: [diagram], x0: 7.3, y0: 10.7, x1: 19, y1: 15.1, nodes: [postgres-snowflake-git, postgres-snowflake-dbt]}
     layout3d:
       tiers:
-        - {id: aws, label: AWS, z: 0, size: [5, 7]}
-        - {id: fivetran, label: Fivetran SaaS, z: 0, origin: [8, 0], size: [5, 7]}
-        - {id: git, label: Git, z: 0, origin: [15, 0], size: [4, 7]}
-        - {id: snowflake, label: Snowflake, z: 0, origin: [22, 0], size: [5, 7]}
+        - {id: aws, label: "利用者の AWS アカウント", z: 0, origin: [0, 0], size: [6, 9]}
+        - {id: fivetran, label: "Fivetran の接続とジョブ", z: 0, origin: [10, 0], size: [9, 9]}
+        - {id: snowflake, label: "Snowflake のデータと実行", z: 0, origin: [22, 0], size: [12, 9]}
+        - {id: github, label: "dbt プロジェクトの保管", z: 0, origin: [10, -8], size: [9, 5]}
       nodes:
-        postgres-snowflake-pg: {tier: aws, x: 2, y: 2}
-        postgres-snowflake-publication: {tier: aws, x: 2, y: 5}
-        postgres-snowflake-connection: {tier: fivetran, x: 2, y: 2}
-        postgres-snowflake-runner: {tier: fivetran, x: 2, y: 5}
-        postgres-snowflake-dbt: {tier: git, x: 2, y: 3}
-        postgres-snowflake-snowflake: {tier: snowflake, x: 2, y: 2}
-        postgres-snowflake-warehouse: {tier: snowflake, x: 2, y: 5}
+        postgres-snowflake-pg: {tier: aws, x: 3, y: 3}
+        postgres-snowflake-publication: {tier: aws, x: 3, y: 6.5}
+        postgres-snowflake-connection: {tier: fivetran, x: 3.5, y: 2.5}
+        postgres-snowflake-runner: {tier: fivetran, x: 2.2, y: 6.5}
+        postgres-snowflake-cursor: {tier: fivetran, x: 7, y: 5.2}
+        postgres-snowflake-snowflake: {tier: snowflake, x: 3, y: 2.5}
+        postgres-snowflake-warehouse: {tier: snowflake, x: 3, y: 6.5}
+        postgres-snowflake-mart: {tier: snowflake, x: 8.5, y: 6.5}
+        postgres-snowflake-role: {tier: snowflake, x: 8.5, y: 2.5}
+        postgres-snowflake-git: {tier: github, x: 2, y: 2}
+        postgres-snowflake-dbt: {tier: github, x: 6.5, y: 2}
       groups:
-        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [aws], nodes: [postgres-snowflake-pg, postgres-snowflake-publication]}
-        - {kind: cloud, label: Fivetran SaaS, tier: [fivetran], nodes: [postgres-snowflake-connection, postgres-snowflake-runner]}
-        - {kind: cloud, label: Snowflake アカウント, provider: snowflake, tier: [snowflake], nodes: [postgres-snowflake-snowflake, postgres-snowflake-warehouse]}
+        - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [aws], nodes: [postgres-snowflake-pg, postgres-snowflake-publication]}
+        - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [fivetran], nodes: [postgres-snowflake-connection, postgres-snowflake-runner, postgres-snowflake-cursor]}
+        - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [snowflake], nodes: [postgres-snowflake-snowflake, postgres-snowflake-warehouse, postgres-snowflake-mart, postgres-snowflake-role]}
+        - {kind: cloud, provider: github, label: "GitHub.com", tier: [github], nodes: [postgres-snowflake-git, postgres-snowflake-dbt]}

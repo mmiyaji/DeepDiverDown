@@ -26,8 +26,21 @@ Real-Time のタスクは長時間スロットを保持する。状態ありク�
 
 ## 7. 実装例：Spark 4.3 Standalone と Kafka
 
-代表的な自己管理構成として Kafka の入力・出力トピック、Spark Standalone Master、Worker 上の Driver と Executor、および共有ファイルシステムの checkpointLocation を組み合わせる。State Store は Executor 上で実行し、永続チェックポイントは共有ファイルシステムに保存する。図は公式資料を組み合わせた例であり、導入事例や動作検証済みの構成を示すものではない。Kafka sink は重複し得るため、後続の消費側で対処する。可用性、認証、ホスト台数は環境に応じて設計する。
+自前のサーバー群に Kafka クラスター、Spark Standalone クラスター、HDFS 互換の共有ファイルシステムを置く例である。入出力トピックは同じ Kafka クラスターに置く。共有ファイルシステムは Spark クラスターの外に置き、Driver と Executor からチェックポイントのパスにアクセスできるようにする。RocksDB State Store は Executor で動き、チェックポイントは共有ファイルシステムに保存する。
 
-役割の対応：入力＝Kafka 入力、進行管理＝Driver、処理＝Executor の入力・状態タスク、状態＝State Store、復旧＝共有チェックポイント、出力＝Kafka 出力。
+投入クライアントの `spark-submit` は、`cluster` モードで Standalone Master にアプリケーションを投入する。Master の割り当てに従って Worker が Driver と Executor を起動する。投入クライアントの設置場所は指定しない。図は公式資料を組み合わせた構成例で、実機での動作と具体的な可用性構成、認証設定、ホスト台数は未確認である。Kafka sink は重複し得るため、後続の消費側で対処する。
 
-出典：[Spark 3.5.7 Continuous Processing](https://spark.apache.org/docs/3.5.7/structured-streaming-programming-guide.html#continuous-processing)、[Spark 4.1 リリース](https://spark.apache.org/releases/spark-release-4.1.0.html)、[Spark 4.3 Real-Time Mode](https://spark.apache.org/docs/4.3.0/streaming/real-time-mode.html)、[Spark 4.3 リリース](https://spark.apache.org/releases/spark-release-4-3-0.html)、[Standalone Mode](https://spark.apache.org/docs/4.3.0/spark-standalone.html)。
+| 機能配置 | 実装例の部品 |
+| --- | --- |
+| 再読可能な入力 | Kafka 入力トピック |
+| Driver・進捗管理 | Spark Driver |
+| 短時間のタスクと通常 shuffle | Executor 入力タスク |
+| Continuous の長時間タスク | Executor 入力タスク |
+| Real-Time 入力 Stage | Executor 入力タスク |
+| Pipelined / streaming shuffle | Executor 状態タスク |
+| 状態あり Stage | Executor 状態タスク |
+| State Store | RocksDB State Store |
+| 進捗と状態のチェックポイント | 共有ファイルシステムの `checkpointLocation` |
+| 外部出力 | Kafka 出力トピック |
+
+出典：[Spark 3.5.7 Continuous Processing](https://spark.apache.org/docs/3.5.7/structured-streaming-programming-guide.html#continuous-processing)、[Spark 4.1 リリース](https://spark.apache.org/releases/spark-release-4.1.0.html)、[Spark 4.3 Real-Time Mode](https://spark.apache.org/docs/4.3.0/streaming/real-time-mode.html)、[Spark 4.3 リリース](https://spark.apache.org/releases/spark-release-4-3-0.html)、[Standalone Mode](https://spark.apache.org/docs/4.3.0/spark-standalone.html)、[クラスターモード](https://spark.apache.org/docs/4.3.0/cluster-overview.html)、[チェックポイント](https://spark.apache.org/docs/4.3.0/streaming/apis-on-dataframes-and-datasets.html#recovering-from-failures-with-checkpointing)、[Kafka コネクター](https://spark.apache.org/docs/4.3.0/streaming/structured-streaming-kafka-integration.html)。

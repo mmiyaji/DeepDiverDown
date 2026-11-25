@@ -549,7 +549,7 @@ gates:
 implementations:
   - id: aws-msk-fargate
     label: AWS（Amazon MSK と ECS on Fargate）
-    description: 3 つの AZ に Standard ブローカーを置いた MSK Provisioned に、Fargate 上の Producer が書き込む例。
+    description: 3 つの AZ に Standard ブローカーを置いた MSK Provisioned に、同じ VPC の Fargate タスクが書き込む。KRaft Controller の枠は MSK クラスター内の論理的な所属を表す。
     sources:
       - title: MSK Provisioned クラスターの作成
         url: https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html
@@ -559,6 +559,10 @@ implementations:
         url: https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html
       - title: Amazon ECS のサービス定義
         url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html
+      - title: Fargate タスクのネットワーク
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html
+      - title: MSK Provisioned への接続
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html
     tiers:
       - id: runtime
         label: 書き込みと複製
@@ -574,31 +578,24 @@ implementations:
           - 3
     groups:
       - kind: cloud
-        label: AWS アカウント
+        label: 顧客 AWS アカウントのリソース
         provider: aws
         tier:
           - runtime
           - operations
+        nodes: &repl-account [aws-repl-producer, aws-repl-b1, aws-repl-b2, aws-repl-b3, aws-repl-controller]
       - kind: vpc
         label: アプリとブローカーの VPC
         provider: aws
         tier:
           - runtime
-        nodes:
-          - aws-repl-producer
-          - aws-repl-b1
-          - aws-repl-b2
-          - aws-repl-b3
+        nodes: &repl-vpc [aws-repl-producer, aws-repl-b1, aws-repl-b2, aws-repl-b3]
       - kind: cluster
         label: MSK Provisioned（論理的な所属）
         tier:
           - runtime
           - operations
-        nodes:
-          - aws-repl-b1
-          - aws-repl-b2
-          - aws-repl-b3
-          - aws-repl-controller
+        nodes: &repl-msk [aws-repl-b1, aws-repl-b2, aws-repl-b3, aws-repl-controller]
     nodes:
       aws-repl-producer:
         label: Fargate タスク（Producer）
@@ -665,7 +662,7 @@ implementations:
           - type: doc
             ref: docs/reference-kafka-replication.md#§7
       aws-repl-controller:
-        label: MSK 管理の KRaft Controller
+        label: KRaft Controller 群
         svc: msk
         kind: service
         tier: operations
@@ -673,11 +670,38 @@ implementations:
         'y': 1.5
         realizes:
           - controller
-        description: リーダーと ISR のメタデータを管理する。配置は模式図。
+        description: AWS が運用する KRaft Controller 群。リーダーと ISR のメタデータを管理する。図中の位置は論理配置で、実際のネットワーク配置は未確認。
         management:
-          type: shared
-          scope: AWS が Kafka 基盤を運用する。Controller の台数と配置は資料で確認していない。
+          type: aws
+          scope: AWS が Controller を運用し、利用者はブローカーのエンドポイントから管理操作を行う。Kafka 4.1 以降で新規作成するクラスターでは Controller の DNS エンドポイントは提供されない。
         evidence:
           - type: doc
             ref: docs/reference-kafka-replication.md#§7
     links: []
+    layout2d:
+      tiers: [{id: diagram, label: 書き込み・レプリカ・メタデータ管理, z: 0, size: [25, 20]}]
+      nodes:
+        aws-repl-producer: {tier: diagram, x: 4, y: 6}
+        aws-repl-b1: {tier: diagram, x: 12, y: 4}
+        aws-repl-b2: {tier: diagram, x: 19, y: 7}
+        aws-repl-b3: {tier: diagram, x: 12, y: 10}
+        aws-repl-controller: {tier: diagram, x: 17, y: 16}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウントのリソース, tier: diagram, x0: -1, y0: -1, x1: 25, y1: 20, nodes: *repl-account}
+        - {kind: vpc, provider: aws, label: アプリとブローカーの VPC, tier: diagram, x0: 0.5, y0: 0.5, x1: 23.5, y1: 12.5, nodes: *repl-vpc}
+        - {kind: cluster, label: MSK Provisioned（論理的な所属）, tier: diagram, x0: 8.5, y0: 2, x1: 22, y1: 18.5, nodes: *repl-msk}
+    layout3d:
+      tiers:
+        - {id: metadata, label: MSK のメタデータ管理, z: 1, origin: [9, 0], size: [13, 5]}
+        - {id: runtime, label: Fargate タスクとブローカー, z: 0, size: [24, 10]}
+      nodes:
+        aws-repl-producer: {tier: runtime, x: 2, y: 5}
+        aws-repl-b1: {tier: runtime, x: 10, y: 3}
+        aws-repl-b2: {tier: runtime, x: 16, y: 8}
+        aws-repl-b3: {tier: runtime, x: 20, y: 2.5}
+        aws-repl-controller: {tier: metadata, x: 5, y: 2}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウントのリソース, tier: [runtime, metadata], nodes: *repl-account}
+        - {kind: vpc, provider: aws, label: アプリとブローカーの VPC, tier: runtime, x0: -0.5, y0: 0.5, x1: 24, y1: 11, nodes: *repl-vpc}
+        - {kind: cluster, label: MSK の論理境界, tier: runtime, x0: 7.5, y0: 0.5, x1: 23.5, y1: 10.7, nodes: *repl-msk}
+        - {kind: cluster, tier: metadata, nodes: [aws-repl-controller]}

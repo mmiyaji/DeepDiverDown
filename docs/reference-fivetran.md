@@ -25,38 +25,25 @@ Connector は処理したデータを Destination にロードする。Destinati
 
 出典 [Get Started with Fivetran](https://fivetran.com/docs/getting-started/quickstart)・[FAQ](https://fivetran.com/docs/getting-started/faq)・[Glossary](https://fivetran.com/docs/getting-started/glossary)
 
-## 6. 実装例：RDS PostgreSQL → Fivetran SaaS → Snowflake
+## 6. 実装例：RDS for PostgreSQL から Snowflake へ
 
-Fivetran の SaaS 接続で Amazon RDS for PostgreSQL を初回同期し、利用条件を満たす環境で論理レプリケーションによる増分同期を行う例。ロード後に dbt 変換を実行する。
+Amazon RDS for PostgreSQL の注文テーブルを Fivetran SaaS で Snowflake に同期する。初回は既存行を読み、増分は publication と `pgoutput` の論理レプリケーションスロットを使う。同期後は、GitHub.com の dbt プロジェクトを使って Snowflake に注文マートを作る。
 
-| 機能 | 実装での担い手 | 配置・設定 |
-| --- | --- | --- |
-| 基幹 DB | Amazon RDS for PostgreSQL の業務テーブル | 同期対象の注文テーブルと変更を提供する。 |
-| 取り込み接続、履歴の初回同期、更新分の同期、同期の進捗位置 | Fivetran PostgreSQL 接続 | 初回同期と増分同期を担当し、接続単位の進捗を管理する。 |
-| 分析用ウェアハウス、ロード後の SQL 変換 | Snowflake RAW テーブルと実行 Warehouse | 同期先を raw スキーマとし、変換 SQL はターゲット側で処理する。 |
+| 機能 | 担い手 |
+| --- | --- |
+| 基幹 DB と変更の取得元 | Amazon RDS for PostgreSQL の注文テーブルと WAL |
+| 取り込み接続、初回・増分同期、進捗 | Fivetran SaaS の PostgreSQL 接続 |
+| 同期データ | Snowflake の RAW テーブル |
+| dbt のモデル定義 | GitHub.com のリポジトリ |
+| dbt ジョブの起動とコマンド実行 | Fivetran のホスト型 dbt ジョブ |
+| SQL の実行と変換結果 | Snowflake Warehouse と注文マート |
 
-実装で加わる部品を以下に示す。
+AWS アカウントに RDS と論理レプリケーション設定を置く。利用者は `rds.logical_replication` を有効にし、同期ユーザー、選択テーブルの読み取り権限、`rds_replication`、publication とスロットを設定する。この例では RDS に直接接続する。TLS を有効にし、Fivetran の送信元に接続を許可する。同期が長く止まった場合はスロットによる WAL 保持を監視する。[PostgreSQL Connector Setup Guide](https://fivetran.com/docs/connectors/databases/postgresql/setup-guide) [Amazon RDS の論理レプリケーション](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html)
 
-- PostgreSQL の論理レプリケーション設定。同期テーブルを公開し、コネクターが対象の変更を受け取れるようにする。
-- Git の dbt プロジェクト。同期後に変換を実行する場合のモデル定義を保持する。
+Fivetran の SaaS 上で接続と dbt ジョブが動く。Snowflake アカウントには RAW テーブル、Warehouse、注文マート、接続用の専用ユーザーとロールを置く。Snowflake に公開鍵、Fivetran に対応する秘密鍵を設定する。利用者はロード先と変換先の権限、Warehouse を管理する。[Snowflake Destination Setup Guide](https://fivetran.com/docs/destinations/snowflake/setup-guide) [Transformations for dbt](https://fivetran.com/docs/transformations/dbt)
 
-公式資料
+dbt プロジェクトは GitHub.com の対象リポジトリに置く。Fivetran は読み取り専用 Deploy key を使い、SSH で取得する。利用者がリポジトリへのアクセスとコードを管理し、GitHub がサービス基盤を運用する。注文データを GitHub へ送る経路はこの例に含めない。[Transformations for dbt Setup Guide](https://fivetran.com/docs/transformations/dbt/setup-guide) [GitHub の Deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys)
 
-- [Get Started with Fivetran](https://fivetran.com/docs/getting-started/quickstart)
-- [Sync Overview](https://fivetran.com/docs/core-concepts/syncoverview)
-- [Fivetran Glossary](https://fivetran.com/docs/getting-started/glossary)
-- [Supported Destinations](https://fivetran.com/docs/destinations)
-- [Fivetran PostgreSQL Connector](https://fivetran.com/docs/connectors/databases/postgresql)
-- [Fivetran Snowflake destination](https://fivetran.com/docs/destinations/snowflake)
-- [Fivetran Transformations for dbt](https://fivetran.com/docs/transformations/dbt)
+AWS、Fivetran、Snowflake はそれぞれのサービス基盤を運用する。Fivetran と Snowflake の内部ホスト、各サービスの選定リージョン、実動作は未確認である。図は公式資料を組み合わせた例である。
 
-
-### サービスごとの配置
-
-RDS for PostgreSQL の論理レプリケーションを設定し、Fivetran SaaS の PostgreSQL 接続から変更を読み取る。Fivetran は Snowflake へのロード用 Warehouse と権限を使い、同期後の dbt 変換も Snowflake の Warehouse 上で実行する。Fivetran の処理実体を RDS や Snowflake のプロセスとして扱わない。
-
-RDS の論理レプリケーション、publication、スロット、接続経路とソース権限を個別に構成し、同期の遅延時に WAL が保持される影響を監視する。Snowflake の接続ユーザー、ロール、Warehouse、ロード先の権限と Fivetran の dbt 変換設定は別途必要。
-
-[Fivetran PostgreSQL setup guide](https://fivetran.com/docs/connectors/databases/postgresql/setup-guide)、[Fivetran Snowflake destination setup](https://fivetran.com/docs/destinations/snowflake/setup-guide)。
-
-Fivetran が dbt の実行サービスをホストし、Git のプロジェクトから生成した SQL は Snowflake Warehouse で実行する。AWS は RDS 基盤を運用し、利用者が DB 設定・レプリケーション・権限を管理する。Fivetran の同期・dbt 実行基盤と Snowflake のサービス基盤は各提供元が運用し、利用者は接続・変換設定や Snowflake の Warehouse・データ・権限を管理する。内部ホストの直接操作は想定しない。接続方式と Git の提供元は未指定で、この構成は各公式資料を組み合わせた例であり実動作は未検証。
+Fivetran と GitHub の公式サービスアイコンは未確認のため、図では汎用記号を使う。

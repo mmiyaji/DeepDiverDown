@@ -46,6 +46,7 @@ export const CATEGORY_INFO = {
 
 // 「違い」の比較表を置いた分類（docs/category-<slug>.md）
 export const CATEGORY_DOCS = {
+  '取り込み': 'ingestion',
   'バッチ・SQL エンジン': 'batch-sql',
   'ストリーム処理': 'stream',
 };

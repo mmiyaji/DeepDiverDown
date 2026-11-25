@@ -340,7 +340,7 @@ implementations:
           - type: doc
             ref: docs/reference-risingwave.md#§7
       rw-aws-kafka:
-        label: Apache Kafka（実行場所は未選定）
+        label: 外部の Apache Kafka
         kind: external
         tier: entry
         x: 5
@@ -352,14 +352,14 @@ implementations:
           - type: doc
             ref: docs/reference-risingwave.md#§7
       rw-aws-downstream:
-        label: 出力先（Kafka・Iceberg・PostgreSQL など）
+        label: 外部の出力先
         kind: external
         tier: entry
         x: 9
         'y': 1.5
         realizes:
           - sink
-        description: Sink の配信先。実行場所は選んだ出力先による。
+        description: Sink の配信先。Kafka・Iceberg・PostgreSQL などから選ぶ。実行場所は配信先による。
         evidence:
           - type: doc
             ref: docs/reference-risingwave.md#§7
@@ -700,12 +700,39 @@ implementations:
             - rw-aws-meta
             - rw-aws-compute
             - rw-aws-compactor
+    layout3d:
+      tiers:
+        - {id: ingress, label: 利用者・入力元, kind: origin, z: 0, origin: [-6, 0], size: [4, 7]}
+        - {id: workers, label: EKS 実行ノード, z: 0, size: [16, 7]}
+        - {id: pods, label: RisingWave の各 Pod, z: 1, size: [16, 7]}
+        - {id: services, label: AWS の管理サービス, z: 0, origin: [19, 0], size: [13, 7]}
+        - {id: egress, label: 外部システム, kind: origin, z: 0, origin: [34, 0], size: [4, 7]}
+      nodes:
+        rw-aws-client: {tier: ingress, x: 1.5, y: 1.5}
+        rw-aws-kafka: {tier: ingress, x: 1.5, y: 5.5}
+        rw-aws-downstream: {tier: egress, x: 2, y: 3.5}
+        rw-aws-eks: {tier: services, x: 3, y: 1.5}
+        rw-aws-iam: {tier: services, x: 9.5, y: 1.5}
+        rw-aws-ec2: {tier: workers, x: 8, y: 3.5}
+        rw-aws-frontend: {tier: pods, x: 2, y: 2}
+        rw-aws-meta: {tier: pods, x: 6, y: 2}
+        rw-aws-compute: {tier: pods, x: 10, y: 5}
+        rw-aws-compactor: {tier: pods, x: 14, y: 2}
+        rw-aws-s3: {tier: services, x: 9.5, y: 5.5}
+        rw-aws-rds: {tier: services, x: 3, y: 5.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [workers, pods, services], nodes: [rw-aws-eks, rw-aws-iam, rw-aws-ec2, rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor, rw-aws-s3, rw-aws-rds]}
+        - {kind: vpc, label: EKS ワーカーの利用者 VPC, provider: aws, tier: [workers, pods], nodes: [rw-aws-ec2, rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor]}
+        - {kind: cluster, label: EKS クラスター（ワーカー側）, provider: k8s, tier: [workers, pods], nodes: [rw-aws-ec2, rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor]}
+        - {kind: namespace, label: RisingWave 名前空間, provider: k8s, tier: [pods], nodes: [rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor]}
   - id: self-hosted-docker
     label: 自社データセンターの Docker Compose（分散構成）
     description: 自社のサーバー上で Frontend・Meta・Compute・Compactor を別コンテナにし、PostgreSQL を meta store、MinIO を state store にする構成例。
     sources:
       - title: RisingWave · Docker Compose
         url: https://docs.risingwave.com/deploy/risingwave-docker-compose
+      - title: RisingWave · docker-compose-distributed.yml
+        url: https://github.com/risingwavelabs/risingwave/blob/main/docker/docker-compose-distributed.yml
       - title: RisingWave · Hardware requirements
         url: https://docs.risingwave.com/deploy/hardware-requirements
       - title: RisingWave · Architecture
@@ -774,7 +801,7 @@ implementations:
         tier: processing
         x: 15
         'y': 1.5
-        description: docker-compose-distributed.yml の各コンテナを実行する。台数や配置は資料で指定されていない。
+        description: docker-compose-distributed.yml の各コンテナを実行する。本番運用での台数と配置は未確認。
         evidence:
           - type: doc
             ref: docs/reference-risingwave.md#§8
@@ -921,3 +948,41 @@ implementations:
           - rw-dc-compactor
           - rw-dc-postgres
           - rw-dc-minio
+      - {kind: nodegroup, label: Docker Compose のコンテナ, tier: [processing, storage], nodes: [rw-dc-frontend, rw-dc-meta, rw-dc-compute, rw-dc-compactor, rw-dc-postgres, rw-dc-minio]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: RisingWave と保存先, z: 0, size: [35, 19]}
+      nodes:
+        rw-dc-client: {tier: diagram, x: 1, y: 4}
+        rw-dc-kafka: {tier: diagram, x: 1, y: 10}
+        rw-dc-downstream: {tier: diagram, x: 34, y: 10}
+        rw-dc-host: {tier: diagram, x: 17.5, y: 16}
+        rw-dc-frontend: {tier: diagram, x: 10.5, y: 4}
+        rw-dc-meta: {tier: diagram, x: 17.5, y: 4}
+        rw-dc-compute: {tier: diagram, x: 10.5, y: 10}
+        rw-dc-compactor: {tier: diagram, x: 24.5, y: 10}
+        rw-dc-postgres: {tier: diagram, x: 24.5, y: 4}
+        rw-dc-minio: {tier: diagram, x: 17.5, y: 10}
+      groups:
+        - {kind: datacenter, label: 自社データセンター, provider: onprem, tier: diagram, x0: 5.5, y0: -0.1, x1: 29.5, y1: 19, nodes: [rw-dc-host, rw-dc-frontend, rw-dc-meta, rw-dc-compute, rw-dc-compactor, rw-dc-postgres, rw-dc-minio]}
+        - {kind: nodegroup, label: Docker Compose のコンテナ, tier: diagram, x0: 6.6, y0: 1, x1: 28.4, y1: 12.8, nodes: [rw-dc-frontend, rw-dc-meta, rw-dc-compute, rw-dc-compactor, rw-dc-postgres, rw-dc-minio]}
+    layout3d:
+      tiers:
+        - {id: ingress, label: 利用者・入力元, kind: origin, z: 0, origin: [-9, 0], size: [5, 8]}
+        - {id: hosts, label: 実行基盤, z: 0, size: [19, 8]}
+        - {id: containers, label: コンテナ実行層, z: 1, size: [19, 8]}
+        - {id: egress, label: 外部の出力先, kind: origin, z: 0, origin: [24, 0], size: [5, 8]}
+      nodes:
+        rw-dc-client: {tier: ingress, x: 2, y: 2}
+        rw-dc-kafka: {tier: ingress, x: 2, y: 6.5}
+        rw-dc-downstream: {tier: egress, x: 2, y: 6.5}
+        rw-dc-host: {tier: hosts, x: 9.5, y: 4}
+        rw-dc-frontend: {tier: containers, x: 2.5, y: 2}
+        rw-dc-meta: {tier: containers, x: 9.5, y: 2}
+        rw-dc-compute: {tier: containers, x: 2.5, y: 6.5}
+        rw-dc-compactor: {tier: containers, x: 16.5, y: 6.5}
+        rw-dc-postgres: {tier: containers, x: 16.5, y: 2}
+        rw-dc-minio: {tier: containers, x: 9.5, y: 6.5}
+      groups:
+        - {kind: datacenter, label: 自社データセンター, provider: onprem, tier: [hosts, containers], nodes: [rw-dc-host, rw-dc-frontend, rw-dc-meta, rw-dc-compute, rw-dc-compactor, rw-dc-postgres, rw-dc-minio]}
+        - {kind: nodegroup, label: Docker Compose のコンテナ, tier: containers, nodes: [rw-dc-frontend, rw-dc-meta, rw-dc-compute, rw-dc-compactor, rw-dc-postgres, rw-dc-minio]}

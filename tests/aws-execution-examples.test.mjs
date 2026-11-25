@@ -42,7 +42,9 @@ test('synthetic data job specifies execution and restricted candidate storage',(
 test('Fivetran SaaS separates source, destination and warehouse',()=>{
   const impl=load('fivetran').implementations[0], n=impl.nodes;
   assert.equal(n['postgres-snowflake-pg'].svc,'rds');
-  assert.equal(n['postgres-snowflake-snowflake'].svc,'snowflake:platform');
+  assert.equal(n['postgres-snowflake-snowflake'].provider,'snowflake');
+  assert.equal(n['postgres-snowflake-snowflake'].svc, undefined); // RAW テーブルはサービスではない
+  assert.equal(n['postgres-snowflake-connection'].svc,'fivetran:platform');
   assert.equal(n['postgres-snowflake-warehouse'].svc,'snowflake:warehouse');
   assert.ok(impl.groups.some(g=>g.label==='Fivetran SaaS'&&g.nodes.includes('postgres-snowflake-connection')));
 });

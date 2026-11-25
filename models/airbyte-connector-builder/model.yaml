@@ -1,0 +1,120 @@
+name: Airbyte：Connector Builder の宣言・試し読み・公開
+description: HTTP API の認証とページングを宣言し、試し読みを経てワークスペースに公開する。同期ジョブは確定済みのカーソルから再開する。
+parent: {model: airbyte, node: sourceConnector}
+reference:
+  objectives: [宣言の作成と試し読みの流れを追う, 公開済みコネクターと接続・実行時の資格情報を区別する, HTTP API のカーソルから再開する流れを追う]
+  sources:
+    - {title: Airbyte Connector Builder, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview}
+    - {title: Airbyte Connector Builder Tutorial, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/tutorial}
+    - {title: Incremental Sync, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync}
+    - {title: Airbyte Protocol, url: https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol}
+sources: [docs/reference-airbyte-connector-builder.md]
+evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§1}]
+tiers:
+  - {id: flow, label: 宣言から同期への流れ, z: 0, size: [29, 11]}
+nodes:
+  author: {label: コネクターの作成者, kind: actor, tier: flow, x: 1, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§1}]}
+  declaration: {label: 取得ルールの宣言, kind: file, tier: flow, x: 6, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§1}]}
+  preview: {label: 試し読みと応答確認, kind: service, tier: flow, x: 11, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§2}]}
+  api: {label: 取得対象の HTTP API, kind: external, tier: flow, x: 11, y: 7, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§2}]}
+  published: {label: 公開した入力アダプター定義, kind: catalog, tier: flow, x: 17, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  sync: {label: 定期同期とカーソル読取, kind: workflow, tier: flow, x: 17, y: 7, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  output: {label: 複製先へ書き込む担当, kind: worker, tier: flow, x: 23, y: 7, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  target: {label: レコードの保存先, kind: db, tier: flow, x: 28, y: 7, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  state: {label: 確定済みカーソル, kind: db, tier: flow, x: 23, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+links:
+  - {id: edit-rules, from: author, to: declaration, label: 認証と取得範囲を宣言, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§1}]}
+  - {id: start-test, from: declaration, to: preview, label: 宣言を試し読みへ渡す, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§2}]}
+  - {id: test-call, from: preview, to: api, label: テスト用資格情報で HTTP リクエスト, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§2}]}
+  - {id: test-answer, from: api, to: preview, label: レコードを返す, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§2}]}
+  - {id: publish, from: declaration, to: published, label: ワークスペース内に公開, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: configure, from: published, to: sync, label: 公開した定義から同期を設定, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: request, from: sync, to: api, label: カーソル範囲とページを指定, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: receive, from: api, to: sync, label: 変更データを返す, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: relay, from: sync, to: output, label: レコードと State を渡す, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: commit, from: output, to: target, label: レコードをコミット, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: acknowledge, from: output, to: sync, label: コミットした State を返す, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: store, from: sync, to: state, label: 確定済みカーソルを保存, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+  - {id: resume, from: state, to: sync, label: 保存したカーソルを読み出す, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+scenarios:
+  - id: build
+    label: 宣言を試しワークスペースに公開する
+    evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§2}]
+    steps:
+      - {links: [edit-rules, start-test], note: 認証入力、ページング、カーソルの取得ルールを定義する。}
+      - {links: [test-call, test-answer], note: テスト値で応答、レコード抽出、型を確認する。}
+      - {links: [publish, configure], note: 公開版を使って Source と同期接続を作る。}
+  - id: fetch
+    label: カーソルから同期を再開する
+    evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]
+    steps:
+      - {links: [resume, request, receive], note: 接続の資格情報で前回の確定位置から API に問い合わせる。}
+      - {links: [relay, commit], note: 取得レコードを複製先に書く。}
+      - {links: [acknowledge, store], note: コミットを確認したカーソルを保存する。}
+requirements:
+  - {id: SRC-01, kind: usecase, title: API の取得ルールを配布する, text: 試し読みで確認した宣言をワークスペース内で再利用する。, links: [start-test, test-answer, publish, configure], evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§3}]}
+unknowns: [{id: UNK-01, text: 例示した注文 API の実装と運用環境での互換性は未確認。, refs: [api, sync]}]
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: kubernetes-http-postgres
+    label: 自前 Kubernetes の Connector Builder と PostgreSQL
+    description: 受注 API の取得宣言を Airbyte のワークスペース内に公開し、同期 Pod が分析 PostgreSQL に書く。
+    sources:
+      - {title: Airbyte Connector Builder, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview}
+      - {title: Airbyte Connector Builder Tutorial, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/tutorial}
+      - {title: Incremental Sync, url: https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync}
+      - {title: Airbyte プラットフォーム構成, url: https://docs.airbyte.com/platform/understanding-airbyte/high-level-view}
+      - {title: Airbyte Postgres Destination, url: https://docs.airbyte.com/integrations/destinations/postgres}
+      - {title: Airbyte 設定 DB, url: https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections}
+    tiers:
+      - {id: diagram, label: HTTP API の入力コネクター, z: 0, size: [35, 16]}
+    nodes:
+      bld-author: {label: ワークスペースの作成者, kind: actor, tier: diagram, x: 1, y: 3, realizes: [author], evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-api: {label: 注文 API, kind: external, tier: diagram, x: 1, y: 10, realizes: [api], description: 更新日時フィルターとページングを返す想定の HTTPS API。, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-host: {label: 自前 Linux Kubernetes ノード, kind: host, tier: diagram, x: 23, y: 2, description: Airbyte の管理 Pod と同期ワークロードを実行する。, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-builder: {label: Connector Builder の編集・試し読み, svc: 'airbyte:connector-builder', kind: service, tier: diagram, x: 11, y: 3, realizes: [declaration, preview], description: ワークスペースのプロジェクトに YAML 宣言を保存し、テスト値で応答を確認する。, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-released: {label: ワークスペースの公開済み Source 定義, kind: catalog, tier: diagram, x: 17, y: 3, realizes: [published], description: ワークスペース内の Source 作成時に選べる。, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-sync: {label: カスタム Source と同期ジョブ, kind: workflow, tier: diagram, x: 11, y: 10, realizes: [sync], description: 公開版と Source 設定を使い、カーソル範囲とページを指定して取得する。, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-writer: {label: Airbyte Postgres Destination, svc: 'airbyte:postgres-destination', kind: worker, tier: diagram, x: 23, y: 10, realizes: [output], evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-db: {label: 分析用 PostgreSQL サーバー, svc: 'postgresql:server', kind: db, tier: diagram, x: 31, y: 10, realizes: [target], description: Postgres Destination を通して分析用スキーマにレコードを書き込む接続先。, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+      bld-state: {label: Airbyte 設定 DB の State, kind: db, tier: diagram, x: 31, y: 3, realizes: [state], evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+    links:
+      - {id: bld-node-sync, from: bld-host, to: bld-sync, label: 同期ワークロードを実行, evidence: [{type: doc, ref: docs/reference-airbyte-connector-builder.md#§4}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [bld-host, bld-builder, bld-released, bld-sync, bld-writer, bld-db, bld-state]}
+      - {kind: cluster, label: 自前 Kubernetes, provider: k8s, tier: diagram, nodes: [bld-host, bld-builder, bld-released, bld-sync, bld-writer]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 編集・試し読みと同期, z: 0, size: [35, 15]}
+      nodes:
+        bld-author: {tier: diagram, x: 1, y: 3}
+        bld-api: {tier: diagram, x: 1, y: 10}
+        bld-host: {tier: diagram, x: 23, y: 2}
+        bld-builder: {tier: diagram, x: 10, y: 3}
+        bld-released: {tier: diagram, x: 16.5, y: 3}
+        bld-sync: {tier: diagram, x: 10, y: 10}
+        bld-writer: {tier: diagram, x: 23, y: 10}
+        bld-db: {tier: diagram, x: 31, y: 10}
+        bld-state: {tier: diagram, x: 31, y: 3}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, x0: 4.9, y0: -2, x1: 35.6, y1: 14, nodes: [bld-host, bld-builder, bld-released, bld-sync, bld-writer, bld-db, bld-state]}
+        - {kind: cluster, label: 自前 Kubernetes, provider: k8s, tier: diagram, x0: 6, y0: -0.9, x1: 27, y1: 12.7, nodes: [bld-host, bld-builder, bld-released, bld-sync, bld-writer]}
+    layout3d:
+      tiers:
+        - {id: entry, label: 作成者と入力 API, kind: origin, z: 0, origin: [-8.5, 0], size: [5, 8]}
+        - {id: hosts, label: Kubernetes ノード, z: 0, size: [16, 8]}
+        - {id: pods, label: Airbyte の管理・同期, z: 1, size: [16, 8]}
+        - {id: storage, label: PostgreSQL の接続先, z: 0, origin: [19.5, 0], size: [8, 8]}
+      nodes:
+        bld-author: {tier: entry, x: 2, y: 2}
+        bld-api: {tier: entry, x: 2, y: 6.5}
+        bld-host: {tier: hosts, x: 8, y: 3}
+        bld-builder: {tier: pods, x: 3, y: 1.8}
+        bld-released: {tier: pods, x: 11, y: 1.8}
+        bld-sync: {tier: pods, x: 3, y: 6}
+        bld-writer: {tier: pods, x: 12.5, y: 6}
+        bld-db: {tier: storage, x: 4, y: 6}
+        bld-state: {tier: storage, x: 4, y: 2}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [hosts, pods, storage], nodes: [bld-host, bld-builder, bld-released, bld-sync, bld-writer, bld-db, bld-state]}
+        - {kind: cluster, label: 自前 Kubernetes, provider: k8s, tier: [hosts, pods], nodes: [bld-host, bld-builder, bld-released, bld-sync, bld-writer]}

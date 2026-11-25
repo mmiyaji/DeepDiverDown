@@ -30,19 +30,23 @@ changelog checkpointing と非同期 state checkpointing は別の機能。後�
 
 ## 5. 実装例
 
-Kafka 等の再読可能な入力を AWS 上の Databricks クラシック Jobs compute が処理し、RocksDB の状態差分と進捗を顧客 S3 の各クエリ専用チェックポイントに保存し、S3 上の Delta テーブルに出力する概念例。クラスター、バケットと権限は事前に用意する。個々の環境の権限、再処理の保証は公式ガイドで確認する。
+Databricks のコントロールプレーンで、Lakeflow Jobs が継続実行に設定したジョブの起動と再試行を管理する。ジョブは顧客 AWS アカウントのクラシックジョブコンピュートで動く。Databricks Runtime のドライバーとワーカーはクラスタの EC2 ノードで動き、RocksDB はワーカーのローカルメモリとディスクを使う。
+
+この構成例では、クラスタと同じ顧客 AWS アカウント内の S3 にクエリ専用のチェックポイントと Delta 出力テーブルを置く。AWS は S3 の基盤を運用する。利用者はバケットの設定、データ、アクセス権限を管理する。
+
+利用者はジョブ定義で実行環境とトリガーを設定し、Kafka への接続と認証を用意する。ジョブの再実行では、Structured Streaming が同じチェックポイントを読み込み、Kafka の必要なオフセットから再処理する。Kafka は外部入力として示す。提供元と設置場所は未特定で、再処理に必要なレコードがトピックに残っていることを前提とする。
 
 | 機能 | 担い手 |
 | --- | --- |
-| 再読できる入力 | Kafka などの入力 |
-| バッチの進行管理 | Structured Streaming のクエリ |
-| 状態付き演算 | Databricks Runtime のタスク |
-| ローカル状態ストア | RocksDB state store |
-| 状態の差分 | 状態の changelog |
-| 状態のスナップショット | RocksDB snapshot |
-| オフセットと完了記録 | チェックポイントログ |
-| 結果の出力 | Delta 出力テーブル |
-| 障害からの再開 | クエリの再起動 |
+| 再読できる入力 | 外部 Kafka トピック |
+| バッチの進行管理 | クラシックジョブコンピュート上の Spark ドライバー |
+| 状態付き演算 | ワーカー上の Spark エグゼキューター |
+| ローカル状態ストア | ワーカーローカルの RocksDB state store |
+| 状態の差分 | S3 チェックポイント内の changelog |
+| 状態のスナップショット | S3 チェックポイント内の RocksDB snapshot |
+| オフセットと完了記録 | S3 チェックポイント内のオフセットログとコミットログ |
+| 結果の出力 | S3 上の Delta 出力テーブル |
+| 障害からの再開 | Lakeflow Jobs による再試行と Structured Streaming による進捗・状態の復元 |
 
 ## 公式資料
 
@@ -51,4 +55,11 @@ Kafka 等の再読可能な入力を AWS 上の Databricks クラシック Jobs 
 - [Structured Streaming のチェックポイント](https://docs.databricks.com/aws/en/structured-streaming/checkpoints)
 - [非同期 state checkpointing](https://docs.databricks.com/aws/en/structured-streaming/async-checkpointing)
 - [Databricks コンピュート](https://docs.databricks.com/aws/en/compute/)
-- [Unity Catalog 管理ストレージ](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)
+- [Databricks on AWS のアーキテクチャ](https://docs.databricks.com/aws/en/getting-started/high-level-architecture)
+- [クラシックコンピュートの設定](https://docs.databricks.com/aws/en/compute/configure)
+- [本番向け Structured Streaming のジョブ設定](https://docs.databricks.com/aws/en/structured-streaming/production)
+- [Lakeflow Jobs の継続実行](https://docs.databricks.com/aws/en/jobs/continuous)
+- [Apache Kafka への接続](https://docs.databricks.com/aws/en/connect/streaming/kafka)
+- [Spark Structured Streaming の Kafka コネクター](https://spark.apache.org/docs/latest/streaming/structured-streaming-kafka-integration.html)
+- [Delta テーブルのストリーミング書き込み](https://docs.databricks.com/aws/en/structured-streaming/delta-lake)
+- [Amazon S3 の責任共有モデル](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security.html)

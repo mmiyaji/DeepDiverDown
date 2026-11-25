@@ -1,4 +1,4 @@
-name: Kafka から Snowflake 管理 Iceberg への取り込み
+name: Snowflake：Kafka から管理 Iceberg への取り込み
 description: Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。
 parent:
   model: snowflake-snowpipe-streaming-internals
@@ -7,7 +7,7 @@ reference:
   objectives:
     - Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。
     - 既存 Kafka と Connect からイベントを送信する。
-    - PIPE で検証・対応する変換を行い、失敗は設定したログで確認する。
+    - 取り込みと検証の役割を追い、拒否された行の保存先を確認する。
   sources:
     - title: Kafka topics を Iceberg に取り込む
       url: https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/
@@ -15,6 +15,8 @@ reference:
       url: https://docs.snowflake.com/en/user-guide/kafka-connector
     - title: Snowpipe Streaming
       url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+    - title: Kafka Connector の Iceberg 取り込み
+      url: https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg
 sources:
   - docs/reference-snowflake-kafka-iceberg-streaming.md
 evidence:
@@ -89,12 +91,12 @@ nodes:
       - type: doc
         ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
   reject:
-    label: エラーの確認
-    kind: file
+    label: 行エラーの記録
+    kind: db
     tier: data
     x: 0
     'y': 1.5
-    description: サーバー側で拒否された行は設定したエラーログで確認する。
+    description: 行エラーの記録を有効にした場合に、取り込み中に拒否された行を保持する。
     evidence:
       - type: doc
         ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
@@ -120,7 +122,7 @@ nodes:
         ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§2
   data:
     label: データファイル
-    kind: db
+    kind: file
     tier: data
     x: 10.4
     'y': 1.5
@@ -231,8 +233,8 @@ implementations:
   - id: snowflake
     label: Snowflake の実装例
     description: >-
-      既存の Kafka と Kafka Connect を利用者が運用し、Snowflake Connector v4 から Snowflake 管理 Iceberg テーブルへ取り込む公式記事の構成。Snowflake
-      が取り込みと管理表のファイル・メタデータを保守する。Kafka や Connect の基盤は既存環境であり所在を推測しない。
+      自前の Linux ホストで Kafka と Kafka Connect を運用し、Snowflake Connector v4 から Snowflake 管理 Iceberg テーブルへ取り込む構成例。
+      Snowflake が取り込みと管理表のファイル・メタデータを保守する。各ホストを利用者管理のデータセンターに置くことは、この例の前提である。
     sources:
       - title: Kafka topics を Iceberg に取り込む
         url: https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/
@@ -240,6 +242,12 @@ implementations:
         url: https://docs.snowflake.com/en/user-guide/kafka-connector
       - title: Snowpipe Streaming
         url: https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview
+      - title: Kafka Connector の設定と認証
+        url: https://docs.snowflake.com/en/user-guide/kafka-connector/setup-kafka
+      - title: Iceberg テーブルのストレージ
+        url: https://docs.snowflake.com/en/user-guide/tables-iceberg-storage
+      - title: Kafka Connector の Iceberg 取り込み
+        url: https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg
     tiers:
       - id: input
         label: 既存 Kafka と Connect
@@ -303,7 +311,7 @@ implementations:
         realizes:
           - connect
       ex-pipe:
-        label: Snowpipe Streaming と PIPE
+        label: Snowpipe Streaming
         kind: service
         tier: process
         x: 0
@@ -314,14 +322,23 @@ implementations:
             ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
         realizes:
           - pipe
-        svc: snowflake:pipe
-      ex-reject:
-        label: Snowflake のエラーログ
+        svc: snowflake:streaming
+      ex-pipe-config:
+        label: 名前付き PIPE 定義
         kind: file
+        provider: snowflake
+        tier: process
+        x: 6
+        'y': 3
+        description: 取り込み先とサーバー側の検証・変換を指定する利用者管理の設定。
+        evidence: [{type: doc, ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5}]
+      ex-reject:
+        label: Snowflake のエラーテーブル
+        kind: db
         tier: data
         x: 0
         'y': 1.5
-        description: サーバー側で拒否された行は設定したエラーログで確認する。
+        description: 対象の Iceberg テーブルで ERROR_LOGGING を有効にして、サーバー側の解析・変換で拒否された行とエラーを保持する。
         evidence:
           - type: doc
             ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
@@ -353,7 +370,7 @@ implementations:
           - metadata
       ex-data:
         label: 管理 Iceberg の Parquet
-        kind: db
+        kind: file
         tier: data
         x: 10.4
         'y': 1.5
@@ -364,8 +381,9 @@ implementations:
         realizes:
           - data
       ex-read:
-        label: Snowflake SQL
-        kind: client
+        label: SQL クエリ実行（Warehouse）
+        svc: snowflake:warehouse
+        kind: service
         tier: data
         x: 15.600000000000001
         'y': 1.5
@@ -375,9 +393,39 @@ implementations:
             ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5
         realizes:
           - read
+      ex-kafka-host:
+        label: 自前 Kafka ホスト
+        kind: host
+        tier: input
+        x: 5.2
+        'y': 3.5
+        description: 利用者が Kafka ブローカーとログを運用する Linux ホスト。
+        evidence: [{type: doc, ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5}]
+      ex-connect-host:
+        label: 自前 Connect ホスト
+        kind: host
+        tier: input
+        x: 10.4
+        'y': 3.5
+        description: 利用者が Kafka Connect ワーカーと Snowflake Connector v4 を運用する Linux ホスト。
+        evidence: [{type: doc, ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5}]
+      ex-sql-client:
+        label: SQL 利用者
+        kind: client
+        tier: input
+        x: 16
+        'y': 3.5
+        description: Snowflake に認証し、Warehouse へ SQL クエリを送る。
+        evidence: [{type: doc, ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5}]
+    links:
+      - {id: ex-pipe-definition, from: ex-pipe-config, to: ex-pipe, label: PIPE を設定}
+      - {id: ex-kafka-run, from: ex-kafka-host, to: ex-topic, label: Kafka トピックを提供, evidence: [{type: doc, ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5}]}
+      - {id: ex-connect-run, from: ex-connect-host, to: ex-connect, label: Connector を実行, evidence: [{type: doc, ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5}]}
+      - {id: ex-query, from: ex-sql-client, to: ex-read, label: SQL クエリの実行を要求, evidence: [{type: doc, ref: docs/reference-snowflake-kafka-iceberg-streaming.md#§5}]}
     groups:
+      - {kind: datacenter, provider: onprem, label: 利用者管理の Kafka・Connect 環境（構成例）, tier: [input], nodes: [ex-kafka-host, ex-connect-host, ex-topic, ex-connect]}
       - kind: cloud
-        label: Snowflake の取り込みと管理テーブル（論理範囲）
+        label: Snowflake アカウント（論理範囲）
         provider: snowflake
         tier:
           - process
@@ -385,7 +433,57 @@ implementations:
           - data
         nodes:
           - ex-pipe
+          - ex-pipe-config
           - ex-reject
           - ex-writer
           - ex-metadata
           - ex-data
+          - ex-read
+    layout2d:
+      tiers:
+        - {id: diagram, label: Kafka から Snowflake への取り込み, z: 0, size: [40, 15]}
+      nodes:
+        ex-producer: {tier: diagram, x: 0, y: 5}
+        ex-kafka-host: {tier: diagram, x: 5, y: 2}
+        ex-topic: {tier: diagram, x: 5, y: 6}
+        ex-connect-host: {tier: diagram, x: 11, y: 2}
+        ex-connect: {tier: diagram, x: 11, y: 6}
+        ex-pipe: {tier: diagram, x: 19, y: 3}
+        ex-pipe-config: {tier: diagram, x: 19, y: 6}
+        ex-writer: {tier: diagram, x: 25, y: 3}
+        ex-reject: {tier: diagram, x: 19, y: 9}
+        ex-metadata: {tier: diagram, x: 25, y: 9}
+        ex-data: {tier: diagram, x: 31, y: 9}
+        ex-read: {tier: diagram, x: 31, y: 3}
+        ex-sql-client: {tier: diagram, x: 39, y: 3}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理の Kafka・Connect 環境（構成例）, tier: diagram, x0: 2.5, y0: -0.5, x1: 14, y1: 9, nodes: [ex-kafka-host, ex-connect-host, ex-topic, ex-connect]}
+        - {kind: nodegroup, label: Kafka ホスト, tier: diagram, x0: 3.2, y0: 0.2, x1: 6.8, y1: 8, nodes: [ex-kafka-host, ex-topic]}
+        - {kind: nodegroup, label: Connect ホスト, tier: diagram, x0: 9.2, y0: 0.2, x1: 12.8, y1: 8, nodes: [ex-connect-host, ex-connect]}
+        - {kind: cloud, provider: snowflake, label: Snowflake アカウント（論理範囲）, tier: diagram, x0: 16, y0: 0, x1: 35, y1: 12, nodes: [ex-pipe, ex-pipe-config, ex-reject, ex-writer, ex-metadata, ex-data, ex-read]}
+    layout3d:
+      tiers:
+        - {id: client, label: イベント送信元, kind: origin, z: 0, origin: [-7, 0], size: [5, 8]}
+        - {id: hosts, label: 自前 Linux ホスト, z: 0, origin: [0, 0], size: [12, 8]}
+        - {id: runtime, label: Kafka と Connect, z: 1, origin: [0, 0], size: [12, 8]}
+        - {id: snowflake, label: Snowflake の論理機能, z: 0, origin: [17, 0], size: [22, 11]}
+        - {id: sql-client, label: SQL 接続元, kind: origin, z: 0, origin: [32, -8], size: [5, 5]}
+      nodes:
+        ex-producer: {tier: client, x: 2, y: 2}
+        ex-sql-client: {tier: sql-client, x: 2.5, y: 2.5}
+        ex-kafka-host: {tier: hosts, x: 2, y: 4}
+        ex-connect-host: {tier: hosts, x: 9, y: 4}
+        ex-topic: {tier: runtime, x: 2, y: 4}
+        ex-connect: {tier: runtime, x: 9, y: 4}
+        ex-pipe: {tier: snowflake, x: 2, y: 2}
+        ex-pipe-config: {tier: snowflake, x: 2, y: 5}
+        ex-writer: {tier: snowflake, x: 9, y: 2}
+        ex-read: {tier: snowflake, x: 17, y: 2}
+        ex-reject: {tier: snowflake, x: 2, y: 8}
+        ex-metadata: {tier: snowflake, x: 9, y: 8}
+        ex-data: {tier: snowflake, x: 17, y: 8}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理の Kafka・Connect 環境（構成例）, tier: [hosts, runtime], nodes: [ex-kafka-host, ex-connect-host, ex-topic, ex-connect]}
+        - {kind: nodegroup, label: Kafka ホスト, tier: [hosts, runtime], nodes: [ex-kafka-host, ex-topic]}
+        - {kind: nodegroup, label: Connect ホスト, tier: [hosts, runtime], nodes: [ex-connect-host, ex-connect]}
+        - {kind: cloud, provider: snowflake, label: Snowflake アカウント（論理範囲）, tier: [snowflake], nodes: [ex-pipe, ex-pipe-config, ex-reject, ex-writer, ex-metadata, ex-data, ex-read]}

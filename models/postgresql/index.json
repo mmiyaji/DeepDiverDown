@@ -1,0 +1,332 @@
+{
+  "model": "postgresql",
+  "name": "PostgreSQL の基本アーキテクチャ",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "sql-client": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "listener": {
+      "type": "node",
+      "label": "接続の受付",
+      "status": "claim"
+    },
+    "session": {
+      "type": "node",
+      "label": "SQL 処理プロセス",
+      "status": "claim"
+    },
+    "access": {
+      "type": "node",
+      "label": "接続規則と認証",
+      "status": "claim"
+    },
+    "page-cache": {
+      "type": "node",
+      "label": "共有ページバッファー",
+      "status": "claim"
+    },
+    "data-files": {
+      "type": "node",
+      "label": "テーブル・索引ファイル",
+      "status": "claim"
+    },
+    "change-log": {
+      "type": "node",
+      "label": "先行書き込みログ",
+      "status": "claim"
+    },
+    "change-stream": {
+      "type": "node",
+      "label": "論理変更の配信",
+      "status": "claim"
+    },
+    "subscriber": {
+      "type": "node",
+      "label": "変更の購読クライアント",
+      "status": "claim"
+    },
+    "open-sql": {
+      "type": "link",
+      "label": "SQL クライアント → 接続の受付",
+      "status": "claim"
+    },
+    "start-session": {
+      "type": "link",
+      "label": "接続の受付 → SQL 処理プロセス",
+      "status": "claim"
+    },
+    "authenticate-sql": {
+      "type": "link",
+      "label": "SQL 処理プロセス → 接続規則と認証",
+      "status": "claim"
+    },
+    "submit-sql": {
+      "type": "link",
+      "label": "SQL クライアント → SQL 処理プロセス",
+      "status": "claim"
+    },
+    "return-sql": {
+      "type": "link",
+      "label": "SQL 処理プロセス → SQL クライアント",
+      "status": "claim"
+    },
+    "access-pages": {
+      "type": "link",
+      "label": "SQL 処理プロセス → 共有ページバッファー",
+      "status": "claim"
+    },
+    "read-pages": {
+      "type": "link",
+      "label": "テーブル・索引ファイル → 共有ページバッファー",
+      "status": "claim"
+    },
+    "log-commit": {
+      "type": "link",
+      "label": "SQL 処理プロセス → 先行書き込みログ",
+      "status": "claim"
+    },
+    "flush-pages": {
+      "type": "link",
+      "label": "共有ページバッファー → テーブル・索引ファイル",
+      "status": "claim"
+    },
+    "open-replication": {
+      "type": "link",
+      "label": "変更の購読クライアント → 接続の受付",
+      "status": "claim"
+    },
+    "start-stream": {
+      "type": "link",
+      "label": "接続の受付 → 論理変更の配信",
+      "status": "claim"
+    },
+    "authenticate-stream": {
+      "type": "link",
+      "label": "論理変更の配信 → 接続規則と認証",
+      "status": "claim"
+    },
+    "decode-log": {
+      "type": "link",
+      "label": "先行書き込みログ → 論理変更の配信",
+      "status": "claim"
+    },
+    "deliver-change": {
+      "type": "link",
+      "label": "論理変更の配信 → 変更の購読クライアント",
+      "status": "claim"
+    },
+    "sql-update": {
+      "type": "scenario",
+      "label": "SQL 接続と更新の保存"
+    },
+    "logical-streaming": {
+      "type": "scenario",
+      "label": "コミット済み変更を購読"
+    },
+    "unverified": {
+      "type": "unknown",
+      "label": "ホストの耐障害性、遅延、ストレージ容量、構成全体の実機動作は未確認。"
+    },
+    "ex-psql": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "psql",
+      "realizes": [
+        "sql-client"
+      ]
+    },
+    "ex-subscriber": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "pgoutput 対応の購読クライアント",
+      "realizes": [
+        "subscriber"
+      ]
+    },
+    "ex-linux": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Linux ホスト",
+      "realizes": []
+    },
+    "ex-postmaster": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "postgres 親プロセス",
+      "realizes": [
+        "listener"
+      ]
+    },
+    "ex-backend": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "SQL バックエンド",
+      "realizes": [
+        "session"
+      ]
+    },
+    "ex-auth": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "pg_hba.conf と DB ロール",
+      "realizes": [
+        "access"
+      ]
+    },
+    "ex-buffers": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "shared_buffers",
+      "realizes": [
+        "page-cache"
+      ]
+    },
+    "ex-files": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PGDATA/base のデータファイル",
+      "realizes": [
+        "data-files"
+      ]
+    },
+    "ex-wal": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PGDATA/pg_wal",
+      "realizes": [
+        "change-log"
+      ]
+    },
+    "ex-sender": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "WAL sender と pgoutput",
+      "realizes": [
+        "change-stream"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-postgresql.md#§1": [
+      "model"
+    ],
+    "docs/reference-postgresql.md": [
+      "model",
+      "sql-client",
+      "listener",
+      "session",
+      "access",
+      "page-cache",
+      "data-files",
+      "change-log",
+      "change-stream",
+      "subscriber",
+      "open-sql",
+      "start-session",
+      "authenticate-sql",
+      "submit-sql",
+      "return-sql",
+      "access-pages",
+      "read-pages",
+      "log-commit",
+      "flush-pages",
+      "open-replication",
+      "start-stream",
+      "authenticate-stream",
+      "decode-log",
+      "deliver-change",
+      "sql-update",
+      "logical-streaming",
+      "ex-psql",
+      "ex-subscriber",
+      "ex-linux",
+      "ex-postmaster",
+      "ex-backend",
+      "ex-auth",
+      "ex-buffers",
+      "ex-files",
+      "ex-wal",
+      "ex-sender"
+    ],
+    "docs/reference-postgresql.md#§6": [
+      "model"
+    ],
+    "docs/reference-postgresql.md#§2": [
+      "sql-client",
+      "listener",
+      "session",
+      "access",
+      "open-sql",
+      "start-session",
+      "authenticate-sql",
+      "submit-sql",
+      "return-sql",
+      "sql-update"
+    ],
+    "docs/reference-postgresql.md#§3": [
+      "page-cache",
+      "data-files",
+      "change-log",
+      "access-pages",
+      "read-pages",
+      "log-commit",
+      "flush-pages",
+      "sql-update"
+    ],
+    "docs/reference-postgresql.md#§4": [
+      "change-stream",
+      "subscriber",
+      "open-replication",
+      "start-stream",
+      "authenticate-stream",
+      "decode-log",
+      "deliver-change",
+      "logical-streaming"
+    ],
+    "docs/reference-postgresql.md#§5": [
+      "ex-psql",
+      "ex-subscriber",
+      "ex-linux",
+      "ex-postmaster",
+      "ex-backend",
+      "ex-auth",
+      "ex-buffers",
+      "ex-files",
+      "ex-wal",
+      "ex-sender"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "取り込み",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "PostgreSQL",
+    "role": "overview",
+    "order": 50,
+    "objectives": [
+      "接続の受付と SQL を実行するプロセスの役割を区別する。",
+      "共有バッファー、データファイル、先行書き込みログの関係を説明する。",
+      "コミット済み変更を論理レプリケーションで配信する経路を追う。"
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL 18 Architectural Fundamentals",
+        "url": "https://www.postgresql.org/docs/18/tutorial-arch.html"
+      },
+      {
+        "title": "PostgreSQL 18 Write-Ahead Logging",
+        "url": "https://www.postgresql.org/docs/18/wal-intro.html"
+      },
+      {
+        "title": "PostgreSQL 18 Logical Replication Architecture",
+        "url": "https://www.postgresql.org/docs/18/logical-replication-architecture.html"
+      }
+    ]
+  }
+}

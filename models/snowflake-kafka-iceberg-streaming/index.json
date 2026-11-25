@@ -1,6 +1,6 @@
 {
   "model": "snowflake-kafka-iceberg-streaming",
-  "name": "Kafka から Snowflake 管理 Iceberg への取り込み",
+  "name": "Snowflake：Kafka から管理 Iceberg への取り込み",
   "coverage": {
     "covered": 5,
     "total": 5
@@ -28,7 +28,7 @@
     },
     "reject": {
       "type": "node",
-      "label": "エラーの確認",
+      "label": "行エラーの記録",
       "status": "claim"
     },
     "writer": {
@@ -68,7 +68,7 @@
     },
     "error": {
       "type": "link",
-      "label": "取り込みと検証 → エラーの確認",
+      "label": "取り込みと検証 → 行エラーの記録",
       "status": "claim"
     },
     "ingest": {
@@ -130,15 +130,21 @@
     "ex-pipe": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "Snowpipe Streaming と PIPE",
+      "label": "Snowpipe Streaming",
       "realizes": [
         "pipe"
       ]
     },
+    "ex-pipe-config": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "名前付き PIPE 定義",
+      "realizes": []
+    },
     "ex-reject": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "Snowflake のエラーログ",
+      "label": "Snowflake のエラーテーブル",
       "realizes": [
         "reject"
       ]
@@ -170,10 +176,28 @@
     "ex-read": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "Snowflake SQL",
+      "label": "SQL クエリ実行（Warehouse）",
       "realizes": [
         "read"
       ]
+    },
+    "ex-kafka-host": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "自前 Kafka ホスト",
+      "realizes": []
+    },
+    "ex-connect-host": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "自前 Connect ホスト",
+      "realizes": []
+    },
+    "ex-sql-client": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "SQL 利用者",
+      "realizes": []
     }
   },
   "byRef": {
@@ -205,11 +229,15 @@
       "ex-topic",
       "ex-connect",
       "ex-pipe",
+      "ex-pipe-config",
       "ex-reject",
       "ex-writer",
       "ex-metadata",
       "ex-data",
-      "ex-read"
+      "ex-read",
+      "ex-kafka-host",
+      "ex-connect-host",
+      "ex-sql-client"
     ],
     "docs/reference-snowflake-kafka-iceberg-streaming.md#§4": [
       "model"
@@ -242,23 +270,30 @@
       "ex-topic",
       "ex-connect",
       "ex-pipe",
+      "ex-pipe-config",
       "ex-reject",
       "ex-writer",
       "ex-metadata",
       "ex-data",
-      "ex-read"
+      "ex-read",
+      "ex-kafka-host",
+      "ex-connect-host",
+      "ex-sql-client"
     ]
   },
   "reference": {
-    "category": "取り込み",
+    "category": "クラウド分析基盤",
     "order": 95,
-    "domain": "データ処理",
+    "domain": "分析基盤・DWH",
     "kind": "仕組みの深掘り",
-    "detailOf": "snowflake-snowpipe-streaming-internals",
+    "detailOf": "snowflake",
+    "product": "Snowflake",
+    "role": "internals",
+    "step": 3,
     "objectives": [
       "Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。",
       "既存 Kafka と Connect からイベントを送信する。",
-      "PIPE で検証・対応する変換を行い、失敗は設定したログで確認する。"
+      "取り込みと検証の役割を追い、拒否された行の保存先を確認する。"
     ],
     "sources": [
       {
@@ -272,6 +307,10 @@
       {
         "title": "Snowpipe Streaming",
         "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
+      },
+      {
+        "title": "Kafka Connector の Iceberg 取り込み",
+        "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg"
       }
     ]
   }

@@ -1,0 +1,205 @@
+name: "Fivetran：初回同期と PostgreSQL の WAL"
+description: "初回同期で履歴を取り込み、論理レプリケーションで変更を読み、次回の同期に進むまで。"
+parent: {model: fivetran, node: incremental}
+reference:
+  objectives:
+    - "履歴を読む初回同期と、変更ログを読む増分同期を区別する。"
+    - "Publication、レプリケーションスロット、cursor の役割を区別する。"
+    - "同期が止まったときの WAL 保持と再同期の関係を説明する。"
+  sources:
+    - {title: "Sync Overview", url: https://fivetran.com/docs/core-concepts/syncoverview}
+    - {title: "Fivetran Glossary", url: https://fivetran.com/docs/getting-started/glossary#cursor}
+    - {title: "Fivetran PostgreSQL Connector", url: https://fivetran.com/docs/connectors/databases/postgresql}
+    - {title: "PostgreSQL Connector Setup Guide", url: https://fivetran.com/docs/connectors/databases/postgresql/setup-guide}
+    - {title: "Amazon RDS for PostgreSQL · Logical replication", url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html}
+sources: [docs/reference-fivetran-postgresql-cdc.md]
+evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§1"}]
+tiers:
+  - {id: flow, label: "履歴と更新分の同期", z: 0, size: [26, 12]}
+nodes:
+  source:
+    label: "同期対象テーブル"
+    kind: table
+    tier: flow
+    x: 3
+    y: 3
+    description: "初回同期で既存行を読む。例では主キーを持つ注文テーブルを選ぶ。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§1"}]
+  log:
+    label: "変更ログと保持位置"
+    kind: queue
+    tier: flow
+    x: 3
+    y: 8
+    description: "選択したテーブルの変更を取得する入口。ログの保持位置はソースで管理する。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§2"}]
+  initial:
+    label: "初回同期"
+    kind: worker
+    tier: flow
+    x: 11
+    y: 3
+    description: "既存の履歴を抽出し、Destination に順次ロードする。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§1"}]
+  incremental:
+    label: "増分同期"
+    kind: worker
+    tier: flow
+    x: 11
+    y: 8
+    description: "初回同期の後は進捗位置を使って更新分を読み込む。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§2"}]
+  cursor:
+    label: "同期の進捗位置"
+    kind: db
+    tier: flow
+    x: 18
+    y: 8
+    description: "次の同期の開始位置を決める。進捗位置の内部の保存先は未確認。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§3"}]
+  target:
+    label: "同期先テーブル"
+    kind: table
+    tier: flow
+    x: 22
+    y: 3
+    description: "履歴を保持し、主キーを使って追加、更新、削除を反映する。"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§3"}]
+links:
+  - {id: historical-read, from: source, to: initial, label: "選択したテーブルの既存行を渡す", evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§1"}]}
+  - {id: initial-load, from: initial, to: target, label: "履歴をロード", evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§1"}]}
+  - {id: read-changes, from: log, to: incremental, label: "選択したテーブルの変更を渡す", evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§2"}]}
+  - {id: change-load, from: incremental, to: target, label: "追加・更新・削除を反映", evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§3"}]}
+  - {id: remember, from: incremental, to: cursor, label: "同期の進捗を記録", evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§3"}]}
+  - {id: resume, from: cursor, to: incremental, label: "次回の読取開始位置を決める", evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§3"}]}
+scenarios:
+  - id: initial-to-cdc
+    label: "履歴のロードから増分反映へ"
+    evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§4"}]
+    steps:
+      - {links: [historical-read, initial-load], note: "選択したテーブルを初回同期する。"}
+      - {links: [read-changes, change-load], note: "差分を読み、同期先に反映する。"}
+      - {links: [remember, resume], note: "次回の開始位置を引き継ぐ。"}
+unknowns:
+  - {id: UNK-01, text: "cursor の保存先、コミット順序、失敗時の再試行の細かい境界は公式資料で未確認。", refs: [cursor, remember]}
+  - {id: UNK-02, text: "実際の負荷とネットワーク設定に応じた WAL 保持の監視しきい値は未確認。", refs: [log, read-changes]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: postgres-snowflake
+    label: "RDS for PostgreSQL の WAL を Snowflake に同期"
+    description: "Amazon RDS for PostgreSQL の論理レプリケーションを使う。Fivetran SaaS が Snowflake に注文テーブルの履歴と変更をロードする構成例。"
+    sources:
+      - {title: "Fivetran PostgreSQL Connector", url: https://fivetran.com/docs/connectors/databases/postgresql}
+      - {title: "PostgreSQL Connector Setup Guide", url: https://fivetran.com/docs/connectors/databases/postgresql/setup-guide}
+      - {title: "Amazon RDS for PostgreSQL · Logical replication", url: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.FeatureSupport.LogicalReplication.html}
+      - {title: "Sync Overview", url: https://fivetran.com/docs/core-concepts/syncoverview}
+      - {title: "Fivetran Glossary", url: https://fivetran.com/docs/getting-started/glossary#cursor}
+      - {title: "Snowflake Destination Setup Guide", url: https://fivetran.com/docs/destinations/snowflake/setup-guide}
+    tiers:
+      - {id: aws, label: "利用者の AWS アカウント", z: 0, origin: [0, 0], size: [8, 8]}
+      - {id: fivetran, label: "Fivetran の同期処理", z: 0, origin: [12, 0], size: [9, 8]}
+      - {id: snowflake, label: "Snowflake の実行と保存", z: 0, origin: [25, 0], size: [8, 8]}
+    nodes:
+      cdc-rds:
+        label: "Amazon RDS for PostgreSQL"
+        kind: db
+        svc: rds
+        tier: aws
+        x: 3.3
+        y: 2
+        realizes: [source]
+        description: "主インスタンスに主キー付きの注文テーブルを置く。TLS、Fivetran 用 PostgreSQL ユーザー、テーブルの SELECT 権限を設定する。"
+        management: {type: shared, scope: "AWS が基盤を運用し、利用者がパラメーター・TLS・接続元の許可・権限を設定する。"}
+        evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]
+      cdc-wal:
+        label: "WAL・論理スロット"
+        kind: queue
+        provider: aws
+        tier: aws
+        x: 3.3
+        y: 6
+        realizes: [log]
+        description: "対象行は publication で選ぶ。RDS が WAL を保持し、論理スロットと pgoutput で変更を Fivetran に渡す。"
+        management: {type: customer, scope: "利用者が論理レプリケーションと pgoutput スロットを設定し、WAL 保持量を監視する。"}
+        evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]
+      cdc-connection:
+        label: "Fivetran PostgreSQL 接続"
+        kind: worker
+        svc: fivetran:platform
+        tier: fivetran
+        x: 4
+        y: 2
+        realizes: [initial, incremental]
+        description: "Fivetran の SaaS が RDS へ TLS で接続する。初回は既存行を読み、以後は論理レプリケーションで変更を読む。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]
+      cdc-cursor:
+        label: "接続の進捗位置"
+        kind: db
+        provider: fivetran
+        tier: fivetran
+        x: 4
+        y: 6
+        realizes: [cursor]
+        description: "次回の同期で WAL のどこから読むかを管理する。物理的な保管先は未確認。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]
+      cdc-compute:
+        label: "Snowflake Warehouse"
+        kind: service
+        svc: snowflake:warehouse
+        tier: snowflake
+        x: 3.5
+        y: 2
+        description: "専用サービスユーザーがキーペアで認証し、設定したロールと Warehouse を使う。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]
+      cdc-table:
+        label: "同期先の注文テーブル"
+        kind: table
+        provider: snowflake
+        tier: snowflake
+        x: 3.5
+        y: 6
+        realizes: [target]
+        description: "主キーで行を突き合わせる。論理レプリケーションで受け取った削除は、通常の同期モードでは _fivetran_deleted で示す。"
+        evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]
+    links:
+      - {id: cdc-connect, from: cdc-connection, to: cdc-rds, label: "PostgreSQL ユーザーで TLS 接続", evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]}
+      - {id: cdc-read-history, from: cdc-rds, to: cdc-connection, label: "初回に既存行を渡す", realizes: [historical-read], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]}
+      - {id: cdc-read-wal, from: cdc-wal, to: cdc-connection, label: "pgoutput の変更を渡す", realizes: [read-changes], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]}
+      - {id: cdc-record-cursor, from: cdc-connection, to: cdc-cursor, label: "同期の進捗を記録", realizes: [remember], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]}
+      - {id: cdc-resume-read, from: cdc-cursor, to: cdc-connection, label: "次回の読取開始位置を渡す", realizes: [resume], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]}
+      - {id: cdc-load, from: cdc-connection, to: cdc-compute, label: "キーペア認証してロード", realizes: [initial-load, change-load], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]}
+      - {id: cdc-write, from: cdc-compute, to: cdc-table, label: "履歴と行変更を反映", realizes: [initial-load, change-load], replace: true, evidence: [{type: doc, ref: "docs/reference-fivetran-postgresql-cdc.md#§5"}]}
+    groups:
+      - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [aws], nodes: [cdc-rds, cdc-wal]}
+      - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [fivetran], nodes: [cdc-connection, cdc-cursor]}
+      - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [snowflake], nodes: [cdc-compute, cdc-table]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: "RDS の履歴と WAL から Snowflake へ", z: 0, size: [32, 13]}
+      nodes:
+        cdc-rds: {tier: diagram, x: 4, y: 3}
+        cdc-wal: {tier: diagram, x: 4, y: 9}
+        cdc-connection: {tier: diagram, x: 15.5, y: 3}
+        cdc-cursor: {tier: diagram, x: 15.5, y: 9}
+        cdc-compute: {tier: diagram, x: 26.5, y: 3}
+        cdc-table: {tier: diagram, x: 26.5, y: 9}
+      groups:
+        - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [diagram], x0: 0.6, y0: 0.7, x1: 7.4, y1: 11.8, nodes: [cdc-rds, cdc-wal]}
+        - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [diagram], x0: 11.8, y0: 0.7, x1: 19.2, y1: 11.8, nodes: [cdc-connection, cdc-cursor]}
+        - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [diagram], x0: 22.7, y0: 0.7, x1: 30.4, y1: 11.8, nodes: [cdc-compute, cdc-table]}
+    layout3d:
+      tiers:
+        - {id: aws, label: "利用者の AWS アカウント", z: 0, origin: [0, 0], size: [8, 8]}
+        - {id: fivetran, label: "Fivetran の同期処理", z: 0, origin: [12, 0], size: [9, 8]}
+        - {id: snowflake, label: "Snowflake の実行と保存", z: 0, origin: [25, 0], size: [8, 8]}
+      nodes:
+        cdc-rds: {tier: aws, x: 3.3, y: 2}
+        cdc-wal: {tier: aws, x: 3.3, y: 6}
+        cdc-connection: {tier: fivetran, x: 4, y: 2}
+        cdc-cursor: {tier: fivetran, x: 4, y: 6}
+        cdc-compute: {tier: snowflake, x: 3.5, y: 2}
+        cdc-table: {tier: snowflake, x: 3.5, y: 6}
+      groups:
+        - {kind: cloud, provider: aws, label: "AWS アカウント", tier: [aws], nodes: [cdc-rds, cdc-wal]}
+        - {kind: cloud, provider: fivetran, label: "Fivetran SaaS", tier: [fivetran], nodes: [cdc-connection, cdc-cursor]}
+        - {kind: cloud, provider: snowflake, label: "Snowflake アカウント", tier: [snowflake], nodes: [cdc-compute, cdc-table]}

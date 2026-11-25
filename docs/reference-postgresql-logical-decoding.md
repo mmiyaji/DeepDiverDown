@@ -52,7 +52,7 @@ PostgreSQL 18 の論理デコードを pgoutput で公開し、Debezium を配�
 | 機能 | 実装での担い手 | 配置・設定 |
 | --- | --- | --- |
 | 注文トランザクション、WAL、論理スロット、Publication、論理デコーダと出力プラグイン | PostgreSQL 18 Primary と pgoutput | 注文テーブル、WAL、論理スロット、Publication、組み込みプラグインは同じ PostgreSQL インスタンスが担う。 |
-| 変更データ捕捉タスク | 分散 Kafka Connect の Debezium Source Task | 確認済みの進捗を保持し、変更イベントを Kafka へ発行する。 |
+| 変更データ捕捉タスク | 分散 Kafka Connect の Debezium Source Task | 変更イベントを Kafka へ発行する。Kafka Connect が読み取り位置をソースオフセットトピックへ保存する。 |
 | 捕捉タスクの永続オフセット、下流の変更イベントログ | Kafka の CDC トピックと Connect 内部トピック | 業務イベントと、分散 Connect のソースオフセットを別のトピックに保持する。 |
 
 実装で加わる部品を以下に示す。
@@ -86,6 +86,6 @@ RDS の DB パラメータグループで `rds.logical_replication` を有効に
 - [MSK Connect のソースオフセット](https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-set-offset-storage-topic.html)
 - [Amazon RDS の CloudWatch メトリクス](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html)
 
-自前例では PostgreSQL 18、分散 Connect、Kafka ブローカーをそれぞれ自前 Linux ホストで運用する。AWS 例では MSK Connect のワーカーと利用者 VPC の接続用 ENI を区別し、S3 の ZIP からカスタムプラグインを登録する。AWS は RDS・MSK・MSK Connect・S3・CloudWatch 基盤を運用し、利用者は DB の論理スロットと権限、コネクター・容量・トピック・ネットワークを設定する。内部ワーカーホストは直接操作しない。具体的な認証・ネットワークと製品バージョンの互換性は未確認で、公式資料を組み合わせた代表例である。
+自前例では、利用者が管理する一つのデータセンターに別々の Linux ホストを置き、PostgreSQL 18、分散 Connect、Kafka ブローカーを運用する構成とする。AWS 例では、MSK Connect のワーカーと利用者 VPC の接続用 ENI を区別する。利用者は Debezium の ZIP を Amazon S3 に置く。プラグイン登録でそのオブジェクトを指定すると、MSK Connect が登録時点の内容をコピーする。AWS は RDS・MSK・MSK Connect・S3・CloudWatch の基盤を運用する。利用者は DB の論理スロット、コネクター、容量、トピック、ネットワーク、S3 のオブジェクトと権限を管理する。ワーカーはコネクター設定と容量設定を通じて運用する。具体的な認証・ネットワークと製品バージョンの互換性は未確認で、公式資料を組み合わせた代表例である。
 
 - [MSK Connect のプラグイン](https://docs.aws.amazon.com/msk/latest/developerguide/msk-connect-plugins.html)

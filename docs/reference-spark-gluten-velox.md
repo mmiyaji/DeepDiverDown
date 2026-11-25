@@ -37,14 +37,16 @@ unsupported な演算子では Spark に fallback する。ColumnarToRow / RowTo
 
 ## 4. 実装例：Spark Standalone
 
-自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。図中の対応は以下の通り。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
+自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
 
-- Spark 物理計画：Spark Driver 側。
-- Gluten の計画変換：Spark Driver 側。
-- JNI 境界：Spark Executor 側。
-- Velox ネイティブ実行：Spark Executor 側。
-- Arrow / ColumnarBatch：Spark Executor 側。
-- Spark fallback と形式変換：Spark Executor 側。
-- Spark UI の実行指標：クラスター外のクライアント・ストレージ等。
+| 機能配置 | 実装例の部品 |
+| --- | --- |
+| Spark 物理計画 | Driver：Spark 物理計画 |
+| Gluten の計画変換 | Driver：Gluten の計画変換 |
+| JNI 境界 | Executor：JNI 境界 |
+| Velox ネイティブ実行 | Executor：Velox ネイティブ実行 |
+| Arrow / ColumnarBatch | Executor：Arrow / ColumnarBatch |
+| Spark fallback と形式変換 | Executor：Spark fallback と形式変換 |
+| Spark UI の実行指標 | Spark UI の実行指標 |
 
 公式資料：[Apache Gluten Architecture](https://github.com/apache/gluten)、[Gluten Configuration](https://github.com/apache/gluten/blob/main/docs/Configuration.md)。

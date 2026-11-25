@@ -1,8 +1,8 @@
 name: Databricks：RocksDB 状態とチェックポイント
 description: 状態付き Structured Streaming の RocksDB、差分チェックポイント、障害復旧を追う。
 parent:
-  model: spark-structured-streaming
-  node: state
+  model: databricks
+  node: transform
 reference:
   objectives:
     - 状態付き Structured Streaming の RocksDB、差分チェックポイント、障害復旧を追う。
@@ -20,8 +20,6 @@ reference:
       url: https://docs.databricks.com/aws/en/structured-streaming/async-checkpointing
     - title: Databricks コンピュート
       url: https://docs.databricks.com/aws/en/compute/
-    - title: Unity Catalog 管理ストレージ
-      url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
 sources:
   - docs/reference-databricks-streaming-state-internals.md
 evidence:
@@ -275,8 +273,9 @@ implementations:
   - id: databricks
     label: AWS 上の Databricks Jobs と S3
     description: >-
-      Kafka 等の再読可能な入力を AWS 上の Databricks クラシック Jobs compute が処理し、RocksDB の状態差分と進捗を顧客 S3 の各クエリ専用チェックポイントに保存し、S3 上の Delta
-      テーブルに出力する概念例。クラスター、バケットと権限は事前に用意する。個々の環境の権限、再処理の保証は公式ガイドで確認する。
+      Lakeflow Jobs が顧客 AWS アカウントのクラシックジョブコンピュートで Structured Streaming を実行する。
+      クエリは外部の Kafka 入力を処理し、クエリ専用の S3 チェックポイントに状態と進捗を保存する。結果は S3 上の Delta テーブルに書き込む。
+      S3 はクラスタと同じ顧客 AWS アカウントに置く構成例とする。Kafka の提供元と設置場所は指定しない。
     sources:
       - title: 状態付きパイプラインの性能改善
         url: >-
@@ -287,170 +286,210 @@ implementations:
         url: https://docs.databricks.com/aws/en/structured-streaming/checkpoints
       - title: 非同期 state checkpointing
         url: https://docs.databricks.com/aws/en/structured-streaming/async-checkpointing
-      - title: Databricks コンピュート
-        url: https://docs.databricks.com/aws/en/compute/
-      - title: Unity Catalog 管理ストレージ
-        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
-    tiers:
-      - id: input
-        label: 入力
-        z: 3
-        size:
-          - 23
-          - 4
-      - id: process
-        label: バッチ処理と状態
-        z: 2
-        size:
-          - 23
-          - 4
-      - id: compute
-        label: 再開
-        z: 1
-        size:
-          - 23
-          - 4
-      - id: data
-        label: チェックポイントと出力
-        z: 0
-        size:
-          - 23
-          - 4
+      - title: Databricks on AWS のアーキテクチャ
+        url: https://docs.databricks.com/aws/en/getting-started/high-level-architecture
+      - title: クラシックコンピュートの設定
+        url: https://docs.databricks.com/aws/en/compute/configure
+      - title: 本番向け Structured Streaming のジョブ設定
+        url: https://docs.databricks.com/aws/en/structured-streaming/production
+      - title: Lakeflow Jobs の継続実行
+        url: https://docs.databricks.com/aws/en/jobs/continuous
+      - title: Apache Kafka への接続
+        url: https://docs.databricks.com/aws/en/connect/streaming/kafka
+      - title: Spark Structured Streaming の Kafka コネクター
+        url: https://spark.apache.org/docs/latest/streaming/structured-streaming-kafka-integration.html
+      - title: Delta テーブルのストリーミング書き込み
+        url: https://docs.databricks.com/aws/en/structured-streaming/delta-lake
+      - title: Amazon S3 の責任共有モデル
+        url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/security.html
+    tiers: &classic-job-tiers
+      - {id: diagram, label: クラシックジョブコンピュートと S3, z: 0, origin: [-3, 0], size: [30, 18]}
     nodes:
       ex-source:
-        label: Kafka などの入力
-        kind: queue
-        tier: input
+        label: 外部 Kafka 入力
+        kind: external
+        tier: diagram
         x: 0
-        'y': 1.5
-        description: 入力イベントと処理位置を取得する。
+        'y': 7
+        description: クエリが接続する Kafka トピック。入力元の提供者と設置場所は指定せず、再処理に必要なオフセットが保持されることを前提とする。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - source
       ex-driver:
-        label: Structured Streaming のクエリ
+        label: Spark ドライバー
         kind: service
-        tier: process
-        x: 0
-        'y': 1.5
-        description: マイクロバッチの入力範囲と完了状況を管理する。
+        tier: diagram
+        x: 8
+        'y': 6
+        description: Databricks Runtime のドライバー上でクエリを実行し、マイクロバッチの入力範囲と完了状況を管理する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - driver
       ex-task:
-        label: Databricks Runtime のタスク
+        label: Spark エグゼキューター
         kind: worker
-        tier: process
-        x: 5.2
-        'y': 1.5
-        description: キー別の集計などを行い、状態ストアを読み書きする。
+        tier: diagram
+        x: 14
+        'y': 6
+        description: Databricks Runtime のワーカー上で入力を読み、キー別の集計などのタスクを実行する。状態はワーカーのローカル状態ストアに読み書きする。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - task
-        svc: databricks:platform
       ex-state:
         label: RocksDB state store
         kind: db
-        tier: process
-        x: 10.4
-        'y': 1.5
-        description: RocksDB がネイティブメモリとローカルディスクを利用してキー別状態を管理する。
+        tier: diagram
+        x: 20
+        'y': 6
+        description: RocksDB がワーカーのネイティブメモリとローカルディスクを利用してキー別状態を管理する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - state
       ex-changes:
-        label: 状態の changelog（S3）
+        label: 状態の changelog
         kind: file
-        tier: data
-        x: 0
-        'y': 1.5
-        description: changelog checkpointing では各バッチの変更を永続ストレージに記録する。
+        tier: diagram
+        x: 23
+        'y': 12
+        description: changelog checkpointing では各バッチの変更を S3 のチェックポイントに記録する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - changes
-        svc: aws:s3
       ex-snapshot:
-        label: RocksDB snapshot（S3）
+        label: RocksDB snapshot
         kind: file
-        tier: data
-        x: 5.2
-        'y': 1.5
-        description: 復旧を速めるためのスナップショットをバックグラウンドで保存する。
+        tier: diagram
+        x: 18
+        'y': 12
+        description: 復旧を速めるためのスナップショットをバックグラウンドで S3 のチェックポイントに保存する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - snapshot
-        svc: aws:s3
       ex-progress:
-        label: チェックポイントログ（S3）
+        label: チェックポイントログ
         kind: file
-        tier: data
-        x: 10.4
-        'y': 1.5
-        description: 入力位置、コミット、クエリと状態のメタデータをチェックポイントに保持する。
+        tier: diagram
+        x: 8
+        'y': 12
+        description: 入力位置、コミット、クエリと状態のメタデータを S3 のチェックポイントに保持する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - progress
-        svc: aws:s3
       ex-sink:
-        label: Delta 出力テーブル（S3）
-        kind: db
-        tier: data
-        x: 15.600000000000001
-        'y': 1.5
-        description: 結果を出力先に保存する。処理保証は出力先の対応に依存する。
+        label: Delta 出力テーブル
+        kind: table
+        tier: diagram
+        x: 13
+        'y': 12
+        description: 結果を S3 上の Delta テーブルに書き込む。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - sink
       ex-restart:
-        label: クエリの再起動
+        label: クエリの復旧
         kind: service
-        tier: compute
-        x: 0
-        'y': 1.5
-        description: チェックポイントから進捗と状態を復元し、必要な入力を再処理する。
+        tier: diagram
+        x: 8
+        'y': 9
+        description: 再起動した Structured Streaming が同じチェックポイントから進捗と状態を復元し、必要な入力を再処理する。
         evidence:
           - type: doc
             ref: docs/reference-databricks-streaming-state-internals.md#§5
         realizes:
           - restart
-    groups:
-      - kind: cloud
-        label: Databricks Jobs compute（論理範囲）
-        provider: databricks
-        tier:
-          - process
-          - compute
-        nodes:
-          - ex-driver
-          - ex-task
-          - ex-state
-          - ex-restart
-      - kind: cloud
-        label: 顧客 AWS アカウント：S3
-        provider: aws
-        tier:
-          - data
-        nodes:
-          - ex-changes
-          - ex-snapshot
-          - ex-progress
-          - ex-sink
+      ex-jobs:
+        label: Lakeflow Jobs
+        svc: databricks:lakeflow
+        kind: service
+        tier: diagram
+        x: 0
+        'y': 2
+        description: Databricks のコントロールプレーンがジョブを起動し、継続実行で障害が起きたジョブを再試行する。利用者はジョブ定義でトリガーや実行環境を設定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+      ex-compute:
+        label: EC2 ドライバー・ワーカーノード
+        svc: aws:ec2
+        kind: host
+        tier: diagram
+        x: 14
+        'y': 3
+        description: クラシックジョブコンピュートの EC2 ノードで Databricks Runtime が動く。
+        management:
+          type: shared
+          scope: AWS が EC2 基盤を運用し、利用者は Lakeflow Jobs でノード型や Databricks Runtime を指定する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+      ex-s3:
+        label: Amazon S3
+        svc: aws:s3
+        kind: db
+        tier: diagram
+        x: 15.5
+        'y': 16
+        description: クエリ専用のチェックポイントと Delta 出力テーブルのオブジェクトを保存する。
+        management:
+          type: aws
+          scope: AWS は S3 の基盤を運用する。利用者はバケットの設定、データ、アクセス権限を管理する。
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-streaming-state-internals.md#§5
+    links:
+      - {id: ex-start-job, from: ex-jobs, to: ex-compute, label: ジョブを起動・再試行}
+      - {id: ex-start-query, from: ex-compute, to: ex-driver, label: クエリを実行}
+      - {id: ex-fetch-records, from: ex-source, to: ex-task, label: 入力イベントを読み取る, realizes: [input]}
+      - {id: ex-store-changes, from: ex-changes, to: ex-s3, label: changelog を保存}
+      - {id: ex-store-snapshot, from: ex-snapshot, to: ex-s3, label: snapshot を保存}
+      - {id: ex-store-progress, from: ex-progress, to: ex-s3, label: チェックポイントログを保存}
+      - {id: ex-store-output, from: ex-sink, to: ex-s3, label: Delta のデータとログを保存}
+    groups: &classic-job-groups
+      - {kind: cloud, provider: databricks, label: Databricks コントロールプレーン, tier: diagram, x0: -2.8, y0: 0, x1: 2.8, y1: 4, nodes: &job-control-nodes [ex-jobs]}
+      - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: diagram, x0: 4.5, y0: 0, x1: 26, y1: 18, nodes: &job-aws-nodes [ex-compute, ex-driver, ex-task, ex-state, ex-restart, ex-progress, ex-changes, ex-snapshot, ex-sink, ex-s3]}
+      - {kind: cluster, label: クラシックジョブコンピュート, tier: diagram, x0: 5.5, y0: 1.4, x1: 24.5, y1: 10.5, nodes: [ex-compute, ex-driver, ex-task, ex-state, ex-restart]}
+    layout2d:
+      tiers: *classic-job-tiers
+      groups: *classic-job-groups
+      nodes: {}
+    layout3d:
+      tiers:
+        - {id: runtime, label: Jobs クラスタの Databricks Runtime, z: 1, origin: [5, 0], size: [20, 8]}
+        - {id: platform, label: ジョブ制御・EC2・S3, z: 0, origin: [-4, 0], size: [30, 15]}
+      nodes:
+        ex-jobs: {tier: platform, x: 0, y: 2}
+        ex-source: {tier: platform, x: 0, y: 8}
+        ex-compute: {tier: platform, x: 16, y: 3}
+        ex-driver: {tier: runtime, x: 1, y: 2}
+        ex-task: {tier: runtime, x: 7, y: 2}
+        ex-state: {tier: runtime, x: 13, y: 2}
+        ex-restart: {tier: runtime, x: 1, y: 5}
+        ex-progress: {tier: platform, x: 10, y: 10}
+        ex-sink: {tier: platform, x: 15, y: 10}
+        ex-snapshot: {tier: platform, x: 20, y: 10}
+        ex-changes: {tier: platform, x: 25, y: 10}
+        ex-s3: {tier: platform, x: 8.8, y: 13}
+      groups:
+        - {kind: cloud, provider: databricks, label: Databricks コントロールプレーン, tier: platform, nodes: *job-control-nodes}
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウント, tier: [runtime, platform], nodes: *job-aws-nodes}
+        - {kind: cluster, tier: platform, x0: 13.2, y0: 1, x1: 18.5, y1: 6.6, nodes: [ex-compute]}
+        - {kind: cluster, tier: runtime, x0: 0, y0: 0.85, x1: 14.25, y1: 7.9, nodes: [ex-driver, ex-task, ex-state, ex-restart]}
 blocks:
   - id: checkpoint
     title: 状態とチェックポイント（概念例）

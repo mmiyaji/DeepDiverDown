@@ -44,10 +44,12 @@ docs.risingwave.com の公式ドキュメントを基準に、`CREATE MATERIALIZ
 
 「RisingWave の基本アーキテクチャ」と同じ AWS 構成。Frontend Pod が計画し、Meta Pod が Actor を割り当て、Compute Pod がバックフィル・Actor・時間による状態の整理を実行する。状態と Table・ビューの行は S3 の Hummock に置く。
 
+SQL クライアントは PostgreSQL プロトコルで Frontend Pod に接続する。Frontend Pod が `SELECT` を受け、ビューの更新済みの結果をクライアントに返す。
+
 | 機能 | 担い手 |
 | --- | --- |
 | SQL クライアント | psql など |
-| 計画とフラグメント化 | Frontend Pod |
+| 計画、フラグメント化、`SELECT` 結果の返却 | Frontend Pod |
 | Actor の割り当て | Meta Pod |
 | バックフィル・Actor・Watermark / Temporal Filter | Compute Pod |
 | 演算子の状態・ビュー・上流の Table | Amazon S3 上の Hummock |

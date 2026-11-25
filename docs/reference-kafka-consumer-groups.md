@@ -36,7 +36,7 @@ Apache Kafka 4.4 の公式ドキュメントを基準に、Consumer Group がパ
 
 ## 7. 実装例：AWS（Amazon MSK と ECS on Fargate）
 
-MSK のクラスターから、ECS の購読サービスが起動する複数の Fargate タスクが同じ `group.id` で読む例。
+ECS の購読サービスが複数の Fargate タスクを維持する。タスクは同じ VPC の MSK Provisioned から共通の `group.id` で読み取る。VPC の枠はタスクのネットワークインターフェースとブローカーの接続範囲を示す。ECS のサービス制御は VPC の枠の外に描く。図ではクラスターのブローカー群を一つの部品にまとめている。
 
 | 機能 | 担い手 |
 | --- | --- |
@@ -45,11 +45,13 @@ MSK のクラスターから、ECS の購読サービスが起動する複数の
 | コミット済み offset | MSK 上の内部 Topic `__consumer_offsets` |
 | タスク数の維持 | Amazon ECS のサービス |
 
-ECS がタスクを増減させると、グループのメンバーが変わりリバランスが起きる。AWS が MSK・ECS・Fargate の基盤を運用し、利用者はアプリ、`group.id`、タスク数、権限を設定する。公式資料を組み合わせた例で、実環境では未検証。
+ECS がタスクを増減させると、グループのメンバーが変わりリバランスが起きる。AWS が MSK・ECS・Fargate の基盤を運用し、利用者はアプリ、`group.id`、タスク数、IAM 権限を設定する。利用者はブローカーへの接続をセキュリティグループで許可する。公式資料を組み合わせた例で、実環境では未検証。
 
 - [Amazon ECS のサービス定義](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html)
 - [MSK の IAM アクセス制御](https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html)
 - [MSK Provisioned クラスターの作成](https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html)
+- [Fargate タスクのネットワーク](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html)
+- [MSK Provisioned への接続](https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html)
 
 ## 未確認
 

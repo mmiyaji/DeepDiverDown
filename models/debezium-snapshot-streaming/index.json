@@ -1,0 +1,250 @@
+{
+  "model": "debezium-snapshot-streaming",
+  "name": "Debezium：初期スナップショットと変更ストリーム",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "rows": {
+      "type": "node",
+      "label": "取り込み対象の表",
+      "status": "claim"
+    },
+    "changes": {
+      "type": "node",
+      "label": "順序付きの変更ログ",
+      "status": "claim"
+    },
+    "runtime": {
+      "type": "node",
+      "label": "コネクター実行基盤",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "node",
+      "label": "初回の行読み取り",
+      "status": "claim"
+    },
+    "stream": {
+      "type": "node",
+      "label": "継続ログ読み取り",
+      "status": "claim"
+    },
+    "events": {
+      "type": "node",
+      "label": "配信イベントのログ",
+      "status": "claim"
+    },
+    "progress": {
+      "type": "node",
+      "label": "読み取り位置の記録",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "コネクター実行基盤 → 初回の行読み取り",
+      "status": "claim"
+    },
+    "locate": {
+      "type": "link",
+      "label": "順序付きの変更ログ → 初回の行読み取り",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "取り込み対象の表 → 初回の行読み取り",
+      "status": "claim"
+    },
+    "emit-read": {
+      "type": "link",
+      "label": "初回の行読み取り → 配信イベントのログ",
+      "status": "claim"
+    },
+    "complete": {
+      "type": "link",
+      "label": "初回の行読み取り → 読み取り位置の記録",
+      "status": "claim"
+    },
+    "handoff": {
+      "type": "link",
+      "label": "初回の行読み取り → 継続ログ読み取り",
+      "status": "claim"
+    },
+    "tail": {
+      "type": "link",
+      "label": "順序付きの変更ログ → 継続ログ読み取り",
+      "status": "claim"
+    },
+    "emit-change": {
+      "type": "link",
+      "label": "継続ログ読み取り → 配信イベントのログ",
+      "status": "claim"
+    },
+    "update-position": {
+      "type": "link",
+      "label": "継続ログ読み取り → 読み取り位置の記録",
+      "status": "claim"
+    },
+    "first-start": {
+      "type": "scenario",
+      "label": "既存行から変更ストリームへ"
+    },
+    "unverified": {
+      "type": "unknown",
+      "label": "実環境の読み取り量、ログ保持容量、停止後の再開は未検証。"
+    },
+    "pg-table": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PostgreSQL の注文テーブル",
+      "realizes": [
+        "rows"
+      ]
+    },
+    "pg-wal": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PostgreSQL の WAL と論理スロット",
+      "realizes": [
+        "changes"
+      ]
+    },
+    "pg-server": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PostgreSQL サーバー",
+      "realizes": []
+    },
+    "connect-worker": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Kafka Connect Worker",
+      "realizes": [
+        "runtime"
+      ]
+    },
+    "dbz-scan": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Debezium のスナップショット処理",
+      "realizes": [
+        "scan"
+      ]
+    },
+    "dbz-stream": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Debezium の変更読み取り",
+      "realizes": [
+        "stream"
+      ]
+    },
+    "kafka-events": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Kafka の CDC トピック",
+      "realizes": [
+        "events"
+      ]
+    },
+    "kafka-offsets": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "Kafka のソースオフセットトピック",
+      "realizes": [
+        "progress"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-debezium-snapshot-streaming.md#§1": [
+      "model"
+    ],
+    "docs/reference-debezium-snapshot-streaming.md": [
+      "model",
+      "rows",
+      "changes",
+      "runtime",
+      "scan",
+      "stream",
+      "events",
+      "progress",
+      "start",
+      "locate",
+      "read",
+      "emit-read",
+      "complete",
+      "handoff",
+      "tail",
+      "emit-change",
+      "update-position",
+      "first-start",
+      "pg-table",
+      "pg-wal",
+      "pg-server",
+      "connect-worker",
+      "dbz-scan",
+      "dbz-stream",
+      "kafka-events",
+      "kafka-offsets"
+    ],
+    "docs/reference-debezium-snapshot-streaming.md#§5": [
+      "model"
+    ],
+    "docs/reference-debezium-snapshot-streaming.md#§2": [
+      "rows",
+      "changes",
+      "runtime",
+      "scan",
+      "stream",
+      "events",
+      "progress",
+      "start",
+      "locate",
+      "read",
+      "emit-read",
+      "complete",
+      "handoff",
+      "tail",
+      "emit-change",
+      "update-position"
+    ],
+    "docs/reference-debezium-snapshot-streaming.md#§3": [
+      "first-start"
+    ],
+    "docs/reference-debezium-snapshot-streaming.md#§4": [
+      "pg-table",
+      "pg-wal",
+      "pg-server",
+      "connect-worker",
+      "dbz-scan",
+      "dbz-stream",
+      "kafka-events",
+      "kafka-offsets"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "取り込み",
+    "kind": "仕組みの深掘り",
+    "product": "Debezium",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "debezium",
+    "objectives": [
+      "初期スナップショットの読み取り位置と完了記録を区別する。",
+      "既存行の読み取りと変更ストリームへの切り替えを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Debezium PostgreSQL Connector",
+        "url": "https://debezium.io/documentation/reference/3.7/connectors/postgresql.html"
+      },
+      {
+        "title": "Debezium Architecture",
+        "url": "https://debezium.io/documentation/reference/3.7/architecture.html"
+      }
+    ]
+  }
+}

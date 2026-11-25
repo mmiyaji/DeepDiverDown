@@ -36,7 +36,7 @@ Apache Kafka 4.4 の公式ドキュメントを基準に、パーティション
 
 ## 7. 実装例：AWS（Amazon MSK と ECS on Fargate）
 
-3 つの AZ に Standard ブローカーを置いた MSK Provisioned のクラスターに、Fargate 上の Producer が書き込む例。複製、ISR、リーダー選出は MSK 内の Kafka が行う。
+3 つの AZ に Standard ブローカーを置いた MSK Provisioned のクラスターに、同じ VPC の Fargate 上の Producer が書き込む。利用者はブローカーへの接続をセキュリティグループで許可し、タスクから IAM 認証で接続する。複製、ISR、リーダー選出は MSK 内の Kafka が行う。
 
 | 機能 | 担い手 |
 | --- | --- |
@@ -44,12 +44,14 @@ Apache Kafka 4.4 の公式ドキュメントを基準に、パーティション
 | リーダー・フォロワー（Broker 1〜3） | MSK の Standard ブローカー |
 | Controller | MSK が管理する KRaft Controller |
 
-AWS が MSK と Fargate の基盤を運用し、利用者は Topic、複製係数、`min.insync.replicas`、権限、アプリを設定する。MSK の枠は論理的な所属で、ブローカーの AZ 配置や Controller のネットワーク配置は図に表さない。公式資料を組み合わせた例で、実環境では未検証。
+AWS が MSK と Fargate の基盤を運用し、利用者は Topic、複製係数、`min.insync.replicas`、権限、アプリを設定する。MSK の枠はブローカーと KRaft Controller の論理的な所属を示す。VPC の枠は Fargate タスクとブローカーの接続範囲を示す。Controller の台数と実際のネットワーク配置は未確認で、図中の位置は論理配置とする。Kafka 4.1 以降で新規作成した MSK クラスターでは Controller の DNS エンドポイントは提供されず、管理操作はブローカー経由で行う。公式資料を組み合わせた例で、実環境では未検証。
 
 - [MSK Provisioned クラスターの作成](https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html)
 - [Amazon MSK と KRaft](https://docs.aws.amazon.com/msk/latest/developerguide/metadata-management.html)
 - [MSK の IAM アクセス制御](https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html)
 - [Amazon ECS のサービス定義](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html)
+- [Fargate タスクのネットワーク](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html)
+- [MSK Provisioned への接続](https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html)
 
 ## 未確認
 

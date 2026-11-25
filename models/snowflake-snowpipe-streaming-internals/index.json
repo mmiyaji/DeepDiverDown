@@ -1,6 +1,6 @@
 {
   "model": "snowflake-snowpipe-streaming-internals",
-  "name": "Snowpipe Streaming：バッファからテーブルへの取り込み",
+  "name": "Snowflake：Snowpipe Streaming の受信と取り込み",
   "coverage": {
     "covered": 5,
     "total": 5
@@ -38,7 +38,7 @@
     },
     "cluster": {
       "type": "node",
-      "label": "取り込み時の配置",
+      "label": "取り込み時のクラスタリング",
       "status": "claim"
     },
     "table": {
@@ -83,12 +83,12 @@
     },
     "prepare": {
       "type": "link",
-      "label": "取り込みジョブ → 取り込み時の配置",
+      "label": "取り込みジョブ → 取り込み時のクラスタリング",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "取り込み時の配置 → 分析対象の表",
+      "label": "取り込み時のクラスタリング → 分析対象の表",
       "status": "claim"
     },
     "direct": {
@@ -103,15 +103,24 @@
     },
     "flow": {
       "type": "scenario",
-      "label": "データと処理の流れ"
+      "label": "イベントの取り込みと照会"
+    },
+    "pre-clustering": {
+      "type": "scenario",
+      "label": "クラスタリングを有効にした場合"
     },
     "internal-deployment": {
-      "type": "unknown"
+      "type": "unknown",
+      "label": "内部ホスト、クラスタ、配置、スケジューリングしきい値、バッファの耐久化方式は公開資料で未確認。"
+    },
+    "example-validation": {
+      "type": "unknown",
+      "label": "この組み合わせの実動作と、選定アカウントでの取り込み時クラスタリングの動作は未確認。"
     },
     "ex-producer": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "SDK / REST の送信元",
+      "label": "注文イベント送信アプリ",
       "realizes": [
         "producer"
       ]
@@ -119,7 +128,7 @@
     "ex-ingress": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "Snowflake Ingress",
+      "label": "Snowpipe Streaming 受信サービス",
       "realizes": [
         "ingress"
       ]
@@ -127,7 +136,7 @@
     "ex-assign": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "Assigner",
+      "label": "Assigner（振り分け先）",
       "realizes": [
         "assign"
       ]
@@ -140,18 +149,10 @@
         "buffer"
       ]
     },
-    "ex-pipe": {
-      "type": "implementation",
-      "impl": "snowflake",
-      "label": "Snowpipe の PIPE",
-      "realizes": [
-        "pipe"
-      ]
-    },
     "ex-job": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "Snowpipe serverless jobs",
+      "label": "サーバーレス取り込みジョブ",
       "realizes": [
         "job"
       ]
@@ -159,23 +160,43 @@
     "ex-cluster": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "pre-clustering（任意）",
+      "label": "取り込み時のクラスタリング",
       "realizes": [
         "cluster"
       ]
     },
+    "ex-pipe": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "名前付き PIPE（COPY 定義）",
+      "realizes": [
+        "pipe"
+      ]
+    },
+    "ex-rbac": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "送信用ユーザーとロール",
+      "realizes": []
+    },
     "ex-table": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "Snowflake / 管理 Iceberg テーブル",
+      "label": "注文イベント（管理 Iceberg）",
       "realizes": [
         "table"
       ]
     },
+    "ex-warehouse": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "照会用 Virtual Warehouse",
+      "realizes": []
+    },
     "ex-query": {
       "type": "implementation",
       "impl": "snowflake",
-      "label": "SQL クエリ",
+      "label": "照会用 SQL クライアント",
       "realizes": [
         "query"
       ]
@@ -207,18 +228,22 @@
       "direct",
       "read",
       "flow",
+      "pre-clustering",
       "ex-producer",
       "ex-ingress",
       "ex-assign",
       "ex-buffer",
-      "ex-pipe",
       "ex-job",
       "ex-cluster",
+      "ex-pipe",
+      "ex-rbac",
       "ex-table",
+      "ex-warehouse",
       "ex-query"
     ],
     "docs/reference-snowflake-snowpipe-streaming-internals.md#§4": [
-      "model"
+      "model",
+      "pre-clustering"
     ],
     "docs/reference-snowflake-snowpipe-streaming-internals.md#§2": [
       "producer",
@@ -249,23 +274,28 @@
       "ex-ingress",
       "ex-assign",
       "ex-buffer",
-      "ex-pipe",
       "ex-job",
       "ex-cluster",
+      "ex-pipe",
+      "ex-rbac",
       "ex-table",
+      "ex-warehouse",
       "ex-query"
     ]
   },
   "reference": {
-    "category": "取り込み",
+    "category": "クラウド分析基盤",
     "order": 95,
-    "domain": "データ処理",
+    "domain": "分析基盤・DWH",
     "kind": "仕組みの深掘り",
-    "detailOf": "snowflake-ingestion-cdc",
+    "detailOf": "snowflake",
+    "product": "Snowflake",
+    "role": "internals",
+    "step": 2,
     "objectives": [
-      "高性能アーキテクチャで受信、バッファ、サーバーレスジョブ、pre-clustering を追う。2025年の記事を基にした論理図。",
-      "SDK または REST から行を受信して認証し、バッファに振り分ける。",
-      "負荷を観測し、Assigner が振り分け先を調整する。"
+      "受信、バッファ、サーバーレスジョブの役割を区別する。",
+      "利用者が設定する PIPE と取り込み処理の関係を説明する。",
+      "取り込み時の処理とコミット後の SQL 照会を区別する。"
     ],
     "sources": [
       {

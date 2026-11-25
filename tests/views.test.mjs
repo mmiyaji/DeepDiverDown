@@ -66,7 +66,7 @@ test('リファレンス：自動の論理構成は出さず、機能配置と�
   const m = M.debezium;
   assert.deepEqual([...V.available(m)], ['cloud', 'impl:aws']);
   assert.equal(V.info(m, 'cloud').label, '機能配置');
-  assert.equal(V.info(m, 'impl:aws').label, '実装例：AWS');
+  assert.equal(V.info(m, 'impl:aws').label, '実装例：RDS・MSK Connect・Amazon MSK・Lambda');
 });
 
 test('実装例：機能をサービスに写し、同じサービスに収まる接続は消え、実装で加わる部品と接続が出る', () => {
@@ -93,4 +93,13 @@ test('点検：実装例が機能配置を覆い、資料を持つ', () => {
 test('mergeNode：停止 > 影響、ずれ > 主張、強調は 1 つでもあれば', () => {
   const r = V.mergeNode([{ fill: 'impact', status: 'claim' }, { fill: 'down', status: 'drift', outline: true }, { dim: true }]);
   assert.equal(r.fill, 'down'); assert.equal(r.status, 'drift'); assert.equal(r.outline, true); assert.equal(r.dim, false);
+});
+
+test('実装例の台数は機能配置から引き継がず、実装部品の指定値を使う', () => {
+  const inherited = { text: '3台', tone: 'replicas' };
+  assert.equal(V.implementationBadge(inherited, undefined), undefined);
+  assert.equal(V.implementationBadge(undefined, 4).text, '4台');
+  assert.equal(V.implementationBadge(inherited, 1), undefined);
+  const issue = { text: '停止', tone: 'acc' };
+  assert.equal(V.implementationBadge(issue, 4), issue);
 });

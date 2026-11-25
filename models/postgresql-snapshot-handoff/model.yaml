@@ -1,0 +1,100 @@
+name: PostgreSQL：スナップショットと変更配信の引き継ぎ
+description: 同じ境界に対応するスナップショットと配信開始位置を使い、初回コピーから変更ストリームへ移る条件を追う。
+parent: {model: postgresql, node: subscriber}
+reference:
+  objectives:
+    - 初回コピーの可視性と変更配信の開始位置がどう対応するかを説明する。
+    - 別の SQL トランザクションにスナップショットを渡せる条件を確認する。
+    - コピーの完了後に同じ論理スロットを使う理由を説明する。
+  sources:
+    - {title: PostgreSQL 18 Exported Snapshots, url: https://www.postgresql.org/docs/18/logicaldecoding-explanation.html#LOGICALDECODING-EXPORTED-SNAPSHOTS}
+    - {title: PostgreSQL 18 Streaming Replication Protocol, url: https://www.postgresql.org/docs/18/protocol-replication.html}
+    - {title: PostgreSQL 18 SET TRANSACTION, url: https://www.postgresql.org/docs/18/sql-set-transaction.html}
+sources: [docs/reference-postgresql-snapshot-handoff.md]
+evidence:
+  - {type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§1"}
+  - {type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§6"}
+tiers: [{id: flow, label: 初回コピーから変更配信へ, z: 0, size: [27, 13]}]
+nodes:
+  boundary: {label: コピーと配信の境界, kind: service, tier: flow, x: 9, y: 2, description: 表を読むための可視性と、変更配信の開始位置を一緒に確定する。, evidence: &handoff-boundary [{type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§2"}]}
+  controller: {label: 取り込み制御, kind: workflow, tier: flow, x: 18, y: 2, description: スナップショット識別子を初回コピーに渡し、完了後に変更配信を始める。, evidence: [{type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§4"}]}
+  rows: {label: コピー対象の表, kind: table, tier: flow, x: 2, y: 6, evidence: &handoff-import [{type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§3"}]}
+  read-session: {label: 初回コピーの読み取りセッション, kind: worker, tier: flow, x: 9, y: 6, description: データを読む前に指定された可視性を取り込む。, evidence: *handoff-import}
+  copy-client: {label: 初回コピーのクライアント, kind: client, tier: flow, x: 18, y: 6, evidence: *handoff-import}
+  log: {label: 変更ログ, kind: file, tier: flow, x: 2, y: 11, description: 初回コピーの境界より後の変更を配信できるよう保持する。, evidence: &handoff-stream [{type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§4"}]}
+  stream: {label: 変更配信処理, kind: service, tier: flow, x: 9, y: 11, description: 同じ初回境界を使い、保持されているログから変更を配信する。, evidence: *handoff-stream}
+  output: {label: 取り込みデータの保存先, kind: file, tier: flow, x: 24, y: 9, description: 初回コピーと、その後の変更データを保存する。, evidence: *handoff-stream}
+links:
+  - {id: establish, from: controller, to: boundary, label: 初回境界を確保, evidence: *handoff-boundary}
+  - {id: return-boundary, from: boundary, to: controller, label: 識別子と開始位置を返す, evidence: *handoff-boundary}
+  - {id: share, from: controller, to: copy-client, label: スナップショット識別子を渡す, evidence: *handoff-import}
+  - {id: import, from: copy-client, to: read-session, label: 読み取り前に取り込む, evidence: *handoff-import}
+  - {id: read-table, from: rows, to: read-session, label: スナップショットで見える行を読む, evidence: *handoff-import}
+  - {id: copy-rows, from: read-session, to: copy-client, label: 初回データを返す, evidence: *handoff-import}
+  - {id: save-base, from: copy-client, to: output, label: 初回コピーを保存, evidence: *handoff-import}
+  - {id: copy-complete, from: copy-client, to: controller, label: コピーの完了を通知, evidence: *handoff-stream}
+  - {id: begin-stream, from: controller, to: stream, label: 対応する位置から配信を要求, evidence: *handoff-stream}
+  - {id: read-changes, from: log, to: stream, label: 保持された変更を読む, evidence: *handoff-stream}
+  - {id: push-changes, from: stream, to: controller, label: コミット済みの変更を配信, evidence: *handoff-stream}
+  - {id: save-changes, from: controller, to: output, label: 変更データを保存, evidence: *handoff-stream}
+scenarios:
+  - id: copy-to-stream
+    label: 境界の確保・コピー・変更配信
+    evidence: [{type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§2"}, {type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§3"}, {type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§4"}]
+    steps:
+      - {links: [establish, return-boundary], note: 初回コピーの可視性と配信開始位置を一緒に確保する。}
+      - {links: [share, import, read-table, copy-rows, save-base], note: 識別子が有効な間に別の読み取りトランザクションへ渡し、対象行を保存する。}
+      - {links: [copy-complete, begin-stream, read-changes, push-changes, save-changes], note: 初回コピーの完了を確認し、対応する位置から変更を受け取る。}
+  - id: expired-snapshot
+    label: 読み取り前に識別子が失効
+    evidence: *handoff-import
+    steps:
+      - {links: [establish, return-boundary], note: 識別子を取得した後、読み取り側が取り込む前に発行元の接続が閉じる。}
+      - {links: [share, import], note: 古い識別子での取り込みが失敗する。コピーと配信位置の組を取り直す。}
+unknowns:
+  - {id: unverified, text: 実機での動作、初回コピー時間、必要なログ容量は未確認。, refs: [read-table, read-changes]}
+implementations:
+  - id: onprem
+    label: PostgreSQL 18・pg_dump・論理配信クライアント
+    description: 自前の PostgreSQL 18 ホストから、別の Linux ホストの pg_dump が初回データを取得する。同じホストの取り込みプログラムが libpq のレプリケーション接続で対応する変更を受け取る。
+    sources:
+      - {title: PostgreSQL 18 Exported Snapshots, url: https://www.postgresql.org/docs/18/logicaldecoding-explanation.html#LOGICALDECODING-EXPORTED-SNAPSHOTS}
+      - {title: PostgreSQL 18 Streaming Replication Protocol, url: https://www.postgresql.org/docs/18/protocol-replication.html}
+      - {title: PostgreSQL 18 SET TRANSACTION, url: https://www.postgresql.org/docs/18/sql-set-transaction.html}
+      - {title: PostgreSQL 18 pg_dump, url: https://www.postgresql.org/docs/18/app-pgdump.html}
+      - {title: PostgreSQL 18 libpq Connection Control, url: https://www.postgresql.org/docs/18/libpq-connect.html}
+      - {title: PostgreSQL 18 Logical Streaming Replication Protocol, url: https://www.postgresql.org/docs/18/protocol-logical-replication.html}
+      - {title: PostgreSQL 18 Logical Replication Security, url: https://www.postgresql.org/docs/18/logical-replication-security.html}
+      - {title: PostgreSQL 18 pg_hba.conf, url: https://www.postgresql.org/docs/18/auth-pg-hba-conf.html}
+      - {title: PostgreSQL 18 Password Authentication, url: https://www.postgresql.org/docs/18/auth-password.html}
+      - {title: PostgreSQL 18 Replication Slots, url: https://www.postgresql.org/docs/18/view-pg-replication-slots.html}
+    tiers: &handoff-2d-tiers [{id: diagram, label: 自前 Linux ホスト間の取り込み, z: 0, size: [34, 17]}]
+    nodes:
+      ex-slot: {label: WAL sender のスロット作成, kind: service, tier: diagram, x: 11.5, y: 3, realizes: [boundary], description: CREATE_REPLICATION_SLOT の結果に snapshot_name と consistent_point を含める。, evidence: &handoff-impl [{type: doc, ref: "docs/reference-postgresql-snapshot-handoff.md#§5"}]}
+      ex-table: {label: PostgreSQL の注文テーブル, kind: table, tier: diagram, x: 4, y: 8, realizes: [rows], evidence: *handoff-impl}
+      ex-backend: {label: SQL バックエンド, kind: worker, tier: diagram, x: 11.5, y: 8, realizes: [read-session], description: SQL 接続のトランザクションがエクスポートされたスナップショットを使う。, evidence: *handoff-impl}
+      ex-wal: {label: PGDATA/pg_wal, kind: file, tier: diagram, x: 4, y: 13, realizes: [log], description: 論理スロットが読み取りに必要とする WAL を保持する。, evidence: *handoff-impl}
+      ex-sender: {label: WAL sender と pgoutput, kind: service, tier: diagram, x: 11.5, y: 13, realizes: [stream], description: スロットを作成した接続で START_REPLICATION を処理し、publication の対象だけを配信する。, evidence: *handoff-impl}
+      ex-app: {label: libpq の取り込みプログラム, kind: workflow, tier: diagram, x: 22, y: 3, realizes: [controller], description: レプリケーション接続を維持し、初回ダンプ後に同じスロットで変更を受信する。, evidence: *handoff-impl}
+      ex-dump: {label: pg_dump, kind: client, tier: diagram, x: 22, y: 8, realizes: [copy-client], description: --snapshot で指定された可視性を別の SQL 接続に取り込む。, evidence: *handoff-impl}
+      ex-files: {label: ダンプと変更データのファイル, kind: file, tier: diagram, x: 29.5, y: 11, realizes: [output], description: 取り込みホストの永続ストレージにダンプ、対応するスロット名と開始位置、変更データを保存する。, evidence: *handoff-impl}
+    groups: &handoff-2d-groups
+      - {kind: datacenter, provider: onprem, label: 自前 Linux DB ホスト, tier: diagram, x0: 0.25, y0: 0.25, x1: 15.6, y1: 16, nodes: &handoff-server [ex-slot, ex-table, ex-backend, ex-wal, ex-sender]}
+      - {kind: datacenter, provider: onprem, label: 自前 Linux 取り込みホスト, tier: diagram, x0: 17.4, y0: 0.25, x1: 33.7, y1: 16, nodes: &handoff-client [ex-app, ex-dump, ex-files]}
+    layout2d: {tiers: *handoff-2d-tiers, nodes: {}, groups: *handoff-2d-groups}
+    layout3d:
+      tiers:
+        - {id: db, label: PostgreSQL 18, z: 0, size: [15, 14]}
+        - {id: intake, label: 取り込みとファイル保存, z: 0, origin: [19, 0], size: [15, 12]}
+      nodes:
+        ex-slot: {tier: db, x: 10, y: 2.5}
+        ex-table: {tier: db, x: 3, y: 6.2}
+        ex-backend: {tier: db, x: 9.6, y: 6.5}
+        ex-wal: {tier: db, x: 3, y: 11.7}
+        ex-sender: {tier: db, x: 10.2, y: 11.4}
+        ex-app: {tier: intake, x: 3.3, y: 2}
+        ex-dump: {tier: intake, x: 3.3, y: 7}
+        ex-files: {tier: intake, x: 10, y: 8.5}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux DB ホスト, tier: db, nodes: *handoff-server}
+        - {kind: datacenter, provider: onprem, label: 自前 Linux 取り込みホスト, tier: intake, nodes: *handoff-client}

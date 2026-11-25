@@ -1,0 +1,296 @@
+{
+  "model": "postgresql-snapshot-handoff",
+  "name": "PostgreSQL：スナップショットと変更配信の引き継ぎ",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "boundary": {
+      "type": "node",
+      "label": "コピーと配信の境界",
+      "status": "claim"
+    },
+    "controller": {
+      "type": "node",
+      "label": "取り込み制御",
+      "status": "claim"
+    },
+    "rows": {
+      "type": "node",
+      "label": "コピー対象の表",
+      "status": "claim"
+    },
+    "read-session": {
+      "type": "node",
+      "label": "初回コピーの読み取りセッション",
+      "status": "claim"
+    },
+    "copy-client": {
+      "type": "node",
+      "label": "初回コピーのクライアント",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "変更ログ",
+      "status": "claim"
+    },
+    "stream": {
+      "type": "node",
+      "label": "変更配信処理",
+      "status": "claim"
+    },
+    "output": {
+      "type": "node",
+      "label": "取り込みデータの保存先",
+      "status": "claim"
+    },
+    "establish": {
+      "type": "link",
+      "label": "取り込み制御 → コピーと配信の境界",
+      "status": "claim"
+    },
+    "return-boundary": {
+      "type": "link",
+      "label": "コピーと配信の境界 → 取り込み制御",
+      "status": "claim"
+    },
+    "share": {
+      "type": "link",
+      "label": "取り込み制御 → 初回コピーのクライアント",
+      "status": "claim"
+    },
+    "import": {
+      "type": "link",
+      "label": "初回コピーのクライアント → 初回コピーの読み取りセッション",
+      "status": "claim"
+    },
+    "read-table": {
+      "type": "link",
+      "label": "コピー対象の表 → 初回コピーの読み取りセッション",
+      "status": "claim"
+    },
+    "copy-rows": {
+      "type": "link",
+      "label": "初回コピーの読み取りセッション → 初回コピーのクライアント",
+      "status": "claim"
+    },
+    "save-base": {
+      "type": "link",
+      "label": "初回コピーのクライアント → 取り込みデータの保存先",
+      "status": "claim"
+    },
+    "copy-complete": {
+      "type": "link",
+      "label": "初回コピーのクライアント → 取り込み制御",
+      "status": "claim"
+    },
+    "begin-stream": {
+      "type": "link",
+      "label": "取り込み制御 → 変更配信処理",
+      "status": "claim"
+    },
+    "read-changes": {
+      "type": "link",
+      "label": "変更ログ → 変更配信処理",
+      "status": "claim"
+    },
+    "push-changes": {
+      "type": "link",
+      "label": "変更配信処理 → 取り込み制御",
+      "status": "claim"
+    },
+    "save-changes": {
+      "type": "link",
+      "label": "取り込み制御 → 取り込みデータの保存先",
+      "status": "claim"
+    },
+    "copy-to-stream": {
+      "type": "scenario",
+      "label": "境界の確保・コピー・変更配信"
+    },
+    "expired-snapshot": {
+      "type": "scenario",
+      "label": "読み取り前に識別子が失効"
+    },
+    "unverified": {
+      "type": "unknown",
+      "label": "実機での動作、初回コピー時間、必要なログ容量は未確認。"
+    },
+    "ex-slot": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "WAL sender のスロット作成",
+      "realizes": [
+        "boundary"
+      ]
+    },
+    "ex-table": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PostgreSQL の注文テーブル",
+      "realizes": [
+        "rows"
+      ]
+    },
+    "ex-backend": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "SQL バックエンド",
+      "realizes": [
+        "read-session"
+      ]
+    },
+    "ex-wal": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "PGDATA/pg_wal",
+      "realizes": [
+        "log"
+      ]
+    },
+    "ex-sender": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "WAL sender と pgoutput",
+      "realizes": [
+        "stream"
+      ]
+    },
+    "ex-app": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "libpq の取り込みプログラム",
+      "realizes": [
+        "controller"
+      ]
+    },
+    "ex-dump": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "pg_dump",
+      "realizes": [
+        "copy-client"
+      ]
+    },
+    "ex-files": {
+      "type": "implementation",
+      "impl": "onprem",
+      "label": "ダンプと変更データのファイル",
+      "realizes": [
+        "output"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-postgresql-snapshot-handoff.md#§1": [
+      "model"
+    ],
+    "docs/reference-postgresql-snapshot-handoff.md": [
+      "model",
+      "boundary",
+      "controller",
+      "rows",
+      "read-session",
+      "copy-client",
+      "log",
+      "stream",
+      "output",
+      "establish",
+      "return-boundary",
+      "share",
+      "import",
+      "read-table",
+      "copy-rows",
+      "save-base",
+      "copy-complete",
+      "begin-stream",
+      "read-changes",
+      "push-changes",
+      "save-changes",
+      "copy-to-stream",
+      "expired-snapshot",
+      "ex-slot",
+      "ex-table",
+      "ex-backend",
+      "ex-wal",
+      "ex-sender",
+      "ex-app",
+      "ex-dump",
+      "ex-files"
+    ],
+    "docs/reference-postgresql-snapshot-handoff.md#§6": [
+      "model"
+    ],
+    "docs/reference-postgresql-snapshot-handoff.md#§2": [
+      "boundary",
+      "establish",
+      "return-boundary",
+      "copy-to-stream"
+    ],
+    "docs/reference-postgresql-snapshot-handoff.md#§4": [
+      "controller",
+      "log",
+      "stream",
+      "output",
+      "copy-complete",
+      "begin-stream",
+      "read-changes",
+      "push-changes",
+      "save-changes",
+      "copy-to-stream"
+    ],
+    "docs/reference-postgresql-snapshot-handoff.md#§3": [
+      "rows",
+      "read-session",
+      "copy-client",
+      "share",
+      "import",
+      "read-table",
+      "copy-rows",
+      "save-base",
+      "copy-to-stream",
+      "expired-snapshot"
+    ],
+    "docs/reference-postgresql-snapshot-handoff.md#§5": [
+      "ex-slot",
+      "ex-table",
+      "ex-backend",
+      "ex-wal",
+      "ex-sender",
+      "ex-app",
+      "ex-dump",
+      "ex-files"
+    ]
+  },
+  "reference": {
+    "category": "取り込み",
+    "order": 10,
+    "domain": "データ処理",
+    "kind": "仕組みの深掘り",
+    "product": "PostgreSQL",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "postgresql",
+    "objectives": [
+      "初回コピーの可視性と変更配信の開始位置がどう対応するかを説明する。",
+      "別の SQL トランザクションにスナップショットを渡せる条件を確認する。",
+      "コピーの完了後に同じ論理スロットを使う理由を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "PostgreSQL 18 Exported Snapshots",
+        "url": "https://www.postgresql.org/docs/18/logicaldecoding-explanation.html#LOGICALDECODING-EXPORTED-SNAPSHOTS"
+      },
+      {
+        "title": "PostgreSQL 18 Streaming Replication Protocol",
+        "url": "https://www.postgresql.org/docs/18/protocol-replication.html"
+      },
+      {
+        "title": "PostgreSQL 18 SET TRANSACTION",
+        "url": "https://www.postgresql.org/docs/18/sql-set-transaction.html"
+      }
+    ]
+  }
+}

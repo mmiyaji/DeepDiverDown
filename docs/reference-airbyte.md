@@ -3,10 +3,13 @@
 ## 1. Connection と Connector
 Airbyte の Connection は Source Connector と Destination Connector の関係であり、対象データ、読み書き方式、同期条件を定義する。ここでは受注 API から分析用ウェアハウスへ複製する例を示す。
 
+1. [PostgreSQL の初回スナップショットと CDC](reference-airbyte-postgres-cdc.md)
+2. [Connector Builder の宣言・試し読み・公開](reference-airbyte-connector-builder.md)
+
 出典 [Connections and streams](https://docs.airbyte.com/platform/using-airbyte/getting-started/set-up-a-connection)・[Airbyte Protocol](https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol)
 
 ## 2. Source Connector の読み取り
-Source Connector は Stream を Full Refresh または Incremental で読む。Incremental は前回の State 以降だけを返し、cursor が境界になる。初回の Incremental は全件取得に相当する。
+Source Connector は Stream を Full Refresh または Incremental で読む。HTTP API の Incremental では前回の State のカーソルを使う。State がない初回は Source の設定で指定した開始位置から読む。
 
 出典 [Sync Modes](https://docs.airbyte.com/platform/using-airbyte/core-concepts/sync-modes)・[Incremental Sync](https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync)
 
@@ -25,21 +28,24 @@ Connection は自動スケジュールまたは手動で繰り返し実行でき
 
 出典 [Connections and streams](https://docs.airbyte.com/platform/using-airbyte/getting-started/set-up-a-connection)・[Modifying connection state](https://docs.airbyte.com/platform/cloud/managing-airbyte-cloud/manage-connection-state)・[Schema change management](https://docs.airbyte.com/platform/using-airbyte/schema-change-management)
 
-## 6. 実装例：Airbyte Connector Builder と PostgreSQL
+## 6. 実装例：自前 Kubernetes の Connector Builder と PostgreSQL
 
-注文 API の更新日時をカーソルとし、Airbyte の増分接続から PostgreSQL に集める例。API が時刻フィルターと必要な順序を提供する前提で同期範囲を決める。
+自前 Linux Kubernetes に Airbyte を導入する。カスタム HTTP Source は注文 API の更新日時をカーソルとして取得する。API が時刻フィルターと必要な順序を提供する前提である。Airbyte 設定 DB と分析用 PostgreSQL は自前のサーバー群のうち Kubernetes クラスターの外側に置く想定である。
 
 | 機能 | 実装での担い手 | 配置・設定 |
 | --- | --- | --- |
 | 受注 API | 注文 API の orders エンドポイント | 更新日時パラメーターとページングで注文を提供する。 |
 | 入力 API アダプター | Airbyte のカスタム Source | Connector Builder でページングと updated_at を使う増分取得を定義する。 |
-| 同期対象と実行設定、同期の実行単位、増分の再開位置 | Airbyte の Connection・同期ジョブ・状態 | 同期頻度とストリームを設定し、接続ごとの進捗を管理する。 |
+| 同期対象と実行設定、同期の実行単位 | Airbyte の Connection と同期ジョブ | 自前 Kubernetes の管理 Pod と同期ワークロードで動く。 |
+| 増分の再開位置 | Airbyte 設定用 PostgreSQL サーバー | Destination からコミット済み State の確認を受け、Airbyte が設定 DB に保存する。 |
 | 出力アダプター | Airbyte Postgres Destination | 受け取ったレコードを接続先のデータベースへ書く。 |
-| 分析用データベース | PostgreSQL の分析用スキーマ | 同期された orders データを保存する。 |
+| 分析用データベース | 分析用 PostgreSQL サーバー | 同期された orders データを分析用スキーマに保存する。 |
 
 実装で加わる部品を以下に示す。
 
-- カスタム Source の宣言ファイル。API の認証、ページング、ストリームのカーソル設定を定義する。
+- カスタム Source の YAML 宣言をワークスペースに公開する。API 認証の方式と入力項目、ページング、カーソルを宣言する。資格情報の値は Source 作成時に指定する。
+
+利用者が Airbyte の導入・更新、Kubernetes から両 DB と外部 API への到達性、資格情報、TLS を管理する。分析用 DB のユーザーはテーブルと必要なスキーマを作成し、行を書き込める必要がある。ログ用ストレージとホスト台数は未指定である。
 
 公式資料
 
@@ -47,6 +53,9 @@ Connection は自動スケジュールまたは手動で繰り返し実行でき
 - [Connections and streams](https://docs.airbyte.com/platform/using-airbyte/getting-started/set-up-a-connection)
 - [Sync Modes](https://docs.airbyte.com/platform/using-airbyte/core-concepts/sync-modes)
 - [Incremental Sync](https://docs.airbyte.com/platform/connector-development/connector-builder-ui/incremental-sync)
+- [Connector Builder](https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview)
+- [Airbyte プラットフォーム構成](https://docs.airbyte.com/platform/understanding-airbyte/high-level-view)
+- [Airbyte 設定 DB](https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections)
 - [Airbyte Postgres Destination](https://docs.airbyte.com/integrations/destinations/postgres)
 
 ## 7. 実装例：Amazon EKS 上の Airbyte・RDS・S3
@@ -71,6 +80,6 @@ Airbyte のバージョンと Helm チャートの組み合わせを固定し、
 - [Connector Builder](https://docs.airbyte.com/platform/connector-development/connector-builder-ui/overview)
 - [Postgres Destination](https://docs.airbyte.com/integrations/destinations/postgres)
 
-自前例は Linux Kubernetes ノードで Airbyte を自己管理し、分析先と別の PostgreSQL に接続設定と確定済み State を保存する。ログ用ストレージ、ネットワークとホストの具体的な構成は未指定である。AWS 例は公式資料の組み合わせによる代表構成であり、動作検証済み導入事例ではない。AWS が EKS 制御プレーンと EC2・RDS・S3 基盤を運用し、利用者は Kubernetes API、ノード、Airbyte、コネクター設定、DB・S3 のデータと権限を管理する。制御プレーンサーバーには直接アクセスしない。Airbyte のエディション、バージョンと Helm チャートの互換性は未検証。
+AWS 例は公式資料を組み合わせた構成であり、動作は未検証である。AWS が EKS 制御プレーンと EC2・RDS・S3 の基盤を運用する。利用者は Kubernetes API、ノード、Airbyte、コネクター設定、DB・S3 のデータと権限を管理する。EKS ワーカーと RDS を同じ利用者 VPC に置く想定である。S3 と EKS 制御プレーンの論理的な所属は AWS アカウントの枠で示す。Airbyte のエディション、バージョンと Helm チャートの互換性は未検証である。
 
 - [Deploying Airbyte](https://docs.airbyte.com/platform/deploying-airbyte)

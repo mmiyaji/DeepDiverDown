@@ -69,7 +69,7 @@ ClickHouse Cloud ではデータをオブジェクトストレージに置き、
 | パート | オブジェクトストレージ（サービスごとに分離） |
 | 調整 | ClickHouse Keeper |
 
-Cloud の内部の制御系の構成は公開資料で確認できていないため、図には描かない。ストレージ分離の仕方はクラウドごとに異なる（AWS は共有バケット内のサービスごとのプレフィックス、GCP はバケット、Azure はコンテナ）。
+図の ClickHouse Cloud の枠は、計算ノード、SharedMergeTree、オブジェクトストレージ、Keeper を含むサービスの論理的な範囲を示す。ストレージ分離の仕方はクラウドごとに異なる（AWS は共有バケット内のサービスごとのプレフィックス、GCP はバケット、Azure はコンテナ）。Keeper の配置・台数と内部の制御系の構成は未確認である。
 
 - [ClickHouse Cloud のアーキテクチャ](https://clickhouse.com/docs/cloud/reference/architecture)
 - [SharedMergeTree](https://clickhouse.com/docs/cloud/reference/shared-merge-tree)

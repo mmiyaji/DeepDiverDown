@@ -50,6 +50,8 @@ Source が外部システム（Kafka など）からイベントを読み、Oper
 
 実装で加わる部品は、S3 のコード、IAM サービス実行ロール、CloudWatch Logs。容量は KPU（1 vCPU・4 GB・実行用ストレージ 50 GB）で決まり、`Parallelism / ParallelismPerKPU` が割り当て KPU 数になる（別にオーケストレーション用の KPU が 1 つ課金される）。チェックポイントは既定で有効（間隔 60000 ms、最小間隔 5000 ms）。AWS が実行基盤を運用し、利用者がコード・並列度・チェックポイント設定・権限を管理する。JobManager と TaskManager の内部への操作範囲は確認した資料に記載がなく、未確認。
 
+AWS アカウントの枠は、この実装例で使うリソースの論理的な所属を示す。3D では、Flink アプリケーションとサービスが管理する復旧データを同じ区画に配置する。MSK、S3、IAM、CloudWatch Logs は同じアカウントの別区画に配置する。
+
 ## 8. 実装例：自前ホストの Standalone クラスタと Kafka・HDFS
 
 自前のサーバー群で JobManager と TaskManager を動かし、自前の Kafka を読み、チェックポイントを HDFS に置く。

@@ -37,14 +37,16 @@ EXPLAIN EXTENDED、FORMATTED、COST、CODEGEN はそれぞれ異なる観点を�
 
 ## 4. 実装例：Spark Standalone
 
-自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。図中の対応は以下の通り。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
+自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
 
-- SQL / DataFrame：クラスター外のクライアント・ストレージ等。
-- 未解決の論理計画：Spark Driver 側。
-- 名前と型の解決：Spark Driver 側。
-- 論理最適化：Spark Driver 側。
-- 物理計画と codegen：Spark Driver 側。
-- Stage / Task：Spark Executor 側。
-- 入力データ：クラスター外のクライアント・ストレージ等。
+| 機能配置 | 実装例の部品 |
+| --- | --- |
+| SQL / DataFrame | SQL / DataFrame |
+| 未解決の論理計画 | Driver：未解決の論理計画 |
+| 名前と型の解決 | Driver：名前と型の解決 |
+| 論理最適化 | Driver：論理最適化 |
+| 物理計画と codegen | Driver：物理計画と codegen |
+| Stage / Task | Executor：Stage / Task |
+| 入力データ | 入力データ |
 
 公式資料：[Spark EXPLAIN](https://spark.apache.org/docs/4.3.0/sql-ref-syntax-qry-explain.html)、[Spark SQL 性能](https://spark.apache.org/docs/4.3.0/sql-performance-tuning.html)、[Spark Cluster Mode](https://spark.apache.org/docs/4.3.0/cluster-overview.html)。

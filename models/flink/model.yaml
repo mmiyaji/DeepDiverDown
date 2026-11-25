@@ -357,7 +357,7 @@ implementations:
           - type: doc
             ref: docs/reference-flink.md#§7
       msf-app:
-        label: Managed Service for Apache Flink アプリケーション
+        label: Flink アプリケーション
         kind: service
         tier: managed
         x: 3
@@ -378,7 +378,7 @@ implementations:
           type: shared
           scope: AWS がサービスの実行基盤を運用し、利用者がアプリケーションコード・並列度・チェックポイント設定・権限を管理する。内部の JobManager・TaskManager の配置と操作範囲は確認した資料に記載がない。
       msf-checkpoint:
-        label: チェックポイント・スナップショット（サービス管理）
+        label: チェックポイント・スナップショット
         kind: db
         tier: managed
         x: 11
@@ -504,6 +504,36 @@ implementations:
           - msf-sink
           - msf-role
           - msf-logs
+    layout2d:
+      tiers:
+        - {id: diagram, label: Managed Service for Apache Flink と MSK, z: 0, size: [22, 12]}
+      nodes:
+        msf-client: {tier: diagram, x: 1.5, y: 5.5}
+        msf-source: {tier: diagram, x: 7, y: 5.5}
+        msf-app: {tier: diagram, x: 12, y: 5.5}
+        msf-sink: {tier: diagram, x: 17, y: 5.5}
+        msf-role: {tier: diagram, x: 12, y: 2}
+        msf-code: {tier: diagram, x: 7, y: 9}
+        msf-logs: {tier: diagram, x: 12, y: 9}
+        msf-checkpoint: {tier: diagram, x: 17, y: 9}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 4.5, y0: 0, x1: 20, y1: 11.5, nodes: [msf-app, msf-checkpoint, msf-code, msf-source, msf-sink, msf-role, msf-logs]}
+    layout3d:
+      tiers:
+        - {id: entry, label: 利用者, kind: origin, z: 0, origin: [-5, 0], size: [3, 8]}
+        - {id: managed, label: Managed Service for Apache Flink, z: 0, size: [10, 8]}
+        - {id: support, label: 入出力・コード・権限・ログ, z: 0, origin: [12, 0], size: [17, 8]}
+      nodes:
+        msf-client: {tier: entry, x: 1.5, y: 4}
+        msf-app: {tier: managed, x: 3, y: 3}
+        msf-checkpoint: {tier: managed, x: 7.5, y: 6}
+        msf-source: {tier: support, x: 3, y: 2}
+        msf-sink: {tier: support, x: 8.5, y: 2}
+        msf-role: {tier: support, x: 14, y: 2}
+        msf-code: {tier: support, x: 3, y: 6}
+        msf-logs: {tier: support, x: 11.5, y: 6}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [managed, support], nodes: [msf-app, msf-checkpoint, msf-code, msf-source, msf-sink, msf-role, msf-logs]}
   - id: standalone
     label: 自前ホストの Standalone クラスタと Kafka・HDFS
     description: 自前のサーバー群に Flink の JobManager・TaskManager を起動し、自前の Kafka を読み、HDFS にチェックポイントを置く構成例。
@@ -659,3 +689,32 @@ implementations:
           - standalone-kafka-in
           - standalone-kafka-out
           - standalone-hdfs
+    layout2d:
+      tiers:
+        - {id: diagram, label: Standalone Flink と Kafka・HDFS, z: 0, size: [27, 12]}
+      nodes:
+        standalone-client: {tier: diagram, x: 0, y: 2}
+        standalone-jm: {tier: diagram, x: 10, y: 2}
+        standalone-tm: {tier: diagram, x: 15.5, y: 5.5}
+        standalone-rocks: {tier: diagram, x: 15.5, y: 9}
+        standalone-kafka-in: {tier: diagram, x: 5, y: 5.5}
+        standalone-kafka-out: {tier: diagram, x: 23, y: 5.5}
+        standalone-hdfs: {tier: diagram, x: 23, y: 9}
+      groups:
+        - {kind: datacenter, label: 自前のデータセンター, provider: onprem, tier: [diagram], x0: 2.8, y0: 0, x1: 26, y1: 11.5, nodes: [standalone-jm, standalone-tm, standalone-rocks, standalone-kafka-in, standalone-kafka-out, standalone-hdfs]}
+        - {kind: cluster, label: Flink クラスター, tier: [diagram], x0: 7.45, y0: 0.5, x1: 18.9, y1: 11, nodes: [standalone-jm, standalone-tm, standalone-rocks]}
+    layout3d:
+      tiers:
+        - {id: entry, label: 運用者, kind: origin, z: 0, origin: [-7, 0], size: [4, 9]}
+        - {id: onprem, label: 自前サーバーの実行・入出力・保存, z: 0, size: [28, 9]}
+      nodes:
+        standalone-client: {tier: entry, x: 1.5, y: 3}
+        standalone-jm: {tier: onprem, x: 9, y: 2}
+        standalone-tm: {tier: onprem, x: 15, y: 4}
+        standalone-rocks: {tier: onprem, x: 15, y: 7.5}
+        standalone-kafka-in: {tier: onprem, x: 3, y: 6}
+        standalone-kafka-out: {tier: onprem, x: 24, y: 3}
+        standalone-hdfs: {tier: onprem, x: 24, y: 7}
+      groups:
+        - {kind: datacenter, label: 自前のデータセンター, provider: onprem, tier: [onprem], nodes: [standalone-jm, standalone-tm, standalone-rocks, standalone-kafka-in, standalone-kafka-out, standalone-hdfs]}
+        - {kind: cluster, label: Flink クラスター, tier: [onprem], nodes: [standalone-jm, standalone-tm, standalone-rocks]}

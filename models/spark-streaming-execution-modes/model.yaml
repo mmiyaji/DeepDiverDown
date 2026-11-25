@@ -62,26 +62,73 @@ scenarios:
 implementations:
   - id: standalone-kafka
     label: Spark 4.3 Standalone・Kafka・共有ストレージ
-    description: Kafka と Spark Standalone の代表構成。図には代替モードの接続も含むためシナリオで切り替える。Real-Time の Kafka 出力は重複対策が必要。
+    description: 自前環境の Kafka クラスターと Spark Standalone を接続し、共有ファイルシステムにチェックポイントを保存する。投入クライアントはクラスターとは別に示す。各実行モードの接続はシナリオで確認できる。
     sources:
       - {title: Spark 4.3 Real-Time Mode, url: 'https://spark.apache.org/docs/4.3.0/streaming/real-time-mode.html'}
       - {title: Spark Standalone Mode, url: 'https://spark.apache.org/docs/4.3.0/spark-standalone.html'}
+      - {title: Spark のクラスターモード, url: 'https://spark.apache.org/docs/4.3.0/cluster-overview.html'}
+      - {title: Structured Streaming のチェックポイント, url: 'https://spark.apache.org/docs/4.3.0/streaming/apis-on-dataframes-and-datasets.html#recovering-from-failures-with-checkpointing'}
+      - {title: Structured Streaming の Kafka コネクター, url: 'https://spark.apache.org/docs/4.3.0/streaming/structured-streaming-kafka-integration.html'}
     tiers:
-      - {id: platform, label: 自己管理環境, z: 0, size: [22, 7]}
+      - {id: platform, label: Kafka・Spark・共有ファイルシステム, z: 0, origin: [-2, 0], size: [34, 19]}
     groups:
-      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [platform], nodes: [ex-input, ex-master, ex-driver, ex-producer, ex-consumer, ex-state, ex-checkpoint, ex-output]}
-      - {kind: cluster, label: Spark Standalone クラスター, tier: [platform], nodes: [ex-master, ex-driver, ex-producer, ex-consumer, ex-state]}
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: platform, x0: -0.5, y0: 2.7, x1: 33, y1: 18, nodes: &spark-env [ex-input, ex-output, ex-master, ex-worker, ex-driver, ex-producer, ex-consumer, ex-state, ex-checkpoint]}
+      - {kind: cluster, label: Kafka クラスター, tier: platform, x0: 0.75, y0: 5.8, x1: 7.5, y1: 15.8, nodes: &spark-kafka [ex-input, ex-output]}
+      - {kind: cluster, label: Spark Standalone クラスター, tier: platform, x0: 8.25, y0: 3.8, x1: 25.8, y1: 16.8, nodes: &spark-standalone [ex-master, ex-worker, ex-driver, ex-producer, ex-consumer, ex-state]}
     nodes:
-      ex-input: {label: Kafka 入力トピック, kind: queue, tier: platform, x: 1, y: 2, realizes: [source], description: 入力を保持し再読できる。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
-      ex-master: {label: Standalone Master, kind: service, tier: platform, x: 5, y: 0, description: Worker を登録し Executor の資源を割り当てる。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
-      ex-driver: {label: Spark Driver, kind: service, tier: platform, x: 5, y: 2, realizes: [driver], description: Real-Time クエリの実行と進捗を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
-      ex-producer: {label: Executor 入力タスク, kind: worker, tier: platform, x: 9, y: 2, realizes: [producer, batch, continuous], description: モードに応じた入力タスク。Real-Time では長時間動作する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
-      ex-consumer: {label: Executor 状態タスク, kind: worker, tier: platform, x: 14, y: 2, realizes: [consumer, shuffle], description: Real-Time では入力タスクと並行動作しネットワークでキー別の入力を受け取る。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
-      ex-state: {label: RocksDB State Store, kind: db, tier: platform, x: 14, y: 5, realizes: [state], description: Executor のローカル状態を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
-      ex-checkpoint: {label: 共有 checkpointLocation, kind: db, tier: platform, x: 9, y: 5, realizes: [checkpoint], description: 状態と進捗を共有ストレージへ永続化する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
-      ex-output: {label: Kafka 出力トピック, kind: queue, tier: platform, x: 20, y: 2, realizes: [sink], description: Kafka sink の出力は障害後に重複し得る。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-submit: {label: spark-submit, kind: client, tier: platform, x: 12, y: 0, description: cluster モードでジョブを Standalone Master に投入する。クライアントの設置場所は指定しない。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-input: {label: Kafka 入力トピック, kind: queue, tier: platform, x: 4, y: 8, realizes: [source], description: 入力を保持し再読できる。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-master: {label: Standalone Master, kind: service, tier: platform, x: 12, y: 5.5, description: Worker を登録し、Driver と Executor の実行先を割り当てる。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-worker: {label: Standalone Worker, kind: host, tier: platform, x: 20, y: 5.5, description: Worker プロセスをまとめて示す。割り当てに従い Driver や Executor を起動する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-driver: {label: Spark Driver, kind: service, tier: platform, x: 13, y: 9, realizes: [driver], description: Worker 上でクエリを実行し、タスクと進捗を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-producer: {label: Executor 入力タスク, kind: worker, tier: platform, x: 12, y: 13, realizes: [producer, batch, continuous], description: Worker 上の Executor で動く入力タスク。Real-Time では長時間動作する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-consumer: {label: Executor 状態タスク, kind: worker, tier: platform, x: 20, y: 10, realizes: [consumer, shuffle], description: Worker 上の Executor で動く。Real-Time では入力タスクと並行動作し、キー別の入力を受け取る。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-state: {label: RocksDB State Store, kind: db, tier: platform, x: 22, y: 14.5, realizes: [state], description: Executor がローカルメモリとディスクを使って状態を管理する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-checkpoint: {label: 共有ファイルシステム, kind: db, tier: platform, x: 30, y: 12, realizes: [checkpoint], description: HDFS 互換の共有ファイルシステム。クエリの checkpointLocation に進捗と状態を永続化する。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
+      ex-output: {label: Kafka 出力トピック, kind: queue, tier: platform, x: 4, y: 13, realizes: [sink], description: 入力トピックと同じ Kafka クラスターに置く。Kafka sink の出力は障害後に重複し得る。, evidence: [{type: doc, ref: 'docs/reference-spark-streaming-execution-modes.md#§7'}]}
     links:
-      - {id: ex-allocate, from: ex-master, to: ex-producer, label: Executor の資源を割り当て}
-      - {id: ex-schedule, from: ex-driver, to: ex-producer, label: タスクを起動}
+      - {id: ex-submit-job, from: ex-submit, to: ex-master, label: ジョブを投入}
+      - {id: ex-allocate, from: ex-master, to: ex-worker, label: 実行先を割り当て}
+      - {id: ex-launch-driver, from: ex-worker, to: ex-driver, label: Driver を起動}
+      - {id: ex-launch-executor, from: ex-worker, to: ex-producer, label: Executor を起動}
+      - {id: ex-schedule, from: ex-driver, to: ex-producer, label: タスクを起動, realizes: [mb-run], replace: true}
       - {id: ex-checkpoint, from: ex-driver, to: ex-checkpoint, label: 進捗を保存}
-      - {id: ex-restore, from: ex-state, to: ex-checkpoint, label: 状態を保存}
+      - {id: ex-restore, from: ex-state, to: ex-checkpoint, label: 状態を保存, realizes: [rt-save], replace: true}
+    layout2d:
+      tiers: [{id: diagram, label: Kafka・Spark・共有ファイルシステム, z: 0, origin: [-2, 0], size: [34, 19]}]
+      nodes:
+        ex-submit: {tier: diagram, x: 12, y: 0}
+        ex-input: {tier: diagram, x: 4, y: 8}
+        ex-output: {tier: diagram, x: 4, y: 13}
+        ex-master: {tier: diagram, x: 12, y: 5.5}
+        ex-worker: {tier: diagram, x: 20, y: 5.5}
+        ex-driver: {tier: diagram, x: 13, y: 9}
+        ex-producer: {tier: diagram, x: 12, y: 13}
+        ex-consumer: {tier: diagram, x: 20, y: 10}
+        ex-state: {tier: diagram, x: 22, y: 14.5}
+        ex-checkpoint: {tier: diagram, x: 30, y: 12}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, x0: -0.5, y0: 2.7, x1: 33, y1: 18, nodes: *spark-env}
+        - {kind: cluster, label: Kafka クラスター, tier: diagram, x0: 0.75, y0: 5.8, x1: 7.5, y1: 15.8, nodes: *spark-kafka}
+        - {kind: cluster, label: Spark Standalone クラスター, tier: diagram, x0: 8.25, y0: 3.8, x1: 25.8, y1: 16.8, nodes: *spark-standalone}
+    layout3d:
+      tiers:
+        - {id: kafka, label: Kafka クラスター, z: 0, size: [7, 12]}
+        - {id: spark, label: Spark Standalone クラスター, z: 0, origin: [8, 0], size: [15, 14]}
+        - {id: checkpoint, label: チェックポイント保存先, z: 0, origin: [25, 3.5], size: [6, 6]}
+        - {id: clients, label: 投入クライアント, kind: origin, z: 0, origin: [17.5, -7], size: [5, 3]}
+      nodes:
+        ex-submit: {tier: clients, x: 2, y: 1.5}
+        ex-input: {tier: kafka, x: 3, y: 3.5}
+        ex-output: {tier: kafka, x: 3, y: 8.5}
+        ex-master: {tier: spark, x: 2, y: 2}
+        ex-worker: {tier: spark, x: 10, y: 2}
+        ex-driver: {tier: spark, x: 2, y: 6}
+        ex-producer: {tier: spark, x: 4, y: 10}
+        ex-consumer: {tier: spark, x: 10, y: 6}
+        ex-state: {tier: spark, x: 12, y: 10}
+        ex-checkpoint: {tier: checkpoint, x: 2.8, y: 2.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [kafka, spark, checkpoint], nodes: *spark-env}
+        - {kind: cluster, tier: kafka, x0: 0.5, y0: 1.5, x1: 6.5, y1: 11, nodes: *spark-kafka}
+        - {kind: cluster, tier: spark, x0: 0.25, y0: 0.4, x1: 14.2, y1: 12.7, nodes: *spark-standalone}

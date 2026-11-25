@@ -105,12 +105,6 @@
       "type": "unknown",
       "label": "Connector 種別・同期間隔・Destination 製品名は確定していない。"
     },
-    "postgres-snowflake-runner": {
-      "type": "implementation",
-      "impl": "postgres-snowflake",
-      "label": "Fivetran のホスト型 dbt 実行",
-      "realizes": []
-    },
     "postgres-snowflake-pg": {
       "type": "implementation",
       "impl": "postgres-snowflake",
@@ -119,44 +113,75 @@
         "source"
       ]
     },
+    "postgres-snowflake-publication": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "Publication とスロット",
+      "realizes": []
+    },
     "postgres-snowflake-connection": {
       "type": "implementation",
       "impl": "postgres-snowflake",
-      "label": "Fivetran SaaS / PostgreSQL 接続",
+      "label": "PostgreSQL 接続",
       "realizes": [
         "connector",
         "initial",
-        "incremental",
+        "incremental"
+      ]
+    },
+    "postgres-snowflake-cursor": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "同期の進捗位置",
+      "realizes": [
         "cursor"
       ]
+    },
+    "postgres-snowflake-runner": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "ホスト型 dbt ジョブ",
+      "realizes": []
     },
     "postgres-snowflake-snowflake": {
       "type": "implementation",
       "impl": "postgres-snowflake",
-      "label": "Snowflake / RAW テーブル",
+      "label": "Snowflake の RAW テーブル",
       "realizes": [
         "destination"
       ]
     },
-    "postgres-snowflake-publication": {
+    "postgres-snowflake-warehouse": {
       "type": "implementation",
       "impl": "postgres-snowflake",
-      "label": "PostgreSQL の論理レプリケーション設定",
+      "label": "Snowflake Warehouse",
+      "realizes": [
+        "transform"
+      ]
+    },
+    "postgres-snowflake-mart": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "注文マート",
+      "realizes": []
+    },
+    "postgres-snowflake-role": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "Snowflake ユーザーとロール",
+      "realizes": []
+    },
+    "postgres-snowflake-git": {
+      "type": "implementation",
+      "impl": "postgres-snowflake",
+      "label": "GitHub.com",
       "realizes": []
     },
     "postgres-snowflake-dbt": {
       "type": "implementation",
       "impl": "postgres-snowflake",
-      "label": "Git の dbt プロジェクト",
+      "label": "dbt プロジェクト",
       "realizes": []
-    },
-    "postgres-snowflake-warehouse": {
-      "type": "implementation",
-      "impl": "postgres-snowflake",
-      "label": "Snowflake / 実行 Warehouse",
-      "realizes": [
-        "transform"
-      ]
     }
   },
   "byRef": {
@@ -189,13 +214,17 @@
       "failed-sync",
       "BR-01",
       "NFR-01",
-      "postgres-snowflake-runner",
       "postgres-snowflake-pg",
-      "postgres-snowflake-connection",
-      "postgres-snowflake-snowflake",
       "postgres-snowflake-publication",
-      "postgres-snowflake-dbt",
-      "postgres-snowflake-warehouse"
+      "postgres-snowflake-connection",
+      "postgres-snowflake-cursor",
+      "postgres-snowflake-runner",
+      "postgres-snowflake-snowflake",
+      "postgres-snowflake-warehouse",
+      "postgres-snowflake-mart",
+      "postgres-snowflake-role",
+      "postgres-snowflake-git",
+      "postgres-snowflake-dbt"
     ],
     "docs/reference-fivetran.md#§2": [
       "source",
@@ -229,13 +258,17 @@
       "NFR-01"
     ],
     "docs/reference-fivetran.md#§6": [
-      "postgres-snowflake-runner",
       "postgres-snowflake-pg",
-      "postgres-snowflake-connection",
-      "postgres-snowflake-snowflake",
       "postgres-snowflake-publication",
-      "postgres-snowflake-dbt",
-      "postgres-snowflake-warehouse"
+      "postgres-snowflake-connection",
+      "postgres-snowflake-cursor",
+      "postgres-snowflake-runner",
+      "postgres-snowflake-snowflake",
+      "postgres-snowflake-warehouse",
+      "postgres-snowflake-mart",
+      "postgres-snowflake-role",
+      "postgres-snowflake-git",
+      "postgres-snowflake-dbt"
     ]
   },
   "reference": {
@@ -243,6 +276,8 @@
     "order": 40,
     "domain": "データ処理",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "Fivetran",
+    "role": "overview",
     "objectives": [
       "Source・Connection・Destination の役割を区別する",
       "Initial sync と Incremental sync・cursor の関係を理解する",

@@ -389,3 +389,30 @@ implementations:
           - eks-native-ec2
           - eks-native-jm
           - eks-native-tm
+    layout2d:
+      tiers:
+        - {id: diagram, label: EKS 上の Flink, z: 0, size: [21, 11]}
+      nodes:
+        eks-native-cli: {tier: diagram, x: 1.5, y: 2}
+        eks-native-api: {tier: diagram, x: 8, y: 2}
+        eks-native-ec2: {tier: diagram, x: 16, y: 5}
+        eks-native-jm: {tier: diagram, x: 8, y: 8}
+        eks-native-tm: {tier: diagram, x: 15, y: 8}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [diagram], x0: 4.5, y0: 0, x1: 20, y1: 10.5, nodes: [eks-native-api, eks-native-ec2, eks-native-jm, eks-native-tm]}
+        - {kind: cluster, label: EKS クラスター（ワーカー側）, provider: k8s, tier: [diagram], x0: 5, y0: 3.65, x1: 19.5, y1: 10.1, nodes: [eks-native-ec2, eks-native-jm, eks-native-tm]}
+    layout3d:
+      tiers:
+        - {id: entry, label: 利用者, kind: origin, z: 0, origin: [-5, 0], size: [3, 5]}
+        - {id: workers, label: EKS の実行ノード, z: 0, size: [13, 5]}
+        - {id: pods, label: Flink の Pod, z: 1, size: [13, 5]}
+        - {id: api, label: AWS が運用する制御プレーン, z: 0, origin: [16, 0], size: [7, 5]}
+      nodes:
+        eks-native-cli: {tier: entry, x: 1, y: 2.5}
+        eks-native-api: {tier: api, x: 3, y: 2.5}
+        eks-native-ec2: {tier: workers, x: 6, y: 2.5}
+        eks-native-jm: {tier: pods, x: 3, y: 2.5}
+        eks-native-tm: {tier: pods, x: 10, y: 2.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [workers, pods, api], nodes: [eks-native-api, eks-native-ec2, eks-native-jm, eks-native-tm]}
+        - {kind: cluster, label: EKS クラスター（ワーカー側）, provider: k8s, tier: [workers, pods], nodes: [eks-native-ec2, eks-native-jm, eks-native-tm]}

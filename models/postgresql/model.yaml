@@ -1,0 +1,115 @@
+name: PostgreSQL の基本アーキテクチャ
+description: SQL を処理する接続ごとのプロセスと、テーブル・先行書き込みログ・変更配信の関係を追う。
+reference:
+  objectives:
+    - 接続の受付と SQL を実行するプロセスの役割を区別する。
+    - 共有バッファー、データファイル、先行書き込みログの関係を説明する。
+    - コミット済み変更を論理レプリケーションで配信する経路を追う。
+  sources:
+    - {title: PostgreSQL 18 Architectural Fundamentals, url: https://www.postgresql.org/docs/18/tutorial-arch.html}
+    - {title: PostgreSQL 18 Write-Ahead Logging, url: https://www.postgresql.org/docs/18/wal-intro.html}
+    - {title: PostgreSQL 18 Logical Replication Architecture, url: https://www.postgresql.org/docs/18/logical-replication-architecture.html}
+sources: [docs/reference-postgresql.md]
+evidence:
+  - {type: doc, ref: "docs/reference-postgresql.md#§1"}
+  - {type: doc, ref: "docs/reference-postgresql.md#§6"}
+tiers:
+  - {id: flow, label: SQL 接続・保存・変更配信, z: 0, size: [29, 14]}
+nodes:
+  sql-client: {label: SQL クライアント, kind: client, tier: flow, x: 1, y: 4, description: データベースに接続し、SQL を実行して結果を受け取る。, evidence: &connection [{type: doc, ref: "docs/reference-postgresql.md#§2"}]}
+  listener: {label: 接続の受付, kind: service, tier: flow, x: 7, y: 4, description: 接続を受け付け、接続を処理するプロセスを起動する。, evidence: *connection}
+  session: {label: SQL 処理プロセス, kind: worker, tier: flow, x: 13, y: 4, description: 接続の認証を行い、許可された SQL を実行する。, evidence: *connection}
+  access: {label: 接続規則と認証, kind: policy, tier: flow, x: 7, y: 12, description: 接続元・データベース・利用者に応じて認証方法を決める。, evidence: *connection}
+  page-cache: {label: 共有ページバッファー, kind: cache, tier: flow, x: 19, y: 4, description: 複数の処理プロセスがデータページを読み書きするための共有メモリ。, evidence: &storage [{type: doc, ref: "docs/reference-postgresql.md#§3"}]}
+  data-files: {label: テーブル・索引ファイル, kind: db, tier: flow, x: 25, y: 4, description: テーブルと索引のページを永続化する。, evidence: *storage}
+  change-log: {label: 先行書き込みログ, kind: file, tier: flow, x: 23, y: 10, description: データページの書き出しに先立ち、変更を復旧できる記録を保存する。, evidence: *storage}
+  change-stream: {label: 論理変更の配信, kind: service, tier: flow, x: 14, y: 10, drill: postgresql-logical-decoding, description: ログの記録を行の変更に変換して配信する。配信に使う位置を保持する。, evidence: &replication [{type: doc, ref: "docs/reference-postgresql.md#§4"}]}
+  subscriber: {label: 変更の購読クライアント, kind: client, tier: flow, x: 1, y: 10, drill: postgresql-snapshot-handoff, description: 許可された接続でコミット済みの行変更を受け取る。, evidence: *replication}
+links:
+  - {id: open-sql, from: sql-client, to: listener, label: SQL 接続を開始, evidence: *connection}
+  - {id: start-session, from: listener, to: session, label: 接続に対応するプロセスを起動, evidence: *connection}
+  - {id: authenticate-sql, from: session, to: access, label: 認証規則を参照, evidence: *connection}
+  - {id: submit-sql, from: sql-client, to: session, label: SQL を送信, evidence: *connection}
+  - {id: return-sql, from: session, to: sql-client, label: SQL の結果を返す, evidence: *connection}
+  - {id: access-pages, from: session, to: page-cache, label: ページを読み書き, evidence: *storage}
+  - {id: read-pages, from: data-files, to: page-cache, label: 必要なページを読み込む, evidence: *storage}
+  - {id: log-commit, from: session, to: change-log, label: 変更とコミットを記録, evidence: *storage}
+  - {id: flush-pages, from: page-cache, to: data-files, label: 変更済みページを書き出す, evidence: *storage}
+  - {id: open-replication, from: subscriber, to: listener, label: 変更配信用の接続を開始, evidence: *replication}
+  - {id: start-stream, from: listener, to: change-stream, label: 配信を担当するプロセスを起動, evidence: *replication}
+  - {id: authenticate-stream, from: change-stream, to: access, label: 購読接続の認証規則を参照, evidence: *replication}
+  - {id: decode-log, from: change-log, to: change-stream, label: 記録した変更を読み出す, evidence: *replication}
+  - {id: deliver-change, from: change-stream, to: subscriber, label: コミット済みの行変更を配信, evidence: *replication}
+scenarios:
+  - id: sql-update
+    label: SQL 接続と更新の保存
+    evidence:
+      - {type: doc, ref: "docs/reference-postgresql.md#§2"}
+      - {type: doc, ref: "docs/reference-postgresql.md#§3"}
+    steps:
+      - {links: [open-sql, start-session, authenticate-sql], note: 接続を受け付け、担当プロセスが認証する。}
+      - {links: [submit-sql, read-pages, access-pages], note: SQL を実行し、共有バッファーのページを読み書きする。}
+      - {links: [log-commit, return-sql, flush-pages], note: 同期コミットでは WAL の永続化を待って成功を返す。変更ページは先行書き込み規則に沿って後から書き出せる。}
+  - id: logical-streaming
+    label: コミット済み変更を購読
+    evidence: *replication
+    steps:
+      - {links: [open-replication, start-stream, authenticate-stream], note: 対象データベースへレプリケーション接続を開く。}
+      - {links: [decode-log, deliver-change], note: ログから表の変更を取り出し、購読側へ送る。}
+unknowns:
+  - {id: unverified, text: ホストの耐障害性、遅延、ストレージ容量、構成全体の実機動作は未確認。, refs: [log-commit, deliver-change]}
+implementations:
+  - id: onprem
+    label: 自前 Linux ホストの PostgreSQL 18
+    description: 1 台の Linux ホストで PostgreSQL 18 を動かす。接続ごとのバックエンドと WAL sender が、SQL と論理レプリケーションを受け持つ。クライアントの設置場所は指定しない。
+    sources:
+      - {title: PostgreSQL 18 Architectural Fundamentals, url: https://www.postgresql.org/docs/18/tutorial-arch.html}
+      - {title: PostgreSQL 18 pg_ctl, url: https://www.postgresql.org/docs/18/app-pg-ctl.html}
+      - {title: PostgreSQL 18 pg_hba.conf, url: https://www.postgresql.org/docs/18/auth-pg-hba-conf.html}
+      - {title: PostgreSQL 18 Password Authentication, url: https://www.postgresql.org/docs/18/auth-password.html}
+      - {title: PostgreSQL 18 Secure TCP/IP Connections, url: https://www.postgresql.org/docs/18/ssl-tcp.html}
+      - {title: PostgreSQL 18 Database File Layout, url: https://www.postgresql.org/docs/18/storage-file-layout.html}
+      - {title: PostgreSQL 18 Resource Consumption, url: https://www.postgresql.org/docs/18/runtime-config-resource.html}
+      - {title: PostgreSQL 18 WAL Configuration, url: https://www.postgresql.org/docs/18/wal-configuration.html}
+      - {title: PostgreSQL 18 Logical Replication Architecture, url: https://www.postgresql.org/docs/18/logical-replication-architecture.html}
+      - {title: PostgreSQL 18 Logical Replication Security, url: https://www.postgresql.org/docs/18/logical-replication-security.html}
+      - {title: PostgreSQL 18 Logical Replication Settings, url: https://www.postgresql.org/docs/18/logical-replication-config.html}
+      - {title: PostgreSQL 18 Logical Streaming Replication Protocol, url: https://www.postgresql.org/docs/18/protocol-logical-replication.html}
+    tiers: &pg-2d-tiers [{id: diagram, label: PostgreSQL 18 と外部クライアント, z: 0, origin: [-2.5, 0], size: [33, 19]}]
+    nodes:
+      ex-psql: {label: psql, kind: client, tier: diagram, x: 1, y: 5, realizes: [sql-client], description: TLS で SQL 接続を開き、専用のログインロールで SQL を送る。, evidence: &pg-example [{type: doc, ref: "docs/reference-postgresql.md#§5"}]}
+      ex-subscriber: {label: pgoutput 対応の購読クライアント, kind: client, tier: diagram, x: 1, y: 12, realizes: [subscriber], description: 専用のレプリケーションロールで接続する外部クライアント。稼働場所は未指定。, evidence: *pg-example}
+      ex-linux: {label: Linux ホスト, kind: host, tier: diagram, x: 20, y: 1.9, replicas: 1, description: 利用者が管理する実行ホスト。OS、PostgreSQL の起動設定、データディレクトリを運用する。, evidence: *pg-example}
+      ex-postmaster: {label: postgres 親プロセス, svc: postgresql:server, kind: service, tier: diagram, x: 8.5, y: 7.5, replicas: 1, realizes: [listener], description: 指定したアドレスで接続を待ち、接続ごとの子プロセスを起動する。, evidence: *pg-example}
+      ex-backend: {label: SQL バックエンド, kind: worker, tier: diagram, x: 14.8, y: 5.8, realizes: [session], description: 接続を認証し、SQL の解析・計画・実行を行う。権限は接続ロールに従う。, evidence: *pg-example}
+      ex-auth: {label: pg_hba.conf と DB ロール, kind: policy, tier: diagram, x: 9.7, y: 15.2, realizes: [access], description: TLS を使う接続を hostssl で選び、SCRAM-SHA-256 で認証する。SQL と購読に別の DB ロールを使う。, evidence: *pg-example}
+      ex-buffers: {label: shared_buffers, kind: cache, tier: diagram, x: 21, y: 6, realizes: [page-cache], description: PostgreSQL の各プロセスで共有するデータページのバッファー。, evidence: *pg-example}
+      ex-files: {label: PGDATA/base のデータファイル, kind: db, tier: diagram, x: 28, y: 6.2, realizes: [data-files], description: 既定のデータ格納先。ヒープや索引のページを保持する。, evidence: *pg-example}
+      ex-wal: {label: PGDATA/pg_wal, kind: file, tier: diagram, x: 28, y: 12.6, realizes: [change-log], description: この例では PGDATA 内に置く WAL の永続ファイル。, evidence: *pg-example}
+      ex-sender: {label: WAL sender と pgoutput, kind: service, tier: diagram, x: 15.2, y: 12.6, realizes: [change-stream], description: 論理スロットの位置から WAL を読み、publication の対象を論理レプリケーションプロトコルで配信する。, evidence: *pg-example}
+    links:
+      - {id: run-postgres, from: ex-linux, to: ex-postmaster, label: PostgreSQL を起動, evidence: *pg-example}
+    groups: &pg-2d-groups
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー, tier: diagram, x0: 5.4, y0: 0.4, x1: 31.5, y1: 18, nodes: &pg-host [ex-linux, ex-postmaster, ex-backend, ex-auth, ex-buffers, ex-files, ex-wal, ex-sender]}
+      - {kind: cluster, label: PostgreSQL 18 クラスター, tier: diagram, x0: 6.35, y0: 4, x1: 30.6, y1: 17, nodes: [ex-postmaster, ex-backend, ex-auth, ex-buffers, ex-files, ex-wal, ex-sender]}
+    layout2d: {tiers: *pg-2d-tiers, nodes: {}, groups: *pg-2d-groups}
+    layout3d:
+      tiers:
+        - {id: processes, label: PostgreSQL 18 のプロセスと共有メモリ, z: 1, origin: [7.7, 0.5], size: [23, 12]}
+        - {id: storage, label: Linux ホストと永続ストレージ, z: 0, origin: [7.7, 0.5], size: [23, 12]}
+        - {id: clients, label: 外部クライアント, kind: origin, z: 0, origin: [-2.8, 0.5], size: [5.4, 12]}
+      nodes:
+        ex-psql: {tier: clients, x: 2.6, y: 2.5}
+        ex-subscriber: {tier: clients, x: 2.6, y: 8.2}
+        ex-linux: {tier: storage, x: 3, y: 2}
+        ex-postmaster: {tier: processes, x: 2.6, y: 2.4}
+        ex-backend: {tier: processes, x: 9.5, y: 2.4}
+        ex-auth: {tier: processes, x: 3.2, y: 9.3}
+        ex-buffers: {tier: processes, x: 18.5, y: 2.5}
+        ex-files: {tier: storage, x: 18.5, y: 2.5}
+        ex-wal: {tier: storage, x: 18.6, y: 8.4}
+        ex-sender: {tier: processes, x: 12, y: 8.4}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー, tier: [processes, storage], nodes: *pg-host}
+        - {kind: cluster, tier: processes, x0: 0.4, y0: 0.65, x1: 21.2, y1: 11.2, nodes: [ex-postmaster, ex-backend, ex-auth, ex-buffers, ex-sender]}
+        - {kind: cluster, tier: storage, x0: 15.5, y0: 0.65, x1: 21.2, y1: 10.9, nodes: [ex-files, ex-wal]}

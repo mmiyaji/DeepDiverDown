@@ -41,15 +41,19 @@ write では DataWriter が task 単位でファイルと commit message を作�
 
 ## 4. 実装例：Spark Standalone
 
-自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。図中の対応は以下の通り。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
+自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
 
-- SQL / DataFrame：クラスター外のクライアント・ストレージ等。
-- Catalog / Table：Spark Driver 側。
-- ScanBuilder の交渉：Spark Driver 側。
-- Iceberg メタデータ：クラスター外のクライアント・ストレージ等。
-- InputPartition と Reader：Spark Executor 側。
-- Task の DataWriter：Spark Executor 側。
-- Driver の BatchWrite commit：Spark Driver 側。
-- データファイル：クラスター外のクライアント・ストレージ等。
+| 機能配置 | 実装例の部品 |
+| --- | --- |
+| SQL / DataFrame | SQL / DataFrame |
+| Catalog / Table | Driver：Catalog / Table |
+| ScanBuilder の交渉 | Driver：ScanBuilder の交渉 |
+| Iceberg メタデータ | Iceberg メタデータ |
+| InputPartition と Reader | Executor：InputPartition と Reader |
+| Task の DataWriter | Executor：Task の DataWriter |
+| Driver の BatchWrite commit | Driver：Driver の BatchWrite commit |
+| データファイル | データファイル |
+
+Iceberg メタデータとデータファイルは、自前のサーバー群のうち Spark Standalone クラスターの外側に置く。ストレージの実装とホストの割り当ては未指定である。
 
 公式資料：[Spark Data Source V2](https://spark.apache.org/docs/4.3.0/sql-v2-data-sources.html)、[Iceberg Spark Writes](https://iceberg.apache.org/docs/latest/spark-writes/)、[Iceberg Spark Queries](https://iceberg.apache.org/docs/latest/spark-queries/)。

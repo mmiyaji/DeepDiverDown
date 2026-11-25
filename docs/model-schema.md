@@ -164,7 +164,7 @@ implementations:
 - `node.az`：`['a','c']` のように配置 AZ。1つだけだと SINGLE_AZ 指摘
 - `node.subnet`：`public` / `private`。データストアが public だと PUBLIC_DATA 指摘
 - `groups` の `tier` にはフロア ID または配列を指定する。`x0, y0, x1, y1` でフロア内の範囲を固定できる。座標を省略すると `nodes` に列挙した部品から範囲を求める。`nodes` も省略すると対象フロアの全部品が対象になる。クラウドなどが重なる場合は境界の種類に応じて余白が異なる。
-- `group.provider` には `aws` / `gcp` / `azure` / `oci` / `cloudflare` / `onprem` / `k8s` / `databricks` / `snowflake` / `fabric` / `purview` / `clickhouse` を指定できる。
+- `group.provider` には `aws` / `gcp` / `azure` / `oci` / `cloudflare` / `onprem` / `k8s` / `databricks` / `snowflake` / `fabric` / `purview` / `clickhouse` / `fivetran` / `github` を指定できる。
 
 | 枠の種類 | 表示 |
 |---|---|

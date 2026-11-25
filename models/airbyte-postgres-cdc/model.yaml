@@ -1,0 +1,114 @@
+name: Airbyte：PostgreSQL の初回スナップショットと CDC
+description: 初回の表読み取りから論理変更ログの読み取りに移り、確定済みの位置から次の同期を再開する。
+parent: {model: airbyte, node: state}
+reference:
+  objectives: [初回スナップショットとログ読み取りを区別する, publication・slot と同期 State の担当を区別する]
+  sources:
+    - {title: Airbyte Postgres Source, url: https://docs.airbyte.com/integrations/sources/postgres}
+    - {title: Airbyte CDC, url: https://docs.airbyte.com/platform/understanding-airbyte/cdc}
+    - {title: Airbyte Protocol, url: https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol}
+    - {title: PostgreSQL Logical Replication, url: https://www.postgresql.org/docs/current/logical-replication.html}
+sources: [docs/reference-airbyte-postgres-cdc.md]
+evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§1}]
+tiers:
+  - {id: flow, label: 初回読取と変更の転送, z: 0, size: [25, 10]}
+nodes:
+  tables: {label: 複製元の表, kind: db, tier: flow, x: 2, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§1}]}
+  log: {label: 論理変更ログ, kind: file, tier: flow, x: 2, y: 6, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§2}]}
+  scope: {label: 対象表とログ保持位置, kind: policy, tier: flow, x: 7, y: 6, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§2}]}
+  reader: {label: 初回と変更ログの読取, kind: worker, tier: flow, x: 7, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§1}]}
+  run: {label: 同期の起動と転送, kind: workflow, tier: flow, x: 12, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  state: {label: 確定済みの同期位置, kind: db, tier: flow, x: 12, y: 6, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  writer: {label: 複製先への書き込み, kind: worker, tier: flow, x: 17, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  target: {label: 複製先の表, kind: db, tier: flow, x: 22, y: 2, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+links:
+  - {id: snapshot, from: tables, to: reader, label: 初回の行を読む, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§1}]}
+  - {id: change, from: tables, to: log, label: 更新をログに記録, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§2}]}
+  - {id: scope-log, from: log, to: scope, label: 対象の変更を選ぶ, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§2}]}
+  - {id: read-log, from: scope, to: reader, label: 続きの変更を読む, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§2}]}
+  - {id: extract, from: reader, to: run, label: レコードと State を送る, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  - {id: send, from: run, to: writer, label: レコードを書き込みへ渡す, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  - {id: commit, from: writer, to: target, label: 複製先にコミット, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  - {id: confirm, from: writer, to: run, label: コミットした State を返す, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  - {id: save, from: run, to: state, label: 確定した State を保存, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  - {id: restore, from: state, to: run, label: 前回の State を読み出す, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+  - {id: resume, from: run, to: reader, label: 読取位置を渡して起動, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§3}]}
+scenarios:
+  - id: initial
+    label: 初回同期で既存の行を複製する
+    evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§1}]
+    steps:
+      - {links: [resume, snapshot], note: 保存済みの同期位置がないため、対象表の既存行を読む。}
+      - {links: [extract, send, commit], note: 同期ジョブが初回のレコードを複製先へ運ぶ。}
+      - {links: [confirm, save], note: コミットを確認した位置を次回用に保存する。}
+  - id: incremental
+    label: 次回同期はログ位置から読む
+    evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§2}]
+    steps:
+      - {links: [restore, resume], note: 前回の確定済み State を読み取り担当へ渡す。}
+      - {links: [change, scope-log, read-log], note: 対象表の論理変更を保存済み位置から取得する。}
+      - {links: [extract, send, commit, confirm, save], note: 複製先へのコミット後に State を更新する。}
+requirements:
+  - {id: CDC-01, kind: usecase, title: 既存行と変更を複製する, text: 初回の表読取と後続の論理変更読み取りで対象データを送る。, links: [snapshot, read-log, send, commit], evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§1}]}
+unknowns: [{id: UNK-01, text: 実環境のバージョン構成と停止中に必要な WAL 容量は未確認。, refs: [log, state]}]
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: self-managed-postgres
+    label: 自前 Kubernetes の Airbyte と PostgreSQL
+    description: 取引 DB の論理レプリケーションを標準 Postgres Source で読み、Postgres Destination が別の PostgreSQL に書く。
+    sources:
+      - {title: Airbyte Postgres Source, url: https://docs.airbyte.com/integrations/sources/postgres}
+      - {title: Airbyte Postgres Destination, url: https://docs.airbyte.com/integrations/destinations/postgres}
+      - {title: Airbyte CDC, url: https://docs.airbyte.com/platform/understanding-airbyte/cdc}
+      - {title: Airbyte プラットフォーム構成, url: https://docs.airbyte.com/platform/understanding-airbyte/high-level-view}
+      - {title: Airbyte 設定 DB, url: https://docs.airbyte.com/platform/understanding-airbyte/database-data-catalog/config-database-connections}
+      - {title: Deploy Airbyte, url: https://docs.airbyte.com/platform/deploying-airbyte}
+    tiers:
+      - {id: diagram, label: PostgreSQL から変更を複製, z: 0, size: [29, 15]}
+    nodes:
+      cdc-pg: {label: 取引 PostgreSQL サーバー, svc: 'postgresql:server', kind: db, tier: diagram, x: 2, y: 3, realizes: [tables, log], description: 主キーを持つ表の初回読取と WAL の論理デコードを提供する。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+      cdc-slot: {label: publication・pgoutput slot, kind: policy, tier: diagram, x: 2, y: 8, realizes: [scope], description: 対象表の publication と Source 専用の論理レプリケーションスロットを作る。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+      cdc-host: {label: 自前 Linux Kubernetes ノード, kind: host, tier: diagram, x: 15, y: 1, description: Airbyte の管理・同期ワークロードを実行する。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+      cdc-source: {label: Airbyte Postgres Source, svc: 'airbyte:postgres-source', kind: worker, tier: diagram, x: 9, y: 6, realizes: [reader], description: SELECT で初回スナップショットを読み、CDC モードで論理変更を受け取る。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+      cdc-run: {label: Airbyte Connection・同期ジョブ, kind: workflow, tier: diagram, x: 15, y: 6, realizes: [run], description: 設定した間隔で同期ワークロードを起動し、データと State を仲介する。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+      cdc-destination: {label: Airbyte Postgres Destination, svc: 'airbyte:postgres-destination', kind: worker, tier: diagram, x: 21, y: 6, realizes: [writer], description: 主キーを使う Incremental Append + Deduped で対象表へ書く。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+      cdc-config-db: {label: Airbyte 設定 DB の State, kind: db, tier: diagram, x: 28, y: 2, realizes: [state], description: コミットが確認された同期位置を接続単位で保持する。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+      cdc-target: {label: 分析用 PostgreSQL サーバー, svc: 'postgresql:server', kind: db, tier: diagram, x: 28, y: 7.5, realizes: [target], description: Postgres Destination の接続先。複製したデータを分析用スキーマに保存する。, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+    links:
+      - {id: cdc-runtime, from: cdc-host, to: cdc-run, label: 管理・同期ワークロードを実行, evidence: [{type: doc, ref: docs/reference-airbyte-postgres-cdc.md#§4}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [cdc-pg, cdc-slot, cdc-host, cdc-source, cdc-run, cdc-destination, cdc-config-db, cdc-target]}
+      - {kind: cluster, label: 自前 Kubernetes, provider: k8s, tier: diagram, nodes: [cdc-host, cdc-source, cdc-run, cdc-destination]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 取引 DB・同期ジョブ・分析 DB, z: 0, size: [32, 12]}
+      nodes:
+        cdc-pg: {tier: diagram, x: 2, y: 3}
+        cdc-slot: {tier: diagram, x: 2, y: 8}
+        cdc-host: {tier: diagram, x: 15, y: 1}
+        cdc-source: {tier: diagram, x: 9, y: 6}
+        cdc-run: {tier: diagram, x: 15, y: 6}
+        cdc-destination: {tier: diagram, x: 21, y: 6}
+        cdc-config-db: {tier: diagram, x: 28.5, y: 2}
+        cdc-target: {tier: diagram, x: 28.5, y: 7.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, x0: -2.2, y0: -3.1, x1: 33.3, y1: 11, nodes: [cdc-pg, cdc-slot, cdc-host, cdc-source, cdc-run, cdc-destination, cdc-config-db, cdc-target]}
+        - {kind: cluster, label: 自前 Kubernetes, provider: k8s, tier: diagram, x0: 5.6, y0: -2, x1: 24.6, y1: 9, nodes: [cdc-host, cdc-source, cdc-run, cdc-destination]}
+    layout3d:
+      tiers:
+        - {id: source, label: 取引 DB, z: 0, origin: [-8.5, 0], size: [6, 7]}
+        - {id: hosts, label: Kubernetes ノード, z: 0, size: [16, 7]}
+        - {id: pods, label: Airbyte ワークロード, z: 1, size: [16, 7]}
+        - {id: storage, label: 設定 DB と分析 DB, z: 0, origin: [19, 0], size: [7, 7]}
+      nodes:
+        cdc-pg: {tier: source, x: 3, y: 2}
+        cdc-slot: {tier: source, x: 3, y: 5.5}
+        cdc-host: {tier: hosts, x: 8, y: 3}
+        cdc-source: {tier: pods, x: 2.5, y: 3.5}
+        cdc-run: {tier: pods, x: 8, y: 3.5}
+        cdc-destination: {tier: pods, x: 13.5, y: 3.5}
+        cdc-config-db: {tier: storage, x: 3.5, y: 1.5}
+        cdc-target: {tier: storage, x: 3.5, y: 5.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [source, hosts, pods, storage], nodes: [cdc-pg, cdc-slot, cdc-host, cdc-source, cdc-run, cdc-destination, cdc-config-db, cdc-target]}
+        - {kind: cluster, label: 自前 Kubernetes, provider: k8s, tier: [hosts, pods], nodes: [cdc-host, cdc-source, cdc-run, cdc-destination]}

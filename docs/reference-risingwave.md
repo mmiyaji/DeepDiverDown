@@ -70,18 +70,25 @@ EKS の EC2 マネージドノードグループに RisingWave Operator で Fron
 
 AWS が EKS 制御プレーンと EC2・S3・RDS の基盤を運用する。利用者は Kubernetes API、ノードグループ、RisingWave の配置・設定・更新、データ、権限を管理する。RDS を meta store にすること、Amazon MSK を Kafka に使うこと、必要な IAM 権限の一覧は RisingWave の資料に記載がなく未確認。図は公式資料を組み合わせた代表例で、実動作は未検証。
 
+3D では RisingWave の Pod を実行ノードの上に配置する。EKS の Kubernetes API、IAM、S3、RDS は同じ AWS アカウント内の別の領域に置く。AWS アカウントの枠はリソースの論理的な所属を示す。図中の VPC は EKS ワーカーの範囲で、RDS の VPC 配置は未確認。
+
 ## 8. 実装例：自社データセンターの Docker Compose（分散構成）
 
-自社のサーバー上で `docker-compose-distributed.yml` の構成を使い、4 種のコンポーネントを別コンテナで動かす例。meta store は PostgreSQL（既定）、state store は MinIO（既定）である。
+自社のサーバーで `docker-compose-distributed.yml` を使う例。Frontend・Meta・Compute・Compactor を別々のコンテナで実行する。同じ Compose 構成に PostgreSQL と MinIO のコンテナが含まれる。
 
 | 機能 | 担い手 |
 | --- | --- |
 | Frontend・Meta・Compute・Compactor | Docker ホスト上の各コンテナ |
-| Hummock | MinIO（S3 互換） |
-| meta store | PostgreSQL |
+| Hummock | MinIO コンテナ（S3 互換） |
+| meta store | PostgreSQL コンテナ |
 | Source・Sink | 外部の Kafka と出力先（実行場所は未選定） |
 
-利用者がサーバー、Docker、PostgreSQL、MinIO の運用・冗長化・バックアップを管理する。資料の Docker Compose は導入の手順として書かれており、本番運用の構成として推奨されているかは未確認。ホストの台数と配置も資料で指定されていない。
+図では外部の Apache Kafka を入力とする。配布されている Compose ファイルには Kafka 互換の Redpanda が含まれる。
+
+利用者がサーバー、Docker、PostgreSQL、MinIO を運用する。公式ガイドは Docker Compose による起動手順を示す。本番運用でのホスト台数、コンテナのホスト間配置、冗長化は未確認である。
+
+- [RisingWave · Docker Compose](https://docs.risingwave.com/deploy/risingwave-docker-compose)
+- [RisingWave · docker-compose-distributed.yml](https://github.com/risingwavelabs/risingwave/blob/main/docker/docker-compose-distributed.yml)
 
 ## 公式資料
 

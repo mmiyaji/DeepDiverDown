@@ -22,10 +22,24 @@
     newrelic: { label: 'New Relic', color: '#008C86' },
     spotnetapp: { label: 'Spot by NetApp', color: '#1474B8' },
     slack: { label: 'Slack', color: '#BD68BA' },
+    fivetran: { label: 'Fivetran', color: '#306BEA' },
+    github: { label: 'GitHub', color: '#57606A' },
+    postgresql: { label: 'PostgreSQL', color: '#336791' },
+    airbyte: { label: 'Airbyte', color: '#6d6a63' },
   };
   const S = (abbr, name, cat, more = {}) => ({ abbr, name, cat, ...more });
   const I = true; // infra
   const SERVICES = {
+    fivetran: { platform: S('Fivetran', 'Fivetran SaaS', 'int') },
+    github: { platform: S('GitHub', 'GitHub.com', 'devtools') },
+    postgresql: { server: S('PG', 'PostgreSQL', 'db', { shape: 'cyl' }) },
+    airbyte: {
+      server: S('AB', 'Airbyte Server', 'mgmt'),
+      'connector-builder': S('Builder', 'Airbyte Connector Builder', 'devtools'),
+      'postgres-source': S('Src', 'Airbyte Postgres Source', 'int'),
+      'postgres-destination': S('Dst', 'Airbyte Postgres Destination', 'int'),
+      'declarative-source': S('HTTP', 'Airbyte 宣言型 Source', 'int'),
+    },
     datadog: { platform: S('DD', 'Datadog SaaS', 'mgmt') },
     newrelic: { platform: S('NR', 'New Relic SaaS', 'mgmt') },
     fabric: {
@@ -53,6 +67,7 @@
       warehouse: S('WH', 'Snowflake Virtual Warehouse', 'compute', { icon: ['Snowflake-Virtual-Warehouse'], fallback: 'platform' }),
       task: S('Task', 'Snowflake Task', 'compute', { icon: ['Snowflake-Task'], fallback: 'platform' }),
       pipe: S('Pipe', 'Snowpipe', 'int', { icon: ['Snowflake-Pipe'], fallback: 'platform' }),
+      streaming: S('Streaming', 'Snowpipe Streaming', 'int', { fallback: 'platform' }),
       stream: S('Stream', 'Snowflake Stream', 'int', { icon: ['Snowflake-Stream'], fallback: 'platform' }),
       database: S('DB', 'Snowflake Database', 'db', { icon: ['Snowflake-Database'], fallback: 'platform' }),
       dynamic: S('Dynamic', 'Snowflake Dynamic Tables', 'db', { icon: ['Snowflake-Dynamic-Tables'], fallback: 'platform' }),

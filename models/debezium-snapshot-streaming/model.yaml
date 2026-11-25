@@ -1,0 +1,90 @@
+name: Debezium：初期スナップショットと変更ストリーム
+description: 最初に確保したログ位置から変更ストリームへ切り替え、スナップショット中の変更も取り込む。
+parent: {model: debezium, node: connector}
+reference:
+  objectives:
+    - 初期スナップショットの読み取り位置と完了記録を区別する。
+    - 既存行の読み取りと変更ストリームへの切り替えを追う。
+  sources:
+    - {title: Debezium PostgreSQL Connector, url: https://debezium.io/documentation/reference/3.7/connectors/postgresql.html}
+    - {title: Debezium Architecture, url: https://debezium.io/documentation/reference/3.7/architecture.html}
+sources: [docs/reference-debezium-snapshot-streaming.md]
+evidence: [{type: doc, ref: "docs/reference-debezium-snapshot-streaming.md#§1"}, {type: doc, ref: "docs/reference-debezium-snapshot-streaming.md#§5"}]
+tiers: [{id: flow, label: 既存行の読み取りと変更の配信, z: 0, size: [24, 9]}]
+nodes:
+  rows: {label: 取り込み対象の表, kind: table, tier: flow, x: 0, y: 2, evidence: &snapshot [{type: doc, ref: "docs/reference-debezium-snapshot-streaming.md#§2"}]}
+  changes: {label: 順序付きの変更ログ, kind: queue, tier: flow, x: 0, y: 6, description: 読み取り開始位置とコミット済みの変更を提供する。, evidence: *snapshot}
+  runtime: {label: コネクター実行基盤, kind: host, tier: flow, x: 8, y: 0, evidence: *snapshot}
+  scan: {label: 初回の行読み取り, kind: worker, tier: flow, x: 8, y: 3, description: 開始位置を確保し、一貫した読み取りで既存行をイベントに変換する。, evidence: *snapshot}
+  stream: {label: 継続ログ読み取り, kind: worker, tier: flow, x: 8, y: 7, description: 初回取得中の変更を含め、指定した位置からログを読む。, evidence: *snapshot}
+  events: {label: 配信イベントのログ, kind: queue, tier: flow, x: 17, y: 4, evidence: *snapshot}
+  progress: {label: 読み取り位置の記録, kind: db, tier: flow, x: 17, y: 8, description: スナップショットの完了と変更ログの位置を保持する。, evidence: *snapshot}
+links:
+  - {id: start, from: runtime, to: scan, label: 初回取り込みを起動, evidence: *snapshot}
+  - {id: locate, from: changes, to: scan, label: 開始位置を取得, evidence: *snapshot}
+  - {id: read, from: rows, to: scan, label: 既存行を読み取る, evidence: *snapshot}
+  - {id: emit-read, from: scan, to: events, label: 既存行のイベントを発行, evidence: *snapshot}
+  - {id: complete, from: scan, to: progress, label: 初回取得の完了を記録, evidence: *snapshot}
+  - {id: handoff, from: scan, to: stream, label: 開始位置を渡す, evidence: *snapshot}
+  - {id: tail, from: changes, to: stream, label: 開始位置から変更を読む, evidence: *snapshot}
+  - {id: emit-change, from: stream, to: events, label: 変更イベントを発行, evidence: *snapshot}
+  - {id: update-position, from: stream, to: progress, label: 読み取り位置を保存, evidence: *snapshot}
+scenarios:
+  - id: first-start
+    label: 既存行から変更ストリームへ
+    evidence: [{type: doc, ref: "docs/reference-debezium-snapshot-streaming.md#§3"}]
+    steps:
+      - {links: [start, locate, read], note: 読み取り位置を先に取得し、対象表の既存行を読む。}
+      - {links: [emit-read, complete], note: 既存行のイベントを発行し、初回取得の完了を記録する。}
+      - {links: [handoff, tail, emit-change, update-position], note: 最初に取得した位置から変更を読み、初回取得中に起きた変更も配信する。}
+unknowns:
+  - {id: unverified, text: 実環境の読み取り量、ログ保持容量、停止後の再開は未検証。, refs: [read, tail]}
+implementations:
+  - id: onprem
+    label: 自前の PostgreSQL・Kafka Connect・Kafka
+    description: 分散 Kafka Connect の Worker 上で Debezium PostgreSQL Source Task を 1 個動かす。pgoutput から変更を読み、Kafka に既存行・変更イベントとソースオフセットを記録する。
+    sources:
+      - {title: Debezium PostgreSQL Connector, url: https://debezium.io/documentation/reference/3.7/connectors/postgresql.html}
+      - {title: Debezium Architecture, url: https://debezium.io/documentation/reference/3.7/architecture.html}
+      - {title: Kafka Connect User Guide, url: https://kafka.apache.org/44/kafka-connect/user-guide/}
+      - {title: PostgreSQL Logical Replication Architecture, url: https://www.postgresql.org/docs/18/logical-replication-architecture.html}
+    tiers: &snapshot-2d-tiers [{id: diagram, label: PostgreSQL から Kafka への初回取り込み, z: 0, size: [25, 13]}]
+    nodes:
+      pg-table: {label: PostgreSQL の注文テーブル, kind: table, tier: diagram, x: 3.5, y: 4, realizes: [rows], evidence: &snapshot-impl [{type: doc, ref: "docs/reference-debezium-snapshot-streaming.md#§4"}]}
+      pg-wal: {label: PostgreSQL の WAL と論理スロット, kind: queue, tier: diagram, x: 3.5, y: 9, realizes: [changes], description: 事前に作った publication と論理スロットを pgoutput で使う。, evidence: *snapshot-impl}
+      pg-server: {label: PostgreSQL サーバー, svc: postgresql:server, kind: db, tier: diagram, x: 3.5, y: 6.5, description: 自前 Linux 上で SQL 接続と論理レプリケーション接続を受ける。SQL の読み取り結果と pgoutput の変更をそれぞれ返す。, evidence: *snapshot-impl}
+      connect-worker: {label: Kafka Connect Worker, kind: host, tier: diagram, x: 12, y: 2.5, realizes: [runtime], description: 自前 Linux 上の分散 Worker が Source Task を実行する。, evidence: *snapshot-impl}
+      dbz-scan: {label: Debezium のスナップショット処理, kind: worker, tier: diagram, x: 12, y: 6, realizes: [scan], description: 同じ Source Task 内の初回処理。snapshot.mode=initial で SQL の既存行を READ イベントにする。, evidence: *snapshot-impl}
+      dbz-stream: {label: Debezium の変更読み取り, kind: worker, tier: diagram, x: 12, y: 10, realizes: [stream], description: 同じ Source Task 内で、スナップショット時の LSN から pgoutput の変更を読む。, evidence: *snapshot-impl}
+      kafka-events: {label: Kafka の CDC トピック, kind: queue, tier: diagram, x: 21, y: 4, realizes: [events], evidence: *snapshot-impl}
+      kafka-offsets: {label: Kafka のソースオフセットトピック, kind: db, tier: diagram, x: 21, y: 9, realizes: [progress], description: Connect の offset.storage.topic にスナップショットの状態と LSN を保存する。, evidence: *snapshot-impl}
+    links:
+      - {id: source-read-table, from: pg-table, to: pg-server, label: 対象表を読み取る, realizes: [read], replace: true}
+      - {id: source-read-wal, from: pg-wal, to: pg-server, label: 開始位置と変更を読み取る, realizes: [locate, tail], replace: true}
+      - {id: source-return-snapshot, from: pg-server, to: dbz-scan, label: 既存行と開始 LSN を返す, realizes: [read, locate], replace: true}
+      - {id: source-stream, from: pg-server, to: dbz-stream, label: pgoutput で変更を返す, realizes: [tail], replace: true}
+    groups: &snapshot-2d-groups
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: diagram, x0: -0.5, y0: -0.25, x1: 25, y1: 12.5, nodes: &snapshot-env [pg-server, pg-table, pg-wal, connect-worker, dbz-scan, dbz-stream, kafka-events, kafka-offsets]}
+      - {kind: cluster, label: PostgreSQL, tier: diagram, x0: 0.3, y0: 1.8, x1: 7.5, y1: 11.7, nodes: [pg-server, pg-table, pg-wal]}
+      - {kind: cluster, label: Kafka Connect, tier: diagram, x0: 8.4, y0: 1, x1: 15.6, y1: 11.7, nodes: [connect-worker, dbz-scan, dbz-stream]}
+      - {kind: cluster, label: Kafka, tier: diagram, x0: 16.5, y0: 1.8, x1: 24, y1: 11.7, nodes: [kafka-events, kafka-offsets]}
+    layout2d: {tiers: *snapshot-2d-tiers, nodes: {}, groups: *snapshot-2d-groups}
+    layout3d:
+      tiers:
+        - {id: pg, label: PostgreSQL, z: 0, size: [7, 10]}
+        - {id: connect, label: Kafka Connect, z: 0, origin: [8, 0], size: [8, 12]}
+        - {id: kafka, label: Kafka, z: 0, origin: [17, 0], size: [7, 9]}
+      nodes:
+        pg-table: {tier: pg, x: 2.5, y: 1.5}
+        pg-server: {tier: pg, x: 4.5, y: 5}
+        pg-wal: {tier: pg, x: 2.5, y: 8.5}
+        connect-worker: {tier: connect, x: 3.5, y: 1.5}
+        dbz-scan: {tier: connect, x: 3, y: 5.5}
+        dbz-stream: {tier: connect, x: 4.8, y: 9.5}
+        kafka-events: {tier: kafka, x: 3, y: 2}
+        kafka-offsets: {tier: kafka, x: 3, y: 6.8}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: [pg, connect, kafka], nodes: *snapshot-env}
+        - {kind: cluster, tier: pg, nodes: [pg-server, pg-table, pg-wal]}
+        - {kind: cluster, tier: connect, nodes: [connect-worker, dbz-scan, dbz-stream]}
+        - {kind: cluster, tier: kafka, nodes: [kafka-events, kafka-offsets]}

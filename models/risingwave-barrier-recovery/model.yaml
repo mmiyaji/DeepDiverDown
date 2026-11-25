@@ -339,14 +339,14 @@ implementations:
           - type: doc
             ref: docs/reference-risingwave-barrier-recovery.md#§7
       rw-aws-downstream:
-        label: 出力先（Kafka・Iceberg・PostgreSQL など）
+        label: 外部の出力先
         kind: external
         tier: entry
         x: 9
         'y': 1.5
         realizes:
           - downstream
-        description: Sink の配信先。実行場所は選んだ出力先による。
+        description: Sink の配信先。Kafka・Iceberg・PostgreSQL などから選ぶ。実行場所は配信先による。
         evidence:
           - type: doc
             ref: docs/reference-risingwave-barrier-recovery.md#§7
@@ -702,3 +702,27 @@ implementations:
             - rw-aws-meta
             - rw-aws-compute
             - rw-aws-compactor
+    layout3d:
+      tiers:
+        - {id: ingress, label: 利用者, kind: origin, z: 0, origin: [-6, 0], size: [4, 7]}
+        - {id: workers, label: EKS 実行ノード, z: 0, size: [16, 7]}
+        - {id: pods, label: RisingWave の各 Pod, z: 1, size: [16, 7]}
+        - {id: services, label: AWS の管理サービス, z: 0, origin: [19, 0], size: [13, 7]}
+        - {id: egress, label: 外部システム, kind: origin, z: 0, origin: [34, 0], size: [4, 7]}
+      nodes:
+        rw-aws-client: {tier: ingress, x: 1.5, y: 1.5}
+        rw-aws-downstream: {tier: egress, x: 2, y: 3.5}
+        rw-aws-eks: {tier: services, x: 3, y: 1.5}
+        rw-aws-iam: {tier: services, x: 9.5, y: 1.5}
+        rw-aws-ec2: {tier: workers, x: 8, y: 3.5}
+        rw-aws-frontend: {tier: pods, x: 2, y: 2}
+        rw-aws-meta: {tier: pods, x: 6, y: 2}
+        rw-aws-compute: {tier: pods, x: 10, y: 5}
+        rw-aws-compactor: {tier: pods, x: 14, y: 2}
+        rw-aws-s3: {tier: services, x: 9.5, y: 5.5}
+        rw-aws-rds: {tier: services, x: 3, y: 5.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [workers, pods, services], nodes: [rw-aws-eks, rw-aws-iam, rw-aws-ec2, rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor, rw-aws-s3, rw-aws-rds]}
+        - {kind: vpc, label: EKS ワーカーの利用者 VPC, provider: aws, tier: [workers, pods], nodes: [rw-aws-ec2, rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor]}
+        - {kind: cluster, label: EKS クラスター（ワーカー側）, provider: k8s, tier: [workers, pods], nodes: [rw-aws-ec2, rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor]}
+        - {kind: namespace, label: RisingWave 名前空間, provider: k8s, tier: [pods], nodes: [rw-aws-frontend, rw-aws-meta, rw-aws-compute, rw-aws-compactor]}

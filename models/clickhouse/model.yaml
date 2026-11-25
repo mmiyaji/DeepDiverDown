@@ -173,6 +173,34 @@ implementations:
     links:
       - {id: sm-use-config, from: sm-config, to: sm-server, label: クラスター構成を読み込む}
       - {id: sm-keeper-conn, from: sm-server, to: sm-keeper, label: Keeper のクライアントポートへ接続}
+    layout2d:
+      tiers:
+        - {id: diagram, label: ClickHouse Server と Keeper, z: 0, size: [29, 16]}
+      nodes:
+        sm-client: {tier: diagram, x: 1, y: 5}
+        sm-server: {tier: diagram, x: 10, y: 5}
+        sm-distributed: {tier: diagram, x: 18, y: 3}
+        sm-replica: {tier: diagram, x: 18, y: 8}
+        sm-parts: {tier: diagram, x: 25, y: 8}
+        sm-config: {tier: diagram, x: 25, y: 3}
+        sm-keeper: {tier: diagram, x: 10, y: 13}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, x0: 5.2, y0: -0.3, x1: 30, y1: 16, nodes: [sm-server, sm-distributed, sm-replica, sm-parts, sm-config, sm-keeper]}
+        - {kind: nodegroup, label: ClickHouse Server のホスト, tier: diagram, x0: 6.3, y0: 0.7, x1: 29, y1: 10.3, nodes: [sm-server, sm-distributed, sm-replica, sm-parts, sm-config]}
+    layout3d:
+      tiers:
+        - {id: diagram, label: ClickHouse Server と Keeper, z: 0, size: [23, 13]}
+      nodes:
+        sm-client: {tier: diagram, x: 0, y: 4}
+        sm-server: {tier: diagram, x: 7, y: 4}
+        sm-distributed: {tier: diagram, x: 14, y: 2}
+        sm-replica: {tier: diagram, x: 14, y: 6}
+        sm-parts: {tier: diagram, x: 21, y: 6}
+        sm-config: {tier: diagram, x: 21, y: 2}
+        sm-keeper: {tier: diagram, x: 7, y: 10}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, x0: 3.7, y0: -0.4, x1: 23.7, y1: 12.4, nodes: [sm-server, sm-distributed, sm-replica, sm-parts, sm-config, sm-keeper]}
+        - {kind: nodegroup, label: ClickHouse Server のホスト, tier: diagram, x0: 4.6, y0: 0.3, x1: 22.7, y1: 7.7, nodes: [sm-server, sm-distributed, sm-replica, sm-parts, sm-config]}
   - id: cloud
     label: ClickHouse Cloud（計算とオブジェクトストレージの分離）
     description: ClickHouse Cloud のサービスで、SharedMergeTree が共有のオブジェクトストレージを使い、計算ノードを増減する構成。公開資料にある範囲だけを描く。
@@ -181,7 +209,7 @@ implementations:
       - {title: SharedMergeTree, url: "https://clickhouse.com/docs/cloud/reference/shared-merge-tree"}
     tiers:
       - {id: access, label: クライアント, z: 0, origin: [-6, 0], size: [4, 7]}
-      - {id: compute, label: ClickHouse Cloud のサービス（計算）, z: 1, size: [22, 7]}
+      - {id: compute, label: 計算ノードとテーブルエンジン, z: 1, size: [22, 7]}
       - {id: shared, label: 共有ストレージと調整, z: 0, size: [22, 5]}
     groups:
       - {kind: cloud, label: ClickHouse Cloud, provider: clickhouse, tier: [compute, shared], nodes: [cl-compute, cl-smt, cl-object, cl-keeper]}
@@ -193,3 +221,27 @@ implementations:
       cl-keeper: {label: ClickHouse Keeper, kind: catalog, tier: shared, x: 12, y: 2, realizes: [keeper], description: SharedMergeTree のレプリカが調整に使う。, evidence: [{type: doc, ref: "docs/reference-clickhouse.md#§9"}]}
     links:
       - {id: cl-shared-read, from: cl-compute, to: cl-object, label: 共有ストレージから読み書き}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クエリ処理・保存・調整, z: 0, size: [24, 11]}
+      nodes:
+        cl-client: {tier: diagram, x: 1, y: 3}
+        cl-compute: {tier: diagram, x: 10, y: 3}
+        cl-smt: {tier: diagram, x: 19, y: 3}
+        cl-object: {tier: diagram, x: 10, y: 8}
+        cl-keeper: {tier: diagram, x: 19, y: 8}
+      groups:
+        - {kind: cloud, label: ClickHouse Cloud, provider: clickhouse, tier: diagram, x0: 5.5, y0: 0.5, x1: 23.5, y1: 10.5, nodes: [cl-compute, cl-smt, cl-object, cl-keeper]}
+    layout3d:
+      tiers:
+        - {id: access, label: クライアント, kind: origin, z: 0, origin: [-9, 0], size: [4, 5]}
+        - {id: compute, label: 計算ノードとテーブルエンジン, z: 1, size: [15, 5]}
+        - {id: shared, label: 共有ストレージと調整, z: 0, size: [15, 5]}
+      nodes:
+        cl-client: {tier: access, x: 1.5, y: 2.5}
+        cl-compute: {tier: compute, x: 3, y: 2}
+        cl-smt: {tier: compute, x: 11, y: 2}
+        cl-object: {tier: shared, x: 3, y: 3}
+        cl-keeper: {tier: shared, x: 11, y: 3}
+      groups:
+        - {kind: cloud, label: ClickHouse Cloud, provider: clickhouse, tier: [compute, shared], nodes: [cl-compute, cl-smt, cl-object, cl-keeper]}

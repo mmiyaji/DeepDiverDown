@@ -37,14 +37,16 @@ Query stage の実行結果が確定すると、map 出力の partition 統計�
 
 ## 4. 実装例：Spark Standalone
 
-自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。図中の対応は以下の通り。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
+自己管理のホスト群で Spark Standalone の Master と Worker を運用し、Driver と Executor を実行する。実装資料を組み合わせた説明用構成であり、実機検証済み構成や実在の導入事例ではない。対象製品・Spark・Scala・JDK の組み合わせ、セキュリティ、入力と出力は個別に確認する。
 
-- 入力と推定統計：クラスター外のクライアント・ストレージ等。
-- 初期物理計画：Spark Driver 側。
-- Shuffle 書き込み：Spark Executor 側。
-- 実行時統計：Spark Driver 側。
-- 適応的再計画：Spark Driver 側。
-- 下流 Join と集約：Spark Executor 側。
-- 結果：クラスター外のクライアント・ストレージ等。
+| 機能配置 | 実装例の部品 |
+| --- | --- |
+| 入力と推定統計 | 入力と推定統計 |
+| 初期物理計画 | Driver：初期物理計画 |
+| Shuffle 書き込み | Executor：Shuffle 書き込み |
+| 実行時統計 | Driver：実行時統計 |
+| 適応的再計画 | Driver：適応的再計画 |
+| 下流 Join と集約 | Executor：下流 Join と集約 |
+| 結果 | 結果 |
 
 公式資料：[Spark SQL performance tuning](https://spark.apache.org/docs/4.3.0/sql-performance-tuning.html)、[Spark SQL UI](https://spark.apache.org/docs/4.3.0/web-ui.html)。

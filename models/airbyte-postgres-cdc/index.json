@@ -1,0 +1,291 @@
+{
+  "model": "airbyte-postgres-cdc",
+  "name": "Airbyte：PostgreSQL の初回スナップショットと CDC",
+  "coverage": {
+    "covered": 4,
+    "total": 4
+  },
+  "byId": {
+    "tables": {
+      "type": "node",
+      "label": "複製元の表",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "論理変更ログ",
+      "status": "claim"
+    },
+    "scope": {
+      "type": "node",
+      "label": "対象表とログ保持位置",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "初回と変更ログの読取",
+      "status": "claim"
+    },
+    "run": {
+      "type": "node",
+      "label": "同期の起動と転送",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "確定済みの同期位置",
+      "status": "claim"
+    },
+    "writer": {
+      "type": "node",
+      "label": "複製先への書き込み",
+      "status": "claim"
+    },
+    "target": {
+      "type": "node",
+      "label": "複製先の表",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "link",
+      "label": "複製元の表 → 初回と変更ログの読取",
+      "status": "claim"
+    },
+    "change": {
+      "type": "link",
+      "label": "複製元の表 → 論理変更ログ",
+      "status": "claim"
+    },
+    "scope-log": {
+      "type": "link",
+      "label": "論理変更ログ → 対象表とログ保持位置",
+      "status": "claim"
+    },
+    "read-log": {
+      "type": "link",
+      "label": "対象表とログ保持位置 → 初回と変更ログの読取",
+      "status": "claim"
+    },
+    "extract": {
+      "type": "link",
+      "label": "初回と変更ログの読取 → 同期の起動と転送",
+      "status": "claim"
+    },
+    "send": {
+      "type": "link",
+      "label": "同期の起動と転送 → 複製先への書き込み",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "複製先への書き込み → 複製先の表",
+      "status": "claim"
+    },
+    "confirm": {
+      "type": "link",
+      "label": "複製先への書き込み → 同期の起動と転送",
+      "status": "claim"
+    },
+    "save": {
+      "type": "link",
+      "label": "同期の起動と転送 → 確定済みの同期位置",
+      "status": "claim"
+    },
+    "restore": {
+      "type": "link",
+      "label": "確定済みの同期位置 → 同期の起動と転送",
+      "status": "claim"
+    },
+    "resume": {
+      "type": "link",
+      "label": "同期の起動と転送 → 初回と変更ログの読取",
+      "status": "claim"
+    },
+    "initial": {
+      "type": "scenario",
+      "label": "初回同期で既存の行を複製する"
+    },
+    "incremental": {
+      "type": "scenario",
+      "label": "次回同期はログ位置から読む"
+    },
+    "CDC-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "既存行と変更を複製する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "実環境のバージョン構成と停止中に必要な WAL 容量は未確認。"
+    },
+    "cdc-pg": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "取引 PostgreSQL サーバー",
+      "realizes": [
+        "tables",
+        "log"
+      ]
+    },
+    "cdc-slot": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "publication・pgoutput slot",
+      "realizes": [
+        "scope"
+      ]
+    },
+    "cdc-host": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "自前 Linux Kubernetes ノード",
+      "realizes": []
+    },
+    "cdc-source": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "Airbyte Postgres Source",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "cdc-run": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "Airbyte Connection・同期ジョブ",
+      "realizes": [
+        "run"
+      ]
+    },
+    "cdc-destination": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "Airbyte Postgres Destination",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "cdc-config-db": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "Airbyte 設定 DB の State",
+      "realizes": [
+        "state"
+      ]
+    },
+    "cdc-target": {
+      "type": "implementation",
+      "impl": "self-managed-postgres",
+      "label": "分析用 PostgreSQL サーバー",
+      "realizes": [
+        "target"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-airbyte-postgres-cdc.md#§1": [
+      "model",
+      "tables",
+      "reader",
+      "snapshot",
+      "initial",
+      "CDC-01"
+    ],
+    "docs/reference-airbyte-postgres-cdc.md": [
+      "model",
+      "tables",
+      "log",
+      "scope",
+      "reader",
+      "run",
+      "state",
+      "writer",
+      "target",
+      "snapshot",
+      "change",
+      "scope-log",
+      "read-log",
+      "extract",
+      "send",
+      "commit",
+      "confirm",
+      "save",
+      "restore",
+      "resume",
+      "initial",
+      "incremental",
+      "CDC-01",
+      "cdc-pg",
+      "cdc-slot",
+      "cdc-host",
+      "cdc-source",
+      "cdc-run",
+      "cdc-destination",
+      "cdc-config-db",
+      "cdc-target"
+    ],
+    "docs/reference-airbyte-postgres-cdc.md#§2": [
+      "log",
+      "scope",
+      "change",
+      "scope-log",
+      "read-log",
+      "incremental"
+    ],
+    "docs/reference-airbyte-postgres-cdc.md#§3": [
+      "run",
+      "state",
+      "writer",
+      "target",
+      "extract",
+      "send",
+      "commit",
+      "confirm",
+      "save",
+      "restore",
+      "resume"
+    ],
+    "docs/reference-airbyte-postgres-cdc.md#§4": [
+      "cdc-pg",
+      "cdc-slot",
+      "cdc-host",
+      "cdc-source",
+      "cdc-run",
+      "cdc-destination",
+      "cdc-config-db",
+      "cdc-target"
+    ]
+  },
+  "reference": {
+    "domain": "データ処理",
+    "category": "取り込み",
+    "kind": "仕組みの深掘り",
+    "product": "Airbyte",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "airbyte",
+    "objectives": [
+      "初回スナップショットとログ読み取りを区別する",
+      "publication・slot と同期 State の担当を区別する"
+    ],
+    "sources": [
+      {
+        "title": "Airbyte Postgres Source",
+        "url": "https://docs.airbyte.com/integrations/sources/postgres"
+      },
+      {
+        "title": "Airbyte CDC",
+        "url": "https://docs.airbyte.com/platform/understanding-airbyte/cdc"
+      },
+      {
+        "title": "Airbyte Protocol",
+        "url": "https://docs.airbyte.com/platform/understanding-airbyte/airbyte-protocol"
+      },
+      {
+        "title": "PostgreSQL Logical Replication",
+        "url": "https://www.postgresql.org/docs/current/logical-replication.html"
+      }
+    ]
+  }
+}

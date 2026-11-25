@@ -42,7 +42,7 @@ Apache Kafka 4.4 の公式ドキュメントを基準に、1 つのパーティ�
 
 ## 8. 実装例：自前 Linux Broker ホストのログディレクトリ
 
-Broker プロセスが Linux ホストのローカルディスク（`log.dirs`）にセグメントを置く最小の例。ホストとディスクは利用者が管理するデータセンター（オンプレミス）として描く。
+利用者が管理する Linux ホスト 1 台で Broker を動かし、ローカルディスク（`log.dirs`）にセグメントを置く。Producer と Consumer の設置場所は指定せず、Broker に接続する外部クライアントとして示す。Broker が 1 台のため、`offsets.topic.replication.factor=1` で内部 Topic を作成する。
 
 | 機能 | 担い手 |
 | --- | --- |

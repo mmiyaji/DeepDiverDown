@@ -403,7 +403,7 @@ gates:
 implementations:
   - id: onprem-log-dirs
     label: 自前 Linux ホストのログディレクトリ
-    description: Broker プロセスが Linux ホストのローカルディスク（log.dirs）にセグメントを置く最小の例。
+    description: 自前の Linux ホスト 1 台で Broker を動かし、ローカルディスク（log.dirs）にセグメントを置く。Producer と Consumer は外部のクライアントとして示す。
     sources:
       - title: Kafka Log Implementation
         url: https://kafka.apache.org/44/implementation/log/
@@ -431,6 +431,7 @@ implementations:
         label: 利用者管理の Kafka 実行環境
         tier:
           - processing
+        nodes: &lseg-environment [lseg-host, lseg-broker, lseg-disk, lseg-offsets]
     nodes:
       lseg-producer:
         label: KafkaProducer
@@ -459,6 +460,7 @@ implementations:
       lseg-host:
         label: Linux Broker ホスト
         kind: host
+        replicas: 1
         tier: processing
         x: 1
         'y': 1.5
@@ -469,6 +471,7 @@ implementations:
       lseg-broker:
         label: Kafka Broker プロセス
         kind: service
+        replicas: 1
         tier: processing
         x: 6
         'y': 1.5
@@ -493,14 +496,14 @@ implementations:
           - type: doc
             ref: docs/reference-kafka-log-segments.md#§8
       lseg-offsets:
-        label: Broker 上の __consumer_offsets
+        label: __consumer_offsets
         kind: queue
         tier: processing
         x: 6
         'y': 5
         realizes:
           - offsets
-        description: コミット済み offset を保存する内部 Topic。
+        description: コミット済み offset を保存する内部 Topic。この例は offsets.topic.replication.factor を 1 に設定する。
         evidence:
           - type: doc
             ref: docs/reference-kafka-log-segments.md#§8
@@ -519,3 +522,15 @@ implementations:
         evidence:
           - type: doc
             ref: docs/reference-kafka-log-segments.md#§8
+    layout2d: &lseg-layout
+      tiers: [{id: diagram, label: 外部クライアントと自前 Broker ホスト, z: 0, origin: [-3, 0], size: [25, 11]}]
+      nodes:
+        lseg-producer: {tier: diagram, x: 0, y: 2}
+        lseg-consumer: {tier: diagram, x: 0, y: 7}
+        lseg-host: {tier: diagram, x: 9, y: 2}
+        lseg-broker: {tier: diagram, x: 15, y: 4}
+        lseg-disk: {tier: diagram, x: 20, y: 7}
+        lseg-offsets: {tier: diagram, x: 9, y: 7}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 利用者管理の Kafka 実行環境, tier: diagram, x0: 5, y0: 0, x1: 23, y1: 10, nodes: *lseg-environment}
+    layout3d: *lseg-layout

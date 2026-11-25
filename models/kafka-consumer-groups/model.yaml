@@ -327,7 +327,7 @@ gates:
 implementations:
   - id: aws-msk-fargate-group
     label: AWS（Amazon MSK と ECS on Fargate）
-    description: MSK のクラスターから、ECS の購読サービスが起動する複数の Fargate タスクが同じ group.id で読む例。
+    description: ECS の購読サービスが起動する複数の Fargate タスクが、同じ VPC の MSK Provisioned から共通の group.id で読む。
     sources:
       - title: Amazon ECS のサービス定義
         url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html
@@ -335,6 +335,10 @@ implementations:
         url: https://docs.aws.amazon.com/msk/latest/developerguide/iam-access-control.html
       - title: MSK Provisioned クラスターの作成
         url: https://docs.aws.amazon.com/msk/latest/developerguide/create-cluster-console.html
+      - title: Fargate タスクのネットワーク
+        url: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-task-networking.html
+      - title: MSK Provisioned への接続
+        url: https://docs.aws.amazon.com/msk/latest/developerguide/client-access.html
     tiers:
       - id: runtime
         label: 購読と coordinator
@@ -350,21 +354,19 @@ implementations:
           - 3
     groups:
       - kind: cloud
-        label: AWS アカウント
+        label: 顧客 AWS アカウントのリソース
         provider: aws
         tier:
           - runtime
           - operations
+        nodes: &cg-account [aws-cg-ecs, aws-cg-c1, aws-cg-c2, aws-cg-c3, aws-cg-msk]
       - kind: vpc
         label: アプリとブローカーの VPC
         provider: aws
         tier:
           - runtime
-        nodes:
-          - aws-cg-c1
-          - aws-cg-c2
-          - aws-cg-c3
-          - aws-cg-msk
+        nodes: &cg-vpc [aws-cg-c1, aws-cg-c2, aws-cg-c3, aws-cg-msk]
+      - {kind: cluster, label: MSK Provisioned, tier: runtime, nodes: [aws-cg-msk]}
     nodes:
       aws-cg-ecs:
         label: Amazon ECS（購読サービス）
@@ -381,7 +383,7 @@ implementations:
           - type: doc
             ref: docs/reference-kafka-consumer-groups.md#§7
       aws-cg-c1:
-        label: Fargate タスク（Consumer 1）
+        label: Fargate Consumer 1
         svc: fargate
         kind: worker
         tier: runtime
@@ -397,7 +399,7 @@ implementations:
           - type: doc
             ref: docs/reference-kafka-consumer-groups.md#§7
       aws-cg-c2:
-        label: Fargate タスク（Consumer 2）
+        label: Fargate Consumer 2
         svc: fargate
         kind: worker
         tier: runtime
@@ -413,7 +415,7 @@ implementations:
           - type: doc
             ref: docs/reference-kafka-consumer-groups.md#§7
       aws-cg-c3:
-        label: Fargate タスク（Consumer 3）
+        label: Fargate Consumer 3
         svc: fargate
         kind: worker
         tier: runtime
@@ -429,7 +431,7 @@ implementations:
           - type: doc
             ref: docs/reference-kafka-consumer-groups.md#§7
       aws-cg-msk:
-        label: Amazon MSK ブローカー
+        label: Amazon MSK ブローカー群
         svc: msk
         kind: db
         tier: runtime
@@ -439,7 +441,7 @@ implementations:
           - topic
           - coordinator
           - offsets
-        description: Topic のパーティション、Group Coordinator、__consumer_offsets を持つ。
+        description: クラスターのブローカー群をまとめて示す。Topic のパーティション、Group Coordinator、__consumer_offsets を担う。
         management:
           type: shared
           scope: AWS が Kafka 基盤を運用し、利用者がトピックと権限を設定する。内部構成の詳細は資料で確認していない。
@@ -459,3 +461,29 @@ implementations:
         from: aws-cg-ecs
         to: aws-cg-c3
         label: 購読タスクを起動
+    layout2d:
+      tiers: [{id: diagram, label: ECS のタスク維持と Kafka の購読, z: 0, size: [22, 22]}]
+      nodes:
+        aws-cg-ecs: {tier: diagram, x: 5, y: 2}
+        aws-cg-c1: {tier: diagram, x: 6, y: 7}
+        aws-cg-c2: {tier: diagram, x: 6, y: 12}
+        aws-cg-c3: {tier: diagram, x: 6, y: 17}
+        aws-cg-msk: {tier: diagram, x: 17, y: 12}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウントのリソース, tier: diagram, x0: 0, y0: 0, x1: 22, y1: 21, nodes: *cg-account}
+        - {kind: vpc, provider: aws, label: アプリとブローカーの VPC, tier: diagram, x0: 2, y0: 4.5, x1: 21, y1: 20, nodes: *cg-vpc}
+        - {kind: cluster, label: MSK Provisioned, tier: diagram, x0: 13.8, y0: 9.5, x1: 20.2, y1: 14.8, nodes: [aws-cg-msk]}
+    layout3d:
+      tiers:
+        - {id: control, label: ECS のサービス制御, z: 1, size: [8, 5]}
+        - {id: runtime, label: Fargate タスクとブローカー, z: 0, size: [23, 10]}
+      nodes:
+        aws-cg-ecs: {tier: control, x: 4, y: 2}
+        aws-cg-c1: {tier: runtime, x: 2, y: 1.5}
+        aws-cg-c2: {tier: runtime, x: 6, y: 5}
+        aws-cg-c3: {tier: runtime, x: 9, y: 8}
+        aws-cg-msk: {tier: runtime, x: 18, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: 顧客 AWS アカウントのリソース, tier: [control, runtime], nodes: *cg-account}
+        - {kind: vpc, provider: aws, label: 顧客 VPC, tier: runtime, x0: -1, y0: -0.5, x1: 22, y1: 11.5, nodes: *cg-vpc}
+        - {kind: cluster, label: MSK, tier: runtime, x0: 14, y0: 1.5, x1: 21, y1: 9.4, nodes: [aws-cg-msk]}

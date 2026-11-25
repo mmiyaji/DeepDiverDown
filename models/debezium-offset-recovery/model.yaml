@@ -1,0 +1,86 @@
+name: Debezium：オフセットと再起動時の再送
+description: 変更イベントの発行位置と記録済みオフセットの差から、異常終了後に再送される範囲を追う。
+parent: {model: debezium, node: offset}
+reference:
+  objectives:
+    - ソースオフセットと下流の購読位置を区別する。
+    - ワーカーの異常終了後に同じ変更が発行される条件を確認する。
+  sources:
+    - {title: Debezium PostgreSQL Connector, url: https://debezium.io/documentation/reference/3.7/connectors/postgresql.html}
+    - {title: Kafka Connect User Guide, url: https://kafka.apache.org/44/kafka-connect/user-guide/}
+sources: [docs/reference-debezium-offset-recovery.md]
+evidence: [{type: doc, ref: "docs/reference-debezium-offset-recovery.md#§1"}, {type: doc, ref: "docs/reference-debezium-offset-recovery.md#§5"}]
+tiers: [{id: flow, label: 発行・記録・読み直し, z: 0, size: [24, 10]}]
+nodes:
+  logs: {label: 変更ログ, kind: queue, tier: flow, x: 0, y: 4, description: 変更を読み取るための位置と履歴を提供する。, evidence: &recovery [{type: doc, ref: "docs/reference-debezium-offset-recovery.md#§2"}]}
+  runtime: {label: コネクター実行基盤, kind: host, tier: flow, x: 6.5, y: 0, description: 異常終了したタスクを再起動する。, evidence: *recovery}
+  task: {label: 変更捕捉タスク, kind: worker, tier: flow, x: 6.5, y: 4, description: 保存済みの位置を読み戻し、変更イベントを生成する。, evidence: *recovery}
+  events: {label: 発行済みイベント, kind: queue, tier: flow, x: 13.5, y: 2, evidence: *recovery}
+  offsets: {label: 記録済みソースオフセット, kind: db, tier: flow, x: 13.5, y: 7, evidence: *recovery}
+  consumer: {label: 下流の購読処理, kind: client, tier: flow, x: 20, y: 2, description: イベントを読み、処理の重複による影響を抑える。, evidence: *recovery}
+links:
+  - {id: read, from: logs, to: task, label: ログの変更を読む, evidence: *recovery}
+  - {id: publish, from: task, to: events, label: 変更を発行, evidence: *recovery}
+  - {id: commit, from: task, to: offsets, label: 処理した位置を保存, evidence: *recovery}
+  - {id: restart, from: runtime, to: task, label: タスクを再起動, evidence: *recovery}
+  - {id: restore, from: offsets, to: task, label: 保存済みの位置を読む, evidence: *recovery}
+  - {id: repeat, from: logs, to: task, label: 保存済みの位置からログを再読, evidence: *recovery}
+  - {id: replay, from: task, to: events, label: 保存前に発行した変更を再送, evidence: *recovery}
+  - {id: consume, from: events, to: consumer, label: 変更イベントを読む, evidence: *recovery}
+scenarios:
+  - id: restart-after-crash
+    label: オフセット保存前にワーカーが異常終了
+    evidence: [{type: doc, ref: "docs/reference-debezium-offset-recovery.md#§3"}]
+    steps:
+      - {links: [read, publish, commit], note: ある変更まで処理し、位置を保存する。}
+      - {links: [read, publish], note: 次のイベントを発行した直後、位置の保存前にワーカーが停止する。}
+      - {links: [restart, restore, repeat], note: 別のワーカーが保存済みの位置から再開する。対応する変更ログが残っていることが条件である。}
+      - {links: [replay, consume], note: 既に発行した変更がイベントとして再送され、下流が再び読む場合がある。}
+unknowns:
+  - {id: unverified, text: 実測の再開時間・重複件数・WAL 保持容量は未確認。, refs: [restore, replay]}
+implementations:
+  - id: onprem
+    label: 自前 PostgreSQL・分散 Kafka Connect・Kafka
+    description: PostgreSQL の pgoutput を Debezium Source Task が読み、Kafka に発行する。Source の exactly-once を有効にしていない条件での再開を扱う。
+    sources:
+      - {title: Debezium PostgreSQL Connector, url: https://debezium.io/documentation/reference/3.7/connectors/postgresql.html}
+      - {title: Kafka Connect User Guide, url: https://kafka.apache.org/44/kafka-connect/user-guide/}
+      - {title: PostgreSQL Logical Decoding Concepts, url: https://www.postgresql.org/docs/18/logicaldecoding-explanation.html}
+      - {title: PostgreSQL Logical Replication Architecture, url: https://www.postgresql.org/docs/18/logical-replication-architecture.html}
+    tiers: &recovery-2d-tiers [{id: diagram, label: Debezium の再開経路, z: 0, size: [31, 11]}]
+    nodes:
+      pg-slot: {label: 論理スロットと WAL, kind: queue, tier: diagram, x: 3.6, y: 7, realizes: [logs], description: 位置と再開に必要な変更履歴を保持する。, evidence: &recovery-impl [{type: doc, ref: "docs/reference-debezium-offset-recovery.md#§4"}]}
+      pg-server: {label: PostgreSQL サーバー, svc: postgresql:server, kind: db, tier: diagram, x: 3.6, y: 2.9, description: 自前 Linux 上で論理レプリケーション接続を受け、publication が対象とする行変更を pgoutput で返す。, evidence: *recovery-impl}
+      connect-workers: {label: 分散 Kafka Connect Worker 群, kind: host, tier: diagram, x: 11.5, y: 2.6, realizes: [runtime], description: 同じグループの別 Worker が異常終了した Source Task を引き継ぐ。タスクの個数は 1 個。, evidence: *recovery-impl}
+      dbz-task: {label: Debezium PostgreSQL Source Task, kind: worker, tier: diagram, x: 11.5, y: 7, realizes: [task], description: Kafka Connect Worker 上で動き、記録済み LSN から論理レプリケーションを再開する。, evidence: *recovery-impl}
+      kafka-events: {label: Kafka の CDC トピック, kind: queue, tier: diagram, x: 20, y: 2.6, realizes: [events], evidence: *recovery-impl}
+      kafka-offsets: {label: Kafka のソースオフセットトピック, kind: db, tier: diagram, x: 20, y: 7, realizes: [offsets], description: Connect の offset.storage.topic に Source Task の読み取り位置を保持する。, evidence: *recovery-impl}
+      consumer-app: {label: 下流の Kafka Consumer, kind: client, tier: diagram, x: 28, y: 2.6, realizes: [consumer], description: 接続先の外部クライアント。再送を想定して処理する。設置場所は未指定。, evidence: *recovery-impl}
+    links:
+      - {id: source-read, from: pg-slot, to: pg-server, label: 保持した変更履歴を読む, realizes: [read, repeat], replace: true}
+      - {id: source-stream, from: pg-server, to: dbz-task, label: pgoutput で変更を返す, realizes: [read, repeat], replace: true}
+    groups: &recovery-2d-groups
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: diagram, x0: -0.5, y0: -0.25, x1: 24, y1: 9.8, nodes: &recovery-env [pg-server, pg-slot, connect-workers, dbz-task, kafka-events, kafka-offsets]}
+      - {kind: cluster, label: PostgreSQL, tier: diagram, x0: 0.3, y0: 0.8, x1: 7, y1: 9, nodes: [pg-server, pg-slot]}
+      - {kind: cluster, label: Kafka Connect, tier: diagram, x0: 8.1, y0: 0.8, x1: 15, y1: 9.2, nodes: [connect-workers, dbz-task]}
+      - {kind: cluster, label: Kafka, tier: diagram, x0: 16.3, y0: 0.8, x1: 23, y1: 9.2, nodes: [kafka-events, kafka-offsets]}
+    layout2d: {tiers: *recovery-2d-tiers, nodes: {}, groups: *recovery-2d-groups}
+    layout3d:
+      tiers:
+        - {id: pg, label: PostgreSQL, z: 0, size: [6, 8]}
+        - {id: connect, label: Kafka Connect, z: 0, origin: [8, 0], size: [7, 9]}
+        - {id: kafka, label: Kafka, z: 0, origin: [17, 0], size: [7, 9]}
+        - {id: clients, label: 外部クライアント, kind: origin, z: 0, origin: [27, 0], size: [5, 5]}
+      nodes:
+        pg-slot: {tier: pg, x: 2.6, y: 6.6}
+        pg-server: {tier: pg, x: 2.8, y: 2}
+        connect-workers: {tier: connect, x: 2.8, y: 2}
+        dbz-task: {tier: connect, x: 3.8, y: 6.2}
+        kafka-events: {tier: kafka, x: 2.7, y: 2}
+        kafka-offsets: {tier: kafka, x: 2.7, y: 6.2}
+        consumer-app: {tier: clients, x: 2, y: 2.8}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: [pg, connect, kafka], nodes: *recovery-env}
+        - {kind: cluster, tier: pg, nodes: [pg-server, pg-slot]}
+        - {kind: cluster, tier: connect, nodes: [connect-workers, dbz-task]}
+        - {kind: cluster, tier: kafka, nodes: [kafka-events, kafka-offsets]}
