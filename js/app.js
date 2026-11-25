@@ -21,6 +21,18 @@ const $ = id => document.getElementById(id);
 const sidebar = $('sidebar');
 sidebar.addEventListener('scroll', () => { if (sidebar.scrollLeft) sidebar.scrollLeft = 0; });
 sidebar.scrollLeft = 0;
+// 折り返し位置に関係なく、開いたメニューを画面内に収める。
+function fitToolbarMenu(details) {
+  const menu = details.querySelector(':scope > .menu-list');
+  if (!menu || !details.open) return;
+  menu.style.transform = '';
+  const r = menu.getBoundingClientRect();
+  const offset = Math.max(0, -r.left) - Math.max(0, r.right - innerWidth);
+  if (offset) menu.style.transform = `translateX(${offset}px)`;
+}
+const toolbarMenus = document.querySelectorAll('.stage-head details.tb-menu');
+toolbarMenus.forEach(details => details.addEventListener('toggle', () => fitToolbarMenu(details)));
+addEventListener('resize', () => toolbarMenus.forEach(fitToolbarMenu));
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* ================= 設定・ルーティング・データ読込 ================= */
@@ -179,7 +191,11 @@ function routeHash(withView) {
   const s = q.toString();
   return `#/m/${encodeURIComponent(KEY)}/${st.mode}${s ? '?' + s : ''}`;
 }
-const syncUrl = () => { if (parseRoute().cat) return; history.replaceState(null, '', routeHash(false)); }; // 分類ページの URL は書き換えない
+const syncUrl = () => {
+  if (parseRoute().cat) return; // 分類ページの URL は書き換えない
+  const next = routeHash(false);
+  if (location.hash !== next) history.replaceState(null, '', next);
+};
 addEventListener('hashchange', () => {
   const r = parseRoute();
   if (r.cat) return showCategoryPage(r.cat);
