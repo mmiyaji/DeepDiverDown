@@ -628,7 +628,7 @@ const railIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="fa
 const railLabel = d => ({ 'データ基盤': 'データ', 'コンテナ基盤': 'コンテナ', '運用基盤': '運用' })[d] || d.replace(/基盤$/, '');
 function saveLibSel() { try { sessionStorage.setItem('ddd.libSel', JSON.stringify(LIB_SEL)); } catch {} }
 function renderLibrary() {
-  const panel = $('reference-list'), top = panel?.closest('.lib-panel')?.scrollTop;
+  const panel = $('reference-list'), top = $('lib-scroll').scrollTop;
   const mine = REGISTRY.filter(entry => !entry.reference);
   $('mlist').innerHTML = mine.map(modelLink).join('') + '<button class="b small" data-act="open">＋ YAML を開く</button>';
   $('my-count').textContent = mine.length;
@@ -659,7 +659,7 @@ function renderLibrary() {
       order(cats, REF_CATS).map(([cat, list]) => {
         const top = list.filter(e => !e.reference.detailOf || !list.some(p => p.id === e.reference.detailOf)).sort((a, b) => ord(a) - ord(b));
         const rows = top.flatMap(e => [e, ...list.filter(c => c.reference.detailOf === e.id).sort((a, b) => ord(a) - ord(b))]);
-        return `<div class="lib-cat"><span class="lib-cat-h">${esc(cat)} <small>${list.length}</small></span><div class="mlist">${rows.map(modelLink).join('')}</div></div>`;
+        return `<div class="lib-cat"><span class="lib-cat-h"><span>${esc(cat)}</span><small>${list.length}</small></span><div class="mlist">${rows.map(modelLink).join('')}</div></div>`;
       }).join('')}</section>`).join('')}</div>`).join('');
 
   const kinds = REF_KINDS.filter(k => domains.some(([, ks]) => ks.has(k)));
@@ -668,12 +668,12 @@ function renderLibrary() {
   renderTagFilter();
   $('model-filter').value = LIB_FILTER.query || '';
   filterLibrary();
-  const scroller = panel.closest('.lib-panel');
+  const scroller = $('lib-scroll');
   if (scroller && top != null) scroller.scrollTop = top;
   const cur = $('library').querySelector('.mitem.on:not([hidden])');
   if (cur && scroller) { const r = cur.getBoundingClientRect(), a = scroller.getBoundingClientRect(); if (r.top < a.top + 140 || r.bottom > a.bottom) cur.scrollIntoView({ block: 'center' }); }
 }
-function selectLibDomain(d) { LIB_SEL.domain = d; saveLibSel(); $('library').scrollTop = 0; renderLibrary(); }
+function selectLibDomain(d) { LIB_SEL.domain = d; saveLibSel(); $('lib-scroll').scrollTop = 0; renderLibrary(); }
 function selectLibKind(k) { LIB_SEL.kind = k; saveLibSel(); renderLibrary(); }
 function updateLibraryFilter() {
   try { sessionStorage.setItem('ddd.libFilter', JSON.stringify({ query: $('model-filter').value, tags: [...LIB_TAGS] })); } catch {}
