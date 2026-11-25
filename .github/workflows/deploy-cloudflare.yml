@@ -26,9 +26,13 @@ jobs:
           npm run icons
       - name: Build public reference site
         run: node tools/build-public.mjs "$RUNNER_TEMP/ddd-public" --require-icons
+      - name: Prepare isolated Wrangler directory
+        run: mkdir -p "$RUNNER_TEMP/wrangler"
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.168.0'
+          workingDirectory: ${{ runner.temp }}/wrangler
           command: pages deploy ${{ runner.temp }}/ddd-public --project-name=deepdiverdown --branch=main
