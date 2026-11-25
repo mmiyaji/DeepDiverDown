@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { copyPublicIcons } from './public-icons.mjs';
+import { CATEGORY_DOCS } from '../js/categories.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = process.argv[2];
@@ -30,6 +31,10 @@ for (const entry of registry) {
   if (fs.existsSync(path.join(root, doc))) copy(doc);
 }
 for (const doc of ['docs/reference-modern-data-stack-candidates.md']) if (fs.existsSync(path.join(root, doc))) copy(doc);
+for (const slug of new Set(Object.values(CATEGORY_DOCS))) {
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new Error('Invalid category document ID');
+  copy(`docs/category-${slug}.md`);
+}
 const publicRegistry = registry.map(({ actual, compare, ...entry }) => ({ ...entry, actual: false }));
 fs.writeFileSync(path.join(out, 'models/registry.json'), JSON.stringify(publicRegistry, null, 2) + '\n');
 const index = JSON.parse(fs.readFileSync(path.join(root, 'models/research-index.json'), 'utf8'));
