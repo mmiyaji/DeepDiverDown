@@ -39,7 +39,7 @@
 .dialog-head{padding:16px 20px}
 .dialog-head h2{border-left:4px solid var(--accent);padding-left:12px}
 .dialog-body{padding-left:20px;padding-right:20px}
-.settings-nav button,.settings-rules{border-radius:6px}
+
 .research-heading h1,.kg-heading h1,.objects-page h1{border-left:4px solid var(--accent);padding-left:14px}
 .kg-content,.kg-search,.research-history,.objects-page table{border-radius:8px}
 @media(max-width:560px){.brand:before{font-size:21px}.dialog-head{padding:12px 16px}.dialog-body{padding-left:16px;padding-right:16px}}
@@ -52,7 +52,7 @@
 .sidebar-heading{position:sticky;top:0;z-index:5}
 .sidebar-heading strong,.panel-heading strong{display:block;font-size:15px;line-height:1.4}
 .sidebar-heading span,.panel-heading span{display:block;color:var(--mute);font-size:11px;line-height:1.5}
-.sidebar-close{display:none}
+.sidebar-close{display:block;min-width:32px;min-height:32px}
 .sidebar section.library-section{margin:0;border:0;padding:12px 14px 24px}
 .library>summary{border-radius:6px;padding:7px 8px;background:var(--card)}
 .library input[type=search]{border-radius:6px;padding:9px}
@@ -188,3 +188,46 @@
 .stage-head .toolbar>*{flex:none}.stage-head .tb-group{flex-wrap:nowrap}
 @media (max-width:1279px){.stage-head .tb-group:has(#detail-toggle){display:none}}
 @media (max-width:620px){.stage-head .stage-context{flex:1 1 0;min-width:0}.stage-head .stage-actions{order:1}.stage-head .toolbar{order:2}}
+
+/* 幅が足りないときは、ツールバーを切らずに次の段へ送る（flex-end の nowrap だと左側が見切れる） */
+.stage-head{flex-wrap:wrap}
+.stage-head .toolbar{flex-wrap:wrap;row-gap:6px}
+.stage-head .stage-context{flex:1 1 140px}
+
+/* 左右の端の取っ手（一覧・詳細）と、図の右上の全画面アイコン。1279px 以下で使う（下のバーは廃止） */
+.edge-handle,.view-max{display:none}
+.edge-handle{position:fixed;top:50%;transform:translateY(-50%);z-index:35;width:26px;height:88px;padding:0;align-items:center;justify-content:center;gap:4px;background:var(--panel);border:1px solid var(--line);color:var(--fg);font:600 11px var(--f);writing-mode:vertical-rl;letter-spacing:.1em;cursor:pointer;opacity:.92;transition:left .2s,right .2s,opacity .15s}
+.edge-handle svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;writing-mode:horizontal-tb}
+.edge-handle.l{left:0;border-left:0;border-radius:0 10px 10px 0}
+.edge-handle.r{right:0;border-right:0;border-radius:10px 0 0 10px}
+.edge-handle:hover,.edge-handle:focus-visible,.edge-handle.on{border-color:var(--ink);opacity:1}
+.view-max{position:absolute;top:8px;right:8px;z-index:6;width:36px;height:36px;padding:0;align-items:center;justify-content:center;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--fg);cursor:pointer}
+.view-max svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.view-max:hover,.view-max:focus-visible,.view-max[aria-pressed="true"]{border-color:var(--ink)}
+@media (max-width:1279px){
+  .edge-handle,.view-max{display:flex}
+  .panel{position:fixed;top:var(--head);bottom:0;right:0;left:auto;width:min(400px,90vw);max-height:none;z-index:30;border-left:1px solid var(--line);border-top:0;border-radius:0;box-shadow:-6px 0 20px #0002;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+  body.nav-open .edge-handle.l{left:min(340px,88vw)}
+  body.detail-open .edge-handle.r{right:min(400px,90vw)}
+  body.viewer-maximized .edge-handle,body.cat-mode .edge-handle.r{display:none}
+}
+/* 分野の列（アイコン）は 768px 以上で常に見せる。押すとその分野の一覧が右に開く。左の取っ手は 768px 未満だけ使う */
+@media (min-width:768px){
+  .edge-handle.l{display:none}
+}
+@media (min-width:768px) and (max-width:1279px){
+  .shell,body.nav-closed .shell{padding-left:64px;box-sizing:border-box}
+  body.viewer-maximized .shell{padding-left:0}
+  .sidebar,body.nav-open .sidebar{transform:none;width:64px;transition:width .2s,box-shadow .2s;box-shadow:none}
+  body.nav-open .sidebar{width:min(340px,88vw);box-shadow:6px 0 20px #0002}
+  .lib-panel{min-width:calc(min(340px,88vw) - 64px)}
+}
+@media (min-width:1280px){
+  body.nav-closed:not(.viewer-maximized) .shell{grid-template-columns:64px minmax(0,1fr) var(--detail-track)}
+  body.nav-closed:not(.viewer-maximized) .sidebar{visibility:visible}
+}
+
+/* 縦が足りないとき、分野の列に左右のスクロールバーが出ないようにする（縦スクロールの幅で 56px の項目が溢れていた） */
+.lib-rail{overflow-x:hidden;scrollbar-width:none}
+.lib-rail::-webkit-scrollbar{display:none}
+.lib-rail .rail-item{width:min(56px,calc(100% - 4px));flex:none}

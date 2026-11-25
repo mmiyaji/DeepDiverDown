@@ -8,8 +8,8 @@
     toggle.setAttribute('aria-pressed', expanded);
     toggle.querySelector('span').textContent = expanded ? '元に戻す' : '最大化';
     toggle.title = expanded ? '構成図を元の表示に戻す' : '構成図を画面内で最大化';
-    nav.disabled = expanded;
-    const bbMax = document.getElementById('bb-max'); bbMax.setAttribute('aria-pressed', expanded); bbMax.querySelector('span').textContent = expanded ? '戻す' : '全画面';
+    if (nav) nav.disabled = expanded;
+    const bbMax = document.getElementById('bb-max'); bbMax.setAttribute('aria-pressed', expanded); const label = expanded ? '全画面を終了' : '構成図を全画面で表示'; bbMax.setAttribute('aria-label', label); bbMax.title = label;
   });
 })();
 
@@ -58,7 +58,7 @@
     if (e.target.closest?.('[data-act="nav"]') && compact.matches && !document.body.classList.contains('nav-open') && !panel.hidden) { userOpen = false; render(); }
   }, true);
   new MutationObserver(() => {
-    document.querySelectorAll('.bottombar [data-act="nav"]').forEach(b => b.classList.toggle('on', document.body.classList.contains('nav-open')));
+    document.querySelectorAll('.edge-handle[data-act="nav"]').forEach(b => b.classList.toggle('on', document.body.classList.contains('nav-open')));
   }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   toggle.addEventListener('click', () => {
@@ -80,7 +80,8 @@
     render();
     panel.focus();
   });
-  compact.addEventListener('change', render);
+  // 画面の広さが変わったら、引き出しは閉じた状態に戻す（広い画面では詳細を既定で開く）
+  compact.addEventListener('change', () => { userOpen = undefined; document.body.classList.remove('nav-open'); render(); });
   render();
 })();
 

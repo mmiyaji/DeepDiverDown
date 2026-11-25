@@ -42,8 +42,13 @@
 .compare-viewport > .view{width:100%;height:100%;box-sizing:border-box}
 .view.hide-node-labels .n-card:not(:hover):not(:focus-visible):not([data-selected]) .n-card-text,
 .view.hide-node-labels .n-card:not(:hover):not(:focus-visible):not([data-selected]) .n-management,
-.view.hide-node-labels .n-role:not([data-selected]):not([data-hovered]),
+.view.hide-node-labels .n-role:not([data-selected]):not([data-hovered]):not([data-outlined]) .n-card-text,
+.view.hide-node-labels .n-role:not([data-selected]):not([data-hovered]):not([data-outlined]) .n-management,
 .view.hide-node-labels .n-sub:not([data-selected]):not([data-hovered]) { display:none; }
+/* 3D では部品の名前を隠し、アイコンだけを小さく残す。選択・ホバー・再生中の部品は名前を出す */
+.view.hide-node-labels .n-role:not([data-selected]):not([data-hovered]):not([data-outlined]) {
+  padding: 2px; gap: 0; background: var(--card); border-color: transparent; opacity: .85;
+}
 .view.hide-management .n-management { display:none; }
 .legend { gap:6px 8px; }
 .legend-toggle { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border:1px solid var(--line); border-radius:4px; color:var(--fg); background:var(--card); font:inherit; cursor:pointer; }
@@ -63,6 +68,20 @@
   pointer-events: none;
 }
 [data-label-offset^="-"]::before { top: 100%; bottom: auto; }
+/* 引き出し線の先に点を付け、ラベルが指す位置を分かるようにする */
+[data-label-offset]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--leader-length) - 2px);
+  width: 5px;
+  height: 5px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--mute);
+  pointer-events: none;
+}
+[data-label-offset^="-"]::after { top: calc(100% + var(--leader-length) - 3px); }
 .legend .route-caption { color: var(--fg); font-weight: 650; }
 .legend.edge-selected .route-caption { font-weight: 400; }
 .legend.edge-selected .route-caption strong { color: var(--accent); }
@@ -134,4 +153,36 @@ body.reference-preview .legend.edge-selected { display: flex; }
 .n-badge.drill:focus-visible {
   outline: 2px solid var(--focus-ring, var(--ink));
   outline-offset: 2px;
+}
+
+/* 3D：フロア・データの流れのラベルを小さく薄くし、立体の部品を主役にする */
+.t-lbl.t-3d {
+  padding: 1px 4px;
+  background: transparent;
+  border-color: transparent;
+  font-size: calc(10px * var(--lbl-scale));
+  font-weight: 600;
+  opacity: .8;
+}
+
+/* 3D：選択・ホバー・再生中でない部品は、やや小さく控えめなラベルにする。
+   再生中は図を毎回描き直すため、状態の切り替えでラベルの幅が大きく変わると図が揺れて見える。
+   大きさの差は小さくし、管理区分は選択・ホバーのときだけ出して幅を変えない */
+.n-lbl.n-3d { font-size: calc(12px * var(--lbl-scale)); }
+.n-lbl.n-3d:not([data-selected]):not([data-hovered]):not([data-outlined]) {
+  padding: 2px 5px;
+  border-color: transparent;
+  font-size: calc(10.5px * var(--lbl-scale));
+  opacity: .8;
+}
+.n-lbl.n-3d:not([data-selected]):not([data-hovered]) .n-management { display: none; }
+
+/* シナリオ再生中は、説明文を常に 1 段目に置く。
+   文が長いステップだけ凡例が 2 段になると図の領域の高さが変わり、視点が再調整されて図が動く */
+.scenario-active .legend .route-caption {
+  flex: 1 0 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

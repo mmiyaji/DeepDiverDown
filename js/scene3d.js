@@ -35,7 +35,7 @@ export class Scene3D {
 
     this.root = new THREE.Group(); this.lbl = new THREE.Group();
     this.scene.add(this.root, this.lbl);
-    this.pick = []; this.edgePaths = []; this.packets = []; this.frustum = 10; this.fitted = false;
+    this.pick = []; this.edgePaths = []; this.packets = []; this.frustum = 10; this.fitted = false; this.settleTries = 0;
 
     this.ray = new THREE.Raycaster();
     let down = null;
@@ -86,11 +86,16 @@ export class Scene3D {
       if (this.flat) this.onFlatResize?.();
       if (this.fitView && this.root.children.length) this.fit(this.fitView);
       else this.resize();
+      // 大きさが変わった直後の 1 フレームに、古い配置（台数バッジなど）が見えないよう、その場で描き直して配置する
+      this.redrawNow();
     }).observe(el);
     this.resize();
     this.labelProjection = new THREE.Matrix4();
     this.lastLabelProjection = new THREE.Matrix4();
     document.fonts.ready.then(() => { this.labelsDirty = true; });
+    // 初めて使う文字のフォントが後から読み込まれると、ラベルの幅が変わって重なり判定がずれる。読み込みのたびに配置し直す
+    document.fonts.addEventListener?.('loadingdone', () => { this.labelsDirty = true; });
+    for (const weight of [400, 500, 600, 700]) document.fonts.load(`${weight} 12px Inter`).catch(() => {});
     const clock = new THREE.Clock();
     this.speed = 1; this.phase = 0;
     this.renderer.setAnimationLoop(() => {
@@ -111,8 +116,11 @@ export class Scene3D {
       // ラベルの重なりは 2D・3D とも解消する（3D は動かしている間の負荷を抑えて間引く）
       this.labelProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
       const moved = !this.labelProjection.equals(this.lastLabelProjection), now = performance.now();
+      if (this.gateFrames > 0) { this.gateFrames--; this.labelsDirty = true; }
       if (this.labelsDirty || (moved && (this.flat || now - (this.lastPlace || 0) > 120))) {
-        this.placeLabels();
+        // 配置は前回の結果（幅の上限・ずらした量）に左右され、描き直した直後は 1〜2 回では落ち着かないことがある
+        // （台数バッジが一瞬見えて消える）。画面に出す前に、結果が変わらなくなるまで繰り返す
+        this.layoutLabels(this.labelsDirty);
         if (this.revealComparisonNode) {
           const card = [...this.labels.domElement.children].find(el =>
             el.classList.contains('n-card') && el.dataset.node === this.revealComparisonNode);
@@ -201,6 +209,9 @@ export class Scene3D {
   /* 2D では画面上のラベルを測り、優先順に重なりのないものを表示する */
   placeLabels(layer = this.labels.domElement, camera = this.camera) {
     const frame = layer.getBoundingClientRect();
+    const main = layer === this.labels.domElement;
+    const settling = main && (this.gateFrames > 0 || (this.settleTries < 40 && (document.fonts.status === 'loading' || [...layer.querySelectorAll('img')].some(img => !img.complete))));
+    if (settling) this.settleTries++;
     // Client rectangles are in screen pixels; CSS widths below are in the
     // unscaled coordinate system when the 2D overview uses CSS zoom.
     const labelZoom = frame.width / (layer.clientWidth || frame.width) || 1;
@@ -244,7 +255,7 @@ export class Scene3D {
     if (layer === this.labels.domElement && this.miniOn && this.miniEl && !this.miniEl.hidden && this.miniEl.style.visibility !== 'hidden')
       occupied.push(this.miniEl.getBoundingClientRect());
     for (const { el, rect } of labels) {
-      const groupLabel = el.classList.contains('g-cloud');
+      const groupLabel = el.classList.contains('g-cloud') || el.classList.contains('g-datacenter');
       const floorLabel = el.classList.contains('t-lbl');
       const movable = el.classList.contains('n-3d') || floorLabel;
       const offsets = groupLabel ? [0, -rect.height - 3, rect.height + 3, -rect.height * 2 - 6, rect.height * 2 + 6]
@@ -264,7 +275,15 @@ export class Scene3D {
         placed = true;
         break;
       }
-      el.style.visibility = placed ? '' : 'hidden';
+      // アイコン画像の読み込み前は、ラベルの幅が最終の大きさと違い、重なり判定がずれる。
+      // 読み込みが終わるまで、新しいラベルは出さずに待つ（待ちすぎないよう上限あり）
+      el.style.visibility = placed && !(settling && !el.dataset.shown) ? '' : 'hidden';
+      if (placed && !settling) el.dataset.shown = '1';
+    }
+    if (settling) this.labelsDirty = true;
+    else {
+      this.settleTries = 0;
+      if (main && this.ghost) { this.ghost.remove(); this.ghost = null; }
     }
   }
 
@@ -502,6 +521,29 @@ export class Scene3D {
   color(c) { return new THREE.Color(c.startsWith('--') ? this.css(c) : c); }
   mix(a, b, p) { return this.color(b).lerp(this.color(a), p); } // b に a を p の割合で混ぜる
 
+  /* ラベルの配置は前回の結果（幅の上限・ずらした量）に左右され、描き直した直後は 1 回では落ち着かないことがある。
+     画面に出す前に、結果が変わらなくなるまで繰り返す */
+  layoutLabels(rebuilt) {
+    let previous = null;
+    for (let pass = 0; pass < (rebuilt && !(this.gateFrames > 0) ? 5 : 1); pass++) {
+      this.placeLabels();
+      if (!rebuilt) break;
+      const result = [...this.labels.domElement.children].map(el => el.style.visibility + el.style.translate + el.style.getPropertyValue('--card-room')).join('|');
+      if (result === previous) break;
+      previous = result;
+    }
+  }
+  /* 大きさの変更などで、次のアニメーションフレームを待たずに描画とラベルの配置をやり直す */
+  redrawNow() {
+    if (!this.lastLabelProjection || !this.root.children.length) return;
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+    this.labels.render(this.scene, this.camera);
+    this.labelProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    this.layoutLabels(true);
+    this.lastLabelProjection.copy(this.labelProjection);
+    this.labelsDirty = false; this.lastPlace = performance.now();
+  }
   resize() {
     const w = this.el.clientWidth, h = this.el.clientHeight || 1, a = w / h;
     this.labelsDirty = true;
@@ -516,6 +558,16 @@ export class Scene3D {
     if (this.labels.domElement.contains(active) && active.dataset.action) this.labelFocus = active.dataset;
     this.root.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => m.dispose()); });
     this.root.clear(); this.lbl.clear(); this.pick = []; this.edgePaths = []; this.packets = [];
+    // 描き直した直後の数フレームは、新しいラベルの配置がまだ落ち着かず、台数バッジなどが一瞬見えて消える。
+    // 落ち着くまで、直前のラベルの写しを重ねて見せておき、新しいラベルは隠しておく
+    const layer = this.labels.domElement;
+    if (layer.children.length) {
+      this.ghost?.remove();
+      const ghost = layer.cloneNode(true);
+      ghost.inert = true; ghost.setAttribute('aria-hidden', 'true'); ghost.style.pointerEvents = 'none';
+      layer.after(ghost); this.ghost = ghost;
+    }
+    this.gateFrames = 3;
   }
   end(flat) {
     this.flat = flat;
@@ -570,6 +622,8 @@ export class Scene3D {
   label(text, pos, cls, anchor = [0.5, 0.5], style = {}, interactive = false) {
     const div = document.createElement(interactive ? 'button' : 'div'); div.className = cls; div.textContent = text; Object.assign(div.style, style);
     if (interactive) div.type = 'button';
+    // 位置と重なりを決めるまでは見せない（描き直した直後に、未配置のラベルが一瞬見えるのを防ぐ）
+    div.style.visibility = 'hidden';
     const o = new CSS2DObject(div); o.position.set(...pos); o.center.set(...anchor); this.lbl.add(o); return div;
   }
   edges(geo, color, opacity = 1, dashed = false) {
@@ -633,9 +687,9 @@ export class Scene3D {
     const [fallback, style, fill] = {
       vpc, vnet: vpc, vcn: vpc, az: ['--mute', 'dot'], subnet: ['--line', null, '--grid'],
       cloud: ['--mute'], region: ['--mute', 'dash'], cluster: ['#326CE5', 'dashdot'], parallel: ['--par', 'dash'],
-      namespace: ['--mute', 'dot'], nodegroup: ['--mute', 'dot'], datacenter: ['#6d6a63'],
+      namespace: ['#7c5cd6', 'dot'], nodegroup: ['--mute', 'dot'], datacenter: ['#6d6a63', 'dash'],
     }[kind] || ['--mute', 'dash'];
-    const ink = ['cluster', 'datacenter', 'parallel'].includes(kind) ? fallback : color || fallback;
+    const ink = ['cluster', 'datacenter', 'parallel', 'namespace'].includes(kind) ? fallback : color || fallback;
     this.loop(pts, y, ink, style, fill);
     // クラウド・データセンター・クラスタは、枠の内側を淡く塗って入れ子が分かるようにする
     const tint = { cloud: 0.07, datacenter: 0.07, cluster: 0.05, region: 0.03, parallel: 0.08 }[kind];
@@ -1035,11 +1089,20 @@ export class Scene3D {
     const v = s.points.map(p => new THREE.Vector3(...p));
     this.edgePaths.push({ id: s.id, points: v });
     const color = this.color(s.color);
+    // 3D では既定の接続色が床や部品に紛れるため、文字色に近づけて矢印を見やすくする
+    if (s.color === '--diagram-link') color.lerp(this.color('--ink'), 0.5);
+    const pixel = s.unitsPerPixel || 0.02;
     if (s.solid) {
       this.linkBand(v, color, s);
-    } else if (s.thick && !s.dashed) {
+    } else if (s.flat) {
+      // 2D の線は 1px だと細すぎて背景に紛れるため、画面上で 2〜3px の帯で描く
+      this.linkBand(v, color, { ...s, halfWidth: (s.thick ? 1.5 : 1) * pixel, unit: pixel });
+    } else if (!s.flat && s.dashed) {
+      // 3D の破線は 1px の線だと床や部品に紛れるため、幅のある帯で描く
+      this.linkBand(v, color, { ...s, thick: true });
+    } else if (!s.flat || (s.thick && !s.dashed)) {
       const path = new THREE.CurvePath(); for (let i = 1; i < v.length; i++) path.add(new THREE.LineCurve3(v[i - 1], v[i]));
-      const geo = new THREE.TubeGeometry(path, v.length * 12, 0.035, 6, false);
+      const geo = new THREE.TubeGeometry(path, v.length * 12, s.thick ? 0.075 : 0.06, 6, false);
       this.root.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: s.opacity < 1, opacity: s.opacity })));
     } else {
       const geo = new THREE.BufferGeometry().setFromPoints(v);
@@ -1057,8 +1120,8 @@ export class Scene3D {
         const direction = leg.end.clone().sub(leg.start).normalize();
         const tip = leg.start.clone().lerp(leg.end, s.arrowPosition?.fraction ?? (s.flat ? 0.5 : 0.57));
         tip.y += 0.02;
-        const arrowLength = s.flat ? Math.min((s.thick ? 9 : 7) * s.unitsPerPixel, leg.length * (s.arrowPosition?.fraction ?? 0.5))
-          : s.thick ? 0.36 : 0.25;
+        const arrowLength = s.flat ? Math.min((s.thick ? 15 : 12) * pixel, leg.length * (s.arrowPosition?.fraction ?? 0.5))
+          : s.thick ? 0.8 : 0.62;
         const back = tip.clone().addScaledVector(direction, -arrowLength);
         const wing = new THREE.Vector3(-direction.z, 0, direction.x);
         if (!wing.lengthSq()) wing.set(1, 0, 0);
@@ -1076,17 +1139,18 @@ export class Scene3D {
       this.packets.push({ seg, len, meshes });
     }
   }
-  linkBand(points, color, { dashed, thick, opacity }) {
+  /* halfWidth・unit は 2D 用：線幅と破線の長さを画面のピクセルに合わせる（unit は 1px あたりのモデル単位） */
+  linkBand(points, color, { dashed, thick, opacity, halfWidth, unit }) {
     const vertices = [];
-    const dash = dashed === 'dot' ? 0.10 : 0.28;
-    const gap = dashed === 'dot' ? 0.16 : 0.14;
+    const dash = unit ? (dashed === 'dot' ? 3 : 8) * unit : dashed === 'dot' ? 0.10 : 0.28;
+    const gap = unit ? 4 * unit : dashed === 'dot' ? 0.16 : 0.14;
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1], b = points[i], len = a.distanceTo(b);
       if (len < 0.001) continue;
       const along = b.clone().sub(a).normalize();
       const across = new THREE.Vector3(-along.z, 0, along.x);
       if (!across.lengthSq()) across.set(1, 0, -1);
-      across.normalize().multiplyScalar(thick ? 0.043 : 0.024);
+      across.normalize().multiplyScalar(halfWidth ?? (thick ? 0.05 : 0.03));
       for (let start = 0; start < len; start += dashed ? dash + gap : len) {
         const p = a.clone().addScaledVector(along, start);
         const q = a.clone().addScaledVector(along, dashed ? Math.min(len, start + dash) : len);

@@ -1,5 +1,5 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=view-accent1';
+import { Scene3D } from './scene3d.js?v=ns10';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=compare-layout3';
 import { implementation3D, platformFootprint } from './implementation-3d.js';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
@@ -548,7 +548,9 @@ function drawScene() {
         (gr.kind !== 'az' || !gr.az || n.az?.includes(gr.az))).map(([, n]) => n);
       if (!members.length) continue;
       const xs = members.map(n => n.x), ys = members.map(n => n.y);
-      const padding = { cloud: 1.2, region: 1.0, cluster: 0.8, namespace: 0.6 }[gr.kind] ?? 0.8;
+      // 3D は枠と部品の間を広げ、入れ子の枠が部品に密着して見えないようにする
+      const padding = (st.dimension === '3' ? { cloud: 1.7, region: 1.4, cluster: 2.0, datacenter: 1.8, namespace: 1.1 }
+        : { cloud: 1.2, region: 1.0, cluster: 0.8, namespace: 0.6 })[gr.kind] ?? (st.dimension === '3' ? 1.1 : 0.8);
       // Cards retain their screen size as the diagram scales. A fixed model
       // margin can therefore put a cloud border through its member cards.
       const vertical = plan.floors.get(t)?.vertical;
@@ -673,7 +675,8 @@ function renderLibrary() {
   const count = d => [...d.values()].reduce((n, c) => n + [...c.values()].flat().length, 0);
   const railBtn = (key, label, n) => `<button type="button" class="rail-item ${LIB_SEL.domain === key ? 'on' : ''}" data-lib-domain="${esc(key)}" aria-pressed="${LIB_SEL.domain === key}" title="${esc(key === MINE ? '自分の設計' : key)}（${n}）">${railIcon(key)}<span>${esc(label)}</span></button>`;
   $('lib-rail').innerHTML = domains.map(([d, kinds]) => railBtn(d, railLabel(d), count(kinds))).join('')
-    + '<span class="rail-gap"></span>' + railBtn(MINE, '自分の設計', mine.length);
+    + '<span class="rail-gap"></span>' + railBtn(MINE, '自分の設計', mine.length)
+    + '<button type="button" class="rail-item rail-settings" data-act="settings" title="設定" aria-label="設定"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg><span>設定</span></button>';
 
   const kindIdx = e => e.reference.role === 'overview' ? 0 : e.reference.step != null ? 5e5 + e.reference.step : (REF_KINDS.indexOf(e.reference.kind) + 1 || 9) * 1e6 + Math.min(ord(e), 999999);
   const leaves = list => {
@@ -1480,6 +1483,7 @@ function modal(title, body) {
 }
 function closeModal() {
   $('modal').hidden = true;
+  $('modal').classList.remove('settings-dialog');
   if ($('modal').classList.contains('reference-comparison')) {
     exitComparisonFull();
     $('modal-body').replaceChildren();
@@ -1580,57 +1584,84 @@ function openEvidenceRef(ref) {
     ${owners.length ? '<h4>この参照先に紐付く要素</h4>' + owners.join('') : ''}`);
 }
 
+/* 設定：左に分類、右に項目（1 行 1 項目）。狭い画面では分類の一覧から項目へ進む。
+   「このアプリについて」の規約・ライセンス・更新履歴は about.html の内容を読み込んで再利用する */
+const SETTINGS_PANES = [
+  ['display', '表示', '<circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.8.7-1.5 1.5-1.5H16c3.3 0 6-2.7 6-6 0-4.9-4.5-9-10-9z"/>', '色や図の見え方。すぐに反映されます。'],
+  ['controls', '操作', '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M2 14h4M10 8h4M18 16h4"/>', '図を開くときの表示とドラッグ操作。'],
+  ['ai', 'AI 支援', '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>', 'ローカル起動時のみ利用できます。'],
+  ['review', '点検', '<path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>', '変更は保存され、再読み込み後の点検に反映されます。'],
+  ['data', 'データ', '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>', 'このブラウザに保存しているもの。'],
+  ['about', 'サイト情報', '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', '利用規約・免責事項・ライセンス・更新履歴。'],
+];
+const ABOUT_SECTIONS = [['inspiration', '参考にしたサイト'], ['terms', '利用規約'], ['privacy', 'プライバシーポリシー'], ['disclaimer', '免責事項'], ['licenses', 'サードパーティーライセンス'], ['author', '作者・リンク'], ['history', '更新履歴']];
+
+async function loadAboutInto(box) {
+  try {
+    const res = await fetch('about.html', { cache: 'no-cache' });
+    if (!res.ok) throw new Error(String(res.status));
+    const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+    const parts = ABOUT_SECTIONS.map(([id, title]) => {
+      const section = doc.getElementById(id);
+      if (!section) return '';
+      const body = section.cloneNode(true);
+      body.querySelector('h2')?.remove();
+      body.querySelectorAll('a[target="_blank"]').forEach(a => a.setAttribute('rel', 'noopener noreferrer'));
+      return `<details class="set-acc"><summary>${esc(title)}</summary><div class="set-acc-body">${body.innerHTML}</div></details>`;
+    }).join('');
+    const latest = doc.querySelector('#history time')?.getAttribute('datetime');
+    const date = latest ? latest.replace(/^(\d+)-0?(\d+)-0?(\d+)$/, '$1年$2月$3日') : '';
+    box.innerHTML = parts + `<p class="set-ver">${date ? `最終更新 ${esc(date)}　` : ''}<a href="about.html" target="_blank" rel="noopener noreferrer">サイト情報のページを開く</a></p>`;
+  } catch {
+    box.innerHTML = '<p class="set-ver">規約などを読み込めませんでした。<a href="about.html" target="_blank" rel="noopener noreferrer">サイト情報のページを開く</a></p>';
+  }
+}
+
 function openSettings() {
   const rules = Analyze.RULES;
-  modal('設定', `
-    <form id="settings" class="settings">
-    <p class="settings-intro">変更はこのブラウザに保存されます。</p>
-    <nav class="settings-nav" aria-label="設定の分類">
-      <button type="button" data-settings-target="settings-display">表示</button><button type="button" data-settings-target="settings-controls">操作</button><button type="button" data-settings-target="settings-ai">AI 支援</button><button type="button" data-settings-target="settings-review">点検</button><button type="button" data-settings-target="settings-data">データ</button>
-    </nav>
-    <section class="settings-section" id="settings-display" tabindex="-1">
-    <div class="settings-heading"><div><h3>表示</h3><p>色や図の見え方を変更します。</p></div><span>すぐに反映</span></div>
-    <label class="chk"><input type="checkbox" name="officialIcons" ${S.officialIcons ? 'checked' : ''} ${hasIcons ? '' : 'disabled'}> 公式アイコンを使う</label>
-    <label>テーマ <select name="theme">${[['auto', 'OS に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, n]) => `<option value="${v}" ${S.theme === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-    <label>図のアクセントカラー <select name="viewAccent"><option value="orange" ${S.viewAccent === 'orange' ? 'selected' : ''}>オレンジ</option><option value="blue" ${S.viewAccent !== 'orange' ? 'selected' : ''}>ブルー</option></select></label>
-    <p class="settings-help">処理の流れや選択中の部品・接続に適用します。</p>
-    <label>ラベルの大きさ <input type="range" name="labelScale" min="0.8" max="1.5" step="0.05" value="${S.labelScale}"><output>${Math.round(S.labelScale * 100)}%</output></label>
-    <label>パケットの速さ <input type="range" name="packetSpeed" min="0" max="3" step="0.25" value="${S.packetSpeed}"><output>${S.packetSpeed}×</output></label>
-    <label>2D の部品デザイン <select name="nodeStyle2D"><option value="card" ${S.nodeStyle2D !== 'silhouette' ? 'selected' : ''}>ラベル一体型カード</option><option value="silhouette" ${S.nodeStyle2D === 'silhouette' ? 'selected' : ''}>種類別のシルエット</option></select></label>
-    <label>3D の部品デザイン <select name="nodeStyle3D"><option value="components" ${S.nodeStyle3D !== 'flow' ? 'selected' : ''}>形と色で部品を区別</option><option value="flow" ${S.nodeStyle3D === 'flow' ? 'selected' : ''}>フロアと接続を強調</option></select></label>
-    </section>
-    <section class="settings-section" id="settings-controls" tabindex="-1">
-    <div class="settings-heading"><div><h3>操作と初期表示</h3><p>図を開くときの表示とドラッグ操作を設定します。</p></div></div>
-    <label>初期の表示 <select name="dimension"><option value="3" ${S.dimension === '3' ? 'selected' : ''}>3D</option><option value="2" ${S.dimension === '2' ? 'selected' : ''}>2D</option></select></label>
-    <label>初期の視点 <select name="defaultView">${[['iso', '斜め'], ['top', '真上'], ['side', '横'], ['back', '裏側']].map(([v, n]) => `<option value="${v}" ${S.defaultView === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-    <label>左ドラッグの既定 <select name="dragMode"><option value="rotate" ${S.dragMode === 'rotate' ? 'selected' : ''}>回転</option><option value="pan" ${S.dragMode === 'pan' ? 'selected' : ''}>移動</option></select></label>
-    </section>
-    <section class="settings-section" id="settings-ai" tabindex="-1">
-    <div class="settings-heading"><div><h3>AI 支援</h3><p>AI 支援はローカル起動時のみ利用できます。実行先は AI 用ビューアでの対話・取り込み・指摘対応に適用します。</p></div></div>
-    <label>実行先 <select name="aiProvider">${Object.entries(AI_PROVIDERS).map(([id, label]) => `<option value="${id}" ${(S.aiProvider === 'codex' ? 'codex' : 'claude') === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-    </section>
-    <section class="settings-section" id="settings-review" tabindex="-1">
-    <div class="settings-heading"><div><h3>点検</h3><p>変更は保存され、再読み込み後の点検に反映されます。</p></div><span>再読み込みが必要</span></div>
-    <h4>点検のしきい値</h4><p class="sub">空欄の場合はモデルの設定を使います。</p>
-    <label>許容する「ずれ」の件数 <input type="number" name="maxDrift" min="0" value="${S.gates.maxDrift ?? ''}" placeholder="${M.gates?.maxDrift ?? 0}"></label>
-    <label>許容する重大な指摘の件数 <input type="number" name="maxHigh" min="0" value="${S.gates.maxHigh ?? ''}" placeholder="${M.gates?.maxHigh ?? 0}"></label>
-    <details class="settings-rules"><summary>指摘ルール <small>${rules.length} 件</small></summary>
-    <div class="rules">${rules.map(r => `<label class="chk"><input type="checkbox" name="rule" value="${r.id}" ${S.disabledRules.includes(r.id) ? '' : 'checked'}> <span class="tag ${r.sev}">${r.sev === 'high' ? '重大' : '注意'}</span>${esc(r.title)} <small class="mono mute">${r.id}${r.for ? ' / ' + r.for : ''}</small></label>`).join('')}</div>
-    </details>
-    <div class="settings-action"><button type="button" class="b on" data-act="reload">再読み込みして点検に反映</button></div>
-    </section>
-    <section class="settings-section" id="settings-data" tabindex="-1">
-    <div class="settings-heading"><div><h3>ブラウザ内のデータ</h3><p>読み込んだモデルを管理します。</p></div></div>
-    <div class="locals">${REGISTRY.filter(r => r.local).map(r => `<div class="item">${esc(r.name || r.id)} <button type="button" class="b small" data-rmlocal="${r.id}">削除</button></div>`).join('') || '<div class="sub">ブラウザに読み込んだモデルはありません</div>'}</div>
-    </section>
-    <div class="settings-reset"><button type="button" class="b" data-act="reset-settings">設定を初期値に戻す</button><p class="sub">表示や点検の設定を初期値に戻します。</p></div>
-    </form>`);
+  const row = (title, help, control) => `<div class="set-row"><div class="set-text"><div class="set-t">${title}</div>${help ? `<div class="set-h">${help}</div>` : ''}</div><div class="set-ctl">${control}</div></div>`;
+  const select = (name, label, options, cur) => `<select name="${name}" aria-label="${label}">${options.map(([v, n]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+  const group = t => `<h4 class="set-group">${t}</h4>`;
+  const panes = {
+    display: group('外観')
+      + row('テーマ', '', select('theme', 'テーマ', [['auto', 'OS に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']], S.theme))
+      + row('図のアクセントカラー', '処理の流れや選択中の部品・接続に使います。', select('viewAccent', '図のアクセントカラー', [['orange', 'オレンジ'], ['blue', 'ブルー']], S.viewAccent === 'orange' ? 'orange' : 'blue'))
+      + row('公式アイコンを使う', hasIcons ? '' : 'アイコンが同梱されていないため使えません。', `<label class="switch"><input type="checkbox" name="officialIcons" aria-label="公式アイコンを使う" ${S.officialIcons ? 'checked' : ''} ${hasIcons ? '' : 'disabled'}><span></span></label>`)
+      + group('図')
+      + row('ラベルの大きさ', '', `<input type="range" name="labelScale" aria-label="ラベルの大きさ" min="0.8" max="1.5" step="0.05" value="${S.labelScale}"><output>${Math.round(S.labelScale * 100)}%</output>`)
+      + row('パケットの速さ', '', `<input type="range" name="packetSpeed" aria-label="パケットの速さ" min="0" max="3" step="0.25" value="${S.packetSpeed}"><output>${S.packetSpeed}×</output>`)
+      + row('2D の部品デザイン', '', select('nodeStyle2D', '2D の部品デザイン', [['card', 'ラベル一体型カード'], ['silhouette', '種類別のシルエット']], S.nodeStyle2D === 'silhouette' ? 'silhouette' : 'card'))
+      + row('3D の部品デザイン', '', select('nodeStyle3D', '3D の部品デザイン', [['components', '形と色で部品を区別'], ['flow', 'フロアと接続を強調']], S.nodeStyle3D === 'flow' ? 'flow' : 'components')),
+    controls: row('初期の表示', '', select('dimension', '初期の表示', [['3', '3D'], ['2', '2D']], S.dimension))
+      + row('初期の視点', '', select('defaultView', '初期の視点', [['iso', '斜め'], ['top', '真上'], ['side', '横'], ['back', '裏側']], S.defaultView))
+      + row('左ドラッグの既定', '', select('dragMode', '左ドラッグの既定', [['rotate', '回転'], ['pan', '移動']], S.dragMode)),
+    ai: row('実行先', 'AI 用ビューアでの対話・取り込み・指摘対応に使います。', select('aiProvider', '実行先', Object.entries(AI_PROVIDERS), S.aiProvider === 'codex' ? 'codex' : 'claude')),
+    review: group('点検のしきい値')
+      + `<p class="set-h set-note">空欄の場合はモデルの設定を使います。</p>`
+      + row('許容する「ずれ」の件数', '', `<input type="number" name="maxDrift" aria-label="許容するずれの件数" min="0" value="${S.gates.maxDrift ?? ''}" placeholder="${M.gates?.maxDrift ?? 0}">`)
+      + row('許容する重大な指摘の件数', '', `<input type="number" name="maxHigh" aria-label="許容する重大な指摘の件数" min="0" value="${S.gates.maxHigh ?? ''}" placeholder="${M.gates?.maxHigh ?? 0}">`)
+      + `<details class="set-acc"><summary>指摘ルール <small>${rules.length} 件</small></summary><div class="set-acc-body rules">${rules.map(r => `<label class="chk"><input type="checkbox" name="rule" value="${r.id}" ${S.disabledRules.includes(r.id) ? '' : 'checked'}> <span class="tag ${r.sev}">${r.sev === 'high' ? '重大' : '注意'}</span>${esc(r.title)} <small class="mono mute">${r.id}${r.for ? ' / ' + r.for : ''}</small></label>`).join('')}</div></details>`
+      + `<div class="set-action"><button type="button" class="b on" data-act="reload">再読み込みして点検に反映</button></div>`,
+    data: group('読み込んだモデル')
+      + `<div class="locals">${REGISTRY.filter(r => r.local).map(r => `<div class="item">${esc(r.name || r.id)} <button type="button" class="b small" data-rmlocal="${r.id}">削除</button></div>`).join('') || '<div class="set-h">ブラウザに読み込んだモデルはありません。</div>'}</div>`
+      + group('初期化')
+      + row('設定を初期値に戻す', '表示や点検の設定が対象です。モデルは消えません。', '<button type="button" class="b" data-act="reset-settings">初期化</button>'),
+    about: '<div id="about-body" class="set-about"><p class="set-ver">読み込み中…</p></div>',
+  };
+  const nav = SETTINGS_PANES.map(([id, name, icon], i) => `${id === 'about' ? '<hr>' : ''}<button type="button" class="${i === 0 ? 'on' : ''}" data-pane="${id}"><svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg><span>${name}</span><i aria-hidden="true">›</i></button>`).join('');
+  const main = SETTINGS_PANES.map(([id, name, , lead], i) => `<section class="settings-pane" id="settings-${id}" data-pane-id="${id}" ${i === 0 ? '' : 'hidden'}><header><button type="button" class="settings-back" aria-label="設定の分類に戻る">‹ 設定</button><h3>${name}</h3><p>${lead}</p></header>${panes[id]}</section>`).join('');
+  modal('設定', `<form id="settings" class="settings" data-stage="list"><nav class="settings-nav" aria-label="設定の分類">${nav}</nav><div class="settings-main">${main}</div></form>`);
+  $('modal').classList.add('settings-dialog');
   const f = $('settings');
-  f.querySelectorAll('[data-settings-target]').forEach(button => button.addEventListener('click', () => {
-    const section = $(button.dataset.settingsTarget);
-    section.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    section.focus({ preventScroll: true });
-  }));
+  const showPane = id => {
+    f.querySelectorAll('.settings-nav [data-pane]').forEach(b => b.classList.toggle('on', b.dataset.pane === id));
+    f.querySelectorAll('.settings-pane').forEach(p => { p.hidden = p.dataset.paneId !== id; });
+    f.dataset.stage = 'pane';
+    f.querySelector('.settings-main').scrollTop = 0;
+    if (id === 'about' && !f.dataset.aboutLoaded) { f.dataset.aboutLoaded = '1'; loadAboutInto($('about-body')); }
+  };
+  f.querySelectorAll('.settings-nav [data-pane]').forEach(b => b.addEventListener('click', () => showPane(b.dataset.pane)));
+  f.querySelectorAll('.settings-back').forEach(b => b.addEventListener('click', () => { f.dataset.stage = 'list'; }));
   f.addEventListener('input', e => {
     const fd = new FormData(f);
     Object.assign(S, { theme: fd.get('theme'), labelScale: +fd.get('labelScale'), packetSpeed: +fd.get('packetSpeed'), defaultView: fd.get('defaultView'), dimension: fd.get('dimension'), dragMode: fd.get('dragMode') });
@@ -1847,7 +1878,19 @@ $('reference-list').addEventListener('click', e => {
   !p.open ? LIB_PROD_OPEN.add(p.dataset.prod) : LIB_PROD_OPEN.delete(p.dataset.prod);
   try { sessionStorage.setItem('ddd.libProd', JSON.stringify([...LIB_PROD_OPEN])); } catch {}
 });
-$('lib-rail').addEventListener('click', e => { const b = e.target.closest('[data-lib-domain]'); if (b) selectLibDomain(b.dataset.libDomain); });
+$('lib-rail').addEventListener('click', e => {
+  const b = e.target.closest('[data-lib-domain]'); if (!b) return;
+  const d = b.dataset.libDomain, body = document.body;
+  if (matchMedia('(max-width:1279px)').matches) {
+    // 狭い画面：列を押すとその分野の一覧が開く。開いている分野をもう一度押すと閉じる（768px 以上）
+    if (body.classList.contains('nav-open') && LIB_SEL.domain === d && matchMedia('(min-width:768px)').matches) return body.classList.remove('nav-open');
+    if (body.classList.contains('detail-open')) $('detail-close').click();
+    body.classList.add('nav-open');
+  } else if (body.classList.contains('nav-closed')) {
+    body.classList.remove('nav-closed'); S.sidebar = true; saveSettings(S);
+  }
+  selectLibDomain(d);
+});
 $('lib-active').addEventListener('click', e => { const b = e.target.closest('[data-lib-kind]'); if (b) selectLibKind(''); });
 $('lib-kinds').addEventListener('click', e => { const b = e.target.closest('[data-lib-kind]'); if (b) selectLibKind(b.dataset.libKind); });
 document.addEventListener('click', e => {
