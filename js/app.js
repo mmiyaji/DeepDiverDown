@@ -634,13 +634,19 @@ const KIND_SHORT = { '製品・技術のアーキテクチャ': '製品', '仕�
 const MINE = '__mine';
 const LIB_PROD_OPEN = new Set((() => { try { return JSON.parse(sessionStorage.getItem('ddd.libProd')) || []; } catch { return []; } })());
 const RAIL_ICONS = {
-  'データ基盤': '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+  'データ処理': '<path d="M4 7h11M4 12h16M4 17h8"/><path d="M15 4l3 3-3 3"/>',
+  'データ保存': '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+  '分析基盤・DWH': '<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
+  'メタデータ・ガバナンス': '<path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/>',
+  'AI・新技術': '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
+  'アプリケーション基盤': '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 8h18M8 21h8"/>',
+  '車載・エッジ': '<path d="M3 14l2-6h14l2 6v4H3z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
   'コンテナ基盤': '<rect x="3" y="7" width="18" height="12" rx="1"/><path d="M7 7V4h10v3M9 11v4M15 11v4"/>',
   '運用基盤': '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>',
   [MINE]: '<path d="M4 20h16M6 16l9-9 3 3-9 9H6z"/>',
 };
 const railIcon = k => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${RAIL_ICONS[k] || '<path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/>'}</svg>`;
-const railLabel = d => ({ 'データ基盤': 'データ', 'コンテナ基盤': 'コンテナ', '運用基盤': '運用' })[d] || d.replace(/基盤$/, '');
+const railLabel = d => ({ 'データ処理': '処理', 'データ保存': '保存', '分析基盤・DWH': '分析', 'メタデータ・ガバナンス': 'メタデータ', 'AI・新技術': 'AI', 'コンテナ基盤': 'コンテナ', '運用基盤': '運用', 'アプリケーション基盤': 'アプリ', '車載・エッジ': '車載' })[d] || d.replace(/基盤$/, '');
 function saveLibSel() { try { sessionStorage.setItem('ddd.libSel', JSON.stringify(LIB_SEL)); } catch {} }
 function renderLibrary() {
   const panel = $('reference-list'), top = $('lib-scroll').scrollTop;
@@ -722,7 +728,10 @@ function libraryGroups(all) {
   for (const [name, list] of prods) {
     const ordered = [...list].sort((a, b) => (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)));
     const overview = ordered[0];
-    const cats = new Set([...list.map(e => e.reference.category || 'その他'), ...(PRODUCT_ALSO[name] || [])]);
+    // 追加で載せる分類は、同じ分野にあるものだけ（分野をまたいで紛れ込ませない）
+    const domain = overview.reference.domain || 'その他';
+    const also = (PRODUCT_ALSO[name] || []).filter(c => REGISTRY.some(r => r.reference?.category === c && (r.reference.domain || 'その他') === domain));
+    const cats = new Set([...list.map(e => e.reference.category || 'その他'), ...also]);
     for (const cat of cats) {
       // その分類では、概要の図と、その分類に属する図だけを見せる
       const here = list.filter(e => e === overview || (e.reference.category || 'その他') === cat);
@@ -818,7 +827,7 @@ function filterLibrary() {
   $('lib-active').innerHTML = conds.map(([label, attr]) => `<button type="button" class="lib-cond" ${attr} aria-label="${esc(label)} の条件を外す">${esc(label)} <span aria-hidden="true">×</span></button>`).join('');
 }
 /* ラベル（提供形態・提供元）で絞り込む。複数選ぶとすべてを持つものだけ */
-const REF_DOMAINS = ['データ基盤', 'コンテナ基盤', '運用基盤'];
+const REF_DOMAINS = ['データ処理', 'データ保存', '分析基盤・DWH', 'メタデータ・ガバナンス', 'AI・新技術', 'コンテナ基盤', '運用基盤', 'アプリケーション基盤', '車載・エッジ'];
 const REF_CATS = [
   '取り込み', 'ストリーム処理', 'バッチ・SQL エンジン', 'テーブル形式とカタログ', 'データカタログ',
   '変換とオーケストレーション', 'クラウド分析基盤', '運用とガバナンス', 'データ配置と読み取り',
