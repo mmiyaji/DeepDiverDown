@@ -111,8 +111,9 @@ export class Scene3D {
       }
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
-      this.labels.render(this.scene, this.camera);
+      // 全体図は、ラベルの位置を書き換える前に処理する（書き換えた後に位置を読むと、再計算が毎フレーム走る）
       this.renderMinimap();
+      this.labels.render(this.scene, this.camera);
       // ラベルの重なりは 2D・3D とも解消する（3D は動かしている間の負荷を抑えて間引く）
       this.labelProjection.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
       const moved = !this.labelProjection.equals(this.lastLabelProjection), now = performance.now();
@@ -150,6 +151,7 @@ export class Scene3D {
   /* ミニマップ：右下に真上からの全体図。クリックでその場所へ視点を移す */
   setMinimap(on) {
     this.miniOn = on;
+    this.miniDirty = true;
     this.labelsDirty = true;
     if (!this.miniEl) {
       this.miniEl = document.createElement('button');
@@ -182,6 +184,7 @@ export class Scene3D {
     this.miniCam.position.set(c.x, box.max.y + 50, c.z); this.miniCam.lookAt(c.x, 0, c.z);
     this.miniCam.updateProjectionMatrix();
     this.miniBounds = { cx: c.x, cz: c.z, hw, hh };
+    this.miniDirty = true;
   }
   renderMinimap() {
     if (!this.miniOn || !this.miniCam || this.el.clientWidth < 520 || (this.flat && this.fitView && this.miniCoversOverview)) {
@@ -200,9 +203,30 @@ export class Scene3D {
     const points = right > left && bottom > top ? minimapViewport(this.camera, this.controls.target.y, this.miniBounds, visible) : null;
     this.miniViewport.setAttribute('points', points ? points.map(([x, y]) => `${x},${y}`).join(' ') : '');
     const r = this.renderer, W = this.el.clientWidth, w = 180, h = 130, x = W - w - 12, y = 12;
+    // 全体図の中身は、図が変わらない限り同じ。毎フレーム全部品を描き直さず、描画結果を使い回す
+    // （パケットが動く間だけ、間引いて更新する）
+    const now = performance.now(), dpr = r.getPixelRatio();
+    const moving = this.packets.length > 0 && this.speed > 0 && now - (this.miniStamp || 0) > 160;
+    if (!this.miniRT || this.miniRT.width !== Math.round(w * dpr)) {
+      this.miniRT?.dispose();
+      this.miniRT = new THREE.WebGLRenderTarget(Math.round(w * dpr), Math.round(h * dpr));
+      this.miniDirty = true;
+    }
+    if (this.miniDirty || moving) {
+      r.setRenderTarget(this.miniRT);
+      r.setClearColor(this.color('--card'), 0.94); r.clear();
+      r.render(this.scene, this.miniCam);
+      r.setRenderTarget(null);
+      this.miniDirty = false; this.miniStamp = now;
+    }
+    if (!this.miniQuad) {
+      this.miniQuadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      this.miniQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ blending: THREE.NoBlending, depthTest: false, depthWrite: false }));
+      this.miniQuadScene = new THREE.Scene(); this.miniQuadScene.add(this.miniQuad);
+    }
+    this.miniQuad.material.map = this.miniRT.texture;
     r.autoClear = false; r.setScissorTest(true); r.setScissor(x, y, w, h); r.setViewport(x, y, w, h);
-    r.setClearColor(this.color('--card'), 0.94); r.clear();
-    r.render(this.scene, this.miniCam);
+    r.render(this.miniQuadScene, this.miniQuadCam);
     r.setScissorTest(false); r.setViewport(0, 0, W, this.el.clientHeight); r.setClearColor(0x000000, 0); r.autoClear = true;
   }
 
@@ -517,8 +541,20 @@ export class Scene3D {
   }
 
   /* ---------- 基本 ---------- */
-  css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'; }
-  color(c) { return new THREE.Color(c.startsWith('--') ? this.css(c) : c); }
+  // CSS 変数の読み取り（getComputedStyle）は 1 回が重い。1 回の描き直しの間は結果を使い回す（begin() で捨てる）
+  css(v) {
+    const cache = this.cssCache ??= new Map();
+    let value = cache.get(v);
+    if (value === undefined) { value = getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'; cache.set(v, value); }
+    return value;
+  }
+  color(c) {
+    const text = c.startsWith('--') ? this.css(c) : c;
+    const cache = this.colorCache ??= new Map();
+    let base = cache.get(text);
+    if (!base) { base = new THREE.Color(text); cache.set(text, base); }
+    return base.clone();
+  }
   mix(a, b, p) { return this.color(b).lerp(this.color(a), p); } // b に a を p の割合で混ぜる
 
   /* ラベルの配置は前回の結果（幅の上限・ずらした量）に左右され、描き直した直後は 1 回では落ち着かないことがある。
@@ -558,6 +594,7 @@ export class Scene3D {
     if (this.labels.domElement.contains(active) && active.dataset.action) this.labelFocus = active.dataset;
     this.root.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => m.dispose()); });
     this.root.clear(); this.lbl.clear(); this.pick = []; this.edgePaths = []; this.packets = [];
+    this.cssCache = null; this.colorCache = null;
     // 描き直した直後の数フレームは、新しいラベルの配置がまだ落ち着かず、台数バッジなどが一瞬見えて消える。
     // 落ち着くまで、直前のラベルの写しを重ねて見せておき、新しいラベルは隠しておく
     const layer = this.labels.domElement;
@@ -569,9 +606,59 @@ export class Scene3D {
     }
     this.gateFrames = 3;
   }
+  /* 動かず、選択もしない不透明な部品（箱・円柱・稜線）を、色ごとに 1 つの描画にまとめる。
+     部品が多い図で描画の呼び出し回数が数百から数十に減り、回転・拡大縮小の 1 フレームあたりの時間が縮む。
+     選択できる部品（this.pick）、動くパケット、透明な部品、破線は、そのまま残す */
+  mergeStatic() {
+    const keep = new Set([...this.pick, ...this.packets.flatMap(p => p.meshes)]);
+    this.root.updateMatrixWorld(true);
+    const toRoot = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
+    const groups = new Map();
+    this.root.traverse(o => {
+      if (keep.has(o) || !o.visible || !(o.isMesh || o.isLineSegments) || o.userData.id) return;
+      const m = o.material, geo = o.geometry;
+      if (!m || Array.isArray(m) || !geo?.attributes.position) return;
+      const lit = m.type === 'MeshLambertMaterial', basic = m.type === 'MeshBasicMaterial', line = m.type === 'LineBasicMaterial';
+      // 透明な箱は、並べ替えの影響が大きいので対象にしない。矢印・接続の帯・影・稜線は、元から原点の位置で並べ替えられるため、まとめても見え方が変わらない
+      if (!(lit || basic || line) || (lit && m.transparent) || m.map || m.vertexColors || (lit && !geo.attributes.normal)) return;
+      if ((line && !o.isLineSegments) || (!line && !o.isMesh)) return;
+      const key = [m.type, m.color.getHex(), m.emissive?.getHex() ?? 0, m.opacity, m.transparent ? 1 : 0, m.side, m.depthWrite, m.depthTest, m.flatShading ? 1 : 0, m.polygonOffset ? m.polygonOffsetFactor : 'x', o.renderOrder].join('|');
+      (groups.get(key) ?? groups.set(key, []).get(key)).push(o);
+    });
+    for (const objects of groups.values()) {
+      if (objects.length < 2) continue;
+      const first = objects[0], lit = first.material.type === 'MeshLambertMaterial';
+      const parts = objects.map(o => {
+        const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(toRoot, o.matrixWorld));
+        return g;
+      });
+      const count = parts.reduce((n, g) => n + g.attributes.position.count, 0);
+      const position = new Float32Array(count * 3), normal = lit ? new Float32Array(count * 3) : null;
+      let offset = 0;
+      for (const g of parts) {
+        position.set(g.attributes.position.array, offset * 3);
+        if (lit) normal.set(g.attributes.normal.array, offset * 3);
+        offset += g.attributes.position.count; g.dispose();
+      }
+      const merged = new THREE.BufferGeometry();
+      merged.setAttribute('position', new THREE.BufferAttribute(position, 3));
+      if (lit) merged.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
+      const mesh = first.isMesh ? new THREE.Mesh(merged, first.material) : new THREE.LineSegments(merged, first.material);
+      mesh.renderOrder = first.renderOrder; mesh.frustumCulled = false;
+      // 両面の透明な板は、裏→表の 2 回描画をやめる（薄い板なので見え方は変わらず、描画の呼び出しが半分になる）
+      if (first.material.transparent && first.material.side === THREE.DoubleSide) first.material.forceSinglePass = true;
+      this.root.add(mesh);
+      for (const o of objects) {
+        o.parent?.remove(o); o.geometry.dispose();
+        if (o.material !== first.material) o.material.dispose();
+      }
+    }
+  }
   end(flat) {
     this.flat = flat;
     this.labelsDirty = true;
+    this.mergeStatic();
     if (!this.fitted || (flat && this.fitView)) { this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true; }
     this.updateMinimapCamera();
   }
@@ -629,7 +716,12 @@ export class Scene3D {
   edges(geo, color, opacity = 1, dashed = false) {
     const m = dashed ? new THREE.LineDashedMaterial({ color, dashSize: 0.12, gapSize: 0.08, transparent: opacity < 1, opacity })
       : new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity });
-    const l = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), m); if (dashed) l.computeLineDistances(); return l;
+    // 稜線の計算（EdgesGeometry）は重い。同じ形（箱・円柱など）の部品が多いので、形が同じなら計算結果を使い回す
+    const key = geo.parameters ? `${geo.type}|${JSON.stringify(geo.parameters)}` : null;
+    const cache = this.edgesCache ??= new Map();
+    let edgesGeo = key && cache.get(key);
+    if (!edgesGeo) { edgesGeo = new THREE.EdgesGeometry(geo, 25); if (key) cache.set(key, edgesGeo); }
+    const l = new THREE.LineSegments(edgesGeo, m); if (dashed) l.computeLineDistances(); return l;
   }
 
   /* ---------- フロア・グループ ---------- */

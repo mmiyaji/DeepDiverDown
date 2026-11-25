@@ -1,5 +1,5 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
-import { Scene3D } from './scene3d.js?v=ns10';
+import { Scene3D } from './scene3d.js?v=perf6';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=compare-layout3';
 import { implementation3D, platformFootprint } from './implementation-3d.js';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
