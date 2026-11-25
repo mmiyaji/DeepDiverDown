@@ -487,6 +487,8 @@ implementations:
       - {id: ex-host-catalog, from: ex-host, to: ex-catalog, label: REST fixture を実行}
       - {id: ex-host-storage, from: ex-host, to: ex-data, label: MinIO のデータを提供}
       - {id: ex-catalog-state, from: ex-catalog, to: ex-catalog-store, label: 表名とメタデータ位置を保存, evidence: [{type: doc, ref: "docs/reference-iceberg-v3-metadata.md#§5"}]}
+    groups:
+      - {kind: datacenter, label: 自前 Linux の Docker ホスト, provider: onprem, tier: [zone0, zone1, zone2, zone3], nodes: [ex-host, ex-catalog, ex-metadata, ex-schema, ex-snapshot, ex-list, ex-data-manifest, ex-data, ex-dictionary, ex-delete-manifest, ex-dv, ex-reader, ex-lineage, ex-catalog-store]}
     layout2d:
       tiers:
         - {id: diagram, label: 実装構成, z: 0, size: [30, 19]}
@@ -507,6 +509,7 @@ implementations:
         ex-lineage: {tier: diagram, x: 20, y: 8}
       groups:
         - {kind: nodegroup, label: "Docker ホストと REST", tier: [diagram], x0: 0, y0: 0, x1: 4, y1: 15, nodes: [ex-host, ex-catalog, ex-catalog-store, ex-reader]}
+        - {kind: datacenter, label: 自前 Linux の Docker ホスト, provider: onprem, tier: [diagram], nodes: [ex-host, ex-catalog, ex-metadata, ex-schema, ex-snapshot, ex-list, ex-data-manifest, ex-data, ex-dictionary, ex-delete-manifest, ex-dv, ex-reader, ex-lineage, ex-catalog-store]}
     layout3d:
       tiers:
         - {id: zone0, label: "Docker ホストと REST", z: 0, origin: [0, 0], size: [5, 12]}
@@ -530,6 +533,7 @@ implementations:
         ex-lineage: {tier: zone3, x: 2, y: 7}
       groups:
         - {kind: nodegroup, label: "Docker ホストと REST", tier: [zone0], nodes: [ex-host, ex-catalog, ex-catalog-store, ex-reader]}
+        - {kind: datacenter, label: 自前 Linux の Docker ホスト, provider: onprem, tier: [zone0, zone1, zone2, zone3], nodes: [ex-host, ex-catalog, ex-metadata, ex-schema, ex-snapshot, ex-list, ex-data-manifest, ex-data, ex-dictionary, ex-delete-manifest, ex-dv, ex-reader, ex-lineage, ex-catalog-store]}
   - id: aws-emr-ec2
     label: "AWS：EMR on EC2 / Spark 4.1・Iceberg v3"
     description: "EMR Spark 8.1.0 の Spark 4.1.1 / Iceberg 1.11.0 で、Glue Data Catalog と S3 に置いた Iceberg v3 テーブルの Variant・行の系譜・削除ベクトルを読む例。"

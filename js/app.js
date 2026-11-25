@@ -12,7 +12,7 @@ import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz3';
 import { productOf, productName, isConcept, shortName, PRODUCT_ALSO } from './products.js?v=4';
-import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=transform1';
+import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=table1';
 import { drawThumbnail } from './home-thumbnail.js';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 

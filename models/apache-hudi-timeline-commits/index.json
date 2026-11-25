@@ -1,0 +1,367 @@
+{
+  "model": "apache-hudi-timeline-commits",
+  "name": "Apache Hudi：タイムラインとコミット",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "Hudi 書き込みジョブ",
+      "status": "claim"
+    },
+    "lock": {
+      "type": "node",
+      "label": "並行書き込みのロック",
+      "status": "claim"
+    },
+    "requested": {
+      "type": "node",
+      "label": "requested の instant",
+      "status": "claim"
+    },
+    "inflight": {
+      "type": "node",
+      "label": "inflight の instant",
+      "status": "claim"
+    },
+    "completed": {
+      "type": "node",
+      "label": "completed の instant",
+      "status": "claim"
+    },
+    "files": {
+      "type": "node",
+      "label": "データファイル",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "クエリエンジン",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "link",
+      "label": "Hudi 書き込みジョブ → requested の instant",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "requested の instant → inflight の instant",
+      "status": "claim"
+    },
+    "write-files": {
+      "type": "link",
+      "label": "Hudi 書き込みジョブ → データファイル",
+      "status": "claim"
+    },
+    "check-conflict": {
+      "type": "link",
+      "label": "Hudi 書き込みジョブ → 並行書き込みのロック",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "inflight の instant → completed の instant",
+      "status": "claim"
+    },
+    "rollback": {
+      "type": "link",
+      "label": "Hudi 書き込みジョブ → inflight の instant",
+      "status": "claim"
+    },
+    "pick": {
+      "type": "link",
+      "label": "completed の instant → クエリエンジン",
+      "status": "claim"
+    },
+    "read-files": {
+      "type": "link",
+      "label": "データファイル → クエリエンジン",
+      "status": "claim"
+    },
+    "write-then-read": {
+      "type": "scenario",
+      "label": "書き込みのコミットと読み取り"
+    },
+    "failed-write": {
+      "type": "scenario",
+      "label": "書き込みの失敗"
+    },
+    "layout": {
+      "type": "unknown",
+      "label": "タイムラインのファイル配置と名前は Hudi のバージョンで異なる。この図は instant の状態の順序だけを扱い、配置は未確認。"
+    },
+    "lock-impl": {
+      "type": "unknown",
+      "label": "ロックプロバイダーの実環境での動作と競合時の再試行は未検証。"
+    },
+    "rollback-timing": {
+      "type": "unknown",
+      "label": "失敗した書き込みを巻き戻す時機と設定は未確認。"
+    },
+    "spark-master": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark master",
+      "realizes": []
+    },
+    "spark-worker": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark worker",
+      "realizes": []
+    },
+    "spark-writer": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark 上の Hudi 書き込みジョブ",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "spark-sql": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark SQL",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "zk-lock": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "ZooKeeper のロック",
+      "realizes": [
+        "lock"
+      ]
+    },
+    "hdfs-requested": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS の .hoodie（requested）",
+      "realizes": [
+        "requested"
+      ]
+    },
+    "hdfs-inflight": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS の .hoodie（inflight）",
+      "realizes": [
+        "inflight"
+      ]
+    },
+    "hdfs-completed": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS の .hoodie（completed）",
+      "realizes": [
+        "completed"
+      ]
+    },
+    "hdfs-data": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS のデータファイル",
+      "realizes": [
+        "files"
+      ]
+    },
+    "aws-emr": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "aws-host": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "aws-writer": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark / Hudi 書き込みジョブ",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "aws-sql": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark SQL / Hudi",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "aws-ddb": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon DynamoDB のロック表",
+      "realizes": [
+        "lock"
+      ]
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3 のテーブルパス",
+      "realizes": []
+    },
+    "aws-requested": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": ".hoodie（requested）",
+      "realizes": [
+        "requested"
+      ]
+    },
+    "aws-inflight": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": ".hoodie（inflight）",
+      "realizes": [
+        "inflight"
+      ]
+    },
+    "aws-completed": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": ".hoodie（completed）",
+      "realizes": [
+        "completed"
+      ]
+    },
+    "aws-data": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "データファイル",
+      "realizes": [
+        "files"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-apache-hudi-timeline-commits.md#§1": [
+      "model"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md": [
+      "model",
+      "writer",
+      "lock",
+      "requested",
+      "inflight",
+      "completed",
+      "files",
+      "reader",
+      "plan",
+      "start",
+      "write-files",
+      "check-conflict",
+      "commit",
+      "rollback",
+      "pick",
+      "read-files",
+      "write-then-read",
+      "failed-write",
+      "spark-master",
+      "spark-worker",
+      "spark-writer",
+      "spark-sql",
+      "zk-lock",
+      "hdfs-requested",
+      "hdfs-inflight",
+      "hdfs-completed",
+      "hdfs-data",
+      "aws-emr",
+      "aws-host",
+      "aws-writer",
+      "aws-sql",
+      "aws-ddb",
+      "aws-s3",
+      "aws-requested",
+      "aws-inflight",
+      "aws-completed",
+      "aws-data"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§7": [
+      "model"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§2": [
+      "writer",
+      "requested",
+      "inflight",
+      "completed",
+      "plan",
+      "start",
+      "commit"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§5": [
+      "lock",
+      "check-conflict"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§3": [
+      "files",
+      "write-files",
+      "write-then-read"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§4": [
+      "reader",
+      "pick",
+      "read-files"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§6": [
+      "rollback",
+      "failed-write"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§8": [
+      "spark-master",
+      "spark-worker",
+      "spark-writer",
+      "spark-sql",
+      "zk-lock",
+      "hdfs-requested",
+      "hdfs-inflight",
+      "hdfs-completed",
+      "hdfs-data"
+    ],
+    "docs/reference-apache-hudi-timeline-commits.md#§9": [
+      "aws-emr",
+      "aws-host",
+      "aws-writer",
+      "aws-sql",
+      "aws-ddb",
+      "aws-s3",
+      "aws-requested",
+      "aws-inflight",
+      "aws-completed",
+      "aws-data"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "テーブル形式とカタログ",
+    "kind": "仕組みの深掘り",
+    "role": "internals",
+    "product": "Apache Hudi",
+    "step": 1,
+    "detailOf": "apache-hudi",
+    "objectives": [
+      "instant の 3 つの状態を、書き込みの進行と対応付ける。",
+      "完了前の書き込みが読み取りに見えない理由を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Apache Hudi Timeline",
+        "url": "https://hudi.apache.org/docs/timeline/"
+      },
+      {
+        "title": "Apache Hudi Concurrency Control",
+        "url": "https://hudi.apache.org/docs/concurrency_control/"
+      }
+    ]
+  }
+}

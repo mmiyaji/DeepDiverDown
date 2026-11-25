@@ -1,0 +1,152 @@
+name: Apache Hudi：Copy-on-Write と Merge-on-Read
+description: CoW は更新のたびにベースファイルを書き直し、MoR はログファイルへ追記してコンパクションでベースへ戻す。読み取りの経路も異なる。
+parent: {model: apache-hudi, node: mor}
+reference:
+  objectives:
+    - CoW と MoR で、1 回の更新が書くファイルの違いを説明する。
+    - MoR のログファイルとコンパクションが読み取りに与える影響を追う。
+  sources:
+    - {title: Apache Hudi Table & Query Types, url: https://hudi.apache.org/docs/table_types/}
+    - {title: Apache Hudi Compaction, url: https://hudi.apache.org/docs/compaction/}
+sources: [docs/reference-apache-hudi-cow-mor-compaction.md]
+evidence: [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§1"}, {type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§7"}]
+tiers: [{id: flow, label: 書き込みの経路と読み取りの経路, z: 0, size: [26, 11]}]
+nodes:
+  input: {label: 更新イベント, kind: external, tier: flow, x: 0, y: 4.5, description: 同じレコードキーへの挿入・更新を届ける。, evidence: &wr [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§2"}]}
+  writer: {label: Hudi 書き込みジョブ, kind: worker, tier: flow, x: 6, y: 4.5, description: 表の種類に応じてベースファイルまたはログファイルへ書く。, evidence: *wr}
+  cow: {label: CoW のベースファイル, kind: file, tier: flow, x: 13, y: 0.5, description: 更新のたびに、該当ファイルの全レコードを新しいバージョンへ書き直す。, evidence: *wr}
+  log: {label: MoR のログファイル, kind: file, tier: flow, x: 13, y: 4.5, description: 更新を追記する。ベースファイルは書き換えない。, evidence: &mor [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§3"}]}
+  base: {label: MoR のベースファイル, kind: file, tier: flow, x: 13, y: 8.5, description: コンパクションまでは前のバージョンのまま残る。, evidence: *mor}
+  plan: {label: コンパクションの計画, kind: file, tier: flow, x: 6, y: 9, description: タイムラインに compaction の instant として記録し、対象のファイルを決める。, evidence: &cp [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§4"}]}
+  compactor: {label: コンパクション処理, kind: worker, tier: flow, x: 20, y: 8.5, description: ベースとログをマージして新しいベースファイルを書く。, evidence: *cp}
+  snap: {label: Snapshot クエリ, kind: service, tier: flow, x: 20, y: 3, description: CoW はベースだけを読む。MoR はベースとログをマージして読む。, evidence: &rd [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§5"}]}
+  ro: {label: Read Optimized クエリ, kind: service, tier: flow, x: 24, y: 6, description: MoR のベースファイルだけを読み、コンパクション済みの内容を返す。, evidence: *rd}
+links:
+  - {id: receive, from: input, to: writer, label: 更新を受ける, evidence: *wr}
+  - {id: cow-rewrite, from: writer, to: cow, label: ベースを書き直す（CoW）, evidence: *wr}
+  - {id: mor-append, from: writer, to: log, label: ログへ追記（MoR）, evidence: *mor}
+  - {id: schedule, from: writer, to: plan, label: コンパクションを計画, evidence: *cp}
+  - {id: run-plan, from: plan, to: compactor, label: 計画を実行, evidence: *cp}
+  - {id: read-log, from: log, to: compactor, label: ログを読む, evidence: *cp}
+  - {id: read-base, from: base, to: compactor, label: 旧ベースを読む, evidence: *cp}
+  - {id: write-base, from: compactor, to: base, label: 新しいベースを書く, evidence: *cp}
+  - {id: snap-cow, from: cow, to: snap, label: ベースを読む, evidence: *rd}
+  - {id: snap-base, from: base, to: snap, label: ベースを読む, evidence: *rd}
+  - {id: snap-log, from: log, to: snap, label: ログをマージして読む, evidence: *rd}
+  - {id: ro-base, from: base, to: ro, label: ベースだけを読む, evidence: *rd}
+scenarios:
+  - id: one-update
+    label: 1 件の更新を CoW と MoR で書く
+    evidence: [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§2"}, {type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§6"}]
+    steps:
+      - {links: [receive], note: 同じレコードキーの更新が届く。}
+      - {links: [cow-rewrite], note: CoW の表では、該当ベースファイルを更新込みで書き直す。書き込みの I/O が大きい。}
+      - {links: [mor-append], note: MoR の表では、ログファイルへ追記するだけでベースは変えない。}
+  - id: read-and-compact
+    label: MoR の読み取りとコンパクション
+    evidence: [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§4"}]
+    steps:
+      - {links: [snap-base, snap-log], note: Snapshot クエリはベースとログをマージして最新の内容を返す。ログが長いほど読み取りの負担が増える。}
+      - {links: [ro-base], note: Read Optimized クエリはベースだけを読む。コンパクションまでの更新は見えない。}
+      - {links: [schedule, run-plan, read-log, read-base, write-base], note: コンパクションがベースとログを新しいベースへまとめ、ログのマージを減らす。}
+unknowns:
+  - {id: trigger, text: コンパクションを起動する条件と、書き込みと同じジョブで動かすか別ジョブにするかの選び方は未確認。, refs: [schedule, run-plan]}
+  - {id: cost, text: 実データでの書き込み量・読み取り時間の差とコンパクションの所要時間は未測定。, refs: [cow-rewrite, mor-append, snap-log]}
+  - {id: file-layout, text: ファイルグループ・ファイルスライスの命名とログの形式の詳細は未確認。, refs: [mor-append, write-base]}
+implementations:
+  - id: hudi-spark
+    label: 自前の Kafka・Spark・HDFS
+    description: Kafka の更新を Spark 上の Hudi Streamer で CoW と MoR の表へ書き、MoR は別の Spark ジョブでコンパクションする。
+    sources:
+      - {title: Apache Hudi Table & Query Types, url: https://hudi.apache.org/docs/table_types/}
+      - {title: Apache Hudi Compaction, url: https://hudi.apache.org/docs/compaction/}
+      - {title: Hudi Streamer Deployment, url: https://hudi.apache.org/docs/deployment/}
+      - {title: Hudi Docker Demo, url: https://hudi.apache.org/docs/docker_demo/}
+    tiers: &cm-2d-tiers [{id: diagram, label: Kafka・Spark・HDFS, z: 0, size: [27, 13]}]
+    nodes:
+      kafka-topic: {label: Kafka の注文更新トピック, kind: queue, tier: diagram, x: 3.5, y: 5, realizes: [input], evidence: &cm-onprem [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§8"}]}
+      spark-streamer: {label: Spark 上の Hudi Streamer, kind: worker, tier: diagram, x: 11, y: 3, realizes: [writer], description: CoW と MoR の別の表へ書く。, evidence: *cm-onprem}
+      spark-compact: {label: Spark のコンパクションジョブ, kind: worker, tier: diagram, x: 11, y: 8.5, realizes: [compactor], description: Streamer と別の Spark ジョブで、MoR の計画済みコンパクションを実行する。, evidence: *cm-onprem}
+      spark-sql-snap: {label: Spark SQL（Snapshot）, kind: service, tier: diagram, x: 11, y: 11, realizes: [snap], evidence: *cm-onprem}
+      spark-sql-ro: {label: Spark SQL（Read Optimized）, kind: service, tier: diagram, x: 5, y: 11, realizes: [ro], evidence: *cm-onprem}
+      hdfs-cow: {label: HDFS の CoW 表, kind: table, tier: diagram, x: 19, y: 1.5, realizes: [cow], evidence: *cm-onprem}
+      hdfs-log: {label: HDFS の MoR 表（ログ）, kind: table, tier: diagram, x: 19, y: 4.5, realizes: [log], evidence: *cm-onprem}
+      hdfs-base: {label: HDFS の MoR 表（ベース）, kind: table, tier: diagram, x: 19, y: 7.5, realizes: [base], evidence: *cm-onprem}
+      hdfs-plan: {label: HDFS の .hoodie（compaction）, kind: file, tier: diagram, x: 23.5, y: 10, realizes: [plan], evidence: *cm-onprem}
+    links: []
+    groups: &cm-2d-groups
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: diagram, x0: -0.5, y0: -0.5, x1: 27, y1: 12.8, nodes: &cm-env [kafka-topic, spark-streamer, spark-compact, spark-sql-snap, spark-sql-ro, hdfs-cow, hdfs-log, hdfs-base, hdfs-plan]}
+      - {kind: cluster, label: Kafka, tier: diagram, x0: 0.5, y0: 3, x1: 7, y1: 7, nodes: [kafka-topic]}
+      - {kind: cluster, label: Spark, tier: diagram, x0: 8, y0: 1.2, x1: 14.5, y1: 12.4, nodes: [spark-streamer, spark-compact, spark-sql-snap]}
+      - {kind: cluster, label: HDFS, tier: diagram, x0: 16.5, y0: 0, x1: 26.5, y1: 11.7, nodes: [hdfs-cow, hdfs-log, hdfs-base, hdfs-plan]}
+    layout2d: {tiers: *cm-2d-tiers, nodes: {}, groups: *cm-2d-groups}
+    layout3d:
+      tiers:
+        - {id: kafka, label: Kafka, z: 0, size: [6, 6]}
+        - {id: spark, label: Spark, z: 0, origin: [7, 0], size: [8, 12]}
+        - {id: hdfs, label: HDFS, z: 0, origin: [16, 0], size: [10, 12]}
+      nodes:
+        kafka-topic: {tier: kafka, x: 3, y: 3}
+        spark-streamer: {tier: spark, x: 4, y: 1.5}
+        spark-compact: {tier: spark, x: 4, y: 5}
+        spark-sql-snap: {tier: spark, x: 2, y: 9}
+        spark-sql-ro: {tier: spark, x: 6, y: 9}
+        hdfs-cow: {tier: hdfs, x: 3, y: 1.5}
+        hdfs-log: {tier: hdfs, x: 3, y: 5}
+        hdfs-base: {tier: hdfs, x: 3, y: 8.5}
+        hdfs-plan: {tier: hdfs, x: 7.5, y: 5}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: [kafka, spark, hdfs], nodes: *cm-env}
+        - {kind: cluster, tier: kafka, nodes: [kafka-topic]}
+        - {kind: cluster, tier: spark, nodes: [spark-streamer, spark-compact, spark-sql-snap, spark-sql-ro]}
+        - {kind: cluster, tier: hdfs, nodes: [hdfs-cow, hdfs-log, hdfs-base, hdfs-plan]}
+  - id: aws-emr-ec2
+    label: AWS：EMR on EC2・MSK・S3
+    description: EMR on EC2 の Spark で Hudi Streamer が MSK の更新を CoW と MoR の S3 プレフィックスへ書き、MoR はコンパクションする。
+    sources:
+      - {title: How Hudi works on Amazon EMR, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-hudi-how-it-works.html}
+      - {title: Apache Hudi Table & Query Types, url: https://hudi.apache.org/docs/table_types/}
+      - {title: Apache Hudi Compaction, url: https://hudi.apache.org/docs/compaction/}
+      - {title: Amazon MSK, url: https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html}
+      - {title: Amazon EMR クラスタの構成, url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers: &cm-aws-tiers [{id: diagram, label: AWS 上の実装構成, z: 0, size: [28, 14]}]
+    nodes:
+      aws-msk: {label: Amazon MSK / 更新トピック, svc: msk, kind: queue, tier: diagram, x: 4, y: 1.5, realizes: [input], description: 上流が生成した更新イベントを Kafka トピックに保持する。, management: {type: shared, scope: AWS は MSK 基盤を運用し、利用者はトピック、データとアクセス権限を管理する。}, evidence: &cm-aws [{type: doc, ref: "docs/reference-apache-hudi-cow-mor-compaction.md#§9"}]}
+      aws-emr: {label: Amazon EMR, svc: emr, kind: service, tier: diagram, x: 10, y: 1.5, description: EC2 クラスタを作成・管理し、Spark の step を受け付ける。, management: {type: shared, scope: AWS は EMR サービスを運用し、利用者はクラスタと step を設定する。}, evidence: *cm-aws}
+      aws-host: {label: Amazon EC2 / YARN, svc: ec2, kind: host, tier: diagram, x: 6, y: 5, description: EMR の EC2 ノードで YARN が Spark の実行リソースを割り当てる。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はクラスタ、ゲスト OS とソフトウェアを管理する。}, evidence: *cm-aws}
+      aws-streamer: {label: Spark / Hudi Streamer, kind: worker, tier: diagram, x: 3.5, y: 9, realizes: [writer], description: MSK の更新を読み、CoW と MoR の別プレフィックスへ書く。, management: {type: customer, scope: 利用者がジョブ、入力と Hudi の設定を管理する。}, evidence: *cm-aws}
+      aws-compact: {label: Hudi コンパクション, kind: worker, tier: diagram, x: 8.5, y: 9, realizes: [compactor], description: MoR を書く Streamer と同じ Spark アプリケーション内の非同期コンパクション、または別の Spark ジョブで動く。, management: {type: customer, scope: 利用者がコンパクションの設定と運用を管理する。}, evidence: *cm-aws}
+      aws-sql: {label: Spark SQL / Hudi, kind: service, tier: diagram, x: 12.5, y: 7, realizes: [snap, ro], description: クエリ方式の設定で Snapshot と Read Optimized を切り替える。, management: {type: customer, scope: 利用者が Spark ジョブとクエリを管理する。}, evidence: *cm-aws}
+      aws-s3: {label: Amazon S3, svc: s3, kind: db, tier: diagram, x: 21, y: 1.5, description: CoW と MoR の表をそれぞれ別のバケットまたはプレフィックスに置く。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。}, evidence: *cm-aws}
+      aws-cow: {label: CoW 表のベースファイル, kind: file, tier: diagram, x: 18, y: 5, realizes: [cow], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *cm-aws}
+      aws-log: {label: MoR 表のログファイル, kind: file, tier: diagram, x: 22, y: 7.5, realizes: [log], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *cm-aws}
+      aws-base: {label: MoR 表のベースファイル, kind: file, tier: diagram, x: 18, y: 10, realizes: [base], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *cm-aws}
+      aws-plan: {label: .hoodie の compaction instant, kind: file, tier: diagram, x: 26, y: 10, realizes: [plan], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *cm-aws}
+    links:
+      - {id: aws-provision, from: aws-emr, to: aws-host, label: クラスタを作成・管理, evidence: *cm-aws}
+      - {id: aws-submit, from: aws-emr, to: aws-streamer, label: Streamer の Spark step を投入, evidence: *cm-aws}
+    groups: &cm-aws-groups
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: diagram, x0: 0.5, y0: -0.5, x1: 27.8, y1: 12.8, nodes: &cm-aws-env [aws-msk, aws-emr, aws-host, aws-streamer, aws-compact, aws-sql, aws-s3, aws-cow, aws-log, aws-base, aws-plan]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 1.2, y0: 3.5, x1: 14.8, y1: 11, nodes: [aws-host, aws-streamer, aws-compact, aws-sql]}
+    layout2d: {tiers: *cm-aws-tiers, nodes: {}, groups: *cm-aws-groups}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [14, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [14, 3]}
+        - {id: services, label: AWS 管理サービスとデータ, z: 0, origin: [16, 0], size: [26, 3]}
+      nodes:
+        aws-host: {tier: cluster, x: 7, y: 1.5}
+        aws-streamer: {tier: apps, x: 2, y: 1.5}
+        aws-compact: {tier: apps, x: 7, y: 1.5}
+        aws-sql: {tier: apps, x: 12, y: 1.5}
+        aws-msk: {tier: services, x: 2, y: 1.5}
+        aws-emr: {tier: services, x: 5, y: 1.5}
+        aws-s3: {tier: services, x: 8, y: 1.5}
+        aws-cow: {tier: services, x: 11, y: 0.5}
+        aws-log: {tier: services, x: 14, y: 1.5}
+        aws-base: {tier: services, x: 11, y: 2.5}
+        aws-plan: {tier: services, x: 18, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [apps, cluster, services], nodes: *cm-aws-env}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-host, aws-streamer, aws-compact, aws-sql]}

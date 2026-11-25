@@ -1,0 +1,147 @@
+name: Apache Hudi：タイムラインとコミット
+description: 書き込みが .hoodie に requested・inflight・completed の instant を順に残し、読み取りは completed の instant でスナップショットを決める。
+parent: {model: apache-hudi, node: timeline}
+reference:
+  objectives:
+    - instant の 3 つの状態を、書き込みの進行と対応付ける。
+    - 完了前の書き込みが読み取りに見えない理由を説明する。
+  sources:
+    - {title: Apache Hudi Timeline, url: https://hudi.apache.org/docs/timeline/}
+    - {title: Apache Hudi Concurrency Control, url: https://hudi.apache.org/docs/concurrency_control/}
+sources: [docs/reference-apache-hudi-timeline-commits.md]
+evidence: [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§1"}, {type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§7"}]
+tiers: [{id: flow, label: instant の進行と読み取り, z: 0, size: [24, 10]}]
+nodes:
+  writer: {label: Hudi 書き込みジョブ, kind: worker, tier: flow, x: 0, y: 4, description: 1 回の書き込みに instant 時刻を 1 つ決め、データファイルとコミットを書く。, evidence: &tl [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§2"}]}
+  lock: {label: 並行書き込みのロック, kind: service, tier: flow, x: 0, y: 8, description: 複数の書き込みジョブが同じ表へコミットするときだけ使う。, evidence: &lk [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§5"}]}
+  requested: {label: requested の instant, kind: file, tier: flow, x: 9, y: 0.5, description: 計画を保持する。この時点ではデータは読み取り対象にならない。, evidence: *tl}
+  inflight: {label: inflight の instant, kind: file, tier: flow, x: 9, y: 4, description: 書き込みの実行中を示す。失敗時はこの状態のまま残る。, evidence: *tl}
+  completed: {label: completed の instant, kind: file, tier: flow, x: 9, y: 7.5, description: コミットの完了を示す。読み取りはこの状態の instant だけを見る。, evidence: *tl}
+  files: {label: データファイル, kind: table, tier: flow, x: 17, y: 1, description: ベースファイルとログファイル。ファイル名に書き込んだ instant 時刻を含む。, evidence: &df [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§3"}]}
+  reader: {label: クエリエンジン, kind: service, tier: flow, x: 17, y: 6, description: 読み取りの開始時に completed の instant を選び、その時点のファイルだけを読む。, evidence: &rd [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§4"}]}
+links:
+  - {id: plan, from: writer, to: requested, label: 書き込みを計画, evidence: *tl}
+  - {id: start, from: requested, to: inflight, label: 実行を開始, evidence: *tl}
+  - {id: write-files, from: writer, to: files, label: ファイルを書く, evidence: *df}
+  - {id: check-conflict, from: writer, to: lock, label: コミット前に競合を確認, evidence: *lk}
+  - {id: commit, from: inflight, to: completed, label: コミットを完了, evidence: *tl}
+  - {id: rollback, from: writer, to: inflight, label: 失敗した書き込みを巻き戻す, evidence: [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§6"}]}
+  - {id: pick, from: completed, to: reader, label: 読み取り時点を渡す, evidence: *rd}
+  - {id: read-files, from: files, to: reader, label: その時点のファイルを読む, evidence: *rd}
+scenarios:
+  - id: write-then-read
+    label: 書き込みのコミットと読み取り
+    evidence: [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§3"}]
+    steps:
+      - {links: [plan, start], note: 書き込みジョブが instant 時刻を決め、requested を作って inflight へ進める。}
+      - {links: [write-files, check-conflict], note: データファイルを書く。複数の書き込みジョブがあるときはコミット前にロックで競合を確認する。}
+      - {links: [commit], note: inflight を completed にする。この瞬間からデータが読み取りに見える。}
+      - {links: [pick, read-files], note: 読み取りは completed の instant を選び、その時点のファイルだけを読む。inflight の書き込みは対象外。}
+  - id: failed-write
+    label: 書き込みの失敗
+    evidence: [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§6"}]
+    steps:
+      - {links: [plan, start, write-files], note: 書き込み中にジョブが止まり、inflight の instant が残る。}
+      - {links: [rollback], note: 次の書き込みが未完了の instant を巻き戻す。読み取りは巻き戻しの前後とも completed だけを見る。}
+unknowns:
+  - {id: layout, text: タイムラインのファイル配置と名前は Hudi のバージョンで異なる。この図は instant の状態の順序だけを扱い、配置は未確認。, refs: [plan, start, commit]}
+  - {id: lock-impl, text: ロックプロバイダーの実環境での動作と競合時の再試行は未検証。, refs: [check-conflict]}
+  - {id: rollback-timing, text: 失敗した書き込みを巻き戻す時機と設定は未確認。, refs: [rollback]}
+implementations:
+  - id: hudi-spark
+    label: 自前の Spark・HDFS・ZooKeeper
+    description: Spark 上の Hudi 書き込みジョブが HDFS の表へ instant とデータファイルを書く。複数ライターは ZooKeeper でロックする。
+    sources:
+      - {title: Apache Hudi Timeline, url: https://hudi.apache.org/docs/timeline/}
+      - {title: Apache Hudi Concurrency Control, url: https://hudi.apache.org/docs/concurrency_control/}
+      - {title: Apache Hudi Docker Demo, url: https://hudi.apache.org/docs/docker_demo/}
+    tiers: &tl-2d-tiers [{id: diagram, label: Spark・HDFS・ZooKeeper, z: 0, size: [26, 13]}]
+    nodes:
+      spark-master: {label: Spark master, kind: scheduler, tier: diagram, x: 6, y: 2, description: Worker へ Executor を割り当てる。, evidence: &tl-impl [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§8"}]}
+      spark-worker: {label: Spark worker, kind: host, tier: diagram, x: 6, y: 5.5, description: 自前 Linux 上で書き込みジョブとクエリの Executor を動かす。, evidence: *tl-impl}
+      spark-writer: {label: Spark 上の Hudi 書き込みジョブ, kind: worker, tier: diagram, x: 3.5, y: 9.5, realizes: [writer], evidence: *tl-impl}
+      spark-sql: {label: Spark SQL, kind: service, tier: diagram, x: 8.5, y: 9.5, realizes: [reader], evidence: *tl-impl}
+      zk-lock: {label: ZooKeeper のロック, kind: service, tier: diagram, x: 13.5, y: 2, realizes: [lock], description: ZooKeeper を使うロックプロバイダーで、複数ライターのコミットを直列化する。, evidence: *tl-impl}
+      hdfs-requested: {label: HDFS の .hoodie（requested）, kind: file, tier: diagram, x: 18.5, y: 1.5, realizes: [requested], evidence: *tl-impl}
+      hdfs-inflight: {label: HDFS の .hoodie（inflight）, kind: file, tier: diagram, x: 18.5, y: 5, realizes: [inflight], evidence: *tl-impl}
+      hdfs-completed: {label: HDFS の .hoodie（completed）, kind: file, tier: diagram, x: 18.5, y: 8.5, realizes: [completed], evidence: *tl-impl}
+      hdfs-data: {label: HDFS のデータファイル, kind: table, tier: diagram, x: 23, y: 5, realizes: [files], evidence: *tl-impl}
+    links:
+      - {id: allocate, from: spark-master, to: spark-worker, label: Executor を割り当てる, evidence: *tl-impl}
+      - {id: run-writer, from: spark-worker, to: spark-writer, label: 書き込みジョブを実行, evidence: *tl-impl}
+      - {id: run-sql, from: spark-worker, to: spark-sql, label: クエリを実行, evidence: *tl-impl}
+    groups: &tl-2d-groups
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: diagram, x0: -0.5, y0: -0.5, x1: 26, y1: 12.5, nodes: &tl-env [spark-master, spark-worker, spark-writer, spark-sql, zk-lock, hdfs-requested, hdfs-inflight, hdfs-completed, hdfs-data]}
+      - {kind: cluster, label: Spark, tier: diagram, x0: 1, y0: 0.5, x1: 11, y1: 11.5, nodes: [spark-master, spark-worker, spark-writer, spark-sql]}
+      - {kind: cluster, label: ZooKeeper, tier: diagram, x0: 12, y0: 0.5, x1: 15.5, y1: 3.5, nodes: [zk-lock]}
+      - {kind: cluster, label: HDFS, tier: diagram, x0: 16.5, y0: 0.2, x1: 25.5, y1: 11.5, nodes: [hdfs-requested, hdfs-inflight, hdfs-completed, hdfs-data]}
+    layout2d: {tiers: *tl-2d-tiers, nodes: {}, groups: *tl-2d-groups}
+    layout3d:
+      tiers:
+        - {id: spark, label: Spark, z: 0, size: [10, 12]}
+        - {id: zk, label: ZooKeeper, z: 0, origin: [11, 0], size: [5, 5]}
+        - {id: hdfs, label: HDFS, z: 0, origin: [17, 0], size: [9, 12]}
+      nodes:
+        spark-master: {tier: spark, x: 5, y: 1.5}
+        spark-worker: {tier: spark, x: 5, y: 5}
+        spark-writer: {tier: spark, x: 2.5, y: 9}
+        spark-sql: {tier: spark, x: 7.5, y: 9}
+        zk-lock: {tier: zk, x: 2.5, y: 2.5}
+        hdfs-requested: {tier: hdfs, x: 2.5, y: 1.5}
+        hdfs-inflight: {tier: hdfs, x: 2.5, y: 5}
+        hdfs-completed: {tier: hdfs, x: 2.5, y: 8.5}
+        hdfs-data: {tier: hdfs, x: 6.5, y: 5}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー群, tier: [spark, zk, hdfs], nodes: *tl-env}
+        - {kind: cluster, tier: spark, nodes: [spark-master, spark-worker, spark-writer, spark-sql]}
+        - {kind: cluster, tier: zk, nodes: [zk-lock]}
+        - {kind: cluster, tier: hdfs, nodes: [hdfs-requested, hdfs-inflight, hdfs-completed, hdfs-data]}
+  - id: aws-emr-ec2
+    label: AWS：EMR on EC2・S3・DynamoDB
+    description: EMR on EC2 の Spark で Hudi 書き込みジョブを動かし、S3 のテーブルパスへ instant とデータファイルを書く。複数ライターは DynamoDB でロックする。
+    sources:
+      - {title: How Hudi works on Amazon EMR, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-hudi-how-it-works.html}
+      - {title: Apache Hudi Timeline, url: https://hudi.apache.org/docs/timeline/}
+      - {title: Apache Hudi Concurrency Control, url: https://hudi.apache.org/docs/concurrency_control/}
+      - {title: Amazon EMR クラスタの構成, url: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers: &tl-aws-tiers [{id: diagram, label: AWS 上の実装構成, z: 0, size: [27, 14]}]
+    nodes:
+      aws-emr: {label: Amazon EMR, svc: emr, kind: service, tier: diagram, x: 4, y: 1.5, description: EC2 クラスタを作成・管理し、Spark の step を受け付ける。, management: {type: shared, scope: AWS は EMR サービスを運用し、利用者はクラスタと step を設定する。}, evidence: &tl-aws [{type: doc, ref: "docs/reference-apache-hudi-timeline-commits.md#§9"}]}
+      aws-host: {label: Amazon EC2 / YARN, svc: ec2, kind: host, tier: diagram, x: 6, y: 5, description: EMR の EC2 ノードで YARN が Spark の実行リソースを割り当てる。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はクラスタ、ゲスト OS とソフトウェアを管理する。}, evidence: *tl-aws}
+      aws-writer: {label: Spark / Hudi 書き込みジョブ, kind: worker, tier: diagram, x: 3.5, y: 9, realizes: [writer], management: {type: customer, scope: 利用者がジョブと Hudi の設定を管理する。}, evidence: *tl-aws}
+      aws-sql: {label: Spark SQL / Hudi, kind: service, tier: diagram, x: 9, y: 9, realizes: [reader], management: {type: customer, scope: 利用者が Spark ジョブとクエリを管理する。}, evidence: *tl-aws}
+      aws-ddb: {label: Amazon DynamoDB のロック表, svc: dynamodb, kind: db, tier: diagram, x: 14, y: 1.5, realizes: [lock], description: DynamoDB を使うロックプロバイダーで、複数ライターのコミットを直列化する。, management: {type: shared, scope: AWS は DynamoDB 基盤を運用し、利用者は表の設定とアクセス権限を管理する。}, evidence: *tl-aws}
+      aws-s3: {label: Amazon S3 のテーブルパス, svc: s3, kind: db, tier: diagram, x: 19, y: 1.5, description: Hudi の表の `.hoodie` とデータファイルを置くバケットとプレフィックス。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。}, evidence: *tl-aws}
+      aws-requested: {label: .hoodie（requested）, kind: file, tier: diagram, x: 16.5, y: 5, realizes: [requested], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *tl-aws}
+      aws-inflight: {label: .hoodie（inflight）, kind: file, tier: diagram, x: 16.5, y: 8, realizes: [inflight], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *tl-aws}
+      aws-completed: {label: .hoodie（completed）, kind: file, tier: diagram, x: 16.5, y: 11, realizes: [completed], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *tl-aws}
+      aws-data: {label: データファイル, kind: table, tier: diagram, x: 22, y: 8, realizes: [files], management: {type: customer, scope: 利用者がテーブルのデータと保持方針を管理する。}, evidence: *tl-aws}
+    links:
+      - {id: aws-provision, from: aws-emr, to: aws-host, label: クラスタを作成・管理, evidence: *tl-aws}
+      - {id: aws-submit, from: aws-emr, to: aws-writer, label: 書き込みの Spark step を投入, evidence: *tl-aws}
+      - {id: aws-run-sql, from: aws-host, to: aws-sql, label: クエリの Executor を割り当てる, evidence: *tl-aws}
+      - {id: aws-store, from: aws-s3, to: aws-requested, label: プレフィックス内の instant, evidence: *tl-aws}
+    groups: &tl-aws-groups
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: diagram, x0: 1, y0: -0.5, x1: 26.5, y1: 12.8, nodes: &tl-aws-env [aws-emr, aws-host, aws-writer, aws-sql, aws-ddb, aws-s3, aws-requested, aws-inflight, aws-completed, aws-data]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 1.8, y0: 3.5, x1: 11.8, y1: 11, nodes: [aws-host, aws-writer, aws-sql]}
+    layout2d: {tiers: *tl-aws-tiers, nodes: {}, groups: *tl-aws-groups}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [12, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [12, 3]}
+        - {id: services, label: AWS 管理サービスとデータ, z: 0, origin: [14, 0], size: [20, 3]}
+      nodes:
+        aws-host: {tier: cluster, x: 6, y: 1.5}
+        aws-writer: {tier: apps, x: 3, y: 1.5}
+        aws-sql: {tier: apps, x: 9, y: 1.5}
+        aws-emr: {tier: services, x: 2, y: 1.5}
+        aws-ddb: {tier: services, x: 5, y: 1.5}
+        aws-s3: {tier: services, x: 8, y: 1.5}
+        aws-requested: {tier: services, x: 11, y: 0.5}
+        aws-inflight: {tier: services, x: 14, y: 1.5}
+        aws-completed: {tier: services, x: 11, y: 2.5}
+        aws-data: {tier: services, x: 17, y: 1.5}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [apps, cluster, services], nodes: *tl-aws-env}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-host, aws-writer, aws-sql]}

@@ -16431,6 +16431,440 @@
           ]
         }
       ]
+    },
+    {
+      "id": "delta-lake-transaction-log",
+      "name": "Delta Lake：トランザクションログとチェックポイント",
+      "description": "_delta_log のコミットを順に再生して表の状態を作り、チェックポイントで再生を短縮し、同時書き込みの競合を検出する。",
+      "domain": "データ保存",
+      "category": "テーブル形式とカタログ",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Linux Foundation"
+      ],
+      "objectives": [
+        "JSON コミットとチェックポイントの役割を区別する。",
+        "読み取り時にログを再生して表の状態を作る手順を追う。",
+        "楽観的並行制御が競合を検出して書き込みを失敗させる流れを追う。"
+      ],
+      "documents": [
+        "docs/reference-delta-lake-transaction-log.md"
+      ],
+      "sources": [
+        {
+          "title": "Delta Transaction Log Protocol",
+          "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
+        },
+        {
+          "title": "Concurrency control",
+          "url": "https://docs.delta.io/latest/concurrency-control.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-emr-ec2",
+          "label": "AWS：EMR on EC2 の Spark・Delta Lake・S3",
+          "sources": [
+            {
+              "title": "Use a Delta Lake cluster with Spark",
+              "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltausing-cluster-spark.html"
+            },
+            {
+              "title": "Delta Lake Storage configuration",
+              "url": "https://docs.delta.io/delta-storage/"
+            },
+            {
+              "title": "Delta Transaction Log Protocol",
+              "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delta-lake-optimize-vacuum",
+      "name": "Delta Lake：コンパクションと古いファイルの削除",
+      "description": "OPTIMIZE で小さなファイルを統合し、VACUUM で保持期間を過ぎた不要ファイルを消す。消したファイルの版へはタイムトラベルできなくなる。",
+      "domain": "データ保存",
+      "category": "テーブル形式とカタログ",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Linux Foundation"
+      ],
+      "objectives": [
+        "OPTIMIZE がファイルを書き換えても表の内容が変わらないことを追う。",
+        "VACUUM が削除する対象と保持期間の関係を区別する。",
+        "VACUUM がタイムトラベルの範囲に与える影響を追う。"
+      ],
+      "documents": [
+        "docs/reference-delta-lake-optimize-vacuum.md"
+      ],
+      "sources": [
+        {
+          "title": "Optimizations (Delta Lake OSS)",
+          "url": "https://docs.delta.io/latest/optimizations-oss.html"
+        },
+        {
+          "title": "Table utility commands",
+          "url": "https://docs.delta.io/latest/delta-utility.html"
+        },
+        {
+          "title": "Concurrency control",
+          "url": "https://docs.delta.io/latest/concurrency-control.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-emr-ec2",
+          "label": "AWS：EMR on EC2 の Spark・Delta Lake・S3",
+          "sources": [
+            {
+              "title": "Use a Delta Lake cluster with Spark",
+              "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltausing-cluster-spark.html"
+            },
+            {
+              "title": "Optimizations (Delta Lake OSS)",
+              "url": "https://docs.delta.io/latest/optimizations-oss.html"
+            },
+            {
+              "title": "Table utility commands",
+              "url": "https://docs.delta.io/latest/delta-utility.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apache-hudi-timeline-commits",
+      "name": "Apache Hudi：タイムラインとコミット",
+      "description": "書き込みが .hoodie に requested・inflight・completed の instant を順に残し、読み取りは completed の instant でスナップショットを決める。",
+      "domain": "データ保存",
+      "category": "テーブル形式とカタログ",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "instant の 3 つの状態を、書き込みの進行と対応付ける。",
+        "完了前の書き込みが読み取りに見えない理由を説明する。"
+      ],
+      "documents": [
+        "docs/reference-apache-hudi-timeline-commits.md"
+      ],
+      "sources": [
+        {
+          "title": "Apache Hudi Timeline",
+          "url": "https://hudi.apache.org/docs/timeline/"
+        },
+        {
+          "title": "Apache Hudi Concurrency Control",
+          "url": "https://hudi.apache.org/docs/concurrency_control/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "hudi-spark",
+          "label": "自前の Spark・HDFS・ZooKeeper",
+          "sources": [
+            {
+              "title": "Apache Hudi Timeline",
+              "url": "https://hudi.apache.org/docs/timeline/"
+            },
+            {
+              "title": "Apache Hudi Concurrency Control",
+              "url": "https://hudi.apache.org/docs/concurrency_control/"
+            },
+            {
+              "title": "Apache Hudi Docker Demo",
+              "url": "https://hudi.apache.org/docs/docker_demo/"
+            }
+          ]
+        },
+        {
+          "id": "aws-emr-ec2",
+          "label": "AWS：EMR on EC2・S3・DynamoDB",
+          "sources": [
+            {
+              "title": "How Hudi works on Amazon EMR",
+              "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-hudi-how-it-works.html"
+            },
+            {
+              "title": "Apache Hudi Timeline",
+              "url": "https://hudi.apache.org/docs/timeline/"
+            },
+            {
+              "title": "Apache Hudi Concurrency Control",
+              "url": "https://hudi.apache.org/docs/concurrency_control/"
+            },
+            {
+              "title": "Amazon EMR クラスタの構成",
+              "url": "https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apache-hudi-cow-mor-compaction",
+      "name": "Apache Hudi：Copy-on-Write と Merge-on-Read",
+      "description": "CoW は更新のたびにベースファイルを書き直し、MoR はログファイルへ追記してコンパクションでベースへ戻す。読み取りの経路も異なる。",
+      "domain": "データ保存",
+      "category": "テーブル形式とカタログ",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "CoW と MoR で、1 回の更新が書くファイルの違いを説明する。",
+        "MoR のログファイルとコンパクションが読み取りに与える影響を追う。"
+      ],
+      "documents": [
+        "docs/reference-apache-hudi-cow-mor-compaction.md"
+      ],
+      "sources": [
+        {
+          "title": "Apache Hudi Table & Query Types",
+          "url": "https://hudi.apache.org/docs/table_types/"
+        },
+        {
+          "title": "Apache Hudi Compaction",
+          "url": "https://hudi.apache.org/docs/compaction/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "hudi-spark",
+          "label": "自前の Kafka・Spark・HDFS",
+          "sources": [
+            {
+              "title": "Apache Hudi Table & Query Types",
+              "url": "https://hudi.apache.org/docs/table_types/"
+            },
+            {
+              "title": "Apache Hudi Compaction",
+              "url": "https://hudi.apache.org/docs/compaction/"
+            },
+            {
+              "title": "Hudi Streamer Deployment",
+              "url": "https://hudi.apache.org/docs/deployment/"
+            },
+            {
+              "title": "Hudi Docker Demo",
+              "url": "https://hudi.apache.org/docs/docker_demo/"
+            }
+          ]
+        },
+        {
+          "id": "aws-emr-ec2",
+          "label": "AWS：EMR on EC2・MSK・S3",
+          "sources": [
+            {
+              "title": "How Hudi works on Amazon EMR",
+              "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-hudi-how-it-works.html"
+            },
+            {
+              "title": "Apache Hudi Table & Query Types",
+              "url": "https://hudi.apache.org/docs/table_types/"
+            },
+            {
+              "title": "Apache Hudi Compaction",
+              "url": "https://hudi.apache.org/docs/compaction/"
+            },
+            {
+              "title": "Amazon MSK",
+              "url": "https://docs.aws.amazon.com/msk/latest/developerguide/what-is-msk.html"
+            },
+            {
+              "title": "Amazon EMR クラスタの構成",
+              "url": "https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-overview.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apache-paimon-architecture",
+      "name": "Apache Paimon の基本アーキテクチャ",
+      "description": "Paimon のテーブルがスナップショット・マニフェスト・データファイルでできていること、Flink などのエンジンとカタログ、ストレージの関係を追う。",
+      "domain": "データ保存",
+      "category": "テーブル形式とカタログ",
+      "kind": "製品・技術のアーキテクチャ",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "テーブルのディレクトリ構成（schema・snapshot・manifest・データファイル）を説明する。",
+        "書き込みと読み取りがスナップショットを境にどう分かれるかを追う。",
+        "カタログとストレージがエンジンとテーブルの間で果たす役割を区別する。"
+      ],
+      "documents": [
+        "docs/reference-apache-paimon-architecture.md"
+      ],
+      "sources": [
+        {
+          "title": "Paimon 2.1 Understand Files",
+          "url": "https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/"
+        },
+        {
+          "title": "Paimon 2.1 Basic Concepts",
+          "url": "https://paimon.apache.org/docs/2.1/concepts/basic-concepts/"
+        },
+        {
+          "title": "Paimon 2.1 Primary-Key Table",
+          "url": "https://paimon.apache.org/docs/2.1/primary-key-table/"
+        },
+        {
+          "title": "Paimon 2.1 Filesystems",
+          "url": "https://paimon.apache.org/docs/2.1/maintenance/filesystems/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "flink-local",
+          "label": "Flink SQL・Paimon ファイルカタログ（ローカル）",
+          "sources": [
+            {
+              "title": "Paimon 2.1 Flink Quick Start",
+              "url": "https://paimon.apache.org/docs/2.1/flink/quick-start/"
+            },
+            {
+              "title": "Paimon 2.1 Understand Files",
+              "url": "https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/"
+            },
+            {
+              "title": "Paimon 2.1 Basic Concepts",
+              "url": "https://paimon.apache.org/docs/2.1/concepts/basic-concepts/"
+            }
+          ]
+        },
+        {
+          "id": "aws-emr-ec2",
+          "label": "AWS：EMR on EC2 / Flink・Paimon・S3",
+          "sources": [
+            {
+              "title": "Apache Flink on Amazon EMR",
+              "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-flink.html"
+            },
+            {
+              "title": "Paimon 2.1 Flink Installation",
+              "url": "https://paimon.apache.org/docs/2.1/flink/installation/"
+            },
+            {
+              "title": "Paimon 2.1 Filesystems",
+              "url": "https://paimon.apache.org/docs/2.1/maintenance/filesystems/"
+            },
+            {
+              "title": "Paimon 2.1 Understand Files",
+              "url": "https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/"
+            },
+            {
+              "title": "Flink 1.20 Amazon S3",
+              "url": "https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/filesystems/s3/"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "apache-paimon-snapshots-manifests",
+      "name": "Apache Paimon：スナップショットとマニフェスト",
+      "description": "スナップショットから manifest list、manifest、データファイルへたどる経路と、コミットがその経路を作る順序を追う。",
+      "domain": "データ保存",
+      "category": "テーブル形式とカタログ",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "スナップショット、manifest list、manifest、データファイルの参照関係を説明する。",
+        "読み取りがディレクトリを一覧せずに有効なファイルを決める手順を追う。",
+        "コミットと期限切れがメタデータの階層に何をするかを区別する。"
+      ],
+      "documents": [
+        "docs/reference-apache-paimon-snapshots-manifests.md"
+      ],
+      "sources": [
+        {
+          "title": "Paimon 2.1 Understand Files",
+          "url": "https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/"
+        },
+        {
+          "title": "Paimon 2.1 Basic Concepts",
+          "url": "https://paimon.apache.org/docs/2.1/concepts/basic-concepts/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "flink-local",
+          "label": "Flink SQL・Paimon ファイルカタログ（ローカル）",
+          "sources": [
+            {
+              "title": "Paimon 2.1 Understand Files",
+              "url": "https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/"
+            },
+            {
+              "title": "Paimon 2.1 Basic Concepts",
+              "url": "https://paimon.apache.org/docs/2.1/concepts/basic-concepts/"
+            },
+            {
+              "title": "Paimon 2.1 Flink Quick Start",
+              "url": "https://paimon.apache.org/docs/2.1/flink/quick-start/"
+            }
+          ]
+        },
+        {
+          "id": "aws-emr-ec2",
+          "label": "AWS：EMR on EC2 / Flink・Paimon・S3",
+          "sources": [
+            {
+              "title": "Apache Flink on Amazon EMR",
+              "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-flink.html"
+            },
+            {
+              "title": "Paimon 2.1 Understand Files",
+              "url": "https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/"
+            },
+            {
+              "title": "Paimon 2.1 Filesystems",
+              "url": "https://paimon.apache.org/docs/2.1/maintenance/filesystems/"
+            },
+            {
+              "title": "Flink 1.20 Amazon S3",
+              "url": "https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/filesystems/s3/"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
     }
   ],
   "history": [

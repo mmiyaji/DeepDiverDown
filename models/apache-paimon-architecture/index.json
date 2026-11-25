@@ -1,0 +1,441 @@
+{
+  "model": "apache-paimon-architecture",
+  "name": "Apache Paimon の基本アーキテクチャ",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "書き込みエンジン（Flink・Spark など）",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "読み取りエンジン",
+      "status": "claim"
+    },
+    "catalog": {
+      "type": "node",
+      "label": "カタログ",
+      "status": "claim"
+    },
+    "schema": {
+      "type": "node",
+      "label": "スキーマ（schema-n）",
+      "status": "claim"
+    },
+    "snapshots": {
+      "type": "node",
+      "label": "スナップショット（snapshot-id）",
+      "status": "claim"
+    },
+    "manifests": {
+      "type": "node",
+      "label": "manifest list と manifest",
+      "status": "claim"
+    },
+    "data": {
+      "type": "node",
+      "label": "データファイル（パーティション・バケット）",
+      "status": "claim"
+    },
+    "compaction": {
+      "type": "node",
+      "label": "LSM コンパクションと変更ログ",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "resolve-write": {
+      "type": "link",
+      "label": "書き込みエンジン（Flink・Spark など） → カタログ",
+      "status": "claim"
+    },
+    "resolve-read": {
+      "type": "link",
+      "label": "読み取りエンジン → カタログ",
+      "status": "claim"
+    },
+    "load-schema": {
+      "type": "link",
+      "label": "カタログ → スキーマ（schema-n）",
+      "status": "claim"
+    },
+    "write-data": {
+      "type": "link",
+      "label": "書き込みエンジン（Flink・Spark など） → データファイル（パーティション・バケット）",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "書き込みエンジン（Flink・Spark など） → スナップショット（snapshot-id）",
+      "status": "claim"
+    },
+    "choose": {
+      "type": "link",
+      "label": "読み取りエンジン → スナップショット（snapshot-id）",
+      "status": "claim"
+    },
+    "follow-list": {
+      "type": "link",
+      "label": "スナップショット（snapshot-id） → manifest list と manifest",
+      "status": "claim"
+    },
+    "follow-files": {
+      "type": "link",
+      "label": "manifest list と manifest → データファイル（パーティション・バケット）",
+      "status": "claim"
+    },
+    "read-data": {
+      "type": "link",
+      "label": "データファイル（パーティション・バケット） → 読み取りエンジン",
+      "status": "claim"
+    },
+    "pick-runs": {
+      "type": "link",
+      "label": "データファイル（パーティション・バケット） → LSM コンパクションと変更ログ",
+      "status": "claim"
+    },
+    "compact-commit": {
+      "type": "link",
+      "label": "LSM コンパクションと変更ログ → スナップショット（snapshot-id）",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "データファイル（パーティション・バケット） → ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "write-read": {
+      "type": "scenario",
+      "label": "テーブルを書いて読む"
+    },
+    "engines": {
+      "type": "unknown",
+      "label": "Flink 以外のエンジン（Spark、Hive、Trino など）の対応範囲と機能差は未確認。"
+    },
+    "catalogs": {
+      "type": "unknown",
+      "label": "ファイルカタログ以外のカタログ種別（REST など）の仕組みと対応エンジンは未確認。"
+    },
+    "runtime": {
+      "type": "unknown",
+      "label": "実環境の書き込み量、コンパクションの負荷、スナップショットの保持量は未検証。"
+    },
+    "loc-jm": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "Flink JobManager",
+      "realizes": []
+    },
+    "loc-writer": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "Flink TaskManager / Paimon Sink",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "loc-reader": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "Flink TaskManager / Paimon Source",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "loc-catalog": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "Paimon ファイルカタログ（warehouse）",
+      "realizes": [
+        "catalog"
+      ]
+    },
+    "loc-schema": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "schema ディレクトリ",
+      "realizes": [
+        "schema"
+      ]
+    },
+    "loc-snapshot": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "snapshot ディレクトリ",
+      "realizes": [
+        "snapshots"
+      ]
+    },
+    "loc-manifest": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "manifest ディレクトリ",
+      "realizes": [
+        "manifests"
+      ]
+    },
+    "loc-data": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "バケットディレクトリのデータファイル",
+      "realizes": [
+        "data"
+      ]
+    },
+    "loc-compact": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "Sink 内の Paimon コンパクション",
+      "realizes": [
+        "compaction"
+      ]
+    },
+    "loc-fs": {
+      "type": "implementation",
+      "impl": "flink-local",
+      "label": "ローカルファイルシステム（file:）",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "aws-control": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "aws-host": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "aws-jm": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Flink JobManager",
+      "realizes": []
+    },
+    "aws-writer": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Flink / Paimon Sink",
+      "realizes": [
+        "writer",
+        "compaction"
+      ]
+    },
+    "aws-reader": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Flink / Paimon Source",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "aws-warehouse": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3 / warehouse",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "aws-catalog": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Paimon ファイルカタログ（s3:// の warehouse）",
+      "realizes": [
+        "catalog"
+      ]
+    },
+    "aws-schema": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "schema プレフィックス",
+      "realizes": [
+        "schema"
+      ]
+    },
+    "aws-snapshot": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "snapshot プレフィックス",
+      "realizes": [
+        "snapshots"
+      ]
+    },
+    "aws-manifest": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "manifest プレフィックス",
+      "realizes": [
+        "manifests"
+      ]
+    },
+    "aws-data": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "バケットのデータファイル",
+      "realizes": [
+        "data"
+      ]
+    },
+    "aws-checkpoint": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3 / Flink チェックポイント",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-apache-paimon-architecture.md#§1": [
+      "model"
+    ],
+    "docs/reference-apache-paimon-architecture.md": [
+      "model",
+      "writer",
+      "reader",
+      "catalog",
+      "schema",
+      "snapshots",
+      "manifests",
+      "data",
+      "compaction",
+      "storage",
+      "resolve-write",
+      "resolve-read",
+      "load-schema",
+      "write-data",
+      "commit",
+      "choose",
+      "follow-list",
+      "follow-files",
+      "read-data",
+      "pick-runs",
+      "compact-commit",
+      "persist",
+      "write-read",
+      "loc-jm",
+      "loc-writer",
+      "loc-reader",
+      "loc-catalog",
+      "loc-schema",
+      "loc-snapshot",
+      "loc-manifest",
+      "loc-data",
+      "loc-compact",
+      "loc-fs",
+      "aws-control",
+      "aws-host",
+      "aws-jm",
+      "aws-writer",
+      "aws-reader",
+      "aws-warehouse",
+      "aws-catalog",
+      "aws-schema",
+      "aws-snapshot",
+      "aws-manifest",
+      "aws-data",
+      "aws-checkpoint"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§2": [
+      "model",
+      "schema",
+      "data"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§3": [
+      "writer",
+      "reader",
+      "write-data",
+      "commit",
+      "read-data"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§6": [
+      "catalog",
+      "storage",
+      "resolve-write",
+      "resolve-read",
+      "load-schema",
+      "persist"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§4": [
+      "snapshots",
+      "manifests",
+      "choose",
+      "follow-list",
+      "follow-files"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§5": [
+      "compaction",
+      "pick-runs",
+      "compact-commit"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§7": [
+      "write-read"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§8": [
+      "loc-jm",
+      "loc-writer",
+      "loc-reader",
+      "loc-catalog",
+      "loc-schema",
+      "loc-snapshot",
+      "loc-manifest",
+      "loc-data",
+      "loc-compact",
+      "loc-fs"
+    ],
+    "docs/reference-apache-paimon-architecture.md#§9": [
+      "aws-control",
+      "aws-host",
+      "aws-jm",
+      "aws-writer",
+      "aws-reader",
+      "aws-warehouse",
+      "aws-catalog",
+      "aws-schema",
+      "aws-snapshot",
+      "aws-manifest",
+      "aws-data",
+      "aws-checkpoint"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "テーブル形式とカタログ",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Apache Paimon",
+    "role": "overview",
+    "objectives": [
+      "テーブルのディレクトリ構成（schema・snapshot・manifest・データファイル）を説明する。",
+      "書き込みと読み取りがスナップショットを境にどう分かれるかを追う。",
+      "カタログとストレージがエンジンとテーブルの間で果たす役割を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Paimon 2.1 Understand Files",
+        "url": "https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/"
+      },
+      {
+        "title": "Paimon 2.1 Basic Concepts",
+        "url": "https://paimon.apache.org/docs/2.1/concepts/basic-concepts/"
+      },
+      {
+        "title": "Paimon 2.1 Primary-Key Table",
+        "url": "https://paimon.apache.org/docs/2.1/primary-key-table/"
+      },
+      {
+        "title": "Paimon 2.1 Filesystems",
+        "url": "https://paimon.apache.org/docs/2.1/maintenance/filesystems/"
+      }
+    ]
+  }
+}

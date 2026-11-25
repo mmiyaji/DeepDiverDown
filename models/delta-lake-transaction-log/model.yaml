@@ -1,0 +1,92 @@
+name: Delta Lake：トランザクションログとチェックポイント
+description: _delta_log のコミットを順に再生して表の状態を作り、チェックポイントで再生を短縮し、同時書き込みの競合を検出する。
+parent: {model: delta-lake, node: log}
+reference:
+  objectives:
+    - JSON コミットとチェックポイントの役割を区別する。
+    - 読み取り時にログを再生して表の状態を作る手順を追う。
+    - 楽観的並行制御が競合を検出して書き込みを失敗させる流れを追う。
+  sources:
+    - {title: Delta Transaction Log Protocol, url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md}
+    - {title: Concurrency control, url: https://docs.delta.io/latest/concurrency-control.html}
+sources: [docs/reference-delta-lake-transaction-log.md]
+evidence: [{type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§8"}, {type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§1"}, {type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§6"}]
+tiers: [{id: flow, label: コミット・再生・競合検出, z: 0, size: [24, 10]}]
+nodes:
+  writer: {label: 書き込みエンジン, kind: service, tier: flow, x: 0, y: 3, description: 読んだバージョンを基準に新しいデータファイルを書き、コミットを試みる。, evidence: &tl-commit [{type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§2"}]}
+  data: {label: 新しいデータファイル, kind: file, tier: flow, x: 0, y: 7, evidence: *tl-commit}
+  conflict: {label: 競合の検査, kind: worker, tier: flow, x: 8, y: 3, description: 読んだバージョン以降に入ったコミットを調べ、読んだファイルと衝突すれば失敗させる。, evidence: &tl-occ [{type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§5"}]}
+  commits: {label: JSON コミットファイル, kind: queue, tier: flow, x: 8, y: 7, description: バージョン番号を名前に持つ JSON。add・remove・metaData などのアクションを持つ。, evidence: *tl-commit}
+  checkpoint: {label: チェックポイント（Parquet）, kind: file, tier: flow, x: 16, y: 7, description: あるバージョンまでの有効なアクションをまとめる。, evidence: &tl-cp [{type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§4"}]}
+  hint: {label: _last_checkpoint, kind: file, tier: flow, x: 16, y: 3, description: 最新のチェックポイントの位置を示す。, evidence: *tl-cp}
+  snapshot: {label: 再生した表の状態, kind: db, tier: flow, x: 20, y: 0, description: 有効なデータファイルの集合とメタデータ。, evidence: &tl-replay [{type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§3"}]}
+  reader: {label: 読み取りエンジン, kind: service, tier: flow, x: 20, y: 5, evidence: *tl-replay}
+links:
+  - {id: write-files, from: writer, to: data, label: データファイルを書く, evidence: *tl-commit}
+  - {id: read-latest, from: commits, to: conflict, label: 読んだ後のコミットを取得, evidence: *tl-occ}
+  - {id: validate, from: writer, to: conflict, label: コミットを検査へ回す, evidence: *tl-occ}
+  - {id: commit, from: conflict, to: commits, label: 次のバージョンを作成, evidence: *tl-commit}
+  - {id: checkpointing, from: commits, to: checkpoint, label: 状態をチェックポイント化, evidence: *tl-cp}
+  - {id: record-hint, from: checkpoint, to: hint, label: 位置を記録, evidence: *tl-cp}
+  - {id: find-start, from: hint, to: snapshot, label: 再生の起点を渡す, evidence: *tl-replay}
+  - {id: load-cp, from: checkpoint, to: snapshot, label: 起点の状態を読む, evidence: *tl-replay}
+  - {id: replay, from: commits, to: snapshot, label: 後続コミットを順に適用, evidence: *tl-replay}
+  - {id: read-table, from: snapshot, to: reader, label: 有効ファイルを渡す, evidence: *tl-replay}
+  - {id: scan, from: data, to: reader, label: 対象ファイルを読む, evidence: *tl-replay}
+scenarios:
+  - id: commit-and-read
+    label: 競合を検査してコミットし、再生して読む
+    evidence: [{type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§6"}]
+    steps:
+      - {links: [write-files, validate, read-latest], note: データファイルを書き、読んだ後に入ったコミットを検査する。}
+      - {links: [commit, checkpointing, record-hint], note: 競合がなければ次のバージョンを作り、必要に応じてチェックポイントを書く。}
+      - {links: [find-start, load-cp, replay, read-table, scan], note: 読み手はチェックポイントから後続コミットを再生し、有効ファイルを読む。}
+unknowns:
+  - {id: unverified, text: チェックポイントを書く間隔の既定値、競合時の再試行方針、実環境の動作は未確認。, refs: [checkpointing, validate]}
+implementations:
+  - id: aws-emr-ec2
+    label: AWS：EMR on EC2 の Spark・Delta Lake・S3
+    description: EMR on EC2 の Spark が Delta テーブルを S3 に書き、同じプレフィックスの _delta_log を再生して読む。
+    sources:
+      - {title: Use a Delta Lake cluster with Spark, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltausing-cluster-spark.html}
+      - {title: Delta Lake Storage configuration, url: https://docs.delta.io/delta-storage/}
+      - {title: Delta Transaction Log Protocol, url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers: &tl-2d-tiers [{id: diagram, label: EMR と S3 の Delta テーブル, z: 0, size: [24, 12]}]
+    nodes:
+      emr: {label: Amazon EMR, svc: emr, kind: service, tier: diagram, x: 3, y: 1, description: EC2 クラスタを作成し、Spark のステップを受け付ける。, management: {type: shared, scope: AWS は EMR サービスを運用し、利用者はクラスタ構成とステップを指定する。}, evidence: &tl-impl [{type: doc, ref: "docs/reference-delta-lake-transaction-log.md#§7"}]}
+      ec2: {label: Amazon EC2 / YARN, svc: ec2, kind: host, tier: diagram, x: 3, y: 4, description: YARN が Spark の実行リソースを割り当てる。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はクラスタ構成とソフトウェアを管理する。}, evidence: *tl-impl}
+      spark-writer: {label: Spark の書き込みジョブ, kind: worker, tier: diagram, x: 2, y: 8, realizes: [writer], management: {type: customer, scope: 利用者が Spark ジョブと Delta の設定を管理する。}, evidence: *tl-impl}
+      spark-commit: {label: Delta のコミット処理（競合検査）, kind: worker, tier: diagram, x: 6, y: 8, realizes: [conflict], description: Spark 内の Delta ライブラリがコミット前に競合を検査する。, management: {type: customer, scope: 利用者が Delta のバージョンと設定を管理する。}, evidence: *tl-impl}
+      spark-reader: {label: Spark の読み取りジョブ（ログ再生）, kind: worker, tier: diagram, x: 10, y: 8, realizes: [reader, snapshot], management: {type: customer, scope: 利用者が Spark ジョブと Delta の設定を管理する。}, evidence: *tl-impl}
+      s3: {label: Amazon S3, svc: s3, kind: db, tier: diagram, x: 16, y: 1.5, description: Delta テーブルのプレフィックスを保持する。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータ、暗号化、権限を管理する。}, evidence: *tl-impl}
+      s3-data: {label: Parquet データファイル, kind: file, tier: diagram, x: 15, y: 5, realizes: [data], management: {type: customer, scope: 利用者がデータと保持方針を管理する。}, evidence: *tl-impl}
+      s3-commits: {label: _delta_log の JSON コミット, kind: file, tier: diagram, x: 19, y: 5, realizes: [commits], management: {type: customer, scope: 利用者がログと保持方針を管理する。}, evidence: *tl-impl}
+      s3-cp: {label: チェックポイントと _last_checkpoint, kind: file, tier: diagram, x: 19, y: 9, realizes: [checkpoint, hint], management: {type: customer, scope: 利用者がログと保持方針を管理する。}, evidence: *tl-impl}
+    links:
+      - {id: i-provision, from: emr, to: ec2, label: クラスタを作成, evidence: *tl-impl}
+      - {id: i-run-w, from: ec2, to: spark-writer, label: 書き込みジョブを実行, evidence: *tl-impl}
+      - {id: i-run-r, from: ec2, to: spark-reader, label: 読み取りジョブを実行, evidence: *tl-impl}
+      - {id: i-store, from: s3, to: s3-data, label: テーブルのプレフィックスに保存, evidence: *tl-impl}
+      - {id: i-store-log, from: s3, to: s3-commits, label: 同じプレフィックスにログを保存, evidence: *tl-impl}
+    groups: &tl-2d-groups
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: -0.5, y0: -0.5, x1: 23.5, y1: 11, nodes: &tl-env [emr, ec2, spark-writer, spark-commit, spark-reader, s3, s3-data, s3-commits, s3-cp]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 0.3, y0: 3, x1: 12, y1: 10, nodes: [ec2, spark-writer, spark-commit, spark-reader]}
+    layout2d: {tiers: *tl-2d-tiers, nodes: {}, groups: *tl-2d-groups}
+    layout3d:
+      tiers:
+        - {id: apps, label: Spark ジョブ, z: 1, size: [14, 3]}
+        - {id: infra, label: EMR・EC2・S3, z: 0, size: [14, 4]}
+      nodes:
+        emr: {tier: infra, x: 1, y: 1}
+        ec2: {tier: infra, x: 4, y: 2}
+        spark-writer: {tier: apps, x: 1, y: 1.5}
+        spark-commit: {tier: apps, x: 5, y: 1.5}
+        spark-reader: {tier: apps, x: 9, y: 1.5}
+        s3: {tier: infra, x: 8, y: 0.5}
+        s3-data: {tier: infra, x: 8, y: 2}
+        s3-commits: {tier: infra, x: 11, y: 2}
+        s3-cp: {tier: infra, x: 11, y: 3.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, infra], nodes: *tl-env}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, infra], nodes: [ec2, spark-writer, spark-commit, spark-reader]}

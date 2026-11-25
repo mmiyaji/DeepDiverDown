@@ -1,0 +1,294 @@
+{
+  "model": "delta-lake-optimize-vacuum",
+  "name": "Delta Lake：コンパクションと古いファイルの削除",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "small": {
+      "type": "node",
+      "label": "小さなデータファイル群",
+      "status": "claim"
+    },
+    "optimize": {
+      "type": "node",
+      "label": "OPTIMIZE ジョブ",
+      "status": "claim"
+    },
+    "compact": {
+      "type": "node",
+      "label": "統合したデータファイル",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "_delta_log",
+      "status": "claim"
+    },
+    "stale": {
+      "type": "node",
+      "label": "remove 済みの古いファイル",
+      "status": "claim"
+    },
+    "retention": {
+      "type": "node",
+      "label": "保持期間の設定",
+      "status": "claim"
+    },
+    "vacuum": {
+      "type": "node",
+      "label": "VACUUM ジョブ",
+      "status": "claim"
+    },
+    "timetravel": {
+      "type": "node",
+      "label": "過去版の読み取り",
+      "status": "claim"
+    },
+    "read-small": {
+      "type": "link",
+      "label": "小さなデータファイル群 → OPTIMIZE ジョブ",
+      "status": "claim"
+    },
+    "write-compact": {
+      "type": "link",
+      "label": "OPTIMIZE ジョブ → 統合したデータファイル",
+      "status": "claim"
+    },
+    "commit-opt": {
+      "type": "link",
+      "label": "OPTIMIZE ジョブ → _delta_log",
+      "status": "claim"
+    },
+    "list-stale": {
+      "type": "link",
+      "label": "remove 済みの古いファイル → VACUUM ジョブ",
+      "status": "claim"
+    },
+    "check-refs": {
+      "type": "link",
+      "label": "_delta_log → VACUUM ジョブ",
+      "status": "claim"
+    },
+    "apply-retention": {
+      "type": "link",
+      "label": "保持期間の設定 → VACUUM ジョブ",
+      "status": "claim"
+    },
+    "delete-stale": {
+      "type": "link",
+      "label": "VACUUM ジョブ → remove 済みの古いファイル",
+      "status": "claim"
+    },
+    "replay-version": {
+      "type": "link",
+      "label": "_delta_log → 過去版の読み取り",
+      "status": "claim"
+    },
+    "read-old": {
+      "type": "link",
+      "label": "remove 済みの古いファイル → 過去版の読み取り",
+      "status": "claim"
+    },
+    "read-new": {
+      "type": "link",
+      "label": "統合したデータファイル → 過去版の読み取り",
+      "status": "claim"
+    },
+    "compact-and-clean": {
+      "type": "scenario",
+      "label": "統合し、期間を過ぎたファイルを消す"
+    },
+    "unverified": {
+      "type": "unknown",
+      "label": "OPTIMIZE の既定の目標ファイルサイズ、書き込みとの競合の頻度、実環境の所要時間は未確認。"
+    },
+    "emr": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "ec2": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "spark-optimize": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark の OPTIMIZE ジョブ",
+      "realizes": [
+        "optimize"
+      ]
+    },
+    "spark-vacuum": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark の VACUUM ジョブ",
+      "realizes": [
+        "vacuum"
+      ]
+    },
+    "spark-read": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark のバージョン指定読み取り",
+      "realizes": [
+        "timetravel"
+      ]
+    },
+    "s3": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3",
+      "realizes": []
+    },
+    "s3-small": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "統合前の Parquet ファイル",
+      "realizes": [
+        "small",
+        "stale"
+      ]
+    },
+    "s3-compact": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "統合後の Parquet ファイル",
+      "realizes": [
+        "compact"
+      ]
+    },
+    "s3-log": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "_delta_log",
+      "realizes": [
+        "log"
+      ]
+    },
+    "table-props": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "テーブルプロパティの保持期間",
+      "realizes": [
+        "retention"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-delta-lake-optimize-vacuum.md#§5": [
+      "model"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md": [
+      "model",
+      "small",
+      "optimize",
+      "compact",
+      "log",
+      "stale",
+      "retention",
+      "vacuum",
+      "timetravel",
+      "read-small",
+      "write-compact",
+      "commit-opt",
+      "list-stale",
+      "check-refs",
+      "apply-retention",
+      "delete-stale",
+      "replay-version",
+      "read-old",
+      "read-new",
+      "compact-and-clean",
+      "emr",
+      "ec2",
+      "spark-optimize",
+      "spark-vacuum",
+      "spark-read",
+      "s3",
+      "s3-small",
+      "s3-compact",
+      "s3-log",
+      "table-props"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md#§8": [
+      "model"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md#§1": [
+      "model"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md#§6": [
+      "model",
+      "compact-and-clean"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md#§2": [
+      "small",
+      "optimize",
+      "compact",
+      "log",
+      "read-small",
+      "write-compact",
+      "commit-opt"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md#§3": [
+      "stale",
+      "retention",
+      "vacuum",
+      "list-stale",
+      "check-refs",
+      "apply-retention",
+      "delete-stale"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md#§4": [
+      "timetravel",
+      "replay-version",
+      "read-old",
+      "read-new"
+    ],
+    "docs/reference-delta-lake-optimize-vacuum.md#§7": [
+      "emr",
+      "ec2",
+      "spark-optimize",
+      "spark-vacuum",
+      "spark-read",
+      "s3",
+      "s3-small",
+      "s3-compact",
+      "s3-log",
+      "table-props"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "テーブル形式とカタログ",
+    "kind": "仕組みの深掘り",
+    "role": "internals",
+    "product": "Delta Lake",
+    "step": 2,
+    "detailOf": "delta-lake",
+    "objectives": [
+      "OPTIMIZE がファイルを書き換えても表の内容が変わらないことを追う。",
+      "VACUUM が削除する対象と保持期間の関係を区別する。",
+      "VACUUM がタイムトラベルの範囲に与える影響を追う。"
+    ],
+    "sources": [
+      {
+        "title": "Optimizations (Delta Lake OSS)",
+        "url": "https://docs.delta.io/latest/optimizations-oss.html"
+      },
+      {
+        "title": "Table utility commands",
+        "url": "https://docs.delta.io/latest/delta-utility.html"
+      },
+      {
+        "title": "Concurrency control",
+        "url": "https://docs.delta.io/latest/concurrency-control.html"
+      }
+    ]
+  }
+}

@@ -1,0 +1,94 @@
+name: Delta Lake：コンパクションと古いファイルの削除
+description: OPTIMIZE で小さなファイルを統合し、VACUUM で保持期間を過ぎた不要ファイルを消す。消したファイルの版へはタイムトラベルできなくなる。
+parent: {model: delta-lake, node: data}
+reference:
+  objectives:
+    - OPTIMIZE がファイルを書き換えても表の内容が変わらないことを追う。
+    - VACUUM が削除する対象と保持期間の関係を区別する。
+    - VACUUM がタイムトラベルの範囲に与える影響を追う。
+  sources:
+    - {title: Optimizations (Delta Lake OSS), url: https://docs.delta.io/latest/optimizations-oss.html}
+    - {title: Table utility commands, url: https://docs.delta.io/latest/delta-utility.html}
+    - {title: Concurrency control, url: https://docs.delta.io/latest/concurrency-control.html}
+sources: [docs/reference-delta-lake-optimize-vacuum.md]
+evidence: [{type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§5"}, {type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§8"}, {type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§1"}, {type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§6"}]
+tiers: [{id: flow, label: 統合・削除・過去版の読み取り, z: 0, size: [24, 10]}]
+nodes:
+  small: {label: 小さなデータファイル群, kind: file, tier: flow, x: 0, y: 1, evidence: &ov-opt [{type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§2"}]}
+  optimize: {label: OPTIMIZE ジョブ, kind: worker, tier: flow, x: 7, y: 1, description: 小さなファイルを読み、統合して書き直す。ZORDER BY を付けると列の値が近い行を同じファイルに集める。, evidence: *ov-opt}
+  compact: {label: 統合したデータファイル, kind: file, tier: flow, x: 14, y: 1, evidence: *ov-opt}
+  log: {label: _delta_log, kind: queue, tier: flow, x: 14, y: 5, description: add と remove を記録し、どのファイルが有効かを決める。, evidence: *ov-opt}
+  stale: {label: remove 済みの古いファイル, kind: file, tier: flow, x: 0, y: 5, description: ログ上は無効だが、VACUUM まで物理的に残る。, evidence: &ov-vac [{type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§3"}]}
+  retention: {label: 保持期間の設定, kind: db, tier: flow, x: 7, y: 8, description: VACUUM が削除してよいファイルの古さを決める。, evidence: *ov-vac}
+  vacuum: {label: VACUUM ジョブ, kind: worker, tier: flow, x: 7, y: 5, description: ログが参照しない古いファイルを保持期間に従って削除する。自動では動かない。, evidence: *ov-vac}
+  timetravel: {label: 過去版の読み取り, kind: service, tier: flow, x: 20, y: 5, description: 指定したバージョンの有効ファイルを選んで読む。, evidence: &ov-tt [{type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§4"}]}
+links:
+  - {id: read-small, from: small, to: optimize, label: 小さなファイルを読む, evidence: *ov-opt}
+  - {id: write-compact, from: optimize, to: compact, label: 統合したファイルを書く, evidence: *ov-opt}
+  - {id: commit-opt, from: optimize, to: log, label: add と remove をコミット, evidence: *ov-opt}
+  - {id: list-stale, from: stale, to: vacuum, label: 削除候補を列挙, evidence: *ov-vac}
+  - {id: check-refs, from: log, to: vacuum, label: 参照中のファイルを判定, evidence: *ov-vac}
+  - {id: apply-retention, from: retention, to: vacuum, label: 保持期間を適用, evidence: *ov-vac}
+  - {id: delete-stale, from: vacuum, to: stale, label: 期間を過ぎたファイルを削除, evidence: *ov-vac}
+  - {id: replay-version, from: log, to: timetravel, label: 指定バージョンを再生, evidence: *ov-tt}
+  - {id: read-old, from: stale, to: timetravel, label: 過去版のファイルを読む, evidence: *ov-tt}
+  - {id: read-new, from: compact, to: timetravel, label: 現在版のファイルを読む, evidence: *ov-tt}
+scenarios:
+  - id: compact-and-clean
+    label: 統合し、期間を過ぎたファイルを消す
+    evidence: [{type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§6"}]
+    steps:
+      - {links: [read-small, write-compact, commit-opt], note: 小さなファイルを統合し、add と remove を新しいバージョンとしてコミットする。}
+      - {links: [list-stale, check-refs, apply-retention, delete-stale], note: 保持期間を過ぎ、ログが参照しないファイルだけを削除する。}
+      - {links: [replay-version, read-old, read-new], note: 削除前のバージョンは旧ファイルを読めるが、削除後は読めない。}
+unknowns:
+  - {id: unverified, text: OPTIMIZE の既定の目標ファイルサイズ、書き込みとの競合の頻度、実環境の所要時間は未確認。, refs: [write-compact, commit-opt]}
+implementations:
+  - id: aws-emr-ec2
+    label: AWS：EMR on EC2 の Spark・Delta Lake・S3
+    description: EMR on EC2 の Spark で OPTIMIZE と VACUUM を実行し、S3 の Delta テーブルのファイルを統合・削除する。
+    sources:
+      - {title: Use a Delta Lake cluster with Spark, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/Deltausing-cluster-spark.html}
+      - {title: Optimizations (Delta Lake OSS), url: https://docs.delta.io/latest/optimizations-oss.html}
+      - {title: Table utility commands, url: https://docs.delta.io/latest/delta-utility.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers: &ov-2d-tiers [{id: diagram, label: EMR と S3 の Delta テーブル, z: 0, size: [24, 12]}]
+    nodes:
+      emr: {label: Amazon EMR, svc: emr, kind: service, tier: diagram, x: 3, y: 1, description: EC2 クラスタを作成し、Spark のステップを受け付ける。, management: {type: shared, scope: AWS は EMR サービスを運用し、利用者はクラスタ構成とステップを指定する。}, evidence: &ov-impl [{type: doc, ref: "docs/reference-delta-lake-optimize-vacuum.md#§7"}]}
+      ec2: {label: Amazon EC2 / YARN, svc: ec2, kind: host, tier: diagram, x: 3, y: 4, description: YARN が Spark の実行リソースを割り当てる。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はクラスタ構成とソフトウェアを管理する。}, evidence: *ov-impl}
+      spark-optimize: {label: Spark の OPTIMIZE ジョブ, kind: worker, tier: diagram, x: 2, y: 8, realizes: [optimize], management: {type: customer, scope: 利用者がジョブの実行時刻と対象を管理する。}, evidence: *ov-impl}
+      spark-vacuum: {label: Spark の VACUUM ジョブ, kind: worker, tier: diagram, x: 6, y: 8, realizes: [vacuum], management: {type: customer, scope: 利用者がジョブの実行時刻と保持期間を管理する。}, evidence: *ov-impl}
+      spark-read: {label: Spark のバージョン指定読み取り, kind: worker, tier: diagram, x: 10, y: 8, realizes: [timetravel], management: {type: customer, scope: 利用者が Spark ジョブを管理する。}, evidence: *ov-impl}
+      s3: {label: Amazon S3, svc: s3, kind: db, tier: diagram, x: 16, y: 1.5, description: Delta テーブルのプレフィックスを保持する。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータ、暗号化、権限を管理する。}, evidence: *ov-impl}
+      s3-small: {label: 統合前の Parquet ファイル, kind: file, tier: diagram, x: 14, y: 5, realizes: [small, stale], management: {type: customer, scope: 利用者がデータと保持方針を管理する。}, evidence: *ov-impl}
+      s3-compact: {label: 統合後の Parquet ファイル, kind: file, tier: diagram, x: 18, y: 5, realizes: [compact], management: {type: customer, scope: 利用者がデータと保持方針を管理する。}, evidence: *ov-impl}
+      s3-log: {label: _delta_log, kind: file, tier: diagram, x: 22, y: 5, realizes: [log], management: {type: customer, scope: 利用者がログと保持方針を管理する。}, evidence: *ov-impl}
+      table-props: {label: テーブルプロパティの保持期間, kind: db, tier: diagram, x: 18, y: 9, realizes: [retention], description: ログに記録されるテーブル設定。VACUUM のコマンドで期間を指定することもできる。, management: {type: customer, scope: 利用者が保持期間を決める。}, evidence: *ov-impl}
+    links:
+      - {id: i-provision, from: emr, to: ec2, label: クラスタを作成, evidence: *ov-impl}
+      - {id: i-run-o, from: ec2, to: spark-optimize, label: OPTIMIZE を実行, evidence: *ov-impl}
+      - {id: i-run-v, from: ec2, to: spark-vacuum, label: VACUUM を実行, evidence: *ov-impl}
+      - {id: i-store, from: s3, to: s3-small, label: テーブルのプレフィックスに保存, evidence: *ov-impl}
+      - {id: i-store-log, from: s3, to: s3-log, label: 同じプレフィックスにログを保存, evidence: *ov-impl}
+    groups: &ov-2d-groups
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: -0.5, y0: -0.5, x1: 23.5, y1: 11, nodes: &ov-env [emr, ec2, spark-optimize, spark-vacuum, spark-read, s3, s3-small, s3-compact, s3-log, table-props]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 0.3, y0: 3, x1: 12, y1: 10, nodes: [ec2, spark-optimize, spark-vacuum, spark-read]}
+    layout2d: {tiers: *ov-2d-tiers, nodes: {}, groups: *ov-2d-groups}
+    layout3d:
+      tiers:
+        - {id: apps, label: Spark ジョブ, z: 1, size: [14, 3]}
+        - {id: infra, label: EMR・EC2・S3, z: 0, size: [14, 4]}
+      nodes:
+        emr: {tier: infra, x: 1, y: 1}
+        ec2: {tier: infra, x: 4, y: 2}
+        spark-optimize: {tier: apps, x: 1, y: 1.5}
+        spark-vacuum: {tier: apps, x: 5, y: 1.5}
+        spark-read: {tier: apps, x: 9, y: 1.5}
+        s3: {tier: infra, x: 8, y: 0.5}
+        s3-small: {tier: infra, x: 6, y: 2}
+        s3-compact: {tier: infra, x: 9, y: 2}
+        s3-log: {tier: infra, x: 12, y: 2}
+        table-props: {tier: infra, x: 11, y: 3.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, infra], nodes: *ov-env}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, infra], nodes: [ec2, spark-optimize, spark-vacuum, spark-read]}

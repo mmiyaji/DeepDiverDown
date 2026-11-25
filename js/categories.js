@@ -50,4 +50,5 @@ export const CATEGORY_DOCS = {
   'バッチ・SQL エンジン': 'batch-sql',
   'ストリーム処理': 'stream',
   '変換とオーケストレーション': 'transform',
+  'テーブル形式とカタログ': 'table-catalog',
 };

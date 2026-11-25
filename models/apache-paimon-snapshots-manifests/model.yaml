@@ -1,0 +1,188 @@
+name: "Apache Paimon：スナップショットとマニフェスト"
+description: スナップショットから manifest list、manifest、データファイルへたどる経路と、コミットがその経路を作る順序を追う。
+parent: {model: apache-paimon-architecture, node: snapshots}
+reference:
+  objectives:
+    - スナップショット、manifest list、manifest、データファイルの参照関係を説明する。
+    - 読み取りがディレクトリを一覧せずに有効なファイルを決める手順を追う。
+    - コミットと期限切れがメタデータの階層に何をするかを区別する。
+  sources:
+    - {title: Paimon 2.1 Understand Files, url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/}
+    - {title: Paimon 2.1 Basic Concepts, url: https://paimon.apache.org/docs/2.1/concepts/basic-concepts/}
+sources: [docs/reference-apache-paimon-snapshots-manifests.md]
+evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§1"}, {type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]
+tiers:
+  - {id: engine, label: 書き込みと読み取り, z: 1, size: [18,3]}
+  - {id: meta, label: Paimon テーブルのファイル, z: 0, origin: [2,0], size: [16,3]}
+nodes:
+  writer: {label: 書き込み側のコミット, kind: worker, tier: engine, x: 1, y: 0.8, description: データファイルと manifest を書き、スナップショットを公開する。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§4"}]}
+  reader: {label: 読み取りエンジン, kind: service, tier: engine, x: 1, y: 2.5, description: スナップショットを選び、有効なデータファイルを読む。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§3"}]}
+  snap: {label: スナップショット（snapshot-id）, kind: file, tier: meta, x: 5, y: 1.5, description: スキーマ ID、コミットの種類、manifest list への参照を持つ。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  schema: {label: スキーマ（schema-n）, kind: file, tier: meta, x: 5, y: 0.2, description: フィールド、主キー、オプション。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  baselist: {label: base manifest list, kind: file, tier: meta, x: 8, y: 0.5, description: 既存のファイル集合を表す manifest を指す。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  deltalist: {label: delta manifest list, kind: file, tier: meta, x: 8, y: 2.5, description: そのコミットでの追加と削除を表す manifest を指す。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  manifest: {label: manifest（add・delete エントリ）, kind: file, tier: meta, x: 11, y: 1.5, description: データファイルの追加と削除、パーティション、バケット、統計を持つ。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  data: {label: データファイル, kind: file, tier: meta, x: 14, y: 1.5, description: パーティション・バケットのディレクトリにあるレコード。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  expire: {label: スナップショットの期限切れ, kind: worker, tier: meta, x: 14, y: 2.9, description: 保持設定に従って古いスナップショットとファイルを回収する。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§5"}]}
+links:
+  - {id: write-files, from: writer, to: data, label: データファイルを書く, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§4"}]}
+  - {id: write-manifest, from: writer, to: manifest, label: 追加・削除のエントリを記録, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§4"}]}
+  - {id: publish, from: writer, to: snap, label: 新しいスナップショットを公開, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§4"}]}
+  - {id: pick, from: reader, to: snap, label: スナップショットを選ぶ, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§3"}]}
+  - {id: use-schema, from: snap, to: schema, label: スキーマ ID で参照, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  - {id: to-base, from: snap, to: baselist, label: base を指す, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  - {id: to-delta, from: snap, to: deltalist, label: delta を指す, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  - {id: base-manifest, from: baselist, to: manifest, label: manifest を指す, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  - {id: delta-manifest, from: deltalist, to: manifest, label: manifest を指す, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§2"}]}
+  - {id: entries, from: manifest, to: data, label: 有効なファイルを決める, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§3"}]}
+  - {id: scan, from: data, to: reader, label: データファイルを読む, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§3"}]}
+  - {id: expire-snap, from: expire, to: snap, label: 古いスナップショットを削除, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§5"}]}
+scenarios:
+  - id: commit-read
+    label: コミットして読む
+    evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§6"}]
+    steps:
+      - {links: [write-files, write-manifest], note: 書き込み側がデータファイルを書き、そのファイルを指す manifest を作る。}
+      - {links: [publish], note: manifest list を経由して新しいファイルを指す、新しいスナップショットを公開する。}
+      - {links: [pick, use-schema], note: 読み取りエンジンがスナップショットを選び、スキーマ ID でスキーマを引く。}
+      - {links: [to-base, to-delta, base-manifest, delta-manifest], note: base と delta の manifest list から manifest をたどる。}
+      - {links: [entries, scan], note: manifest の add と delete のエントリで有効なファイルを決め、読む。}
+      - {links: [expire-snap], note: 期限切れが古いスナップショットを回収する。ファイルは、どの保持中のスナップショットからも参照されなくなってから回収される。}
+unknowns:
+  - {id: commit-order, text: manifest、manifest list、スナップショットの書き込み順の詳細は未確認。, refs: [write-manifest, publish]}
+  - {id: commit-atomic, text: 同時書き込みの競合検出とスナップショット公開の原子性は未確認。, refs: [publish]}
+  - {id: expire-timing, text: 期限切れの実行タイミングとファイル回収の細部は未確認。, refs: [expire-snap]}
+implementations:
+  - id: flink-local
+    label: Flink SQL・Paimon ファイルカタログ（ローカル）
+    description: ローカルの Flink の Paimon Sink がコミットし、Paimon Source が warehouse のスナップショットからたどって読む例。
+    sources:
+      - {title: Paimon 2.1 Understand Files, url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/}
+      - {title: Paimon 2.1 Basic Concepts, url: https://paimon.apache.org/docs/2.1/concepts/basic-concepts/}
+      - {title: Paimon 2.1 Flink Quick Start, url: https://paimon.apache.org/docs/2.1/flink/quick-start/}
+    groups:
+      - {kind: datacenter, provider: onprem, label: ローカルホスト, tier: local, nodes: [loc-writer, loc-reader, loc-snap, loc-schema, loc-baselist, loc-deltalist, loc-manifest, loc-data, loc-expire]}
+    nodes:
+      loc-writer: {label: Flink TaskManager / Paimon Sink, kind: worker, tier: local, x: 2, y: 1, realizes: [writer], description: データファイルと manifest を書き、スナップショットを公開する。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-reader: {label: Flink TaskManager / Paimon Source, kind: worker, tier: local, x: 2, y: 1, realizes: [reader], description: スナップショットをたどって読む。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-snap: {label: snapshot ディレクトリ, kind: file, tier: local, x: 2, y: 1, realizes: [snap], description: snapshot-id のファイル。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-schema: {label: schema ディレクトリ, kind: file, tier: local, x: 2, y: 1, realizes: [schema], description: schema-n のファイル。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-baselist: {label: base manifest list のファイル, kind: file, tier: local, x: 2, y: 1, realizes: [baselist], description: manifest ディレクトリ内。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-deltalist: {label: delta manifest list のファイル, kind: file, tier: local, x: 2, y: 1, realizes: [deltalist], description: manifest ディレクトリ内。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-manifest: {label: manifest のファイル, kind: file, tier: local, x: 2, y: 1, realizes: [manifest], description: manifest ディレクトリ内。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-data: {label: バケットディレクトリのデータファイル, kind: file, tier: local, x: 2, y: 1, realizes: [data], description: パーティションとバケットのディレクトリ内。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      loc-expire: {label: Paimon の期限切れ処理, kind: worker, tier: local, x: 2, y: 1, realizes: [expire], description: 保持設定に従う。実行する場所は未確認。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+    links:
+      - {id: loc-pick, from: loc-reader, to: loc-snap, label: スナップショットを選ぶ, realizes: [pick], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      - {id: loc-publish, from: loc-writer, to: loc-snap, label: スナップショットを公開, realizes: [publish], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+      - {id: loc-scan, from: loc-data, to: loc-reader, label: データファイルを読む, realizes: [scan], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§7"}]}
+    layout2d:
+      tiers: [{id: local, label: ローカルの Flink と warehouse, z: 0, size: [24, 14]}]
+      nodes:
+        loc-writer: {tier: local, x: 2, y: 1}
+        loc-reader: {tier: local, x: 6, y: 1}
+        loc-snap: {tier: local, x: 6, y: 5}
+        loc-schema: {tier: local, x: 2, y: 5}
+        loc-baselist: {tier: local, x: 10, y: 5}
+        loc-deltalist: {tier: local, x: 14, y: 5}
+        loc-manifest: {tier: local, x: 6, y: 9}
+        loc-data: {tier: local, x: 10, y: 9}
+        loc-expire: {tier: local, x: 10, y: 1}
+      groups:
+        - {kind: datacenter, provider: onprem, label: ローカルホスト, tier: local, nodes: [loc-writer, loc-reader, loc-snap, loc-schema, loc-baselist, loc-deltalist, loc-manifest, loc-data, loc-expire]}
+    layout3d:
+      tiers:
+        - {id: processes, label: Flink のプロセス, z: 1, size: [24, 6]}
+        - {id: files, label: warehouse のファイル, z: 0, size: [24, 6]}
+      nodes:
+        loc-writer: {tier: processes, x: 2, y: 1}
+        loc-reader: {tier: processes, x: 6, y: 1}
+        loc-snap: {tier: files, x: 6, y: 1}
+        loc-schema: {tier: files, x: 2, y: 1}
+        loc-baselist: {tier: files, x: 10, y: 1}
+        loc-deltalist: {tier: files, x: 14, y: 1}
+        loc-manifest: {tier: files, x: 2, y: 4}
+        loc-data: {tier: files, x: 6, y: 4}
+        loc-expire: {tier: processes, x: 10, y: 1}
+      groups:
+        - {kind: datacenter, provider: onprem, label: ローカルホスト, tier: [processes, files], nodes: [loc-writer, loc-reader, loc-snap, loc-schema, loc-baselist, loc-deltalist, loc-manifest, loc-data, loc-expire]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Flink・Paimon・S3"
+    description: EMR on EC2 の Flink で Paimon Sink が S3 の warehouse にコミットし、Paimon Source がスナップショットからたどって読む例。
+    sources:
+      - {title: Apache Flink on Amazon EMR, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-flink.html}
+      - {title: Paimon 2.1 Understand Files, url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/}
+      - {title: Paimon 2.1 Filesystems, url: https://paimon.apache.org/docs/2.1/maintenance/filesystems/}
+      - {title: Flink 1.20 Amazon S3, url: https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/filesystems/s3/}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: S3 のテーブルのファイル, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-control, aws-host, aws-jm, aws-writer, aws-reader, aws-expire, aws-s3, aws-schema, aws-snap, aws-baselist, aws-deltalist, aws-manifest, aws-data]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-host, aws-jm, aws-writer, aws-reader, aws-expire]}
+    nodes:
+      aws-control: {label: Amazon EMR, svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。, management: {type: shared, scope: AWS は EMR サービスを運用し、利用者はクラスタとステップを設定する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-host: {label: Amazon EC2 / YARN, svc: ec2, kind: host, tier: compute, x: 2, y: 1.5, description: EMR の EC2 ノードで YARN が実行リソースを割り当てる。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はクラスタ、ゲスト OS とソフトウェアを管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-jm: {label: Flink JobManager, kind: scheduler, tier: compute, x: 2, y: 1.5, description: YARN 上で Flink のジョブを調整し、TaskManager にタスクを割り当てる。, management: {type: customer, scope: 利用者がジョブと Flink の実行設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-writer: {label: Flink / Paimon Sink, kind: worker, tier: compute, x: 2, y: 1.5, realizes: [writer], description: TaskManager 上でデータファイルと manifest を書き、スナップショットを公開する。, management: {type: customer, scope: 利用者がジョブと Paimon コネクタ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-reader: {label: Flink / Paimon Source, kind: worker, tier: compute, x: 2, y: 1.5, realizes: [reader], description: TaskManager 上でスナップショットをたどって読む。, management: {type: customer, scope: 利用者がジョブと Paimon コネクタ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-expire: {label: Paimon の期限切れ処理, kind: worker, tier: compute, x: 2, y: 1.5, realizes: [expire], description: 保持設定に従って古いスナップショットとファイルを回収する。実行する場所は未確認。, management: {type: customer, scope: 利用者が保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-s3: {label: Amazon S3 / warehouse, svc: s3, kind: db, tier: management, x: 2, y: 1.5, description: Paimon のテーブルのファイルを置く共用ストレージ。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-schema: {label: schema プレフィックス, kind: file, tier: storage, x: 2, y: 1.5, realizes: [schema], description: schema-n のオブジェクト。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-snap: {label: snapshot プレフィックス, kind: file, tier: storage, x: 2, y: 1.5, realizes: [snap], description: snapshot-id のオブジェクト。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-baselist: {label: base manifest list, kind: file, tier: storage, x: 2, y: 1.5, realizes: [baselist], description: manifest プレフィックス内のオブジェクト。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-deltalist: {label: delta manifest list, kind: file, tier: storage, x: 2, y: 1.5, realizes: [deltalist], description: manifest プレフィックス内のオブジェクト。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-manifest: {label: manifest, kind: file, tier: storage, x: 2, y: 1.5, realizes: [manifest], description: manifest プレフィックス内のオブジェクト。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      aws-data: {label: バケットのデータファイル, kind: file, tier: storage, x: 2, y: 1.5, realizes: [data], description: パーティションとバケットのプレフィックス内のオブジェクト。, management: {type: customer, scope: 利用者がテーブルデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+    links:
+      - {id: aws-provision, from: aws-control, to: aws-host, label: クラスタを作成・管理, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      - {id: aws-start, from: aws-control, to: aws-jm, label: Flink YARN セッションを起動, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      - {id: aws-assign-write, from: aws-jm, to: aws-writer, label: Sink タスクを割り当てる, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      - {id: aws-assign-read, from: aws-jm, to: aws-reader, label: Source タスクを割り当てる, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      - {id: aws-pick, from: aws-reader, to: aws-snap, label: スナップショットを選ぶ, realizes: [pick], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      - {id: aws-publish, from: aws-writer, to: aws-snap, label: スナップショットを公開, realizes: [publish], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+      - {id: aws-scan, from: aws-data, to: aws-reader, label: データファイルを読む, realizes: [scan], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-snapshots-manifests.md#§8"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [16, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [16, 3]}
+        - {id: services, label: AWS 管理サービスとデータ, z: 0, origin: [19, 0], size: [20, 9]}
+      nodes:
+        aws-host: {tier: cluster, x: 7, y: 1.5}
+        aws-jm: {tier: apps, x: 1, y: 1.5}
+        aws-writer: {tier: apps, x: 5, y: 1.5}
+        aws-reader: {tier: apps, x: 9, y: 1.5}
+        aws-expire: {tier: apps, x: 13, y: 1.5}
+        aws-control: {tier: services, x: 2, y: 1.5}
+        aws-s3: {tier: services, x: 6, y: 1.5}
+        aws-schema: {tier: services, x: 10, y: 1.5}
+        aws-snap: {tier: services, x: 14, y: 1.5}
+        aws-baselist: {tier: services, x: 2, y: 4.5}
+        aws-deltalist: {tier: services, x: 6, y: 4.5}
+        aws-manifest: {tier: services, x: 10, y: 4.5}
+        aws-data: {tier: services, x: 14, y: 4.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, cluster, services], nodes: [aws-control, aws-host, aws-jm, aws-writer, aws-reader, aws-expire, aws-s3, aws-schema, aws-snap, aws-baselist, aws-deltalist, aws-manifest, aws-data]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-host, aws-jm, aws-writer, aws-reader, aws-expire]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [29, 16]}
+      nodes:
+        aws-host: {tier: diagram, x: 7, y: 4}
+        aws-jm: {tier: diagram, x: 3, y: 7}
+        aws-writer: {tier: diagram, x: 7, y: 7}
+        aws-reader: {tier: diagram, x: 11, y: 7}
+        aws-expire: {tier: diagram, x: 15, y: 7}
+        aws-control: {tier: diagram, x: 19, y: 1}
+        aws-s3: {tier: diagram, x: 23, y: 1}
+        aws-schema: {tier: diagram, x: 27, y: 1}
+        aws-snap: {tier: diagram, x: 19, y: 5}
+        aws-baselist: {tier: diagram, x: 23, y: 5}
+        aws-deltalist: {tier: diagram, x: 27, y: 5}
+        aws-manifest: {tier: diagram, x: 21, y: 9}
+        aws-data: {tier: diagram, x: 25, y: 9}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 1, y0: -1, x1: 29, y1: 11.5, nodes: [aws-control, aws-host, aws-jm, aws-writer, aws-reader, aws-expire, aws-s3, aws-schema, aws-snap, aws-baselist, aws-deltalist, aws-manifest, aws-data]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 1.4, y0: 3, x1: 17, y1: 9, nodes: [aws-host, aws-jm, aws-writer, aws-reader, aws-expire]}

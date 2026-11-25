@@ -1,0 +1,287 @@
+{
+  "model": "delta-lake-transaction-log",
+  "name": "Delta Lake：トランザクションログとチェックポイント",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "書き込みエンジン",
+      "status": "claim"
+    },
+    "data": {
+      "type": "node",
+      "label": "新しいデータファイル",
+      "status": "claim"
+    },
+    "conflict": {
+      "type": "node",
+      "label": "競合の検査",
+      "status": "claim"
+    },
+    "commits": {
+      "type": "node",
+      "label": "JSON コミットファイル",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "node",
+      "label": "チェックポイント（Parquet）",
+      "status": "claim"
+    },
+    "hint": {
+      "type": "node",
+      "label": "_last_checkpoint",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "node",
+      "label": "再生した表の状態",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "読み取りエンジン",
+      "status": "claim"
+    },
+    "write-files": {
+      "type": "link",
+      "label": "書き込みエンジン → 新しいデータファイル",
+      "status": "claim"
+    },
+    "read-latest": {
+      "type": "link",
+      "label": "JSON コミットファイル → 競合の検査",
+      "status": "claim"
+    },
+    "validate": {
+      "type": "link",
+      "label": "書き込みエンジン → 競合の検査",
+      "status": "claim"
+    },
+    "commit": {
+      "type": "link",
+      "label": "競合の検査 → JSON コミットファイル",
+      "status": "claim"
+    },
+    "checkpointing": {
+      "type": "link",
+      "label": "JSON コミットファイル → チェックポイント（Parquet）",
+      "status": "claim"
+    },
+    "record-hint": {
+      "type": "link",
+      "label": "チェックポイント（Parquet） → _last_checkpoint",
+      "status": "claim"
+    },
+    "find-start": {
+      "type": "link",
+      "label": "_last_checkpoint → 再生した表の状態",
+      "status": "claim"
+    },
+    "load-cp": {
+      "type": "link",
+      "label": "チェックポイント（Parquet） → 再生した表の状態",
+      "status": "claim"
+    },
+    "replay": {
+      "type": "link",
+      "label": "JSON コミットファイル → 再生した表の状態",
+      "status": "claim"
+    },
+    "read-table": {
+      "type": "link",
+      "label": "再生した表の状態 → 読み取りエンジン",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "link",
+      "label": "新しいデータファイル → 読み取りエンジン",
+      "status": "claim"
+    },
+    "commit-and-read": {
+      "type": "scenario",
+      "label": "競合を検査してコミットし、再生して読む"
+    },
+    "unverified": {
+      "type": "unknown",
+      "label": "チェックポイントを書く間隔の既定値、競合時の再試行方針、実環境の動作は未確認。"
+    },
+    "emr": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "ec2": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "spark-writer": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark の書き込みジョブ",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "spark-commit": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Delta のコミット処理（競合検査）",
+      "realizes": [
+        "conflict"
+      ]
+    },
+    "spark-reader": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark の読み取りジョブ（ログ再生）",
+      "realizes": [
+        "reader",
+        "snapshot"
+      ]
+    },
+    "s3": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3",
+      "realizes": []
+    },
+    "s3-data": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Parquet データファイル",
+      "realizes": [
+        "data"
+      ]
+    },
+    "s3-commits": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "_delta_log の JSON コミット",
+      "realizes": [
+        "commits"
+      ]
+    },
+    "s3-cp": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "チェックポイントと _last_checkpoint",
+      "realizes": [
+        "checkpoint",
+        "hint"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-delta-lake-transaction-log.md#§8": [
+      "model"
+    ],
+    "docs/reference-delta-lake-transaction-log.md": [
+      "model",
+      "writer",
+      "data",
+      "conflict",
+      "commits",
+      "checkpoint",
+      "hint",
+      "snapshot",
+      "reader",
+      "write-files",
+      "read-latest",
+      "validate",
+      "commit",
+      "checkpointing",
+      "record-hint",
+      "find-start",
+      "load-cp",
+      "replay",
+      "read-table",
+      "scan",
+      "commit-and-read",
+      "emr",
+      "ec2",
+      "spark-writer",
+      "spark-commit",
+      "spark-reader",
+      "s3",
+      "s3-data",
+      "s3-commits",
+      "s3-cp"
+    ],
+    "docs/reference-delta-lake-transaction-log.md#§1": [
+      "model"
+    ],
+    "docs/reference-delta-lake-transaction-log.md#§6": [
+      "model",
+      "commit-and-read"
+    ],
+    "docs/reference-delta-lake-transaction-log.md#§2": [
+      "writer",
+      "data",
+      "commits",
+      "write-files",
+      "commit"
+    ],
+    "docs/reference-delta-lake-transaction-log.md#§5": [
+      "conflict",
+      "read-latest",
+      "validate"
+    ],
+    "docs/reference-delta-lake-transaction-log.md#§4": [
+      "checkpoint",
+      "hint",
+      "checkpointing",
+      "record-hint"
+    ],
+    "docs/reference-delta-lake-transaction-log.md#§3": [
+      "snapshot",
+      "reader",
+      "find-start",
+      "load-cp",
+      "replay",
+      "read-table",
+      "scan"
+    ],
+    "docs/reference-delta-lake-transaction-log.md#§7": [
+      "emr",
+      "ec2",
+      "spark-writer",
+      "spark-commit",
+      "spark-reader",
+      "s3",
+      "s3-data",
+      "s3-commits",
+      "s3-cp"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "テーブル形式とカタログ",
+    "kind": "仕組みの深掘り",
+    "role": "internals",
+    "product": "Delta Lake",
+    "step": 1,
+    "detailOf": "delta-lake",
+    "objectives": [
+      "JSON コミットとチェックポイントの役割を区別する。",
+      "読み取り時にログを再生して表の状態を作る手順を追う。",
+      "楽観的並行制御が競合を検出して書き込みを失敗させる流れを追う。"
+    ],
+    "sources": [
+      {
+        "title": "Delta Transaction Log Protocol",
+        "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
+      },
+      {
+        "title": "Concurrency control",
+        "url": "https://docs.delta.io/latest/concurrency-control.html"
+      }
+    ]
+  }
+}

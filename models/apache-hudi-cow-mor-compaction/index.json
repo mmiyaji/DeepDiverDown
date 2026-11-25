@@ -1,0 +1,425 @@
+{
+  "model": "apache-hudi-cow-mor-compaction",
+  "name": "Apache Hudi：Copy-on-Write と Merge-on-Read",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "input": {
+      "type": "node",
+      "label": "更新イベント",
+      "status": "claim"
+    },
+    "writer": {
+      "type": "node",
+      "label": "Hudi 書き込みジョブ",
+      "status": "claim"
+    },
+    "cow": {
+      "type": "node",
+      "label": "CoW のベースファイル",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "MoR のログファイル",
+      "status": "claim"
+    },
+    "base": {
+      "type": "node",
+      "label": "MoR のベースファイル",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "node",
+      "label": "コンパクションの計画",
+      "status": "claim"
+    },
+    "compactor": {
+      "type": "node",
+      "label": "コンパクション処理",
+      "status": "claim"
+    },
+    "snap": {
+      "type": "node",
+      "label": "Snapshot クエリ",
+      "status": "claim"
+    },
+    "ro": {
+      "type": "node",
+      "label": "Read Optimized クエリ",
+      "status": "claim"
+    },
+    "receive": {
+      "type": "link",
+      "label": "更新イベント → Hudi 書き込みジョブ",
+      "status": "claim"
+    },
+    "cow-rewrite": {
+      "type": "link",
+      "label": "Hudi 書き込みジョブ → CoW のベースファイル",
+      "status": "claim"
+    },
+    "mor-append": {
+      "type": "link",
+      "label": "Hudi 書き込みジョブ → MoR のログファイル",
+      "status": "claim"
+    },
+    "schedule": {
+      "type": "link",
+      "label": "Hudi 書き込みジョブ → コンパクションの計画",
+      "status": "claim"
+    },
+    "run-plan": {
+      "type": "link",
+      "label": "コンパクションの計画 → コンパクション処理",
+      "status": "claim"
+    },
+    "read-log": {
+      "type": "link",
+      "label": "MoR のログファイル → コンパクション処理",
+      "status": "claim"
+    },
+    "read-base": {
+      "type": "link",
+      "label": "MoR のベースファイル → コンパクション処理",
+      "status": "claim"
+    },
+    "write-base": {
+      "type": "link",
+      "label": "コンパクション処理 → MoR のベースファイル",
+      "status": "claim"
+    },
+    "snap-cow": {
+      "type": "link",
+      "label": "CoW のベースファイル → Snapshot クエリ",
+      "status": "claim"
+    },
+    "snap-base": {
+      "type": "link",
+      "label": "MoR のベースファイル → Snapshot クエリ",
+      "status": "claim"
+    },
+    "snap-log": {
+      "type": "link",
+      "label": "MoR のログファイル → Snapshot クエリ",
+      "status": "claim"
+    },
+    "ro-base": {
+      "type": "link",
+      "label": "MoR のベースファイル → Read Optimized クエリ",
+      "status": "claim"
+    },
+    "one-update": {
+      "type": "scenario",
+      "label": "1 件の更新を CoW と MoR で書く"
+    },
+    "read-and-compact": {
+      "type": "scenario",
+      "label": "MoR の読み取りとコンパクション"
+    },
+    "trigger": {
+      "type": "unknown",
+      "label": "コンパクションを起動する条件と、書き込みと同じジョブで動かすか別ジョブにするかの選び方は未確認。"
+    },
+    "cost": {
+      "type": "unknown",
+      "label": "実データでの書き込み量・読み取り時間の差とコンパクションの所要時間は未測定。"
+    },
+    "file-layout": {
+      "type": "unknown",
+      "label": "ファイルグループ・ファイルスライスの命名とログの形式の詳細は未確認。"
+    },
+    "kafka-topic": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Kafka の注文更新トピック",
+      "realizes": [
+        "input"
+      ]
+    },
+    "spark-streamer": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark 上の Hudi Streamer",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "spark-compact": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark のコンパクションジョブ",
+      "realizes": [
+        "compactor"
+      ]
+    },
+    "spark-sql-snap": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark SQL（Snapshot）",
+      "realizes": [
+        "snap"
+      ]
+    },
+    "spark-sql-ro": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "Spark SQL（Read Optimized）",
+      "realizes": [
+        "ro"
+      ]
+    },
+    "hdfs-cow": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS の CoW 表",
+      "realizes": [
+        "cow"
+      ]
+    },
+    "hdfs-log": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS の MoR 表（ログ）",
+      "realizes": [
+        "log"
+      ]
+    },
+    "hdfs-base": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS の MoR 表（ベース）",
+      "realizes": [
+        "base"
+      ]
+    },
+    "hdfs-plan": {
+      "type": "implementation",
+      "impl": "hudi-spark",
+      "label": "HDFS の .hoodie（compaction）",
+      "realizes": [
+        "plan"
+      ]
+    },
+    "aws-msk": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon MSK / 更新トピック",
+      "realizes": [
+        "input"
+      ]
+    },
+    "aws-emr": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "aws-host": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "aws-streamer": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark / Hudi Streamer",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "aws-compact": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Hudi コンパクション",
+      "realizes": [
+        "compactor"
+      ]
+    },
+    "aws-sql": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Spark SQL / Hudi",
+      "realizes": [
+        "snap",
+        "ro"
+      ]
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "Amazon S3",
+      "realizes": []
+    },
+    "aws-cow": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "CoW 表のベースファイル",
+      "realizes": [
+        "cow"
+      ]
+    },
+    "aws-log": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "MoR 表のログファイル",
+      "realizes": [
+        "log"
+      ]
+    },
+    "aws-base": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": "MoR 表のベースファイル",
+      "realizes": [
+        "base"
+      ]
+    },
+    "aws-plan": {
+      "type": "implementation",
+      "impl": "aws-emr-ec2",
+      "label": ".hoodie の compaction instant",
+      "realizes": [
+        "plan"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§1": [
+      "model"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md": [
+      "model",
+      "input",
+      "writer",
+      "cow",
+      "log",
+      "base",
+      "plan",
+      "compactor",
+      "snap",
+      "ro",
+      "receive",
+      "cow-rewrite",
+      "mor-append",
+      "schedule",
+      "run-plan",
+      "read-log",
+      "read-base",
+      "write-base",
+      "snap-cow",
+      "snap-base",
+      "snap-log",
+      "ro-base",
+      "one-update",
+      "read-and-compact",
+      "kafka-topic",
+      "spark-streamer",
+      "spark-compact",
+      "spark-sql-snap",
+      "spark-sql-ro",
+      "hdfs-cow",
+      "hdfs-log",
+      "hdfs-base",
+      "hdfs-plan",
+      "aws-msk",
+      "aws-emr",
+      "aws-host",
+      "aws-streamer",
+      "aws-compact",
+      "aws-sql",
+      "aws-s3",
+      "aws-cow",
+      "aws-log",
+      "aws-base",
+      "aws-plan"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§7": [
+      "model"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§2": [
+      "input",
+      "writer",
+      "cow",
+      "receive",
+      "cow-rewrite",
+      "one-update"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§3": [
+      "log",
+      "base",
+      "mor-append"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§4": [
+      "plan",
+      "compactor",
+      "schedule",
+      "run-plan",
+      "read-log",
+      "read-base",
+      "write-base",
+      "read-and-compact"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§5": [
+      "snap",
+      "ro",
+      "snap-cow",
+      "snap-base",
+      "snap-log",
+      "ro-base"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§6": [
+      "one-update"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§8": [
+      "kafka-topic",
+      "spark-streamer",
+      "spark-compact",
+      "spark-sql-snap",
+      "spark-sql-ro",
+      "hdfs-cow",
+      "hdfs-log",
+      "hdfs-base",
+      "hdfs-plan"
+    ],
+    "docs/reference-apache-hudi-cow-mor-compaction.md#§9": [
+      "aws-msk",
+      "aws-emr",
+      "aws-host",
+      "aws-streamer",
+      "aws-compact",
+      "aws-sql",
+      "aws-s3",
+      "aws-cow",
+      "aws-log",
+      "aws-base",
+      "aws-plan"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "テーブル形式とカタログ",
+    "kind": "仕組みの深掘り",
+    "role": "internals",
+    "product": "Apache Hudi",
+    "step": 2,
+    "detailOf": "apache-hudi",
+    "objectives": [
+      "CoW と MoR で、1 回の更新が書くファイルの違いを説明する。",
+      "MoR のログファイルとコンパクションが読み取りに与える影響を追う。"
+    ],
+    "sources": [
+      {
+        "title": "Apache Hudi Table & Query Types",
+        "url": "https://hudi.apache.org/docs/table_types/"
+      },
+      {
+        "title": "Apache Hudi Compaction",
+        "url": "https://hudi.apache.org/docs/compaction/"
+      }
+    ]
+  }
+}

@@ -1,0 +1,195 @@
+name: Apache Paimon の基本アーキテクチャ
+description: Paimon のテーブルがスナップショット・マニフェスト・データファイルでできていること、Flink などのエンジンとカタログ、ストレージの関係を追う。
+reference:
+  objectives:
+    - テーブルのディレクトリ構成（schema・snapshot・manifest・データファイル）を説明する。
+    - 書き込みと読み取りがスナップショットを境にどう分かれるかを追う。
+    - カタログとストレージがエンジンとテーブルの間で果たす役割を区別する。
+  sources:
+    - {title: Paimon 2.1 Understand Files, url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/}
+    - {title: Paimon 2.1 Basic Concepts, url: https://paimon.apache.org/docs/2.1/concepts/basic-concepts/}
+    - {title: Paimon 2.1 Primary-Key Table, url: https://paimon.apache.org/docs/2.1/primary-key-table/}
+    - {title: Paimon 2.1 Filesystems, url: https://paimon.apache.org/docs/2.1/maintenance/filesystems/}
+sources: [docs/reference-apache-paimon-architecture.md]
+evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§1"}, {type: doc, ref: "docs/reference-apache-paimon-architecture.md#§2"}]
+tiers:
+  - {id: engine, label: 読み書きエンジン, z: 2, size: [18,3]}
+  - {id: table, label: Paimon テーブル, z: 1, origin: [2,0], size: [14,3]}
+  - {id: storage, label: ストレージ, z: 0, origin: [2,0], size: [14,3]}
+nodes:
+  writer: {label: 書き込みエンジン（Flink・Spark など）, kind: worker, tier: engine, x: 1, y: 1.5, description: データファイルを書き、コミットでスナップショットを作る。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§3"}]}
+  reader: {label: 読み取りエンジン, kind: service, tier: engine, x: 17, y: 1.5, description: スナップショットから有効なデータファイルを求めて読む。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§3"}]}
+  catalog: {label: カタログ, kind: catalog, tier: table, x: 4, y: 0.5, description: データベースとテーブルを管理し、テーブルの場所を解決する。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§6"}]}
+  schema: {label: スキーマ（schema-n）, kind: file, tier: table, x: 4, y: 2.5, description: フィールド、主キー、オプションを保持する。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§2"}]}
+  snapshots: {label: スナップショット（snapshot-id）, kind: file, tier: table, x: 7, y: 1.5, description: コミットごとの版。スキーマ ID と manifest list への参照を持つ。次の図「スナップショットとマニフェスト」で詳しく追う。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§4"}]}
+  manifests: {label: manifest list と manifest, kind: file, tier: table, x: 10, y: 1.5, description: データファイルの追加と削除のエントリを持つ。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§4"}]}
+  data: {label: データファイル（パーティション・バケット）, kind: file, tier: table, x: 13, y: 1.5, description: レコードを持つ Parquet などのファイル。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§2"}]}
+  compaction: {label: LSM コンパクションと変更ログ, kind: worker, tier: table, x: 11, y: 2.7, description: 主キーテーブルで sorted run をマージし、下流向けの変更ログを選ぶ。「主キーテーブル：Flink 更新と変更ログ」（仕組み step 1）で詳しく追う。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§5"}]}
+  storage: {label: ファイルシステム／オブジェクトストレージ, kind: db, tier: storage, x: 9, y: 1.5, description: テーブルのファイルを置く。file:、s3:// などのスキームで warehouse を指す。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§6"}]}
+links:
+  - {id: resolve-write, from: writer, to: catalog, label: テーブルを解決, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§6"}]}
+  - {id: resolve-read, from: reader, to: catalog, label: テーブルを解決, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§6"}]}
+  - {id: load-schema, from: catalog, to: schema, label: スキーマを取得, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§6"}]}
+  - {id: write-data, from: writer, to: data, label: データファイルを書く, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§3"}]}
+  - {id: commit, from: writer, to: snapshots, label: コミットでスナップショットを作る, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§3"}]}
+  - {id: choose, from: reader, to: snapshots, label: スナップショットを選ぶ, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§4"}]}
+  - {id: follow-list, from: snapshots, to: manifests, label: manifest list をたどる, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§4"}]}
+  - {id: follow-files, from: manifests, to: data, label: 有効なファイルを指す, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§4"}]}
+  - {id: read-data, from: data, to: reader, label: データファイルを読む, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§3"}]}
+  - {id: pick-runs, from: data, to: compaction, label: 重なる run を選ぶ, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§5"}]}
+  - {id: compact-commit, from: compaction, to: snapshots, label: 統合結果をコミット, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§5"}]}
+  - {id: persist, from: data, to: storage, label: ファイルを保存, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§6"}]}
+scenarios:
+  - id: write-read
+    label: テーブルを書いて読む
+    evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§7"}]
+    steps:
+      - {links: [resolve-write, load-schema], note: 書き込みエンジンがカタログでテーブルとスキーマを解決する。}
+      - {links: [write-data, persist], note: データファイルを書き、ストレージに保存する。}
+      - {links: [commit, follow-list, follow-files], note: コミットで新しいスナップショットを作る。スナップショットが manifest を通じて新しいファイルを指す。}
+      - {links: [resolve-read, choose, follow-list, follow-files, read-data], note: 読み取りエンジンはスナップショットを選び、manifest をたどって有効なファイルだけを読む。}
+      - {links: [pick-runs, compact-commit], note: 主キーテーブルでは、コンパクションが run をマージして新しいスナップショットをコミットする。}
+unknowns:
+  - {id: engines, text: Flink 以外のエンジン（Spark、Hive、Trino など）の対応範囲と機能差は未確認。, refs: [write-data, read-data]}
+  - {id: catalogs, text: ファイルカタログ以外のカタログ種別（REST など）の仕組みと対応エンジンは未確認。, refs: [resolve-write, resolve-read]}
+  - {id: runtime, text: 実環境の書き込み量、コンパクションの負荷、スナップショットの保持量は未検証。, refs: [commit, compact-commit]}
+implementations:
+  - id: flink-local
+    label: Flink SQL・Paimon ファイルカタログ（ローカル）
+    description: ローカルの Flink で Paimon のファイルカタログを作り、warehouse のファイルに読み書きする例。
+    sources:
+      - {title: Paimon 2.1 Flink Quick Start, url: https://paimon.apache.org/docs/2.1/flink/quick-start/}
+      - {title: Paimon 2.1 Understand Files, url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/}
+      - {title: Paimon 2.1 Basic Concepts, url: https://paimon.apache.org/docs/2.1/concepts/basic-concepts/}
+    groups:
+      - {kind: datacenter, provider: onprem, label: ローカルホスト, tier: table, nodes: [loc-jm, loc-writer, loc-reader, loc-compact, loc-catalog, loc-schema, loc-snapshot, loc-manifest, loc-data, loc-fs]}
+    nodes:
+      loc-jm: {label: Flink JobManager, kind: scheduler, tier: table, x: 3, y: 1.5, description: ジョブを調整し、TaskManager にタスクを割り当てる。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-writer: {label: Flink TaskManager / Paimon Sink, kind: worker, tier: table, x: 3, y: 1.5, realizes: [writer], description: テーブルへデータファイルを書き、コミットする。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-reader: {label: Flink TaskManager / Paimon Source, kind: worker, tier: table, x: 3, y: 1.5, realizes: [reader], description: スナップショットをたどって読む。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-catalog: {label: Paimon ファイルカタログ（warehouse）, kind: catalog, tier: table, x: 3, y: 1.5, realizes: [catalog], description: CREATE CATALOG で warehouse のパスを指定する。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-schema: {label: schema ディレクトリ, kind: file, tier: table, x: 3, y: 1.5, realizes: [schema], description: テーブルディレクトリ内の schema-n。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-snapshot: {label: snapshot ディレクトリ, kind: file, tier: table, x: 3, y: 1.5, realizes: [snapshots], description: テーブルディレクトリ内の snapshot-id。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-manifest: {label: manifest ディレクトリ, kind: file, tier: table, x: 3, y: 1.5, realizes: [manifests], description: manifest list と manifest のファイル。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-data: {label: バケットディレクトリのデータファイル, kind: file, tier: table, x: 3, y: 1.5, realizes: [data], description: パーティションとバケットのディレクトリに置く。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-compact: {label: Sink 内の Paimon コンパクション, kind: worker, tier: table, x: 3, y: 1.5, realizes: [compaction], description: 主キーテーブルの run をマージする。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      loc-fs: {label: ローカルファイルシステム（file:）, kind: db, tier: table, x: 3, y: 1.5, realizes: [storage], description: 単一マシンの実験用の warehouse を置く。, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+    links:
+      - {id: loc-assign-write, from: loc-jm, to: loc-writer, label: Sink タスクを割り当てる, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      - {id: loc-assign-read, from: loc-jm, to: loc-reader, label: Source タスクを割り当てる, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      - {id: loc-write-data, from: loc-writer, to: loc-data, label: バケットへ書く, realizes: [write-data], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      - {id: loc-commit, from: loc-writer, to: loc-snapshot, label: スナップショットをコミット, realizes: [commit], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      - {id: loc-choose, from: loc-reader, to: loc-snapshot, label: スナップショットを選ぶ, realizes: [choose], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+      - {id: loc-read-data, from: loc-data, to: loc-reader, label: データファイルを読む, realizes: [read-data], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§8"}]}
+    layout2d:
+      tiers: [{id: local, label: ローカルの Flink と warehouse, z: 0, size: [24, 14]}]
+      nodes:
+        loc-jm: {tier: local, x: 2, y: 1}
+        loc-writer: {tier: local, x: 6, y: 1}
+        loc-reader: {tier: local, x: 10, y: 1}
+        loc-compact: {tier: local, x: 14, y: 1}
+        loc-catalog: {tier: local, x: 2, y: 5}
+        loc-schema: {tier: local, x: 6, y: 5}
+        loc-snapshot: {tier: local, x: 10, y: 5}
+        loc-manifest: {tier: local, x: 14, y: 5}
+        loc-data: {tier: local, x: 2, y: 9}
+        loc-fs: {tier: local, x: 6, y: 9}
+      groups:
+        - {kind: datacenter, provider: onprem, label: ローカルホスト, tier: local, nodes: [loc-jm, loc-writer, loc-reader, loc-compact, loc-catalog, loc-schema, loc-snapshot, loc-manifest, loc-data, loc-fs]}
+    layout3d:
+      tiers:
+        - {id: processes, label: Flink のプロセス, z: 1, size: [24, 6]}
+        - {id: files, label: warehouse のファイル, z: 0, size: [24, 6]}
+      nodes:
+        loc-jm: {tier: processes, x: 2, y: 1}
+        loc-writer: {tier: processes, x: 6, y: 1}
+        loc-reader: {tier: processes, x: 10, y: 1}
+        loc-compact: {tier: processes, x: 14, y: 1}
+        loc-catalog: {tier: files, x: 2, y: 1}
+        loc-schema: {tier: files, x: 6, y: 1}
+        loc-snapshot: {tier: files, x: 10, y: 1}
+        loc-manifest: {tier: files, x: 14, y: 1}
+        loc-data: {tier: files, x: 2, y: 4}
+        loc-fs: {tier: files, x: 6, y: 4}
+      groups:
+        - {kind: datacenter, provider: onprem, label: ローカルホスト, tier: [processes, files], nodes: [loc-jm, loc-writer, loc-reader, loc-compact, loc-catalog, loc-schema, loc-snapshot, loc-manifest, loc-data, loc-fs]}
+  - id: aws-emr-ec2
+    label: "AWS：EMR on EC2 / Flink・Paimon・S3"
+    description: EMR on EC2 の Flink/YARN に Paimon コネクタを導入し、S3 のファイルカタログでテーブルを運用する例。
+    sources:
+      - {title: Apache Flink on Amazon EMR, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-flink.html}
+      - {title: Paimon 2.1 Flink Installation, url: https://paimon.apache.org/docs/2.1/flink/installation/}
+      - {title: Paimon 2.1 Filesystems, url: https://paimon.apache.org/docs/2.1/maintenance/filesystems/}
+      - {title: Paimon 2.1 Understand Files, url: https://paimon.apache.org/docs/2.1/learn-paimon/understand-files/}
+      - {title: Flink 1.20 Amazon S3, url: https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/filesystems/s3/}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理とストレージ, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: storage, label: テーブルのファイル, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, storage], nodes: [aws-control, aws-host, aws-jm, aws-writer, aws-reader, aws-warehouse, aws-catalog, aws-schema, aws-snapshot, aws-manifest, aws-data, aws-checkpoint]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-host, aws-jm, aws-writer, aws-reader]}
+    nodes:
+      aws-control: {label: Amazon EMR, svc: emr, kind: service, tier: management, x: 2, y: 1.5, description: EC2 クラスタを作成・管理し、ジョブ投入用の step を受け付ける。, management: {type: shared, scope: AWS は EMR サービスを運用し、利用者はクラスタとステップを設定する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-host: {label: Amazon EC2 / YARN, svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: EMR の EC2 ノードで YARN が実行リソースを割り当てる。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はクラスタ、ゲスト OS とソフトウェアを管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-jm: {label: Flink JobManager, kind: scheduler, tier: compute, x: 3, y: 1.5, description: YARN 上で Flink のジョブを調整し、TaskManager にタスクを割り当てる。, management: {type: customer, scope: 利用者がジョブと Flink の実行設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-writer: {label: Flink / Paimon Sink, kind: worker, tier: compute, x: 8, y: 1.5, realizes: [writer, compaction], description: TaskManager 上でデータファイルを書き、コミットする。主キーテーブルのコンパクションも Sink 内の Paimon の処理として動く。, management: {type: customer, scope: 利用者がジョブと Paimon コネクタ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-reader: {label: Flink / Paimon Source, kind: worker, tier: compute, x: 13, y: 1.5, realizes: [reader], description: TaskManager 上でスナップショットをたどって読む。, management: {type: customer, scope: 利用者がジョブと Paimon コネクタ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-warehouse: {label: Amazon S3 / warehouse, svc: s3, kind: db, tier: management, x: 8, y: 1.5, realizes: [storage], description: Paimon のテーブルのファイルを置く共用ストレージ。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-catalog: {label: Paimon ファイルカタログ（s3:// の warehouse）, kind: catalog, tier: storage, x: 3, y: 1.5, realizes: [catalog], description: S3 の warehouse パスからテーブルを解決する。カタログ専用のサービスは使わない。, management: {type: customer, scope: 利用者がカタログ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-schema: {label: schema プレフィックス, kind: file, tier: storage, x: 7, y: 1.5, realizes: [schema], description: テーブルプレフィックス内の schema-n。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-snapshot: {label: snapshot プレフィックス, kind: file, tier: storage, x: 11, y: 1.5, realizes: [snapshots], description: テーブルプレフィックス内の snapshot-id。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-manifest: {label: manifest プレフィックス, kind: file, tier: storage, x: 15, y: 1.5, realizes: [manifests], description: manifest list と manifest のオブジェクト。, management: {type: customer, scope: 利用者がメタデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-data: {label: バケットのデータファイル, kind: file, tier: storage, x: 19, y: 1.5, realizes: [data], description: パーティションとバケットのプレフィックスに置く。, management: {type: customer, scope: 利用者がテーブルデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      aws-checkpoint: {label: Amazon S3 / Flink チェックポイント, svc: s3, kind: db, tier: management, x: 14, y: 1.5, description: Flink のジョブ状態のチェックポイントは warehouse と別の S3 プレフィックスに保存する。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はチェックポイントとアクセス権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+    links:
+      - {id: aws-provision, from: aws-control, to: aws-host, label: クラスタを作成・管理, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-start, from: aws-control, to: aws-jm, label: Flink YARN セッションを起動, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-assign-write, from: aws-jm, to: aws-writer, label: Sink タスクを割り当てる, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-assign-read, from: aws-jm, to: aws-reader, label: Source タスクを割り当てる, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-save-state, from: aws-jm, to: aws-checkpoint, label: チェックポイントを調整・確定, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-write-data, from: aws-writer, to: aws-data, label: S3 にデータファイルを書く, realizes: [write-data], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-commit, from: aws-writer, to: aws-snapshot, label: スナップショットをコミット, realizes: [commit], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-choose, from: aws-reader, to: aws-snapshot, label: スナップショットを選ぶ, realizes: [choose], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+      - {id: aws-read-data, from: aws-data, to: aws-reader, label: データファイルを読む, realizes: [read-data], replace: true, evidence: [{type: doc, ref: "docs/reference-apache-paimon-architecture.md#§9"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [12, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [12, 3]}
+        - {id: services, label: AWS 管理サービスとデータ, z: 0, origin: [15, 0], size: [20, 6]}
+      nodes:
+        aws-host: {tier: cluster, x: 5, y: 1.5}
+        aws-jm: {tier: apps, x: 1, y: 1.5}
+        aws-writer: {tier: apps, x: 5, y: 1.5}
+        aws-reader: {tier: apps, x: 9, y: 1.5}
+        aws-control: {tier: services, x: 2, y: 1.5}
+        aws-warehouse: {tier: services, x: 6, y: 1.5}
+        aws-checkpoint: {tier: services, x: 10, y: 1.5}
+        aws-catalog: {tier: services, x: 14, y: 1.5}
+        aws-schema: {tier: services, x: 2, y: 4.5}
+        aws-snapshot: {tier: services, x: 6, y: 4.5}
+        aws-manifest: {tier: services, x: 10, y: 4.5}
+        aws-data: {tier: services, x: 14, y: 4.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, cluster, services], nodes: [aws-host, aws-jm, aws-writer, aws-reader, aws-control, aws-warehouse, aws-checkpoint, aws-catalog, aws-schema, aws-snapshot, aws-manifest, aws-data]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-host, aws-jm, aws-writer, aws-reader]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+      nodes:
+        aws-host: {tier: diagram, x: 7, y: 4}
+        aws-jm: {tier: diagram, x: 3, y: 7}
+        aws-writer: {tier: diagram, x: 7, y: 7}
+        aws-reader: {tier: diagram, x: 11, y: 7}
+        aws-control: {tier: diagram, x: 16, y: 1}
+        aws-warehouse: {tier: diagram, x: 20, y: 1}
+        aws-checkpoint: {tier: diagram, x: 24, y: 1}
+        aws-catalog: {tier: diagram, x: 16, y: 5}
+        aws-schema: {tier: diagram, x: 20, y: 5}
+        aws-snapshot: {tier: diagram, x: 24, y: 5}
+        aws-manifest: {tier: diagram, x: 16, y: 9}
+        aws-data: {tier: diagram, x: 20, y: 9}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 1, y0: -1, x1: 26, y1: 11.5, nodes: [aws-host, aws-jm, aws-writer, aws-reader, aws-control, aws-warehouse, aws-checkpoint, aws-catalog, aws-schema, aws-snapshot, aws-manifest, aws-data]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 1.4, y0: 3, x1: 13, y1: 9, nodes: [aws-host, aws-jm, aws-writer, aws-reader]}
