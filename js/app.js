@@ -2030,10 +2030,12 @@ new ResizeObserver(() => {
 }).observe(compareViewport);
 compareViewport.addEventListener('wheel', e => {
   if (st.dimension !== '2' || !compareViewport.classList.contains('compare-viewport')) return;
-  if (e.ctrlKey) { // Ctrl＋ホイール／トラックパッドのピンチ：図全体を拡大・縮小する
+  // ホイール（Ctrl 付き・トラックパッドのピンチも）：図全体を、カーソルの位置を保って拡大・縮小する。Shift＋ホイールは横スクロール
+  if (!PREVIEW && !e.shiftKey) {
     e.preventDefault(); e.stopPropagation();
     const r = compareViewport.getBoundingClientRect();
-    setUserZoom(userZoom * Math.exp(-e.deltaY * 0.0022), e.clientX - r.left, e.clientY - r.top);
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 100 : e.deltaY;
+    setUserZoom(userZoom * Math.exp(-dy * (e.ctrlKey ? 0.0022 : 0.0012)), e.clientX - r.left, e.clientY - r.top);
     return;
   }
   const horizontal = compareViewport.scrollWidth > compareViewport.clientWidth;
