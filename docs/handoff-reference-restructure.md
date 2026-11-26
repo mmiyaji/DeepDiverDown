@@ -28,7 +28,7 @@
 | ファイル形式 | Parquet・ORC・Avro・Arrow IPC・Vortex・Lance の概要図（Vortex・Lance・Arrow IPC は仕組み図も）。比較表は `docs/category-file-formats.md`。ファイル形式は 1 ファイルの中身、テーブル形式は複数ファイルの管理で分ける |
 | クラウド分析基盤 | Snowflake・Databricks（概要＋仕組み各 5〜7 図に統合）、BigQuery・Amazon Redshift・Microsoft Fabric（概要＋仕組み各 3 図）を整理。比較表は `docs/category-cloud-analytics.md`。Athena・Dremio・Starburst・MotherDuck・Oracle・Teradata・Synapse は比較表の注記のみ |
 | データ配置と読み取り | 概念図 2 つ（パーティショニングとシャーディング、ソートとプルーニング）を残した。Iceberg の分散スキャンとカタログ経由の読み取りは Apache Iceberg の仕組み図（手順 3・4）へ移した。比較表は作っていない（製品がないため） |
-| ほかの分類 | 未着手の図がある。古い図は `js/products.js` で製品を推定している |
+| ほかの分類 | データカタログ、時系列データ、インメモリ DB、Kubernetes 系、オブザーバビリティ、OSS の新技術、DWH 設計パターンなどが未着手。古い図は js/products.js で製品を推定している |
 
 バッチ・SQL とストリーム処理の対象はデスクトップの 2D・3D を確認した。3D の初期表示では重なりを避けるため一部ラベルが非表示になる。物理 iPad の Safari と、すべてのカメラ角度は未確認。取り込み分類は追加図の 2D・3D と選択を確認し、変更したモデルの提供元境界点検を通過した。モデル点検には台数未記載の警告が残る。
 
@@ -39,5 +39,7 @@
 - エージェントの作業用ファイルは `scratchpad/<製品名>/` に分け、共有フォルダで上書きし合わない。
 - 複数人で作業する場合は registry や共通コードの編集担当を決め、最後に `node tools/build-index.mjs` を実行する。
 - 完了条件：`node tools/gates.mjs <id>`（台数の警告以外は合格）、`node tools/audit-provider-boundaries.mjs <id>`（問題なし）、`npm test`（全件合格）、分類ページで確認。
+- 配置の点検：node tools/audit-layout-flow.mjs <model-id> で線が無関係な部品の上を通らないかを見る。出た図は 3D を目視し、不自然なものだけ直す。ルールは AGENTS.md の配置の項目。
+- 1 製品に仕組み図が 3 つを超えるときは、内容が近い図を統合する。製品に当たらない概念図は、概念（role: concept）として分類に残す。製品固有の図は、その製品の仕組み図へ移す。
 - 比較表は取りまとめ役が書き、`js/categories.js` の `CATEGORY_DOCS` に登録する。書き方は reference-structure.md の「比較表」と「文章の書き方」に従う（特徴の行、太字は違いの語だけ、AI っぽい文を避ける）。
 - ファイル編集は CRLF に注意。node スクリプトで編集するときは `\r\n` を考慮し、正規表現の `\` がシェルで消えないよう、スクリプトは Write で作ってから実行する。
