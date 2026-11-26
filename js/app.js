@@ -15,6 +15,8 @@ import { initResize } from './resize.js?v=rz3';
 import { productOf, productName, isConcept, shortName, PRODUCT_ALSO } from './products.js?v=4';
 import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=table1';
 import { drawThumbnail } from './home-thumbnail.js';
+import { lab } from './lab.js';
+import { labLayout } from './lab-layout.js';
 import { TreeMap, DistMap, GridMap, TimelineMap, BlockMap } from './datavis.js?v=detail-hint1';
 
 const $ = id => document.getElementById(id);
@@ -123,7 +125,7 @@ if (peers.length && !PREVIEW) {
   $('compare-entry').hidden = false;
   $('compare-entry').textContent = `比較対象（${peers.length}件）`;
 }
-const { model: M, actual: A, docs: DOCS } = await L.loadEntry(ENTRY);
+const { model: M, actual: A, docs: DOCS } = labLayout(await L.loadEntry(ENTRY));
 window.viewerLoading.drawing();
 const OPTS = { disabled: S.disabledRules, gates: S.gates };
 
@@ -293,11 +295,17 @@ function decorate() {
   if (st.mode === 'scenario' && M.scenarios?.length) {
     const current = new Set(M.scenarios[st.scen].steps[st.step].links);
     const active = new Set();
+    // lab: flow-numbers / flow-trail / flow-both（通過済みの線を残す・ステップ番号を出す）
+    const flowNo = lab('flow-numbers') || lab('flow-both'), flowTrail = lab('flow-trail') || lab('flow-both');
+    const passed = new Map();
+    if (flowTrail) M.scenarios[st.scen].steps.slice(0, st.step).forEach(step => (step.links || []).forEach(id => passed.set(id, true)));
     for (const l of allLinks()) {
       if (current.has(l.id)) {
         Object.assign(ls[l.id], { on: true, color: '--view-accent', packets: !REDUCED });
+        if (flowNo) ls[l.id].stepNo = st.step + 1;
         active.add(l.from); active.add(l.to);
-      } else ls[l.id].dim = true;
+      } else if (passed.has(l.id)) Object.assign(ls[l.id], { on: true, trail: true, color: '--view-accent' });
+      else ls[l.id].dim = true;
     }
     for (const id of Object.keys(ns)) {
       if (active.has(id)) ns[id].outline = true;
@@ -598,10 +606,10 @@ function drawScene() {
     const crossFloor = N[l.from].tier !== N[l.to].tier;
     const solid = !!style3D();
     const layout = diagramLayout();
-    scene.link({ id: l.id, points: layout.routes.get(l.id), arrowPosition: layout.arrowPositions.get(l.id), unitsPerPixel: layout.unitsPerPixel,
-      solid, flat: st.dimension === '2', arrow: true, color: s.color || (s.on ? '--ink' : '--diagram-link'), thick: !!s.on, packets: !!s.packets && !REDUCED,
+    scene.link({ id: l.id, from: l.from, to: l.to, points: layout.routes.get(l.id), arrowPosition: layout.arrowPositions.get(l.id), unitsPerPixel: layout.unitsPerPixel,
+      solid, flat: st.dimension === '2', arrow: true, color: s.color || (s.on ? '--ink' : '--diagram-link'), thick: !!s.on && !s.trail, stepNo: s.stepNo, packets: !!s.packets && !REDUCED,
       dashed: s.dashed || (style3D() === 'flow' && crossFloor && !s.on ? 'dot' : linkTiming(l) === false ? 'dash' : null),
-      opacity: s.dim ? 0.12 : s.soft ? 0.18 : s.on ? 1 : solid && !crossFloor ? 0.9 : 0.72 });
+      opacity: s.dim ? 0.12 : s.soft ? 0.18 : s.trail ? 0.65 : s.on ? 1 : solid && !crossFloor ? 0.9 : 0.72 });
   }
   for (const [id, n] of Object.entries(N)) if (visible(n)) scene.node({ ...nodeSpec(id, n, ns[id] || {}), tier: n.tier });
   scene.end(st.dimension === '2');

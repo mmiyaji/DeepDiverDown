@@ -5,8 +5,9 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { SHAPE_OVERRIDES, nodeGlyph } from './node-kinds.js';
 import { minimapViewport } from './minimap-viewport.js';
 import { RectIndex } from './rect-index.js';
+import { lab } from './lab.js';
 
-const LABEL_PRIORITY = new Map(['n-lbl', 'n-badge', 'g-lbl', 't-lbl', 'abbr', 'n-sub'].map((name, index) => [name, index]));
+const LABEL_PRIORITY = new Map(['n-lbl', 'n-badge', 'g-lbl', 't-lbl', 'abbr', 'n-sub', 'flow-no'].map((name, index) => [name, index]));
 const LABEL_GAP = 2;
 const overlaps = (a, b, gap = 0) => a.left < b.right + gap && a.right + gap > b.left &&
   a.top < b.bottom + gap && a.bottom + gap > b.top;
@@ -278,7 +279,7 @@ export class Scene3D {
     // Keep the card anchored to its ports. A solid's name may move a
     // short distance vertically, leaving room for a nearby name or plate.
     for (const el of elements) if (el.dataset.labelOffset) {
-      el.style.translate = ''; delete el.dataset.labelOffset;
+      el.style.translate = ''; delete el.dataset.labelOffset; delete el.dataset.leader;
     }
     const badgeOffsets = elements.filter(el => el.dataset.cardBadge).map(el =>
       [el, -(cards.get(el.dataset.node)?.offsetHeight || 0) / 2 - 4]);
@@ -292,18 +293,42 @@ export class Scene3D {
           el.classList.contains('g-parallel') ? -0.8 : el.dataset.icon ? -0.5 : LABEL_PRIORITY.get(el.classList[0]),
     }));
     labels.sort((a, b) => a.priority - b.priority);
+    if (main && lab('frames-depth') && this.frameDirty) this.applyFrameDepth();
+    const hide = main ? this.labelHideSet(labels, frame, camera) : null;
     const occupied = new RectIndex();
     if (layer === this.labels.domElement && this.miniOn && this.miniEl && !this.miniEl.hidden && this.miniEl.style.visibility !== 'hidden')
       occupied.add(this.miniEl.getBoundingClientRect());
+    const leaderMode = main && lab('labels-leader');
     for (const { el, rect } of labels) {
+      if (hide?.has(el)) { el.style.visibility = 'hidden'; continue; }
       const groupLabel = el.classList.contains('g-cloud') || el.classList.contains('g-datacenter');
       const floorLabel = el.classList.contains('t-lbl');
-      const movable = el.classList.contains('n-3d') || floorLabel;
+      const movable = el.classList.contains('n-3d') || floorLabel || el.classList.contains('flow-no');
+      const leader = leaderMode && el.dataset.node && (el.classList.contains('n-lbl') || el.classList.contains('n-3d'));
       const offsets = groupLabel ? [0, -rect.height - 3, rect.height + 3, -rect.height * 2 - 6, rect.height * 2 + 6]
         : movable ? [0, rect.height + 3, -rect.height - 3, rect.height * 2 + 4] : [0];
       let placed = false;
       const horizontalOffsets = groupLabel || floorLabel ? [0, rect.width / 2, -rect.width / 2, rect.width, -rect.width] : [0];
-      if (overlaps(rect, frame)) for (const [dx, dy] of horizontalOffsets.flatMap(dx => offsets.map(dy => [dx, dy]))) {
+      if (leader && overlaps(rect, frame) && !occupied.overlaps(rect, LABEL_GAP)) {
+        occupied.add(rect); placed = true;
+      } else if (leader && overlaps(rect, frame)) {
+        const h = rect.height, w = rect.width;
+        const cands = [];
+        for (const ring of [1.2, 2.2, 3.4]) for (let k = 0; k < 8; k++) {
+          const a = (k * Math.PI) / 4 + Math.PI / 8;
+          cands.push([Math.cos(a) * (w / 2 + ring * h * 0.8), Math.sin(a) * ring * h * 1.1]);
+        }
+        for (const [dx, dy] of cands) {
+          const candidate = { left: rect.left + dx, right: rect.right + dx, top: rect.top + dy, bottom: rect.bottom + dy };
+          if (candidate.left < frame.left || candidate.right > frame.right || candidate.bottom < frame.top || candidate.top > frame.bottom ||
+              occupied.overlaps(candidate, LABEL_GAP)) continue;
+          el.style.translate = dx + 'px ' + dy + 'px';
+          el.style.setProperty('--ll', Math.hypot(dx, dy) / labelZoom + 'px');
+          el.style.setProperty('--la', Math.atan2(-dy, -dx) + 'rad');
+          el.dataset.leader = '1'; el.dataset.labelOffset = 'x';
+          occupied.add(candidate); placed = true; break;
+        }
+      } else if (overlaps(rect, frame)) for (const [dx, dy] of horizontalOffsets.flatMap(dx => offsets.map(dy => [dx, dy]))) {
         const candidate = { left: rect.left + dx, right: rect.right + dx, top: rect.top + dy, bottom: rect.bottom + dy };
         if (((groupLabel || floorLabel) && (candidate.left < frame.left || candidate.right > frame.right)) || candidate.bottom < frame.top ||
             candidate.top > frame.bottom || occupied.overlaps(candidate, LABEL_GAP)) continue;
@@ -326,6 +351,62 @@ export class Scene3D {
       this.settleTries = 0;
       if (main && this.ghost) { this.ghost.remove(); this.ghost = null; }
     }
+  }
+
+  /* 試作 labels-focus / labels-tier：出さない部品ラベルの集合 */
+  labelHideSet(labels, frame, camera) {
+    const focus = lab('labels-focus'), tier = lab('labels-tier');
+    if (!focus && !tier) return null;
+    const hide = new Set(), info = this.nodeInfo || new Map(), ends = this.linkEnds || [];
+    const near = new Set(), deg = new Map();
+    const hot = new Set(labels.filter(l => l.el.dataset.node && (l.el.dataset.selected || l.el.dataset.outlined || l.el.dataset.node === this.hoverId)).map(l => l.el.dataset.node));
+    for (const [a, b] of ends) {
+      deg.set(a, (deg.get(a) || 0) + 1); deg.set(b, (deg.get(b) || 0) + 1);
+      if (hot.has(a)) near.add(b);
+      if (hot.has(b)) near.add(a);
+    }
+    for (const id of hot) near.add(id);
+    const zoom = camera.zoom;
+    const score = id => (deg.get(id) || 0) + (info.get(id)?.badge ? 3 : 0) + (hot.has(id) ? 100 : 0);
+    let allowed = null;
+    if (tier) {
+      const z = Math.max(0.6, zoom);
+      const cap = Math.max(3, Math.round(frame.width * frame.height / 100000 * z * z));
+      allowed = new Set([...info.keys()].sort((a, b) => score(b) - score(a)).slice(0, cap));
+    }
+    for (const { el } of labels) {
+      const id = el.dataset.node;
+      if (!id) continue;
+      if (focus && !near.has(id) && zoom < 1.6) hide.add(el);
+      else if (allowed && !allowed.has(id)) hide.add(el);
+    }
+    return hide;
+  }
+
+  /* 試作 frames-depth：入れ子の深さで線・面を変える。選択した部品を含む枠は線を強調する */
+  applyFrameDepth() {
+    this.frameDirty = false;
+    const fl = this.frameList || [];
+    const box = f => { const xs = f.pts.map(p => p[0]), zs = f.pts.map(p => p[1]); return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) }; };
+    const bs = fl.map(box), E = 1e-3;
+    const contains = (o, i) => o.x0 <= i.x0 + E && o.x1 >= i.x1 - E && o.z0 <= i.z0 + E && o.z1 >= i.z1 - E;
+    const area = b => (b.x1 - b.x0) * (b.z1 - b.z0);
+    const depths = fl.map((f, i) => fl.reduce((n, g, j) => i !== j && (Math.abs(g.y - f.y) < 0.5 || ['cloud', 'datacenter'].includes(g.kind)) && contains(bs[j], bs[i]) &&
+      (area(bs[j]) > area(bs[i]) + E || j < i) ? n + 1 : n, 0));
+    const max = Math.max(1, ...depths);
+    const sel = [...(this.nodeInfo || new Map()).values()].filter(n => n.selected && n.pos);
+    fl.forEach((f, i) => {
+      const t = depths[i] / max, b = bs[i];
+      const has = sel.some(n => n.pos[0] >= b.x0 && n.pos[0] <= b.x1 && n.pos[2] >= b.z0 && n.pos[2] <= b.z1);
+      const m = f.line.material; m.transparent = true;
+      m.opacity = has ? 1 : 0.3 + 0.7 * t;
+      f.fill.material.opacity = (f.tint ? f.tint * (0.5 + t) : 0.015) * (0.5 + t);
+      // WebGL の線幅は 1 で固定のため、内側の枠と選択を含む枠は、わずかにずらした複製で太く見せる
+      const copies = (t >= 0.5 ? 1 : 0) + (has ? 2 : 0);
+      for (let k = 1; k <= copies; k++) {
+        const c = f.line.clone(); c.position.x += 0.012 * k; c.position.z += 0.012 * k; this.root.add(c);
+      }
+    });
   }
 
   /* 左ドラッグ（1 本指）の役割を切り替える。右ドラッグ（2 本指）は常にもう一方 */
@@ -611,6 +692,7 @@ export class Scene3D {
     if (this.labels.domElement.contains(active) && active.dataset.action) this.labelFocus = active.dataset;
     this.root.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(m => m.dispose()); });
     this.root.clear(); this.lbl.clear(); this.pick = []; this.edgePaths = []; this.packets = [];
+    this.linkEnds = []; this.nodeInfo = new Map(); this.frameList = [];
     this.cssCache = null; this.colorCache = null;
     // 描き直した直後の数フレームは、新しいラベルの配置がまだ落ち着かず、台数バッジなどが一瞬見えて消える。
     // 落ち着くまで、直前のラベルの写しを重ねて見せておき、新しいラベルは隠しておく
@@ -780,7 +862,7 @@ export class Scene3D {
       }
       geo.setFromPoints(segments);
       this.root.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: this.color(color) })));
-      return;
+      return this.root.children[this.root.children.length - 1];
     }
     const mat = style ? new THREE.LineDashedMaterial({ color: this.color(color), dashSize: style === 'dot' ? 0.06 : 0.22, gapSize: style === 'dot' ? 0.1 : 0.12 })
       : new THREE.LineBasicMaterial({ color: this.color(color) });
@@ -790,6 +872,7 @@ export class Scene3D {
       const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: this.color(fill), transparent: true, opacity: 0.7, depthWrite: false }));
       m.rotation.x = -Math.PI / 2; m.position.set((a[0] + c[0]) / 2, y + 0.005, (a[1] + c[1]) / 2); this.root.add(m);
     }
+    return line;
   }
   group({ pts, y, kind, label, color, brandIcon, labelY }) {
     const vpc = ['--ink', 'dash'];
@@ -799,14 +882,25 @@ export class Scene3D {
       namespace: ['#7c5cd6', 'dot'], nodegroup: ['--mute', 'dot'], datacenter: ['#6d6a63', 'dash'],
     }[kind] || ['--mute', 'dash'];
     const ink = ['cluster', 'datacenter', 'parallel', 'namespace'].includes(kind) ? fallback : color || fallback;
-    this.loop(pts, y, ink, style, fill);
+    const frameLine = this.loop(pts, y, ink, style, fill);
+    let frameFill = null;
     // クラウド・データセンター・クラスタは、枠の内側を淡く塗って入れ子が分かるようにする
     const tint = { cloud: 0.07, datacenter: 0.07, cluster: 0.05, region: 0.03, parallel: 0.08 }[kind];
     if (tint) {
       const [a, , c] = pts, w = Math.abs(c[0] - a[0]), d = Math.abs(c[1] - a[1]);
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: this.color(ink), transparent: true, opacity: tint, depthWrite: false }));
       m.rotation.x = -Math.PI / 2; m.position.set((a[0] + c[0]) / 2, y + 0.004 + (kind === 'cluster' ? 0.002 : 0), (a[1] + c[1]) / 2); m.renderOrder = -1;
-      this.root.add(m);
+      this.root.add(m); frameFill = m;
+    }
+    if (lab('frames-depth')) {
+      if (!frameFill) {
+        const [a, , c] = pts;
+        frameFill = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(c[0] - a[0]), Math.abs(c[1] - a[1])), new THREE.MeshBasicMaterial({ color: this.color(ink), transparent: true, opacity: 0, depthWrite: false }));
+        frameFill.rotation.x = -Math.PI / 2; frameFill.position.set((a[0] + c[0]) / 2, y + 0.004, (a[1] + c[1]) / 2); frameFill.renderOrder = -1;
+        this.root.add(frameFill);
+      }
+      (this.frameList ??= []).push({ pts, y, kind, line: frameLine, fill: frameFill, tint: tint || 0 });
+      this.frameDirty = true;
     }
     if (!label) return; // 複数フロアにまたがる枠は、ラベルを 1 か所だけに出す
     const [x, z] = kind === 'az' ? pts[1] : kind === 'cloud' ? pts[0] : pts[3];
@@ -835,6 +929,7 @@ export class Scene3D {
 
   /* ---------- ノード ---------- */
   node(s) {
+    (this.nodeInfo ??= new Map()).set(s.id, { pos: s.pos, selected: !!s.selected, badge: s.badge });
     if (s.flatStyle === 'card') return this.nodeCard(s);
     const [x, y, z] = s.pos, g = new THREE.Group(); g.position.set(x, y, z); this.root.add(g);
     const mat = c => new THREE.MeshLambertMaterial({ color: c, transparent: s.opacity < 1, opacity: s.opacity, depthWrite: s.opacity >= 0.5 });
@@ -1195,6 +1290,7 @@ export class Scene3D {
   }
 
   link(s) {
+    if (s.from) (this.linkEnds ??= []).push([s.from, s.to]);
     const v = s.points.map(p => new THREE.Vector3(...p));
     this.edgePaths.push({ id: s.id, points: v });
     const color = this.color(s.color);
@@ -1239,6 +1335,16 @@ export class Scene3D {
         this.root.add(new THREE.Mesh(arrow, new THREE.MeshBasicMaterial({
           color, side: THREE.DoubleSide, transparent: true, opacity: s.opacity,
         })));
+        if (s.stepNo) {
+          // lab flow-numbers：矢印の少し手前にステップ番号の丸を置く（選択や hover を妨げない）
+          const gap = arrowLength + (s.flat ? 10 * pixel : 0.45);
+          const at = leg.length > gap * 1.6 ? tip.clone().addScaledVector(direction, -gap) : leg.start.clone().lerp(leg.end, 0.5);
+          const css = `#${color.getHexString()}`;
+          this.label(String(s.stepNo), [at.x, at.y + 0.05, at.z], 'flow-no', [0.5, 0.5], {
+            pointerEvents: 'none', minWidth: '16px', height: '16px', lineHeight: '16px', borderRadius: '8px', textAlign: 'center',
+            font: '700 10px/16px system-ui,sans-serif', background: css, color: '#fff', border: '1px solid #fff', padding: '0 3px', boxSizing: 'border-box',
+          });
+        }
       }
     }
     if (s.packets) {
