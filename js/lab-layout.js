@@ -13,7 +13,9 @@ const DATA_KINDS = new Set(['db', 'queue', 'cache', 'table', 'file', 'segment'])
 const CTRL_KINDS = new Set(['service', 'scheduler', 'catalog', 'policy', 'workflow', 'monitor']);
 const ACTOR_KINDS = new Set(['client', 'actor', 'external']);
 const CTRL_SVC = /(^|[:\-_/])(iam|auth|authn|authz|sso|oidc|cognito|entra|aad|okta|kms|vault|secrets?|catalog|glue|unity|purview|polaris|lakeformation|metastore|hive-?metastore|horizon|rbac)([:\-_/]|$)/i;
-const CTRL_LABEL = /認証|認可|資格情報|ロール|権限|カタログ|メタデータ|catalog|metadata|IAM|identity|credential/i;
+const CTRL_LABEL = /認証|認可|資格情報|ロール|権限|カタログ|メタデータ|catalog|metadata|IAM|identity|credential|レジストリ|registry|metastore|リネージ|lineage|keycloak|oauth|ポリシー|マスキング|semantic layer|ZooKeeper|KRaft|Keeper|Consul|Kubernetes API|Marquez|Ranger|Atlas|GMS|UC サーバー|Gravitino|Nessie|Polaris|Horizon|Cloud Services|Fail-safe/i;
+// 保存を担うサービス（kind が service でも「保存・データ」の床に置く）
+const DATA_SVC = /(^|[:-_/])(s3|gcs|dynamodb|blob|adls|bigtable|spanner|ebs|efs|storage)([:-_/]|$)/i;
 // kind が service でも、実際に処理を動かす部品（実行基盤・ジョブ）は「処理」に置く
 const COMPUTE_SVC = /(^|[:\-_/])(cloudrun|ecs|eks|fargate|lambda|functions?|batch|dataflow|emr|spark|ec2|aks|gke|run|job|jobs|warehouse|runtime|compute|pipe|streaming|ingest)([:\-_/]|$)/i;
 const COMPUTE_LABEL = /ジョブ|生成器|評価|ワーカー|実行|Jobs?\b|Warehouse|runtime/i;
@@ -80,10 +82,12 @@ export function ranksOf(ids, links) {
 /* ---------- 役割 ---------- */
 export function roleOf({ kind, svc, label } = {}) {
   if (ACTOR_KINDS.has(kind)) return 'actor';
-  const runs = kind === 'worker' || kind === 'host'; // 実行する部品は、名前にカタログ・認証があっても処理
+  const runs = kind === 'worker' || kind === 'host' || DATA_KINDS.has(kind); // 実行する部品・保存する部品は、名前にカタログ・認証があっても制御にしない
+  if (kind === 'service' && label && COMPUTE_LABEL.test(label) && !CTRL_LABEL.test(label)) return 'proc'; // 「Glue ジョブ実行」のように名前が処理を表す service は、提供元が制御系でも処理
   if (!runs && svc && CTRL_SVC.test(String(svc).split(':').pop())) return 'ctrl'; // 「提供元:サービス」のサービス側だけ見る
   if (!runs && label && CTRL_LABEL.test(label)) return 'ctrl';
-  if (kind === 'service') return (svc && COMPUTE_SVC.test(svc)) || (label && COMPUTE_LABEL.test(label)) ? 'proc' : 'ctrl';
+  // kind が service の部品は、制御（認証・カタログ・メタデータ・調整）と判定できたものだけ上の床に置き、それ以外は処理とする
+  if (kind === 'service') return svc && DATA_SVC.test(svc) ? 'data' : svc && /^(datadog|newrelic|grafana|prometheus):/.test(svc) ? 'ctrl' : 'proc';
   if (CTRL_KINDS.has(kind)) return 'ctrl';
   if (DATA_KINDS.has(kind)) return 'data';
   return 'proc';
