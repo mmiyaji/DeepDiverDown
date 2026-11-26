@@ -686,6 +686,14 @@ export class Scene3D {
     this.lastLabelProjection.copy(this.labelProjection);
     this.labelsDirty = false; this.lastPlace = performance.now();
   }
+  /* 2D を図全体の CSS 拡大で大きくしたとき、描画の解像度も合わせて上げる（拡大した線や矢印が粗くならないように）。上限は 1 辺 4096px */
+  setCssZoom(z) {
+    const w = this.el.clientWidth || 1, h = this.el.clientHeight || 1;
+    const want = Math.min(Math.min(devicePixelRatio, 2) * Math.max(1, z || 1), 4096 / Math.max(w, h));
+    const pr = Math.max(Math.min(devicePixelRatio, 2), Math.min(want, 6));
+    if (Math.abs(pr - this.renderer.getPixelRatio()) < 0.05) return;
+    this.renderer.setPixelRatio(pr); this.resize(); this.labelsDirty = true;
+  }
   resize() {
     const w = this.el.clientWidth, h = this.el.clientHeight || 1, a = w / h;
     this.labelsDirty = true;
@@ -817,7 +825,7 @@ export class Scene3D {
     this.labelsDirty = true;
     // 2D のカードは画面上の大きさが変わらないので、カメラを 1 倍より縮めると図だけが縮んでカードが重なる（iPad のピンチで起きた）。
     // 2D は縮小を止め、すでに縮んでいれば 1 倍へ戻して全体表示にする
-    this.controls.enableZoom = !flat; this.controls.minZoom = flat ? 1 : 0.3; // 2D の拡大は app.js が図全体の CSS 拡大で行う
+    this.controls.enableZoom = !flat; this.controls.enablePan = !flat; this.controls.minZoom = flat ? 1 : 0.3; // 2D の拡大と移動は app.js が図全体の CSS 拡大とスクロールで行う
     if (flat && this.camera.zoom < 1) { this.camera.zoom = 1; this.camera.updateProjectionMatrix(); this.fitView = 'top'; }
     this.mergeStatic();
     if (!this.fitted || (flat && this.fitView)) {

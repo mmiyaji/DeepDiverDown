@@ -1,6 +1,6 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
 import { enhanceSelect } from './dropdown.js';
-import { Scene3D } from './scene3d.js?v=view2';
+import { Scene3D } from './scene3d.js?v=view6';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=perf9';
 import { implementation3D, platformFootprint, platformNeedsMemberBounds } from './implementation-3d.js?v=platform-boundary1';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
@@ -66,7 +66,7 @@ $('view').before(compareViewport);
 compareViewport.append($('view'));
 let readableDiagram = false;
 /* 2D の利用者による拡大（ホイール＋Ctrl、トラックパッドのピンチ、2 本指のピンチ）。描画とカードを一緒に拡大するので、カードだけが小さく残ることがない */
-const USER_ZOOM_MAX = 3.5;
+const USER_ZOOM_MAX = 8, SCALE_MAX = 6; // 利用者の拡大率の上限と、表示倍率全体の上限
 let userZoom = 1;
 function updateDiagramScale() {
   const view = $('view'), button = document.querySelector('[data-act="readable-diagram"]');
@@ -82,9 +82,10 @@ function updateDiagramScale() {
     // 縮小しすぎて文字が読めなくなるのを防ぐ（既定の文字 11.5px が約 9px を下回らない範囲）。収まらない分はスクロールで見る
     if (!lab('zoom-floor-off')) scale = Math.max(scale, 0.78);
   }
-  if (applicable) scale = Math.max(0.4, Math.min(USER_ZOOM_MAX, scale * userZoom));
+  if (applicable) scale = Math.max(0.4, Math.min(SCALE_MAX, scale * userZoom));
   const value = scale === 1 ? '' : String(scale);
   if (view.style.zoom !== value) view.style.zoom = value;
+  scene.setCssZoom?.(applicable ? scale : 1);
 }
 /* 見えている点（cx, cy：ビューポート内の位置）を動かさずに、拡大率を userZoom に変える */
 function setUserZoom(next, cx, cy) {
@@ -2065,6 +2066,27 @@ compareViewport.addEventListener('wheel', e => {
   const up = e => { pts.delete(e.pointerId); if (pts.size < 2) base = null; };
   compareViewport.addEventListener('pointerup', up, true); compareViewport.addEventListener('pointercancel', up, true);
   compareViewport.style.touchAction = 'pan-x pan-y'; // ブラウザ自身のピンチ拡大を止め、上の処理で拡大する
+  /* ドラッグでの移動：カメラを動かすと、図全体を CSS で拡大したときに指の動きより速く動くので、ビューポートのスクロールで動かす（拡大率に依らず指に追従） */
+  let drag = null;
+  compareViewport.addEventListener('pointerdown', e => {
+    if (!active() || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest('button, a, input, select, textarea') || pts.size > 1) return; // カードの上から始めても、動かせばスクロール（動かさなければクリック）
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sl: compareViewport.scrollLeft, st: compareViewport.scrollTop, moved: false };
+  }, true);
+  compareViewport.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (pts.size > 1) { drag = null; return; }
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    if (!drag.moved) { drag.moved = true; compareViewport.style.cursor = 'grabbing'; }
+    compareViewport.scrollLeft = drag.sl - dx; compareViewport.scrollTop = drag.st - dy;
+    e.preventDefault();
+  }, true);
+  const endDrag = e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const moved = drag.moved; drag = null; compareViewport.style.cursor = '';
+    if (moved) { const stop = ev => { ev.stopPropagation(); ev.preventDefault(); }; addEventListener('click', stop, { capture: true, once: true }); setTimeout(() => removeEventListener('click', stop, true), 0); } // ドラッグ後のクリックで部品を選ばない
+  };
+  compareViewport.addEventListener('pointerup', endDrag, true); compareViewport.addEventListener('pointercancel', endDrag, true);
 }
 if (PREVIEW) {
   compared = previewRoles();
