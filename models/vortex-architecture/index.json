@@ -1,0 +1,273 @@
+{
+  "model": "vortex-architecture",
+  "name": "Vortex の基本アーキテクチャ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "書き込み側（Vortex ライブラリ）",
+      "status": "claim"
+    },
+    "scanapi": {
+      "type": "node",
+      "label": "Scan API",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "読み取りエンジン（DataFusion・DuckDB・Spark など）",
+      "status": "claim"
+    },
+    "postscript": {
+      "type": "node",
+      "label": "postscript と末尾の枠",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "node",
+      "label": "DType と footer",
+      "status": "claim"
+    },
+    "layouts": {
+      "type": "node",
+      "label": "レイアウト木",
+      "status": "claim"
+    },
+    "stats": {
+      "type": "node",
+      "label": "ファイル統計とゾーンマップ",
+      "status": "claim"
+    },
+    "segments": {
+      "type": "node",
+      "label": "データセグメント（エンコード済み配列）",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "ローカル・オブジェクトストレージ",
+      "status": "claim"
+    },
+    "write-seg": {
+      "type": "link",
+      "label": "書き込み側（Vortex ライブラリ） → データセグメント（エンコード済み配列）",
+      "status": "claim"
+    },
+    "write-post": {
+      "type": "link",
+      "label": "書き込み側（Vortex ライブラリ） → postscript と末尾の枠",
+      "status": "claim"
+    },
+    "push": {
+      "type": "link",
+      "label": "読み取りエンジン（DataFusion・DuckDB・Spark など） → Scan API",
+      "status": "claim"
+    },
+    "read-tail": {
+      "type": "link",
+      "label": "Scan API → postscript と末尾の枠",
+      "status": "claim"
+    },
+    "to-footer": {
+      "type": "link",
+      "label": "postscript と末尾の枠 → DType と footer",
+      "status": "claim"
+    },
+    "to-layout": {
+      "type": "link",
+      "label": "postscript と末尾の枠 → レイアウト木",
+      "status": "claim"
+    },
+    "to-stats": {
+      "type": "link",
+      "label": "レイアウト木 → ファイル統計とゾーンマップ",
+      "status": "claim"
+    },
+    "to-seg": {
+      "type": "link",
+      "label": "レイアウト木 → データセグメント（エンコード済み配列）",
+      "status": "claim"
+    },
+    "read-seg": {
+      "type": "link",
+      "label": "データセグメント（エンコード済み配列） → 読み取りエンジン（DataFusion・DuckDB・Spark など）",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "データセグメント（エンコード済み配列） → ローカル・オブジェクトストレージ",
+      "status": "claim"
+    },
+    "write-read": {
+      "type": "scenario",
+      "label": "ファイルを書いて読む"
+    },
+    "layout-detail": {
+      "type": "unknown",
+      "label": "ゾーンの作り方と読み飛ばしの判定の詳細は公式の概念ページに記述がなく未確認。"
+    },
+    "governance": {
+      "type": "unknown",
+      "label": "LF AI & Data 傘下であることは、取得した公式ページの表記（Vortex a Series of LF Projects"
+    },
+    "runtime": {
+      "type": "unknown",
+      "label": "実環境の読み取り性能と各エンジンの対応機能の差は未検証。"
+    },
+    "aws-host": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "Amazon EC2",
+      "realizes": []
+    },
+    "aws-writer": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "書き込みジョブ（Vortex ライブラリ）",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "aws-scan": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "Scan API",
+      "realizes": [
+        "scanapi"
+      ]
+    },
+    "aws-reader": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "DataFusion または DuckDB",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "Amazon S3",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "aws-file": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "S3 上の .vortex オブジェクト",
+      "realizes": [
+        "segments",
+        "postscript",
+        "footer",
+        "layouts",
+        "stats"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-vortex-architecture.md#§1": [
+      "model"
+    ],
+    "docs/reference-vortex-architecture.md": [
+      "model",
+      "writer",
+      "scanapi",
+      "reader",
+      "postscript",
+      "footer",
+      "layouts",
+      "stats",
+      "segments",
+      "storage",
+      "write-seg",
+      "write-post",
+      "push",
+      "read-tail",
+      "to-footer",
+      "to-layout",
+      "to-stats",
+      "to-seg",
+      "read-seg",
+      "persist",
+      "write-read",
+      "aws-host",
+      "aws-writer",
+      "aws-scan",
+      "aws-reader",
+      "aws-s3",
+      "aws-file"
+    ],
+    "docs/reference-vortex-architecture.md#§2": [
+      "model",
+      "postscript",
+      "footer",
+      "write-post",
+      "read-tail",
+      "to-footer",
+      "to-layout"
+    ],
+    "docs/reference-vortex-architecture.md#§3": [
+      "writer",
+      "scanapi",
+      "reader",
+      "write-seg",
+      "push",
+      "read-seg"
+    ],
+    "docs/reference-vortex-architecture.md#§4": [
+      "layouts",
+      "stats",
+      "to-stats",
+      "to-seg"
+    ],
+    "docs/reference-vortex-architecture.md#§5": [
+      "segments"
+    ],
+    "docs/reference-vortex-architecture.md#§6": [
+      "storage",
+      "persist"
+    ],
+    "docs/reference-vortex-architecture.md#§7": [
+      "write-read"
+    ],
+    "docs/reference-vortex-architecture.md#§8": [
+      "aws-host",
+      "aws-writer",
+      "aws-scan",
+      "aws-reader",
+      "aws-s3",
+      "aws-file"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "ファイル形式",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Vortex",
+    "role": "overview",
+    "order": 30,
+    "objectives": [
+      "ファイル先頭と末尾の枠、postscript、footer、レイアウト木、セグメントの役割を説明する。",
+      "読み取りが末尾から始まり、必要なセグメントだけを取得する流れを追う。",
+      "Scan API を介したエンジンとファイルの関係を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Vortex ドキュメント",
+        "url": "https://docs.vortex.dev/"
+      },
+      {
+        "title": "Vortex File Format",
+        "url": "https://docs.vortex.dev/specs/file-format"
+      },
+      {
+        "title": "Vortex Layouts",
+        "url": "https://docs.vortex.dev/concepts/layouts"
+      }
+    ]
+  }
+}

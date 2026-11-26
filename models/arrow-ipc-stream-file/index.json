@@ -1,0 +1,267 @@
+{
+  "model": "arrow-ipc-stream-file",
+  "name": "Arrow IPC：ストリーム形式とファイル形式の違い",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "producer": {
+      "type": "node",
+      "label": "書き手",
+      "status": "claim"
+    },
+    "head": {
+      "type": "node",
+      "label": "先頭マジック ARROW1（ファイルのみ）",
+      "status": "claim"
+    },
+    "stream": {
+      "type": "node",
+      "label": "メッセージ列",
+      "status": "claim"
+    },
+    "eos": {
+      "type": "node",
+      "label": "終端マーカー",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "node",
+      "label": "フッター（ファイルのみ）",
+      "status": "claim"
+    },
+    "tail": {
+      "type": "node",
+      "label": "フッター長と末尾マジック（ファイルのみ）",
+      "status": "claim"
+    },
+    "seq-reader": {
+      "type": "node",
+      "label": "ストリーム読み手",
+      "status": "claim"
+    },
+    "rand-reader": {
+      "type": "node",
+      "label": "ファイル読み手",
+      "status": "claim"
+    },
+    "put-head": {
+      "type": "link",
+      "label": "書き手 → 先頭マジック ARROW1（ファイルのみ）",
+      "status": "claim"
+    },
+    "put-msgs": {
+      "type": "link",
+      "label": "書き手 → メッセージ列",
+      "status": "claim"
+    },
+    "follow": {
+      "type": "link",
+      "label": "先頭マジック ARROW1（ファイルのみ） → メッセージ列",
+      "status": "claim"
+    },
+    "put-eos": {
+      "type": "link",
+      "label": "メッセージ列 → 終端マーカー",
+      "status": "claim"
+    },
+    "put-footer": {
+      "type": "link",
+      "label": "終端マーカー → フッター（ファイルのみ）",
+      "status": "claim"
+    },
+    "put-tail": {
+      "type": "link",
+      "label": "フッター（ファイルのみ） → フッター長と末尾マジック（ファイルのみ）",
+      "status": "claim"
+    },
+    "seq-read": {
+      "type": "link",
+      "label": "メッセージ列 → ストリーム読み手",
+      "status": "claim"
+    },
+    "seq-end": {
+      "type": "link",
+      "label": "終端マーカー → ストリーム読み手",
+      "status": "claim"
+    },
+    "rand-tail": {
+      "type": "link",
+      "label": "フッター長と末尾マジック（ファイルのみ） → ファイル読み手",
+      "status": "claim"
+    },
+    "rand-footer": {
+      "type": "link",
+      "label": "フッター（ファイルのみ） → ファイル読み手",
+      "status": "claim"
+    },
+    "rand-seek": {
+      "type": "link",
+      "label": "メッセージ列 → ファイル読み手",
+      "status": "claim"
+    },
+    "stream-vs-file": {
+      "type": "scenario",
+      "label": "同じバッチを順次読みとランダムアクセスで読む"
+    },
+    "layout": {
+      "type": "unknown",
+      "label": "フッターの Flatbuffers の細部（Block 構造体など）は仕様の File.fbs で、この図では確認していない。"
+    },
+    "range": {
+      "type": "unknown",
+      "label": "S3 のようなオブジェクトストレージでの範囲読みの回数と速度は未検証。"
+    },
+    "aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "Amazon EC2",
+      "realizes": []
+    },
+    "aws-writer": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "PyArrow new_file / new_stream",
+      "realizes": [
+        "producer"
+      ]
+    },
+    "aws-stream-reader": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "PyArrow open_stream",
+      "realizes": [
+        "seq-reader"
+      ]
+    },
+    "aws-file-reader": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "PyArrow open_file / get_batch",
+      "realizes": [
+        "rand-reader"
+      ]
+    },
+    "aws-file-obj": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "S3 の .arrow オブジェクト（ファイル形式）",
+      "realizes": [
+        "head",
+        "stream",
+        "eos",
+        "footer",
+        "tail"
+      ]
+    },
+    "aws-stream-obj": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "S3 の .arrows オブジェクト（ストリーム形式）",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-arrow-ipc-stream-file.md#§1": [
+      "model"
+    ],
+    "docs/reference-arrow-ipc-stream-file.md": [
+      "model",
+      "producer",
+      "head",
+      "stream",
+      "eos",
+      "footer",
+      "tail",
+      "seq-reader",
+      "rand-reader",
+      "put-head",
+      "put-msgs",
+      "follow",
+      "put-eos",
+      "put-footer",
+      "put-tail",
+      "seq-read",
+      "seq-end",
+      "rand-tail",
+      "rand-footer",
+      "rand-seek",
+      "stream-vs-file",
+      "aws-ec2",
+      "aws-writer",
+      "aws-stream-reader",
+      "aws-file-reader",
+      "aws-file-obj",
+      "aws-stream-obj"
+    ],
+    "docs/reference-arrow-ipc-stream-file.md#§3": [
+      "model"
+    ],
+    "docs/reference-arrow-ipc-stream-file.md#§4": [
+      "model"
+    ],
+    "docs/reference-arrow-ipc-stream-file.md#§7": [
+      "model"
+    ],
+    "docs/reference-arrow-ipc-stream-file.md#§2": [
+      "producer",
+      "head",
+      "stream",
+      "eos",
+      "footer",
+      "tail",
+      "seq-reader",
+      "rand-reader",
+      "put-head",
+      "put-msgs",
+      "follow",
+      "put-eos",
+      "put-footer",
+      "put-tail",
+      "seq-read",
+      "seq-end",
+      "rand-tail",
+      "rand-footer",
+      "rand-seek"
+    ],
+    "docs/reference-arrow-ipc-stream-file.md#§5": [
+      "stream-vs-file"
+    ],
+    "docs/reference-arrow-ipc-stream-file.md#§6": [
+      "aws-ec2",
+      "aws-writer",
+      "aws-stream-reader",
+      "aws-file-reader",
+      "aws-file-obj",
+      "aws-stream-obj"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "ファイル形式",
+    "kind": "仕組みの深掘り",
+    "product": "Apache Arrow",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "arrow-ipc-architecture",
+    "order": 35,
+    "objectives": [
+      "ストリーム形式とファイル形式が共有するメッセージの並びを説明する。",
+      "ファイル形式だけが持つマジック、フッター、フッター長の役割を区別する。",
+      "順次読みとランダムアクセスの読み取り経路を比べる。"
+    ],
+    "sources": [
+      {
+        "title": "Arrow Columnar Format（IPC）",
+        "url": "https://arrow.apache.org/docs/format/Columnar.html"
+      },
+      {
+        "title": "PyArrow Streaming",
+        "Serialization": null,
+        "and IPC": null,
+        "url": "https://arrow.apache.org/docs/python/ipc.html"
+      }
+    ]
+  }
+}

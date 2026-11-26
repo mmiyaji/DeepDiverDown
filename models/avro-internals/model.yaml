@@ -113,11 +113,13 @@ implementations:
       - {id: hadoop-mapreduce-output-a, from: hadoop-mapreduce-front, to: hadoop-mapreduce-output, label: 結果を書き出す}
       - {id: hadoop-mapreduce-output-b, from: hadoop-mapreduce-tail, to: hadoop-mapreduce-output, label: 結果を書き出す}
       - {id: hadoop-mapreduce-input-connection, from: hadoop-mapreduce-input, to: hadoop-mapreduce-front, label: Avro 入力を割り当てる}
+    groups:
+      - {kind: datacenter, label: 自前 Linux Hadoop ノード群, provider: onprem, tier: [processing, setup], nodes: [hadoop-mapreduce-host, hadoop-mapreduce-front, hadoop-mapreduce-tail, hadoop-mapreduce-hdfs, hadoop-mapreduce-output, hadoop-mapreduce-input]}
     layout2d:
       tiers:
         - {id: diagram, label: 実装構成, z: 0, size: [29, 20]}
       nodes:
-        hadoop-mapreduce-client: {tier: diagram, x: 2, y: 2}
+        hadoop-mapreduce-client: {tier: diagram, x: 2, y: 11}
         hadoop-mapreduce-input: {tier: diagram, x: 2, y: 5}
         hadoop-mapreduce-host: {tier: diagram, x: 8, y: 2}
         hadoop-mapreduce-front: {tier: diagram, x: 8, y: 5}
@@ -125,7 +127,9 @@ implementations:
         hadoop-mapreduce-hdfs: {tier: diagram, x: 14, y: 2}
         hadoop-mapreduce-output: {tier: diagram, x: 14, y: 5}
       groups:
+
         - {kind: cluster, label: "自前 Hadoop ノード", tier: [diagram], x0: 6, y0: 0, x1: 10, y1: 12, nodes: [hadoop-mapreduce-host, hadoop-mapreduce-front, hadoop-mapreduce-tail]}
+        - {kind: datacenter, label: 自前 Linux Hadoop ノード群, provider: onprem, tier: [diagram], nodes: [hadoop-mapreduce-host, hadoop-mapreduce-front, hadoop-mapreduce-tail, hadoop-mapreduce-hdfs, hadoop-mapreduce-output, hadoop-mapreduce-input]}
     layout3d:
       tiers:
         - {id: zone0, label: "ジョブ投入者", z: 0, origin: [0, 0], size: [5, 6]}
@@ -141,6 +145,7 @@ implementations:
         hadoop-mapreduce-output: {tier: zone2, x: 2, y: 4}
       groups:
         - {kind: cluster, label: "自前 Hadoop ノード", tier: [zone1], nodes: [hadoop-mapreduce-host, hadoop-mapreduce-front, hadoop-mapreduce-tail]}
+        - {kind: datacenter, label: 自前 Linux Hadoop ノード群, provider: onprem, tier: [zone0, zone1, zone2], nodes: [hadoop-mapreduce-host, hadoop-mapreduce-front, hadoop-mapreduce-tail, hadoop-mapreduce-hdfs, hadoop-mapreduce-output, hadoop-mapreduce-input]}
   - id: aws-emr-avro
     label: AWS（EMR on EC2・HDFS）
     description: Amazon EMR on EC2 の MapReduce タスクが、S3 から HDFS にステージした同一 Avro ファイルの異なる Split を読む。

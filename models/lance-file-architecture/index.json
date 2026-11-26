@@ -1,0 +1,348 @@
+{
+  "model": "lance-file-architecture",
+  "name": "Lance ファイルの基本アーキテクチャ",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "書き込みエンジン",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "読み取りエンジン",
+      "status": "claim"
+    },
+    "cache": {
+      "type": "node",
+      "label": "検索キャッシュ",
+      "status": "claim"
+    },
+    "pages": {
+      "type": "node",
+      "label": "データページ（列ごと）",
+      "status": "claim"
+    },
+    "blob": {
+      "type": "unknown",
+      "label": "Blob V2 の仕様本文と、外部バッファとの対応は未確認。",
+      "status": "claim"
+    },
+    "colmeta": {
+      "type": "node",
+      "label": "列メタデータ（protobuf）",
+      "status": "claim"
+    },
+    "global": {
+      "type": "node",
+      "label": "グローバルバッファ",
+      "status": "claim"
+    },
+    "offsets": {
+      "type": "node",
+      "label": "オフセット表（列メタデータ・グローバルバッファ）",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "node",
+      "label": "フッター（LANC）",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "write-pages": {
+      "type": "link",
+      "label": "書き込みエンジン → データページ（列ごと）",
+      "status": "claim"
+    },
+    "write-meta": {
+      "type": "link",
+      "label": "書き込みエンジン → 列メタデータ（protobuf）",
+      "status": "claim"
+    },
+    "write-footer": {
+      "type": "link",
+      "label": "書き込みエンジン → フッター（LANC）",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "データページ（列ごと） → ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "read-footer": {
+      "type": "link",
+      "label": "読み取りエンジン → フッター（LANC）",
+      "status": "claim"
+    },
+    "footer-offsets": {
+      "type": "link",
+      "label": "フッター（LANC） → オフセット表（列メタデータ・グローバルバッファ）",
+      "status": "claim"
+    },
+    "offsets-meta": {
+      "type": "link",
+      "label": "オフセット表（列メタデータ・グローバルバッファ） → 列メタデータ（protobuf）",
+      "status": "claim"
+    },
+    "offsets-global": {
+      "type": "link",
+      "label": "オフセット表（列メタデータ・グローバルバッファ） → グローバルバッファ",
+      "status": "claim"
+    },
+    "meta-pages": {
+      "type": "link",
+      "label": "列メタデータ（protobuf） → データページ（列ごと）",
+      "status": "claim"
+    },
+    "read-pages": {
+      "type": "link",
+      "label": "データページ（列ごと） → 読み取りエンジン",
+      "status": "claim"
+    },
+    "page-blob": {
+      "type": "link",
+      "label": "データページ（列ごと） → 外部バッファ・blob",
+      "status": "claim"
+    },
+    "keep-locations": {
+      "type": "link",
+      "label": "読み取りエンジン → 検索キャッシュ",
+      "status": "claim"
+    },
+    "write-read": {
+      "type": "scenario",
+      "label": "ファイルを書いて読む"
+    },
+    "stats": {
+      "type": "unknown",
+      "label": "列統計とデータスキップの形式は File Format の仕様に定義がなく未確認。"
+    },
+    "runtime": {
+      "type": "unknown",
+      "label": "実環境のファイルサイズ、S3 上の遅延、キャッシュ容量は未検証。性能の数値はプロジェクトの自己申告。"
+    },
+    "aws-control": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "Amazon EMR",
+      "realizes": []
+    },
+    "aws-host": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "Amazon EC2 / YARN",
+      "realizes": []
+    },
+    "aws-writer": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "Spark Executor / Lance 書き込み",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "aws-reader": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "Spark Executor / Lance 読み取り",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "aws-cache": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "Executor メモリの検索キャッシュ",
+      "realizes": [
+        "cache"
+      ]
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "Amazon S3 / Lance ファイル",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "aws-pages": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "オブジェクト内のデータページ",
+      "realizes": [
+        "pages"
+      ]
+    },
+    "aws-blob": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "オブジェクト内の外部バッファ",
+      "realizes": [
+        "blob"
+      ]
+    },
+    "aws-colmeta": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "オブジェクト内の列メタデータ",
+      "realizes": [
+        "colmeta"
+      ]
+    },
+    "aws-global": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "オブジェクト内のグローバルバッファ",
+      "realizes": [
+        "global"
+      ]
+    },
+    "aws-offsets": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "オブジェクト内のオフセット表",
+      "realizes": [
+        "offsets"
+      ]
+    },
+    "aws-footer": {
+      "type": "implementation",
+      "impl": "aws-emr-spark",
+      "label": "オブジェクト末尾のフッター",
+      "realizes": [
+        "footer"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-lance-file-architecture.md#§1": [
+      "model"
+    ],
+    "docs/reference-lance-file-architecture.md": [
+      "model",
+      "writer",
+      "reader",
+      "cache",
+      "pages",
+      "blob",
+      "colmeta",
+      "global",
+      "offsets",
+      "footer",
+      "storage",
+      "write-pages",
+      "write-meta",
+      "write-footer",
+      "persist",
+      "read-footer",
+      "footer-offsets",
+      "offsets-meta",
+      "offsets-global",
+      "meta-pages",
+      "read-pages",
+      "page-blob",
+      "keep-locations",
+      "write-read",
+      "aws-control",
+      "aws-host",
+      "aws-writer",
+      "aws-reader",
+      "aws-cache",
+      "aws-s3",
+      "aws-pages",
+      "aws-blob",
+      "aws-colmeta",
+      "aws-global",
+      "aws-offsets",
+      "aws-footer"
+    ],
+    "docs/reference-lance-file-architecture.md#§2": [
+      "model",
+      "offsets",
+      "footer",
+      "footer-offsets",
+      "offsets-meta",
+      "offsets-global"
+    ],
+    "docs/reference-lance-file-architecture.md#§4": [
+      "model"
+    ],
+    "docs/reference-lance-file-architecture.md#§9": [
+      "model"
+    ],
+    "docs/reference-lance-file-architecture.md#§6": [
+      "writer",
+      "reader",
+      "cache",
+      "storage",
+      "write-pages",
+      "write-meta",
+      "write-footer",
+      "persist",
+      "read-footer",
+      "read-pages",
+      "keep-locations"
+    ],
+    "docs/reference-lance-file-architecture.md#§3": [
+      "pages",
+      "colmeta",
+      "meta-pages"
+    ],
+    "docs/reference-lance-file-architecture.md#§5": [
+      "blob",
+      "global",
+      "page-blob"
+    ],
+    "docs/reference-lance-file-architecture.md#§7": [
+      "write-read"
+    ],
+    "docs/reference-lance-file-architecture.md#§8": [
+      "aws-control",
+      "aws-host",
+      "aws-writer",
+      "aws-reader",
+      "aws-cache",
+      "aws-s3",
+      "aws-pages",
+      "aws-blob",
+      "aws-colmeta",
+      "aws-global",
+      "aws-offsets",
+      "aws-footer"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "ファイル形式",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Lance",
+    "role": "overview",
+    "order": 32,
+    "objectives": [
+      "ファイルの末尾から列メタデータとページへたどる読み取りの順序を説明する。",
+      "データページ、列メタデータ、オフセット表、フッター、外部バッファの役割を区別する。",
+      "書く側、読む側、オブジェクトストレージの関係を追う。"
+    ],
+    "sources": [
+      {
+        "title": "Lance File Format",
+        "url": "https://lance.org/format/file/"
+      },
+      {
+        "title": "Lance Encoding Strategy",
+        "url": "https://lance.org/format/file/encoding/"
+      },
+      {
+        "title": "LanceDB Blog",
+        "url": "https://lancedb.com/blog/lance-v2/"
+      }
+    ]
+  }
+}

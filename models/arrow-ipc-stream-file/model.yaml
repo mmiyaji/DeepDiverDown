@@ -1,0 +1,90 @@
+name: Arrow IPC：ストリーム形式とファイル形式の違い
+description: 同じメッセージ列を、ストリーム形式は先頭から順に、ファイル形式は末尾のフッターから位置を引いて読む。
+parent: {model: arrow-ipc-architecture, node: footer}
+reference:
+  objectives:
+    - ストリーム形式とファイル形式が共有するメッセージの並びを説明する。
+    - ファイル形式だけが持つマジック、フッター、フッター長の役割を区別する。
+    - 順次読みとランダムアクセスの読み取り経路を比べる。
+  sources:
+    - {title: Arrow Columnar Format（IPC）, url: https://arrow.apache.org/docs/format/Columnar.html}
+    - {title: PyArrow Streaming, Serialization, and IPC, url: https://arrow.apache.org/docs/python/ipc.html}
+sources: [docs/reference-arrow-ipc-stream-file.md]
+evidence: [{type: doc, ref: "docs/reference-arrow-ipc-stream-file.md#§1"}, {type: doc, ref: "docs/reference-arrow-ipc-stream-file.md#§3"}, {type: doc, ref: "docs/reference-arrow-ipc-stream-file.md#§4"}, {type: doc, ref: "docs/reference-arrow-ipc-stream-file.md#§7"}]
+tiers: [{id: flow, label: バイト列の並びと読み取り, z: 0, size: [26, 10]}]
+nodes:
+  producer: {label: 書き手, kind: worker, tier: flow, x: 0, y: 4, description: new_stream または new_file で開き、バッチを追記して閉じる。, evidence: &sf [{type: doc, ref: "docs/reference-arrow-ipc-stream-file.md#§2"}]}
+  head: {label: 先頭マジック ARROW1（ファイルのみ）, kind: file, tier: flow, x: 6, y: 0.5, description: ARROW1 と 8 バイト境界までのパディング。, evidence: *sf}
+  stream: {label: メッセージ列, kind: file, tier: flow, x: 11, y: 4, description: Schema、辞書バッチ、レコードバッチの順。各メッセージは継続マーカー、メタデータ長、Flatbuffers の Message、パディング、本体の並び。両形式で共通。, evidence: *sf}
+  eos: {label: 終端マーカー, kind: file, tier: flow, x: 16, y: 0.5, description: 0xFFFFFFFF の後に長さ 0。ストリームは接続を閉じて終えてもよい。, evidence: *sf}
+  footer: {label: フッター（ファイルのみ）, kind: file, tier: flow, x: 16, y: 4, description: Schema の複製と、全データブロックのオフセットとサイズ。, evidence: *sf}
+  tail: {label: フッター長と末尾マジック（ファイルのみ）, kind: file, tier: flow, x: 21, y: 4, description: フッターのサイズと ARROW1。読み手が最初に確かめる位置。, evidence: *sf}
+  seq-reader: {label: ストリーム読み手, kind: service, tier: flow, x: 11, y: 8.5, description: 先頭から順に読む。バッチの順番は固定で、ランダムアクセスはない。, evidence: *sf}
+  rand-reader: {label: ファイル読み手, kind: service, tier: flow, x: 21, y: 8.5, description: 末尾からフッターを引いて seek し、バッチを番号で読む。入力は seek できる必要がある。, evidence: *sf}
+links:
+  - {id: put-head, from: producer, to: head, label: ファイルの先頭に書く, evidence: *sf}
+  - {id: put-msgs, from: producer, to: stream, label: メッセージを追記, evidence: *sf}
+  - {id: follow, from: head, to: stream, label: パディング後に続く, evidence: *sf}
+  - {id: put-eos, from: stream, to: eos, label: 閉じるときに終端, evidence: *sf}
+  - {id: put-footer, from: eos, to: footer, label: ファイルは終端の後にフッター, evidence: *sf}
+  - {id: put-tail, from: footer, to: tail, label: 長さとマジックを付ける, evidence: *sf}
+  - {id: seq-read, from: stream, to: seq-reader, label: 先頭から順に読む, evidence: *sf}
+  - {id: seq-end, from: eos, to: seq-reader, label: 終端で読み終える, evidence: *sf}
+  - {id: rand-tail, from: tail, to: rand-reader, label: 末尾からフッター長を知る, evidence: *sf}
+  - {id: rand-footer, from: footer, to: rand-reader, label: ブロックの位置を得る, evidence: *sf}
+  - {id: rand-seek, from: stream, to: rand-reader, label: seek して 1 バッチ読む, evidence: *sf}
+scenarios:
+  - id: stream-vs-file
+    label: 同じバッチを順次読みとランダムアクセスで読む
+    evidence: [{type: doc, ref: "docs/reference-arrow-ipc-stream-file.md#§5"}]
+    steps:
+      - {links: [put-head, put-msgs, follow, put-eos], note: ファイルは先頭マジックの後にストリームと同じメッセージ列と終端を置く。}
+      - {links: [put-footer, put-tail], note: ファイルだけが、各ブロックの位置を持つフッターと、その長さ・末尾マジックを加える。}
+      - {links: [seq-read, seq-end], note: ストリーム読み手は先頭から順に読み、終端か接続の終了で止まる。}
+      - {links: [rand-tail, rand-footer, rand-seek], note: ファイル読み手は末尾からフッターを読み、必要なバッチの位置へ seek する。}
+unknowns:
+  - {id: layout, text: フッターの Flatbuffers の細部（Block 構造体など）は仕様の File.fbs で、この図では確認していない。, refs: [rand-footer]}
+  - {id: range, text: S3 のようなオブジェクトストレージでの範囲読みの回数と速度は未検証。, refs: [rand-tail, rand-seek]}
+implementations:
+  - id: aws-ec2-s3
+    label: "AWS：EC2 上の Python（PyArrow）と S3"
+    description: EC2 上の Python が S3 の .arrow をファイル形式で開いてバッチを番号で読み、別のプロセスが .arrows をストリーム形式で読む構成例。
+    sources:
+      - {title: PyArrow Streaming, Serialization, and IPC, url: https://arrow.apache.org/docs/python/ipc.html}
+      - {title: Arrow Columnar Format（IPC）, url: https://arrow.apache.org/docs/format/Columnar.html}
+    tiers: &aws-tiers [{id: diagram, label: EC2 と S3 のオブジェクト, z: 0, size: [24, 12]}]
+    nodes:
+      aws-ec2: {label: Amazon EC2, svc: ec2, kind: host, tier: diagram, x: 3, y: 5, description: Python プロセスを動かすホスト。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者が OS とソフトウェアを管理する。}, evidence: &sf-aws [{type: doc, ref: "docs/reference-arrow-ipc-stream-file.md#§6"}]}
+      aws-writer: {label: PyArrow new_file / new_stream, kind: worker, tier: diagram, x: 3, y: 1.5, realizes: [producer], description: 同じ API で、ファイル形式かストリーム形式かを選んで書く。, management: {type: customer, scope: 利用者がコードと PyArrow の版を管理する。}, evidence: *sf-aws}
+      aws-stream-reader: {label: PyArrow open_stream, kind: worker, tier: diagram, x: 9, y: 9.5, realizes: [seq-reader], description: 先頭から順に読む。, management: {type: customer, scope: 利用者がコードと PyArrow の版を管理する。}, evidence: *sf-aws}
+      aws-file-reader: {label: PyArrow open_file / get_batch, kind: worker, tier: diagram, x: 3, y: 9.5, realizes: [rand-reader], description: フッターを読み、get_batch(i) でバッチを番号指定する。, management: {type: customer, scope: 利用者がコードと PyArrow の版を管理する。}, evidence: *sf-aws}
+      aws-file-obj: {label: S3 の .arrow オブジェクト（ファイル形式）, svc: s3, kind: file, tier: diagram, x: 15, y: 3, realizes: [head, stream, eos, footer, tail], description: マジック、メッセージ列、終端、フッター、末尾を 1 オブジェクトに持つ。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者がデータとアクセス権限を管理する。}, evidence: *sf-aws}
+      aws-stream-obj: {label: S3 の .arrows オブジェクト（ストリーム形式）, svc: s3, kind: file, tier: diagram, x: 15, y: 8, description: メッセージ列と終端だけで、フッターを持たない。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者がデータとアクセス権限を管理する。}, evidence: *sf-aws}
+    links:
+      - {id: aws-run-w, from: aws-ec2, to: aws-writer, label: 書き込みを実行, evidence: *sf-aws}
+      - {id: aws-write-file, from: aws-writer, to: aws-file-obj, label: ファイル形式で書く, realizes: [put-head, put-msgs, put-footer, put-tail], replace: true, evidence: *sf-aws}
+      - {id: aws-write-stream, from: aws-writer, to: aws-stream-obj, label: ストリーム形式で書く, evidence: *sf-aws}
+      - {id: aws-seq, from: aws-stream-obj, to: aws-stream-reader, label: 先頭から順に読む, realizes: [seq-read, seq-end], replace: true, evidence: *sf-aws}
+      - {id: aws-rand, from: aws-file-obj, to: aws-file-reader, label: 末尾のフッターと 1 バッチを読む, realizes: [rand-tail, rand-footer, rand-seek], replace: true, evidence: *sf-aws}
+    groups: &aws-groups
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 0.5, y0: -0.5, x1: 23.5, y1: 11.5, nodes: [aws-ec2, aws-writer, aws-stream-reader, aws-file-reader, aws-file-obj, aws-stream-obj]}
+      - {kind: cluster, label: EC2 インスタンス, tier: diagram, x0: 1.4, y0: 0.2, x1: 12, y1: 11, nodes: [aws-ec2, aws-writer, aws-stream-reader, aws-file-reader]}
+    layout2d:
+      tiers: *aws-tiers
+      nodes: {}
+      groups: *aws-groups
+    layout3d:
+      tiers:
+        - {id: apps, label: Python プロセス, z: 1, size: [10, 8]}
+        - {id: host, label: EC2 ホスト, z: 0, size: [10, 8]}
+        - {id: data, label: S3 のオブジェクト, z: 0, origin: [12, 0], size: [12, 8]}
+      nodes:
+        aws-writer: {tier: apps, x: 5, y: 1.5}
+        aws-file-reader: {tier: apps, x: 2, y: 6}
+        aws-stream-reader: {tier: apps, x: 8, y: 6}
+        aws-ec2: {tier: host, x: 5, y: 4}
+        aws-file-obj: {tier: data, x: 6, y: 2}
+        aws-stream-obj: {tier: data, x: 6, y: 6}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, host, data], nodes: [aws-ec2, aws-writer, aws-stream-reader, aws-file-reader, aws-file-obj, aws-stream-obj]}
+        - {kind: cluster, label: EC2 インスタンス, tier: [apps, host], nodes: [aws-ec2, aws-writer, aws-stream-reader, aws-file-reader]}

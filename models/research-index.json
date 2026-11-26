@@ -4079,7 +4079,7 @@
       "description": "1 つの Parquet ファイルの中を、末尾のフッター、Row Group、列チャンク、辞書・データページまでドリルダウンし、範囲 GET で読む順序を追います。",
       "domain": "データ保存",
       "category": "ファイル形式",
-      "kind": "仕組みの深掘り",
+      "kind": "製品・技術のアーキテクチャ",
       "tags": [
         "OSS",
         "Apache"
@@ -4162,7 +4162,7 @@
       "description": "1 つの ORC ファイルの中を、末尾の Postscript とフッター、Stripe の索引・Stream までドリルダウンし、範囲 GET で読む順序を追います。",
       "domain": "データ保存",
       "category": "ファイル形式",
-      "kind": "仕組みの深掘り",
+      "kind": "製品・技術のアーキテクチャ",
       "tags": [
         "OSS",
         "Apache"
@@ -4229,7 +4229,7 @@
       "description": "行指向の Avro ファイルを、先頭のヘッダー（スキーマ）、データブロック、16 バイトの同期マーカーまでドリルダウンし、分割読みの仕組みを追います。",
       "domain": "データ保存",
       "category": "ファイル形式",
-      "kind": "仕組みの深掘り",
+      "kind": "製品・技術のアーキテクチャ",
       "tags": [
         "OSS",
         "Apache"
@@ -16861,6 +16861,356 @@
             {
               "title": "AWS shared responsibility",
               "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vortex-architecture",
+      "name": "Vortex の基本アーキテクチャ",
+      "description": "Vortex のファイルが、末尾の postscript・footer・レイアウト木・データセグメントでできていること、書く側と読む側がレイアウトとセグメントをどうたどるかを追う。",
+      "domain": "データ保存",
+      "category": "ファイル形式",
+      "kind": "製品・技術のアーキテクチャ",
+      "tags": [
+        "OSS",
+        "LF AI & Data"
+      ],
+      "objectives": [
+        "ファイル先頭と末尾の枠、postscript、footer、レイアウト木、セグメントの役割を説明する。",
+        "読み取りが末尾から始まり、必要なセグメントだけを取得する流れを追う。",
+        "Scan API を介したエンジンとファイルの関係を区別する。"
+      ],
+      "documents": [
+        "docs/reference-vortex-architecture.md"
+      ],
+      "sources": [
+        {
+          "title": "Vortex ドキュメント",
+          "url": "https://docs.vortex.dev/"
+        },
+        {
+          "title": "Vortex File Format",
+          "url": "https://docs.vortex.dev/specs/file-format"
+        },
+        {
+          "title": "Vortex Layouts",
+          "url": "https://docs.vortex.dev/concepts/layouts"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-ec2-s3",
+          "label": "AWS：EC2 上のエンジンと S3",
+          "sources": [
+            {
+              "title": "Vortex ドキュメント",
+              "url": "https://docs.vortex.dev/"
+            },
+            {
+              "title": "Vortex File Format",
+              "url": "https://docs.vortex.dev/specs/file-format"
+            },
+            {
+              "title": "Amazon S3 ユーザーガイド",
+              "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vortex-encodings-pruning",
+      "name": "Vortex：入れ子のエンコーディングと読み飛ばし",
+      "description": "ゾーンマップで読む範囲を絞り、入れ子にエンコードされた配列を圧縮したまま評価して、必要なときだけ展開する経路を追う。",
+      "domain": "データ保存",
+      "category": "ファイル形式",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "LF AI & Data"
+      ],
+      "objectives": [
+        "ゾーンマップによる読み飛ばしと、セグメントの遅延取得を区別する。",
+        "入れ子のエンコーディングを圧縮したまま評価する流れを追う。",
+        "展開が必要になる場面を説明する。"
+      ],
+      "documents": [
+        "docs/reference-vortex-encodings-pruning.md"
+      ],
+      "sources": [
+        {
+          "title": "Vortex ドキュメント",
+          "url": "https://docs.vortex.dev/"
+        },
+        {
+          "title": "Vortex Layouts",
+          "url": "https://docs.vortex.dev/concepts/layouts"
+        },
+        {
+          "title": "Vortex File Format",
+          "url": "https://docs.vortex.dev/specs/file-format"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-ec2-s3",
+          "label": "AWS：EC2 上のエンジンと S3",
+          "sources": [
+            {
+              "title": "Vortex ドキュメント",
+              "url": "https://docs.vortex.dev/"
+            },
+            {
+              "title": "Vortex Layouts",
+              "url": "https://docs.vortex.dev/concepts/layouts"
+            },
+            {
+              "title": "Amazon S3 ユーザーガイド",
+              "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lance-file-architecture",
+      "name": "Lance ファイルの基本アーキテクチャ",
+      "description": "Lance ファイル 1 つの中のデータページ、列メタデータ、フッターの並びと、エンジンがストレージ上のファイルを書く・読む流れを追う。",
+      "domain": "データ保存",
+      "category": "ファイル形式",
+      "kind": "製品・技術のアーキテクチャ",
+      "tags": [
+        "OSS"
+      ],
+      "objectives": [
+        "ファイルの末尾から列メタデータとページへたどる読み取りの順序を説明する。",
+        "データページ、列メタデータ、オフセット表、フッター、外部バッファの役割を区別する。",
+        "書く側、読む側、オブジェクトストレージの関係を追う。"
+      ],
+      "documents": [
+        "docs/reference-lance-file-architecture.md"
+      ],
+      "sources": [
+        {
+          "title": "Lance File Format",
+          "url": "https://lance.org/format/file/"
+        },
+        {
+          "title": "Lance Encoding Strategy",
+          "url": "https://lance.org/format/file/encoding/"
+        },
+        {
+          "title": "LanceDB Blog",
+          "url": "https://lancedb.com/blog/lance-v2/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-emr-spark",
+          "label": "AWS：EMR on EC2 / Spark・Lance・S3",
+          "sources": [
+            {
+              "title": "Lance File Format",
+              "url": "https://lance.org/format/file/"
+            },
+            {
+              "title": "LanceDB Blog",
+              "url": "https://lancedb.com/blog/lance-v2/"
+            },
+            {
+              "title": "Apache Spark on Amazon EMR",
+              "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark.html"
+            },
+            {
+              "title": "AWS shared responsibility",
+              "url": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lance-random-access",
+      "name": "Lance：ページ構造とランダムアクセス",
+      "description": "行番号を指定して値を取るとき、構造エンコーディングごとに読む IOP の数と経路がどう変わるかを追う。",
+      "domain": "データ保存",
+      "category": "ファイル形式",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS"
+      ],
+      "objectives": [
+        "mini-block、full-zip、constant、blob の使い分けを説明する。",
+        "行番号から読むバイト範囲を求める手順と、構造ごとの IOP の数を区別する。",
+        "検索キャッシュが take に果たす役割を説明する。"
+      ],
+      "documents": [
+        "docs/reference-lance-random-access.md"
+      ],
+      "sources": [
+        {
+          "title": "Lance Encoding Strategy",
+          "url": "https://lance.org/format/file/encoding/"
+        },
+        {
+          "title": "Lance File Format",
+          "url": "https://lance.org/format/file/"
+        },
+        {
+          "title": "LanceDB Blog",
+          "url": "https://lancedb.com/blog/lance-v2/"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "onprem-ray",
+          "label": "自前サーバー：Ray ワーカー・Lance・ローカル NVMe",
+          "sources": [
+            {
+              "title": "Lance Encoding Strategy",
+              "url": "https://lance.org/format/file/encoding/"
+            },
+            {
+              "title": "Lance File Format",
+              "url": "https://lance.org/format/file/"
+            },
+            {
+              "title": "LanceDB Blog",
+              "url": "https://lancedb.com/blog/lance-v2/"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arrow-ipc-architecture",
+      "name": "Arrow IPC（Feather V2）の基本アーキテクチャ",
+      "description": "Arrow IPC のファイルが Schema・辞書バッチ・レコードバッチ・フッターでできていること、書き手と読み手とストレージの関係を追う。",
+      "domain": "データ保存",
+      "category": "ファイル形式",
+      "kind": "製品・技術のアーキテクチャ",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "IPC ファイルの構成要素（Schema、辞書バッチ、レコードバッチ、フッター）を挙げる。",
+        "書き手が要素を並べる順序と、読み手がフッターから入る経路を区別する。",
+        "Feather V2 と IPC ファイル形式の関係を説明する。"
+      ],
+      "documents": [
+        "docs/reference-arrow-ipc-architecture.md"
+      ],
+      "sources": [
+        {
+          "title": "Arrow Columnar Format（IPC）",
+          "url": "https://arrow.apache.org/docs/format/Columnar.html"
+        },
+        {
+          "title": "PyArrow Streaming",
+          "Serialization": null,
+          "and IPC": null,
+          "url": "https://arrow.apache.org/docs/python/ipc.html"
+        },
+        {
+          "title": "PyArrow Feather File Format",
+          "url": "https://arrow.apache.org/docs/python/feather.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-ec2-s3",
+          "label": "AWS：EC2 上の Python（PyArrow）と S3",
+          "sources": [
+            {
+              "title": "PyArrow Streaming",
+              "Serialization": null,
+              "and IPC": null,
+              "url": "https://arrow.apache.org/docs/python/ipc.html"
+            },
+            {
+              "title": "PyArrow Feather File Format",
+              "url": "https://arrow.apache.org/docs/python/feather.html"
+            },
+            {
+              "title": "Arrow Columnar Format（IPC）",
+              "url": "https://arrow.apache.org/docs/format/Columnar.html"
+            }
+          ]
+        },
+        {
+          "id": "onprem-local",
+          "label": "自前：ローカルディスクと PyArrow（mmap）",
+          "sources": [
+            {
+              "title": "PyArrow Streaming",
+              "Serialization": null,
+              "and IPC": null,
+              "url": "https://arrow.apache.org/docs/python/ipc.html"
+            },
+            {
+              "title": "Arrow Columnar Format（IPC）",
+              "url": "https://arrow.apache.org/docs/format/Columnar.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arrow-ipc-stream-file",
+      "name": "Arrow IPC：ストリーム形式とファイル形式の違い",
+      "description": "同じメッセージ列を、ストリーム形式は先頭から順に、ファイル形式は末尾のフッターから位置を引いて読む。",
+      "domain": "データ保存",
+      "category": "ファイル形式",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "OSS",
+        "Apache"
+      ],
+      "objectives": [
+        "ストリーム形式とファイル形式が共有するメッセージの並びを説明する。",
+        "ファイル形式だけが持つマジック、フッター、フッター長の役割を区別する。",
+        "順次読みとランダムアクセスの読み取り経路を比べる。"
+      ],
+      "documents": [
+        "docs/reference-arrow-ipc-stream-file.md"
+      ],
+      "sources": [
+        {
+          "title": "Arrow Columnar Format（IPC）",
+          "url": "https://arrow.apache.org/docs/format/Columnar.html"
+        },
+        {
+          "title": "PyArrow Streaming",
+          "Serialization": null,
+          "and IPC": null,
+          "url": "https://arrow.apache.org/docs/python/ipc.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "aws-ec2-s3",
+          "label": "AWS：EC2 上の Python（PyArrow）と S3",
+          "sources": [
+            {
+              "title": "PyArrow Streaming",
+              "Serialization": null,
+              "and IPC": null,
+              "url": "https://arrow.apache.org/docs/python/ipc.html"
+            },
+            {
+              "title": "Arrow Columnar Format（IPC）",
+              "url": "https://arrow.apache.org/docs/format/Columnar.html"
             }
           ]
         }

@@ -1,0 +1,127 @@
+name: Lance ファイルの基本アーキテクチャ
+description: Lance ファイル 1 つの中のデータページ、列メタデータ、フッターの並びと、エンジンがストレージ上のファイルを書く・読む流れを追う。
+reference:
+  objectives:
+    - ファイルの末尾から列メタデータとページへたどる読み取りの順序を説明する。
+    - データページ、列メタデータ、オフセット表、フッター、外部バッファの役割を区別する。
+    - 書く側、読む側、オブジェクトストレージの関係を追う。
+  sources:
+    - {title: Lance File Format, url: https://lance.org/format/file/}
+    - {title: Lance Encoding Strategy, url: https://lance.org/format/file/encoding/}
+    - {title: LanceDB Blog, url: https://lancedb.com/blog/lance-v2/}
+sources: [docs/reference-lance-file-architecture.md]
+evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§1"}, {type: doc, ref: "docs/reference-lance-file-architecture.md#§2"}, {type: doc, ref: "docs/reference-lance-file-architecture.md#§4"}, {type: doc, ref: "docs/reference-lance-file-architecture.md#§9"}]
+tiers:
+  - {id: engine, label: 読み書きエンジン, z: 2, size: [18,3]}
+  - {id: file, label: Lance ファイルの中身, z: 1, origin: [0,0], size: [18,6]}
+  - {id: storage, label: ストレージ, z: 0, origin: [2,0], size: [14,3]}
+nodes:
+  writer: {label: 書き込みエンジン, kind: worker, tier: engine, x: 3, y: 1.5, description: ページ、列メタデータ、フッターの順にバイト列を書く。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  reader: {label: 読み取りエンジン, kind: service, tier: engine, x: 15, y: 1.5, description: 末尾のフッターから読み、必要な列とページの範囲だけを取る。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  cache: {label: 検索キャッシュ, kind: cache, tier: engine, x: 9, y: 1.5, description: エンコーディングとページ位置の情報を LRU で保持する。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  pages: {label: データページ（列ごと）, kind: file, tier: file, x: 2, y: 1.5, description: 1 つの列の行を持つ。推奨サイズは 8 MB。行グループはない。仕組みは次の図「ページ構造とランダムアクセス」で追う。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§3"}]}
+  blob: {label: 外部バッファ・blob, kind: file, tier: file, x: 2, y: 4.5, description: 1 ページに数行しか入らない大きな値を置き、ページには位置を記録する。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§5"}]}
+  colmeta: {label: 列メタデータ（protobuf）, kind: file, tier: file, x: 7, y: 1.5, description: 列ごとのページ一覧。各ページのバッファ位置、行数、エンコーディング、先頭行番号を持つ。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§3"}]}
+  global: {label: グローバルバッファ, kind: file, tier: file, x: 7, y: 4.5, description: スキーマ、インデックス、統計などの補助データ。統計の形式は未確認。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§5"}]}
+  offsets: {label: オフセット表（列メタデータ・グローバルバッファ）, kind: file, tier: file, x: 12, y: 1.5, description: 列メタデータとグローバルバッファの絶対位置を並べる。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§2"}]}
+  footer: {label: フッター（LANC）, kind: file, tier: file, x: 16, y: 3, description: 固定長。各オフセット表の位置、列数、バージョン、マジックを持つ。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§2"}]}
+  storage: {label: ファイルシステム／オブジェクトストレージ, kind: db, tier: storage, x: 7, y: 1.5, description: ファイルを 1 つのオブジェクトまたはファイルとして置く。範囲読み取りでページの一部を取る。, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+links:
+  - {id: write-pages, from: writer, to: pages, label: データページを書く, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  - {id: write-meta, from: writer, to: colmeta, label: 列メタデータを書く, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  - {id: write-footer, from: writer, to: footer, label: 最後にフッターを書く, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  - {id: persist, from: pages, to: storage, label: ファイルを保存, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  - {id: read-footer, from: reader, to: footer, label: 末尾のセクターを読む, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  - {id: footer-offsets, from: footer, to: offsets, label: オフセット表の位置を指す, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§2"}]}
+  - {id: offsets-meta, from: offsets, to: colmeta, label: 列メタデータの位置, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§2"}]}
+  - {id: offsets-global, from: offsets, to: global, label: グローバルバッファの位置, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§2"}]}
+  - {id: meta-pages, from: colmeta, to: pages, label: ページの位置と符号化を示す, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§3"}]}
+  - {id: read-pages, from: pages, to: reader, label: 必要なページ範囲を読む, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+  - {id: page-blob, from: pages, to: blob, label: 大きな値は外部バッファを参照, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§5"}]}
+  - {id: keep-locations, from: reader, to: cache, label: ページ位置を保持, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§6"}]}
+scenarios:
+  - id: write-read
+    label: ファイルを書いて読む
+    evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§7"}]
+    steps:
+      - {links: [write-pages, write-meta, write-footer, persist], note: エンジンがページ、列メタデータ、フッターの順に書き、ストレージに保存する。}
+      - {links: [read-footer, footer-offsets, offsets-meta, offsets-global], note: 読み取り側は末尾のフッターからオフセット表をたどり、列メタデータとグローバルバッファの位置を知る。}
+      - {links: [meta-pages, keep-locations, read-pages], note: 列メタデータで必要な列のページを選び、位置をキャッシュして範囲だけを読む。}
+      - {links: [page-blob], note: 大きな値は、ページが指す外部バッファを読む。}
+unknowns:
+  - {id: stats, text: 列統計とデータスキップの形式は File Format の仕様に定義がなく未確認。, refs: [offsets-global]}
+  - {id: blob, text: Blob V2 の仕様本文と、外部バッファとの対応は未確認。, refs: [page-blob]}
+  - {id: runtime, text: 実環境のファイルサイズ、S3 上の遅延、キャッシュ容量は未検証。性能の数値はプロジェクトの自己申告。, refs: [read-footer, read-pages]}
+implementations:
+  - id: aws-emr-spark
+    label: "AWS：EMR on EC2 / Spark・Lance・S3"
+    description: EMR on EC2 の YARN 上の Spark Executor が Lance ライブラリで S3 のファイルを読み書きする代表的な構成。EMR での動作検証は未確認。
+    sources:
+      - {title: Lance File Format, url: https://lance.org/format/file/}
+      - {title: LanceDB Blog, url: https://lancedb.com/blog/lance-v2/}
+      - {title: Apache Spark on Amazon EMR, url: https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: management, label: クラスタ管理とストレージ, z: 2, size: [20, 4]}
+      - {id: compute, label: ジョブの実行, z: 1, size: [20, 4]}
+      - {id: files, label: ファイルの中身, z: 0, size: [20, 7]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [management, compute, files], nodes: [aws-control, aws-host, aws-writer, aws-reader, aws-cache, aws-s3, aws-pages, aws-blob, aws-colmeta, aws-global, aws-offsets, aws-footer]}
+      - {kind: cluster, label: EMR on EC2 クラスタ, tier: compute, nodes: [aws-host, aws-writer, aws-reader, aws-cache]}
+    nodes:
+      aws-control: {label: Amazon EMR, svc: emr, kind: service, tier: management, x: 3, y: 1.5, description: EC2 クラスタを作成・管理し、Spark ジョブの step を受け付ける。, management: {type: shared, scope: AWS は EMR サービスを運用し、利用者はクラスタとステップを設定する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-host: {label: Amazon EC2 / YARN, svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: EMR の EC2 ノードで YARN が Executor を割り当てる。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はクラスタ、ゲスト OS とソフトウェアを管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-writer: {label: Spark Executor / Lance 書き込み, kind: worker, tier: compute, x: 4, y: 1.5, realizes: [writer], description: Executor 上で Lance ライブラリがページ、メタデータ、フッターを書く。, management: {type: customer, scope: 利用者がジョブとコネクタ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-reader: {label: Spark Executor / Lance 読み取り, kind: worker, tier: compute, x: 10, y: 1.5, realizes: [reader], description: Executor 上で Lance ライブラリがフッターから範囲読み取りする。, management: {type: customer, scope: 利用者がジョブとコネクタ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-cache: {label: Executor メモリの検索キャッシュ, kind: cache, tier: compute, x: 14, y: 1.5, realizes: [cache], description: ページ位置とエンコーディング情報を Executor のメモリに持つ。, management: {type: customer, scope: 利用者がジョブのメモリ設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-s3: {label: Amazon S3 / Lance ファイル, svc: s3, kind: db, tier: management, x: 10, y: 1.5, realizes: [storage], description: Lance ファイルを 1 オブジェクトとして置く。範囲読み取りで一部を取る。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-pages: {label: オブジェクト内のデータページ, kind: file, tier: files, x: 3, y: 1.5, realizes: [pages], description: オブジェクトの先頭側に並ぶ列ごとのページ。, management: {type: customer, scope: 利用者がデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-blob: {label: オブジェクト内の外部バッファ, kind: file, tier: files, x: 3, y: 5, realizes: [blob], description: 大きな値のバイト列。, management: {type: customer, scope: 利用者がデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-colmeta: {label: オブジェクト内の列メタデータ, kind: file, tier: files, x: 8, y: 1.5, realizes: [colmeta], description: ページの後ろに置く列ごとの protobuf。, management: {type: customer, scope: 利用者がメタデータを管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-global: {label: オブジェクト内のグローバルバッファ, kind: file, tier: files, x: 8, y: 5, realizes: [global], description: スキーマなどの補助データ。, management: {type: customer, scope: 利用者がメタデータを管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-offsets: {label: オブジェクト内のオフセット表, kind: file, tier: files, x: 13, y: 1.5, realizes: [offsets], description: 列メタデータとグローバルバッファの位置。, management: {type: customer, scope: 利用者がメタデータを管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      aws-footer: {label: オブジェクト末尾のフッター, kind: file, tier: files, x: 17, y: 3, realizes: [footer], description: 末尾の固定長領域。リーダーが最初に読む。, management: {type: customer, scope: 利用者がメタデータを管理する。}, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+    links:
+      - {id: aws-provision, from: aws-control, to: aws-host, label: クラスタを作成・管理, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      - {id: aws-start, from: aws-control, to: aws-writer, label: Spark ステップを起動, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+      - {id: aws-persist, from: aws-pages, to: aws-s3, label: S3 にオブジェクトを保存, realizes: [persist], replace: true, evidence: [{type: doc, ref: "docs/reference-lance-file-architecture.md#§8"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [12, 3]}
+        - {id: cluster, label: EMR の EC2 / YARN, z: 0, size: [12, 3]}
+        - {id: services, label: AWS 管理サービスとオブジェクトの中身, z: 0, origin: [15, 0], size: [20, 7]}
+      nodes:
+        aws-host: {tier: cluster, x: 5, y: 1.5}
+        aws-writer: {tier: apps, x: 2, y: 1.5}
+        aws-reader: {tier: apps, x: 6, y: 1.5}
+        aws-cache: {tier: apps, x: 10, y: 1.5}
+        aws-control: {tier: services, x: 2, y: 1.5}
+        aws-s3: {tier: services, x: 6, y: 1.5}
+        aws-pages: {tier: services, x: 2, y: 4.5}
+        aws-blob: {tier: services, x: 6, y: 4.5}
+        aws-colmeta: {tier: services, x: 10, y: 4.5}
+        aws-global: {tier: services, x: 14, y: 4.5}
+        aws-offsets: {tier: services, x: 10, y: 1.5}
+        aws-footer: {tier: services, x: 14, y: 1.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, cluster, services], nodes: [aws-host, aws-writer, aws-reader, aws-cache, aws-control, aws-s3, aws-pages, aws-blob, aws-colmeta, aws-global, aws-offsets, aws-footer]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: [apps, cluster], nodes: [aws-host, aws-writer, aws-reader, aws-cache]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [27, 16]}
+      nodes:
+        aws-host: {tier: diagram, x: 7, y: 4}
+        aws-writer: {tier: diagram, x: 3, y: 7}
+        aws-reader: {tier: diagram, x: 7, y: 7}
+        aws-cache: {tier: diagram, x: 11, y: 7}
+        aws-control: {tier: diagram, x: 16, y: 1}
+        aws-s3: {tier: diagram, x: 20, y: 1}
+        aws-pages: {tier: diagram, x: 16, y: 5}
+        aws-blob: {tier: diagram, x: 20, y: 5}
+        aws-colmeta: {tier: diagram, x: 24, y: 5}
+        aws-global: {tier: diagram, x: 16, y: 9}
+        aws-offsets: {tier: diagram, x: 20, y: 9}
+        aws-footer: {tier: diagram, x: 24, y: 9}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 1, y0: -1, x1: 26, y1: 11.5, nodes: [aws-host, aws-writer, aws-reader, aws-cache, aws-control, aws-s3, aws-pages, aws-blob, aws-colmeta, aws-global, aws-offsets, aws-footer]}
+        - {kind: cluster, label: EMR on EC2 クラスタ, tier: diagram, x0: 1.4, y0: 3, x1: 13, y1: 9, nodes: [aws-host, aws-writer, aws-reader, aws-cache]}

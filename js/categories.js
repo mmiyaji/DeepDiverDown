@@ -51,4 +51,5 @@ export const CATEGORY_DOCS = {
   'ストリーム処理': 'stream',
   '変換とオーケストレーション': 'transform',
   'テーブル形式とカタログ': 'table-catalog',
+  'ファイル形式': 'file-formats',
 };

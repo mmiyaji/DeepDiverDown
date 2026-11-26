@@ -1,0 +1,100 @@
+name: Lance：ページ構造とランダムアクセス
+description: 行番号を指定して値を取るとき、構造エンコーディングごとに読む IOP の数と経路がどう変わるかを追う。
+parent: {model: lance-file-architecture, node: pages}
+reference:
+  objectives:
+    - mini-block、full-zip、constant、blob の使い分けを説明する。
+    - 行番号から読むバイト範囲を求める手順と、構造ごとの IOP の数を区別する。
+    - 検索キャッシュが take に果たす役割を説明する。
+  sources:
+    - {title: Lance Encoding Strategy, url: https://lance.org/format/file/encoding/}
+    - {title: Lance File Format, url: https://lance.org/format/file/}
+    - {title: LanceDB Blog, url: https://lancedb.com/blog/lance-v2/}
+sources: [docs/reference-lance-random-access.md]
+evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§1"}, {type: doc, ref: "docs/reference-lance-random-access.md#§2"}, {type: doc, ref: "docs/reference-lance-random-access.md#§9"}]
+tiers:
+  - {id: read, label: 読み取り側, z: 2, size: [20, 3]}
+  - {id: pages, label: ページのエンコーディング, z: 1, size: [20, 7]}
+  - {id: storage, label: ストレージ, z: 0, origin: [4,0], size: [12, 3]}
+nodes:
+  request: {label: 行番号の要求, kind: client, tier: read, x: 2, y: 1.5, description: 取りたい行番号の集合を渡す。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]}
+  reader: {label: リーダー, kind: service, tier: read, x: 9, y: 1.5, description: ページを選び、構造ごとの方法で範囲を読む。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]}
+  cache: {label: 検索キャッシュ, kind: cache, tier: read, x: 16, y: 1.5, description: エンコーディングとページ位置を LRU で持つ。初期化で埋める。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§6"}]}
+  mini: {label: mini-block のページ, kind: file, tier: pages, x: 2, y: 1.5, description: 小さな値向け。ブロックは圧縮後 32 KiB 未満。ブロック全体を 1 回で読む。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§3"}]}
+  full: {label: full-zip のページ, kind: file, tier: pages, x: 8, y: 1.5, description: 約 256 バイトを超える値向け。レベルと値を 1 つのバッファにまとめる。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§4"}]}
+  repidx: {label: 繰り返しインデックス, kind: file, tier: pages, x: 8, y: 5, description: full-zip の行ごとのオフセット。1・2・4・8 バイトにバイトパックする。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§4"}]}
+  blob: {label: blob の外部データ, kind: file, tier: pages, x: 14, y: 1.5, description: 約 1 MiB 以上の値。ページには位置とサイズだけを置く。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§5"}]}
+  storage: {label: ファイルシステム／オブジェクトストレージ, kind: db, tier: storage, x: 6, y: 1.5, description: ページを置く。範囲読み取りで必要なバイトだけを取る。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]}
+links:
+  - {id: take, from: request, to: reader, label: 行番号を渡す, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]}
+  - {id: lookup, from: reader, to: cache, label: ページ位置を引く, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§6"}]}
+  - {id: pick-mini, from: reader, to: mini, label: 小さな値はブロックを選ぶ, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§3"}]}
+  - {id: pick-full, from: reader, to: full, label: 大きな値は行位置を求める, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§4"}]}
+  - {id: pick-blob, from: reader, to: blob, label: 巨大な値は記述子をたどる, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§5"}]}
+  - {id: offset, from: full, to: repidx, label: 行のオフセットを引く, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§4"}]}
+  - {id: read-mini, from: mini, to: reader, label: ブロック全体を読む（1 IOP）, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§3"}]}
+  - {id: read-full, from: full, to: reader, label: 値の範囲を読む, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§4"}]}
+  - {id: read-blob, from: blob, to: reader, label: 1 値を読む（1 IOP）, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§5"}]}
+  - {id: persist-mini, from: mini, to: storage, label: ページを保存, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]}
+  - {id: persist-full, from: full, to: storage, label: ページを保存, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]}
+  - {id: persist-blob, from: blob, to: storage, label: 外部データを保存, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]}
+scenarios:
+  - id: take-rows
+    label: 行番号で値を取る
+    evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§7"}]
+    steps:
+      - {links: [take, lookup], note: リーダーは検索キャッシュで行を含むページとエンコーディングを知る。}
+      - {links: [pick-mini, read-mini], note: 小さな値の列は、行を含むブロックを 1 回で読む。}
+      - {links: [pick-full, offset, read-full], note: 大きな値の列は、繰り返しインデックスでバイト範囲を求めて読む。インデックスを読むため可変長では 2 IOP になる。}
+      - {links: [pick-blob, read-blob], note: 巨大な値は 1 値 1 IOP で外部データから読む。}
+unknowns:
+  - {id: heuristics, text: 書き込み側が mini-block と full-zip を選ぶ条件の全体は未確認。, refs: [pick-mini, pick-full]}
+  - {id: blobv2, text: Blob V2 の記述子の詳細は別の仕様にあり未確認。, refs: [pick-blob]}
+  - {id: runtime, text: 実環境の IOP 遅延とキャッシュ容量は未検証。性能の数値はプロジェクトの自己申告。, refs: [read-mini, read-full]}
+implementations:
+  - id: onprem-ray
+    label: 自前サーバー：Ray ワーカー・Lance・ローカル NVMe
+    description: 自前の Linux サーバーで Ray ワーカーが Lance ライブラリを使い、ローカルの NVMe 上のファイルから行を取る代表的な構成。動作検証は未確認。
+    sources:
+      - {title: Lance Encoding Strategy, url: https://lance.org/format/file/encoding/}
+      - {title: Lance File Format, url: https://lance.org/format/file/}
+      - {title: LanceDB Blog, url: https://lancedb.com/blog/lance-v2/}
+    groups:
+      - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー, tier: read, nodes: [op-task, op-reader, op-cache, op-mini, op-full, op-repidx, op-blob, op-fs]}
+    nodes:
+      op-task: {label: Ray のタスク, kind: worker, tier: read, x: 2, y: 1.5, realizes: [request], description: 行番号の集合を渡す呼び出し元。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+      op-reader: {label: Ray ワーカー内の Lance リーダー, kind: worker, tier: read, x: 9, y: 1.5, realizes: [reader], description: Lance ライブラリがページを選んで読む。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+      op-cache: {label: ワーカーメモリの検索キャッシュ, kind: cache, tier: read, x: 16, y: 1.5, realizes: [cache], description: ページ位置とエンコーディング情報。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+      op-mini: {label: ファイル内の mini-block ページ, kind: file, tier: pages, x: 2, y: 1.5, realizes: [mini], description: 小さな値の列。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+      op-full: {label: ファイル内の full-zip ページ, kind: file, tier: pages, x: 8, y: 1.5, realizes: [full], description: 大きめの値の列。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+      op-repidx: {label: full-zip の繰り返しインデックス, kind: file, tier: pages, x: 8, y: 5, realizes: [repidx], description: 行ごとのオフセット。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+      op-blob: {label: 外部バッファの blob, kind: file, tier: pages, x: 14, y: 1.5, realizes: [blob], description: 巨大な値。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+      op-fs: {label: ローカル NVMe のファイルシステム, kind: db, tier: pages, x: 17, y: 5, realizes: [storage], description: Lance ファイルを置く。, evidence: [{type: doc, ref: "docs/reference-lance-random-access.md#§8"}]}
+    layout2d:
+      tiers: [{id: local, label: 自前サーバーの Ray と Lance ファイル, z: 0, size: [24, 14]}]
+      nodes:
+        op-task: {tier: local, x: 2, y: 1}
+        op-reader: {tier: local, x: 8, y: 1}
+        op-cache: {tier: local, x: 14, y: 1}
+        op-mini: {tier: local, x: 2, y: 6}
+        op-full: {tier: local, x: 8, y: 6}
+        op-repidx: {tier: local, x: 8, y: 10}
+        op-blob: {tier: local, x: 14, y: 6}
+        op-fs: {tier: local, x: 14, y: 10}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー, tier: local, nodes: [op-task, op-reader, op-cache, op-mini, op-full, op-repidx, op-blob, op-fs]}
+    layout3d:
+      tiers:
+        - {id: processes, label: Ray のプロセス, z: 1, size: [24, 4]}
+        - {id: files, label: Lance ファイルの中身, z: 0, size: [24, 7]}
+      nodes:
+        op-task: {tier: processes, x: 2, y: 1.5}
+        op-reader: {tier: processes, x: 8, y: 1.5}
+        op-cache: {tier: processes, x: 14, y: 1.5}
+        op-mini: {tier: files, x: 2, y: 1.5}
+        op-full: {tier: files, x: 8, y: 1.5}
+        op-repidx: {tier: files, x: 8, y: 5}
+        op-blob: {tier: files, x: 14, y: 1.5}
+        op-fs: {tier: files, x: 14, y: 5}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前 Linux サーバー, tier: [processes, files], nodes: [op-task, op-reader, op-cache, op-mini, op-full, op-repidx, op-blob, op-fs]}

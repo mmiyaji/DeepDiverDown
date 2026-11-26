@@ -1,0 +1,132 @@
+name: Arrow IPC（Feather V2）の基本アーキテクチャ
+description: Arrow IPC のファイルが Schema・辞書バッチ・レコードバッチ・フッターでできていること、書き手と読み手とストレージの関係を追う。
+reference:
+  objectives:
+    - IPC ファイルの構成要素（Schema、辞書バッチ、レコードバッチ、フッター）を挙げる。
+    - 書き手が要素を並べる順序と、読み手がフッターから入る経路を区別する。
+    - Feather V2 と IPC ファイル形式の関係を説明する。
+  sources:
+    - {title: Arrow Columnar Format（IPC）, url: https://arrow.apache.org/docs/format/Columnar.html}
+    - {title: PyArrow Streaming, Serialization, and IPC, url: https://arrow.apache.org/docs/python/ipc.html}
+    - {title: PyArrow Feather File Format, url: https://arrow.apache.org/docs/python/feather.html}
+sources: [docs/reference-arrow-ipc-architecture.md]
+evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§1"}, {type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}, {type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§9"}]
+tiers:
+  - {id: engine, label: 書き手と読み手, z: 2, size: [18,3]}
+  - {id: format, label: IPC の要素, z: 1, origin: [2,0], size: [14,3]}
+  - {id: storage, label: ストレージ, z: 0, origin: [2,0], size: [14,3]}
+nodes:
+  writer: {label: 書き手（IPC ライター）, kind: worker, tier: engine, x: 1, y: 1.5, description: 型付きの列を持つレコードバッチをメッセージにして並べる。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§3"}]}
+  reader: {label: 読み手（IPC リーダー）, kind: service, tier: engine, x: 17, y: 1.5, description: フッターで位置を知り、必要なレコードバッチだけを読む。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§4"}]}
+  schema: {label: Schema メッセージ, kind: file, tier: format, x: 3, y: 0.5, description: 列の名前と型を持つ。本体（body）を持たない。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}]}
+  dicts: {label: 辞書バッチ, kind: file, tier: format, x: 6, y: 2.5, description: 辞書エンコードした列の値表。ID を持ち、レコードバッチが参照する。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}]}
+  batches: {label: レコードバッチ, kind: file, tier: format, x: 9, y: 1.5, description: 同じ行数の各列のバッファを並べたメッセージ。バッファ単位で lz4・zstd 圧縮を選べる。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}]}
+  eos: {label: 終端マーカー, kind: file, tier: format, x: 12, y: 0.5, description: 0xFFFFFFFF に長さ 0 が続く 8 バイト。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}]}
+  footer: {label: フッター（ファイル形式のみ）, kind: file, tier: format, x: 13, y: 2.5, description: Schema の複製と、各辞書バッチ・レコードバッチの位置とサイズを持つ。次の図「ストリーム形式とファイル形式の違い」で詳しく追う。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}]}
+  storage: {label: ファイルシステム／オブジェクトストレージ, kind: db, tier: storage, x: 9, y: 1.5, description: .arrow（Feather V2）のバイト列を置く。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§5"}]}
+links:
+  - {id: write-schema, from: writer, to: schema, label: Schema を先頭に書く, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§3"}]}
+  - {id: write-dict, from: writer, to: dicts, label: 辞書を定義, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§3"}]}
+  - {id: write-batch, from: writer, to: batches, label: バッチを追記, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§3"}]}
+  - {id: write-eos, from: writer, to: eos, label: close で終端を書く, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§3"}]}
+  - {id: write-footer, from: writer, to: footer, label: 位置を集めて書く, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§3"}]}
+  - {id: order-dict, from: schema, to: dicts, label: 型が辞書を要求, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}]}
+  - {id: order-batch, from: dicts, to: batches, label: 辞書キーを参照, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§2"}]}
+  - {id: persist-batches, from: batches, to: storage, label: メッセージ列を保存, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§5"}]}
+  - {id: persist-eos, from: eos, to: storage, label: 終端を保存, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§5"}]}
+  - {id: persist-footer, from: footer, to: storage, label: 末尾にフッターを保存, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§5"}]}
+  - {id: read-footer, from: storage, to: reader, label: 末尾のフッターを読む, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§4"}]}
+  - {id: read-batch, from: storage, to: reader, label: 位置を指定してバッチを読む, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§4"}]}
+scenarios:
+  - id: write-read
+    label: ファイルを書いて 1 バッチだけ読む
+    evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§6"}]
+    steps:
+      - {links: [write-schema, write-dict, order-dict], note: 書き手が Schema を書き、辞書エンコードの列があれば辞書バッチを先に定義する。}
+      - {links: [write-batch, order-batch, persist-batches], note: レコードバッチを順に追記する。辞書を参照する列は定義済みの ID を使う。}
+      - {links: [write-eos, persist-eos, write-footer, persist-footer], note: 終端マーカーのあと、各バッチの位置を集めたフッターを末尾に書く。}
+      - {links: [read-footer, read-batch], note: 読み手は末尾のフッターで位置を知り、必要なバッチだけを読む。}
+unknowns:
+  - {id: flight, text: Arrow Flight は IPC のメッセージを RPC で運ぶ。この図の範囲外で、仕組みは未確認。, refs: [write-batch, read-batch]}
+  - {id: perf, text: 実環境の読み書き速度、圧縮率、S3 への範囲読みの回数は未検証。, refs: [read-footer, read-batch]}
+  - {id: engines, text: Feather V2 を読み書きするエンジンの網羅的な一覧は未確認。, refs: [write-batch, read-batch]}
+implementations:
+  - id: aws-ec2-s3
+    label: "AWS：EC2 上の Python（PyArrow）と S3"
+    description: EC2 上の Python プロセスが PyArrow の IPC ライターで S3 に .arrow を書き、別のプロセスが open_file で読む代表例。
+    sources:
+      - {title: PyArrow Streaming, Serialization, and IPC, url: https://arrow.apache.org/docs/python/ipc.html}
+      - {title: PyArrow Feather File Format, url: https://arrow.apache.org/docs/python/feather.html}
+      - {title: Arrow Columnar Format（IPC）, url: https://arrow.apache.org/docs/format/Columnar.html}
+    tiers:
+      - {id: diagram, label: EC2 と S3 の .arrow, z: 0, size: [24, 11]}
+    nodes:
+      aws-role: {label: IAM ロール, svc: iam, kind: service, tier: diagram, x: 3, y: 1, description: EC2 のプロセスに S3 バケットへの読み書き権限を与える。権限の範囲は構成例の前提で、未確認。, management: {type: shared, scope: AWS は IAM を運用し、利用者がポリシーを管理する。}, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      aws-ec2: {label: Amazon EC2, svc: ec2, kind: host, tier: diagram, x: 3, y: 5, description: Python プロセスを動かすホスト。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者が OS とソフトウェアを管理する。}, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      aws-writer: {label: PyArrow RecordBatchFileWriter, kind: worker, tier: diagram, x: 8, y: 3, realizes: [writer], description: new_file で開き、write_batch で追記し、close でフッターを書く。, management: {type: customer, scope: 利用者がコードと PyArrow の版を管理する。}, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      aws-reader: {label: PyArrow open_file（RecordBatchFileReader）, kind: worker, tier: diagram, x: 8, y: 7.5, realizes: [reader], description: フッターを読み、get_batch でバッチを指定して読む。入力は seek できる必要がある。, management: {type: customer, scope: 利用者がコードと PyArrow の版を管理する。}, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      aws-s3: {label: Amazon S3 バケット, svc: s3, kind: db, tier: diagram, x: 19, y: 5, realizes: [storage], description: .arrow オブジェクトを置く。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者がデータとアクセス権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      aws-object: {label: .arrow オブジェクト（Schema・バッチ・フッター）, kind: file, tier: diagram, x: 14, y: 5, realizes: [schema, dicts, batches, eos, footer], description: Feather V2 のファイルは IPC ファイル形式そのもの。, management: {type: customer, scope: 利用者が内容と保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+    links:
+      - {id: aws-grant, from: aws-role, to: aws-ec2, label: 権限を付与, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      - {id: aws-run-write, from: aws-ec2, to: aws-writer, label: 書き込みを実行, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      - {id: aws-run-read, from: aws-ec2, to: aws-reader, label: 読み取りを実行, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      - {id: aws-put, from: aws-writer, to: aws-object, label: バッチとフッターを書く, realizes: [write-batch, write-footer], replace: true, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      - {id: aws-store, from: aws-object, to: aws-s3, label: オブジェクトとして保存, realizes: [persist-batches, persist-footer], replace: true, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+      - {id: aws-get, from: aws-s3, to: aws-reader, label: フッターとバッチを読む, realizes: [read-footer, read-batch], replace: true, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§7"}]}
+    groups: &aws-groups
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 0.5, y0: -0.5, x1: 23.5, y1: 10.5, nodes: [aws-role, aws-ec2, aws-writer, aws-reader, aws-object, aws-s3]}
+      - {kind: cluster, label: EC2 インスタンス, tier: diagram, x0: 1.4, y0: 2.2, x1: 11, y1: 9.8, nodes: [aws-ec2, aws-writer, aws-reader]}
+    layout2d:
+      tiers: [{id: diagram, label: EC2 と S3 の .arrow, z: 0, size: [24, 11]}]
+      nodes: {}
+      groups: *aws-groups
+    layout3d:
+      tiers:
+        - {id: apps, label: Python プロセス, z: 1, size: [10, 6]}
+        - {id: host, label: EC2 ホスト, z: 0, size: [10, 6]}
+        - {id: services, label: AWS 管理サービスとデータ, z: 0, origin: [12, 0], size: [12, 6]}
+      nodes:
+        aws-writer: {tier: apps, x: 2, y: 1.5}
+        aws-reader: {tier: apps, x: 2, y: 4.5}
+        aws-ec2: {tier: host, x: 5, y: 3}
+        aws-role: {tier: services, x: 2, y: 1.5}
+        aws-s3: {tier: services, x: 6, y: 1.5}
+        aws-object: {tier: services, x: 6, y: 4.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, host, services], nodes: [aws-role, aws-ec2, aws-writer, aws-reader, aws-object, aws-s3]}
+        - {kind: cluster, label: EC2 インスタンス, tier: [apps, host], nodes: [aws-ec2, aws-writer, aws-reader]}
+  - id: onprem-local
+    label: 自前：ローカルディスクと PyArrow（mmap）
+    description: 自前のサーバーで Python が .arrow をローカルディスクに書き、メモリマップで開いて読む例。
+    sources:
+      - {title: PyArrow Streaming, Serialization, and IPC, url: https://arrow.apache.org/docs/python/ipc.html}
+      - {title: Arrow Columnar Format（IPC）, url: https://arrow.apache.org/docs/format/Columnar.html}
+    tiers:
+      - {id: diagram, label: ローカルの .arrow, z: 0, size: [20, 9]}
+    nodes:
+      op-writer: {label: PyArrow RecordBatchFileWriter, kind: worker, tier: diagram, x: 3, y: 2, realizes: [writer], description: new_file でローカルファイルへ書く。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§8"}]}
+      op-reader: {label: PyArrow open_file（memory_map）, kind: worker, tier: diagram, x: 3, y: 6.5, realizes: [reader], description: memory_map で開くと、返るバッチは新しいメモリを確保しない。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§8"}]}
+      op-object: {label: ローカルの .arrow ファイル, kind: file, tier: diagram, x: 10, y: 4, realizes: [schema, dicts, batches, eos, footer], description: Schema・バッチ・フッターを 1 ファイルに持つ。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§8"}]}
+      op-fs: {label: ローカルファイルシステム, kind: db, tier: diagram, x: 16, y: 4, realizes: [storage], description: 単一サーバーの SSD などに置く。, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§8"}]}
+    links:
+      - {id: op-put, from: op-writer, to: op-object, label: バッチとフッターを書く, realizes: [write-batch, write-footer], replace: true, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§8"}]}
+      - {id: op-store, from: op-object, to: op-fs, label: ファイルとして保存, realizes: [persist-batches, persist-footer], replace: true, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§8"}]}
+      - {id: op-get, from: op-fs, to: op-reader, label: マップしてバッチを読む, realizes: [read-footer, read-batch], replace: true, evidence: [{type: doc, ref: "docs/reference-arrow-ipc-architecture.md#§8"}]}
+    groups: &op-groups
+      - {kind: datacenter, provider: onprem, label: 自前サーバー, tier: diagram, x0: 0.5, y0: -0.5, x1: 19.5, y1: 8.5, nodes: [op-writer, op-reader, op-object, op-fs]}
+    layout2d:
+      tiers: [{id: diagram, label: ローカルの .arrow, z: 0, size: [20, 9]}]
+      nodes: {}
+      groups: *op-groups
+    layout3d:
+      tiers:
+        - {id: procs, label: Python プロセス, z: 1, size: [20, 6]}
+        - {id: disk, label: ディスク, z: 0, size: [20, 6]}
+      nodes:
+        op-writer: {tier: procs, x: 4, y: 1.5}
+        op-reader: {tier: procs, x: 4, y: 4.5}
+        op-object: {tier: disk, x: 6, y: 3}
+        op-fs: {tier: disk, x: 13, y: 3}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前サーバー, tier: [procs, disk], nodes: [op-writer, op-reader, op-object, op-fs]}

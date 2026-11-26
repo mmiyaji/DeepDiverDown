@@ -1,0 +1,327 @@
+{
+  "model": "arrow-ipc-architecture",
+  "name": "Arrow IPC（Feather V2）の基本アーキテクチャ",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "書き手（IPC ライター）",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "読み手（IPC リーダー）",
+      "status": "claim"
+    },
+    "schema": {
+      "type": "node",
+      "label": "Schema メッセージ",
+      "status": "claim"
+    },
+    "dicts": {
+      "type": "node",
+      "label": "辞書バッチ",
+      "status": "claim"
+    },
+    "batches": {
+      "type": "node",
+      "label": "レコードバッチ",
+      "status": "claim"
+    },
+    "eos": {
+      "type": "node",
+      "label": "終端マーカー",
+      "status": "claim"
+    },
+    "footer": {
+      "type": "node",
+      "label": "フッター（ファイル形式のみ）",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "write-schema": {
+      "type": "link",
+      "label": "書き手（IPC ライター） → Schema メッセージ",
+      "status": "claim"
+    },
+    "write-dict": {
+      "type": "link",
+      "label": "書き手（IPC ライター） → 辞書バッチ",
+      "status": "claim"
+    },
+    "write-batch": {
+      "type": "link",
+      "label": "書き手（IPC ライター） → レコードバッチ",
+      "status": "claim"
+    },
+    "write-eos": {
+      "type": "link",
+      "label": "書き手（IPC ライター） → 終端マーカー",
+      "status": "claim"
+    },
+    "write-footer": {
+      "type": "link",
+      "label": "書き手（IPC ライター） → フッター（ファイル形式のみ）",
+      "status": "claim"
+    },
+    "order-dict": {
+      "type": "link",
+      "label": "Schema メッセージ → 辞書バッチ",
+      "status": "claim"
+    },
+    "order-batch": {
+      "type": "link",
+      "label": "辞書バッチ → レコードバッチ",
+      "status": "claim"
+    },
+    "persist-batches": {
+      "type": "link",
+      "label": "レコードバッチ → ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "persist-eos": {
+      "type": "link",
+      "label": "終端マーカー → ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "persist-footer": {
+      "type": "link",
+      "label": "フッター（ファイル形式のみ） → ファイルシステム／オブジェクトストレージ",
+      "status": "claim"
+    },
+    "read-footer": {
+      "type": "link",
+      "label": "ファイルシステム／オブジェクトストレージ → 読み手（IPC リーダー）",
+      "status": "claim"
+    },
+    "read-batch": {
+      "type": "link",
+      "label": "ファイルシステム／オブジェクトストレージ → 読み手（IPC リーダー）",
+      "status": "claim"
+    },
+    "write-read": {
+      "type": "scenario",
+      "label": "ファイルを書いて 1 バッチだけ読む"
+    },
+    "flight": {
+      "type": "unknown",
+      "label": "Arrow Flight は IPC のメッセージを RPC で運ぶ。この図の範囲外で、仕組みは未確認。"
+    },
+    "perf": {
+      "type": "unknown",
+      "label": "実環境の読み書き速度、圧縮率、S3 への範囲読みの回数は未検証。"
+    },
+    "engines": {
+      "type": "unknown",
+      "label": "Feather V2 を読み書きするエンジンの網羅的な一覧は未確認。"
+    },
+    "aws-role": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "IAM ロール",
+      "realizes": []
+    },
+    "aws-ec2": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "Amazon EC2",
+      "realizes": []
+    },
+    "aws-writer": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "PyArrow RecordBatchFileWriter",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "aws-reader": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "PyArrow open_file（RecordBatchFileReader）",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "aws-s3": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": "Amazon S3 バケット",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "aws-object": {
+      "type": "implementation",
+      "impl": "aws-ec2-s3",
+      "label": ".arrow オブジェクト（Schema・バッチ・フッター）",
+      "realizes": [
+        "schema",
+        "dicts",
+        "batches",
+        "eos",
+        "footer"
+      ]
+    },
+    "op-writer": {
+      "type": "implementation",
+      "impl": "onprem-local",
+      "label": "PyArrow RecordBatchFileWriter",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "op-reader": {
+      "type": "implementation",
+      "impl": "onprem-local",
+      "label": "PyArrow open_file（memory_map）",
+      "realizes": [
+        "reader"
+      ]
+    },
+    "op-object": {
+      "type": "implementation",
+      "impl": "onprem-local",
+      "label": "ローカルの .arrow ファイル",
+      "realizes": [
+        "schema",
+        "dicts",
+        "batches",
+        "eos",
+        "footer"
+      ]
+    },
+    "op-fs": {
+      "type": "implementation",
+      "impl": "onprem-local",
+      "label": "ローカルファイルシステム",
+      "realizes": [
+        "storage"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-arrow-ipc-architecture.md#§1": [
+      "model"
+    ],
+    "docs/reference-arrow-ipc-architecture.md": [
+      "model",
+      "writer",
+      "reader",
+      "schema",
+      "dicts",
+      "batches",
+      "eos",
+      "footer",
+      "storage",
+      "write-schema",
+      "write-dict",
+      "write-batch",
+      "write-eos",
+      "write-footer",
+      "order-dict",
+      "order-batch",
+      "persist-batches",
+      "persist-eos",
+      "persist-footer",
+      "read-footer",
+      "read-batch",
+      "write-read",
+      "aws-role",
+      "aws-ec2",
+      "aws-writer",
+      "aws-reader",
+      "aws-s3",
+      "aws-object",
+      "op-writer",
+      "op-reader",
+      "op-object",
+      "op-fs"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§2": [
+      "model",
+      "schema",
+      "dicts",
+      "batches",
+      "eos",
+      "footer",
+      "order-dict",
+      "order-batch"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§9": [
+      "model"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§3": [
+      "writer",
+      "write-schema",
+      "write-dict",
+      "write-batch",
+      "write-eos",
+      "write-footer"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§4": [
+      "reader",
+      "read-footer",
+      "read-batch"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§5": [
+      "storage",
+      "persist-batches",
+      "persist-eos",
+      "persist-footer"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§6": [
+      "write-read"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§7": [
+      "aws-role",
+      "aws-ec2",
+      "aws-writer",
+      "aws-reader",
+      "aws-s3",
+      "aws-object"
+    ],
+    "docs/reference-arrow-ipc-architecture.md#§8": [
+      "op-writer",
+      "op-reader",
+      "op-object",
+      "op-fs"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "ファイル形式",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Apache Arrow",
+    "role": "overview",
+    "order": 34,
+    "objectives": [
+      "IPC ファイルの構成要素（Schema、辞書バッチ、レコードバッチ、フッター）を挙げる。",
+      "書き手が要素を並べる順序と、読み手がフッターから入る経路を区別する。",
+      "Feather V2 と IPC ファイル形式の関係を説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Arrow Columnar Format（IPC）",
+        "url": "https://arrow.apache.org/docs/format/Columnar.html"
+      },
+      {
+        "title": "PyArrow Streaming",
+        "Serialization": null,
+        "and IPC": null,
+        "url": "https://arrow.apache.org/docs/python/ipc.html"
+      },
+      {
+        "title": "PyArrow Feather File Format",
+        "url": "https://arrow.apache.org/docs/python/feather.html"
+      }
+    ]
+  }
+}

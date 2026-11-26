@@ -1,0 +1,98 @@
+name: "Vortex：入れ子のエンコーディングと読み飛ばし"
+description: ゾーンマップで読む範囲を絞り、入れ子にエンコードされた配列を圧縮したまま評価して、必要なときだけ展開する経路を追う。
+parent: {model: vortex-architecture, node: segments}
+reference:
+  objectives:
+    - ゾーンマップによる読み飛ばしと、セグメントの遅延取得を区別する。
+    - 入れ子のエンコーディングを圧縮したまま評価する流れを追う。
+    - 展開が必要になる場面を説明する。
+  sources:
+    - {title: Vortex ドキュメント, url: https://docs.vortex.dev/}
+    - {title: Vortex Layouts, url: https://docs.vortex.dev/concepts/layouts}
+    - {title: Vortex File Format, url: https://docs.vortex.dev/specs/file-format}
+sources: [docs/reference-vortex-encodings-pruning.md]
+evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§1"}, {type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§2"}]
+tiers: [{id: flow, label: 読み飛ばしと圧縮したままの評価, z: 0, size: [26, 10]}]
+nodes:
+  filter: {label: フィルタと列の指定, kind: service, tier: flow, x: 0, y: 4, description: エンジンが Scan API に渡す条件と必要な列。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§2"}]}
+  root: {label: 構造・チャンクのレイアウト, kind: file, tier: flow, x: 5, y: 4, description: 列ごと・行範囲ごとの子レイアウトを持つ。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  zoned: {label: ゾーンマップ（ZonedLayout）, kind: file, tier: flow, x: 10, y: 1, description: 範囲ごとの統計を持ち、条件に合わない範囲の判定に使う。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  segsrc: {label: セグメントソース, kind: service, tier: flow, x: 10, y: 7, description: 必要なセグメントのバッファだけを遅延して取得する。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  storage: {label: ローカル・オブジェクトストレージ, kind: db, tier: flow, x: 15, y: 9, description: 範囲指定の読み取りに応える。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  flat: {label: FlatLayout のセグメント, kind: file, tier: flow, x: 15, y: 4, description: シリアライズされた配列を 1 つ持つ。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  encoded: {label: 入れ子にエンコードされた配列, kind: file, tier: flow, x: 20, y: 4, description: FastLanes、FSST、ALP などの軽量エンコーディングを重ねた配列。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§4"}]}
+  compute: {label: 圧縮したままの演算, kind: worker, tier: flow, x: 20, y: 0.5, description: 多くの演算を展開せずにエンコーディングのまま評価する。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§5"}]}
+  canonical: {label: 展開した配列, kind: worker, tier: flow, x: 24, y: 2.5, description: 圧縮したまま評価できない演算のために展開する。, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§5"}]}
+links:
+  - {id: push, from: filter, to: root, label: 条件と列を渡す, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§2"}]}
+  - {id: check-zone, from: root, to: zoned, label: 範囲の統計を確認, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  - {id: keep, from: zoned, to: flat, label: 合う範囲だけ残す, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  - {id: fetch, from: flat, to: segsrc, label: セグメントを要求, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  - {id: range-read, from: segsrc, to: storage, label: 範囲を読む, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§3"}]}
+  - {id: open, from: flat, to: encoded, label: 配列を復元, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§4"}]}
+  - {id: eval, from: encoded, to: compute, label: 展開せず評価, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§5"}]}
+  - {id: expand, from: compute, to: canonical, label: 必要なときだけ展開, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§5"}]}
+  - {id: result, from: canonical, to: filter, label: 結果を返す, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§5"}]}
+  - {id: result-direct, from: compute, to: filter, label: 評価結果を返す, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§5"}]}
+scenarios:
+  - id: scan
+    label: 条件付きの読み取り
+    evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§6"}]
+    steps:
+      - {links: [push, check-zone, keep], note: 条件をレイアウト木に渡し、ゾーンマップで合わない範囲を除く。}
+      - {links: [fetch, range-read, open], note: 残った範囲のセグメントだけを取得し、配列を復元する。}
+      - {links: [eval, result-direct], note: 多くの演算は展開せずエンコーディングのまま評価し、結果を返す。}
+      - {links: [expand, result], note: 圧縮したまま評価できない演算では、必要な分だけ展開して返す。}
+unknowns:
+  - {id: cascade, text: エンコーディングを選んで入れ子にする手順と、各エンコーディングの組み合わせ規則は取得した資料に記述がなく未確認。, refs: [open]}
+  - {id: zone, text: ゾーンの大きさと、判定に使う統計の種類は未確認。, refs: [check-zone]}
+  - {id: perf, text: 公式の性能数値はプロジェクトの自己申告であり、実環境では未検証。, refs: [eval, range-read]}
+implementations:
+  - id: aws-ec2-s3
+    label: "AWS：EC2 上のエンジンと S3"
+    description: EC2 上の DataFusion または DuckDB が S3 の Vortex ファイルを、条件付きで読む例。
+    sources:
+      - {title: Vortex ドキュメント, url: https://docs.vortex.dev/}
+      - {title: Vortex Layouts, url: https://docs.vortex.dev/concepts/layouts}
+      - {title: Amazon S3 ユーザーガイド, url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: compute, label: 実行環境, z: 1, size: [20, 4]}
+      - {id: data, label: ファイルを置くストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [compute, data], nodes: [aws-host, aws-engine, aws-scan, aws-s3, aws-file]}
+    nodes:
+      aws-host: {label: Amazon EC2, svc: ec2, kind: host, tier: compute, x: 9, y: 0.3, description: エンジンのプロセスを動かすインスタンス。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はゲスト OS とソフトウェアを管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      aws-engine: {label: DataFusion または DuckDB, kind: service, tier: compute, x: 3, y: 2, realizes: [filter], description: クエリのフィルタと列を Scan API に渡し、結果を受ける。, management: {type: customer, scope: 利用者がエンジンと設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      aws-scan: {label: Vortex Scan 実装（レイアウト木・評価）, kind: worker, tier: compute, x: 13, y: 2, realizes: [root, zoned, segsrc, flat, encoded, compute, canonical], description: レイアウト木をたどり、ゾーンマップで絞り、圧縮したまま評価する。, management: {type: customer, scope: 利用者がライブラリのバージョンを管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      aws-s3: {label: Amazon S3, svc: s3, kind: db, tier: data, x: 4, y: 1.5, realizes: [storage], description: Vortex ファイルをオブジェクトとして置き、範囲指定の読み取りに応える。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      aws-file: {label: S3 上の .vortex オブジェクト, kind: file, tier: data, x: 14, y: 1.5, description: レイアウト木、ゾーンマップ、エンコード済みセグメントを持つ。, management: {type: customer, scope: 利用者がデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+    links:
+      - {id: aws-run, from: aws-host, to: aws-engine, label: クエリを実行, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      - {id: aws-push, from: aws-engine, to: aws-scan, label: 条件と列を渡す, realizes: [push], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      - {id: aws-get, from: aws-scan, to: aws-file, label: 必要な範囲を要求, realizes: [range-read], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      - {id: aws-stored, from: aws-file, to: aws-s3, label: オブジェクトとして保存, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+      - {id: aws-back, from: aws-scan, to: aws-engine, label: 結果を返す, realizes: [result-direct], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-encodings-pruning.md#§7"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [20, 4]}
+        - {id: store, label: S3, z: 0, size: [20, 4]}
+      nodes:
+        aws-host: {tier: apps, x: 9, y: 0.5}
+        aws-engine: {tier: apps, x: 3, y: 2.5}
+        aws-scan: {tier: apps, x: 13, y: 2.5}
+        aws-s3: {tier: store, x: 4, y: 1.5}
+        aws-file: {tier: store, x: 14, y: 1.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, store], nodes: [aws-host, aws-engine, aws-scan, aws-s3, aws-file]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [20, 12]}
+      nodes:
+        aws-host: {tier: diagram, x: 8, y: 1}
+        aws-engine: {tier: diagram, x: 3, y: 4}
+        aws-scan: {tier: diagram, x: 13, y: 4}
+        aws-s3: {tier: diagram, x: 4, y: 8}
+        aws-file: {tier: diagram, x: 13, y: 8}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 1, y0: -0.5, x1: 17, y1: 10, nodes: [aws-host, aws-engine, aws-scan, aws-s3, aws-file]}

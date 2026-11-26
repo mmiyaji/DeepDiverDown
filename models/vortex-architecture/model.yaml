@@ -1,0 +1,104 @@
+name: Vortex の基本アーキテクチャ
+description: Vortex のファイルが、末尾の postscript・footer・レイアウト木・データセグメントでできていること、書く側と読む側がレイアウトとセグメントをどうたどるかを追う。
+reference:
+  objectives:
+    - ファイル先頭と末尾の枠、postscript、footer、レイアウト木、セグメントの役割を説明する。
+    - 読み取りが末尾から始まり、必要なセグメントだけを取得する流れを追う。
+    - Scan API を介したエンジンとファイルの関係を区別する。
+  sources:
+    - {title: Vortex ドキュメント, url: https://docs.vortex.dev/}
+    - {title: Vortex File Format, url: https://docs.vortex.dev/specs/file-format}
+    - {title: Vortex Layouts, url: https://docs.vortex.dev/concepts/layouts}
+sources: [docs/reference-vortex-architecture.md]
+evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§1"}, {type: doc, ref: "docs/reference-vortex-architecture.md#§2"}]
+tiers:
+  - {id: engine, label: 読み書きエンジン, z: 2, size: [18,3]}
+  - {id: file, label: Vortex ファイル, z: 1, origin: [2,0], size: [14,3]}
+  - {id: storage, label: ストレージ, z: 0, origin: [2,0], size: [14,3]}
+nodes:
+  writer: {label: 書き込み側（Vortex ライブラリ）, kind: worker, tier: engine, x: 1, y: 1.5, description: 列を配列としてエンコードし、セグメントとレイアウト木、footer、postscript を書く。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§3"}]}
+  scanapi: {label: Scan API, kind: service, tier: engine, x: 9, y: 0.3, description: フィルタと列の指定を受け、ファイルに押し下げる。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§3"}]}
+  reader: {label: 読み取りエンジン（DataFusion・DuckDB・Spark など）, kind: service, tier: engine, x: 17, y: 1.5, description: Scan API 経由でファイルを読む。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§3"}]}
+  postscript: {label: postscript と末尾の枠, kind: file, tier: file, x: 11, y: 0.3, description: 先頭と末尾の VTXF、バージョン、postscript 長を持つ。DType、ルートレイアウト、統計、footer の位置を指す。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§2"}]}
+  footer: {label: DType と footer, kind: file, tier: file, x: 7, y: 0.3, description: 論理型と、配列・レイアウト・セグメントの仕様を持つ。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§2"}]}
+  layouts: {label: レイアウト木, kind: file, tier: file, x: 7, y: 1.7, description: 構造・チャンク・辞書・ゾーンのレイアウトで、列と行の分割を表す。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§4"}]}
+  stats: {label: ファイル統計とゾーンマップ, kind: file, tier: file, x: 11, y: 1.7, description: ファイル単位と範囲単位の統計。読み飛ばしの判断に使う。詳細は次の図。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§4"}]}
+  segments: {label: データセグメント（エンコード済み配列）, kind: file, tier: file, x: 14, y: 1.2, description: 軽量エンコーディングを入れ子にした配列のバッファ。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§5"}]}
+  storage: {label: ローカル・オブジェクトストレージ, kind: db, tier: storage, x: 9, y: 1.5, description: ファイルを置き、範囲指定の読み取りに応える。, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§6"}]}
+links:
+  - {id: write-seg, from: writer, to: segments, label: エンコードしたセグメントを書く, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§3"}]}
+  - {id: write-post, from: writer, to: postscript, label: 末尾に postscript を書く, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§2"}]}
+  - {id: push, from: reader, to: scanapi, label: フィルタと列を渡す, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§3"}]}
+  - {id: read-tail, from: scanapi, to: postscript, label: 末尾から読み始める, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§2"}]}
+  - {id: to-footer, from: postscript, to: footer, label: footer の位置を指す, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§2"}]}
+  - {id: to-layout, from: postscript, to: layouts, label: ルートレイアウトを指す, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§2"}]}
+  - {id: to-stats, from: layouts, to: stats, label: 統計で範囲を絞る, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§4"}]}
+  - {id: to-seg, from: layouts, to: segments, label: 必要なセグメントを指す, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§4"}]}
+  - {id: read-seg, from: segments, to: reader, label: 必要なセグメントだけ読む, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§3"}]}
+  - {id: persist, from: segments, to: storage, label: ファイルを保存, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§6"}]}
+scenarios:
+  - id: write-read
+    label: ファイルを書いて読む
+    evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§7"}]
+    steps:
+      - {links: [write-seg, write-post, persist], note: 書き込み側がセグメントと末尾の postscript を書き、ストレージに保存する。}
+      - {links: [push, read-tail, to-footer, to-layout], note: 読み取り側は条件を Scan API に渡し、末尾の postscript から footer とルートレイアウトの位置を得る。}
+      - {links: [to-stats, to-seg, read-seg], note: 統計で範囲を絞り、残った範囲のセグメントだけを読む。}
+unknowns:
+  - {id: layout-detail, text: ゾーンの作り方と読み飛ばしの判定の詳細は公式の概念ページに記述がなく未確認。, refs: [to-stats]}
+  - {id: governance, text: LF AI & Data 傘下であることは、取得した公式ページの表記（Vortex a Series of LF Projects, LLC）からは確認できず未確認。, refs: [write-seg]}
+  - {id: runtime, text: 実環境の読み取り性能と各エンジンの対応機能の差は未検証。, refs: [read-seg, push]}
+implementations:
+  - id: aws-ec2-s3
+    label: "AWS：EC2 上のエンジンと S3"
+    description: EC2 上の DataFusion または DuckDB が Vortex ファイルを S3 に書き、Scan API 経由で読む例。
+    sources:
+      - {title: Vortex ドキュメント, url: https://docs.vortex.dev/}
+      - {title: Vortex File Format, url: https://docs.vortex.dev/specs/file-format}
+      - {title: Amazon S3 ユーザーガイド, url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html}
+      - {title: AWS shared responsibility, url: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/shared-responsibility.html}
+    tiers:
+      - {id: compute, label: 実行環境, z: 1, size: [20, 4]}
+      - {id: data, label: ファイルを置くストレージ, z: 0, size: [20, 4]}
+    groups:
+      - {kind: cloud, label: AWS アカウント, provider: aws, tier: [compute, data], nodes: [aws-host, aws-writer, aws-scan, aws-reader, aws-s3, aws-file]}
+    nodes:
+      aws-host: {label: Amazon EC2, svc: ec2, kind: host, tier: compute, x: 9, y: 0.3, description: エンジンのプロセスを動かすインスタンス。, management: {type: shared, scope: AWS は EC2 基盤を運用し、利用者はゲスト OS とソフトウェアを管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      aws-writer: {label: 書き込みジョブ（Vortex ライブラリ）, kind: worker, tier: compute, x: 2, y: 1.5, realizes: [writer], description: 列をエンコードして Vortex ファイルを書く。, management: {type: customer, scope: 利用者がジョブとライブラリのバージョンを管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      aws-scan: {label: Scan API, kind: service, tier: compute, x: 9, y: 2, realizes: [scanapi], description: エンジンからのフィルタと列の指定をファイルの読み取りに変える。, management: {type: customer, scope: 利用者がライブラリとして組み込み管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      aws-reader: {label: DataFusion または DuckDB, kind: service, tier: compute, x: 16, y: 1.5, realizes: [reader], description: Vortex の統合を通じてクエリを実行する。, management: {type: customer, scope: 利用者がエンジンと設定を管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      aws-s3: {label: Amazon S3, svc: s3, kind: db, tier: data, x: 3, y: 1.5, realizes: [storage], description: Vortex ファイルをオブジェクトとして置く。, management: {type: shared, scope: AWS は S3 基盤を運用し、利用者はデータとアクセス権限を管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      aws-file: {label: S3 上の .vortex オブジェクト, kind: file, tier: data, x: 12, y: 1.5, realizes: [segments, postscript, footer, layouts, stats], description: セグメント、レイアウト木、footer、postscript を 1 つのオブジェクトに持つ。, management: {type: customer, scope: 利用者がデータと保持方針を管理する。}, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+    links:
+      - {id: aws-run-w, from: aws-host, to: aws-writer, label: 書き込みを実行, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      - {id: aws-run-r, from: aws-host, to: aws-reader, label: クエリを実行, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      - {id: aws-write, from: aws-writer, to: aws-file, label: オブジェクトを書く, realizes: [write-seg], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      - {id: aws-put, from: aws-file, to: aws-s3, label: S3 に保存, realizes: [persist], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      - {id: aws-pushdown, from: aws-reader, to: aws-scan, label: フィルタと列を渡す, realizes: [push], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      - {id: aws-tail, from: aws-scan, to: aws-file, label: 末尾から読み始める, realizes: [read-tail], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+      - {id: aws-get, from: aws-file, to: aws-reader, label: 必要な範囲を読む, realizes: [read-seg], replace: true, evidence: [{type: doc, ref: "docs/reference-vortex-architecture.md#§8"}]}
+    layout3d:
+      tiers:
+        - {id: apps, label: 実行ジョブ, z: 1, size: [20, 4]}
+        - {id: store, label: S3, z: 0, size: [20, 4]}
+      nodes:
+        aws-host: {tier: apps, x: 9, y: 0.5}
+        aws-writer: {tier: apps, x: 2, y: 2.5}
+        aws-scan: {tier: apps, x: 9, y: 2.5}
+        aws-reader: {tier: apps, x: 16, y: 2.5}
+        aws-s3: {tier: store, x: 4, y: 1.5}
+        aws-file: {tier: store, x: 14, y: 1.5}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: [apps, store], nodes: [aws-host, aws-writer, aws-scan, aws-reader, aws-s3, aws-file]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 実装構成, z: 0, size: [22, 12]}
+      nodes:
+        aws-host: {tier: diagram, x: 9, y: 1}
+        aws-writer: {tier: diagram, x: 3, y: 4}
+        aws-scan: {tier: diagram, x: 9, y: 4}
+        aws-reader: {tier: diagram, x: 15, y: 4}
+        aws-s3: {tier: diagram, x: 5, y: 8}
+        aws-file: {tier: diagram, x: 13, y: 8}
+      groups:
+        - {kind: cloud, label: AWS アカウント, provider: aws, tier: diagram, x0: 1, y0: -0.5, x1: 19, y1: 10, nodes: [aws-host, aws-writer, aws-scan, aws-reader, aws-s3, aws-file]}

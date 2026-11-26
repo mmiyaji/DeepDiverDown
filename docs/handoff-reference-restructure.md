@@ -25,6 +25,7 @@
 | 取り込み | Debezium・Airbyte・Fivetran・PostgreSQL の概要と詳細図を整理。比較表は `docs/category-ingestion.md` |
 | 変換とオーケストレーション | dbt・Apache Airflow・AWS Glue・Azure Data Factory・Google Cloud Dataflow の概要と仕組み図（各 2 つ）を整理。比較表は `docs/category-transform.md` |
 | テーブル形式とカタログ | Apache Iceberg・Delta Lake・Apache Hudi・Apache Paimon（各 3 図）と Iceberg REST Catalog の概要図を整理。比較表は `docs/category-table-catalog.md` |
+| ファイル形式 | Parquet・ORC・Avro・Arrow IPC・Vortex・Lance の概要図（Vortex・Lance・Arrow IPC は仕組み図も）。比較表は `docs/category-file-formats.md`。ファイル形式は 1 ファイルの中身、テーブル形式は複数ファイルの管理で分ける |
 | クラウド分析基盤 | Databricks と Snowflake の関連図を同じ製品に整理。ほかの製品は未点検 |
 | ほかの分類 | 未着手の図がある。古い図は `js/products.js` で製品を推定している |
 
