@@ -31,12 +31,15 @@ function linksOf(model, impl) {
 
 function check(pos, links) {
   const issues = [];
+  // 通り過ぎる部品が、線の両端のどちらかとつながっていれば、一連の流れの途中なので不自然とみなさない
+  const adj = {};
+  for (const [a, b] of links) { (adj[a] ||= new Set()).add(b); (adj[b] ||= new Set()).add(a); }
   for (const [a, b, id] of links) {
     const A = pos[a], B = pos[b]; if (!A || !B || A.z !== B.z) continue;
     if (withBack && B.x - A.x < -BACK) issues.push(`戻り：${id}（${a} → ${b}）`);
     const dx = B.x - A.x, dy = B.y - A.y, len2 = dx * dx + dy * dy; if (!len2) continue;
     for (const [c, C] of Object.entries(pos)) {
-      if (c === a || c === b || C.z !== A.z) continue;
+      if (c === a || c === b || C.z !== A.z || adj[a]?.has(c) || adj[b]?.has(c)) continue;
       const t = ((C.x - A.x) * dx + (C.y - A.y) * dy) / len2;
       if (t <= 0.1 || t >= 0.9) continue;
       const d = Math.hypot(A.x + t * dx - C.x, A.y + t * dy - C.y);
