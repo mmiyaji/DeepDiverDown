@@ -2043,6 +2043,7 @@ scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();
 if (initialSelection && Object.hasOwn(VW().nodes, initialSelection)) st.sel = resolveSel(initialSelection);
 if (ROUTE.q.edge && (allLinks().some(l => l.id === ROUTE.q.edge) || VW().links.some(l => l.id === ROUTE.q.edge))) st.edge = ROUTE.q.edge;
+if (lab('diag2d')) await import('./lab-diag.js');
 if (lab('perf-log')) {
   // lab perf-log：描き直しの内訳を計る。window.__ddPerf.report() で表にする
   const P = await import('./lab-perf.js');
