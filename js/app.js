@@ -2043,6 +2043,19 @@ scene.setMinimap(st.minimap && !PREVIEW);
 if (st.mode === 'compare') await ensureComparison();
 if (initialSelection && Object.hasOwn(VW().nodes, initialSelection)) st.sel = resolveSel(initialSelection);
 if (ROUTE.q.edge && (allLinks().some(l => l.id === ROUTE.q.edge) || VW().links.some(l => l.id === ROUTE.q.edge))) st.edge = ROUTE.q.edge;
+if (lab('perf-log')) {
+  // lab perf-log：描き直しの内訳を計る。window.__ddPerf.report() で表にする
+  const P = await import('./lab-perf.js');
+  decorate = P.perfFn('app.decorate', decorate); projectState = P.perfFn('app.projectState', projectState);
+  diagramLayout = P.perfFn('app.diagramLayout', diagramLayout); nodeSpec = P.perfFn('app.nodeSpec', nodeSpec);
+  renderSidebar = P.perfFn('app.renderSidebar', renderSidebar); renderStats = P.perfFn('app.renderStats', renderStats);
+  renderPanel = P.perfFn('app.renderPanel', renderPanel); renderViewOverview = P.perfFn('app.renderViewOverview', renderViewOverview);
+  renderFlowControls = P.perfFn('app.renderFlowControls', renderFlowControls); updateDiagramScale = P.perfFn('app.updateDiagramScale', updateDiagramScale);
+  syncFileMap = P.perfFn('app.syncFileMap', syncFileMap);
+  drawScene = P.perfRecord(drawScene);
+  P.perfWrap(Object.getPrototypeOf(scene), ['begin', 'floor', 'group', 'platformEnvelope', 'link', 'node', 'mergeStatic', 'end', 'layoutLabels', 'placeLabels', 'labelHideSet', 'updateMinimapCamera', 'fastPatch'], 'scene.');
+  const api = P.installReport({ select: (id, o) => select(id, o), draw: () => draw(), st, scene, nodeIds: () => Object.keys(VW().nodes), linkIds: () => VW().links.map(l => l.id) }); api.run = (n, pick) => P.perfSelectRun(api, n, pick);
+}
 draw();
 if (ROUTE.q.v) { const v = ROUTE.q.v.split('_').map(Number); if (v.length === 7 && v.every(Number.isFinite)) scene.setView({ p: v.slice(0, 3), t: v.slice(3, 6), z: v[6] }); }
 window.viewerLoading.ready();

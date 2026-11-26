@@ -81,7 +81,7 @@ export class Scene3D {
       });
     });
     this.renderer.domElement.addEventListener('pointerleave', () => { hoverQueued = null; if (this.hoverId) { this.hoverId = null; this.labelsDirty = true; } });
-    this.controls.addEventListener('start', () => { this.usingControls = true; });
+    this.controls.addEventListener('start', () => { this.usingControls = true; this.keepHold = null; });
     this.controls.addEventListener('end', () => { this.usingControls = false; });
     this.controls.addEventListener('change', () => {
       if (this.usingControls) this.fitView = null;
@@ -90,6 +90,7 @@ export class Scene3D {
       if (this.flat) this.onFlatResize?.();
       if (this.fitView && this.root.children.length) this.fit(this.fitView);
       else this.resize();
+      if (this.keepHold && performance.now() - this.keepHold.t < 4000) this.applyKeep(this.keepHold.anchor); // camera-keep：領域の大きさが落ち着くまで位置を保つ
       // 大きさが変わった直後の 1 フレームに、古い配置（台数バッジなど）が見えないよう、その場で描き直して配置する
       this.redrawNow();
     }).observe(el);
@@ -101,6 +102,13 @@ export class Scene3D {
     // 初めて使う文字のフォントが後から読み込まれると、ラベルの幅が変わって重なり判定がずれる。読み込みのたびに配置し直す
     document.fonts.addEventListener?.('loadingdone', () => { this.labelsDirty = true; });
     for (const weight of [400, 500, 600, 700]) document.fonts.load(`${weight} 12px Inter`).catch(() => {});
+    // camera-keep：クリックで配置が変わる前の選択部品の位置を覚え、描画領域の大きさが落ち着くまで（4 秒）その位置を保ち直す。描画ループとは別の 80ms 間隔
+    if (lab('camera-keep')) setInterval(() => {
+      if (!this.keepHold) { this.keepLast = this.keepAnchor(); return; }
+      const h = this.keepHold, r = this.renderer.domElement.getBoundingClientRect(), key = `${r.left | 0},${r.top | 0},${r.width | 0},${r.height | 0}`;
+      if (performance.now() - h.t > 4000) this.keepHold = null;
+      else if (key !== h.key) { h.key = key; this.applyKeep(h.anchor); }
+    }, 80);
     const clock = new THREE.Clock();
     this.speed = 1; this.phase = 0;
     this.renderer.setAnimationLoop(() => {
@@ -274,7 +282,7 @@ export class Scene3D {
         if (Math.abs(card.y - other.y) > 26 * labelZoom) break;
         space = Math.min(space, Math.abs(card.x - other.x) - 22 * labelZoom);
       }
-      card.el.style.setProperty('--card-room', Math.max(38, space / labelZoom) + 'px');
+      card.el.style.setProperty('--card-room', Math.max(72, space / labelZoom) + 'px');
     }
     // Keep the card anchored to its ports. A solid's name may move a
     // short distance vertically, leaving room for a nearby name or plate.
@@ -686,7 +694,55 @@ export class Scene3D {
     this.camera.updateProjectionMatrix();
   }
 
+  /* lab camera-keep：選択中の部品の画面上の位置（NDC）を覚える */
+  keepAnchor() {
+    const ids = [...(this.nodeInfo || new Map())].filter(([, n]) => n.selected && n.pos).map(([id]) => id);
+    if (!ids.length) return null;
+    const v = new THREE.Vector3();
+    for (const id of ids) v.add(new THREE.Vector3(...this.nodeInfo.get(id).pos));
+    v.divideScalar(ids.length).project(this.camera);
+    if (Math.abs(v.x) > 1 || Math.abs(v.y) > 1) return null;
+    // 2D と 3D で描画領域の大きさや位置が変わるため、NDC ではなくページ上の px で覚える
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { ids, cx: r.left + (v.x + 1) / 2 * r.width, cy: r.top + (1 - v.y) / 2 * r.height };
+  }
+  /* 再配置後、選択中の部品を覚えた位置へ寄せる。はみ出す部品が出るときは、その位置を軸に縮小して全部品を画面の ±0.95 に収める（縮小は 0.5 倍まで） */
+  applyKeep(anchor) {
+    const rect = this.renderer.domElement.getBoundingClientRect(), lim = v => Math.max(-0.9, Math.min(0.9, v));
+    const a = { x: lim((anchor.cx - rect.left) / rect.width * 2 - 1), y: lim(1 - (anchor.cy - rect.top) / rect.height * 2) };
+    const ids = anchor.ids.filter(id => this.nodeInfo.get(id)?.pos);
+    if (!ids.length || !this.root.children.length) return;
+    const c = this.camera, P = THREE.Vector3;
+    const pts = [...this.nodeInfo.values()].filter(n => n.pos).map(n => new P(...n.pos));
+    const selPts = ids.map(id => new P(...this.nodeInfo.get(id).pos));
+    const selNdc = () => { c.updateMatrixWorld(); return selPts.reduce((t, v) => t.add(v), new P()).divideScalar(selPts.length).project(c); };
+    const pan = () => {
+      const s0 = selNdc(), dx = a.x - s0.x, dy = a.y - s0.y;
+      const hw = (c.right - c.left) / 2 / c.zoom, hh = (c.top - c.bottom) / 2 / c.zoom;
+      const shift = new P(1, 0, 0).applyQuaternion(c.quaternion).multiplyScalar(-dx * hw).addScaledVector(new P(0, 1, 0).applyQuaternion(c.quaternion), -dy * hh);
+      c.position.add(shift); this.controls.target.add(shift); c.updateMatrixWorld();
+    };
+    if (this.keepHold?.anchor !== anchor) this.keepHold = { anchor, t: performance.now(), key: '' };
+    const before = selNdc();
+    if (Math.hypot(before.x - a.x, before.y - a.y) < 0.005) return; // すでに同じ位置
+    pan();
+    let k = 1; const L = 0.95;
+    for (const p of pts) {
+      const n = p.clone().project(c);
+      for (const [v, o] of [[n.x, a.x], [n.y, a.y]]) {
+        const d = v - o;
+        if (d > 1e-6 && o + d > L) k = Math.min(k, (L - o) / d);
+        if (d < -1e-6 && o + d < -L) k = Math.min(k, (-L - o) / d);
+      }
+    }
+    k = Math.max(0.5, k);
+    if (k < 0.999) { c.zoom *= k; c.updateProjectionMatrix(); pan(); }
+    this.fitView = null; // 縮小・移動した視点を、画面サイズの変化や描き直しで元の全体表示へ戻さない
+    this.keepResult = { want: [+a.x.toFixed(3), +a.y.toFixed(3)], before: [+before.x.toFixed(3), +before.y.toFixed(3)], zoomK: +k.toFixed(3) };
+  }
+
   begin() {
+    this.keep = lab('camera-keep') ? (this.keepLast || this.keepAnchor()) : null;
     this.floorBounds = new Map();
     const active = document.activeElement;
     if (this.labels.domElement.contains(active) && active.dataset.action) this.labelFocus = active.dataset;
@@ -713,6 +769,7 @@ export class Scene3D {
     this.root.updateMatrixWorld(true);
     const toRoot = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
     const groups = new Map();
+    const selectFast = lab('select-fast'); // 部品・接続ごとに別の描画にまとめる（差分更新でその部品だけ作り直せるように）
     this.root.traverse(o => {
       if (keep.has(o) || !o.visible || !(o.isMesh || o.isLineSegments) || o.userData.id) return;
       const m = o.material, geo = o.geometry;
@@ -721,7 +778,7 @@ export class Scene3D {
       // 透明な箱は、並べ替えの影響が大きいので対象にしない。矢印・接続の帯・影・稜線は、元から原点の位置で並べ替えられるため、まとめても見え方が変わらない
       if (!(lit || basic || line) || (lit && m.transparent) || m.map || m.vertexColors || (lit && !geo.attributes.normal)) return;
       if ((line && !o.isLineSegments) || (!line && !o.isMesh)) return;
-      const key = [m.type, m.color.getHex(), m.emissive?.getHex() ?? 0, m.opacity, m.transparent ? 1 : 0, m.side, m.depthWrite, m.depthTest, m.flatShading ? 1 : 0, m.polygonOffset ? m.polygonOffsetFactor : 'x', o.renderOrder].join('|');
+      const key = [m.type, m.color.getHex(), m.emissive?.getHex() ?? 0, m.opacity, m.transparent ? 1 : 0, m.side, m.depthWrite, m.depthTest, m.flatShading ? 1 : 0, m.polygonOffset ? m.polygonOffsetFactor : 'x', o.renderOrder, selectFast ? ownerOf(o) : ''].join('|');
       (groups.get(key) ?? groups.set(key, []).get(key)).push(o);
     });
     for (const objects of groups.values()) {
@@ -745,6 +802,7 @@ export class Scene3D {
       if (lit) merged.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
       const mesh = first.isMesh ? new THREE.Mesh(merged, first.material) : new THREE.LineSegments(merged, first.material);
       mesh.renderOrder = first.renderOrder; mesh.frustumCulled = false;
+      if (selectFast) mesh.userData.owner = ownerOf(first);
       // 両面の透明な板は、裏→表の 2 回描画をやめる（薄い板なので見え方は変わらず、描画の呼び出しが半分になる）
       if (first.material.transparent && first.material.side === THREE.DoubleSide) first.material.forceSinglePass = true;
       this.root.add(mesh);
@@ -758,16 +816,57 @@ export class Scene3D {
     this.flat = flat;
     this.labelsDirty = true;
     this.mergeStatic();
-    if (!this.fitted || (flat && this.fitView)) { this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true; }
+    if (!this.fitted || (flat && this.fitView)) {
+      this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true;
+    }
+    if (this.keep) this.applyKeep(this.keep); // 2D のカード寸法の確定による再配置でも、選択部品を同じ位置に保つ
+    if (lab('camera-auto') || lab('camera-keep')) window.__ddScene = this;
     this.updateMinimapCamera();
+  }
+
+  /* lab camera-auto：方位角 8 × 仰角 3 の候補を、部品中心の画面射影で採点して最良の向きを返す（結果は autoScores） */
+  autoDirection() {
+    const info = [...(this.nodeInfo || new Map()).entries()].filter(([, n]) => n.pos);
+    const w = this.el.clientWidth || 1, h = this.el.clientHeight || 1;
+    const key = `${info.length}|${Math.round(w / h * 4)}`;
+    if (this.autoCache?.info === this.nodeInfo && this.autoCache.key === key) return this.autoCache.dir.clone();
+    const P = info.map(([, n]) => new THREE.Vector3(...n.pos)), idx = new Map(info.map(([id], i) => [id, i]));
+    const links = (this.linkEnds || []).map(([a, b]) => [idx.get(a), idx.get(b)]).filter(([a, b]) => a != null && b != null && a !== b);
+    const clamp = x => Math.max(0, Math.min(1, x)), up = new THREE.Vector3(0, 1, 0);
+    const cands = [{ az: null, el: null, dir: new THREE.Vector3(...VIEWS.iso).normalize() }];
+    for (const el of [24, 38, 55]) for (let k = 0; k < 8; k++) {
+      const az = k * 45, e = el * Math.PI / 180, a = az * Math.PI / 180;
+      cands.push({ az, el, dir: new THREE.Vector3(Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a)) });
+    }
+    if (P.length < 3) { this.autoScores = null; return cands[0].dir; }
+    for (const c of cands) {
+      const f = c.dir.clone().negate(), r = new THREE.Vector3().crossVectors(f, up).normalize(), u = new THREE.Vector3().crossVectors(r, f);
+      const q = P.map(p => [p.dot(r), p.dot(u)]);
+      const xs = q.map(v => v[0]), ys = q.map(v => v[1]);
+      const W = Math.max(...xs) - Math.min(...xs) || 1e-3, H = Math.max(...ys) - Math.min(...ys) || 1e-3;
+      const px = Math.min(w * 0.88 / W, h * 0.84 / H);
+      const ds = [];
+      for (let i = 0; i < q.length; i++) for (let j = i + 1; j < q.length; j++) ds.push(Math.hypot(q[i][0] - q[j][0], q[i][1] - q[j][1]) * px);
+      ds.sort((m, n) => m - n);
+      c.minPx = ds[0]; c.p10Px = ds[Math.floor(ds.length * 0.1)];
+      c.a = 0.5 * clamp(ds[0] / 48) + 0.5 * (1 - clamp(ds.filter(d => d < 48).length / ds.length / 0.1));
+      c.b = clamp(W * px * H * px / (w * h) / 0.5);
+      c.c = links.length ? links.reduce((t, [i, j]) => { const dx = q[j][0] - q[i][0], dy = q[j][1] - q[i][1]; return t + (dx / (Math.hypot(dx, dy) || 1) + 1) / 2; }, 0) / links.length : 0.5;
+      c.score = 0.4 * c.a + 0.25 * c.b + 0.35 * c.c;
+    }
+    const best = cands.slice(1).reduce((m, c) => c.score > m.score ? c : m);
+    this.autoScores = { best: { az: best.az, el: best.el }, list: cands.map(c => ({ az: c.az, el: c.el, a: +c.a.toFixed(3), b: +c.b.toFixed(3), c: +c.c.toFixed(3), score: +c.score.toFixed(3), minPx: +c.minPx.toFixed(1), p10Px: +c.p10Px.toFixed(1) })) };
+    this.autoCache = { info: this.nodeInfo, key, dir: best.dir };
+    return best.dir.clone();
   }
 
   fit(view = 'iso') {
     this.anim = null;
     const box = new THREE.Box3().setFromObject(this.root), c = box.getCenter(new THREE.Vector3());
     if (box.isEmpty()) return;
+    if (view === 'iso' && !this.flat && lab('camera-auto')) view = 'auto';
     this.fitView = view;
-    const d = new THREE.Vector3(...VIEWS[view]).normalize();
+    const d = (view === 'auto' ? this.autoDirection() : new THREE.Vector3(...VIEWS[view])).normalize();
     this.camera.position.copy(c).addScaledVector(d, 100);
     this.camera.zoom = 1; this.controls.target.copy(c); this.camera.lookAt(c); this.camera.updateMatrixWorld();
     // Project each occupied part separately. An empty corner between two
@@ -1385,4 +1484,137 @@ function at(p, t) {
   const L = p.len * t;
   for (const [a, b, s, d] of p.seg) if (L <= s + d) return a.clone().lerp(b, d ? (L - s) / d : 0);
   return p.seg[p.seg.length - 1][1].clone();
+}
+
+/* lab select-fast：部品・接続の選択などで「部品ごとの見た目だけ」が変わる更新は、シーン全体を作り直さず、
+   変わった部品（と接続）だけ作り直し、既存の DOM ラベルは属性（選択・輪郭・不透明度）だけ更新する。
+   begin() から end() の間の floor/group/node/link は記録だけしておき、end() で前回との差を見て、
+   床・枠・部品の並び・位置・接続の経路・テーマが同じなら差分更新、違えば従来どおり全部作り直す。 */
+function ownerOf(o) { for (; o; o = o.parent) if (o.userData.owner) return o.userData.owner; return ''; }
+if (lab('select-fast')) installSelectFast(Scene3D.prototype);
+function installSelectFast(proto) {
+  const orig = { begin: proto.begin, end: proto.end, floor: proto.floor, group: proto.group, platformEnvelope: proto.platformEnvelope, node: proto.node, link: proto.link };
+  const sig = (m, s) => JSON.stringify([m, s]);
+  const themeKey = () => { const r = document.documentElement; return [r.getAttribute('style'), r.className, r.dataset.theme, matchMedia('(prefers-color-scheme: dark)').matches].join('|'); };
+  const keyOf = (m, s) => (m === 'node' ? 'n:' : 'l:') + s.id;
+  const IGNORE_DATA = ['data-hovered', 'data-selected', 'data-outlined', 'data-label-offset', 'data-leader'];
+  const IGNORE_STYLE = ['opacity', 'visibility', 'translate', 'margin-top', '--card-room'];
+  /* 古いラベル a が、新しく作ったラベル b と「作り方で決まる部分」まで同じか。配置や描画器が足した属性（transform・z-index・data-shown など）は見ない */
+  const sameLabel = (a, b) => {
+    if (a.tagName !== b.tagName || a.innerHTML !== b.innerHTML) return false;
+    for (const c of b.classList) if (!a.classList.contains(c)) return false;
+    for (const { name, value } of b.attributes) {
+      if (name === "style" || name === "class" || IGNORE_DATA.includes(name)) continue;
+      if (a.getAttribute(name) !== value) return false;
+    }
+    for (const p of b.style) if (!IGNORE_STYLE.includes(p) && a.style.getPropertyValue(p) !== b.style.getPropertyValue(p)) return false;
+    return true;
+  };
+  const stats = proto.fast = { patched: 0, full: 0, changed: 0, reasons: {} };
+  const why = r => { stats.reasons[r] = (stats.reasons[r] || 0) + 1; return false; };
+
+  proto.begin = function () { this.rec = []; this.cssCache = null; this.colorCache = null; };
+  for (const m of ['floor', 'group', 'platformEnvelope', 'node', 'link']) proto[m] = function (s) { if (this.rec) this.rec.push([m, s]); else orig[m].call(this, s); };
+
+  /* 部品・接続を 1 つ作り、作った描画物に持ち主を記録する。ラベルは持ち主ごとに控えておく */
+  function buildOwned(m, s, tag) {
+    const r0 = this.root.children.length, l0 = this.lbl.children.length;
+    orig[m].call(this, s);
+    for (let i = r0; i < this.root.children.length; i++) this.root.children[i].userData.owner = tag;
+    return { key: keyOf(m, s), spec: s, sig: sig(m, s), route: sig(m, [s.id, s.from, s.to, s.points, s.pos]), labels: this.lbl.children.slice(l0) };
+  }
+  function dispose(object) {
+    object.traverse(o => { o.geometry?.dispose(); [].concat(o.material || []).forEach(x => x.dispose()); });
+  }
+
+  proto.end = function (flat) {
+    const rec = this.rec; this.rec = null;
+    if (!rec) return orig.end.call(this, flat);
+    let ok = false;
+    try { ok = this.fastPatch(rec, flat); } catch (e) { console.warn('select-fast', e); why('error'); }
+    if (ok) { stats.patched++; return; }
+    stats.full++;
+    orig.begin.call(this);
+    const owners = this.owners = new Map(), fixed = [], order = [];
+    for (const [m, s] of rec) {
+      if (m === 'node' || m === 'link') { const e = buildOwned.call(this, m, s, keyOf(m, s)); owners.set(e.key, e); order.push(e.key); }
+      else { fixed.push(sig(m, s)); orig[m].call(this, s); }
+    }
+    this.fastScene = { theme: themeKey(), flat, scale: this.comparisonScale, fixed, order };
+    orig.end.call(this, flat);
+  };
+
+  proto.fastPatch = function (rec, flat) {
+    const prev = this.fastScene;
+    if (!prev || !this.owners || !this.root.children.length) return why('first');
+    if (this.forceFull) { this.forceFull = false; return why('forced'); }
+    if (prev.theme !== themeKey()) return why('theme');
+    if (prev.flat !== flat || prev.scale !== this.comparisonScale) return why('dimension');
+    const fixed = [], order = [], specs = new Map();
+    for (const [m, s] of rec) {
+      if (m === 'node' || m === 'link') { const k = keyOf(m, s); order.push(k); specs.set(k, [m, s]); }
+      else fixed.push(sig(m, s));
+    }
+    if (fixed.length !== prev.fixed.length || fixed.some((x, i) => x !== prev.fixed[i])) return why('floors-groups');
+    if (order.length !== prev.order.length || order.some((k, i) => k !== prev.order[i])) return why('parts-set');
+    const changed = order.filter(k => sig(...specs.get(k)) !== this.owners.get(k).sig);
+    const snap = { pick: this.pick.length, paths: this.edgePaths.length, ends: this.linkEnds.length, packets: this.packets.length, info: new Map(this.nodeInfo) };
+    const fresh = [];
+    const rollback = () => {
+      for (const c of [...this.root.children]) if (c.userData.owner?.endsWith('#new')) { this.root.remove(c); dispose(c); }
+      for (const e of fresh) for (const l of e.labels) this.lbl.remove(l);
+      this.pick.length = snap.pick; this.edgePaths.length = snap.paths; this.linkEnds.length = snap.ends; this.packets.length = snap.packets; this.nodeInfo = snap.info;
+    };
+    for (const k of changed) {
+      const [m, s] = specs.get(k), old = this.owners.get(k);
+      // 処理の流れ（パケットの動き・ステップ番号）が変わる更新は、従来どおり全部作り直す
+      if (m === 'link' && (!!old.spec.packets !== !!s.packets || old.spec.stepNo !== s.stepNo)) { rollback(); return why('flow'); }
+      const e = buildOwned.call(this, m, s, k + '#new'); fresh.push(e);
+      if (e.route !== old.route) { rollback(); return why('route'); }
+      if (e.labels.length !== old.labels.length) { rollback(); return why('labels-count'); }
+      for (let i = 0; i < e.labels.length; i++) {
+        const a = old.labels[i], b = e.labels[i];
+        if (!a.position.equals(b.position) || !a.center.equals(b.center) || !sameLabel(a.element, b.element)) { stats.lastDiff = [a.element.outerHTML, b.element.outerHTML]; rollback(); return why('labels-differ'); }
+      }
+    }
+    // 確定：古い描画物を捨て、新しいものを持ち主の名前に直す。ラベルは古い DOM を残して属性だけ写す
+    this.edgePaths.length = snap.paths; this.linkEnds.length = snap.ends;
+    const removed = new Set();
+    for (const c of [...this.root.children]) {
+      const o = c.userData.owner;
+      if (changed.includes(o)) { c.traverse(x => removed.add(x)); this.root.remove(c); dispose(c); }
+      else if (o?.endsWith('#new')) c.userData.owner = o.slice(0, -4);
+    }
+    this.pick = this.pick.filter(m => !removed.has(m));
+    this.packets = this.packets.filter(p => !p.meshes.some(m => removed.has(m)));
+    for (const e of fresh) {
+      const old = this.owners.get(e.key);
+      e.labels.forEach((b, i) => {
+        const a = old.labels[i].element, n = b.element;
+        for (const name of ['selected', 'outlined']) { if (n.dataset[name]) a.dataset[name] = n.dataset[name]; else delete a.dataset[name]; }
+        a.style.opacity = n.style.opacity;
+        this.lbl.remove(b);
+      });
+      old.sig = e.sig; old.spec = e.spec;
+    }
+    stats.changed += changed.length;
+    this.mergeStatic();
+    this.flat = flat; this.labelsDirty = true; this.miniDirty = true;
+    return true;
+  };
+
+  /* 検証用：描画物（持ち主ごとの形・色・不透明度）と DOM ラベルの属性を、順序に依らない行にする */
+  proto.fingerprint = function () {
+    const rows = [];
+    this.root.updateMatrixWorld(true);
+    this.root.traverse(o => {
+      if (!(o.isMesh || o.isLineSegments || o.isLine)) return;
+      const m = [].concat(o.material)[0], p = o.geometry.attributes.position;
+      const box = o.geometry.boundingBox || (o.geometry.computeBoundingBox(), o.geometry.boundingBox);
+      const b = box.clone().applyMatrix4(o.matrixWorld);
+      rows.push([ownerOf(o), o.type, m.type, m.color?.getHex(), +m.opacity.toFixed(3), m.transparent ? 1 : 0, m.depthWrite ? 1 : 0, o.visible ? 1 : 0, p?.count, ...[...b.min.toArray(), ...b.max.toArray()].map(v => +v.toFixed(2))].join(','));
+    });
+    const labels = [...this.labels.domElement.children].map(el => [el.className, el.dataset.node || '', el.textContent, el.dataset.selected || '', el.dataset.outlined || '', el.style.opacity].join('|'));
+    return { objects: rows.sort(), labels: labels.sort() };
+  };
 }
