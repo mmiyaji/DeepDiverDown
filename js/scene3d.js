@@ -454,7 +454,7 @@ export class Scene3D {
     if (!this.controls.enableRotate) {
       this.camera.position.copy(this.controls.target).addScaledVector(new THREE.Vector3(...VIEWS.top).normalize(), 100);
     }
-    this.camera.zoom = v.z || 1; this.camera.lookAt(this.controls.target); this.camera.updateProjectionMatrix(); this.fitted = true;
+    this.camera.zoom = this.flat ? Math.max(1, v.z || 1) : (v.z || 1); this.camera.lookAt(this.controls.target); this.camera.updateProjectionMatrix(); this.fitted = true;
   }
 
   fullSvgLayout() {
@@ -815,6 +815,10 @@ export class Scene3D {
   end(flat) {
     this.flat = flat;
     this.labelsDirty = true;
+    // 2D のカードは画面上の大きさが変わらないので、カメラを 1 倍より縮めると図だけが縮んでカードが重なる（iPad のピンチで起きた）。
+    // 2D は縮小を止め、すでに縮んでいれば 1 倍へ戻して全体表示にする
+    this.controls.minZoom = flat ? 1 : 0.3;
+    if (flat && this.camera.zoom < 1) { this.camera.zoom = 1; this.camera.updateProjectionMatrix(); this.fitView = 'top'; }
     this.mergeStatic();
     if (!this.fitted || (flat && this.fitView)) {
       this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true;
