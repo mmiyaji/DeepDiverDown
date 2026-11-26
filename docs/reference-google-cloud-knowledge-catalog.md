@@ -20,7 +20,7 @@ Aspect Type がメタデータの項目と型を規定し、Aspect として Ent
 
 ## 4. リネージ
 
-対応するサービスから収集したリネージを資産と関連付け、上流・下流を調べる。対応するソースと収集範囲を確認する。Google Cloud Lakehouse runtime catalog は Iceberg テーブルを読み書きするカタログであり、Knowledge Catalog はそこからもメタデータを取得できる。
+対応するサービスから収集したリネージを資産と関連付け、上流・下流を調べる。対応するソースと収集範囲を確認する。Lakehouse for Apache Iceberg（旧 BigLake）の Lakehouse runtime catalog は、Google Cloud が推奨するマネージドのメタストアで、Iceberg REST カタログのエンドポイントを持つ。旧 BigLake metastore（classic）は非推奨で、REST エンドポイントは runtime catalog だけが対応する。Knowledge Catalog が runtime catalog からメタデータを取得する点は、Lakehouse 側の公式ページで確認できず未確認。
 
 [Knowledge Catalog Release Notes](https://docs.cloud.google.com/knowledge-catalog/docs/release-notes)、[About Data Lineage](https://docs.cloud.google.com/knowledge-catalog/docs/about-data-lineage)
 

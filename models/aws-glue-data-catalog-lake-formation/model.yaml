@@ -1,0 +1,381 @@
+name: AWS Glue Data Catalog と Lake Formation の権限と Iceberg REST
+description: データベース・テーブルの解決、Iceberg REST の認証、Lake Formation の権限と一時認証情報の払い出しをつなげる。
+reference:
+  objectives:
+    - Glue Data Catalog が持つ対象と、エンジンがそれを解決する 2 つの経路（Glue API と Iceberg REST）を区別する。
+    - Iceberg REST の SigV4 と OAuth の使い分けを確認する。
+    - Lake Formation の権限が一時認証情報として S3 アクセスに変わる流れを確認する。
+  sources:
+    - title: Glue Iceberg REST エンドポイント
+      url: https://docs.aws.amazon.com/glue/latest/dg/connect-glu-iceberg-rest.html
+    - title: Lake Formation の仕組み
+      url: https://docs.aws.amazon.com/lake-formation/latest/dg/how-it-works.html
+    - title: Lake Formation のアプリケーション統合（クレデンシャルベンディング）
+      url: https://docs.aws.amazon.com/lake-formation/latest/dg/using-cred-vending.html
+    - title: Lake Formation と他の AWS サービス
+      url: https://docs.aws.amazon.com/lake-formation/latest/dg/working-with-services.html
+    - title: Glue Data Catalog の概要
+      url: https://docs.aws.amazon.com/glue/latest/dg/catalog-and-crawler.html
+sources:
+  - docs/reference-aws-glue-data-catalog-lake-formation.md
+evidence:
+  - type: doc
+    ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§1
+tiers:
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size: [23, 9]
+nodes:
+  engine:
+    label: AWS のクエリエンジン
+    kind: client
+    tier: flow
+    x: 0
+    'y': 6
+    description: Athena・EMR・Redshift Spectrum などの AWS 分析エンジン。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§2}]
+  ext-engine:
+    label: 外部のクエリエンジン
+    kind: client
+    tier: flow
+    x: 0
+    'y': 2
+    description: AWS 外の Spark や Trino など。Iceberg REST で接続する。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+  auth:
+    label: トークン交換（AWS Sign-In）
+    kind: service
+    tier: flow
+    x: 4
+    'y': 0
+    description: 外部エンジンが利用者の JWT を短期の OAuth アクセストークンに交換する。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+  rest:
+    label: Iceberg REST エンドポイント
+    kind: service
+    tier: flow
+    x: 8
+    'y': 2
+    description: Iceberg REST 仕様の API を提供する。SigV4 か OAuth Bearer で認証する。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+  glue-api:
+    label: Glue Data Catalog API
+    kind: service
+    tier: flow
+    x: 8
+    'y': 5
+    description: AWS のエンジンがメタデータを取得する Glue の API。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§2}]
+  tables:
+    label: データベースとテーブル
+    kind: db
+    tier: flow
+    x: 12
+    'y': 3
+    description: スキーマ、パーティション、S3 上の保存場所のメタデータ。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§1}]
+  perm:
+    label: Lake Formation の権限
+    kind: service
+    tier: flow
+    x: 16
+    'y': 0
+    description: データベース・テーブル・列・行への許可を管理する。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  location:
+    label: 登録済み S3 ロケーション
+    kind: service
+    tier: flow
+    x: 12
+    'y': 8
+    description: Lake Formation に登録したテーブルの保存パス。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  vend:
+    label: クレデンシャルベンディング
+    kind: service
+    tier: flow
+    x: 16
+    'y': 6
+    description: 許可された範囲の一時認証情報をエンジンへ払い出す。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  storage:
+    label: Amazon S3 のテーブルデータ
+    kind: db
+    tier: flow
+    x: 20
+    'y': 6
+    description: Parquet や Iceberg のデータファイル。
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+links:
+  - id: meta
+    from: engine
+    to: glue-api
+    label: メタデータを要求
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§2}]
+  - id: sigv4
+    from: engine
+    to: rest
+    label: SigV4 署名で REST 要求
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+  - id: exchange
+    from: ext-engine
+    to: auth
+    label: JWT を OAuth トークンに交換
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+  - id: bearer
+    from: ext-engine
+    to: rest
+    label: Bearer トークンで REST 要求
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+  - id: resolve-rest
+    from: rest
+    to: tables
+    label: 名前空間・テーブルを解決
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+  - id: resolve-api
+    from: glue-api
+    to: tables
+    label: データベース・テーブルを解決
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§2}]
+  - id: check
+    from: tables
+    to: perm
+    label: 要求者の権限を確認
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  - id: path
+    from: tables
+    to: location
+    label: 保存パスを参照
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  - id: register
+    from: location
+    to: vend
+    label: 登録ロケーションを払い出しの範囲に指定
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  - id: grant
+    from: perm
+    to: vend
+    label: 許可の範囲で発行
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  - id: request
+    from: engine
+    to: vend
+    label: 一時認証情報を要求
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+  - id: read
+    from: engine
+    to: storage
+    label: 一時認証情報で S3 を読む
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§4}]
+scenarios:
+  - id: aws-engine
+    label: Athena が Lake Formation 管理の表を読む
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§2}]
+    steps:
+      - links: [meta, resolve-api]
+        note: エンジンが Glue Data Catalog API で表のメタデータを取得する。
+      - links: [check, grant]
+        note: Lake Formation が要求者の権限を確認し、許可された範囲だけを払い出しの対象にする。
+      - links: [request, read]
+        note: エンジンが一時認証情報を受け取り、S3 のデータを読む。
+  - id: external-engine
+    label: 外部の Spark が Iceberg REST で表を読む
+    evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§3}]
+    steps:
+      - links: [exchange]
+        note: 外部エンジンが利用者の JWT を OAuth アクセストークンに交換する。
+      - links: [bearer, resolve-rest]
+        note: Bearer トークンで REST 要求を送り、名前空間と表を解決する。
+      - links: [check, grant]
+        note: Glue が Lake Formation の権限を要求ごとに適用する。LoadTable では権限の範囲に収まる S3 認証情報を払い出す。
+treeLayout:
+  title: カタログからテーブルへ
+  unit: 資産
+  levels:
+    - カタログ
+    - データベース
+    - テーブル
+  note: 既定のカタログは AWS アカウント ID で指定する。Iceberg REST の名前空間は 1 階層で、上位に別のカタログの階層を置いて 3 部表記にする。
+  root:
+    id: root
+    label: アカウントの既定カタログ
+    children:
+      - id: db
+        label: sales_db
+        node: tables
+        children:
+          - id: t1
+            label: orders
+implementations:
+  - id: glue-lf-aws
+    label: Glue Data Catalog と Lake Formation を AWS のエンジンと社内 Spark から使う
+    description: 1 つの AWS アカウントのカタログを、Athena・EMR・Redshift Spectrum は Glue API と Lake Formation で、社内の Spark は Iceberg REST と OAuth で読む例。
+    sources:
+      - title: Glue Iceberg REST エンドポイント
+        url: https://docs.aws.amazon.com/glue/latest/dg/connect-glu-iceberg-rest.html
+      - title: Lake Formation の仕組み
+        url: https://docs.aws.amazon.com/lake-formation/latest/dg/how-it-works.html
+      - title: Lake Formation のアプリケーション統合（クレデンシャルベンディング）
+        url: https://docs.aws.amazon.com/lake-formation/latest/dg/using-cred-vending.html
+      - title: Lake Formation と他の AWS サービス
+        url: https://docs.aws.amazon.com/lake-formation/latest/dg/working-with-services.html
+      - title: Glue Data Catalog の概要
+        url: https://docs.aws.amazon.com/glue/latest/dg/catalog-and-crawler.html
+    tiers:
+      - id: flow
+        label: 構成と処理の流れ
+        z: 0
+        size: [26, 11]
+    nodes:
+      example-ext:
+        label: 社内の Spark（Iceberg クライアント）
+        kind: client
+        tier: flow
+        x: 0
+        y: 2
+        realizes: [ext-engine]
+        description: 利用者の JWT を OAuth トークンに交換して REST 要求を送る社内のクライアント。
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-signin:
+        label: AWS Sign-In のトークン交換
+        kind: service
+        tier: flow
+        x: 4
+        y: 0
+        svc: iam
+        realizes: [auth]
+        description: JWT を Glue 向けの短期 OAuth アクセストークンに交換する。設定手順は AWS Sign-In のガイドを参照する。
+        management: {type: aws, scope: "AWS operates Sign-In; customer configures trust for the token exchange."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-rest:
+        label: Glue Iceberg REST エンドポイント
+        kind: service
+        tier: flow
+        x: 8
+        y: 2
+        svc: glue
+        realizes: [rest]
+        description: glue.<リージョン>.amazonaws.com/iceberg。SigV4 の署名名は glue。warehouse にはアカウント ID を指定する。
+        management: {type: aws, scope: "AWS operates the endpoint; customer configures catalog and permissions."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-glue-api:
+        label: Glue Data Catalog API
+        kind: service
+        tier: flow
+        x: 8
+        y: 5
+        svc: glue
+        realizes: [glue-api]
+        description: Athena・EMR・Redshift Spectrum が使うメタデータ API。
+        management: {type: aws, scope: "AWS operates the API; customer manages the metadata."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-tables:
+        label: sales_db.orders（Iceberg テーブル）
+        kind: db
+        tier: flow
+        x: 12
+        y: 3
+        svc: glue
+        realizes: [tables]
+        description: データベースとテーブルの定義。S3 上の保存場所を指す。
+        management: {type: shared, scope: "AWS operates the catalog store; customer defines databases and tables."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-perm:
+        label: Lake Formation の許可（表・列・行フィルター）
+        kind: service
+        tier: flow
+        x: 16
+        y: 0
+        svc: lakeformation
+        realizes: [perm]
+        description: データレイク管理者または委任された利用者が付与する。
+        management: {type: shared, scope: "AWS operates Lake Formation; customer grants permissions."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-location:
+        label: 登録した S3 ロケーション
+        kind: service
+        tier: flow
+        x: 12
+        y: 8
+        svc: lakeformation
+        realizes: [location]
+        description: テーブルの S3 パスを Lake Formation に登録する。登録していない表は S3 のバケットポリシーと IAM ポリシーで評価される。
+        management: {type: shared, scope: "AWS operates Lake Formation; customer registers locations."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-vend:
+        label: Lake Formation の一時認証情報の払い出し
+        kind: service
+        tier: flow
+        x: 16
+        y: 6
+        svc: lakeformation
+        realizes: [vend]
+        description: エンジンが要求し、許可の範囲の一時認証情報を受け取る。
+        management: {type: aws, scope: "AWS operates credential vending."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-s3:
+        label: Amazon S3 のテーブルデータ
+        kind: db
+        tier: flow
+        x: 20
+        y: 6
+        svc: s3
+        realizes: [storage]
+        description: データファイルを保持する。
+        management: {type: shared, scope: "AWS operates S3; customer manages data and locations."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-athena:
+        label: Amazon Athena（SQL）
+        kind: worker
+        tier: flow
+        x: 0
+        y: 6
+        svc: athena
+        realizes: [engine]
+        description: SQL でカタログの表を問い合わせる。
+        management: {type: aws, scope: "AWS operates Athena."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-emr:
+        label: Amazon EMR on EC2 の Spark（YARN）
+        kind: worker
+        tier: flow
+        x: 4
+        y: 9
+        svc: emr
+        description: Lake Formation を有効にしたクラスターで Spark がカタログの表を読む。対応するリリースは公式資料で確認が要る。
+        management: {type: shared, scope: "AWS operates the EMR service; customer operates cluster configuration."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+      example-redshift:
+        label: Amazon Redshift Spectrum
+        kind: worker
+        tier: flow
+        x: 8
+        y: 9
+        svc: redshift
+        description: データカタログの表を外部スキーマ経由で読む。
+        management: {type: aws, scope: "AWS operates Redshift."}
+        evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]
+    links:
+      - {id: example-emr-meta, from: example-emr, to: example-glue-api, label: メタデータを要求, evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]}
+      - {id: example-redshift-meta, from: example-redshift, to: example-glue-api, label: メタデータを要求, evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]}
+      - {id: example-emr-vend, from: example-emr, to: example-vend, label: 一時認証情報を要求, evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]}
+      - {id: example-redshift-vend, from: example-redshift, to: example-vend, label: 一時認証情報を要求, evidence: [{type: doc, ref: docs/reference-aws-glue-data-catalog-lake-formation.md#§5}]}
+    groups:
+      - {kind: datacenter, provider: onprem, label: 社内ネットワーク, tier: flow, nodes: [example-ext]}
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: flow, nodes: [example-signin, example-rest, example-glue-api, example-tables, example-perm, example-location, example-vend, example-s3, example-athena, example-emr, example-redshift]}
+    layout2d:
+      tiers: [{id: diagram, label: Glue Data Catalog と Lake Formation, z: 0, size: [26, 11]}]
+      nodes: {example-ext: {tier: diagram, x: 0, y: 2}, example-signin: {tier: diagram, x: 4, y: 0}, example-rest: {tier: diagram, x: 8, y: 2}, example-glue-api: {tier: diagram, x: 8, y: 5}, example-tables: {tier: diagram, x: 12, y: 3}, example-perm: {tier: diagram, x: 16, y: 0}, example-location: {tier: diagram, x: 12, y: 8}, example-vend: {tier: diagram, x: 16, y: 6}, example-s3: {tier: diagram, x: 20, y: 6}, example-athena: {tier: diagram, x: 0, y: 6}, example-emr: {tier: diagram, x: 4, y: 9}, example-redshift: {tier: diagram, x: 8, y: 9}}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 社内ネットワーク, tier: diagram, nodes: [example-ext]}
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: diagram, nodes: [example-signin, example-rest, example-glue-api, example-tables, example-perm, example-location, example-vend, example-s3, example-athena, example-emr, example-redshift]}
+    layout3d:
+      tiers:
+        - {id: onprem, label: 社内ネットワーク, z: 0, origin: [-4, 0], size: [3, 3]}
+        - {id: aws, label: AWS アカウント, z: 0, size: [22, 10]}
+      nodes: {example-ext: {tier: onprem, x: 1, y: 1.5}, example-signin: {tier: aws, x: 4, y: 0}, example-rest: {tier: aws, x: 8, y: 2}, example-glue-api: {tier: aws, x: 8, y: 5}, example-tables: {tier: aws, x: 12, y: 3}, example-perm: {tier: aws, x: 16, y: 0}, example-location: {tier: aws, x: 12, y: 8}, example-vend: {tier: aws, x: 16, y: 6}, example-s3: {tier: aws, x: 20, y: 6}, example-athena: {tier: aws, x: 0, y: 6}, example-emr: {tier: aws, x: 4, y: 9}, example-redshift: {tier: aws, x: 8, y: 9}}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 社内ネットワーク, tier: onprem, nodes: [example-ext]}
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: aws, nodes: [example-signin, example-rest, example-glue-api, example-tables, example-perm, example-location, example-vend, example-s3, example-athena, example-emr, example-redshift]}
+

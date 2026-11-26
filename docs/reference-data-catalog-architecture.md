@@ -37,6 +37,7 @@
 | Iceberg の技術カタログ | Apache Polaris、Project Nessie | REST 操作と権限、またはカタログ全体のバージョン管理 |
 | 横断的なメタデータ基盤 | DataHub、OpenMetadata | ソース収集、検索、リネージ、データ契約 |
 | マネージドガバナンス | Amazon DataZone、Google Cloud Knowledge Catalog、Microsoft Fabric OneLake catalog | 公開、検索、アクセス申請と接続先での権限反映 |
+| 既存のガバナンス環境 | Microsoft Purview | 資産登録とアクセス申請の既存環境。新規アカウントは受付終了で、集約先は OneLake catalog |
 | プラットフォーム統合 | Snowflake Horizon Catalog、Databricks Unity Catalog | ガバナンス機能と、Iceberg を外部エンジンから利用する入口 |
 
 図の製品ノードは詳細モデルへの入口。各製品が対象にする資産、操作、権限の適用範囲は詳細モデルと公式資料で確認する。

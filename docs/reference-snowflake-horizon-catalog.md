@@ -20,9 +20,9 @@ ACCESS_HISTORY で直接・間接に参照されたオブジェクトや列な�
 
 外部エンジンは Horizon Iceberg REST カタログ API（`https://<account_identifier>.snowflakecomputing.com/polaris/api/catalog`）で、Snowflake 管理 Iceberg テーブルを読み書きする。Horizon Catalog は Apache Polaris を組み込んで互換性を持つ。ヘッダー `X-Iceberg-Access-Delegation: vended-credentials` を指定すると、Snowflake が表ごとの一時的なストレージ認証情報を返す。認証方式は External OAuth、キーペア（JWT）、Programmatic Access Token、Workload Identity Federation が公式資料に挙がる。読み取りには表の `SELECT` とデータベース・スキーマの `USAGE`、書き込みには DML 権限が必要で、表の所有ロールは外部ボリュームの `USAGE` を保つ。
 
-2026 年 11 月時点の公式資料では、Snowflake 管理 Iceberg v2 と v3 の読み取りと書き込みが GA と記載されている。制約は次のとおり。外部エンジンからの CTAS、equality delete、Iceberg の tag・branch、スナップショットのロールバック、v2 から v3 へのアップグレード、dynamic table や共有表への書き込みは使えない。変換した表では vended credentials が使えない。S3 互換の非 AWS ストレージは未対応と記載されている。API 呼び出しは 100 万件あたり 0.5 クレジットの Cloud Services 課金が 2026 年後半に始まる予定で、変更されうる。外部エンジンへのマスキングなどのポリシー伝播は未確認である。
+2026 年 11 月時点の公式資料では、Snowflake 管理 Iceberg v2 と v3 の読み取りと書き込みが GA と記載されている。制約は次のとおり。外部エンジンからの CTAS、equality delete、Iceberg の tag・branch、スナップショットのロールバック、v2 から v3 へのアップグレード、dynamic table や共有表への書き込みは使えない。変換した表では vended credentials が使えない。S3 互換の非 AWS ストレージは未対応と記載されている（一般提供の範囲は AWS S3 などの対応ストレージ）。API 呼び出しは 100 万件あたり 0.5 クレジットの Cloud Services 課金が 2026 年後半に始まる予定で、変更されうる。外部エンジンへのマスキングなどのポリシー伝播は未確認である。
 
-2026 年 10 月の Snowflake 技術記事は、S3 互換ストレージ上の管理 Iceberg テーブルを外部エンジンへ公開する構想を private preview として紹介している。ストレージの内部識別を `s3://` 形式のパスへ解決し、古いメタデータでは一度だけメタデータ更新が必要になる場合があるとする。現行ドキュメントの「未対応」と状況が食い違うため、提供範囲は利用前に確認する（未確認）。S3 互換ストレージを AWS S3 サービスと混同しない。
+2026 年 10 月の Snowflake 技術記事は、S3 互換ストレージ上の管理 Iceberg テーブルを外部エンジンへ公開する構想を private preview として紹介している。ストレージの内部識別を `s3://` 形式のパスへ解決し、古いメタデータでは一度だけメタデータ更新が必要になる場合があるとする。食い違いの内容は、現行ドキュメントが非 AWS の S3 互換ストレージを未対応とするのに対し、技術記事は MinIO、Ceph、Cloudflare R2、オンプレミスのクラスターを対象にした private preview を述べている点である。記事の機能は利用に営業担当への申し込みが要り、一般提供ではない。この機能の GA 時期、制約、ポリシー伝播への対応は未確認。S3 互換ストレージを AWS S3 サービスと混同しない。
 
 ## 図で確認するシナリオ
 

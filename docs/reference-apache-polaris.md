@@ -2,7 +2,7 @@
 
 ## 1. 管理 API とテーブル操作
 
-Polaris は Iceberg REST Catalog を実装する。管理者は管理 API でカタログ、Principal、ロール、権限を設定し、処理エンジンは Iceberg REST API で namespace やテーブルを操作する。本図は内部カタログと AWS S3 を使う構成を扱う。
+Polaris は Iceberg REST Catalog を実装する。管理者は管理 API でカタログ、Principal、ロール、権限を設定し、処理エンジンは Iceberg REST API で namespace やテーブルを操作する。本図は内部カタログと AWS S3 を使う構成を扱う。2026 年 11 月時点の公式ダウンロードページで最新の版は 1.9.0（2026 年 11 月 14 日公開）で、本図の参照版と一致する。
 
 [Apache Polaris 1.9.0 Documentation](https://polaris.apache.org/releases/1.9.0/)、[Using the Polaris REST APIs with curl](https://polaris.apache.org/guides/rest-api/)
 

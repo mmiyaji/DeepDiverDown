@@ -14,7 +14,7 @@ Explore では Fabric のアイテムを絞り込み、詳細から上流・下�
 
 ## 3. Govern とドメイン
 
-Govern はドメイン、認定、メタデータスキャン、ポリシーなどを管理する入口。管理者はドメインやワークスペースの状態を確認し、ガバナンスの推奨アクションを検討できる。Govern の一般提供は 2026年9月。
+Govern はドメイン、認定、メタデータスキャン、ポリシーなどを管理する入口。管理者はドメインやワークスペースの状態を確認し、ガバナンスの推奨アクションを検討できる。Govern の一般提供は 2026年9月で、2026 年 11 月時点の記述である。
 
 [OneLake Catalog Overview](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)、[Govern Your Fabric Data](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-govern)、[What's New in Fabric](https://learn.microsoft.com/fabric/fundamentals/whats-new)
 

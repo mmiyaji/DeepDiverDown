@@ -1,0 +1,343 @@
+{
+  "model": "aws-glue-data-catalog-lake-formation",
+  "name": "AWS Glue Data Catalog と Lake Formation の権限と Iceberg REST",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "engine": {
+      "type": "node",
+      "label": "AWS のクエリエンジン",
+      "status": "claim"
+    },
+    "ext-engine": {
+      "type": "node",
+      "label": "外部のクエリエンジン",
+      "status": "claim"
+    },
+    "auth": {
+      "type": "node",
+      "label": "トークン交換（AWS Sign-In）",
+      "status": "claim"
+    },
+    "rest": {
+      "type": "node",
+      "label": "Iceberg REST エンドポイント",
+      "status": "claim"
+    },
+    "glue-api": {
+      "type": "node",
+      "label": "Glue Data Catalog API",
+      "status": "claim"
+    },
+    "tables": {
+      "type": "node",
+      "label": "データベースとテーブル",
+      "status": "claim"
+    },
+    "perm": {
+      "type": "node",
+      "label": "Lake Formation の権限",
+      "status": "claim"
+    },
+    "location": {
+      "type": "node",
+      "label": "登録済み S3 ロケーション",
+      "status": "claim"
+    },
+    "vend": {
+      "type": "node",
+      "label": "クレデンシャルベンディング",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "Amazon S3 のテーブルデータ",
+      "status": "claim"
+    },
+    "meta": {
+      "type": "link",
+      "label": "AWS のクエリエンジン → Glue Data Catalog API",
+      "status": "claim"
+    },
+    "sigv4": {
+      "type": "link",
+      "label": "AWS のクエリエンジン → Iceberg REST エンドポイント",
+      "status": "claim"
+    },
+    "exchange": {
+      "type": "link",
+      "label": "外部のクエリエンジン → トークン交換（AWS Sign-In）",
+      "status": "claim"
+    },
+    "bearer": {
+      "type": "link",
+      "label": "外部のクエリエンジン → Iceberg REST エンドポイント",
+      "status": "claim"
+    },
+    "resolve-rest": {
+      "type": "link",
+      "label": "Iceberg REST エンドポイント → データベースとテーブル",
+      "status": "claim"
+    },
+    "resolve-api": {
+      "type": "link",
+      "label": "Glue Data Catalog API → データベースとテーブル",
+      "status": "claim"
+    },
+    "check": {
+      "type": "link",
+      "label": "データベースとテーブル → Lake Formation の権限",
+      "status": "claim"
+    },
+    "path": {
+      "type": "link",
+      "label": "データベースとテーブル → 登録済み S3 ロケーション",
+      "status": "claim"
+    },
+    "register": {
+      "type": "link",
+      "label": "登録済み S3 ロケーション → クレデンシャルベンディング",
+      "status": "claim"
+    },
+    "grant": {
+      "type": "link",
+      "label": "Lake Formation の権限 → クレデンシャルベンディング",
+      "status": "claim"
+    },
+    "request": {
+      "type": "link",
+      "label": "AWS のクエリエンジン → クレデンシャルベンディング",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "AWS のクエリエンジン → Amazon S3 のテーブルデータ",
+      "status": "claim"
+    },
+    "aws-engine": {
+      "type": "scenario",
+      "label": "Athena が Lake Formation 管理の表を読む"
+    },
+    "external-engine": {
+      "type": "scenario",
+      "label": "外部の Spark が Iceberg REST で表を読む"
+    },
+    "example-ext": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "社内の Spark（Iceberg クライアント）",
+      "realizes": [
+        "ext-engine"
+      ]
+    },
+    "example-signin": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "AWS Sign-In のトークン交換",
+      "realizes": [
+        "auth"
+      ]
+    },
+    "example-rest": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Glue Iceberg REST エンドポイント",
+      "realizes": [
+        "rest"
+      ]
+    },
+    "example-glue-api": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Glue Data Catalog API",
+      "realizes": [
+        "glue-api"
+      ]
+    },
+    "example-tables": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "sales_db.orders（Iceberg テーブル）",
+      "realizes": [
+        "tables"
+      ]
+    },
+    "example-perm": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Lake Formation の許可（表・列・行フィルター）",
+      "realizes": [
+        "perm"
+      ]
+    },
+    "example-location": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "登録した S3 ロケーション",
+      "realizes": [
+        "location"
+      ]
+    },
+    "example-vend": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Lake Formation の一時認証情報の払い出し",
+      "realizes": [
+        "vend"
+      ]
+    },
+    "example-s3": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Amazon S3 のテーブルデータ",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "example-athena": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Amazon Athena（SQL）",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "example-emr": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Amazon EMR on EC2 の Spark（YARN）",
+      "realizes": []
+    },
+    "example-redshift": {
+      "type": "implementation",
+      "impl": "glue-lf-aws",
+      "label": "Amazon Redshift Spectrum",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-aws-glue-data-catalog-lake-formation.md#§1": [
+      "model",
+      "tables"
+    ],
+    "docs/reference-aws-glue-data-catalog-lake-formation.md": [
+      "model",
+      "engine",
+      "ext-engine",
+      "auth",
+      "rest",
+      "glue-api",
+      "tables",
+      "perm",
+      "location",
+      "vend",
+      "storage",
+      "meta",
+      "sigv4",
+      "exchange",
+      "bearer",
+      "resolve-rest",
+      "resolve-api",
+      "check",
+      "path",
+      "register",
+      "grant",
+      "request",
+      "read",
+      "aws-engine",
+      "external-engine",
+      "example-ext",
+      "example-signin",
+      "example-rest",
+      "example-glue-api",
+      "example-tables",
+      "example-perm",
+      "example-location",
+      "example-vend",
+      "example-s3",
+      "example-athena",
+      "example-emr",
+      "example-redshift"
+    ],
+    "docs/reference-aws-glue-data-catalog-lake-formation.md#§2": [
+      "engine",
+      "glue-api",
+      "meta",
+      "resolve-api",
+      "aws-engine"
+    ],
+    "docs/reference-aws-glue-data-catalog-lake-formation.md#§3": [
+      "ext-engine",
+      "auth",
+      "rest",
+      "sigv4",
+      "exchange",
+      "bearer",
+      "resolve-rest",
+      "external-engine"
+    ],
+    "docs/reference-aws-glue-data-catalog-lake-formation.md#§4": [
+      "perm",
+      "location",
+      "vend",
+      "storage",
+      "check",
+      "path",
+      "register",
+      "grant",
+      "request",
+      "read"
+    ],
+    "docs/reference-aws-glue-data-catalog-lake-formation.md#§5": [
+      "example-ext",
+      "example-signin",
+      "example-rest",
+      "example-glue-api",
+      "example-tables",
+      "example-perm",
+      "example-location",
+      "example-vend",
+      "example-s3",
+      "example-athena",
+      "example-emr",
+      "example-redshift"
+    ]
+  },
+  "reference": {
+    "domain": "メタデータ・ガバナンス",
+    "category": "データカタログ",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "AWS Glue Data Catalog と Lake Formation",
+    "role": "overview",
+    "order": 55,
+    "objectives": [
+      "Glue Data Catalog が持つ対象と、エンジンがそれを解決する 2 つの経路（Glue API と Iceberg REST）を区別する。",
+      "Iceberg REST の SigV4 と OAuth の使い分けを確認する。",
+      "Lake Formation の権限が一時認証情報として S3 アクセスに変わる流れを確認する。"
+    ],
+    "sources": [
+      {
+        "title": "Glue Iceberg REST エンドポイント",
+        "url": "https://docs.aws.amazon.com/glue/latest/dg/connect-glu-iceberg-rest.html"
+      },
+      {
+        "title": "Lake Formation の仕組み",
+        "url": "https://docs.aws.amazon.com/lake-formation/latest/dg/how-it-works.html"
+      },
+      {
+        "title": "Lake Formation のアプリケーション統合（クレデンシャルベンディング）",
+        "url": "https://docs.aws.amazon.com/lake-formation/latest/dg/using-cred-vending.html"
+      },
+      {
+        "title": "Lake Formation と他の AWS サービス",
+        "url": "https://docs.aws.amazon.com/lake-formation/latest/dg/working-with-services.html"
+      },
+      {
+        "title": "Glue Data Catalog の概要",
+        "url": "https://docs.aws.amazon.com/glue/latest/dg/catalog-and-crawler.html"
+      }
+    ]
+  }
+}

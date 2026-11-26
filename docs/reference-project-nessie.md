@@ -20,7 +20,7 @@ Nessie はカタログの名前付き参照を管理する。ブランチはコ�
 
 ## 4. Iceberg REST 接続
 
-公式ガイドでは Iceberg REST 対応を実験的と記載している。サーバー側でストレージと warehouse を構成し、クライアントは URI でブランチやタグを選べる。REST 応答で公開されるテーブルのスナップショットは選択した Nessie コミットに対応する一つで、過去時点は Nessie の参照・コミット ID・時刻から選ぶ。
+2026 年 11 月時点でも、公式ガイドは Iceberg REST 対応を実験的と記載している。サーバー側でストレージと warehouse を構成し、クライアントは URI でブランチやタグを選べる。REST 応答で公開されるテーブルのスナップショットは選択した Nessie コミットに対応する一つで、過去時点は Nessie の参照・コミット ID・時刻から選ぶ。
 
 [Configure Nessie with Iceberg REST](https://projectnessie.org/guides/iceberg-rest/)
 
@@ -41,7 +41,7 @@ Nessie はカタログの名前付き参照を管理する。ブランチはコ�
 | Iceberg メタデータ・ファイル | MinIO（S3 互換） | warehouse に Iceberg メタデータとデータを置く。 |
 | 実装で追加 | warehouse 設定 | オブジェクトストレージの接続先とテーブルの既定位置を定義する。 |
 
-warehouse をサーバーで定義する。試行用の履歴はインメモリで、再起動後も保持する運用では永続バックエンドを使う。Iceberg REST 対応は公式ガイドで実験的とされる。
+warehouse をサーバーで定義する。試行用の履歴はインメモリで、再起動後も保持する運用では永続バックエンドを使う。Iceberg REST 対応は 2026 年 11 月時点でも公式ガイドで実験的とされる。
 
 [Nessie Specification](https://projectnessie.org/develop/spec/)、[Configure Nessie with Iceberg REST](https://projectnessie.org/guides/iceberg-rest/)、[Getting Started with Nessie and Iceberg REST](https://projectnessie.org/guides/try-nessie/)
 

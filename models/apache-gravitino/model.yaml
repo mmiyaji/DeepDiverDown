@@ -1,0 +1,112 @@
+name: Apache Gravitino のフェデレーションメタデータカタログ
+description: メタレイクの下に Hive・Iceberg・JDBC・Kafka・ファイルセットなどのカタログを束ね、ロールによる権限と、コネクタ・Iceberg REST による外部エンジンからの接続を追う。
+reference:
+  objectives:
+    - メタレイクの下に束ねるカタログの種類を説明する。
+    - アクセス制御（ユーザー・グループ・ロール・権限）の判定位置を区別する。
+    - エンジンからの 2 つの接続経路（コネクタと Iceberg REST）を区別する。
+  sources:
+    - {title: Apache Gravitino ドキュメント（概要）, url: "https://raw.githubusercontent.com/apache/gravitino/main/docs/index.md"}
+    - {title: Apache Gravitino アクセス制御, url: "https://raw.githubusercontent.com/apache/gravitino/main/docs/security/access-control.md"}
+sources: [docs/reference-apache-gravitino.md]
+evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§1"}]
+tiers:
+  - {id: client, label: 管理者とエンジン, z: 2, size: [15, 3.4]}
+  - {id: core, label: Gravitino, z: 1, size: [15, 3.4]}
+  - {id: backend, label: カタログと外部のメタデータ・データ, z: 0, size: [15, 3.4]}
+nodes:
+  admin: {label: 管理者, kind: actor, tier: client, x: 1, y: 0.8, description: メタレイク、カタログ、ユーザー、ロールを作る。メタレイクを作れるのは serviceAdmins に指定した管理者のみ。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§4"}]}
+  engine: {label: クエリエンジン, kind: client, tier: client, x: 1, y: 2.4, description: Trino、Spark、Flink、Daft。コネクタでメタデータを引く経路と、Iceberg REST で接続する経路がある。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§5"}]}
+  api: {label: Gravitino サーバー API, kind: service, tier: core, x: 3, y: 0.8, description: 管理者とコネクタからのメタデータ操作を受ける。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§2"}]}
+  authz: {label: アクセス制御, kind: policy, tier: core, x: 3, y: 2.4, description: ユーザー・グループ・ロール・権限で操作を判定する。既定は JcasbinAuthorizer。Apache Ranger などへ判定を委ねる構成もある。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§4"}]}
+  metalake: {label: メタレイク, kind: catalog, tier: core, x: 6, y: 0.8, description: メタデータ管理の最上位の単位。カタログ群を含む。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§2"}]}
+  icerest: {label: Iceberg REST サービス, kind: service, tier: core, x: 6, y: 2.4, description: Gravitino が Iceberg REST カタログとして振る舞う。配置形態とバックエンドは未確認。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§5"}]}
+  relcat: {label: リレーショナルカタログ（Hive・Iceberg・JDBC など）, kind: catalog, tier: backend, x: 9, y: 0.5, description: Hive、Iceberg、MySQL、PostgreSQL、Paimon、Hudi、Doris、StarRocks などを束ねる。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  msgcat: {label: メッセージングカタログ（Kafka）, kind: catalog, tier: backend, x: 9, y: 1.5, description: Kafka のトピックをメタデータとして扱う。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  filecat: {label: ファイルセットカタログ, kind: catalog, tier: backend, x: 9, y: 2.5, description: ストレージ上のファイル群をファイルセットとして管理する。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  extdb: {label: Hive Metastore・RDB, kind: db, tier: backend, x: 13, y: 0.5, description: 既存のメタデータと表を持つ外部システム。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  kafka: {label: Kafka クラスタ, kind: queue, tier: backend, x: 13, y: 1.5, description: トピックを持つ外部システム。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  storage: {label: HDFS・オブジェクトストレージ, kind: db, tier: backend, x: 13, y: 2.5, description: データファイルとファイルセットの置き場。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+links:
+  - {id: setup, from: admin, to: api, label: メタレイク・カタログ・ロールを作成, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§4"}]}
+  - {id: connector, from: engine, to: api, label: コネクタでメタデータを問い合わせ, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§5"}]}
+  - {id: authorize, from: api, to: authz, label: 操作を認可, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§4"}]}
+  - {id: resolve, from: api, to: metalake, label: メタレイク内を解決, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§2"}]}
+  - {id: to-rel, from: metalake, to: relcat, label: カタログを束ねる, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  - {id: to-msg, from: metalake, to: msgcat, label: カタログを束ねる, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  - {id: to-file, from: metalake, to: filecat, label: カタログを束ねる, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  - {id: rel-ext, from: relcat, to: extdb, label: 既存のメタデータを参照, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  - {id: msg-kafka, from: msgcat, to: kafka, label: トピックを管理, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  - {id: file-store, from: filecat, to: storage, label: ファイルセットの場所を管理, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§3"}]}
+  - {id: rest, from: engine, to: icerest, label: Iceberg REST で接続, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§5"}]}
+  - {id: rest-state, from: icerest, to: extdb, label: カタログ状態を保存（未確認）, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§5"}]}
+  - {id: rest-wh, from: icerest, to: storage, label: Iceberg メタデータの置き場（未確認）, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§5"}]}
+  - {id: direct, from: engine, to: storage, label: データファイルを直接読み書き, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§5"}]}
+scenarios:
+  - id: federated-query
+    label: 複数カタログを 1 つのメタレイクから使う
+    evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§6"}]
+    steps:
+      - {links: [setup], note: 管理者がメタレイクに Hive や Kafka のカタログを登録し、ロールを設定する。}
+      - {links: [connector, authorize, resolve], note: エンジンがコネクタ経由でテーブルを問い合わせ、権限判定後にメタレイク内で解決する。}
+      - {links: [to-rel, rel-ext, direct], note: 解決したカタログが外部のメタデータを参照し、エンジンがデータファイルを読む。}
+  - id: iceberg-rest
+    label: Iceberg REST で接続する
+    evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§6"}]
+    steps:
+      - {links: [rest, rest-state], note: Iceberg クライアントが REST サービスでテーブルを解決する。状態の保存先は未確認。}
+      - {links: [rest-wh, direct], note: データファイルを置き場から読み書きする。}
+unknowns:
+  - Iceberg REST サービスの配置形態（サーバー内の補助サービスか単独か）とバックエンドの種類は、今回の取得で確認していない。
+  - Iceberg REST 経由の認可と一時認証情報の発行の有無は未確認。
+  - メタデータ自身の保存先とリネージの有無は未確認（概要の資料にリネージの記載がない）。
+implementations:
+  - id: gravitino-onprem
+    label: 自前環境の Gravitino・Trino/Spark・Hive Metastore・Kafka・HDFS
+    description: 社内のサーバーに Gravitino を置き、既存の Hive Metastore・RDB・Kafka・HDFS を束ねる代表的な構成。公式資料を組み合わせた説明用で、動作検証はしていない。
+    sources:
+      - {title: Apache Gravitino ドキュメント（概要）, url: "https://raw.githubusercontent.com/apache/gravitino/main/docs/index.md"}
+      - {title: Apache Gravitino アクセス制御, url: "https://raw.githubusercontent.com/apache/gravitino/main/docs/security/access-control.md"}
+    nodes:
+      gv-operator: {label: 運用者, kind: actor, tier: client, x: 1, y: 0.8, realizes: [admin], description: REST API または CLI でメタレイクとロールを作る。, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§7"}]}
+      gv-engine: {label: Trino / Spark / Flink, kind: client, tier: client, x: 1, y: 2.4, realizes: [engine], description: Gravitino コネクタまたは Iceberg REST で接続する。, management: {type: customer, scope: "Customer operates the engine clusters and connector configuration."}, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§7"}]}
+      gv-server: {label: Gravitino サーバー（Java 17）, kind: service, tier: core, x: 4, y: 1.6, realizes: [api, authz, metalake, relcat, msgcat, filecat], description: 管理 API、メタレイク、アクセス制御、各カタログを 1 プロセスで提供する。, management: {type: customer, scope: "Customer deploys and operates the server and its configuration."}, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§7"}]}
+      gv-icerest: {label: Iceberg REST サービス, kind: service, tier: core, x: 7, y: 2.4, realizes: [icerest], description: Iceberg クライアント向けの REST エンドポイント。配置形態は未確認。, management: {type: customer, scope: "Customer deploys and operates the service."}, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§7"}]}
+      gv-hms: {label: Hive Metastore と RDB, kind: db, tier: backend, x: 11, y: 0.5, realizes: [extdb], description: 既存の Hive Metastore と MySQL・PostgreSQL。, management: {type: customer, scope: "Customer operates the existing systems."}, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§7"}]}
+      gv-kafka: {label: Kafka クラスタ, kind: queue, tier: backend, x: 11, y: 1.5, realizes: [kafka], description: 既存の Kafka。, management: {type: customer, scope: "Customer operates the cluster."}, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§7"}]}
+      gv-hdfs: {label: HDFS・S3 互換ストレージ, kind: db, tier: backend, x: 11, y: 2.5, realizes: [storage], description: データファイルとファイルセットの置き場。ストレージの種類は構成による。, management: {type: customer, scope: "Customer operates the storage."}, evidence: [{type: doc, ref: "docs/reference-apache-gravitino.md#§7"}]}
+    links: []
+    groups:
+      - {kind: datacenter, label: 社内データセンター, provider: onprem, tier: [client, core, backend], nodes: [gv-engine, gv-server, gv-icerest, gv-hms, gv-kafka, gv-hdfs]}
+    tiers:
+      - {id: client, label: 運用者とエンジン, z: 2, size: [13, 3.4]}
+      - {id: core, label: Gravitino, z: 1, size: [13, 3.4]}
+      - {id: backend, label: 既存のメタデータとデータ, z: 0, size: [13, 3.4]}
+    layout2d:
+      tiers: [{id: diagram, label: 社内データセンター, z: 0, size: [20, 8]}]
+      nodes:
+        gv-operator: {tier: diagram, x: 0, y: 1}
+        gv-engine: {tier: diagram, x: 0, y: 5}
+        gv-server: {tier: diagram, x: 6, y: 1}
+        gv-icerest: {tier: diagram, x: 6, y: 5}
+        gv-hms: {tier: diagram, x: 12, y: 0}
+        gv-kafka: {tier: diagram, x: 12, y: 3}
+        gv-hdfs: {tier: diagram, x: 12, y: 6}
+      groups:
+        - {kind: datacenter, label: 社内データセンター, provider: onprem, tier: diagram, nodes: [gv-engine, gv-server, gv-icerest, gv-hms, gv-kafka, gv-hdfs]}
+    layout3d:
+      tiers:
+        - {id: engine, label: エンジン, z: 1, size: [5, 3]}
+        - {id: app, label: Gravitino, z: 1, origin: [7, 0], size: [8, 3]}
+        - {id: backend, label: 既存システム, z: 0, origin: [16, 0], size: [5, 3]}
+        - {id: outside, label: 運用者, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+      nodes:
+        gv-operator: {tier: outside, x: 0, y: 1.5}
+        gv-engine: {tier: engine, x: 2, y: 1.5}
+        gv-server: {tier: app, x: 2, y: 1.5}
+        gv-icerest: {tier: app, x: 5, y: 1.5}
+        gv-hms: {tier: backend, x: 1, y: 0.5}
+        gv-kafka: {tier: backend, x: 2.5, y: 1.5}
+        gv-hdfs: {tier: backend, x: 4, y: 2.5}
+      groups:
+        - {kind: datacenter, label: 社内データセンター, provider: onprem, tier: [engine, app, backend], nodes: [gv-engine, gv-server, gv-icerest, gv-hms, gv-kafka, gv-hdfs]}

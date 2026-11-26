@@ -28,7 +28,7 @@
 | ファイル形式 | Parquet・ORC・Avro・Arrow IPC・Vortex・Lance の概要図（Vortex・Lance・Arrow IPC は仕組み図も）。比較表は `docs/category-file-formats.md`。ファイル形式は 1 ファイルの中身、テーブル形式は複数ファイルの管理で分ける |
 | クラウド分析基盤 | Snowflake・Databricks（概要＋仕組み各 5〜7 図に統合）、BigQuery・Amazon Redshift・Microsoft Fabric（概要＋仕組み各 3 図）を整理。比較表は `docs/category-cloud-analytics.md`。Athena・Dremio・Starburst・MotherDuck・Oracle・Teradata・Synapse は比較表の注記のみ |
 | データ配置と読み取り | 概念図 2 つ（パーティショニングとシャーディング、ソートとプルーニング）を残した。Iceberg の分散スキャンとカタログ経由の読み取りは Apache Iceberg の仕組み図（手順 3・4）へ移した。比較表は作っていない（製品がないため） |
-| データカタログ | 10 製品（Polaris・Nessie・DataHub・OpenMetadata・DataZone・Purview・Fabric OneLake catalog・Google Cloud Knowledge Catalog・Snowflake Horizon・Databricks Unity）の概要図と、一時認証情報の仕組み図 2 つ。比較表は 2 つ（OSS・自前運用型、マネージド型）で docs/category-data-catalog.md。追加候補は scratchpad の調査メモ（Glue Data Catalog と Lake Formation、Gravitino、Unity Catalog OSS、Hive Metastore） |
+| データカタログ | 12 製品（Apache Gravitino・AWS Glue Data Catalog と Lake Formation を追加。Polaris・Nessie・DataHub・OpenMetadata・DataZone・Purview・Fabric OneLake catalog・Google Cloud Knowledge Catalog・Snowflake Horizon・Databricks Unity）の概要図と、一時認証情報の仕組み図 2 つ。比較表は 2 つ（OSS・自前運用型、マネージド型）で docs/category-data-catalog.md。追加候補は scratchpad の調査メモ（Glue Data Catalog と Lake Formation、Gravitino、Unity Catalog OSS、Hive Metastore） |
 | ほかの分類 | 時系列データ、インメモリ DB、Kubernetes 系、オブザーバビリティ、OSS の新技術、DWH 設計パターンなどが未着手。古い図は js/products.js で製品を推定している |
 
 バッチ・SQL とストリーム処理の対象はデスクトップの 2D・3D を確認した。3D の初期表示では重なりを避けるため一部ラベルが非表示になる。物理 iPad の Safari と、すべてのカメラ角度は未確認。取り込み分類は追加図の 2D・3D と選択を確認し、変更したモデルの提供元境界点検を通過した。モデル点検には台数未記載の警告が残る。
