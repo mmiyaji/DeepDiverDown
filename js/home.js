@@ -15,7 +15,6 @@ $('accept-notice').addEventListener('click', () => {
   try { sessionStorage.setItem(consentKey, 'accepted'); } catch { /* Continue without persistence. */ }
   notice.hidden = true;
   site.inert = false;
-  $('search').focus();
 });
 notice.addEventListener('keydown', event => {
   if (event.key !== 'Tab') return;
