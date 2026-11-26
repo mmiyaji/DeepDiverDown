@@ -52,6 +52,7 @@ const observer = new IntersectionObserver(entries => {
 const compactCount = n => n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/.0$/, '') + 'k' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
 let stats = null;
 const productOf = new Map();
+const roleOf = new Map();
 const starsOf = entry => stats?.products?.[productOf.get(entry.id)]?.stars ?? -1;
 function card(entry) {
   const a = element('a', 'card');
@@ -80,9 +81,12 @@ function render() {
   const query = $('search').value.trim().toLocaleLowerCase();
   const domain = $('domain').value;
   const matching = entries.filter(entry => (!domain || entry.domain === domain) && [entry.name, entry.description, entry.domain, entry.category, ...(entry.tags || [])].join(' ').toLocaleLowerCase().includes(query));
-  const filtered = !showAll && !query && !domain ? matching.filter(entry => featured.includes(entry.id)) : matching;
+  // 代表例では、同じ製品の図は概要（基本）の 1 枚だけにする
+  const picked = matching.filter(entry => featured.includes(entry.id));
+  const overviews = new Set(picked.filter(entry => roleOf.get(entry.id) === 'overview').map(entry => productOf.get(entry.id)));
+  const filtered = !showAll && !query && !domain ? picked.filter(entry => roleOf.get(entry.id) === 'overview' || !overviews.has(productOf.get(entry.id))) : matching;
   let sortKey = 'stars'; try { sortKey = sessionStorage.getItem('ddd.homeSort') || 'stars'; } catch { /* 既定を使う */ }
-  const shown = sortKey === 'stars' && stats ? [...filtered].sort((a, b) => starsOf(b) - starsOf(a)) : filtered;
+  const shown = sortKey === 'stars' && stats ? [...filtered].sort((a, b) => starsOf(b) - starsOf(a) || (roleOf.get(b.id) === 'overview') - (roleOf.get(a.id) === 'overview')) : filtered;
   $('sort').value = sortKey; $('sort')._dd?.sync();
   $('cards').replaceChildren(...shown.map(card));
   $('count').textContent = !showAll && !query && !domain ? `代表例 ${filtered.length} 件 / 全 ${entries.length} 件` : `${filtered.length} 件のリファレンス`;
@@ -110,7 +114,7 @@ async function loadEntries() {
       fetch('models/oss-stats.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     stats = ossStats;
-    for (const item of registry) if (item.reference?.product) productOf.set(item.id, item.reference.product);
+    for (const item of registry) if (item.reference?.product) { productOf.set(item.id, item.reference.product); roleOf.set(item.id, item.reference.role); }
     $('sort-label').hidden = !stats;
     enhanceSelect($('sort'));
     $('domain').replaceChildren(element('option', '', 'すべて'));
