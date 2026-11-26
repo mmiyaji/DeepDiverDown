@@ -809,12 +809,26 @@ async function showCategoryPage({ domain, category }) {
     const info = idx.get(e.id) || {}, st = stats?.products?.[title];
     return `<a class="cat-card" href="#/m/${encodeURIComponent(e.id)}/struct"><div class="cat-card-title"><h3>${esc(title)}</h3><p>${esc(info.description || '')}</p></div><div class="cat-thumb" data-model-id="${esc(e.id)}" aria-hidden="true">構成図を読み込み中…</div><div class="cat-card-meta">${delivery(e) ? `<span class="mtag mini ${TAG_KIND(delivery(e))}">${esc(delivery(e))}</span>` : ''}<span>図 ${n}</span>${st ? `<span class="cat-star" title="GitHub スター数（${esc(stats.fetchedAt)} 時点）">★ ${compactCount(st.stars)}</span>` : ''}<span class="cat-open">開く →</span></div></a>`;
   };
+  let sortKey = 'stars'; try { sortKey = sessionStorage.getItem('ddd.catSort') || 'stars'; } catch {}
+  const productCards = () => {
+    const stars = g => stats?.products?.[g.name]?.stars ?? -1;
+    const list = sortKey === 'stars' ? [...prods].sort((x, y) => stars(y) - stars(x)) : prods;
+    return list.map(g => card(g.overview, g.name, g.list.length === g.all.length ? g.all.length : `${g.list.length}（全 ${g.all.length}）`)).join('');
+  };
   const first = g => [...g.list].sort((a, b) => (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)))[0];
   page.innerHTML = `<div class="cat-inner"><p class="cat-eyebrow">${esc(domain)}</p><h1>${esc(category)}</h1><p class="cat-lead">${esc(CATEGORY_INFO[category] || '')}</p>
-    ${prods.length ? `<h2>製品 <small>${prods.length}</small></h2><div class="cat-grid">${prods.map(g => card(g.overview, g.name, g.list.length === g.all.length ? g.all.length : `${g.list.length}（全 ${g.all.length}）`)).join('')}</div>` : ''}
+    ${prods.length ? `<div class="cat-sort-head"><h2>製品 <small>${prods.length}</small></h2>${prods.some(g => stats?.products?.[g.name]) ? `<label class="cat-sort">並び順<select id="cat-sort"><option value="stars">GitHub スター数の順</option><option value="default">既定順</option></select></label>` : ''}</div><div class="cat-grid" id="cat-products">${productCards()}</div>` : ''}
     ${cons.length ? `<h2>仕組みとパターン <small>${cons.reduce((s, g) => s + g.list.length, 0)}</small></h2><div class="cat-grid">${cons.flatMap(g => g.list).map(e => card(e, e.name, 1)).join('')}</div>` : ''}
     <section id="cat-compare" class="cat-compare" hidden></section>
     ${!prods.length && !cons.length ? '<p class="sub">この分類にはまだ図がありません。</p>' : ''}</div>`;
+  const sortSel = $('cat-sort');
+  if (sortSel) {
+    sortSel.value = sortKey;
+    sortSel.addEventListener('change', () => {
+      sortKey = sortSel.value; try { sessionStorage.setItem('ddd.catSort', sortKey); } catch {}
+      $('cat-products').innerHTML = productCards(); $('cat-products').querySelectorAll('.cat-thumb').forEach(t => thumbObserver.observe(t));
+    });
+  }
   page.hidden = false; page.scrollTop = 0;
   page.querySelectorAll('.cat-thumb').forEach(t => thumbObserver.observe(t));
   loadCategoryCompare(category);
