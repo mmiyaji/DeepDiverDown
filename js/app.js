@@ -1,6 +1,6 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
 import { enhanceSelect } from './dropdown.js';
-import { Scene3D } from './scene3d.js?v=view1';
+import { Scene3D } from './scene3d.js?v=view2';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=perf9';
 import { implementation3D, platformFootprint, platformNeedsMemberBounds } from './implementation-3d.js?v=platform-boundary1';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
@@ -65,6 +65,9 @@ compareViewport.className = 'diagram-viewport';
 $('view').before(compareViewport);
 compareViewport.append($('view'));
 let readableDiagram = false;
+/* 2D の利用者による拡大（ホイール＋Ctrl、トラックパッドのピンチ、2 本指のピンチ）。描画とカードを一緒に拡大するので、カードだけが小さく残ることがない */
+const USER_ZOOM_MAX = 3.5;
+let userZoom = 1;
 function updateDiagramScale() {
   const view = $('view'), button = document.querySelector('[data-act="readable-diagram"]');
   const applicable = !PREVIEW && st.dimension === '2' && compareViewport.classList.contains('compare-viewport');
@@ -79,8 +82,21 @@ function updateDiagramScale() {
     // 縮小しすぎて文字が読めなくなるのを防ぐ（既定の文字 11.5px が約 9px を下回らない範囲）。収まらない分はスクロールで見る
     if (!lab('zoom-floor-off')) scale = Math.max(scale, 0.78);
   }
+  if (applicable) scale = Math.max(0.4, Math.min(USER_ZOOM_MAX, scale * userZoom));
   const value = scale === 1 ? '' : String(scale);
   if (view.style.zoom !== value) view.style.zoom = value;
+}
+/* 見えている点（cx, cy：ビューポート内の位置）を動かさずに、拡大率を userZoom に変える */
+function setUserZoom(next, cx, cy) {
+  const view = $('view'), vp = compareViewport;
+  const before = parseFloat(view.style.zoom || 1);
+  userZoom = Math.min(USER_ZOOM_MAX, Math.max(0.3, next));
+  updateDiagramScale();
+  const after = parseFloat(view.style.zoom || 1);
+  if (!before || before === after) return;
+  const k = after / before;
+  vp.scrollLeft = (vp.scrollLeft + cx) * k - cx;
+  vp.scrollTop = (vp.scrollTop + cy) * k - cy;
 }
 const [REGISTRY, icons] = await Promise.all([L.loadRegistry(), loadServiceIcons()]);
 Catalog.setIcons(icons);
@@ -1815,7 +1831,7 @@ document.addEventListener('click', e => {
       else startPlay();
       return draw();
     }
-    if (a === 'readable-diagram') { readableDiagram = !readableDiagram; updateDiagramScale(); return; }
+    if (a === 'readable-diagram') { readableDiagram = !readableDiagram; userZoom = 1; updateDiagramScale(); return; }
     if (a === 'review-start') return openReview('struct');
     if (a === 'review-scenario') return openReview('scenario');
     if (a === 'review-issues') return openReview('lint');
@@ -1857,7 +1873,7 @@ document.addEventListener('click', e => {
   if (d.drag) return setDrag(d.drag);
   if (d.viewmode) return setView(d.viewmode);
   if (d.view) {
-    if (st.dimension === '2' && d.view === 'reset') readableDiagram = false;
+    if (st.dimension === '2' && d.view === 'reset') { readableDiagram = false; userZoom = 1; }
     scene.fit(st.dimension === '2' ? 'top' : d.view === 'reset' ? S.defaultView : d.view);
     updateDiagramScale();
     return;
@@ -2012,7 +2028,13 @@ new ResizeObserver(() => {
   if (st.dimension === '2' && compareViewport.classList.contains('compare-viewport')) scene.onFlatResize();
 }).observe(compareViewport);
 compareViewport.addEventListener('wheel', e => {
-  if (st.dimension !== '2' || !compareViewport.classList.contains('compare-viewport') || e.ctrlKey) return;
+  if (st.dimension !== '2' || !compareViewport.classList.contains('compare-viewport')) return;
+  if (e.ctrlKey) { // Ctrl＋ホイール／トラックパッドのピンチ：図全体を拡大・縮小する
+    e.preventDefault(); e.stopPropagation();
+    const r = compareViewport.getBoundingClientRect();
+    setUserZoom(userZoom * Math.exp(-e.deltaY * 0.0022), e.clientX - r.left, e.clientY - r.top);
+    return;
+  }
   const horizontal = compareViewport.scrollWidth > compareViewport.clientWidth;
   const vertical = compareViewport.scrollHeight > compareViewport.clientHeight;
   if (!PREVIEW && e.shiftKey && horizontal) {
@@ -2025,6 +2047,25 @@ compareViewport.addEventListener('wheel', e => {
     }
   }
 }, { capture: true, passive: false });
+/* 2 本指のピンチ（タッチ）：2 点の間隔の比で拡大率を変え、中心を保つ */
+{
+  const pts = new Map(); let base = null;
+  const center = () => { const [a, b] = [...pts.values()], r = compareViewport.getBoundingClientRect(); return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top }; };
+  const active = () => st.dimension === '2' && compareViewport.classList.contains('compare-viewport') && !PREVIEW;
+  compareViewport.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch' || !active()) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) { const c = center(); base = { d: c.d, zoom: userZoom }; }
+  }, true);
+  compareViewport.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2 && base && base.d > 10) { const c = center(); setUserZoom(base.zoom * c.d / base.d, c.x, c.y); e.preventDefault(); }
+  }, true);
+  const up = e => { pts.delete(e.pointerId); if (pts.size < 2) base = null; };
+  compareViewport.addEventListener('pointerup', up, true); compareViewport.addEventListener('pointercancel', up, true);
+  compareViewport.style.touchAction = 'pan-x pan-y'; // ブラウザ自身のピンチ拡大を止め、上の処理で拡大する
+}
 if (PREVIEW) {
   compared = previewRoles();
   function revealRole() {

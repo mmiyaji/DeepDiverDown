@@ -817,7 +817,7 @@ export class Scene3D {
     this.labelsDirty = true;
     // 2D のカードは画面上の大きさが変わらないので、カメラを 1 倍より縮めると図だけが縮んでカードが重なる（iPad のピンチで起きた）。
     // 2D は縮小を止め、すでに縮んでいれば 1 倍へ戻して全体表示にする
-    this.controls.minZoom = flat ? 1 : 0.3;
+    this.controls.enableZoom = !flat; this.controls.minZoom = flat ? 1 : 0.3; // 2D の拡大は app.js が図全体の CSS 拡大で行う
     if (flat && this.camera.zoom < 1) { this.camera.zoom = 1; this.camera.updateProjectionMatrix(); this.fitView = 'top'; }
     this.mergeStatic();
     if (!this.fitted || (flat && this.fitView)) {
