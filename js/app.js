@@ -805,6 +805,46 @@ async function showCategoryPage({ domain, category }) {
   $('mtitle').textContent = `${domain} › ${category}`; $('mparent').hidden = true;
   if (matchMedia('(max-width:1279px)').matches) document.body.classList.remove('nav-open');
 }
+/* 製品の特徴ポップアップ：分類ページの製品カードと「違い」の表・選び方を、この製品の分だけ取り出して見せる */
+function productGroupOf(entry) {
+  const ref = entry?.reference; if (!ref) return null;
+  const domain = ref.domain || 'その他';
+  const { products } = libraryGroups(REGISTRY.filter(r => r.reference && (r.reference.domain || 'その他') === domain));
+  const order = [ref.category, ...products.keys()];
+  for (const category of order) for (const group of products.get(category) || []) if (group.all.some(e => e.id === entry.id)) return { category, group };
+  return null;
+}
+function productFromCompare(md, name) {
+  const lines = md.replace(/\r/g, '').split('\n'), norm = t => t.replace(/\*\*/g, '').replace(/\s+/g, '').toLowerCase();
+  const rows = lines.filter(l => /^\|/.test(l) && !/^[|\s:-]+$/.test(l)).map(l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
+  if (rows.length < 2) return { features: [], choose: '' };
+  const head = rows[0], key = norm(name);
+  const col = head.findIndex((h, k) => k && (norm(h) === key || norm(h).includes(key) || key.includes(norm(h))));
+  if (col < 0) return { features: [], choose: '' };
+  const features = rows.slice(1).map(r => [r[0], r[col] || '']).filter(([, v]) => v);
+  const at = lines.findIndex(l => /^##\s*選び方/.test(l));
+  const choose = at < 0 ? '' : lines.slice(at + 1).find(l => /^- /.test(l) && l.includes(`**${head[col]}**`) && l.includes('→'))?.slice(2).split('→')[0].trim() || '';
+  return { features, choose };
+}
+async function openProductSummary() {
+  const hit = productGroupOf(ENTRY); if (!hit) return;
+  const { category, group } = hit, idx = await researchIndex();
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const description = idx.get(group.overview.id)?.description || '';
+  let features = [], choose = '';
+  const slug = CATEGORY_DOCS[category];
+  if (slug) { try { const r = await fetch(`docs/category-${slug}.md`, { cache: 'no-cache' }); if (r.ok) ({ features, choose } = productFromCompare(await r.text(), group.name)); } catch { /* 比較表がなくても概要は出す */ } }
+  const figures = [...group.all].sort((a, b) => (a.reference.role === 'overview' ? -1 : 0) - (b.reference.role === 'overview' ? -1 : 0) || (a.reference.step ?? 99) - (b.reference.step ?? 99));
+  const catHref = '#/c/' + encodeURIComponent(group.overview.reference.domain || 'その他') + '/' + encodeURIComponent(category);
+  modal(group.name, `<div class="product-summary">
+    ${description ? `<p class="ps-lead">${esc(description)}</p>` : ''}
+    ${features.length ? `<h4>観点別の特徴</h4><dl class="ps-features">${features.map(([k, v]) => `<dt>${inline(k)}</dt><dd>${inline(v)}</dd>`).join('')}</dl>` : ''}
+    ${choose ? `<h4>こんなときに選ぶ</h4><p>${inline(choose)}</p>` : ''}
+    <h4>この製品の図 <small>${figures.length}</small></h4>
+    <ul class="ps-figures">${figures.map(e => `<li${e.id === KEY ? ' class="on"' : ''}><a href="#/m/${encodeURIComponent(e.id)}/struct">${e.reference.role === 'overview' ? '概要　' : e.reference.step ? e.reference.step + '. ' : ''}${esc(e.name)}</a></li>`).join('')}</ul>
+    <p class="ps-more"><a href="${catHref}">「${esc(category)}」で、ほかの製品と比べる →</a></p>
+  </div>`);
+}
 function miniMarkdown(md) {
   const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
@@ -1759,6 +1799,7 @@ document.addEventListener('click', e => {
       if (matchMedia('(max-width:1279px)').matches) return document.body.classList.toggle('nav-open'); // 狭い画面は引き出しの開閉のみ
       S.sidebar = !document.body.classList.toggle('nav-closed'); return saveSettings(S);
     }
+    if (a === 'product-summary') return openProductSummary();
     if (a === 'reload') return location.reload();
     if (a === 'reset-settings') { saveSettings({ ...DEFAULTS }); return location.reload(); }
     return;
@@ -1971,3 +2012,5 @@ if (adminView) {
     modelId: ENTRY.local || ENTRY.design ? undefined : KEY, provider: S.aiProvider,
   }));
 }
+// 製品に属する図だけ、「製品の特徴」ボタンを出す
+$('product-summary').hidden = !productGroupOf(ENTRY);
