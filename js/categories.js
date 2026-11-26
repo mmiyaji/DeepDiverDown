@@ -53,4 +53,5 @@ export const CATEGORY_DOCS = {
   'テーブル形式とカタログ': 'table-catalog',
   'ファイル形式': 'file-formats',
   'クラウド分析基盤': 'cloud-analytics',
+  'データカタログ': 'data-catalog',
 };
