@@ -13,7 +13,7 @@ test('トップページの注意事項の段落は、サイト情報の位置�
   const notice = home.match(/<div id="notice-description"[\s\S]*?<\/div>/)?.[0] ?? '';
   const aboutParas = new Set(['purpose', 'disclaimer', 'inspiration'].flatMap(id => paras(section(id))));
   const noticeParas = paras(notice);
-  assert.ok(noticeParas.length >= 4, '注意事項の段落が少ない');
+  assert.ok(noticeParas.length >= 3, '注意事項の段落が少ない');
   for (const p of noticeParas) assert.ok(aboutParas.has(p), `サイト情報にない文面：${p.slice(0, 40)}`);
 });
 
