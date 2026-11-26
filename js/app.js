@@ -1,6 +1,6 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
 import { enhanceSelect } from './dropdown.js';
-import { Scene3D } from './scene3d.js?v=view6';
+import { Scene3D } from './scene3d.js?v=view14';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=perf9';
 import { implementation3D, platformFootprint, platformNeedsMemberBounds } from './implementation-3d.js?v=platform-boundary1';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
@@ -63,14 +63,31 @@ if (PREVIEW) document.body.classList.add('reference-preview');
 const compareViewport = document.createElement('div');
 compareViewport.className = 'diagram-viewport';
 $('view').before(compareViewport);
-compareViewport.append($('view'));
+/* 2D の移動：図を載せる層（panLayer）を画面 px で平行移動する。スクロール量には上限があるが、この方式は画面外へも動かせる
+   （3D のカメラの移動と同じ感覚）。比較表示（PREVIEW）は従来どおりスクロール */
+const panLayer = document.createElement('div');
+panLayer.className = 'pan-layer';
+if (PREVIEW) compareViewport.append($('view'));
+else { panLayer.append($('view')); compareViewport.append(panLayer); compareViewport.classList.add('pannable'); }
 let readableDiagram = false;
-/* 2D の表示領域の外にも、図を動かせる余白（画面 px）。図が領域に収まっていても、上下左右に少し動かせる */
-const PAN_PAD = PREVIEW ? 0 : 160;
-compareViewport.style.setProperty('--pan-pad', PAN_PAD + 'px');
-let userPanned = false;
-// 横の余白は図（zoom 済み）の margin なので、拡大率の分だけ小さい。縦の余白は擬似要素で、拡大率の影響を受けない
-const homeScroll = () => { if (!userPanned) { compareViewport.scrollLeft = PAN_PAD * parseFloat($('view').style.zoom || 1); compareViewport.scrollTop = PAN_PAD; } };
+let panX = 0, panY = 0, userPanned = false;
+const PAN_KEEP = 96; // 図が画面外へ出ても、これだけは画面に残す（見失わないため）
+function applyPan() {
+  if (PREVIEW) return;
+  const v = $('view').getBoundingClientRect();
+  const W = compareViewport.clientWidth, H = compareViewport.clientHeight;
+  panX = Math.min(W - PAN_KEEP, Math.max(PAN_KEEP - v.width, panX));
+  panY = Math.min(H - PAN_KEEP, Math.max(PAN_KEEP - v.height, panY));
+  panLayer.style.translate = panX + 'px ' + panY + 'px';
+}
+function setPan(x, y) { panX = x; panY = y; userPanned = true; applyPan(); }
+// 初期位置：図が領域より低いときは、縦の中央に置く
+const homePan = () => {
+  if (userPanned || PREVIEW) return;
+  const h = $('view').getBoundingClientRect().height, H = compareViewport.clientHeight;
+  panX = 0; panY = h && h < H ? (H - h) / 2 : 0;
+  panLayer.style.translate = panY ? '0px ' + panY + 'px' : '';
+};
 /* 2D の利用者による拡大（ホイール＋Ctrl、トラックパッドのピンチ、2 本指のピンチ）。描画とカードを一緒に拡大するので、カードだけが小さく残ることがない */
 const USER_ZOOM_MAX = 8, SCALE_MAX = 6; // 利用者の拡大率の上限と、表示倍率全体の上限
 let userZoom = 1;
@@ -97,24 +114,21 @@ function updateDiagramScale() {
   const value = scale === 1 ? '' : String(scale);
   if (view.style.zoom !== value) view.style.zoom = value;
   scene.setCssZoom?.(applicable ? scale : 1);
-  homeScroll();
+  homePan();
 }
 /* 見えている点（cx, cy：ビューポート内の位置）を動かさずに、拡大率を userZoom に変える */
 function setUserZoom(next, cx, cy) {
-  // 図の高さ・幅は、拡大率に比例して増えるとは限らない（領域いっぱいに広げる指定があるため）。そこで、拡大の前後に図の左上の位置を測り、
-  // カーソルの下にあった図の点が同じ画面位置に残るよう、スクロール量を差し引きして合わせる
-  const view = $('view'), vp = compareViewport;
+  // 図の左上（panX, panY）を原点に拡大するので、カーソルの下の点を保つには、原点をカーソルに向けて k 倍だけ寄せればよい
+  const view = $('view');
   const before = parseFloat(view.style.zoom || 1);
-  const rect = vp.getBoundingClientRect(), ax = rect.left + cx, ay = rect.top + cy;
-  const r0 = view.getBoundingClientRect(), ox = ax - r0.left, oy = ay - r0.top;
   userZoom = Math.min(USER_ZOOM_MAX, Math.max(0.3, next));
   userPanned = true;
   updateDiagramScale();
   const after = parseFloat(view.style.zoom || 1);
   if (!before || before === after) return;
-  const k = after / before, r1 = view.getBoundingClientRect();
-  vp.scrollLeft += r1.left - (ax - ox * k);
-  vp.scrollTop += r1.top - (ay - oy * k);
+  const k = after / before;
+  panX = cx - (cx - panX) * k; panY = cy - (cy - panY) * k;
+  applyPan();
 }
 const [REGISTRY, icons] = await Promise.all([L.loadRegistry(), loadServiceIcons()]);
 Catalog.setIcons(icons);
@@ -2058,8 +2072,8 @@ compareViewport.addEventListener('wheel', e => {
   const horizontal = compareViewport.scrollWidth > compareViewport.clientWidth;
   const vertical = compareViewport.scrollHeight > compareViewport.clientHeight;
   if (!PREVIEW && e.shiftKey && horizontal) {
-    e.preventDefault(); e.stopPropagation(); userPanned = true;
-    compareViewport.scrollLeft += e.deltaY || e.deltaX;
+    e.preventDefault(); e.stopPropagation();
+    if (PREVIEW) compareViewport.scrollLeft += e.deltaY || e.deltaX; else setPan(panX - (e.deltaY || e.deltaX), panY);
   } else if (PREVIEW && (horizontal || vertical)) {
     e.stopPropagation();
     if (horizontal && !vertical && !e.deltaX) {
@@ -2089,15 +2103,15 @@ compareViewport.addEventListener('wheel', e => {
   let drag = null;
   compareViewport.addEventListener('pointerdown', e => {
     if (!active() || (e.pointerType === 'mouse' && e.button !== 0) || e.target.closest('button, a, input, select, textarea') || pts.size > 1) return; // カードの上から始めても、動かせばスクロール（動かさなければクリック）
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sl: compareViewport.scrollLeft, st: compareViewport.scrollTop, moved: false };
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, px: panX, py: panY, moved: false };
   }, true);
   compareViewport.addEventListener('pointermove', e => {
     if (!drag || e.pointerId !== drag.id) return;
     if (pts.size > 1) { drag = null; return; }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-    if (!drag.moved) { drag.moved = true; userPanned = true; compareViewport.style.cursor = 'grabbing'; }
-    compareViewport.scrollLeft = drag.sl - dx; compareViewport.scrollTop = drag.st - dy;
+    if (!drag.moved) { drag.moved = true; compareViewport.style.cursor = 'grabbing'; }
+    setPan(drag.px + dx, drag.py + dy);
     e.preventDefault();
   }, true);
   const endDrag = e => {

@@ -216,8 +216,8 @@ export class Scene3D {
     }
     this.miniEl.style.visibility = '';
     const frame = this.el.getBoundingClientRect();
-    const parent = this.el.parentElement;
-    const scrolling = parent?.classList.contains('compare-viewport');
+    const parent = this.el.closest('.compare-viewport'); // 図は panLayer の中にあるので、親ではなく祖先から探す
+    const scrolling = !!parent;
     const clip = scrolling ? parent.getBoundingClientRect() : frame;
     const left = Math.max(frame.left, clip.left), right = Math.min(frame.right, scrolling ? clip.left + parent.clientWidth : clip.right);
     const top = Math.max(frame.top, clip.top), bottom = Math.min(frame.bottom, scrolling ? clip.top + parent.clientHeight : clip.bottom);

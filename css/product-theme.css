@@ -278,6 +278,8 @@
 .compare-viewport{scrollbar-width:none}
 .compare-viewport::-webkit-scrollbar{display:none}
 
-/* 図が領域に収まっていても動かせるよう、2D の表示領域の周りに余白を持たせる（app.js の PAN_PAD。初期のスクロール位置は余白の分だけ進めてある） */
-.compare-viewport::before,.compare-viewport::after{content:'';display:block;height:var(--pan-pad,0)}
-.compare-viewport > .view{margin:0 var(--pan-pad,0);width:100%}
+/* 2D の移動は panLayer の平行移動（app.js）。表示領域ではスクロールさせない */
+.compare-viewport.pannable{position:relative;overflow:hidden}
+.pan-layer{display:contents}
+.compare-viewport.pannable > .pan-layer{display:block;position:absolute;left:0;top:0;width:100%;height:100%}
+.compare-viewport.pannable > .pan-layer > .view{width:100%;height:auto;min-height:0;flex:none;box-sizing:border-box} /* 高さは図の大きさ（app.js・scene3d.js が min-height を指定）に合わせる。領域いっぱいに広げると、拡大の中心が合わなくなる */
