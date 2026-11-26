@@ -770,6 +770,23 @@ async function researchIndex() {
   if (!CAT_INDEX) CAT_INDEX = fetch('models/research-index.json', { cache: 'no-cache' }).then(r => r.json()).then(d => new Map((d.entries || []).map(e => [e.id, e]))).catch(() => new Map());
   return CAT_INDEX;
 }
+let OSS_STATS;
+function ossStats() {
+  if (!OSS_STATS) OSS_STATS = fetch('models/oss-stats.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  return OSS_STATS;
+}
+const compactCount = n => n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/.0$/, '') + 'k' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+function ossFacts(stats, product) {
+  const s = stats?.products?.[product]; if (!s) return '';
+  const rel = r => r ? `${esc(r.tag)}（${esc(r.date)}）` : '';
+  const rows = [
+    ['スター', '★ ' + s.stars.toLocaleString('en-US')], ['フォーク', s.forks.toLocaleString('en-US')], ['ライセンス', s.license ? esc(s.license) : ''],
+    ['最新リリース', rel(s.latest) || 'GitHub のリリース機能は未使用（タグで管理）'], ['GitHub 上の最初のリリース', rel(s.first)], ['最終更新', esc(s.pushedAt)],
+  ].filter(r => r[1]);
+  return `<section class="ps-oss"><h4>GitHub リポジトリ <small>${esc(stats.fetchedAt)} 時点</small></h4><dl>${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+    <p class="ps-links"><a href="https://github.com/${esc(s.repo)}" target="_blank" rel="noopener noreferrer">GitHub（${esc(s.repo)}）</a><a href="https://ossinsight.io/analyze/${esc(s.repo)}" target="_blank" rel="noopener noreferrer">OSS Insight</a></p>
+    <p class="ps-note">「最初のリリース」は GitHub のリリース機能に登録された最古のもので、実際の初版より新しい場合がある。</p></section>`;
+}
 const thumbObserver = new IntersectionObserver(items => {
   for (const it of items) {
     if (!it.isIntersecting) continue;
@@ -787,9 +804,10 @@ async function showCategoryPage({ domain, category }) {
   const { products, concepts } = libraryGroups(refs);
   const prods = products.get(category) || [], cons = concepts.get(category) || [];
   const delivery = e => (e.tags || []).find(t => DELIVERY.includes(t)) || '';
+  const stats = await ossStats();
   const card = (e, title, n) => {
-    const info = idx.get(e.id) || {};
-    return `<a class="cat-card" href="#/m/${encodeURIComponent(e.id)}/struct"><div class="cat-card-title"><h3>${esc(title)}</h3><p>${esc(info.description || '')}</p></div><div class="cat-thumb" data-model-id="${esc(e.id)}" aria-hidden="true">構成図を読み込み中…</div><div class="cat-card-meta">${delivery(e) ? `<span class="mtag mini ${TAG_KIND(delivery(e))}">${esc(delivery(e))}</span>` : ''}<span>図 ${n}</span><span class="cat-open">開く →</span></div></a>`;
+    const info = idx.get(e.id) || {}, st = stats?.products?.[title];
+    return `<a class="cat-card" href="#/m/${encodeURIComponent(e.id)}/struct"><div class="cat-card-title"><h3>${esc(title)}</h3><p>${esc(info.description || '')}</p></div><div class="cat-thumb" data-model-id="${esc(e.id)}" aria-hidden="true">構成図を読み込み中…</div><div class="cat-card-meta">${delivery(e) ? `<span class="mtag mini ${TAG_KIND(delivery(e))}">${esc(delivery(e))}</span>` : ''}<span>図 ${n}</span>${st ? `<span class="cat-star" title="GitHub スター数（${esc(stats.fetchedAt)} 時点）">★ ${compactCount(st.stars)}</span>` : ''}<span class="cat-open">開く →</span></div></a>`;
   };
   const first = g => [...g.list].sort((a, b) => (a.reference.detailOf ? 1 : 0) - (b.reference.detailOf ? 1 : 0) || (REF_KINDS.indexOf(a.reference.kind) - REF_KINDS.indexOf(b.reference.kind)) || ((a.reference.order ?? 1e9) - (b.reference.order ?? 1e9)))[0];
   page.innerHTML = `<div class="cat-inner"><p class="cat-eyebrow">${esc(domain)}</p><h1>${esc(category)}</h1><p class="cat-lead">${esc(CATEGORY_INFO[category] || '')}</p>
@@ -830,7 +848,7 @@ async function openProductSummary() {
   const hit = productGroupOf(ENTRY); if (!hit) return;
   const { category, group } = hit, idx = await researchIndex();
   const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  const description = idx.get(group.overview.id)?.description || '';
+  const description = idx.get(group.overview.id)?.description || '', oss = ossFacts(await ossStats(), group.name);
   let features = [], choose = '';
   const slug = CATEGORY_DOCS[category];
   if (slug) { try { const r = await fetch(`docs/category-${slug}.md`, { cache: 'no-cache' }); if (r.ok) ({ features, choose } = productFromCompare(await r.text(), group.name)); } catch { /* 比較表がなくても概要は出す */ } }
@@ -838,6 +856,7 @@ async function openProductSummary() {
   const catHref = '#/c/' + encodeURIComponent(group.overview.reference.domain || 'その他') + '/' + encodeURIComponent(category);
   modal(group.name, `<div class="product-summary">
     ${description ? `<p class="ps-lead">${esc(description)}</p>` : ''}
+    ${oss}
     ${features.length ? `<h4>観点別の特徴</h4><dl class="ps-features">${features.map(([k, v]) => `<dt>${inline(k)}</dt><dd>${inline(v)}</dd>`).join('')}</dl>` : ''}
     ${choose ? `<h4>こんなときに選ぶ</h4><p>${inline(choose)}</p>` : ''}
     <h4>この製品の図 <small>${figures.length}</small></h4>

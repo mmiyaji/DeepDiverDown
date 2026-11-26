@@ -30,6 +30,7 @@ for (const entry of registry) {
   const doc = `docs/reference-${entry.id}.md`;
   if (fs.existsSync(path.join(root, doc))) copy(doc);
 }
+if (fs.existsSync(path.join(root, 'models/oss-stats.json'))) copy('models/oss-stats.json');
 for (const doc of ['docs/reference-modern-data-stack-candidates.md']) if (fs.existsSync(path.join(root, doc))) copy(doc);
 for (const slug of new Set(Object.values(CATEGORY_DOCS))) {
   if (!/^[a-z0-9-]+$/.test(slug)) throw new Error('Invalid category document ID');
