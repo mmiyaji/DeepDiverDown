@@ -65,6 +65,12 @@ compareViewport.className = 'diagram-viewport';
 $('view').before(compareViewport);
 compareViewport.append($('view'));
 let readableDiagram = false;
+/* 2D の表示領域の外にも、図を動かせる余白（画面 px）。図が領域に収まっていても、上下左右に少し動かせる */
+const PAN_PAD = PREVIEW ? 0 : 160;
+compareViewport.style.setProperty('--pan-pad', PAN_PAD + 'px');
+let userPanned = false;
+// 横の余白は図（zoom 済み）の margin なので、拡大率の分だけ小さい。縦の余白は擬似要素で、拡大率の影響を受けない
+const homeScroll = () => { if (!userPanned) { compareViewport.scrollLeft = PAN_PAD * parseFloat($('view').style.zoom || 1); compareViewport.scrollTop = PAN_PAD; } };
 /* 2D の利用者による拡大（ホイール＋Ctrl、トラックパッドのピンチ、2 本指のピンチ）。描画とカードを一緒に拡大するので、カードだけが小さく残ることがない */
 const USER_ZOOM_MAX = 8, SCALE_MAX = 6; // 利用者の拡大率の上限と、表示倍率全体の上限
 let userZoom = 1;
@@ -76,28 +82,39 @@ function updateDiagramScale() {
   button.textContent = readableDiagram ? '全体を表示' : '文字を拡大';
   let scale = 1;
   if (applicable && !readableDiagram) {
-    const width = parseFloat(view.style.minWidth) || compareViewport.clientWidth;
-    const height = parseFloat(view.style.minHeight) || compareViewport.clientHeight;
-    scale = overviewScale(compareViewport.clientWidth, compareViewport.clientHeight, width, height);
+    const vw = compareViewport.clientWidth, vh = compareViewport.clientHeight;
+    const width = parseFloat(view.style.minWidth) || vw;
+    const height = parseFloat(view.style.minHeight) || vh;
+    scale = overviewScale(vw, vh, width, height);
     // 縮小しすぎて文字が読めなくなるのを防ぐ（既定の文字 11.5px が約 9px を下回らない範囲）。収まらない分はスクロールで見る
     if (!lab('zoom-floor-off')) scale = Math.max(scale, 0.78);
   }
-  if (applicable) scale = Math.max(0.4, Math.min(SCALE_MAX, scale * userZoom));
+  if (applicable) {
+    const base = scale;
+    scale = Math.max(0.4, Math.min(SCALE_MAX, base * userZoom));
+    userZoom = scale / base; // 上限・下限で止まった分は、拡大率の記録からも外す（戻すときに空回りしない）
+  }
   const value = scale === 1 ? '' : String(scale);
   if (view.style.zoom !== value) view.style.zoom = value;
   scene.setCssZoom?.(applicable ? scale : 1);
+  homeScroll();
 }
 /* 見えている点（cx, cy：ビューポート内の位置）を動かさずに、拡大率を userZoom に変える */
 function setUserZoom(next, cx, cy) {
+  // 図の高さ・幅は、拡大率に比例して増えるとは限らない（領域いっぱいに広げる指定があるため）。そこで、拡大の前後に図の左上の位置を測り、
+  // カーソルの下にあった図の点が同じ画面位置に残るよう、スクロール量を差し引きして合わせる
   const view = $('view'), vp = compareViewport;
   const before = parseFloat(view.style.zoom || 1);
+  const rect = vp.getBoundingClientRect(), ax = rect.left + cx, ay = rect.top + cy;
+  const r0 = view.getBoundingClientRect(), ox = ax - r0.left, oy = ay - r0.top;
   userZoom = Math.min(USER_ZOOM_MAX, Math.max(0.3, next));
+  userPanned = true;
   updateDiagramScale();
   const after = parseFloat(view.style.zoom || 1);
   if (!before || before === after) return;
-  const k = after / before;
-  vp.scrollLeft = (vp.scrollLeft + cx) * k - cx;
-  vp.scrollTop = (vp.scrollTop + cy) * k - cy;
+  const k = after / before, r1 = view.getBoundingClientRect();
+  vp.scrollLeft += r1.left - (ax - ox * k);
+  vp.scrollTop += r1.top - (ay - oy * k);
 }
 const [REGISTRY, icons] = await Promise.all([L.loadRegistry(), loadServiceIcons()]);
 Catalog.setIcons(icons);
@@ -1832,7 +1849,7 @@ document.addEventListener('click', e => {
       else startPlay();
       return draw();
     }
-    if (a === 'readable-diagram') { readableDiagram = !readableDiagram; userZoom = 1; updateDiagramScale(); return; }
+    if (a === 'readable-diagram') { readableDiagram = !readableDiagram; userZoom = 1; userPanned = false; updateDiagramScale(); return; }
     if (a === 'review-start') return openReview('struct');
     if (a === 'review-scenario') return openReview('scenario');
     if (a === 'review-issues') return openReview('lint');
@@ -1874,7 +1891,7 @@ document.addEventListener('click', e => {
   if (d.drag) return setDrag(d.drag);
   if (d.viewmode) return setView(d.viewmode);
   if (d.view) {
-    if (st.dimension === '2' && d.view === 'reset') { readableDiagram = false; userZoom = 1; }
+    if (st.dimension === '2' && d.view === 'reset') { readableDiagram = false; userZoom = 1; userPanned = false; }
     scene.fit(st.dimension === '2' ? 'top' : d.view === 'reset' ? S.defaultView : d.view);
     updateDiagramScale();
     return;
@@ -2041,7 +2058,7 @@ compareViewport.addEventListener('wheel', e => {
   const horizontal = compareViewport.scrollWidth > compareViewport.clientWidth;
   const vertical = compareViewport.scrollHeight > compareViewport.clientHeight;
   if (!PREVIEW && e.shiftKey && horizontal) {
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault(); e.stopPropagation(); userPanned = true;
     compareViewport.scrollLeft += e.deltaY || e.deltaX;
   } else if (PREVIEW && (horizontal || vertical)) {
     e.stopPropagation();
@@ -2079,7 +2096,7 @@ compareViewport.addEventListener('wheel', e => {
     if (pts.size > 1) { drag = null; return; }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-    if (!drag.moved) { drag.moved = true; compareViewport.style.cursor = 'grabbing'; }
+    if (!drag.moved) { drag.moved = true; userPanned = true; compareViewport.style.cursor = 'grabbing'; }
     compareViewport.scrollLeft = drag.sl - dx; compareViewport.scrollTop = drag.st - dy;
     e.preventDefault();
   }, true);
