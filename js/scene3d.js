@@ -820,7 +820,7 @@ export class Scene3D {
       this.fit(flat ? 'top' : this.initialView || 'iso'); this.fitted = true;
     }
     if (this.keep) this.applyKeep(this.keep); // 2D のカード寸法の確定による再配置でも、選択部品を同じ位置に保つ
-    if (lab('camera-auto') || lab('camera-keep')) window.__ddScene = this;
+    if (lab('camera-auto') || lab('camera-keep') || lab('diag2d')) window.__ddScene = this;
     this.updateMinimapCamera();
   }
 
