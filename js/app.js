@@ -76,6 +76,8 @@ function updateDiagramScale() {
     const width = parseFloat(view.style.minWidth) || compareViewport.clientWidth;
     const height = parseFloat(view.style.minHeight) || compareViewport.clientHeight;
     scale = overviewScale(compareViewport.clientWidth, compareViewport.clientHeight, width, height);
+    // 縮小しすぎて文字が読めなくなるのを防ぐ（既定の文字 11.5px が約 9px を下回らない範囲）。収まらない分はスクロールで見る
+    if (!lab('zoom-floor-off')) scale = Math.max(scale, 0.78);
   }
   const value = scale === 1 ? '' : String(scale);
   if (view.style.zoom !== value) view.style.zoom = value;

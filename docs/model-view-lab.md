@@ -1,6 +1,6 @@
 # モデルビューの試作
 
-`index.html?lab=名前,名前#/m/<id>/struct` で有効にする（タブの間は覚える。`?lab=off` で解除）。
+採用済みの試作（layout-flow・layout-layers・select-fast・flow-numbers・flow-trail・camera-auto）は既定で有効。`index.html?lab=名前` で試作を追加し、`?lab=-名前` で採用済みを外し、`?lab=off` で全部外す（タブの間は覚える）。2D の文字の下限（拡大率 0.78）は `?lab=zoom-floor-off` で外せる。
 
 | 名前 | 内容 | 状態 |
 | --- | --- | --- |
