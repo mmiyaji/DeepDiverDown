@@ -1,4 +1,5 @@
 /* DeepDiverDown viewer：アプリの枠組み（ヘッダー・サイドバー・パネル）、3D 図、各モード、設定・検索・共有・書き出し */
+import { enhanceSelect } from './dropdown.js';
 import { Scene3D } from './scene3d.js?v=perf9';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=perf9';
 import { implementation3D, platformFootprint, platformNeedsMemberBounds } from './implementation-3d.js?v=platform-boundary1';
@@ -823,7 +824,7 @@ async function showCategoryPage({ domain, category }) {
     ${!prods.length && !cons.length ? '<p class="sub">この分類にはまだ図がありません。</p>' : ''}</div>`;
   const sortSel = $('cat-sort');
   if (sortSel) {
-    sortSel.value = sortKey;
+    sortSel.value = sortKey; enhanceSelect(sortSel);
     sortSel.addEventListener('change', () => {
       sortKey = sortSel.value; try { sessionStorage.setItem('ddd.catSort', sortKey); } catch {}
       $('cat-products').innerHTML = productCards(); $('cat-products').querySelectorAll('.cat-thumb').forEach(t => thumbObserver.observe(t));

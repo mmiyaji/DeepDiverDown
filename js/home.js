@@ -1,3 +1,4 @@
+import { enhanceSelect } from './dropdown.js';
 import { drawThumbnail } from './home-thumbnail.js';
 const $ = id => document.getElementById(id);
 const site = $('site');
@@ -82,7 +83,7 @@ function render() {
   const filtered = !showAll && !query && !domain ? matching.filter(entry => featured.includes(entry.id)) : matching;
   let sortKey = 'stars'; try { sortKey = sessionStorage.getItem('ddd.homeSort') || 'stars'; } catch { /* 既定を使う */ }
   const shown = sortKey === 'stars' && stats ? [...filtered].sort((a, b) => starsOf(b) - starsOf(a)) : filtered;
-  $('sort').value = sortKey;
+  $('sort').value = sortKey; $('sort')._dd?.sync();
   $('cards').replaceChildren(...shown.map(card));
   $('count').textContent = !showAll && !query && !domain ? `代表例 ${filtered.length} 件 / 全 ${entries.length} 件` : `${filtered.length} 件のリファレンス`;
   $('empty').hidden = filtered.length > 0;
@@ -111,6 +112,7 @@ async function loadEntries() {
     stats = ossStats;
     for (const item of registry) if (item.reference?.product) productOf.set(item.id, item.reference.product);
     $('sort-label').hidden = !stats;
+    enhanceSelect($('sort'));
     $('domain').replaceChildren(element('option', '', 'すべて'));
     $('domain').firstElementChild.value = '';
     [...new Set(entries.map(entry => entry.domain).filter(Boolean))].sort().forEach(domain => {
@@ -118,6 +120,7 @@ async function loadEntries() {
       option.value = domain;
       $('domain').append(option);
     });
+    enhanceSelect($('domain'))?.sync();
     loading = false;
     render();
   } catch {
