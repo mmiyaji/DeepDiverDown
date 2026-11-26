@@ -1,0 +1,319 @@
+{
+  "model": "hive-metastore",
+  "name": "Hive Metastore のテーブルメタデータとパーティション",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "spark": {
+      "type": "node",
+      "label": "Spark",
+      "status": "claim"
+    },
+    "trino": {
+      "type": "node",
+      "label": "Trino",
+      "status": "claim"
+    },
+    "hive": {
+      "type": "node",
+      "label": "Hive（HiveServer2）",
+      "status": "claim"
+    },
+    "flink": {
+      "type": "node",
+      "label": "Flink",
+      "status": "claim"
+    },
+    "thrift": {
+      "type": "node",
+      "label": "メタストアの Thrift サービス",
+      "status": "claim"
+    },
+    "rdb": {
+      "type": "node",
+      "label": "メタストア DB（RDB）",
+      "status": "claim"
+    },
+    "tables": {
+      "type": "node",
+      "label": "データベース・テーブル定義",
+      "status": "claim"
+    },
+    "partitions": {
+      "type": "node",
+      "label": "パーティションとストレージ記述子",
+      "status": "claim"
+    },
+    "pointer": {
+      "type": "node",
+      "label": "Iceberg の metadata_location",
+      "status": "claim"
+    },
+    "objstore": {
+      "type": "node",
+      "label": "S3・HDFS のデータの実体",
+      "status": "claim"
+    },
+    "spark-get": {
+      "type": "link",
+      "label": "Spark → メタストアの Thrift サービス",
+      "status": "claim"
+    },
+    "trino-get": {
+      "type": "link",
+      "label": "Trino → メタストアの Thrift サービス",
+      "status": "claim"
+    },
+    "hive-get": {
+      "type": "link",
+      "label": "Hive（HiveServer2） → メタストアの Thrift サービス",
+      "status": "claim"
+    },
+    "flink-get": {
+      "type": "link",
+      "label": "Flink → メタストアの Thrift サービス",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "メタストアの Thrift サービス → メタストア DB（RDB）",
+      "status": "claim"
+    },
+    "hold-tables": {
+      "type": "link",
+      "label": "メタストア DB（RDB） → データベース・テーブル定義",
+      "status": "claim"
+    },
+    "hold-parts": {
+      "type": "link",
+      "label": "メタストア DB（RDB） → パーティションとストレージ記述子",
+      "status": "claim"
+    },
+    "hold-pointer": {
+      "type": "link",
+      "label": "メタストア DB（RDB） → Iceberg の metadata_location",
+      "status": "claim"
+    },
+    "locate-parts": {
+      "type": "link",
+      "label": "パーティションとストレージ記述子 → S3・HDFS のデータの実体",
+      "status": "claim"
+    },
+    "locate-meta": {
+      "type": "link",
+      "label": "Iceberg の metadata_location → S3・HDFS のデータの実体",
+      "status": "claim"
+    },
+    "direct-io": {
+      "type": "link",
+      "label": "Spark → S3・HDFS のデータの実体",
+      "status": "claim"
+    },
+    "read-hive-table": {
+      "type": "scenario",
+      "label": "Hive 形式のテーブルを複数エンジンで読む"
+    },
+    "read-iceberg-table": {
+      "type": "scenario",
+      "label": "Iceberg テーブルを Hive カタログ方式で解決する"
+    },
+    "HM-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "複数エンジンでテーブル定義を共有する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Flink の Hive カタログと Iceberg の Hive カタログ方式の詳細（ロック、同時更新の扱い）は公式資料で未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "パーティションとストレージ記述子の項目の詳細は今回取得した管理資料に記載がなく未確認。"
+    },
+    "hms-spark": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "Spark",
+      "realizes": [
+        "spark"
+      ]
+    },
+    "hms-trino": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "Trino",
+      "realizes": [
+        "trino"
+      ]
+    },
+    "hms-hive": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "HiveServer2",
+      "realizes": [
+        "hive"
+      ]
+    },
+    "hms-flink": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "Flink",
+      "realizes": [
+        "flink"
+      ]
+    },
+    "hms-server": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "スタンドアロン Metastore サーバー",
+      "realizes": [
+        "thrift"
+      ]
+    },
+    "hms-pg": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "PostgreSQL（メタストア DB）",
+      "realizes": [
+        "rdb",
+        "tables",
+        "partitions",
+        "pointer"
+      ]
+    },
+    "hms-hdfs": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "HDFS（または S3 互換ストレージ）",
+      "realizes": [
+        "objstore"
+      ]
+    },
+    "hms-admin": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "運用者（schematool）",
+      "realizes": []
+    }
+  },
+  "byRef": {
+    "docs/reference-hive-metastore.md#§1": [
+      "model"
+    ],
+    "docs/reference-hive-metastore.md": [
+      "model",
+      "spark",
+      "trino",
+      "hive",
+      "flink",
+      "thrift",
+      "rdb",
+      "tables",
+      "partitions",
+      "pointer",
+      "objstore",
+      "spark-get",
+      "trino-get",
+      "hive-get",
+      "flink-get",
+      "persist",
+      "hold-tables",
+      "hold-parts",
+      "hold-pointer",
+      "locate-parts",
+      "locate-meta",
+      "direct-io",
+      "read-hive-table",
+      "read-iceberg-table",
+      "HM-01",
+      "hms-spark",
+      "hms-trino",
+      "hms-hive",
+      "hms-flink",
+      "hms-server",
+      "hms-pg",
+      "hms-hdfs",
+      "hms-admin"
+    ],
+    "docs/reference-hive-metastore.md#§4": [
+      "spark",
+      "trino",
+      "hive",
+      "flink",
+      "spark-get",
+      "trino-get",
+      "hive-get",
+      "flink-get",
+      "direct-io",
+      "read-hive-table",
+      "HM-01"
+    ],
+    "docs/reference-hive-metastore.md#§2": [
+      "thrift",
+      "rdb",
+      "persist"
+    ],
+    "docs/reference-hive-metastore.md#§6": [
+      "thrift"
+    ],
+    "docs/reference-hive-metastore.md#§3": [
+      "tables",
+      "partitions",
+      "objstore",
+      "hold-tables",
+      "hold-parts",
+      "locate-parts"
+    ],
+    "docs/reference-hive-metastore.md#§5": [
+      "pointer",
+      "hold-pointer",
+      "locate-meta",
+      "read-iceberg-table"
+    ],
+    "docs/reference-hive-metastore.md#§7": [
+      "hms-spark",
+      "hms-trino",
+      "hms-hive",
+      "hms-flink",
+      "hms-server",
+      "hms-pg",
+      "hms-hdfs",
+      "hms-admin"
+    ]
+  },
+  "reference": {
+    "domain": "メタデータ・ガバナンス",
+    "category": "データカタログ",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Hive Metastore",
+    "role": "overview",
+    "order": 15,
+    "objectives": [
+      "Thrift サービス・メタストア DB・データの実体の 3 層を区別する",
+      "パーティションと Iceberg のテーブル位置が実体を指す仕組みを確認する",
+      "スタンドアロン運用と Hive 本体との関係を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Hive Metastore Administration (Hive 2.x)",
+        "url": "https://hive.apache.org/docs/latest/admin/adminmanual-metastore-administration/"
+      },
+      {
+        "title": "Hive Metastore Administration (3.0",
+        "standalone)": null,
+        "url": "https://hive.apache.org/docs/latest/admin/adminmanual-metastore-3-0-administration/"
+      },
+      {
+        "title": "Trino Hive connector",
+        "url": "https://trino.io/docs/current/connector/hive.html"
+      },
+      {
+        "title": "Apache Iceberg Hive integration",
+        "url": "https://iceberg.apache.org/docs/latest/hive/"
+      }
+    ]
+  }
+}

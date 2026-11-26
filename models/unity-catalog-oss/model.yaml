@@ -1,0 +1,111 @@
+name: Unity Catalog OSS の統一カタログと外部エンジン接続
+description: 1 つのサーバーがカタログ・スキーマ・テーブル・ボリューム・関数・モデルを管理し、REST API 経由で Spark などのエンジンに一時認証情報を渡す流れを追う。
+reference:
+  objectives:
+    - カタログからモデルまでの管理対象と、メタデータの保存先を区別する。
+    - エンジンが REST API と一時認証情報でデータにたどり着く経路を追う。
+    - 権限の判定と、ストレージへの直接アクセスの境界を確認する。
+  sources:
+    - {title: Unity Catalog OSS Docs, url: "https://unitycatalog.io/docs/"}
+    - {title: Unity Catalog Spark 連携, url: "https://unitycatalog.io/docs/integrations/unity-catalog-spark/"}
+    - {title: Unity Catalog OSS 認証・認可, url: "https://unitycatalog.io/docs/server/auth/"}
+sources: [docs/reference-unity-catalog-oss.md]
+evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§1"}]
+tiers:
+  - {id: client, label: 利用者とエンジン, z: 2, size: [20,3]}
+  - {id: server, label: Unity Catalog サーバー, z: 1, size: [20,4]}
+  - {id: storage, label: 状態とデータ, z: 0, size: [20,3]}
+nodes:
+  admin: {label: 管理者, kind: actor, tier: client, x: 1, y: 1.5, description: ユーザー登録と権限の付与を行う。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  spark: {label: Spark（UC コネクタ）, kind: client, tier: client, x: 8, y: 0.8, description: UCSingleCatalog でカタログを Spark のカタログとして登録する。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§3"}]}
+  engines: {label: DuckDB・Python など, kind: client, tier: client, x: 8, y: 2.4, description: REST API や Iceberg REST で接続するエンジンとクライアント。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§3"}]}
+  authn: {label: ユーザー・トークン, kind: service, tier: server, x: 1, y: 2, description: 外部 IdP のトークンを UC のトークンと交換する。ユーザーは SCIM 2.0 で登録する。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  rest: {label: UC REST API, kind: service, tier: server, x: 6, y: 1, description: カタログ、テーブル、ボリュームなどの操作を受ける。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§2"}]}
+  iceberg: {label: Iceberg REST API, kind: service, tier: server, x: 6, y: 3, description: Iceberg REST クライアントからの接続を受ける。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§2"}]}
+  authz: {label: 権限判定, kind: service, tier: server, x: 10, y: 2, description: 所有者と付与された権限を、親の USE 権限を含めて確認する。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  objects: {label: カタログ・スキーマ・テーブル・ボリューム・関数・モデル, kind: catalog, tier: server, x: 14, y: 1, description: 名前空間と管理対象オブジェクト。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§1"}]}
+  cred: {label: 一時認証情報の発行, kind: service, tier: server, x: 14, y: 3, description: テーブルの場所に絞った短期のストレージ認証情報を返す。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§5"}]}
+  metadb: {label: メタデータ DB, kind: db, tier: storage, x: 10, y: 1.5, description: オブジェクト、ユーザー、権限の状態を保存する。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§1"}]}
+  storage: {label: オブジェクトストレージ, kind: db, tier: storage, x: 17, y: 1.5, description: テーブルとボリュームの実ファイルを置く。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§5"}]}
+links:
+  - {id: register, from: admin, to: authn, label: ユーザーを登録, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  - {id: grant, from: admin, to: authz, label: 権限を付与, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  - {id: spark-api, from: spark, to: rest, label: 認証してオブジェクトを問い合わせ, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§3"}]}
+  - {id: other-api, from: engines, to: iceberg, label: Iceberg REST で接続, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§2"}]}
+  - {id: token, from: authn, to: rest, label: トークンを検証, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  - {id: rest-authz, from: rest, to: authz, label: 操作を認可, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  - {id: ice-authz, from: iceberg, to: authz, label: 操作を認可, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  - {id: authz-db, from: authz, to: metadb, label: 権限を参照, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§4"}]}
+  - {id: rest-obj, from: rest, to: objects, label: オブジェクトを解決, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§1"}]}
+  - {id: ice-obj, from: iceberg, to: objects, label: テーブルを解決, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§2"}]}
+  - {id: obj-db, from: objects, to: metadb, label: メタデータを保存・取得, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§1"}]}
+  - {id: rest-cred, from: rest, to: cred, label: 認証情報を要求, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§5"}]}
+  - {id: cred-spark, from: cred, to: spark, label: 一時認証情報を返す, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§5"}]}
+  - {id: spark-read, from: spark, to: storage, label: 一時認証情報でファイルを読み書き, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§5"}]}
+scenarios:
+  - id: spark-query
+    label: Spark でテーブルを読む
+    evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§6"}]
+    steps:
+      - {links: [register, grant], note: 管理者がユーザーを登録し、テーブルへの SELECT と親の USE 権限を付与する。}
+      - {links: [spark-api, token, rest-authz, authz-db, rest-obj, obj-db], note: Spark がトークン付きでテーブルを問い合わせ、サーバーが認可してテーブルの場所を解決する。}
+      - {links: [rest-cred, cred-spark, spark-read], note: コネクタが短期認証情報を受け取り、ストレージのファイルを直接読む。}
+  - id: iceberg-client
+    label: Iceberg REST クライアントで接続する
+    evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§6"}]
+    steps:
+      - {links: [other-api, ice-authz, authz-db, ice-obj, obj-db], note: クライアントが Iceberg REST でテーブルを解決する。}
+unknowns:
+  - {id: iceberg-scope, text: Iceberg REST の書き込み対応範囲とエンドポイントの詳細、一時認証情報を返す条件は未確認。, refs: [other-api, ice-obj]}
+  - {id: vending-doc, text: 認証情報の発行に対応するクラウドの範囲と設定は、Credential vending の概念ページを取得できず未確認。, refs: [rest-cred, cred-spark]}
+  - {id: runtime, text: 実環境の負荷、規模の上限、リリース版ごとの機能差は未検証。, refs: [rest-obj]}
+implementations:
+  - id: uc-selfhost-aws
+    label: 自前サーバーの UC・Spark・PostgreSQL と AWS S3
+    description: 自前のサーバーで UC サーバーと Spark を動かし、メタデータを PostgreSQL に置き、S3 の認証情報を AWS STS で受け取る例。
+    sources:
+      - {title: Unity Catalog OSS Docs, url: "https://unitycatalog.io/docs/"}
+      - {title: Unity Catalog Spark 連携, url: "https://unitycatalog.io/docs/integrations/unity-catalog-spark/"}
+      - {title: Unity Catalog OSS 認証・認可, url: "https://unitycatalog.io/docs/server/auth/"}
+    nodes:
+      uc-operator: {label: 管理者の CLI, kind: actor, tier: client, x: 0, y: 1.5, realizes: [admin], description: bin/uc でユーザーと権限を管理する。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+      uc-spark: {label: Spark（UC コネクタ）, kind: client, tier: client, x: 6, y: 1.5, realizes: [spark], management: {type: customer, scope: "Customer runs Spark and its catalog settings."}, description: Spark に UC コネクタを入れ、サーバーの URI とトークンを設定する。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+      uc-client: {label: DuckDB・Python クライアント, kind: client, tier: client, x: 12, y: 1.5, realizes: [engines], description: Iceberg REST などで UC サーバーに接続する。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+      uc-server: {label: UC サーバー, kind: service, tier: server, x: 6, y: 1.5, realizes: [authn, rest, iceberg, authz, objects, cred], management: {type: customer, scope: "Customer runs the server, configuration and upgrades."}, description: 自前のサーバーで UC サーバーを動かす。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+      uc-postgres: {label: PostgreSQL, svc: "postgresql:server", kind: db, tier: storage, x: 2, y: 1.5, realizes: [metadb], management: {type: customer, scope: "Customer runs the database."}, description: メタデータ DB。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+      uc-sts: {label: AWS STS, svc: "aws:sts", kind: external, tier: server, x: 12, y: 1.5, description: S3 用の短期認証情報の発行元として使う想定。, management: {type: shared, scope: "AWS operates STS; customer manages role permissions."}, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+      uc-s3: {label: Amazon S3, svc: s3, kind: db, tier: storage, x: 12, y: 1.5, realizes: [storage], management: {type: shared, scope: "AWS operates S3; customer manages data and permissions."}, description: テーブルとボリュームのファイル。, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+    links:
+      - {id: uc-sts-issue, from: uc-server, to: uc-sts, label: 一時認証情報を取得, evidence: [{type: doc, ref: "docs/reference-unity-catalog-oss.md#§7"}]}
+    groups:
+      - {kind: datacenter, provider: onprem, label: 自前のサーバー, tier: [client, server, storage], nodes: [uc-spark, uc-server, uc-postgres]}
+      - {kind: cloud, provider: aws, label: AWS アカウント, tier: [server, storage], nodes: [uc-sts, uc-s3]}
+    layout2d:
+      tiers: [{id: diagram, label: UC OSS, z: 0, size: [30, 10]}]
+      nodes:
+        uc-operator: {tier: diagram, x: 0, y: 2}
+        uc-postgres: {tier: diagram, x: 6, y: 6}
+        uc-server: {tier: diagram, x: 6, y: 2}
+        uc-spark: {tier: diagram, x: 12, y: 6}
+        uc-client: {tier: diagram, x: 12, y: 2}
+        uc-sts: {tier: diagram, x: 20, y: 2}
+        uc-s3: {tier: diagram, x: 20, y: 6}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前のサーバー, tier: diagram, nodes: [uc-spark, uc-server, uc-postgres]}
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: diagram, nodes: [uc-sts, uc-s3]}
+    layout3d:
+      tiers:
+        - {id: op, label: 管理者, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
+        - {id: onprem, label: 自前のサーバー, z: 0, size: [14, 3]}
+        - {id: aws, label: AWS, z: 0, origin: [16, 0], size: [8, 3]}
+      nodes:
+        uc-operator: {tier: op, x: 0, y: 1.5}
+        uc-postgres: {tier: onprem, x: 2, y: 1.5}
+        uc-server: {tier: onprem, x: 7, y: 1.5}
+        uc-spark: {tier: onprem, x: 12, y: 1.5}
+        uc-client: {tier: op, x: 0, y: 2.5}
+        uc-sts: {tier: aws, x: 2, y: 0.8}
+        uc-s3: {tier: aws, x: 6, y: 2.2}
+      groups:
+        - {kind: datacenter, provider: onprem, label: 自前のサーバー, tier: [onprem], nodes: [uc-spark, uc-server, uc-postgres]}
+        - {kind: cloud, provider: aws, label: AWS アカウント, tier: [aws], nodes: [uc-sts, uc-s3]}
