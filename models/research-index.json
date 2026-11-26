@@ -3159,6 +3159,10 @@
         {
           "title": "Overview of BigQuery analytics",
           "url": "https://cloud.google.com/bigquery/docs/query-overview"
+        },
+        {
+          "title": "Apache Iceberg managed tables in BigQuery",
+          "url": "https://docs.cloud.google.com/bigquery/docs/iceberg-tables"
         }
       ],
       "implementations": [
@@ -3279,7 +3283,7 @@
     {
       "id": "microsoft-fabric",
       "name": "Microsoft Fabric の基本アーキテクチャ",
-      "description": "受注データを OneLake に置き、Lakehouse の Delta テーブルを SQL と Power BI で利用します。",
+      "description": "一つの OneLake に Lakehouse と Warehouse の Delta テーブルを置き、SQL 分析エンドポイントと Power BI から読む流れを、容量とワークスペースの単位で追う。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
       "kind": "製品・技術のアーキテクチャ",
@@ -3288,8 +3292,9 @@
         "Microsoft Azure"
       ],
       "objectives": [
-        "OneLake、Lakehouse、Spark、SQL 分析エンドポイントの役割を区別する。",
-        "一つの Delta テーブルを更新と分析で共有する流れを追う。"
+        "OneLake、Lakehouse、Warehouse、SQL 分析エンドポイント、セマンティックモデルの役割を区別する。",
+        "取り込みから Power BI レポートまでの経路と、Spark と T-SQL の書き込み経路の違いを追う。",
+        "容量（CU）とワークスペースが計算の単位になることを説明する。"
       ],
       "documents": [
         "docs/reference-microsoft-fabric.md"
@@ -3304,12 +3309,24 @@
           "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"
         },
         {
+          "title": "Microsoft Learn · Fabric Lakehouse",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"
+        },
+        {
           "title": "Microsoft Learn · SQL analytics endpoint",
           "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
         },
         {
-          "title": "Microsoft Learn · Fabric Lakehouse",
-          "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"
+          "title": "Microsoft Learn · Fabric Data Warehouse",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing"
+        },
+        {
+          "title": "Microsoft Learn · Direct Lake overview",
+          "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview"
+        },
+        {
+          "title": "Microsoft Learn · Fabric licenses and capacity",
+          "url": "https://learn.microsoft.com/en-us/fabric/enterprise/licenses"
         },
         {
           "title": "Microsoft Learn · OneLake catalog",
@@ -3330,36 +3347,32 @@
               "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"
             },
             {
+              "title": "Microsoft Learn · Fabric Lakehouse",
+              "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"
+            },
+            {
               "title": "Microsoft Learn · SQL analytics endpoint",
               "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
             },
             {
-              "title": "Microsoft Learn · Fabric Lakehouse",
-              "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"
+              "title": "Microsoft Learn · Fabric Data Warehouse",
+              "url": "https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing"
+            },
+            {
+              "title": "Microsoft Learn · Direct Lake overview",
+              "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview"
+            },
+            {
+              "title": "Microsoft Learn · Fabric licenses and capacity",
+              "url": "https://learn.microsoft.com/en-us/fabric/enterprise/licenses"
             },
             {
               "title": "Microsoft Learn · OneLake catalog",
               "url": "https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview"
             },
             {
-              "title": "Fabric の Copy activity",
+              "title": "Microsoft Learn · Copy activity",
               "url": "https://learn.microsoft.com/en-us/fabric/data-factory/copy-data-activity"
-            },
-            {
-              "title": "Power BI セマンティックモデルの作成",
-              "url": "https://learn.microsoft.com/en-us/fabric/data-warehouse/create-semantic-model"
-            },
-            {
-              "title": "Fabric の Azure Blob Storage コネクター",
-              "url": "https://learn.microsoft.com/en-us/fabric/data-factory/connector-azure-blob-storage-copy-activity"
-            },
-            {
-              "title": "Fabric の Notebook activity と容量",
-              "url": "https://learn.microsoft.com/en-us/fabric/data-factory/notebook-activity"
-            },
-            {
-              "title": "Direct Lake on SQL と OneLake",
-              "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-create-lakehouse"
             }
           ]
         }
@@ -7871,18 +7884,19 @@
     },
     {
       "id": "snowflake-query-performance",
-      "name": "Snowflake のクエリ性能とウェアハウス",
-      "description": "同時実行時の待ち行列、マイクロパーティションの除外、条件を満たす結果の再利用を分けて調べる。",
+      "name": "Snowflake：クエリ性能とウェアハウス",
+      "description": "同時実行の待ち行列、区画の絞り込み、検索用構造、結果とデータのキャッシュ、追加並列化を分けて調べる。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Snowflake"
       ],
       "objectives": [
         "並行実行と一つのクエリ内部のスキャン量を別々に計測する。",
-        "結果再利用時と実行時の経路を比較する。"
+        "結果再利用、ウェアハウスのデータキャッシュ、実行時の経路を比較する。",
+        "任意の最適化（検索用構造、Optima、QAS）の適用条件と維持費を確認する。"
       ],
       "documents": [
         "docs/reference-snowflake-query-performance.md"
@@ -7915,6 +7929,22 @@
         {
           "title": "Snowflake Optima Metadata",
           "url": "https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/"
+        },
+        {
+          "title": "Search optimization",
+          "url": "https://docs.snowflake.com/en/user-guide/search-optimization-service"
+        },
+        {
+          "title": "Optima",
+          "url": "https://docs.snowflake.com/en/user-guide/snowflake-optima"
+        },
+        {
+          "title": "Query Acceleration Service",
+          "url": "https://docs.snowflake.com/en/user-guide/query-acceleration-service"
+        },
+        {
+          "title": "Warehouse cache",
+          "url": "https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache"
         }
       ],
       "implementations": [
@@ -7941,6 +7971,22 @@
             {
               "title": "Snowflake architecture",
               "url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts"
+            },
+            {
+              "title": "Search optimization",
+              "url": "https://docs.snowflake.com/en/user-guide/search-optimization-service"
+            },
+            {
+              "title": "Optima",
+              "url": "https://docs.snowflake.com/en/user-guide/snowflake-optima"
+            },
+            {
+              "title": "Query Acceleration Service",
+              "url": "https://docs.snowflake.com/en/user-guide/query-acceleration-service"
+            },
+            {
+              "title": "Warehouse cache",
+              "url": "https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache"
             }
           ]
         }
@@ -7948,8 +7994,8 @@
     },
     {
       "id": "snowflake-horizon-catalog",
-      "name": "Snowflake Horizon Catalog の分類・保護・監査",
-      "description": "分類した機微列へマスキングを適用し、誰がその列を参照したかと下流への影響を確認する。",
+      "name": "Snowflake Horizon Catalog：分類・保護・監査と Iceberg REST",
+      "description": "分類した機微列へマスキングを適用し、参照履歴と下流への影響を確認する。外部エンジンは Iceberg REST カタログ経由で表を読む。",
       "domain": "メタデータ・ガバナンス",
       "category": "データカタログ",
       "kind": "製品・技術のアーキテクチャ",
@@ -7959,7 +8005,8 @@
       ],
       "objectives": [
         "ロールによる利用権限と、タグを使った実行時の保護を区別する。",
-        "分類、利用の記録、リネージで確認できる情報を区別する。"
+        "分類、利用の記録、リネージで確認できる情報を区別する。",
+        "外部エンジンが Iceberg REST カタログと一時認証情報で表を読む経路を区別する。"
       ],
       "documents": [
         "docs/reference-snowflake-horizon-catalog.md"
@@ -7980,6 +8027,14 @@
         {
           "title": "アクセス履歴",
           "url": "https://docs.snowflake.com/en/user-guide/access-history"
+        },
+        {
+          "title": "Horizon Catalog の Iceberg REST と外部エンジン",
+          "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon"
+        },
+        {
+          "title": "S3 互換ストレージと Horizon Catalog（2026 年 10 月、private preview）",
+          "url": "https://www.snowflake.com/en/blog/engineering/s3-compatible-storage-iceberg-horizon-catalog/"
         }
       ],
       "implementations": [
@@ -8014,6 +8069,10 @@
             {
               "title": "Snowflake architecture",
               "url": "https://docs.snowflake.com/en/user-guide/intro-key-concepts"
+            },
+            {
+              "title": "Horizon Catalog の Iceberg REST と外部エンジン",
+              "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon"
             }
           ]
         }
@@ -8025,7 +8084,7 @@
       "description": "注文テーブルの誤更新後に過去状態を調べ、別名クローンで比較して復旧する。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Snowflake"
@@ -8090,7 +8149,7 @@
       "description": "同一リージョンのアカウント間で限定した注文情報を共有し、提供者と受領者の責任を分ける。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Snowflake"
@@ -8143,7 +8202,7 @@
       "description": "DB の CDC または到着ファイルを取り込み、宣言型パイプラインで変更と品質を管理する。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Databricks"
@@ -8302,34 +8361,43 @@
     },
     {
       "id": "databricks-sql-performance",
-      "name": "Databricks SQL の実行プロファイルとファイル配置",
-      "description": "SQL Warehouse で実行し、スキャン、シャッフル、キューのどこに時間がかかるかを切り分ける。",
+      "name": "Databricks SQL：実行プロファイル・Photon・キャッシュ",
+      "description": "SQL Warehouse で実行し、ファイル統計による読み飛ばし、Photon、実行時の計画調整、結果・ディスクキャッシュ、Query Profile でのどこに時間がかかるかの切り分けを追う。内部部品は公開資料に基づく論理的な役割。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Databricks"
       ],
       "objectives": [
-        "ストレージの配置と、実行コンピュートの選び方を区別する。",
-        "SQL の実行プロファイルでスキャンとシャッフルを比較する。"
+        "Delta のログとファイル単位の統計による読み飛ばしを理解する。",
+        "Photon と AQE、ファイル配置の役割を区別する。",
+        "結果キャッシュとディスクキャッシュを区別し、観測と費用を考える。"
       ],
       "documents": [
         "docs/reference-databricks-sql-performance.md"
       ],
       "sources": [
         {
-          "title": "SQL Warehouse の種類",
-          "url": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types"
+          "title": "Data skipping",
+          "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
+        },
+        {
+          "title": "Delta Lake protocol",
+          "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
         },
         {
           "title": "Photon",
           "url": "https://docs.databricks.com/aws/en/compute/photon"
         },
         {
-          "title": "クエリプロファイル",
-          "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
+          "title": "Photon SIGMOD 2022",
+          "url": "https://www.databricks.com/de/wp-content/uploads/2022/07/Photon-A-Fast-Query-Engine-for-Lakehouse-Systems.pdf"
+        },
+        {
+          "title": "Adaptive query execution",
+          "url": "https://docs.databricks.com/aws/en/optimizations/aqe"
         },
         {
           "title": "Liquid clustering",
@@ -8338,24 +8406,64 @@
         {
           "title": "Predictive optimization",
           "url": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"
+        },
+        {
+          "title": "Query caching",
+          "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-caching"
+        },
+        {
+          "title": "Query Profile",
+          "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
+        },
+        {
+          "title": "SQL Warehouse の種類",
+          "url": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types"
+        },
+        {
+          "title": "Performance best practices",
+          "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices"
+        },
+        {
+          "title": "Data + AI Summit: Liquid Clustering",
+          "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
+        },
+        {
+          "title": "Optimizing MERGE Performance using Liquid Clustering",
+          "url": "https://www.youtube.com/watch?v=yZmrpXJg-G8"
+        },
+        {
+          "title": "Managed storage",
+          "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
+        },
+        {
+          "title": "Serverless architecture",
+          "url": "https://docs.databricks.com/aws/en/security/network/serverless-network-security/serverless-compute"
         }
       ],
       "implementations": [
         {
-          "id": "databricks-sql-serverless",
-          "label": "Databricks Serverless SQL のクエリ調査",
+          "id": "aws-serverless",
+          "label": "AWS・Serverless SQL と管理 Delta テーブル",
           "sources": [
             {
-              "title": "SQL Warehouse の種類",
-              "url": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types"
+              "title": "Data skipping",
+              "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
+            },
+            {
+              "title": "Delta Lake protocol",
+              "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
             },
             {
               "title": "Photon",
               "url": "https://docs.databricks.com/aws/en/compute/photon"
             },
             {
-              "title": "クエリプロファイル",
-              "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
+              "title": "Photon SIGMOD 2022",
+              "url": "https://www.databricks.com/de/wp-content/uploads/2022/07/Photon-A-Fast-Query-Engine-for-Lakehouse-Systems.pdf"
+            },
+            {
+              "title": "Adaptive query execution",
+              "url": "https://docs.databricks.com/aws/en/optimizations/aqe"
             },
             {
               "title": "Liquid clustering",
@@ -8366,16 +8474,32 @@
               "url": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"
             },
             {
-              "title": "Query history system table",
-              "url": "https://docs.databricks.com/aws/en/admin/system-tables/query-history"
+              "title": "Query caching",
+              "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-caching"
             },
             {
-              "title": "Databricks deployment architecture",
-              "url": "https://docs.databricks.com/aws/en/security/network/deployment-architecture/"
+              "title": "Query Profile",
+              "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
             },
             {
-              "title": "Unity Catalog managed storage",
+              "title": "Performance best practices",
+              "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices"
+            },
+            {
+              "title": "Data + AI Summit: Liquid Clustering",
+              "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
+            },
+            {
+              "title": "Optimizing MERGE Performance using Liquid Clustering",
+              "url": "https://www.youtube.com/watch?v=yZmrpXJg-G8"
+            },
+            {
+              "title": "Managed storage",
               "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
+            },
+            {
+              "title": "Serverless architecture",
+              "url": "https://docs.databricks.com/aws/en/security/network/serverless-network-security/serverless-compute"
             }
           ]
         }
@@ -8387,7 +8511,7 @@
       "description": "Unity Catalog の共有オブジェクトから、Databricks と外部クライアントに注文集計を提供する。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
-      "kind": "製品・技術のアーキテクチャ",
+      "kind": "仕組みの深掘り",
       "tags": [
         "商用サービス",
         "Databricks"
@@ -14404,253 +14528,9 @@
       ]
     },
     {
-      "id": "snowflake-optimization-internals",
-      "name": "Snowflake：読み取り・検索と性能最適化",
-      "description": "注文データを例に、区画の絞り込み、検索用構造、キャッシュ、追加並列化と観測を追う。図は公開情報から組み立てた論理モデル。",
-      "domain": "分析基盤・DWH",
-      "category": "クラウド分析基盤",
-      "kind": "仕組みの深掘り",
-      "tags": [
-        "商用サービス",
-        "Snowflake"
-      ],
-      "objectives": [
-        "区画統計・検索パス・式の統計が読み取り候補にどう影響するか理解する。",
-        "結果キャッシュとウェアハウスのデータキャッシュを区別する。",
-        "任意の最適化の適用条件と維持費を理解する。"
-      ],
-      "documents": [
-        "docs/reference-snowflake-optimization-internals.md"
-      ],
-      "sources": [
-        {
-          "title": "Query Profile",
-          "url": "https://docs.snowflake.com/en/user-guide/ui-snowsight-activity"
-        },
-        {
-          "title": "Micro-partitions",
-          "url": "https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions"
-        },
-        {
-          "title": "Search optimization",
-          "url": "https://docs.snowflake.com/en/user-guide/search-optimization-service"
-        },
-        {
-          "title": "Optima Metadata",
-          "url": "https://docs.snowflake.com/en/user-guide/snowflake-optima"
-        },
-        {
-          "title": "Query Acceleration Service",
-          "url": "https://docs.snowflake.com/en/user-guide/query-acceleration-service"
-        },
-        {
-          "title": "Top-K pruning",
-          "url": "https://docs.snowflake.com/en/user-guide/querying-top-k-pruning-optimization"
-        },
-        {
-          "title": "Result cache",
-          "url": "https://docs.snowflake.com/en/user-guide/querying-persisted-results"
-        },
-        {
-          "title": "Warehouse cache",
-          "url": "https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache"
-        },
-        {
-          "title": "Automatic Clustering",
-          "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
-        }
-      ],
-      "implementations": [
-        {
-          "id": "snowflake",
-          "label": "Snowflake の注文分析と任意の最適化",
-          "sources": [
-            {
-              "title": "Query Profile",
-              "url": "https://docs.snowflake.com/en/user-guide/ui-snowsight-activity"
-            },
-            {
-              "title": "Micro-partitions",
-              "url": "https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions"
-            },
-            {
-              "title": "Search optimization",
-              "url": "https://docs.snowflake.com/en/user-guide/search-optimization-service"
-            },
-            {
-              "title": "Optima Metadata",
-              "url": "https://docs.snowflake.com/en/user-guide/snowflake-optima"
-            },
-            {
-              "title": "Query Acceleration Service",
-              "url": "https://docs.snowflake.com/en/user-guide/query-acceleration-service"
-            },
-            {
-              "title": "Top-K pruning",
-              "url": "https://docs.snowflake.com/en/user-guide/querying-top-k-pruning-optimization"
-            },
-            {
-              "title": "Result cache",
-              "url": "https://docs.snowflake.com/en/user-guide/querying-persisted-results"
-            },
-            {
-              "title": "Warehouse cache",
-              "url": "https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache"
-            },
-            {
-              "title": "Automatic Clustering",
-              "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "databricks-optimization-internals",
-      "name": "Databricks：Delta・Photon と性能最適化",
-      "description": "Unity Catalog 管理 Delta テーブルを例に、ファイル統計、Photon、実行時の計画調整、キャッシュと配置の保守を追う。内部部品は公開資料に基づく論理的な役割。",
-      "domain": "分析基盤・DWH",
-      "category": "クラウド分析基盤",
-      "kind": "仕組みの深掘り",
-      "tags": [
-        "商用サービス",
-        "Databricks"
-      ],
-      "objectives": [
-        "Delta のログとファイル単位の統計による読み飛ばしを理解する。",
-        "Photon と AQE、ファイル配置の役割を区別する。",
-        "結果キャッシュとディスクキャッシュを区別し、観測と費用を考える。"
-      ],
-      "documents": [
-        "docs/reference-databricks-optimization-internals.md"
-      ],
-      "sources": [
-        {
-          "title": "Data skipping",
-          "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
-        },
-        {
-          "title": "Delta Lake protocol",
-          "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
-        },
-        {
-          "title": "Photon",
-          "url": "https://docs.databricks.com/aws/en/compute/photon"
-        },
-        {
-          "title": "Photon SIGMOD 2022",
-          "url": "https://www.databricks.com/de/wp-content/uploads/2022/07/Photon-A-Fast-Query-Engine-for-Lakehouse-Systems.pdf"
-        },
-        {
-          "title": "Adaptive query execution",
-          "url": "https://docs.databricks.com/aws/en/optimizations/aqe"
-        },
-        {
-          "title": "Liquid clustering",
-          "url": "https://docs.databricks.com/aws/en/tables/clustering"
-        },
-        {
-          "title": "Predictive optimization",
-          "url": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"
-        },
-        {
-          "title": "Query caching",
-          "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-caching"
-        },
-        {
-          "title": "Query Profile",
-          "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
-        },
-        {
-          "title": "Performance best practices",
-          "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices"
-        },
-        {
-          "title": "Data + AI Summit: Liquid Clustering",
-          "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
-        },
-        {
-          "title": "Optimizing MERGE Performance using Liquid Clustering",
-          "url": "https://www.youtube.com/watch?v=yZmrpXJg-G8"
-        },
-        {
-          "title": "Managed storage",
-          "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
-        },
-        {
-          "title": "Serverless architecture",
-          "url": "https://docs.databricks.com/aws/en/security/network/serverless-network-security/serverless-compute"
-        }
-      ],
-      "implementations": [
-        {
-          "id": "aws-serverless",
-          "label": "AWS・Serverless SQL と管理 Delta テーブル",
-          "sources": [
-            {
-              "title": "Data skipping",
-              "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
-            },
-            {
-              "title": "Delta Lake protocol",
-              "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
-            },
-            {
-              "title": "Photon",
-              "url": "https://docs.databricks.com/aws/en/compute/photon"
-            },
-            {
-              "title": "Photon SIGMOD 2022",
-              "url": "https://www.databricks.com/de/wp-content/uploads/2022/07/Photon-A-Fast-Query-Engine-for-Lakehouse-Systems.pdf"
-            },
-            {
-              "title": "Adaptive query execution",
-              "url": "https://docs.databricks.com/aws/en/optimizations/aqe"
-            },
-            {
-              "title": "Liquid clustering",
-              "url": "https://docs.databricks.com/aws/en/tables/clustering"
-            },
-            {
-              "title": "Predictive optimization",
-              "url": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"
-            },
-            {
-              "title": "Query caching",
-              "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-caching"
-            },
-            {
-              "title": "Query Profile",
-              "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
-            },
-            {
-              "title": "Performance best practices",
-              "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices"
-            },
-            {
-              "title": "Data + AI Summit: Liquid Clustering",
-              "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
-            },
-            {
-              "title": "Optimizing MERGE Performance using Liquid Clustering",
-              "url": "https://www.youtube.com/watch?v=yZmrpXJg-G8"
-            },
-            {
-              "title": "Managed storage",
-              "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
-            },
-            {
-              "title": "Serverless architecture",
-              "url": "https://docs.databricks.com/aws/en/security/network/serverless-network-security/serverless-compute"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "databricks-liquid-clustering-internals",
-      "name": "Databricks Liquid Clustering：ファイル配置と Delta ログ",
-      "description": "Delta 管理テーブルでキーの選択、ファイルの再配置、ログの更新、統計による読み飛ばしを追う。図は公開情報に基づく論理モデル。",
+      "name": "Databricks Delta：Liquid Clustering・Deletion Vector・ファイル読み飛ばし",
+      "description": "Delta 管理テーブルで、キーによる再配置、行の論理削除、統計と実行時キーによる読み飛ばしを、Delta ログを軸に追う。図は公開情報に基づく論理モデル。2026 年 11 月時点。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
       "kind": "仕組みの深掘り",
@@ -14661,8 +14541,8 @@
       ],
       "objectives": [
         "キー設定と既存ファイルの再配置を区別する。",
-        "Delta ログとファイル単位の統計が読み取りに果たす役割を追う。",
-        "AUTO・増分 OPTIMIZE・FULL の条件と費用を理解する。"
+        "Deletion Vector が Parquet を書き換えずに行を無効にし、PURGE と VACUUM が別段階であることを追う。",
+        "ファイル統計と JOIN の実行時キーによる読み飛ばしを、Delta ログからたどる。"
       ],
       "documents": [
         "docs/reference-databricks-liquid-clustering-internals.md"
@@ -14677,8 +14557,20 @@
           "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#clustered-table"
         },
         {
+          "title": "Deletion vectors",
+          "url": "https://docs.databricks.com/aws/en/tables/features/deletion-vectors"
+        },
+        {
+          "title": "Delta Lake protocol: Deletion Vectors",
+          "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#deletion-vectors"
+        },
+        {
           "title": "Data skipping",
           "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
+        },
+        {
+          "title": "Dynamic file pruning",
+          "url": "https://docs.databricks.com/aws/en/optimizations/dynamic-file-pruning"
         },
         {
           "title": "Predictive optimization",
@@ -14697,10 +14589,6 @@
           "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
         },
         {
-          "title": "Data + AI Summit: Liquid Clustering",
-          "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
-        },
-        {
           "title": "Liquid Clustering のデータ配置とファイル統計",
           "url": "https://www.databricks.com/blog/debunking-8-data-layout-myths-why-liquid-clustering-outperforms-partitioning"
         }
@@ -14708,7 +14596,7 @@
       "implementations": [
         {
           "id": "aws",
-          "label": "AWS 上の管理 Delta テーブルと Serverless Jobs",
+          "label": "AWS 上の管理 Delta テーブルと Serverless",
           "sources": [
             {
               "title": "Liquid clustering",
@@ -14719,8 +14607,20 @@
               "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#clustered-table"
             },
             {
+              "title": "Deletion vectors",
+              "url": "https://docs.databricks.com/aws/en/tables/features/deletion-vectors"
+            },
+            {
+              "title": "Delta Lake protocol: Deletion Vectors",
+              "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#deletion-vectors"
+            },
+            {
               "title": "Data skipping",
               "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
+            },
+            {
+              "title": "Dynamic file pruning",
+              "url": "https://docs.databricks.com/aws/en/optimizations/dynamic-file-pruning"
             },
             {
               "title": "Predictive optimization",
@@ -14739,86 +14639,8 @@
               "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
             },
             {
-              "title": "Data + AI Summit: Liquid Clustering",
-              "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "snowflake-clustering-internals",
-      "name": "Snowflake：Classic と Optima Clustering の内部",
-      "description": "2024 年公開の Classic の区画選択・段階的再配置と、Optima で確認できる違いを分けて追う。",
-      "domain": "分析基盤・DWH",
-      "category": "クラウド分析基盤",
-      "kind": "仕組みの深掘り",
-      "tags": [
-        "商用サービス",
-        "Snowflake"
-      ],
-      "objectives": [
-        "Classic のレベル、対象選択、再配置と競合確認を追う。",
-        "Classic と Optima の公開された違いと未公開部分を区別する。",
-        "課金と実行方式の観測方法を理解する。"
-      ],
-      "documents": [
-        "docs/reference-snowflake-clustering-internals.md"
-      ],
-      "sources": [
-        {
-          "title": "Automatic Clustering at Snowflake（2024年の内部構造）",
-          "url": "https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/"
-        },
-        {
-          "title": "Automatic Clustering の仕様と費用",
-          "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
-        },
-        {
-          "title": "Optima Clustering の発表",
-          "url": "https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/"
-        },
-        {
-          "title": "Clustering Keys",
-          "url": "https://docs.snowflake.com/en/user-guide/tables-clustering-keys"
-        },
-        {
-          "title": "SYSTEM$CLUSTERING_INFORMATION",
-          "url": "https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information"
-        },
-        {
-          "title": "Workload-Aware Incremental Reclustering（研究試作）",
-          "url": "https://arxiv.org/html/2602.23289"
-        }
-      ],
-      "implementations": [
-        {
-          "id": "snowflake",
-          "label": "Snowflake 管理テーブルのクラスタリング",
-          "sources": [
-            {
-              "title": "Automatic Clustering at Snowflake（2024年の内部構造）",
-              "url": "https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/"
-            },
-            {
-              "title": "Automatic Clustering の仕様と費用",
-              "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
-            },
-            {
-              "title": "Optima Clustering の発表",
-              "url": "https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/"
-            },
-            {
-              "title": "Clustering Keys",
-              "url": "https://docs.snowflake.com/en/user-guide/tables-clustering-keys"
-            },
-            {
-              "title": "SYSTEM$CLUSTERING_INFORMATION",
-              "url": "https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information"
-            },
-            {
-              "title": "Workload-Aware Incremental Reclustering（研究試作）",
-              "url": "https://arxiv.org/html/2602.23289"
+              "title": "Liquid Clustering のデータ配置とファイル統計",
+              "url": "https://www.databricks.com/blog/debunking-8-data-layout-myths-why-liquid-clustering-outperforms-partitioning"
             }
           ]
         }
@@ -14827,7 +14649,7 @@
     {
       "id": "snowflake-snowpipe-streaming-internals",
       "name": "Snowflake：Snowpipe Streaming の受信と取り込み",
-      "description": "高性能アーキテクチャの公開資料に基づき、受信した行がバッファとサーバーレスジョブを経てテーブルに反映されるまでを追う。",
+      "description": "直接送信と Kafka Connect の 2 つの経路から、受信・バッファ・サーバーレスジョブを経てテーブルに反映されるまでを追う。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
       "kind": "仕組みの深掘り",
@@ -14838,7 +14660,8 @@
       "objectives": [
         "受信、バッファ、サーバーレスジョブの役割を区別する。",
         "利用者が設定する PIPE と取り込み処理の関係を説明する。",
-        "取り込み時の処理とコミット後の SQL 照会を区別する。"
+        "SDK からの直接送信と Kafka Connect 経由の違いを区別する。",
+        "取り込み時の処理、拒否された行の記録、コミット後の SQL 照会を区別する。"
       ],
       "documents": [
         "docs/reference-snowflake-snowpipe-streaming-internals.md"
@@ -14853,6 +14676,10 @@
           "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
         },
         {
+          "title": "Snowflake Connector for Kafka",
+          "url": "https://docs.snowflake.com/en/user-guide/kafka-connector"
+        },
+        {
           "title": "Kafka から Iceberg へ",
           "url": "https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/"
         },
@@ -14864,7 +14691,7 @@
       "implementations": [
         {
           "id": "snowflake",
-          "label": "注文イベントを Snowpipe Streaming で取り込み、SQL で読む",
+          "label": "注文イベントを Kafka と Connector v4 で取り込み、SQL で読む",
           "sources": [
             {
               "title": "Snowpipe Streaming engineering architecture",
@@ -14897,6 +14724,18 @@
             {
               "title": "Overview of warehouses",
               "url": "https://docs.snowflake.com/en/user-guide/warehouses-overview"
+            },
+            {
+              "title": "Snowflake Connector for Kafka",
+              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector"
+            },
+            {
+              "title": "Kafka Connector の Iceberg 取り込み",
+              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg"
+            },
+            {
+              "title": "Kafka Connector の設定と認証",
+              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/setup-kafka"
             }
           ]
         }
@@ -15002,8 +14841,8 @@
     },
     {
       "id": "snowflake-optima-internals",
-      "name": "Snowflake Optima：メタデータ・索引と実行計画",
-      "description": "問い合わせ履歴を用いる索引・式のメタデータ・実行計画の改善を区別して追う。",
+      "name": "Snowflake Optima：区画の読み取りと再配置",
+      "description": "問い合わせ履歴から作る追加メタデータ・索引・計画改善と、クラスタリングキーに沿った区画の再配置（Classic と Optima の違い）を 1 つの図で追う。",
       "domain": "分析基盤・DWH",
       "category": "クラウド分析基盤",
       "kind": "仕組みの深掘り",
@@ -15012,9 +14851,9 @@
         "Snowflake"
       ],
       "objectives": [
-        "問い合わせ履歴を用いる索引・式のメタデータ・実行計画の改善を区別して追う。",
-        "SQL を実行し、ワークロードと実行シグナルを観測する。",
-        "式のメタデータ、検索用の索引、計画改善をそれぞれ判断する。"
+        "式向けメタデータ、検索用の索引、計画改善を区別する。",
+        "通常の区画統計と Optima の追加情報が、読む区画の絞り込みにどう使われるかを追う。",
+        "Automatic Clustering の Classic と Optima Clustering の違いを区別する。"
       ],
       "documents": [
         "docs/reference-snowflake-optima-internals.md"
@@ -15035,12 +14874,28 @@
         {
           "title": "Optima Indexing の事例",
           "url": "https://www.snowflake.com/en/blog/engineering/snowflake-optima-query-spike-optimization/"
+        },
+        {
+          "title": "Automatic Clustering at Snowflake（2024 年の内部構造）",
+          "url": "https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/"
+        },
+        {
+          "title": "Automatic Clustering の仕様と費用",
+          "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
+        },
+        {
+          "title": "Optima Clustering の発表",
+          "url": "https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/"
+        },
+        {
+          "title": "SYSTEM$CLUSTERING_INFORMATION",
+          "url": "https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information"
         }
       ],
       "implementations": [
         {
           "id": "snowflake",
-          "label": "Snowflake の実装例",
+          "label": "Snowflake 管理テーブルの反復クエリとクラスタリング",
           "sources": [
             {
               "title": "Optima Metadata",
@@ -15057,68 +14912,18 @@
             {
               "title": "Optima Indexing の事例",
               "url": "https://www.snowflake.com/en/blog/engineering/snowflake-optima-query-spike-optimization/"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "databricks-deletion-vectors-internals",
-      "name": "Databricks：Deletion Vector と Delta の更新",
-      "description": "Parquet ファイルを書き換えずに行を無効化し、読み取り時に反映する仕組みを追う。",
-      "domain": "分析基盤・DWH",
-      "category": "クラウド分析基盤",
-      "kind": "仕組みの深掘り",
-      "tags": [
-        "商用サービス",
-        "Databricks"
-      ],
-      "objectives": [
-        "Parquet ファイルを書き換えずに行を無効化し、読み取り時に反映する仕組みを追う。",
-        "変更対象を特定し、無効な行位置と必要な新しい行をコミットする。",
-        "読み手はスナップショットを参照し、無効な位置を除いて結果を返す。"
-      ],
-      "documents": [
-        "docs/reference-databricks-deletion-vectors-internals.md"
-      ],
-      "sources": [
-        {
-          "title": "Deletion vectors の仕様",
-          "url": "https://docs.databricks.com/aws/en/tables/features/deletion-vectors"
-        },
-        {
-          "title": "Delta Lake protocol: Deletion Vectors",
-          "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#deletion-vectors"
-        },
-        {
-          "title": "Delta Lake の内部構造",
-          "url": "https://community.databricks.com/t5/technical-blog/delta-lake-under-the-hood-what-every-data-engineer-should-know/ba-p/156311"
-        },
-        {
-          "title": "Unity Catalog 管理ストレージ",
-          "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
-        }
-      ],
-      "implementations": [
-        {
-          "id": "databricks",
-          "label": "AWS 上の Databricks SQL Warehouse と S3",
-          "sources": [
-            {
-              "title": "Deletion vectors の仕様",
-              "url": "https://docs.databricks.com/aws/en/tables/features/deletion-vectors"
             },
             {
-              "title": "Delta Lake protocol: Deletion Vectors",
-              "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#deletion-vectors"
+              "title": "Automatic Clustering at Snowflake",
+              "url": "https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/"
             },
             {
-              "title": "Delta Lake の内部構造",
-              "url": "https://community.databricks.com/t5/technical-blog/delta-lake-under-the-hood-what-every-data-engineer-should-know/ba-p/156311"
+              "title": "Automatic Clustering の仕様と費用",
+              "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
             },
             {
-              "title": "Unity Catalog 管理ストレージ",
-              "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
+              "title": "Optima Clustering の発表",
+              "url": "https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/"
             }
           ]
         }
@@ -15265,184 +15070,6 @@
             {
               "title": "Optima Planning",
               "url": "https://www.snowflake.com/en/blog/engineering/snowflake-optima-planning-query-performance/"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "databricks-dynamic-file-pruning",
-      "name": "Databricks：JOIN からの Dynamic File Pruning",
-      "description": "JOIN の実行中に得たキーを使い、Delta ファイル統計で読み取り候補を絞る。",
-      "domain": "分析基盤・DWH",
-      "category": "クラウド分析基盤",
-      "kind": "仕組みの深掘り",
-      "tags": [
-        "商用サービス",
-        "Databricks"
-      ],
-      "objectives": [
-        "JOIN の実行中に得たキーを使い、Delta ファイル統計で読み取り候補を絞る。",
-        "小さい入力をフィルターし、実際に使われる JOIN キーを得る。",
-        "大きい側のファイル統計と照合し、無関係なファイルを除外する。"
-      ],
-      "documents": [
-        "docs/reference-databricks-dynamic-file-pruning.md"
-      ],
-      "sources": [
-        {
-          "title": "Dynamic file pruning",
-          "url": "https://docs.databricks.com/aws/en/optimizations/dynamic-file-pruning"
-        },
-        {
-          "title": "Dynamic File Pruning の技術ブログ",
-          "url": "https://www.databricks.com/blog/2020/04/30/faster-sql-queries-on-delta-lake-with-dynamic-file-pruning.html"
-        },
-        {
-          "title": "Photon",
-          "url": "https://docs.databricks.com/aws/en/compute/photon"
-        },
-        {
-          "title": "管理ストレージ",
-          "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
-        }
-      ],
-      "implementations": [
-        {
-          "id": "databricks",
-          "label": "AWS 上の Databricks SQL Warehouse と S3",
-          "sources": [
-            {
-              "title": "Dynamic file pruning",
-              "url": "https://docs.databricks.com/aws/en/optimizations/dynamic-file-pruning"
-            },
-            {
-              "title": "Dynamic File Pruning の技術ブログ",
-              "url": "https://www.databricks.com/blog/2020/04/30/faster-sql-queries-on-delta-lake-with-dynamic-file-pruning.html"
-            },
-            {
-              "title": "Photon",
-              "url": "https://docs.databricks.com/aws/en/compute/photon"
-            },
-            {
-              "title": "管理ストレージ",
-              "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "snowflake-kafka-iceberg-streaming",
-      "name": "Snowflake：Kafka から管理 Iceberg への取り込み",
-      "description": "Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。",
-      "domain": "分析基盤・DWH",
-      "category": "クラウド分析基盤",
-      "kind": "仕組みの深掘り",
-      "tags": [
-        "商用サービス",
-        "Snowflake"
-      ],
-      "objectives": [
-        "Kafka Connect と Snowpipe Streaming を使い、イベントを管理 Iceberg テーブルとして参照する。",
-        "既存 Kafka と Connect からイベントを送信する。",
-        "取り込みと検証の役割を追い、拒否された行の保存先を確認する。"
-      ],
-      "documents": [
-        "docs/reference-snowflake-kafka-iceberg-streaming.md"
-      ],
-      "sources": [
-        {
-          "title": "Kafka topics を Iceberg に取り込む",
-          "url": "https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/"
-        },
-        {
-          "title": "Snowflake Connector for Kafka",
-          "url": "https://docs.snowflake.com/en/user-guide/kafka-connector"
-        },
-        {
-          "title": "Snowpipe Streaming",
-          "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
-        },
-        {
-          "title": "Kafka Connector の Iceberg 取り込み",
-          "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg"
-        }
-      ],
-      "implementations": [
-        {
-          "id": "snowflake",
-          "label": "Snowflake の実装例",
-          "sources": [
-            {
-              "title": "Kafka topics を Iceberg に取り込む",
-              "url": "https://www.snowflake.com/en/blog/engineering/kafka-topics-iceberg-tables-snowflake/"
-            },
-            {
-              "title": "Snowflake Connector for Kafka",
-              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector"
-            },
-            {
-              "title": "Snowpipe Streaming",
-              "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
-            },
-            {
-              "title": "Kafka Connector の設定と認証",
-              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/setup-kafka"
-            },
-            {
-              "title": "Iceberg テーブルのストレージ",
-              "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-storage"
-            },
-            {
-              "title": "Kafka Connector の Iceberg 取り込み",
-              "url": "https://docs.snowflake.com/en/user-guide/kafka-connector/iceberg"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "snowflake-iceberg-s3-compatible",
-      "name": "Snowflake Horizon Catalog：S3 互換ストレージと Iceberg",
-      "description": "S3 互換ストレージ上の Iceberg テーブルを外部エンジンへ公開する際のパスと認証を追う。",
-      "domain": "分析基盤・DWH",
-      "category": "クラウド分析基盤",
-      "kind": "仕組みの深掘り",
-      "tags": [
-        "商用サービス",
-        "Snowflake"
-      ],
-      "objectives": [
-        "S3 互換ストレージ上の Iceberg テーブルを外部エンジンへ公開する際のパスと認証を追う。",
-        "外部エンジンからの要求に対してカタログが権限と保存場所を解決する。",
-        "互換パスとアクセス情報を使い、メタデータとデータを参照する。"
-      ],
-      "documents": [
-        "docs/reference-snowflake-iceberg-s3-compatible.md"
-      ],
-      "sources": [
-        {
-          "title": "S3 互換ストレージと Horizon Catalog",
-          "url": "https://www.snowflake.com/en/blog/engineering/s3-compatible-storage-iceberg-horizon-catalog/"
-        },
-        {
-          "title": "Iceberg REST カタログと外部エンジン",
-          "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon"
-        }
-      ],
-      "implementations": [
-        {
-          "id": "snowflake",
-          "label": "Snowflake の実装例",
-          "sources": [
-            {
-              "title": "S3 互換ストレージと Horizon Catalog",
-              "url": "https://www.snowflake.com/en/blog/engineering/s3-compatible-storage-iceberg-horizon-catalog/"
-            },
-            {
-              "title": "Iceberg REST カタログと外部エンジン",
-              "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon"
             }
           ]
         }
@@ -17211,6 +16838,467 @@
             {
               "title": "Arrow Columnar Format（IPC）",
               "url": "https://arrow.apache.org/docs/format/Columnar.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bigquery-dremel-slots",
+      "name": "BigQuery：クエリ実行とスロット",
+      "description": "クエリのステージをスロットが並列に処理し、予約とスケジューラーが配分する流れを追う。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド"
+      ],
+      "objectives": [
+        "ステージ、スロット、シャッフルの役割を区別する。",
+        "オンデマンドと容量課金（予約）でスロットの配分元がどう違うかを説明する。",
+        "競合時の優先順位と公平なスケジューリングの順序を追う。"
+      ],
+      "documents": [
+        "docs/reference-bigquery-dremel-slots.md"
+      ],
+      "sources": [
+        {
+          "title": "Understand slots",
+          "url": "https://docs.cloud.google.com/bigquery/docs/slots"
+        },
+        {
+          "title": "Query plan and timeline",
+          "url": "https://docs.cloud.google.com/bigquery/docs/query-plan-explanation"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "gcp-reservation",
+          "label": "BigQuery Enterprise 予約とオートスケール",
+          "sources": [
+            {
+              "title": "Understand slots",
+              "url": "https://docs.cloud.google.com/bigquery/docs/slots"
+            },
+            {
+              "title": "Query plan and timeline",
+              "url": "https://docs.cloud.google.com/bigquery/docs/query-plan-explanation"
+            },
+            {
+              "title": "BigQuery のワークロード管理",
+              "url": "https://docs.cloud.google.com/bigquery/docs/reservations-intro"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bigquery-storage-optimization",
+      "name": "BigQuery：Capacitor とストレージの最適化",
+      "description": "書き込みから列指向ファイルへの保存、パーティションとクラスタリングによる読み取りの絞り込み、保持と課金の設定を追う。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド"
+      ],
+      "objectives": [
+        "列指向ストレージ、パーティション、クラスタリングの役割を区別する。",
+        "読み取る量を減らす設定と、保持・課金の設定を分けて説明する。",
+        "取得資料で確認できた範囲と未確認の範囲を区別する。"
+      ],
+      "documents": [
+        "docs/reference-bigquery-storage-optimization.md"
+      ],
+      "sources": [
+        {
+          "title": "Overview of BigQuery storage",
+          "url": "https://docs.cloud.google.com/bigquery/docs/storage_overview"
+        },
+        {
+          "title": "Query plan and timeline",
+          "url": "https://docs.cloud.google.com/bigquery/docs/query-plan-explanation"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "gcp-clustered-table",
+          "label": "パーティション・クラスタリング済みの管理表",
+          "sources": [
+            {
+              "title": "Overview of BigQuery storage",
+              "url": "https://docs.cloud.google.com/bigquery/docs/storage_overview"
+            },
+            {
+              "title": "Query plan and timeline",
+              "url": "https://docs.cloud.google.com/bigquery/docs/query-plan-explanation"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bigquery-lakehouse-iceberg",
+      "name": "BigQuery：Iceberg レイクハウス（旧 BigLake）",
+      "description": "利用者の Cloud Storage に置いた Iceberg テーブルを、BigQuery と外部エンジンが REST カタログ経由で共有する経路を追う。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド"
+      ],
+      "objectives": [
+        "BigQuery の Iceberg 管理テーブルと、REST カタログ経由のテーブルを区別する。",
+        "外部エンジンが認証情報の払い出しでデータファイルを読む経路を追う。",
+        "一般提供（GA）と Preview の範囲を区別する。"
+      ],
+      "documents": [
+        "docs/reference-bigquery-lakehouse-iceberg.md"
+      ],
+      "sources": [
+        {
+          "title": "Apache Iceberg managed tables in BigQuery",
+          "url": "https://docs.cloud.google.com/bigquery/docs/iceberg-tables"
+        },
+        {
+          "title": "Apache Iceberg REST catalog endpoint",
+          "url": "https://docs.cloud.google.com/bigquery/docs/blms-rest-catalog"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "gcp-iceberg-spark",
+          "label": "BigQuery と Managed Service for Apache Spark の Iceberg 共有",
+          "sources": [
+            {
+              "title": "Apache Iceberg managed tables in BigQuery",
+              "url": "https://docs.cloud.google.com/bigquery/docs/iceberg-tables"
+            },
+            {
+              "title": "Apache Iceberg REST catalog endpoint",
+              "url": "https://docs.cloud.google.com/bigquery/docs/blms-rest-catalog"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "redshift-rms-distribution",
+      "name": "Amazon Redshift：分散キー・ソートキーとマネージドストレージ",
+      "description": "テーブル定義の分散スタイルが行のスライスを決め、書き込んだブロックが RMS に永続化されてローカル SSD にキャッシュされる流れ。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド"
+      ],
+      "objectives": [
+        "分散スタイル（AUTO・EVEN・KEY・ALL）が行の置き場所をどう決めるかを区別する。",
+        "分散スタイルが結合時のデータ移動に関わることを説明する。",
+        "データが RMS に永続化され、ローカル SSD がキャッシュとして働く関係を追う。"
+      ],
+      "documents": [
+        "docs/reference-redshift-rms-distribution.md"
+      ],
+      "sources": [
+        {
+          "title": "Distribution styles",
+          "url": "https://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html"
+        },
+        {
+          "title": "Data warehouse system architecture",
+          "url": "https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html"
+        },
+        {
+          "title": "Amazon Redshift provisioned clusters overview",
+          "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "ra3-rms",
+          "label": "RA3 クラスターの KEY 分散テーブルと RMS",
+          "sources": [
+            {
+              "title": "Distribution styles",
+              "url": "https://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html"
+            },
+            {
+              "title": "Data warehouse system architecture",
+              "url": "https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html"
+            },
+            {
+              "title": "Amazon Redshift provisioned clusters overview",
+              "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "redshift-serverless-scaling",
+      "name": "Amazon Redshift Serverless：RPU とスケーリング",
+      "description": "ワークグループのベース容量と価格性能ターゲットを入力に、AI 駆動のスケーリングが RPU を増減する流れ。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド"
+      ],
+      "objectives": [
+        "RPU、ベース容量、最大容量の関係を説明する。",
+        "価格性能ターゲットとスケーリングの関係を追う。",
+        "ワークグループ（計算）とネームスペース（データ）の分担を区別する。"
+      ],
+      "documents": [
+        "docs/reference-redshift-serverless-scaling.md"
+      ],
+      "sources": [
+        {
+          "title": "Compute capacity for Amazon Redshift Serverless",
+          "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-capacity.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "serverless-workgroup",
+          "label": "Redshift Serverless のワークグループ",
+          "sources": [
+            {
+              "title": "Compute capacity for Amazon Redshift Serverless",
+              "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-capacity.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "redshift-spectrum-lakehouse",
+      "name": "Amazon Redshift：Spectrum と Iceberg レイクハウス",
+      "description": "外部スキーマで Glue Data Catalog の表を参照し、S3 の Parquet や Iceberg を読む経路と、zero-ETL で運用 DB を取り込む経路。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "クラウドマネージド"
+      ],
+      "objectives": [
+        "外部スキーマ、Glue Data Catalog、S3 のデータの関係を追う。",
+        "Iceberg 表を Redshift と別のエンジンから同時に扱う方法を説明する。",
+        "zero-ETL による取り込みと、データレイクの外部表参照を区別する。"
+      ],
+      "documents": [
+        "docs/reference-redshift-spectrum-lakehouse.md"
+      ],
+      "sources": [
+        {
+          "title": "Amazon Redshift Spectrum",
+          "url": "https://docs.aws.amazon.com/redshift/latest/dg/c-using-spectrum.html"
+        },
+        {
+          "title": "Using Apache Iceberg tables with Amazon Redshift",
+          "url": "https://docs.aws.amazon.com/redshift/latest/dg/querying-iceberg.html"
+        },
+        {
+          "title": "Zero-ETL integrations",
+          "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/zero-etl-using.html"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "ra3-lake-zeroetl",
+          "label": "RA3 クラスターから S3 の Iceberg 表を参照し、Aurora を zero-ETL で取り込む",
+          "sources": [
+            {
+              "title": "Amazon Redshift Spectrum",
+              "url": "https://docs.aws.amazon.com/redshift/latest/dg/c-using-spectrum.html"
+            },
+            {
+              "title": "Using Apache Iceberg tables with Amazon Redshift",
+              "url": "https://docs.aws.amazon.com/redshift/latest/dg/querying-iceberg.html"
+            },
+            {
+              "title": "Zero-ETL integrations",
+              "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/zero-etl-using.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fabric-onelake-shortcuts",
+      "name": "Microsoft Fabric：OneLake とショートカット",
+      "description": "ショートカットが Lakehouse の Tables と Files に置く参照であり、ターゲットごとに認可・キャッシュの扱いが変わることを追う。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "商用サービス"
+      ],
+      "objectives": [
+        "Tables と Files でショートカットの置き方が違うことを説明する。",
+        "内部ショートカットと外部ショートカットで認可の主体が異なることを区別する。",
+        "キャッシュの対象と制限を説明する。"
+      ],
+      "documents": [
+        "docs/reference-fabric-onelake-shortcuts.md"
+      ],
+      "sources": [
+        {
+          "title": "Microsoft Learn · OneLake shortcuts",
+          "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts"
+        },
+        {
+          "title": "Microsoft Learn · OneLake",
+          "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"
+        },
+        {
+          "title": "Microsoft Learn · SQL analytics endpoint",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
+        },
+        {
+          "title": "Microsoft Learn · Lakehouse shortcuts",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-shortcuts"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "fabric-shortcuts-adls-s3",
+          "label": "ADLS と S3 を参照する Lakehouse",
+          "sources": [
+            {
+              "title": "Microsoft Learn · OneLake shortcuts",
+              "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts"
+            },
+            {
+              "title": "Microsoft Learn · OneLake",
+              "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"
+            },
+            {
+              "title": "Microsoft Learn · SQL analytics endpoint",
+              "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fabric-warehouse-sql-endpoint",
+      "name": "Microsoft Fabric：Warehouse と SQL 分析エンドポイント",
+      "description": "Warehouse と Lakehouse の SQL 分析エンドポイントが同じ SQL エンジンで動き、書き込みの可否とメタデータ同期が異なることを追う。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "商用サービス"
+      ],
+      "objectives": [
+        "Warehouse と SQL 分析エンドポイントの書き込み可否を区別する。",
+        "Spark が書いた Delta テーブルが SQL から見えるまでの同期を追う。",
+        "SQL の権限と容量の消費がどこで効くかを説明する。"
+      ],
+      "documents": [
+        "docs/reference-fabric-warehouse-sql-endpoint.md"
+      ],
+      "sources": [
+        {
+          "title": "Microsoft Learn · Fabric Data Warehouse",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing"
+        },
+        {
+          "title": "Microsoft Learn · SQL analytics endpoint",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
+        },
+        {
+          "title": "Microsoft Learn · SQL analytics endpoint metadata sync",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/sql-analytics-endpoint-metadata-sync"
+        },
+        {
+          "title": "Microsoft Learn · Fabric licenses and capacity",
+          "url": "https://learn.microsoft.com/en-us/fabric/enterprise/licenses"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "fabric-warehouse-lakehouse-sql",
+          "label": "Warehouse と Lakehouse を T-SQL で使う",
+          "sources": [
+            {
+              "title": "Microsoft Learn · Fabric Data Warehouse",
+              "url": "https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing"
+            },
+            {
+              "title": "Microsoft Learn · SQL analytics endpoint",
+              "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
+            },
+            {
+              "title": "Microsoft Learn · Fabric licenses and capacity",
+              "url": "https://learn.microsoft.com/en-us/fabric/enterprise/licenses"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fabric-direct-lake",
+      "name": "Microsoft Fabric：Direct Lake と Power BI",
+      "description": "Direct Lake のセマンティックモデルが、OneLake の Delta テーブルから必要な列だけをメモリに読み、更新はフレーミングで参照を替えることを追う。",
+      "domain": "分析基盤・DWH",
+      "category": "クラウド分析基盤",
+      "kind": "仕組みの深掘り",
+      "tags": [
+        "商用サービス"
+      ],
+      "objectives": [
+        "Import と Direct Lake で更新が何を複製するかを区別する。",
+        "Direct Lake on OneLake と on SQL の違い（DirectQuery へのフォールバック）を説明する。",
+        "容量のガードレールが効く点を説明する。"
+      ],
+      "documents": [
+        "docs/reference-fabric-direct-lake.md"
+      ],
+      "sources": [
+        {
+          "title": "Microsoft Learn · Direct Lake overview",
+          "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview"
+        },
+        {
+          "title": "Microsoft Learn · OneLake",
+          "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"
+        },
+        {
+          "title": "Microsoft Learn · SQL analytics endpoint",
+          "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
+        },
+        {
+          "title": "Microsoft Learn · Fabric licenses and capacity",
+          "url": "https://learn.microsoft.com/en-us/fabric/enterprise/licenses"
+        },
+        {
+          "title": "Microsoft Learn · How Direct Lake works",
+          "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-how-it-works"
+        }
+      ],
+      "implementations": [
+        {
+          "id": "fabric-direct-lake-sales",
+          "label": "Lakehouse の売上テーブルを Direct Lake で見る",
+          "sources": [
+            {
+              "title": "Microsoft Learn · Direct Lake overview",
+              "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview"
+            },
+            {
+              "title": "Microsoft Learn · OneLake",
+              "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"
+            },
+            {
+              "title": "Microsoft Learn · SQL analytics endpoint",
+              "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
+            },
+            {
+              "title": "Microsoft Learn · Fabric licenses and capacity",
+              "url": "https://learn.microsoft.com/en-us/fabric/enterprise/licenses"
             }
           ]
         }

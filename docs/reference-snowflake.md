@@ -23,6 +23,8 @@ Snowflake のストレージ、仮想ウェアハウス、クラウドサービ�
 |---|---|---|
 | Load warehouse | [取り込みと増分処理](reference-snowflake-ingestion-cdc.md) | Snowpipe、Snowpipe Streaming、Streams／Tasks、Dynamic Tables |
 | BI warehouse | [クエリ性能とウェアハウス](reference-snowflake-query-performance.md) | 同時実行、マイクロパーティション、結果の再利用 |
+| Load warehouse（連続取り込み） | [Snowpipe Streaming の受信と取り込み](reference-snowflake-snowpipe-streaming-internals.md) | 直接送信と Kafka Connect の経路、バッファ、PIPE、サーバーレスジョブ |
+| BI warehouse（読み取りの最適化） | [Optima：区画の読み取りと再配置](reference-snowflake-optima-internals.md)、[JOIN 前後の集約](reference-snowflake-aggregation-placement.md) | 追加メタデータ・索引・計画改善、Classic と Optima Clustering、集約の配置 |
 | Horizon Catalog | [分類・保護・監査](reference-snowflake-horizon-catalog.md) | 分類、タグとマスキング、アクセス履歴、リネージ |
 | Cloud storage | [Time Travel とクローン](reference-snowflake-time-travel.md) | 履歴、誤更新の復旧、Fail-safe の境界 |
 | Secure Data Sharing | [共有の公開と失効](reference-snowflake-secure-sharing.md) | 提供側のビュー、受領側の利用、失効 |

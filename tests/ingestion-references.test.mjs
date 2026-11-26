@@ -50,7 +50,7 @@ test('Fivetran と GitHub は SaaS 提供元、PostgreSQL は自前設置でき�
 
 test('Snowflake ingestion details belong to the Snowflake overview', () => {
   const models = loadModels();
-  const ids = ['snowflake-ingestion-cdc', 'snowflake-snowpipe-streaming-internals', 'snowflake-kafka-iceberg-streaming'];
+  const ids = ['snowflake-ingestion-cdc', 'snowflake-snowpipe-streaming-internals'];
   const overview = models.find(x => x.id === 'snowflake');
   assert.equal(overview.reference.role, 'overview');
   ids.forEach((id, i) => {

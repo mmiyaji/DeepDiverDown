@@ -1,134 +1,124 @@
 {
   "model": "databricks-liquid-clustering-internals",
-  "name": "Databricks Liquid Clustering：ファイル配置と Delta ログ",
+  "name": "Databricks Delta：Liquid Clustering・Deletion Vector・ファイル読み飛ばし",
   "coverage": {
-    "covered": 7,
-    "total": 7
+    "covered": 8,
+    "total": 8
   },
   "byId": {
     "operator": {
       "type": "node",
-      "label": "設定・運用",
+      "label": "利用者の SQL",
       "status": "claim"
     },
     "workload": {
       "type": "node",
-      "label": "クエリの傾向",
-      "status": "claim"
-    },
-    "selection": {
-      "type": "node",
-      "label": "キーの選択",
-      "status": "claim"
-    },
-    "config": {
-      "type": "link",
-      "label": "キーの選択 → 配置方針の保存",
+      "label": "クエリ履歴と AUTO のキー選択",
       "status": "claim"
     },
     "optimize": {
       "type": "node",
-      "label": "再配置の実行",
+      "label": "再配置・書き換えの実行",
       "status": "claim"
     },
     "query": {
       "type": "node",
-      "label": "対象ファイルの選択",
+      "label": "ファイル統計による読み飛ばし",
       "status": "claim"
     },
-    "profile": {
+    "dfp": {
       "type": "node",
-      "label": "効果・コストの確認",
+      "label": "JOIN の実行時キーによる絞り込み",
       "status": "claim"
     },
     "oldfiles": {
       "type": "node",
-      "label": "変更前のファイル",
+      "label": "変更前の Parquet ファイル",
       "status": "claim"
     },
     "newfiles": {
       "type": "node",
-      "label": "再配置後のファイル",
+      "label": "再配置後の Parquet ファイル",
+      "status": "claim"
+    },
+    "dv": {
+      "type": "node",
+      "label": "Deletion Vector",
       "status": "claim"
     },
     "log": {
       "type": "node",
-      "label": "表のバージョンと統計",
-      "status": "claim"
-    },
-    "stats": {
-      "type": "node",
-      "label": "ファイルごとの値域",
+      "label": "Delta ログ（版・統計・clustering 設定）",
       "status": "claim"
     },
     "manual": {
       "type": "link",
-      "label": "設定・運用 → キーの選択",
+      "label": "利用者の SQL → Delta ログ（版・統計・clustering 設定）",
       "status": "claim"
     },
     "trend": {
       "type": "link",
-      "label": "クエリの傾向 → キーの選択",
-      "status": "claim"
-    },
-    "record": {
-      "type": "link",
-      "label": "配置方針の保存 → 表のバージョンと統計",
+      "label": "クエリ履歴と AUTO のキー選択 → Delta ログ（版・統計・clustering 設定）",
       "status": "claim"
     },
     "launch": {
       "type": "link",
-      "label": "設定・運用 → 再配置の実行",
-      "status": "claim"
-    },
-    "policy": {
-      "type": "link",
-      "label": "配置方針の保存 → 再配置の実行",
+      "label": "利用者の SQL → 再配置・書き換えの実行",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "変更前のファイル → 再配置の実行",
+      "label": "変更前の Parquet ファイル → 再配置・書き換えの実行",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "再配置の実行 → 再配置後のファイル",
+      "label": "再配置・書き換えの実行 → 再配置後の Parquet ファイル",
       "status": "claim"
     },
     "commit": {
       "type": "link",
-      "label": "再配置の実行 → 表のバージョンと統計",
+      "label": "再配置・書き換えの実行 → Delta ログ（版・統計・clustering 設定）",
       "status": "claim"
     },
-    "statistics": {
+    "mutate": {
       "type": "link",
-      "label": "表のバージョンと統計 → ファイルごとの値域",
+      "label": "利用者の SQL → Deletion Vector",
       "status": "claim"
     },
-    "predicate": {
+    "dvlog": {
       "type": "link",
-      "label": "設定・運用 → 対象ファイルの選択",
+      "label": "Deletion Vector → Delta ログ（版・統計・clustering 設定）",
+      "status": "claim"
+    },
+    "purge": {
+      "type": "link",
+      "label": "Deletion Vector → 再配置・書き換えの実行",
       "status": "claim"
     },
     "snapshot": {
       "type": "link",
-      "label": "表のバージョンと統計 → 対象ファイルの選択",
+      "label": "Delta ログ（版・統計・clustering 設定） → ファイル統計による読み飛ばし",
       "status": "claim"
     },
-    "prune": {
+    "mask": {
       "type": "link",
-      "label": "ファイルごとの値域 → 対象ファイルの選択",
+      "label": "Deletion Vector → ファイル統計による読み飛ばし",
+      "status": "claim"
+    },
+    "dfpstats": {
+      "type": "link",
+      "label": "Delta ログ（版・統計・clustering 設定） → JOIN の実行時キーによる絞り込み",
+      "status": "claim"
+    },
+    "dfpskip": {
+      "type": "link",
+      "label": "JOIN の実行時キーによる絞り込み → ファイル統計による読み飛ばし",
       "status": "claim"
     },
     "scan": {
       "type": "link",
-      "label": "再配置後のファイル → 対象ファイルの選択",
-      "status": "claim"
-    },
-    "measure": {
-      "type": "link",
-      "label": "対象ファイルの選択 → 効果・コストの確認",
+      "label": "再配置後の Parquet ファイル → ファイル統計による読み飛ばし",
       "status": "claim"
     },
     "recluster": {
@@ -139,14 +129,22 @@
       "type": "scenario",
       "label": "キー変更と既存ファイル"
     },
-    "automatic": {
+    "delete-vector": {
       "type": "scenario",
-      "label": "AUTO と保守の条件"
+      "label": "行の削除と Deletion Vector"
+    },
+    "runtime-pruning": {
+      "type": "scenario",
+      "label": "JOIN の実行時キーで絞る"
+    },
+    "unverified": {
+      "type": "unknown",
+      "label": "実環境のファイル数・読み飛ばし率・保守費用は未検証。Dynamic File Pruning の適用条件の最新版は未確認。"
     },
     "ex-operator": {
       "type": "implementation",
       "impl": "aws",
-      "label": "管理者の SQL",
+      "label": "利用者の SQL（SQL Editor・ジョブ）",
       "realizes": [
         "operator"
       ]
@@ -154,31 +152,15 @@
     "ex-workload": {
       "type": "implementation",
       "impl": "aws",
-      "label": "管理テーブルのクエリ履歴",
-      "realizes": [
-        "workload"
-      ]
-    },
-    "ex-selection": {
-      "type": "implementation",
-      "impl": "aws",
       "label": "自動 Liquid Clustering",
       "realizes": [
-        "selection"
-      ]
-    },
-    "ex-config": {
-      "type": "implementation",
-      "impl": "aws",
-      "label": "Delta の clustering メタデータ",
-      "realizes": [
-        "config"
+        "workload"
       ]
     },
     "ex-optimize": {
       "type": "implementation",
       "impl": "aws",
-      "label": "Serverless Jobs の OPTIMIZE",
+      "label": "Serverless Jobs の OPTIMIZE・REORG",
       "realizes": [
         "optimize"
       ]
@@ -191,12 +173,12 @@
         "query"
       ]
     },
-    "ex-profile": {
+    "ex-dfp": {
       "type": "implementation",
       "impl": "aws",
-      "label": "Query Profile と保守履歴",
+      "label": "Dynamic File Pruning",
       "realizes": [
-        "profile"
+        "dfp"
       ]
     },
     "ex-oldfiles": {
@@ -215,6 +197,14 @@
         "newfiles"
       ]
     },
+    "ex-dv": {
+      "type": "implementation",
+      "impl": "aws",
+      "label": "S3 の Deletion Vector",
+      "realizes": [
+        "dv"
+      ]
+    },
     "ex-log": {
       "type": "implementation",
       "impl": "aws",
@@ -222,119 +212,103 @@
       "realizes": [
         "log"
       ]
-    },
-    "ex-stats": {
-      "type": "implementation",
-      "impl": "aws",
-      "label": "add action のファイル統計",
-      "realizes": [
-        "stats"
-      ]
     }
   },
   "byRef": {
-    "docs/reference-databricks-liquid-clustering-internals.md#§1": [
+    "docs/reference-databricks-liquid-clustering-internals.md#§8": [
       "model"
     ],
     "docs/reference-databricks-liquid-clustering-internals.md": [
       "model",
       "operator",
       "workload",
-      "selection",
-      "config",
       "optimize",
       "query",
-      "profile",
+      "dfp",
       "oldfiles",
       "newfiles",
+      "dv",
       "log",
-      "stats",
       "manual",
       "trend",
-      "record",
       "launch",
-      "policy",
       "read",
       "write",
       "commit",
-      "statistics",
-      "predicate",
+      "mutate",
+      "dvlog",
+      "purge",
       "snapshot",
-      "prune",
+      "mask",
+      "dfpstats",
+      "dfpskip",
       "scan",
-      "measure",
       "recluster",
       "key-change",
-      "automatic",
+      "delete-vector",
+      "runtime-pruning",
       "ex-operator",
       "ex-workload",
-      "ex-selection",
-      "ex-config",
       "ex-optimize",
       "ex-query",
-      "ex-profile",
+      "ex-dfp",
       "ex-oldfiles",
       "ex-newfiles",
-      "ex-log",
-      "ex-stats"
+      "ex-dv",
+      "ex-log"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§1": [
+      "model"
     ],
     "docs/reference-databricks-liquid-clustering-internals.md#§3": [
       "model",
-      "newfiles",
-      "recluster",
-      "ex-newfiles"
+      "recluster"
     ],
     "docs/reference-databricks-liquid-clustering-internals.md#§4": [
       "model",
       "key-change"
     ],
-    "docs/reference-databricks-liquid-clustering-internals.md#§5": [
-      "model",
-      "automatic"
-    ],
-    "docs/reference-databricks-liquid-clustering-internals.md#§6": [
-      "model",
-      "ex-operator",
-      "ex-workload",
-      "ex-selection",
-      "ex-config",
-      "ex-optimize",
-      "ex-query",
-      "ex-profile",
-      "ex-oldfiles",
-      "ex-newfiles",
-      "ex-log",
-      "ex-stats"
-    ],
-    "docs/reference-databricks-liquid-clustering-internals.md#§7": [
-      "model"
-    ],
     "docs/reference-databricks-liquid-clustering-internals.md#§2": [
       "operator",
       "workload",
-      "selection",
-      "config",
       "optimize",
       "query",
-      "profile",
+      "dfp",
       "oldfiles",
       "newfiles",
+      "dv",
       "log",
-      "stats",
       "manual",
       "trend",
-      "record",
       "launch",
-      "policy",
       "read",
       "write",
       "commit",
-      "statistics",
-      "predicate",
+      "mutate",
+      "dvlog",
+      "purge",
       "snapshot",
-      "prune",
-      "scan",
-      "measure"
+      "mask",
+      "dfpstats",
+      "dfpskip",
+      "scan"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§5": [
+      "delete-vector"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§6": [
+      "runtime-pruning"
+    ],
+    "docs/reference-databricks-liquid-clustering-internals.md#§7": [
+      "ex-operator",
+      "ex-workload",
+      "ex-optimize",
+      "ex-query",
+      "ex-dfp",
+      "ex-oldfiles",
+      "ex-newfiles",
+      "ex-dv",
+      "ex-log"
     ]
   },
   "reference": {
@@ -342,11 +316,14 @@
     "order": 23,
     "domain": "分析基盤・DWH",
     "kind": "仕組みの深掘り",
-    "detailOf": "databricks-optimization-internals",
+    "detailOf": "databricks",
+    "product": "Databricks",
+    "role": "internals",
+    "step": 4,
     "objectives": [
       "キー設定と既存ファイルの再配置を区別する。",
-      "Delta ログとファイル単位の統計が読み取りに果たす役割を追う。",
-      "AUTO・増分 OPTIMIZE・FULL の条件と費用を理解する。"
+      "Deletion Vector が Parquet を書き換えずに行を無効にし、PURGE と VACUUM が別段階であることを追う。",
+      "ファイル統計と JOIN の実行時キーによる読み飛ばしを、Delta ログからたどる。"
     ],
     "sources": [
       {
@@ -358,8 +335,20 @@
         "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#clustered-table"
       },
       {
+        "title": "Deletion vectors",
+        "url": "https://docs.databricks.com/aws/en/tables/features/deletion-vectors"
+      },
+      {
+        "title": "Delta Lake protocol: Deletion Vectors",
+        "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md#deletion-vectors"
+      },
+      {
         "title": "Data skipping",
         "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
+      },
+      {
+        "title": "Dynamic file pruning",
+        "url": "https://docs.databricks.com/aws/en/optimizations/dynamic-file-pruning"
       },
       {
         "title": "Predictive optimization",
@@ -376,10 +365,6 @@
       {
         "title": "Managed storage",
         "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
-      },
-      {
-        "title": "Data + AI Summit: Liquid Clustering",
-        "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
       },
       {
         "title": "Liquid Clustering のデータ配置とファイル統計",

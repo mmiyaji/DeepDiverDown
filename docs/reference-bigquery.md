@@ -65,3 +65,9 @@ Cloud Storage から同一ロケーションの BigQuery データセットへ�
 出典 [BigQuery overview](https://cloud.google.com/bigquery/docs/introduction)、[Overview of BigQuery storage](https://cloud.google.com/bigquery/docs/storage_overview)、[Introduction to the resource hierarchy](https://cloud.google.com/bigquery/docs/resource-hierarchy)、[Query plan and timeline](https://cloud.google.com/bigquery/docs/query-plan-explanation)、[Overview of BigQuery analytics](https://cloud.google.com/bigquery/docs/query-overview)、[BigQuery のワークロード管理](https://docs.cloud.google.com/bigquery/docs/reservations-intro)、[Cloud Storage の CSV をロード](https://docs.cloud.google.com/bigquery/docs/loading-data-cloud-storage-csv)
 
 この例は分析・データ・予約を同一プロジェクトに置く選択である。Google が BigQuery と Cloud Storage の基盤を運用し、利用者はロード・クエリ API、データセットと表、QUERY 予約と割り当て、IAM 権限を操作する。クエリ計画は確認できるが、内部ワーカーやストレージサーバーへの直接アクセスは想定しない。ロードジョブは既定の共有スロットプールを使い、QUERY 予約と区別する。対象データと予約のロケーション、具体的 IAM と実行性能は未指定で、公式資料を組み合わせた未検証例である。
+
+## 10. 深掘りと Iceberg テーブル
+2026 年 11 月時点で、BigLake は「Lakehouse for Apache Iceberg（旧 BigLake）」の名称で扱われる。Iceberg テーブルのデータは利用者の Cloud Storage に置き、BigQuery と外部エンジンが REST カタログで共有する（名称の対応は公式資料で未確認の部分がある）。詳細は次の図で扱う。
+- [クエリ実行とスロット](reference-bigquery-dremel-slots.md)
+- [Capacitor とストレージの最適化](reference-bigquery-storage-optimization.md)
+- [Iceberg レイクハウス（旧 BigLake）](reference-bigquery-lakehouse-iceberg.md)

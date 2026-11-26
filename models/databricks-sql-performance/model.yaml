@@ -1,354 +1,645 @@
-name: Databricks SQL の実行プロファイルとファイル配置
-description: SQL Warehouse で実行し、スキャン、シャッフル、キューのどこに時間がかかるかを切り分ける。
+name: Databricks SQL：実行プロファイル・Photon・キャッシュ
+description: SQL Warehouse で実行し、ファイル統計による読み飛ばし、Photon、実行時の計画調整、結果・ディスクキャッシュ、Query Profile でのどこに時間がかかるかの切り分けを追う。内部部品は公開資料に基づく論理的な役割。
 parent:
   model: databricks
   node: query
 reference:
   objectives:
-    - ストレージの配置と、実行コンピュートの選び方を区別する。
-    - SQL の実行プロファイルでスキャンとシャッフルを比較する。
+    - Delta のログとファイル単位の統計による読み飛ばしを理解する。
+    - Photon と AQE、ファイル配置の役割を区別する。
+    - 結果キャッシュとディスクキャッシュを区別し、観測と費用を考える。
   sources:
-    - title: SQL Warehouse の種類
-      url: https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types
+    - title: Data skipping
+      url: https://docs.databricks.com/aws/en/tables/data-skipping
+    - title: Delta Lake protocol
+      url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md
     - title: Photon
       url: https://docs.databricks.com/aws/en/compute/photon
-    - title: クエリプロファイル
-      url: https://docs.databricks.com/aws/en/sql/user/queries/query-profile
+    - title: Photon SIGMOD 2022
+      url: https://www.databricks.com/de/wp-content/uploads/2022/07/Photon-A-Fast-Query-Engine-for-Lakehouse-Systems.pdf
+    - title: Adaptive query execution
+      url: https://docs.databricks.com/aws/en/optimizations/aqe
     - title: Liquid clustering
       url: https://docs.databricks.com/aws/en/tables/clustering
     - title: Predictive optimization
       url: https://docs.databricks.com/aws/en/optimizations/predictive-optimization
+    - title: Query caching
+      url: https://docs.databricks.com/aws/en/sql/user/queries/query-caching
+    - title: Query Profile
+      url: https://docs.databricks.com/aws/en/sql/user/queries/query-profile
+    - title: SQL Warehouse の種類
+      url: https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types
+    - title: Performance best practices
+      url: https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices
+    - title: 'Data + AI Summit: Liquid Clustering'
+      url: https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM
+    - title: Optimizing MERGE Performance using Liquid Clustering
+      url: https://www.youtube.com/watch?v=yZmrpXJg-G8
+    - title: Managed storage
+      url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+    - title: Serverless architecture
+      url: https://docs.databricks.com/aws/en/security/network/serverless-network-security/serverless-compute
 sources:
   - docs/reference-databricks-sql-performance.md
 evidence:
   - type: doc
     ref: docs/reference-databricks-sql-performance.md#§1
+  - type: doc
+    ref: docs/reference-databricks-sql-performance.md#§3
+  - type: doc
+    ref: docs/reference-databricks-sql-performance.md#§4
+  - type: doc
+    ref: docs/reference-databricks-sql-performance.md#§5
+  - type: doc
+    ref: docs/reference-databricks-sql-performance.md#§6
 tiers:
-  - id: flow
-    label: 構成と処理の流れ
+  - id: control
+    label: 要求・管理・計画
+    z: 2
+    size:
+      - 24
+      - 4
+  - id: compute
+    label: 実行と観測
+    z: 1
+    size:
+      - 24
+      - 4
+  - id: storage
+    label: 表の状態とデータ
     z: 0
     size:
-      - 14.5
-      - 4.5
+      - 24
+      - 4
 nodes:
-  bi:
-    label: 注文集計 SQL
+  client:
+    label: SQL の発行（SQL Warehouse）
     kind: client
-    tier: flow
+    tier: control
     x: 0
-    'y': 2
-    description: 条件付き集計を送信。
-    evidence:
-      - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§1
-  warehouse:
-    label: SQL 実行の計算資源
-    kind: service
-    tier: flow
-    x: 3
-    'y': 2
-    description: 処理需要に合わせる実行先。
+    'y': 1.5
+    description: 注文日で絞った集計 SQL を発行する。
     evidence:
       - type: doc
         ref: docs/reference-databricks-sql-performance.md#§2
-  engine:
-    label: 最適化された演算エンジン
-    kind: worker
-    tier: flow
-    x: 6
-    'y': 2
-    description: 対応するスキャンや結合を処理。
-    parallel: 'N'
+  catalog:
+    label: テーブルの解決・権限
+    kind: service
+    tier: control
+    x: 5
+    'y': 1.5
+    description: 管理テーブルとアクセス権を解決する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  planner:
+    label: 計画と実行時の調整
+    kind: service
+    tier: control
+    x: 10
+    'y': 1.5
+    description: 統計から計画し、対象クエリでは実行時統計を使って物理戦略を調整する。Warehouse の同時実行が多いと、実行前にキューで待つ場合がある。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  result:
+    label: 保存済みの結果
+    kind: cache
+    tier: control
+    x: 16
+    'y': 1.5
+    description: 条件を満たすクエリ結果を再利用できる。ローカルとサーバーレスのリモート結果キャッシュを区別する。
     evidence:
       - type: doc
         ref: docs/reference-databricks-sql-performance.md#§2
   scan:
-    drill: databricks-optimization-internals
-    label: 列指向テーブルのデータファイル
-    kind: db
-    tier: flow
-    x: 10
-    'y': 0
-    description: 配置と統計が読み取りに影響。
-    evidence:
-      - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§4
-  shuffle:
-    label: 結合・再分配
+    label: 候補ファイルの読み取り
     kind: worker
-    tier: flow
-    x: 10
-    'y': 4
-    description: 結合時に必要なら行を集め直す。
+    tier: compute
+    x: 0
+    'y': 1.5
+    description: ファイル統計で候補を絞り、必要な列を読み取る。
     evidence:
       - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§3
+        ref: docs/reference-databricks-sql-performance.md#§2
+  operators:
+    label: 結合・集計・再分配
+    kind: worker
+    tier: compute
+    x: 5
+    'y': 1.5
+    description: Photon は対応する演算をベクトル化する。非対応の処理は別の実行経路を使う。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  diskcache:
+    label: 実行資源内のデータキャッシュ
+    kind: cache
+    tier: compute
+    x: 10
+    'y': 1.5
+    description: 読み込んだ Parquet データのコピーをローカルディスクに保持する。対象ファイル変更や計算資源の終了により無効になる。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
   profile:
-    label: クエリの演算子プロファイル
+    label: 実行の観測
     kind: service
-    tier: flow
-    x: 14
-    'y': 2
-    description: 演算子の時間やデータ量を確認。
+    tier: compute
+    x: 15
+    'y': 1.5
+    description: Query Profile でスキャン、行数、時間、shuffle や spill を確認する。
     evidence:
       - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§3
-  optimizer:
-    label: テーブル保守
-    kind: worker
-    tier: flow
-    x: 14
-    'y': 0
-    description: クラスタリングなどの配置の調整。
+        ref: docs/reference-databricks-sql-performance.md#§2
+  maintenance:
+    label: データ配置の保守
+    kind: service
+    tier: compute
+    x: 20
+    'y': 1.5
+    description: 管理テーブルでは Predictive Optimization が対象条件に従い OPTIMIZE・VACUUM・ANALYZE 等を実行する。
     evidence:
       - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§4
+        ref: docs/reference-databricks-sql-performance.md#§2
+  log:
+    drill: databricks-liquid-clustering-internals
+    label: 表の状態とファイル統計
+    kind: db
+    tier: storage
+    x: 2
+    'y': 1.5
+    description: Delta transaction log の状態から有効なデータファイルを特定し、ファイルごとの統計で対象を絞る。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  files:
+    label: 列指向の保存ファイル
+    kind: db
+    tier: storage
+    x: 9
+    'y': 1.5
+    description: 表のデータを Parquet ファイルに保存する。ファイルの値域と配置が data skipping に影響する。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  layout:
+    drill: databricks-liquid-clustering-internals
+    label: 配置方針
+    kind: file
+    tier: storage
+    x: 16
+    'y': 1.5
+    description: Liquid Clustering のキーによりファイル配置を調整する。AUTO は対象管理テーブルと Predictive Optimization などの条件が必要。
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
 links:
   - id: submit
-    from: bi
-    to: warehouse
-    label: SQL を発行
+    from: client
+    to: planner
+    label: SQL を送る
     evidence:
       - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§1
-  - id: execute
-    from: warehouse
-    to: engine
-    label: 実行枠を割り当て
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: resolve
+    from: catalog
+    to: planner
+    label: 表と権限を解決
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: stats
+    from: log
+    to: planner
+    label: 表の状態と統計を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: start
+    from: planner
+    to: scan
+    label: 候補ファイルを読む
     evidence:
       - type: doc
         ref: docs/reference-databricks-sql-performance.md#§2
   - id: read
-    from: engine
+    from: files
     to: scan
-    label: 候補ファイルと列を読む
+    label: 必要な列を読む
     evidence:
       - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§4
-  - id: join
-    from: engine
-    to: shuffle
-    label: 結合データの再分配
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: disk
+    from: diskcache
+    to: scan
+    label: キャッシュ済みデータを読む
     evidence:
       - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§3
-  - id: observe
-    from: shuffle
-    to: profile
-    label: 演算子の指標を確認
-    evidence:
-      - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§3
-  - id: scan-profile
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: process
     from: scan
+    to: operators
+    label: 行を結合・集計
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: return
+    from: operators
+    to: client
+    label: 結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: check
+    from: planner
+    to: result
+    label: 結果の再利用を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: cached
+    from: result
+    to: client
+    label: 保存済み結果を返す
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: observe
+    from: operators
     to: profile
-    label: スキャンの作業量を確認
+    label: 実行指標を確認
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: config
+    from: layout
+    to: maintenance
+    label: クラスタリング設定を参照
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: rewrite
+    from: maintenance
+    to: files
+    label: OPTIMIZE でファイルを再編成
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+  - id: commit
+    from: maintenance
+    to: log
+    label: 表の変更をコミット
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+scenarios:
+  - id: skipping
+    label: 統計でファイルを絞る
+    visual: grid
+    evidence:
+      - type: doc
+        ref: docs/reference-databricks-sql-performance.md#§2
+    steps:
+      - links:
+          - submit
+          - resolve
+          - stats
+        note: SQL と権限を確認し、Delta 表の状態とファイル統計を参照する。
+        prune:
+          - row:p1
+          - row:p2
+      - links:
+          - start
+          - read
+        note: 条件が一致し得るファイルから必要な列を読む。
+        read:
+          - row:p3
+          - row:p4
+      - links:
+          - process
+          - return
+          - observe
+        note: 対応する Photon 演算で集計し、Query Profile で実測する。
+  - id: adaptive
+    label: 実行時の結合と再分配
     evidence:
       - type: doc
         ref: docs/reference-databricks-sql-performance.md#§3
-  - id: maintain
-    from: optimizer
-    to: scan
-    label: 表の配置やファイルを保守
+    steps:
+      - links:
+          - submit
+          - stats
+          - start
+        note: 初期統計から計画し候補を読み取る。
+      - links:
+          - read
+          - process
+        note: 対象クエリでは実行時統計により結合戦略や shuffle 後の分割を調整する場合がある。
+      - links:
+          - observe
+          - return
+        note: 最終計画やシャッフル・スキューを確認する。
+  - id: cache
+    label: 結果とディスクキャッシュ
     evidence:
       - type: doc
         ref: docs/reference-databricks-sql-performance.md#§4
-scenarios:
-  - id: plan
-    label: 日付を絞った集計でスキャンを確認
-    evidence:
-      - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§3
     steps:
       - links:
           - submit
-          - execute
-        note: 同じ条件でクエリを実行し、実行時の条件を揃える。
+          - check
+        note: 同じクエリの結果を再利用できるか確認する。
       - links:
-          - read
-          - scan-profile
-        note: スキャンの作業量をプロファイルで確認する。
+          - cached
+        note: 条件を満たし結果が利用された場合、保存済み結果を返す。
       - links:
-          - maintain
-          - read
-        note: 配置の保守後に同条件で再計測し、読んだ量の違いを見る。
-  - id: join
-    label: 結合の待ちと再分配を調べる
+          - start
+          - disk
+          - process
+          - return
+        note: 結果を再利用できない場合も、稼働中の計算資源に残るデータのコピーを使える場合がある。
+  - id: cluster
+    label: ファイル再配置と再計測
     evidence:
       - type: doc
-        ref: docs/reference-databricks-sql-performance.md#§3
+        ref: docs/reference-databricks-sql-performance.md#§5
     steps:
       - links:
-          - submit
-          - execute
-        note: 複数のテーブルを使う集計を実行する。
+          - config
+          - rewrite
+          - commit
+        note: 対象管理テーブルでは設定に応じて保守を実行し、ファイルの変更を Delta ログにコミットする。
       - links:
-          - join
+          - stats
+          - start
+          - read
+        note: 同じ条件でファイルを絞り読み取る。
+      - links:
+          - process
           - observe
-        note: 再分配が大きい演算子と入力行数を調べ、次に見直す条件を決める。
+        note: Profile と保守コストを以前の結果と比較する。
+grid:
+  title: 日付条件による候補ファイルと列
+  rowLabel: 注文日の範囲
+  colLabel: 列
+  unit: ' 単位'
+  node: files
+  rows:
+    - id: p1
+      label: 1/01〜1/07
+    - id: p2
+      label: 1/08〜1/14
+    - id: p3
+      label: 1/24〜1/27
+    - id: p4
+      label: 1/28〜1/31
+  cols:
+    - id: date
+      label: 注文日
+    - id: amount
+      label: 金額
+  values:
+    - - 3
+      - 8
+    - - 3
+      - 8
+    - - 3
+      - 8
+    - - 3
+      - 8
+  note: 例示値。1/25 以降では値域が一部重なる 1/24〜1/27 のファイルも候補に残る。
+unknowns:
+  - id: unverified
+    text: 実環境の性能、キャッシュの命中率、キュー待ちの時間は未検証。Photon の内部実装は 2022 年の論文時点の説明で、現在の挙動は未確認。
+    refs: [operators, diskcache]
 implementations:
-  - id: databricks-sql-serverless
-    label: Databricks Serverless SQL のクエリ調査
-    description: 注文の管理 Delta テーブルを Serverless SQL Warehouse で読み、Query Profile と履歴を使って改善前後を調べる例。
+  - id: aws-serverless
+    label: AWS・Serverless SQL と管理 Delta テーブル
+    description: >-
+      Databricks 管理の Serverless SQL Warehouse が顧客 AWS アカウントの S3 管理ストレージ上の Unity Catalog 管理 Delta テーブルを読む例。Predictive
+      Optimization は管理テーブルで有効な場合に実行する。
     sources:
-      - title: SQL Warehouse の種類
-        url: https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types
+      - title: Data skipping
+        url: https://docs.databricks.com/aws/en/tables/data-skipping
+      - title: Delta Lake protocol
+        url: https://github.com/delta-io/delta/blob/master/PROTOCOL.md
       - title: Photon
         url: https://docs.databricks.com/aws/en/compute/photon
-      - title: クエリプロファイル
-        url: https://docs.databricks.com/aws/en/sql/user/queries/query-profile
+      - title: Photon SIGMOD 2022
+        url: https://www.databricks.com/de/wp-content/uploads/2022/07/Photon-A-Fast-Query-Engine-for-Lakehouse-Systems.pdf
+      - title: Adaptive query execution
+        url: https://docs.databricks.com/aws/en/optimizations/aqe
       - title: Liquid clustering
         url: https://docs.databricks.com/aws/en/tables/clustering
       - title: Predictive optimization
         url: https://docs.databricks.com/aws/en/optimizations/predictive-optimization
-      - title: Query history system table
-        url: https://docs.databricks.com/aws/en/admin/system-tables/query-history
-      - {title: Databricks deployment architecture, url: https://docs.databricks.com/aws/en/security/network/deployment-architecture/}
-      - {title: Unity Catalog managed storage, url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage}
+      - title: Query caching
+        url: https://docs.databricks.com/aws/en/sql/user/queries/query-caching
+      - title: Query Profile
+        url: https://docs.databricks.com/aws/en/sql/user/queries/query-profile
+      - title: Performance best practices
+        url: https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices
+      - title: 'Data + AI Summit: Liquid Clustering'
+        url: >-
+          https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM
+      - title: Optimizing MERGE Performance using Liquid Clustering
+        url: https://www.youtube.com/watch?v=yZmrpXJg-G8
+      - title: Managed storage
+        url: https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage
+      - title: Serverless architecture
+        url: https://docs.databricks.com/aws/en/security/network/serverless-network-security/serverless-compute
     tiers:
-      - id: flow
-        label: 構成と処理の流れ
-        z: 0
+      - id: control
+        label: 要求・管理・計画
+        z: 2
         size:
-          - 14.5
-          - 4.5
-      - id: implementation-setup
-        label: 実装時の設定・観測
+          - 24
+          - 4
+      - id: compute
+        label: 実行と観測
         z: 1
         size:
-          - 8
-          - 3
+          - 24
+          - 4
+      - id: storage
+        label: 表の状態とデータ
+        z: 0
+        size:
+          - 24
+          - 4
     nodes:
-      example-user: {label: SQL analyst, kind: client, tier: flow, x: -2, y: 9, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      example-serverless: {label: Databricks serverless compute plane, kind: host, tier: flow, x: 11, y: 5, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      example-s3: {label: Customer S3 managed storage, svc: s3, kind: db, tier: flow, x: 22, y: 1, management: {type: shared, scope: "AWS operates S3; customer manages storage and access."}, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      example-iam: {label: IAM storage role, svc: iam, kind: policy, tier: flow, x: 22, y: 5, management: {type: customer, scope: "Customer manages permissions and trust."}, evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      example-bi:
-        label: Databricks SQL Editor
+      ex-client:
+        label: BI クライアント
         kind: client
-        tier: flow
-        x: 3
-        y: 1
+        tier: control
+        x: 0
+        'y': 1.5
+        description: 注文日で絞った集計 SQL を発行する。
         realizes:
-          - bi
-        description: 条件と集計が明示された注文クエリを実行する。
+          - client
         evidence:
           - type: doc
-            ref: docs/reference-databricks-sql-performance.md#§5
-        svc: databricks:sql
-      example-warehouse:
-        label: Serverless SQL Warehouse と Photon
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-catalog:
+        label: Unity Catalog
         kind: service
-        tier: flow
-        x: 7
-        y: 1
+        tier: control
+        x: 5
+        'y': 1.5
+        description: 管理テーブルとアクセス権を解決する。
         realizes:
-          - warehouse
-          - engine
-          - shuffle
-        description: 対応するスキャン・結合を処理し、必要な並列実行と再分配をサービス側で行う。
+          - catalog
         evidence:
           - type: doc
-            ref: docs/reference-databricks-sql-performance.md#§5
-        svc: databricks:sql
-      example-scan:
-        drill: databricks-optimization-internals
-        label: Unity Catalog 管理 Delta テーブル
-        kind: db
-        tier: flow
-        x: 11
-        y: 1
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-planner:
+        label: SQL の計画と AQE
+        kind: service
+        tier: control
+        x: 10
+        'y': 1.5
+        description: 統計から計画し、対象クエリでは実行時統計を使って物理戦略を調整する。
+        realizes:
+          - planner
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-result:
+        label: SQL Warehouse の結果キャッシュ
+        kind: cache
+        tier: control
+        x: 16
+        'y': 1.5
+        description: 条件を満たすクエリ結果を再利用できる。ローカルとサーバーレスのリモート結果キャッシュを区別する。
+        realizes:
+          - result
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-scan:
+        label: Photon のファイルスキャン
+        kind: worker
+        tier: compute
+        x: 0
+        'y': 1.5
+        description: ファイル統計で候補を絞り、必要な列を読み取る。
         realizes:
           - scan
-        description: 注文日の絞り込みに利用できる統計とファイルを持つ。
         evidence:
           - type: doc
-            ref: docs/reference-databricks-sql-performance.md#§5
-        svc: databricks:delta
-      example-profile:
-        label: Databricks Query Profile
+            ref: docs/reference-databricks-sql-performance.md#§6
+        svc: databricks:platform
+      ex-operators:
+        label: Photon と対応しない演算
+        kind: worker
+        tier: compute
+        x: 5
+        'y': 1.5
+        description: Photon は対応する演算をベクトル化する。非対応の処理は別の実行経路を使う。
+        realizes:
+          - operators
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-sql-performance.md#§6
+        svc: databricks:platform
+      ex-diskcache:
+        label: Warehouse のディスクキャッシュ
+        kind: cache
+        tier: compute
+        x: 10
+        'y': 1.5
+        description: 読み込んだ Parquet データのコピーをローカルディスクに保持する。対象ファイル変更や計算資源の終了により無効になる。
+        realizes:
+          - diskcache
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-profile:
+        label: SQL Query Profile
         kind: service
-        tier: flow
+        tier: compute
         x: 15
-        y: 1
+        'y': 1.5
+        description: Query Profile でスキャン、行数、時間、shuffle や spill を確認する。
         realizes:
           - profile
-        description: 時間や読み取り行数などの演算子指標を確認する。
         evidence:
           - type: doc
-            ref: docs/reference-databricks-sql-performance.md#§5
-        svc: databricks:sql
-      example-optimizer:
-        label: Liquid Clustering のテーブル設定
-        kind: worker
-        tier: flow
-        x: 3
-        y: 5
-        realizes:
-          - optimizer
-        description: 注文日などのアクセス条件を踏まえてクラスタリング方法を選ぶ。
-        evidence:
-          - type: doc
-            ref: docs/reference-databricks-sql-performance.md#§5
-        svc: databricks:delta
-      example-history:
-        label: system.query.history
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-maintenance:
+        label: Predictive Optimization と OPTIMIZE
         kind: service
-        tier: flow
-        x: 7
-        y: 5
-        description: 比較対象のクエリ識別子や実行指標を SQL で調べる。
+        tier: compute
+        x: 20
+        'y': 1.5
+        description: 管理テーブルでは Predictive Optimization が対象条件に従い OPTIMIZE・VACUUM・ANALYZE 等を実行する。
+        realizes:
+          - maintenance
         evidence:
           - type: doc
-            ref: docs/reference-databricks-sql-performance.md#§5
-    links:
-      - {id: example-user-editor, from: example-user, to: example-bi, label: "Run SQL in editor", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      - {id: example-serverless-run, from: example-serverless, to: example-warehouse, label: "Run SQL warehouse", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      - {id: example-managed-files, from: example-scan, to: example-s3, label: "Store Delta table files", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      - {id: example-role-access, from: example-iam, to: example-s3, label: "Authorize storage access", evidence: [{type: doc, ref: "docs/reference-databricks-sql-performance.md#§5"}]}
-      - id: example-history-connection
-        from: example-history
-        to: example-profile
-        label: 調査対象の実行を照合
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-log:
+        label: S3 上の Delta ログと統計
+        kind: db
+        tier: storage
+        x: 2
+        'y': 1.5
+        description: Delta transaction log の状態から有効なデータファイルを特定し、ファイルごとの統計で対象を絞る。
+        realizes:
+          - log
         evidence:
           - type: doc
-            ref: docs/reference-databricks-sql-performance.md#§5
+            ref: docs/reference-databricks-sql-performance.md#§6
+      ex-files:
+        label: S3 上の Delta Parquet ファイル
+        kind: db
+        tier: storage
+        x: 9
+        'y': 1.5
+        description: 表のデータを Parquet ファイルに保存する。ファイルの値域と配置が data skipping に影響する。
+        realizes:
+          - files
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-sql-performance.md#§6
+        svc: aws:s3
+      ex-layout:
+        drill: databricks-liquid-clustering-internals
+        label: Delta の Liquid Clustering 設定
+        kind: file
+        tier: storage
+        x: 16
+        'y': 1.5
+        description: Liquid Clustering のキーによりファイル配置を調整する。AUTO は対象管理テーブルと Predictive Optimization などの条件が必要。
+        realizes:
+          - layout
+        evidence:
+          - type: doc
+            ref: docs/reference-databricks-sql-performance.md#§6
     groups:
-      - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: flow, nodes: [example-bi, example-warehouse, example-scan, example-profile, example-optimizer, example-history, example-serverless]}
-      - {kind: cloud, provider: aws, label: Customer AWS account, tier: flow, nodes: [example-s3, example-iam]}
-    layout2d:
-      tiers: [{id: diagram, label: SQL and storage, z: 0, size: [27, 12]}]
-      nodes:
-        example-bi: {tier: diagram, x: 3, y: 1}
-        example-warehouse: {tier: diagram, x: 7, y: 1}
-        example-scan: {tier: diagram, x: 11, y: 1}
-        example-profile: {tier: diagram, x: 15, y: 1}
-        example-optimizer: {tier: diagram, x: 3, y: 5}
-        example-history: {tier: diagram, x: 7, y: 5}
-        example-serverless: {tier: diagram, x: 11, y: 5}
-        example-s3: {tier: diagram, x: 22, y: 1}
-        example-iam: {tier: diagram, x: 22, y: 5}
-        example-user: {tier: diagram, x: 0, y: 9}
-      groups:
-        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: diagram, nodes: [example-bi, example-warehouse, example-scan, example-profile, example-optimizer, example-history, example-serverless]}
-        - {kind: cloud, provider: aws, label: Customer AWS account, tier: diagram, nodes: [example-s3, example-iam]}
-    layout3d:
-      tiers:
-        - {id: workspace, label: SQL and workspace, z: 1, size: [16, 6]}
-        - {id: compute, label: Serverless compute plane, z: 0, size: [16, 6]}
-        - {id: customer, label: Customer AWS account, z: 0, origin: [19, 0], size: [8, 3]}
-        - {id: user, label: Analyst, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
-      nodes:
-        example-bi: {tier: workspace, x: 2, y: 1}
-        example-warehouse: {tier: workspace, x: 6, y: 1}
-        example-scan: {tier: workspace, x: 10, y: 1}
-        example-profile: {tier: workspace, x: 14, y: 1}
-        example-optimizer: {tier: workspace, x: 2, y: 4}
-        example-history: {tier: workspace, x: 6, y: 4}
-        example-serverless: {tier: compute, x: 6, y: 1.5}
-        example-s3: {tier: customer, x: 2, y: 1.5}
-        example-iam: {tier: customer, x: 6, y: 1.5}
-        example-user: {tier: user, x: 0, y: 1.5}
-      groups:
-        - {kind: cloud, provider: databricks, label: Databricks workspace and serverless, tier: [workspace, compute], nodes: [example-bi, example-warehouse, example-scan, example-profile, example-optimizer, example-history, example-serverless]}
-        - {kind: cloud, provider: aws, label: Customer AWS account, tier: customer, nodes: [example-s3, example-iam]}
+      - kind: cloud
+        label: Databricks 管理プレーン・サーバーレス計算領域（論理範囲）
+        provider: databricks
+        tier:
+          - control
+          - compute
+          - storage
+        nodes:
+          - ex-catalog
+          - ex-planner
+          - ex-result
+          - ex-scan
+          - ex-operators
+          - ex-diskcache
+          - ex-profile
+          - ex-maintenance
+          - ex-layout
+      - kind: cloud
+        label: 顧客 AWS アカウントの S3 管理ストレージ
+        provider: aws
+        tier:
+          - storage
+        nodes:
+          - ex-log
+          - ex-files

@@ -1,0 +1,86 @@
+name: Amazon Redshift：分散キー・ソートキーとマネージドストレージ
+description: テーブル定義の分散スタイルが行のスライスを決め、書き込んだブロックが RMS に永続化されてローカル SSD にキャッシュされる流れ。
+parent: {model: redshift, node: slice}
+reference:
+  objectives:
+    - 分散スタイル（AUTO・EVEN・KEY・ALL）が行の置き場所をどう決めるかを区別する。
+    - 分散スタイルが結合時のデータ移動に関わることを説明する。
+    - データが RMS に永続化され、ローカル SSD がキャッシュとして働く関係を追う。
+  sources:
+    - {title: Distribution styles, url: https://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html}
+    - {title: Data warehouse system architecture, url: https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html}
+    - {title: Amazon Redshift provisioned clusters overview, url: https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html}
+sources: [docs/reference-redshift-rms-distribution.md]
+evidence: [{type: doc, ref: "docs/reference-redshift-rms-distribution.md#§1"}, {type: doc, ref: "docs/reference-redshift-rms-distribution.md#§2"}]
+tiers: [{id: flow, label: 行の振り分けとブロックの永続化, z: 0, size: [26, 11]}]
+nodes:
+  ddl: {label: テーブル定義（DISTSTYLE・DISTKEY・SORTKEY）, kind: policy, tier: flow, x: 0, y: 1, description: 作成時に分散スタイルを指定する。省略すると AUTO になる。, evidence: &dist [{type: doc, ref: "docs/reference-redshift-rms-distribution.md#§2"}]}
+  loader: {label: ロード・INSERT の要求, kind: external, tier: flow, x: 0, y: 5, evidence: *dist}
+  query: {label: 結合・集計クエリ, kind: external, tier: flow, x: 0, y: 9, evidence: *dist}
+  leader: {label: リーダーノード, kind: worker, tier: flow, x: 7, y: 5, description: 分散スタイルに従って行をスライスへ振り分け、クエリを計画する。, evidence: &route [{type: doc, ref: "docs/reference-redshift-rms-distribution.md#§3"}]}
+  slices: {label: スライス, kind: worker, tier: flow, x: 14, y: 5, parallel: N, description: コンピュートノード内で行の一部を保持し、担当分を処理する。, evidence: *route}
+  blocks: {label: 列ごとのデータブロック, kind: file, tier: flow, x: 14, y: 9, description: ソートキー順に並べて書かれる。, evidence: &store [{type: doc, ref: "docs/reference-redshift-rms-distribution.md#§4"}]}
+  cache: {label: ローカル SSD キャッシュ, kind: db, tier: flow, x: 20, y: 5, description: RMS のデータの高性能キャッシュとして自動利用される。, evidence: *store}
+  rms: {label: Redshift Managed Storage, kind: db, tier: flow, x: 24, y: 9, description: コンピュートから分離して永続化する。S3 を基盤とする。, evidence: *store}
+  auto: {label: 自動テーブル最適化, kind: worker, tier: flow, x: 7, y: 1, description: AUTO のテーブルについて、サイズに応じて分散スタイルをバックグラウンドで変える。, evidence: *dist}
+links:
+  - {id: define, from: ddl, to: leader, label: 分散スタイルを参照, evidence: *dist}
+  - {id: load, from: loader, to: leader, label: 行を送る, evidence: *route}
+  - {id: route, from: leader, to: slices, label: 分散スタイルで振り分け, evidence: *route}
+  - {id: sortwrite, from: slices, to: blocks, label: ソートキー順にブロックを書く, evidence: *store}
+  - {id: persist, from: blocks, to: rms, label: RMS へ永続化, evidence: *store}
+  - {id: cachefill, from: rms, to: cache, label: 読んだブロックをキャッシュ, evidence: *store}
+  - {id: scan, from: cache, to: slices, label: ブロックを読む, evidence: *store}
+  - {id: ask, from: query, to: leader, label: クエリを送る, evidence: *route}
+  - {id: alter, from: auto, to: ddl, label: 分散スタイルを変更, evidence: *dist}
+scenarios:
+  - id: load-and-join
+    label: 行を振り分けて保存し、結合クエリで読む
+    evidence: [{type: doc, ref: "docs/reference-redshift-rms-distribution.md#§3"}]
+    steps:
+      - {links: [define, load, route], note: リーダーがテーブル定義の分散スタイルに従い、行をスライスへ振り分ける。KEY なら結合キーが同じ行を同じスライスに置く。}
+      - {links: [sortwrite, persist], note: スライスがブロックを書き、RMS に永続化する。}
+      - {links: [ask, scan, cachefill], note: クエリが来ると、スライスがキャッシュまたは RMS からブロックを読む。}
+      - {links: [alter], note: AUTO のテーブルはサイズに応じて分散スタイルが変わる。}
+unknowns:
+  - {id: sortkey, text: ソートキーの種類（compound・interleaved）、ブロックの大きさ、ゾーンマップによる読み飛ばしは今回取得した資料で未確認。, refs: [blocks]}
+  - {id: cache-policy, text: キャッシュの追い出し規則と RMS の S3 上の配置は非公開または未確認。, refs: [cache, rms]}
+  - {id: perf, text: 結合時の再分散量や性能は実環境で未検証。, refs: [route]}
+implementations:
+  - id: ra3-rms
+    label: RA3 クラスターの KEY 分散テーブルと RMS
+    description: プロビジョンド RA3 クラスターで、結合キーを DISTKEY に指定したテーブルを作り、RMS とローカル SSD キャッシュで読む。
+    sources:
+      - {title: Distribution styles, url: https://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html}
+      - {title: Data warehouse system architecture, url: https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html}
+      - {title: Amazon Redshift provisioned clusters overview, url: https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html}
+    tiers: &rms-tiers [{id: diagram, label: RA3 クラスターと RMS, z: 0, size: [26, 11]}]
+    nodes:
+      sql-client: {label: SQL クライアント, kind: external, tier: diagram, x: 1, y: 5, realizes: [loader, query], evidence: &rms-impl [{type: doc, ref: "docs/reference-redshift-rms-distribution.md#§5"}]}
+      ra3-ddl: {label: CREATE TABLE（DISTKEY・SORTKEY）, kind: policy, tier: diagram, x: 7, y: 1, realizes: [ddl], description: 利用者が SQL で分散・ソートの設定を書く。, evidence: *rms-impl, svc: redshift, management: {type: customer, scope: "利用者がテーブルと分散・ソートキーを設計する。"}}
+      ra3-leader: {label: RA3 のリーダーノード, kind: worker, tier: diagram, x: 7, y: 5, realizes: [leader], evidence: *rms-impl, svc: redshift, management: {type: aws, scope: "AWS がリーダーノードを運用する。利用者は直接ログインしない。"}}
+      ra3-slices: {label: RA3 コンピュートノードのスライス, kind: worker, tier: diagram, x: 13, y: 5, realizes: [slices, blocks], evidence: *rms-impl, svc: redshift, management: {type: aws, scope: "AWS がコンピュートノードを運用する。利用者はノードタイプと台数を指定する。"}}
+      ra3-ssd: {label: RA3 ノードのローカル SSD, kind: db, tier: diagram, x: 19, y: 5, realizes: [cache], evidence: *rms-impl, svc: redshift, management: {type: aws, scope: "AWS がキャッシュを自動管理する。利用者は直接操作しない。"}}
+      ra3-rms: {label: Redshift Managed Storage, kind: db, tier: diagram, x: 22, y: 9, realizes: [rms], description: 利用者の S3 バケットとは別の、サービス管理のストレージ。, evidence: *rms-impl, svc: redshift, management: {type: shared, scope: "AWS がストレージ基盤を運用し、利用者がテーブルとデータを管理する。"}}
+      ra3-ato: {label: 自動テーブル最適化, kind: worker, tier: diagram, x: 13, y: 1, realizes: [auto], evidence: *rms-impl, svc: redshift, management: {type: aws, scope: "AWS が AUTO のテーブルを自動で調整する。"}}
+    links: []
+    groups: &rms-groups
+      - {kind: cloud, provider: aws, label: AWS 分析アカウント, tier: diagram, x0: 5, y0: -0.3, x1: 25.8, y1: 10.8, nodes: &rms-env [ra3-ddl, ra3-leader, ra3-slices, ra3-ssd, ra3-rms, ra3-ato]}
+      - {kind: cluster, label: RA3 クラスター, tier: diagram, x0: 5.6, y0: 0.2, x1: 20.6, y1: 6.8, nodes: [ra3-ddl, ra3-leader, ra3-slices, ra3-ssd, ra3-ato]}
+    layout2d: {tiers: *rms-tiers, nodes: {}, groups: *rms-groups}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, kind: origin, z: 0, size: [3, 8]}
+        - {id: cluster, label: RA3 クラスター, z: 0, origin: [4, 0], size: [14, 8]}
+        - {id: store, label: 管理ストレージ, z: 0, origin: [19, 0], size: [5, 8]}
+      nodes:
+        sql-client: {tier: clients, x: 1, y: 4}
+        ra3-ddl: {tier: cluster, x: 2, y: 1}
+        ra3-leader: {tier: cluster, x: 2, y: 5}
+        ra3-slices: {tier: cluster, x: 7, y: 5}
+        ra3-ssd: {tier: cluster, x: 11, y: 5}
+        ra3-ato: {tier: cluster, x: 7, y: 1}
+        ra3-rms: {tier: store, x: 2.5, y: 4}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS 分析アカウント, tier: [cluster, store], nodes: *rms-env}
+        - {kind: cluster, tier: cluster, nodes: [ra3-ddl, ra3-leader, ra3-slices, ra3-ssd, ra3-ato]}

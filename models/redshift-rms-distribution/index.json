@@ -1,0 +1,272 @@
+{
+  "model": "redshift-rms-distribution",
+  "name": "Amazon Redshift：分散キー・ソートキーとマネージドストレージ",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "ddl": {
+      "type": "node",
+      "label": "テーブル定義（DISTSTYLE・DISTKEY・SORTKEY）",
+      "status": "claim"
+    },
+    "loader": {
+      "type": "node",
+      "label": "ロード・INSERT の要求",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "結合・集計クエリ",
+      "status": "claim"
+    },
+    "leader": {
+      "type": "node",
+      "label": "リーダーノード",
+      "status": "claim"
+    },
+    "slices": {
+      "type": "node",
+      "label": "スライス",
+      "status": "claim"
+    },
+    "blocks": {
+      "type": "node",
+      "label": "列ごとのデータブロック",
+      "status": "claim"
+    },
+    "cache": {
+      "type": "node",
+      "label": "ローカル SSD キャッシュ",
+      "status": "claim"
+    },
+    "rms": {
+      "type": "node",
+      "label": "Redshift Managed Storage",
+      "status": "claim"
+    },
+    "auto": {
+      "type": "node",
+      "label": "自動テーブル最適化",
+      "status": "claim"
+    },
+    "define": {
+      "type": "link",
+      "label": "テーブル定義（DISTSTYLE・DISTKEY・SORTKEY） → リーダーノード",
+      "status": "claim"
+    },
+    "load": {
+      "type": "link",
+      "label": "ロード・INSERT の要求 → リーダーノード",
+      "status": "claim"
+    },
+    "route": {
+      "type": "link",
+      "label": "リーダーノード → スライス",
+      "status": "claim"
+    },
+    "sortwrite": {
+      "type": "link",
+      "label": "スライス → 列ごとのデータブロック",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "列ごとのデータブロック → Redshift Managed Storage",
+      "status": "claim"
+    },
+    "cachefill": {
+      "type": "link",
+      "label": "Redshift Managed Storage → ローカル SSD キャッシュ",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "link",
+      "label": "ローカル SSD キャッシュ → スライス",
+      "status": "claim"
+    },
+    "ask": {
+      "type": "link",
+      "label": "結合・集計クエリ → リーダーノード",
+      "status": "claim"
+    },
+    "alter": {
+      "type": "link",
+      "label": "自動テーブル最適化 → テーブル定義（DISTSTYLE・DISTKEY・SORTKEY）",
+      "status": "claim"
+    },
+    "load-and-join": {
+      "type": "scenario",
+      "label": "行を振り分けて保存し、結合クエリで読む"
+    },
+    "sortkey": {
+      "type": "unknown",
+      "label": "ソートキーの種類（compound・interleaved）、ブロックの大きさ、ゾーンマップによる読み飛ばしは今回取得した資料で未確認。"
+    },
+    "cache-policy": {
+      "type": "unknown",
+      "label": "キャッシュの追い出し規則と RMS の S3 上の配置は非公開または未確認。"
+    },
+    "perf": {
+      "type": "unknown",
+      "label": "結合時の再分散量や性能は実環境で未検証。"
+    },
+    "sql-client": {
+      "type": "implementation",
+      "impl": "ra3-rms",
+      "label": "SQL クライアント",
+      "realizes": [
+        "loader",
+        "query"
+      ]
+    },
+    "ra3-ddl": {
+      "type": "implementation",
+      "impl": "ra3-rms",
+      "label": "CREATE TABLE（DISTKEY・SORTKEY）",
+      "realizes": [
+        "ddl"
+      ]
+    },
+    "ra3-leader": {
+      "type": "implementation",
+      "impl": "ra3-rms",
+      "label": "RA3 のリーダーノード",
+      "realizes": [
+        "leader"
+      ]
+    },
+    "ra3-slices": {
+      "type": "implementation",
+      "impl": "ra3-rms",
+      "label": "RA3 コンピュートノードのスライス",
+      "realizes": [
+        "slices",
+        "blocks"
+      ]
+    },
+    "ra3-ssd": {
+      "type": "implementation",
+      "impl": "ra3-rms",
+      "label": "RA3 ノードのローカル SSD",
+      "realizes": [
+        "cache"
+      ]
+    },
+    "ra3-rms": {
+      "type": "implementation",
+      "impl": "ra3-rms",
+      "label": "Redshift Managed Storage",
+      "realizes": [
+        "rms"
+      ]
+    },
+    "ra3-ato": {
+      "type": "implementation",
+      "impl": "ra3-rms",
+      "label": "自動テーブル最適化",
+      "realizes": [
+        "auto"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-redshift-rms-distribution.md#§1": [
+      "model"
+    ],
+    "docs/reference-redshift-rms-distribution.md": [
+      "model",
+      "ddl",
+      "loader",
+      "query",
+      "leader",
+      "slices",
+      "blocks",
+      "cache",
+      "rms",
+      "auto",
+      "define",
+      "load",
+      "route",
+      "sortwrite",
+      "persist",
+      "cachefill",
+      "scan",
+      "ask",
+      "alter",
+      "load-and-join",
+      "sql-client",
+      "ra3-ddl",
+      "ra3-leader",
+      "ra3-slices",
+      "ra3-ssd",
+      "ra3-rms",
+      "ra3-ato"
+    ],
+    "docs/reference-redshift-rms-distribution.md#§2": [
+      "model",
+      "ddl",
+      "loader",
+      "query",
+      "auto",
+      "define",
+      "alter"
+    ],
+    "docs/reference-redshift-rms-distribution.md#§3": [
+      "leader",
+      "slices",
+      "load",
+      "route",
+      "ask",
+      "load-and-join"
+    ],
+    "docs/reference-redshift-rms-distribution.md#§4": [
+      "blocks",
+      "cache",
+      "rms",
+      "sortwrite",
+      "persist",
+      "cachefill",
+      "scan"
+    ],
+    "docs/reference-redshift-rms-distribution.md#§5": [
+      "sql-client",
+      "ra3-ddl",
+      "ra3-leader",
+      "ra3-slices",
+      "ra3-ssd",
+      "ra3-rms",
+      "ra3-ato"
+    ]
+  },
+  "reference": {
+    "domain": "分析基盤・DWH",
+    "category": "クラウド分析基盤",
+    "kind": "仕組みの深掘り",
+    "product": "Amazon Redshift",
+    "role": "internals",
+    "step": 1,
+    "detailOf": "redshift",
+    "order": 61,
+    "objectives": [
+      "分散スタイル（AUTO・EVEN・KEY・ALL）が行の置き場所をどう決めるかを区別する。",
+      "分散スタイルが結合時のデータ移動に関わることを説明する。",
+      "データが RMS に永続化され、ローカル SSD がキャッシュとして働く関係を追う。"
+    ],
+    "sources": [
+      {
+        "title": "Distribution styles",
+        "url": "https://docs.aws.amazon.com/redshift/latest/dg/c_choosing_dist_sort.html"
+      },
+      {
+        "title": "Data warehouse system architecture",
+        "url": "https://docs.aws.amazon.com/redshift/latest/dg/c_high_level_system_architecture.html"
+      },
+      {
+        "title": "Amazon Redshift provisioned clusters overview",
+        "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html"
+      }
+    ]
+  }
+}

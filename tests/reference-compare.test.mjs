@@ -16,12 +16,12 @@ test('カタログ発行の認証情報は取得側と発行側の違いを比�
 });
 
 test('Snowflake と Databricks の性能詳細は対応役割と異なる実装を示す', () => {
-  const a = 'snowflake-optimization-internals', b = 'databricks-optimization-internals';
+  const a = 'snowflake-query-performance', b = 'databricks-sql-performance';
   assert.ok(comparisonCandidates(registry, a).some(c => c.entry.id === b));
   assert.ok(comparisonCandidates(registry, b).some(c => c.entry.id === a));
   const pair = [load(a), load(b)];
   const comparison = compareRoles(pair);
-  for (const [left, right] of [['metadata','log'], ['partitions','files'], ['whcache','diskcache'], ['cluster','maintenance']]) {
+  for (const [left, right] of [['metadata','log'], ['micro','files'], ['whcache','diskcache'], ['clusters','operators']]) {
     const group = comparison.groups.find(g => g.sides[0].includes(left) && g.sides[1].includes(right));
     assert.ok(group?.difference, `${left} / ${right}`);
   }

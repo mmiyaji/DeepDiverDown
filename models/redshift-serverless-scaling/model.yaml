@@ -1,0 +1,83 @@
+name: Amazon Redshift Serverless：RPU とスケーリング
+description: ワークグループのベース容量と価格性能ターゲットを入力に、AI 駆動のスケーリングが RPU を増減する流れ。
+parent: {model: redshift, node: compute}
+reference:
+  objectives:
+    - RPU、ベース容量、最大容量の関係を説明する。
+    - 価格性能ターゲットとスケーリングの関係を追う。
+    - ワークグループ（計算）とネームスペース（データ）の分担を区別する。
+  sources:
+    - {title: Compute capacity for Amazon Redshift Serverless, url: https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-capacity.html}
+sources: [docs/reference-redshift-serverless-scaling.md]
+evidence: [{type: doc, ref: "docs/reference-redshift-serverless-scaling.md#§1"}, {type: doc, ref: "docs/reference-redshift-serverless-scaling.md#§2"}]
+tiers: [{id: flow, label: 容量の設定とスケーリング, z: 0, size: [26, 11]}]
+nodes:
+  client: {label: SQL クライアント, kind: external, tier: flow, x: 0, y: 5, evidence: &wg [{type: doc, ref: "docs/reference-redshift-serverless-scaling.md#§2"}]}
+  workgroup: {label: ワークグループ, kind: service, tier: flow, x: 6, y: 5, description: エンドポイントとベース容量を持つ計算の単位。, evidence: *wg}
+  rpu: {label: RPU（コンピュート容量）, kind: worker, tier: flow, x: 13, y: 5, parallel: N, description: 1 RPU は 16 GB のメモリを持つ。クエリに応じて増減する。, evidence: *wg}
+  target: {label: 価格性能ターゲット, kind: policy, tier: flow, x: 6, y: 1, description: コスト優先・バランス・性能優先のスライダー。新規ワークグループの既定はバランス。, evidence: &scale [{type: doc, ref: "docs/reference-redshift-serverless-scaling.md#§3"}]}
+  limits: {label: 最大容量・最大 RPU 時間, kind: policy, tier: flow, x: 13, y: 1, description: スケーリングの上限。ターゲットの設定にかかわらず強制される。, evidence: *scale}
+  scaler: {label: AI 駆動のスケーリングと最適化, kind: worker, tier: flow, x: 20, y: 3, description: ワークロードの履歴から学習し、クエリの複雑さとデータ量に応じて RPU を調整する。, evidence: *scale}
+  namespace: {label: ネームスペース, kind: db, tier: flow, x: 13, y: 9, description: データベース、ユーザー、権限などのデータ側の単位。, evidence: *wg}
+  rms: {label: Redshift Managed Storage, kind: db, tier: flow, x: 20, y: 9, evidence: *wg}
+  usage: {label: 使用量の記録（SYS_SERVERLESS_USAGE）, kind: db, tier: flow, x: 24, y: 5, description: クエリ時間帯に使われた RPU 数を確認できる。, evidence: *scale}
+links:
+  - {id: submit, from: client, to: workgroup, label: SQL を送る, evidence: *wg}
+  - {id: run, from: workgroup, to: rpu, label: ベース容量で実行, evidence: *wg}
+  - {id: goal, from: target, to: scaler, label: 目標を与える, evidence: *scale}
+  - {id: cap, from: limits, to: scaler, label: 上限を課す, evidence: *scale}
+  - {id: observe, from: rpu, to: scaler, label: 負荷とデータ量を観測, evidence: *scale}
+  - {id: scale, from: scaler, to: rpu, label: RPU を増減, evidence: *scale}
+  - {id: access, from: rpu, to: namespace, label: データを読み書き, evidence: *wg}
+  - {id: persist, from: namespace, to: rms, label: RMS に保持, evidence: *wg}
+  - {id: meter, from: rpu, to: usage, label: 使用した RPU を記録, evidence: *scale}
+scenarios:
+  - id: scale-out
+    label: 負荷の高いクエリで RPU が増える
+    evidence: [{type: doc, ref: "docs/reference-redshift-serverless-scaling.md#§3"}]
+    steps:
+      - {links: [submit, run, access, persist], note: クエリがベース容量で動き、ネームスペースのデータを RMS から読む。}
+      - {links: [observe, goal, cap], note: スケーラーが負荷を観測し、価格性能ターゲットと上限に照らして増減を判断する。}
+      - {links: [scale, meter], note: RPU が増減し、使用量が記録される。ターゲット変更の効果は 1〜3 日かけて現れる。}
+unknowns:
+  - {id: billing, text: 課金の単位と最小時間、料金は今回取得した資料で未確認。, refs: [rpu]}
+  - {id: internals, text: スケーリングの内部アルゴリズムと RPU の実体（ノード構成）は非公開で未確認。, refs: [scaler, rpu]}
+  - {id: concurrency, text: 同時実行数の上限と Concurrency Scaling との関係は未確認。, refs: [workgroup]}
+implementations:
+  - id: serverless-workgroup
+    label: Redshift Serverless のワークグループ
+    description: 1 つのワークグループとネームスペースを AWS アカウントに作り、ベース容量と価格性能ターゲットを設定して SQL を実行する。
+    sources:
+      - {title: Compute capacity for Amazon Redshift Serverless, url: https://docs.aws.amazon.com/redshift/latest/mgmt/serverless-capacity.html}
+    tiers: &sv-tiers [{id: diagram, label: Redshift Serverless, z: 0, size: [26, 11]}]
+    nodes:
+      sv-client: {label: SQL クライアント, kind: external, tier: diagram, x: 1, y: 5, realizes: [client], evidence: &sv-impl [{type: doc, ref: "docs/reference-redshift-serverless-scaling.md#§4"}]}
+      sv-workgroup: {label: Serverless ワークグループ, kind: service, tier: diagram, x: 7, y: 5, realizes: [workgroup], evidence: *sv-impl, svc: redshift, management: {type: shared, scope: "AWS が計算基盤を運用し、利用者がベース容量、最大容量、ネットワークを設定する。"}}
+      sv-rpu: {label: RPU（Serverless のコンピュート）, kind: worker, tier: diagram, x: 13, y: 5, realizes: [rpu], description: 内部のノード構成は公開されていない。, evidence: *sv-impl, svc: redshift, management: {type: aws, scope: "AWS が RPU を運用し、利用者は直接アクセスしない。"}}
+      sv-target: {label: 価格性能ターゲット, kind: policy, tier: diagram, x: 7, y: 1, realizes: [target], evidence: *sv-impl, svc: redshift, management: {type: customer, scope: "利用者がワークグループごとにコンソールで設定する。"}}
+      sv-limits: {label: 最大容量・最大 RPU 時間, kind: policy, tier: diagram, x: 13, y: 1, realizes: [limits], evidence: *sv-impl, svc: redshift, management: {type: customer, scope: "利用者が上限を設定する。"}}
+      sv-scaler: {label: AI 駆動のスケーリング, kind: worker, tier: diagram, x: 20, y: 3, realizes: [scaler], evidence: *sv-impl, svc: redshift, management: {type: aws, scope: "AWS が運用する。利用者はターゲットと上限で制御する。"}}
+      sv-namespace: {label: ネームスペース, kind: db, tier: diagram, x: 13, y: 9, realizes: [namespace], evidence: *sv-impl, svc: redshift, management: {type: shared, scope: "利用者がデータベースと権限を管理する。"}}
+      sv-rms: {label: Redshift Managed Storage, kind: db, tier: diagram, x: 20, y: 9, realizes: [rms], evidence: *sv-impl, svc: redshift, management: {type: shared, scope: "AWS がストレージ基盤を運用し、利用者がデータを管理する。"}}
+      sv-usage: {label: SYS_SERVERLESS_USAGE ビュー, kind: db, tier: diagram, x: 24, y: 5, realizes: [usage], evidence: *sv-impl, svc: redshift, management: {type: shared, scope: "AWS がビューを提供し、利用者が参照する。"}}
+    links: []
+    groups: &sv-groups
+      - {kind: cloud, provider: aws, label: AWS 分析アカウント, tier: diagram, x0: 5, y0: -0.3, x1: 25.8, y1: 10.8, nodes: &sv-env [sv-workgroup, sv-rpu, sv-target, sv-limits, sv-scaler, sv-namespace, sv-rms, sv-usage]}
+    layout2d: {tiers: *sv-tiers, nodes: {}, groups: *sv-groups}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, kind: origin, z: 0, size: [3, 8]}
+        - {id: compute, label: ワークグループと設定, z: 0, origin: [4, 0], size: [14, 8]}
+        - {id: data, label: データと記録, z: 0, origin: [19, 0], size: [8, 8]}
+      nodes:
+        sv-client: {tier: clients, x: 1, y: 4}
+        sv-workgroup: {tier: compute, x: 2, y: 4}
+        sv-rpu: {tier: compute, x: 6, y: 4}
+        sv-scaler: {tier: compute, x: 10, y: 4}
+        sv-target: {tier: compute, x: 4, y: 1}
+        sv-limits: {tier: compute, x: 8, y: 1}
+        sv-namespace: {tier: data, x: 2, y: 2}
+        sv-rms: {tier: data, x: 5, y: 2}
+        sv-usage: {tier: data, x: 3.5, y: 6}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS 分析アカウント, tier: [compute, data], nodes: *sv-env}

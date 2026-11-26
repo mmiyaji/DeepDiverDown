@@ -1,0 +1,279 @@
+{
+  "model": "bigquery-storage-optimization",
+  "name": "BigQuery：Capacitor とストレージの最適化",
+  "coverage": {
+    "covered": 10,
+    "total": 10
+  },
+  "byId": {
+    "writer": {
+      "type": "node",
+      "label": "取り込み（ロード・Storage Write API）",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "クエリ実行（スロット）",
+      "status": "claim"
+    },
+    "table": {
+      "type": "node",
+      "label": "テーブル（パーティション・クラスタリング設定）",
+      "status": "claim"
+    },
+    "capacitor": {
+      "type": "node",
+      "label": "Capacitor の列指向ファイル",
+      "status": "claim"
+    },
+    "prune": {
+      "type": "node",
+      "label": "読み取り範囲の絞り込み",
+      "status": "claim"
+    },
+    "optimizer": {
+      "type": "node",
+      "label": "自動の再配置（再クラスタリング）",
+      "status": "claim"
+    },
+    "retention": {
+      "type": "node",
+      "label": "タイムトラベルとフェイルセーフ",
+      "status": "claim"
+    },
+    "billing": {
+      "type": "node",
+      "label": "課金方式（論理・物理）",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "取り込み（ロード・Storage Write API） → テーブル（パーティション・クラスタリング設定）",
+      "status": "claim"
+    },
+    "store": {
+      "type": "link",
+      "label": "テーブル（パーティション・クラスタリング設定） → Capacitor の列指向ファイル",
+      "status": "claim"
+    },
+    "reorg": {
+      "type": "link",
+      "label": "自動の再配置（再クラスタリング） → Capacitor の列指向ファイル",
+      "status": "claim"
+    },
+    "filter": {
+      "type": "link",
+      "label": "クエリ実行（スロット） → 読み取り範囲の絞り込み",
+      "status": "claim"
+    },
+    "select": {
+      "type": "link",
+      "label": "読み取り範囲の絞り込み → Capacitor の列指向ファイル",
+      "status": "claim"
+    },
+    "scan": {
+      "type": "link",
+      "label": "Capacitor の列指向ファイル → クエリ実行（スロット）",
+      "status": "claim"
+    },
+    "keep": {
+      "type": "link",
+      "label": "タイムトラベルとフェイルセーフ → テーブル（パーティション・クラスタリング設定）",
+      "status": "claim"
+    },
+    "meter": {
+      "type": "link",
+      "label": "課金方式（論理・物理） → Capacitor の列指向ファイル",
+      "status": "claim"
+    },
+    "write-and-read": {
+      "type": "scenario",
+      "label": "書き込み、絞り込み、読み取り"
+    },
+    "layout-detail": {
+      "type": "unknown",
+      "label": "Capacitor のファイル構造、Colossus との関係、自動再クラスタリングの条件は取得資料に記述がなく未確認。"
+    },
+    "retention-days": {
+      "type": "unknown",
+      "label": "タイムトラベルとフェイルセーフの日数は取得資料に記載がなく未確認。"
+    },
+    "write-opt": {
+      "type": "unknown",
+      "label": "ストレージ書き込み最適化の挙動は未確認。"
+    },
+    "bq-writer": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "Storage Write API を使うアプリ",
+      "realizes": [
+        "writer"
+      ]
+    },
+    "bq-query": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "BigQuery のクエリ実行",
+      "realizes": [
+        "query"
+      ]
+    },
+    "bq-table": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "orders テーブル（日付パーティション・顧客 ID クラスタリング）",
+      "realizes": [
+        "table"
+      ]
+    },
+    "bq-capacitor": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "BigQuery の管理ストレージ（Capacitor）",
+      "realizes": [
+        "capacitor"
+      ]
+    },
+    "bq-prune": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "BigQuery の読み取り範囲の絞り込み",
+      "realizes": [
+        "prune"
+      ]
+    },
+    "bq-optimizer": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "BigQuery の自動再配置",
+      "realizes": [
+        "optimizer"
+      ]
+    },
+    "bq-retention": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "データセットの保持設定",
+      "realizes": [
+        "retention"
+      ]
+    },
+    "bq-billing": {
+      "type": "implementation",
+      "impl": "gcp-clustered-table",
+      "label": "物理課金のデータセット設定",
+      "realizes": [
+        "billing"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-bigquery-storage-optimization.md#§1": [
+      "model"
+    ],
+    "docs/reference-bigquery-storage-optimization.md": [
+      "model",
+      "writer",
+      "query",
+      "table",
+      "capacitor",
+      "prune",
+      "optimizer",
+      "retention",
+      "billing",
+      "write",
+      "store",
+      "reorg",
+      "filter",
+      "select",
+      "scan",
+      "keep",
+      "meter",
+      "write-and-read",
+      "bq-writer",
+      "bq-query",
+      "bq-table",
+      "bq-capacitor",
+      "bq-prune",
+      "bq-optimizer",
+      "bq-retention",
+      "bq-billing"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§2": [
+      "model",
+      "writer",
+      "write"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§3": [
+      "model",
+      "capacitor",
+      "store"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§4": [
+      "model",
+      "table",
+      "prune",
+      "filter",
+      "select"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§5": [
+      "model",
+      "query",
+      "scan",
+      "write-and-read"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§6": [
+      "model",
+      "optimizer",
+      "reorg"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§7": [
+      "model",
+      "retention",
+      "billing",
+      "keep",
+      "meter"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§9": [
+      "model"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§10": [
+      "model"
+    ],
+    "docs/reference-bigquery-storage-optimization.md#§8": [
+      "bq-writer",
+      "bq-query",
+      "bq-table",
+      "bq-capacitor",
+      "bq-prune",
+      "bq-optimizer",
+      "bq-retention",
+      "bq-billing"
+    ]
+  },
+  "reference": {
+    "domain": "分析基盤・DWH",
+    "category": "クラウド分析基盤",
+    "kind": "仕組みの深掘り",
+    "product": "BigQuery",
+    "role": "internals",
+    "step": 2,
+    "detailOf": "bigquery",
+    "order": 62,
+    "objectives": [
+      "列指向ストレージ、パーティション、クラスタリングの役割を区別する。",
+      "読み取る量を減らす設定と、保持・課金の設定を分けて説明する。",
+      "取得資料で確認できた範囲と未確認の範囲を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Overview of BigQuery storage",
+        "url": "https://docs.cloud.google.com/bigquery/docs/storage_overview"
+      },
+      {
+        "title": "Query plan and timeline",
+        "url": "https://docs.cloud.google.com/bigquery/docs/query-plan-explanation"
+      }
+    ]
+  }
+}

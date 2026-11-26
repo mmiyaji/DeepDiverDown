@@ -1,414 +1,646 @@
-name: Snowflake Optima：メタデータ・索引と実行計画
-description: 問い合わせ履歴を用いる索引・式のメタデータ・実行計画の改善を区別して追う。
+name: Snowflake Optima：区画の読み取りと再配置
+description: 問い合わせ履歴から作る追加メタデータ・索引・計画改善と、クラスタリングキーに沿った区画の再配置（Classic と Optima の違い）を 1 つの図で追う。
 parent:
-  model: snowflake-optimization-internals
-  node: metadata
+  model: snowflake
+  node: biwh
 reference:
   objectives:
-    - 問い合わせ履歴を用いる索引・式のメタデータ・実行計画の改善を区別して追う。
-    - SQL を実行し、ワークロードと実行シグナルを観測する。
-    - 式のメタデータ、検索用の索引、計画改善をそれぞれ判断する。
+  - 式向けメタデータ、検索用の索引、計画改善を区別する。
+  - 通常の区画統計と Optima の追加情報が、読む区画の絞り込みにどう使われるかを追う。
+  - Automatic Clustering の Classic と Optima Clustering の違いを区別する。
   sources:
-    - title: Optima Metadata
-      url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/
-    - title: Optima Planning
-      url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-planning-query-performance/
-    - title: Optima の現行仕様
-      url: https://docs.snowflake.com/en/user-guide/snowflake-optima
-    - title: Optima Indexing の事例
-      url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-query-spike-optimization/
+  - title: Optima Metadata
+    url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/
+  - title: Optima Planning
+    url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-planning-query-performance/
+  - title: Optima の現行仕様
+    url: https://docs.snowflake.com/en/user-guide/snowflake-optima
+  - title: Optima Indexing の事例
+    url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-query-spike-optimization/
+  - title: Automatic Clustering at Snowflake（2024 年の内部構造）
+    url: https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/
+  - title: Automatic Clustering の仕様と費用
+    url: https://docs.snowflake.com/en/user-guide/tables-auto-reclustering
+  - title: Optima Clustering の発表
+    url: https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/
+  - title: SYSTEM$CLUSTERING_INFORMATION
+    url: https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information
 sources:
-  - docs/reference-snowflake-optima-internals.md
+- docs/reference-snowflake-optima-internals.md
 evidence:
-  - type: doc
-    ref: docs/reference-snowflake-optima-internals.md#§1
-  - type: doc
-    ref: docs/reference-snowflake-optima-internals.md#§4
+- type: doc
+  ref: docs/reference-snowflake-optima-internals.md#§1
+- type: doc
+  ref: docs/reference-snowflake-optima-internals.md#§4
 tiers:
-  - id: input
-    label: SQL
-    z: 3
-    size:
-      - 23
-      - 4
-  - id: process
-    label: 履歴と自動最適化
-    z: 2
-    size:
-      - 23
-      - 4
-  - id: compute
-    label: 読み取りと演算
-    z: 1
-    size:
-      - 23
-      - 4
-  - id: data
-    label: データと区画統計
-    z: 0
-    size:
-      - 23
-      - 4
+- id: input
+  label: SQL
+  z: 3
+  size:
+  - 23
+  - 4
+- id: process
+  label: 履歴と自動最適化
+  z: 2
+  size:
+  - 23
+  - 4
+- id: compute
+  label: 読み取りと演算
+  z: 1
+  size:
+  - 23
+  - 4
+- id: data
+  label: データと区画統計
+  z: 0
+  size:
+  - 23
+  - 4
 nodes:
   query:
     label: 問い合わせ
     kind: client
     tier: input
     x: 0
-    'y': 1.5
+    y: 1.5
     description: SQL を実行し結果と実行プロファイルを確認する。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
   history:
     label: 利用傾向
     kind: db
     tier: process
     x: 0
-    'y': 1.5
+    y: 1.5
     description: 過去のクエリや実行の傾向を分析する。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
   metadata:
     label: 式向けメタデータ
     kind: service
     tier: process
     x: 5.2
-    'y': 1.5
+    y: 1.5
     description: 頻出する式に合わせて追加の区画メタデータを生成し、不要な区画の判定に使う。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
   index:
     label: 検索用の索引
     kind: service
     tier: process
     x: 10.4
-    'y': 1.5
+    y: 1.5
     description: 選択性の高い反復検索を検出し、Search Optimization Service を基盤とした索引を自動管理する。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
   planning:
     label: 実行計画の改善
     kind: service
     tier: process
     x: 15.600000000000001
-    'y': 1.5
+    y: 1.5
     description: 過去の実行シグナルを使い、繰り返されるワークロードの計画選択を改善する。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  stats:
-    label: 通常の区画統計
-    kind: file
-    tier: data
-    x: 0
-    'y': 1.5
-    description: 区画の列統計を使って読み取り対象を絞る。
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
   prune:
     label: 候補の選択
     kind: worker
     tier: compute
     x: 0
-    'y': 1.5
-    description: 通常統計と利用可能な追加メタデータや索引を使い、不要な区画を読み飛ばす。
+    y: 1.5
+    description: 区画の列統計と、利用可能な式向けメタデータ・索引を使い、不要な区画を読み飛ばす。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
   plan:
     label: 実行計画と演算
     kind: worker
     tier: compute
     x: 5.2
-    'y': 1.5
+    y: 1.5
     description: 選ばれた計画に従って対象区画を読み、演算結果を返す。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
   table:
     label: 区画データ
     kind: db
     tier: data
     x: 5.2
-    'y': 1.5
-    description: テーブルのデータは micro-partition として管理される。
+    y: 1.5
+    description: テーブルのデータは micro-partition として管理され、区画ごとの列統計（最小値・最大値など）を持つ。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
+  key:
+    label: クラスタリングキー
+    kind: file
+    tier: input
+    x: 5.2
+    y: 1.5
+    description: 列や式で区画の並べ方を指定する。キーの自動選択（AUTO）は 2026 年 10 月の発表時点で private preview。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§2
+  classic:
+    label: Classic の再配置
+    kind: worker
+    tier: compute
+    x: 10.4
+    y: 1.5
+    description: 区画の重なり（width・depth とレベル）で対象を選び、バッチを読んでソートし、新しい区画を作る。コミット直前に並行 DML を確認し、競合した実行はロールバックする。2024 年の公開記事に基づく。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§3
+  optc:
+    label: Optima Clustering
+    kind: worker
+    tier: compute
+    x: 15.6
+    y: 1.5
+    description: 新しいデータを速く再配置し、重要なデータを優先する。キーは列全体で最大 1 KB。内部の選択・競合制御は未公開。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-optima-internals.md#§3
 links:
-  - id: submit
-    from: query
-    to: plan
-    label: SQL を実行
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: observe
-    from: plan
-    to: history
-    label: 実行情報を記録
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: learn-m
-    from: history
-    to: metadata
-    label: 頻出する式を分析
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: learn-i
-    from: history
-    to: index
-    label: 選択性の高い検索を検出
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: learn-p
-    from: history
-    to: planning
-    label: 実行結果を学習
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: apply-p
-    from: planning
-    to: plan
-    label: 計画選択を改善
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: normal
-    from: stats
-    to: prune
-    label: 通常統計を参照
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: extra
-    from: metadata
-    to: prune
-    label: 式向け統計を参照
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: lookup
-    from: index
-    to: prune
-    label: 索引を参照
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: select
-    from: prune
-    to: plan
-    label: 対象区画を絞る
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
-  - id: scan
-    from: table
-    to: plan
-    label: 対象区画を読む
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§2
+- id: submit
+  from: query
+  to: plan
+  label: SQL を実行
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: observe
+  from: plan
+  to: history
+  label: 実行情報を記録
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: learn-m
+  from: history
+  to: metadata
+  label: 頻出する式を分析
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: learn-i
+  from: history
+  to: index
+  label: 選択性の高い検索を検出
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: learn-p
+  from: history
+  to: planning
+  label: 実行結果を学習
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: apply-p
+  from: planning
+  to: plan
+  label: 計画選択を改善
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: extra
+  from: metadata
+  to: prune
+  label: 式向け統計を参照
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: lookup
+  from: index
+  to: prune
+  label: 索引を参照
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: normal
+  from: table
+  to: prune
+  label: 区画の列統計を参照
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: select
+  from: prune
+  to: plan
+  label: 対象区画を絞って読む
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§2
+- id: key-classic
+  from: key
+  to: classic
+  label: キーを使用（既存表）
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§3
+- id: key-optima
+  from: key
+  to: optc
+  label: キーを使用（新規表）
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§3
+- id: recluster-classic
+  from: classic
+  to: table
+  label: 段階的に再配置
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§3
+- id: recluster-optima
+  from: optc
+  to: table
+  label: 優先順に再配置
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§3
 scenarios:
-  - id: flow
-    label: データと処理の流れ
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-optima-internals.md#§3
-    steps:
-      - links:
-          - submit
-          - observe
-        note: SQL を実行し、ワークロードと実行シグナルを観測する。
-      - links:
-          - learn-m
-          - learn-i
-          - learn-p
-        note: 式のメタデータ、検索用の索引、計画改善をそれぞれ判断する。
-      - links:
-          - normal
-          - extra
-          - lookup
-          - select
-          - scan
-          - apply-p
-        note: 利用可能な統計と索引で区画を絞り、改善された計画で読み取る。
+- id: flow
+  label: 読み取りの絞り込みと区画の再配置
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-optima-internals.md#§3
+  steps:
+  - links:
+    - submit
+    - observe
+    note: SQL を実行し、ワークロードと実行シグナルを観測する。
+  - links:
+    - learn-m
+    - learn-i
+    - learn-p
+    note: 式のメタデータ、検索用の索引、計画改善をそれぞれ判断する。
+  - links:
+    - normal
+    - extra
+    - lookup
+    - select
+    - apply-p
+    note: 通常の統計と、利用可能な追加メタデータ・索引で区画を絞り、改善された計画で読み取る。
+  - links:
+    - key-classic
+    - recluster-classic
+    note: Classic は区画の重なりを評価し、バッチ単位で再配置する。コミット前に並行 DML との競合を確認する。
+  - links:
+    - key-optima
+    - recluster-optima
+    note: Optima は重要なデータを優先して再配置する。内部手順は公開資料で未確認。
 unknowns:
-  - id: internal-deployment
-    description: 公開されていない内部配置・閾値は特定できない。
+- id: internal-deployment
+  text: Optima Clustering の区画選択、データ構造、競合検証と、各機能の選択しきい値・内部配置は公開資料で未確認。
+  refs:
+  - optc
+  - index
+  - metadata
+  - planning
 implementations:
-  - id: snowflake
-    label: Snowflake の実装例
-    description: >-
-      Snowflake の Gen2 standard warehouse 等で実行する管理テーブル上の反復クエリを想定する。Optima
-      が適用対象と判断した場合、式向けメタデータや索引を参照し、過去の実行から計画を改善する。Query Profile で適用を確認する概念例。
-    sources:
-      - title: Optima Metadata
-        url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/
-      - title: Optima Planning
-        url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-planning-query-performance/
-      - title: Optima の現行仕様
-        url: https://docs.snowflake.com/en/user-guide/snowflake-optima
-      - title: Optima Indexing の事例
-        url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-query-spike-optimization/
+- id: snowflake
+  label: Snowflake 管理テーブルの反復クエリとクラスタリング
+  description: Gen2 standard warehouse 等で実行する管理テーブル上の反復クエリを想定する。Optima が適用対象と判断した場合に追加情報を参照する。クラスタリングキーを設定した表は、2026 年 9 月以降の新規表は Optima Clustering、既存表は Classic で再配置される。Query Profile と SYSTEM$CLUSTERING_INFORMATION
+    で確認する概念例。
+  sources:
+  - title: Optima Metadata
+    url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/
+  - title: Optima Planning
+    url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-planning-query-performance/
+  - title: Optima の現行仕様
+    url: https://docs.snowflake.com/en/user-guide/snowflake-optima
+  - title: Optima Indexing の事例
+    url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-query-spike-optimization/
+  - title: Automatic Clustering at Snowflake
+    url: https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/
+  - title: Automatic Clustering の仕様と費用
+    url: https://docs.snowflake.com/en/user-guide/tables-auto-reclustering
+  - title: Optima Clustering の発表
+    url: https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/
+  tiers:
+  - id: input
+    label: SQL
+    z: 3
+    size:
+    - 23
+    - 4
+  - id: process
+    label: 履歴と自動最適化
+    z: 2
+    size:
+    - 23
+    - 4
+  - id: compute
+    label: 読み取りと演算
+    z: 1
+    size:
+    - 23
+    - 4
+  - id: data
+    label: データと区画統計
+    z: 0
+    size:
+    - 23
+    - 4
+  nodes:
+    ex-query:
+      label: SQL と Query Profile
+      kind: client
+      tier: input
+      x: 0
+      y: 1.5
+      description: SQL を実行し結果と実行プロファイルを確認する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - query
+    ex-history:
+      label: クエリ履歴・実行情報
+      kind: db
+      tier: process
+      x: 0
+      y: 1.5
+      description: 過去のクエリや実行の傾向を分析する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - history
+    ex-metadata:
+      label: Optima Metadata
+      kind: service
+      tier: process
+      x: 5.2
+      y: 1.5
+      description: 頻出する式に合わせて追加の区画メタデータを生成し、不要な区画の判定に使う。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - metadata
+    ex-index:
+      label: Optima Indexing
+      kind: service
+      tier: process
+      x: 10.4
+      y: 1.5
+      description: 選択性の高い反復検索を検出し、Search Optimization Service を基盤とした索引を自動管理する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - index
+    ex-planning:
+      label: Optima Planning
+      kind: service
+      tier: process
+      x: 15.600000000000001
+      y: 1.5
+      description: 過去の実行シグナルを使い、繰り返されるワークロードの計画選択を改善する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - planning
+    ex-prune:
+      label: 区画 pruning
+      kind: worker
+      tier: compute
+      x: 0
+      y: 1.5
+      description: 通常統計と利用可能な追加メタデータや索引を使い、不要な区画を読み飛ばす。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - prune
+    ex-plan:
+      label: Virtual Warehouse の実行
+      kind: worker
+      tier: compute
+      x: 5.2
+      y: 1.5
+      description: 選ばれた計画に従って対象区画を読み、演算結果を返す。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - plan
+      svc: snowflake:warehouse
+    ex-table:
+      label: Snowflake 管理テーブル
+      kind: db
+      tier: data
+      x: 5.2
+      y: 1.5
+      description: ORDERS の micro-partition と区画ごとの列統計。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+      realizes:
+      - table
+    ex-key:
+      label: ORDERS のクラスタリングキー
+      kind: file
+      provider: snowflake
+      tier: input
+      x: 5.2
+      y: 1.5
+      realizes:
+      - key
+      description: 利用者が列や式で指定する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+    ex-classic:
+      label: Classic Automatic Clustering
+      kind: worker
+      provider: snowflake
+      tier: compute
+      x: 10.4
+      y: 1.5
+      realizes:
+      - classic
+      description: 既存のクラスタリング済み表で動く。選択と実行は内部ジョブで、利用者は直接操作しない。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+    ex-optc:
+      label: Optima Clustering
+      kind: worker
+      provider: snowflake
+      tier: compute
+      x: 15.6
+      y: 1.5
+      realizes:
+      - optc
+      description: 新規のクラスタリング表で動く。内部手順は非公開。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-optima-internals.md#§5
+  groups:
+  - kind: cloud
+    label: Snowflake の管理サービスと実行処理（論理範囲）
+    provider: snowflake
+    tier:
+    - input
+    - process
+    - compute
+    - data
+    nodes: &id001
+    - ex-history
+    - ex-metadata
+    - ex-index
+    - ex-planning
+    - ex-prune
+    - ex-plan
+    - ex-table
+    - ex-key
+    - ex-classic
+    - ex-optc
+  layout2d:
     tiers:
-      - id: input
-        label: SQL
-        z: 3
-        size:
-          - 23
-          - 4
-      - id: process
-        label: 履歴と自動最適化
-        z: 2
-        size:
-          - 23
-          - 4
-      - id: compute
-        label: 読み取りと演算
-        z: 1
-        size:
-          - 23
-          - 4
-      - id: data
-        label: データと区画統計
-        z: 0
-        size:
-          - 23
-          - 4
+    - id: diagram
+      label: Optima と Automatic Clustering
+      z: 0
+      size:
+      - 26
+      - 13
     nodes:
       ex-query:
-        label: SQL と Query Profile
-        kind: client
-        tier: input
+        tier: diagram
         x: 0
-        'y': 1.5
-        description: SQL を実行し結果と実行プロファイルを確認する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - query
+        y: 5
       ex-history:
-        label: クエリ履歴・実行情報
-        kind: db
-        tier: process
-        x: 0
-        'y': 1.5
-        description: 過去のクエリや実行の傾向を分析する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - history
+        tier: diagram
+        x: 5
+        y: 1.5
       ex-metadata:
-        label: Optima Metadata
-        kind: service
-        tier: process
-        x: 5.2
-        'y': 1.5
-        description: 頻出する式に合わせて追加の区画メタデータを生成し、不要な区画の判定に使う。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - metadata
+        tier: diagram
+        x: 10
+        y: 1.5
       ex-index:
-        label: Optima Indexing
-        kind: service
-        tier: process
-        x: 10.4
-        'y': 1.5
-        description: 選択性の高い反復検索を検出し、Search Optimization Service を基盤とした索引を自動管理する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - index
+        tier: diagram
+        x: 15
+        y: 1.5
       ex-planning:
-        label: Optima Planning
-        kind: service
-        tier: process
-        x: 15.600000000000001
-        'y': 1.5
-        description: 過去の実行シグナルを使い、繰り返されるワークロードの計画選択を改善する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - planning
-      ex-stats:
-        label: micro-partition の統計
-        kind: file
-        tier: data
-        x: 0
-        'y': 1.5
-        description: 区画の列統計を使って読み取り対象を絞る。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - stats
+        tier: diagram
+        x: 20
+        y: 1.5
       ex-prune:
-        label: 区画 pruning
-        kind: worker
-        tier: compute
-        x: 0
-        'y': 1.5
-        description: 通常統計と利用可能な追加メタデータや索引を使い、不要な区画を読み飛ばす。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - prune
+        tier: diagram
+        x: 10
+        y: 5
       ex-plan:
-        label: Virtual Warehouse の実行
-        kind: worker
-        tier: compute
-        x: 5.2
-        'y': 1.5
-        description: 選ばれた計画に従って対象区画を読み、演算結果を返す。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - plan
-        svc: snowflake:warehouse
+        tier: diagram
+        x: 15
+        y: 5
       ex-table:
-        label: Snowflake 管理テーブル
-        kind: db
-        tier: data
-        x: 5.2
-        'y': 1.5
-        description: テーブルのデータは micro-partition として管理される。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-optima-internals.md#§5
-        realizes:
-          - table
+        tier: diagram
+        x: 10
+        y: 9
+      ex-key:
+        tier: diagram
+        x: 0
+        y: 10
+      ex-classic:
+        tier: diagram
+        x: 5
+        y: 10
+      ex-optc:
+        tier: diagram
+        x: 5
+        y: 12
     groups:
-      - kind: cloud
-        label: Snowflake の管理サービスと実行処理（論理範囲）
-        provider: snowflake
-        tier:
-          - process
-          - compute
-          - data
-        nodes:
-          - ex-history
-          - ex-metadata
-          - ex-index
-          - ex-planning
-          - ex-stats
-          - ex-prune
-          - ex-plan
-          - ex-table
+    - kind: cloud
+      provider: snowflake
+      label: Snowflake の管理サービスと実行処理（論理範囲）
+      tier: diagram
+      x0: -1
+      y0: -0.5
+      x1: 24
+      y1: 13.3
+      nodes: *id001
+  layout3d:
+    tiers:
+    - id: client
+      label: 利用者
+      kind: origin
+      z: 0
+      origin:
+      - -5
+      - 0
+      size:
+      - 3
+      - 4
+    - id: services
+      label: Snowflake の管理サービスと実行処理
+      z: 0
+      origin:
+      - 0
+      - 0
+      size:
+      - 24
+      - 10
+    nodes:
+      ex-query:
+        tier: client
+        x: 1.5
+        y: 2
+      ex-history:
+        tier: services
+        x: 2
+        y: 1.5
+      ex-metadata:
+        tier: services
+        x: 7
+        y: 1.5
+      ex-index:
+        tier: services
+        x: 12
+        y: 1.5
+      ex-planning:
+        tier: services
+        x: 17
+        y: 1.5
+      ex-prune:
+        tier: services
+        x: 7
+        y: 5
+      ex-plan:
+        tier: services
+        x: 12
+        y: 5
+      ex-table:
+        tier: services
+        x: 7
+        y: 8.5
+      ex-key:
+        tier: services
+        x: 12
+        y: 8.5
+      ex-classic:
+        tier: services
+        x: 17
+        y: 7
+      ex-optc:
+        tier: services
+        x: 20.5
+        y: 8.5
+    groups:
+    - kind: cloud
+      provider: snowflake
+      label: Snowflake の管理サービスと実行処理（論理範囲）
+      tier:
+      - services
+      nodes: *id001

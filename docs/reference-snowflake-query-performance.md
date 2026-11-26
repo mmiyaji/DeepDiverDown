@@ -2,30 +2,40 @@
 
 ## 1. 計測の入口
 
-同じ注文集計でも、待ち時間、実行中のスキャン量、結果の再利用の有無を分けて調べる。図の区画と数値は説明用。
+同じ注文集計でも、待ち時間、実行中のスキャン量、結果の再利用の有無を分けて調べる。実行の実績は Query History（待ち時間）と Query Profile（読んだ区画数、演算子ごとの行数、spill）で確認する。図の区画と数値は説明用。2026 年 11 月時点の公式資料に基づく。
 
 ## 2. 同時実行とコンピュート
 
 マルチクラスターウェアハウスは同時実行需要に応じてクラスターを増減させる選択肢で、最小と最大の間の動きは設定と利用状況に依存する。単一の重いクエリの改善には、スキャン量・演算内容・ウェアハウスサイズなどを別途調べる。
 
-## 3. マイクロパーティション
+## 3. 区画の絞り込みと任意の最適化
 
-Snowflake はマイクロパーティションごとに値の範囲などを記録する。日付条件から該当し得ない区画を除外する。値の範囲が区画間で大きく重なると、同じ条件で読まれる区画が増える。
+Snowflake はマイクロパーティションごとに値の範囲などを記録する。日付条件から該当し得ない区画を除外する。値の範囲が区画間で大きく重なると、同じ条件で読まれる区画が増える。結合から得たフィルターで実行時に区画を減らす動的 pruning と、`ORDER BY` と `LIMIT` で残りが上位 K 件に入らないと判断できたときに読み取りを止める Top-K pruning は、実行資源の中で働く。
 
-## 4. 結果の再利用
+追加の絞り込みは任意で、別々の機能である。
 
-条件を満たす反復クエリでは永続化された過去の結果を使える。元データや設定の変化、権限、クエリの一致条件を確認する。プロファイルを比較する場合はキャッシュの影響を制御する。
+- **Search Optimization**：有効化した対象に検索用の access path を作り、値が含まれ得る区画の候補を絞る。構築・維持に計算とストレージの費用がかかる。
+- **Optima Metadata**：頻出する式（`UPPER` を含む条件など）の統計を自動生成する。Optima は全エディションに含まれるが、Metadata・Indexing・Planning は Gen2 standard warehouse と Adaptive Warehouse が対象である。Optima Indexing は best-effort で、鮮度を保証したい場合は Search Optimization を直接設定する。Query Profile の「Partitions pruned by Snowflake Optima」で効果を確認できる。
+- **Query Acceleration Service**：Enterprise Edition 以上で、ウェアハウスに有効化する。対象となったクエリの一部を共有計算資源へオフロードする。すべてのクエリが対象になるわけではない。
+
+## 4. 二種類のキャッシュ
+
+永続化クエリ結果は、同じクエリ、データ、権限などの条件を満たす場合に結果全体を再利用する。通常 24 時間保持され、再利用のたびに延びるが最初の実行から最大 31 日である。条件を満たしても再利用は保証されない。ウェアハウスのデータキャッシュは、稼働中の同じウェアハウスの後続クエリで使える表データで、ウェアハウス停止時に消える。有効期間と測定時の前提を混同しない。
 
 ## 図で確認するシナリオ
 
-- **日付フィルターで読む区画を減らす** — 1月25日以降の注文を指定し、日付の範囲が重ならない区画を除外する。 → クエリを実行できるクラスターに割り当てる。 → 残った区画から必要列を読み、集計結果を返す。
-- **結果再利用と実行時の待ちを比較** — 再利用条件を満たした同じ要求では、既存の結果を返す。 → 再利用できない要求が集中した場合は、実行枠の空きを待つ。 → マルチクラスター構成では同時要求を別のクラスターに割り当てられる。
+- **条件で絞り、実行し、結果を再利用する** — 日付の範囲が重ならない区画を除外する。 → 検索用の補助構造と追加統計で候補をさらに絞る。 → 空いたクラスターで実行し、キャッシュと QAS を使える場合は使う。 → Query Profile で読んだ区画数を確認し、再利用条件を満たす同じ要求には保存済みの結果を返す。
 
 ## 公式資料
 
 - [マイクロパーティション](https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions)
 - [マルチクラスターウェアハウス](https://docs.snowflake.com/en/user-guide/warehouses-multicluster)
 - [永続化されたクエリ結果](https://docs.snowflake.com/en/user-guide/querying-persisted-results)
+- [Search optimization](https://docs.snowflake.com/en/user-guide/search-optimization-service)
+- [Optima](https://docs.snowflake.com/en/user-guide/snowflake-optima)
+- [Query Acceleration Service](https://docs.snowflake.com/en/user-guide/query-acceleration-service)
+- [ウェアハウスのキャッシュ](https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache)
+- [Query Profile](https://docs.snowflake.com/en/user-guide/ui-snowsight-activity)
 
 ## 5. 実装例 Snowflake Enterprise の BI 負荷調査
 
@@ -35,7 +45,13 @@ BI 専用のマルチクラスターウェアハウスで、待ち時間、区�
 |---|---|---|
 | BI クエリ | 注文集計 SQL クライアント | 注文日を条件に、同一の SQL を実行する。 |
 | クエリ受付と計画 | Snowflake Cloud Services | クエリを受付け、計画や結果再利用の判断を調整する。 |
-| 実行待ち行列・並列クエリ実行資源 | BI_WH マルチクラスターウェアハウス | 最小・最大クラスター数とスケーリングポリシーを設定する。 |
+| 実行待ち行列 | BI_WH マルチクラスターウェアハウス | 最小・最大クラスター数とスケーリングポリシーを設定する。 |
+| ウェアハウスの実行資源 | BI_WH のクラスター | 区画の読み取りと集計を実行する。 |
+| ウェアハウスのデータキャッシュ | BI_WH のデータキャッシュ | 稼働中の後続クエリで使え、停止時に破棄される。 |
+| 検索用の補助構造 | Search Optimization の access path（任意） | 有効化した場合だけ使う。維持費がかかる。 |
+| 式ごとの追加統計 | Optima Metadata（対象環境） | Gen2 standard warehouse などで自動生成される。 |
+| Query Acceleration Service | QAS（任意） | 有効化した場合、対象クエリの一部をオフロードする。 |
+| Query Profile | Snowsight Query Profile | 区画数、行数、spill を確認する。 |
 | 区画メタデータ・列指向のストレージ区画 | Snowflake ORDERS のマイクロパーティション | サービスが管理する区画メタデータで不要な区画を除外する。 |
 | 永続化済み結果 | Snowflake の永続化クエリ結果 | 同一クエリなど、再利用の条件を満たすときに使う。 |
 

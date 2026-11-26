@@ -8,7 +8,7 @@
   "byId": {
     "producer": {
       "type": "node",
-      "label": "イベント送信",
+      "label": "イベント送信アプリ",
       "status": "claim"
     },
     "ingress": {
@@ -51,9 +51,39 @@
       "label": "読み取り",
       "status": "claim"
     },
+    "topic": {
+      "type": "node",
+      "label": "Kafka トピック",
+      "status": "claim"
+    },
+    "connect": {
+      "type": "node",
+      "label": "Kafka Connect と Connector",
+      "status": "claim"
+    },
+    "errors": {
+      "type": "node",
+      "label": "行エラーの記録",
+      "status": "claim"
+    },
     "send": {
       "type": "link",
-      "label": "イベント送信 → 認証と振り分け",
+      "label": "イベント送信アプリ → 認証と振り分け",
+      "status": "claim"
+    },
+    "produce": {
+      "type": "link",
+      "label": "イベント送信アプリ → Kafka トピック",
+      "status": "claim"
+    },
+    "subscribe": {
+      "type": "link",
+      "label": "Kafka トピック → Kafka Connect と Connector",
+      "status": "claim"
+    },
+    "forward": {
+      "type": "link",
+      "label": "Kafka Connect と Connector → 認証と振り分け",
       "status": "claim"
     },
     "route": {
@@ -76,7 +106,7 @@
       "label": "取り込み定義 → 取り込みジョブ",
       "status": "claim"
     },
-    "consume": {
+    "fetch": {
       "type": "link",
       "label": "一時バッファ → 取り込みジョブ",
       "status": "claim"
@@ -101,13 +131,14 @@
       "label": "分析対象の表 → 読み取り",
       "status": "claim"
     },
+    "reject": {
+      "type": "link",
+      "label": "取り込みジョブ → 行エラーの記録",
+      "status": "claim"
+    },
     "flow": {
       "type": "scenario",
-      "label": "イベントの取り込みと照会"
-    },
-    "pre-clustering": {
-      "type": "scenario",
-      "label": "クラスタリングを有効にした場合"
+      "label": "直接送信と Kafka 経由の取り込みと照会"
     },
     "internal-deployment": {
       "type": "unknown",
@@ -116,6 +147,10 @@
     "example-validation": {
       "type": "unknown",
       "label": "この組み合わせの実動作と、選定アカウントでの取り込み時クラスタリングの動作は未確認。"
+    },
+    "connect-versions": {
+      "type": "unknown",
+      "label": "Connector と Kafka のバージョンの組み合わせ、鍵管理、ネットワーク経路は未検証。"
     },
     "ex-producer": {
       "type": "implementation",
@@ -200,6 +235,30 @@
       "realizes": [
         "query"
       ]
+    },
+    "ex-topic": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Kafka トピック",
+      "realizes": [
+        "topic"
+      ]
+    },
+    "ex-connect": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Kafka Connect と Snowflake Connector v4",
+      "realizes": [
+        "connect"
+      ]
+    },
+    "ex-errors": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "エラーテーブル",
+      "realizes": [
+        "errors"
+      ]
     }
   },
   "byRef": {
@@ -217,18 +276,24 @@
       "cluster",
       "table",
       "query",
+      "topic",
+      "connect",
+      "errors",
       "send",
+      "produce",
+      "subscribe",
+      "forward",
       "route",
       "load",
       "routing",
       "definition",
-      "consume",
+      "fetch",
       "prepare",
       "write",
       "direct",
       "read",
+      "reject",
       "flow",
-      "pre-clustering",
       "ex-producer",
       "ex-ingress",
       "ex-assign",
@@ -239,11 +304,13 @@
       "ex-rbac",
       "ex-table",
       "ex-warehouse",
-      "ex-query"
+      "ex-query",
+      "ex-topic",
+      "ex-connect",
+      "ex-errors"
     ],
     "docs/reference-snowflake-snowpipe-streaming-internals.md#§4": [
-      "model",
-      "pre-clustering"
+      "model"
     ],
     "docs/reference-snowflake-snowpipe-streaming-internals.md#§2": [
       "producer",
@@ -255,16 +322,23 @@
       "cluster",
       "table",
       "query",
+      "topic",
+      "connect",
+      "errors",
       "send",
+      "produce",
+      "subscribe",
+      "forward",
       "route",
       "load",
       "routing",
       "definition",
-      "consume",
+      "fetch",
       "prepare",
       "write",
       "direct",
-      "read"
+      "read",
+      "reject"
     ],
     "docs/reference-snowflake-snowpipe-streaming-internals.md#§3": [
       "flow"
@@ -280,7 +354,10 @@
       "ex-rbac",
       "ex-table",
       "ex-warehouse",
-      "ex-query"
+      "ex-query",
+      "ex-topic",
+      "ex-connect",
+      "ex-errors"
     ]
   },
   "reference": {
@@ -295,7 +372,8 @@
     "objectives": [
       "受信、バッファ、サーバーレスジョブの役割を区別する。",
       "利用者が設定する PIPE と取り込み処理の関係を説明する。",
-      "取り込み時の処理とコミット後の SQL 照会を区別する。"
+      "SDK からの直接送信と Kafka Connect 経由の違いを区別する。",
+      "取り込み時の処理、拒否された行の記録、コミット後の SQL 照会を区別する。"
     ],
     "sources": [
       {
@@ -305,6 +383,10 @@
       {
         "title": "Snowpipe Streaming の現行仕様",
         "url": "https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview"
+      },
+      {
+        "title": "Snowflake Connector for Kafka",
+        "url": "https://docs.snowflake.com/en/user-guide/kafka-connector"
       },
       {
         "title": "Kafka から Iceberg へ",

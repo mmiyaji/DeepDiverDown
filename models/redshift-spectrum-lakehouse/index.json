@@ -1,0 +1,366 @@
+{
+  "model": "redshift-spectrum-lakehouse",
+  "name": "Amazon Redshift：Spectrum と Iceberg レイクハウス",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "compute": {
+      "type": "node",
+      "label": "Redshift のコンピュート",
+      "status": "claim"
+    },
+    "extschema": {
+      "type": "node",
+      "label": "外部スキーマ",
+      "status": "claim"
+    },
+    "glue": {
+      "type": "node",
+      "label": "Glue Data Catalog",
+      "status": "claim"
+    },
+    "lf": {
+      "type": "node",
+      "label": "Lake Formation の権限",
+      "status": "claim"
+    },
+    "spectrum": {
+      "type": "node",
+      "label": "データレイクのスキャン処理",
+      "status": "claim"
+    },
+    "iceberg": {
+      "type": "node",
+      "label": "Iceberg 表のメタデータ",
+      "status": "claim"
+    },
+    "files": {
+      "type": "node",
+      "label": "S3 のデータファイル",
+      "status": "claim"
+    },
+    "athena": {
+      "type": "node",
+      "label": "別のエンジン（Athena・EMR）",
+      "status": "claim"
+    },
+    "source": {
+      "type": "node",
+      "label": "運用データベース",
+      "status": "claim"
+    },
+    "zeroetl": {
+      "type": "node",
+      "label": "zero-ETL 統合",
+      "status": "claim"
+    },
+    "local": {
+      "type": "node",
+      "label": "Redshift のローカル表",
+      "status": "claim"
+    },
+    "query": {
+      "type": "link",
+      "label": "SQL クライアント → Redshift のコンピュート",
+      "status": "claim"
+    },
+    "resolve": {
+      "type": "link",
+      "label": "Redshift のコンピュート → 外部スキーマ",
+      "status": "claim"
+    },
+    "catalog": {
+      "type": "link",
+      "label": "外部スキーマ → Glue Data Catalog",
+      "status": "claim"
+    },
+    "authz": {
+      "type": "link",
+      "label": "Lake Formation の権限 → Glue Data Catalog",
+      "status": "claim"
+    },
+    "push": {
+      "type": "link",
+      "label": "Redshift のコンピュート → データレイクのスキャン処理",
+      "status": "claim"
+    },
+    "meta": {
+      "type": "link",
+      "label": "データレイクのスキャン処理 → Iceberg 表のメタデータ",
+      "status": "claim"
+    },
+    "point": {
+      "type": "link",
+      "label": "Iceberg 表のメタデータ → S3 のデータファイル",
+      "status": "claim"
+    },
+    "scanfiles": {
+      "type": "link",
+      "label": "データレイクのスキャン処理 → S3 のデータファイル",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "別のエンジン（Athena・EMR） → Iceberg 表のメタデータ",
+      "status": "claim"
+    },
+    "replicate": {
+      "type": "link",
+      "label": "運用データベース → zero-ETL 統合",
+      "status": "claim"
+    },
+    "apply": {
+      "type": "link",
+      "label": "zero-ETL 統合 → Redshift のローカル表",
+      "status": "claim"
+    },
+    "join": {
+      "type": "link",
+      "label": "Redshift のコンピュート → Redshift のローカル表",
+      "status": "claim"
+    },
+    "lake-join": {
+      "type": "scenario",
+      "label": "データレイクの Iceberg 表とローカル表を結合する"
+    },
+    "sagemaker": {
+      "type": "unknown",
+      "label": "SageMaker Lakehouse 経由の接続（Iceberg REST を含む）と提供段階は今回取得した資料で未確認。"
+    },
+    "iceberg-write": {
+      "type": "unknown",
+      "label": "Redshift から外部 Iceberg 表へ書く機能の提供段階（Preview・GA）は未確認。上の図は読み取りと、他エンジンによる更新だけを描く。"
+    },
+    "zero-stage": {
+      "type": "unknown",
+      "label": "zero-ETL の対象は資料に「現在サポート」と列挙されるが、ソースごとの Preview・GA は未確認。"
+    },
+    "perf": {
+      "type": "unknown",
+      "label": "スキャン性能と料金は実環境で未検証。"
+    },
+    "lk-client": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "SQL クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "lk-compute": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "RA3 クラスター",
+      "realizes": [
+        "compute"
+      ]
+    },
+    "lk-extschema": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "外部スキーマ",
+      "realizes": [
+        "extschema"
+      ]
+    },
+    "lk-glue": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "Glue Data Catalog",
+      "realizes": [
+        "glue"
+      ]
+    },
+    "lk-lf": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "Lake Formation",
+      "realizes": [
+        "lf"
+      ]
+    },
+    "lk-spectrum": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "Redshift Spectrum",
+      "realizes": [
+        "spectrum"
+      ]
+    },
+    "lk-iceberg": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "Iceberg メタデータ（S3）",
+      "realizes": [
+        "iceberg"
+      ]
+    },
+    "lk-files": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "S3 のデータファイル",
+      "realizes": [
+        "files"
+      ]
+    },
+    "lk-athena": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "Athena（Iceberg 更新）",
+      "realizes": [
+        "athena"
+      ]
+    },
+    "lk-aurora": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "Aurora",
+      "realizes": [
+        "source"
+      ]
+    },
+    "lk-zeroetl": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "zero-ETL 統合",
+      "realizes": [
+        "zeroetl"
+      ]
+    },
+    "lk-local": {
+      "type": "implementation",
+      "impl": "ra3-lake-zeroetl",
+      "label": "宛先データベース（RMS）",
+      "realizes": [
+        "local"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-redshift-spectrum-lakehouse.md#§1": [
+      "model"
+    ],
+    "docs/reference-redshift-spectrum-lakehouse.md": [
+      "model",
+      "client",
+      "compute",
+      "extschema",
+      "glue",
+      "lf",
+      "spectrum",
+      "iceberg",
+      "files",
+      "athena",
+      "source",
+      "zeroetl",
+      "local",
+      "query",
+      "resolve",
+      "catalog",
+      "authz",
+      "push",
+      "meta",
+      "point",
+      "scanfiles",
+      "write",
+      "replicate",
+      "apply",
+      "join",
+      "lake-join",
+      "lk-client",
+      "lk-compute",
+      "lk-extschema",
+      "lk-glue",
+      "lk-lf",
+      "lk-spectrum",
+      "lk-iceberg",
+      "lk-files",
+      "lk-athena",
+      "lk-aurora",
+      "lk-zeroetl",
+      "lk-local"
+    ],
+    "docs/reference-redshift-spectrum-lakehouse.md#§2": [
+      "model",
+      "client",
+      "compute",
+      "extschema",
+      "glue",
+      "lf",
+      "spectrum",
+      "files",
+      "query",
+      "resolve",
+      "catalog",
+      "authz",
+      "push",
+      "scanfiles"
+    ],
+    "docs/reference-redshift-spectrum-lakehouse.md#§3": [
+      "iceberg",
+      "athena",
+      "meta",
+      "point",
+      "write",
+      "lake-join"
+    ],
+    "docs/reference-redshift-spectrum-lakehouse.md#§4": [
+      "source",
+      "zeroetl",
+      "local",
+      "replicate",
+      "apply",
+      "join"
+    ],
+    "docs/reference-redshift-spectrum-lakehouse.md#§5": [
+      "lk-client",
+      "lk-compute",
+      "lk-extschema",
+      "lk-glue",
+      "lk-lf",
+      "lk-spectrum",
+      "lk-iceberg",
+      "lk-files",
+      "lk-athena",
+      "lk-aurora",
+      "lk-zeroetl",
+      "lk-local"
+    ]
+  },
+  "reference": {
+    "domain": "分析基盤・DWH",
+    "category": "クラウド分析基盤",
+    "kind": "仕組みの深掘り",
+    "product": "Amazon Redshift",
+    "role": "internals",
+    "step": 3,
+    "detailOf": "redshift",
+    "order": 63,
+    "objectives": [
+      "外部スキーマ、Glue Data Catalog、S3 のデータの関係を追う。",
+      "Iceberg 表を Redshift と別のエンジンから同時に扱う方法を説明する。",
+      "zero-ETL による取り込みと、データレイクの外部表参照を区別する。"
+    ],
+    "sources": [
+      {
+        "title": "Amazon Redshift Spectrum",
+        "url": "https://docs.aws.amazon.com/redshift/latest/dg/c-using-spectrum.html"
+      },
+      {
+        "title": "Using Apache Iceberg tables with Amazon Redshift",
+        "url": "https://docs.aws.amazon.com/redshift/latest/dg/querying-iceberg.html"
+      },
+      {
+        "title": "Zero-ETL integrations",
+        "url": "https://docs.aws.amazon.com/redshift/latest/mgmt/zero-etl-using.html"
+      }
+    ]
+  }
+}

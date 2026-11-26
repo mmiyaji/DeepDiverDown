@@ -28,6 +28,8 @@ Snowflake の公開記事ではテーブルごとの hidden volume に認証情�
 
 ## 5. 実装例
 
+外部カタログの稼働場所は資料で特定できないため、図では利用者が運用する環境と仮定する（Polaris などの実装は未確認）。
+
 外部 Iceberg REST カタログと顧客 S3 の Iceberg テーブルを Snowflake から読む概念例。カタログ側で一時認証情報の発行とアクセス権を設定し、対応する Snowflake の catalog integration を用意する。
 
 | 機能 | 担い手 |

@@ -1,6 +1,6 @@
 {
   "model": "snowflake-optima-internals",
-  "name": "Snowflake Optima：メタデータ・索引と実行計画",
+  "name": "Snowflake Optima：区画の読み取りと再配置",
   "coverage": {
     "covered": 5,
     "total": 5
@@ -31,11 +31,6 @@
       "label": "実行計画の改善",
       "status": "claim"
     },
-    "stats": {
-      "type": "node",
-      "label": "通常の区画統計",
-      "status": "claim"
-    },
     "prune": {
       "type": "node",
       "label": "候補の選択",
@@ -49,6 +44,21 @@
     "table": {
       "type": "node",
       "label": "区画データ",
+      "status": "claim"
+    },
+    "key": {
+      "type": "node",
+      "label": "クラスタリングキー",
+      "status": "claim"
+    },
+    "classic": {
+      "type": "node",
+      "label": "Classic の再配置",
+      "status": "claim"
+    },
+    "optc": {
+      "type": "node",
+      "label": "Optima Clustering",
       "status": "claim"
     },
     "submit": {
@@ -81,11 +91,6 @@
       "label": "実行計画の改善 → 実行計画と演算",
       "status": "claim"
     },
-    "normal": {
-      "type": "link",
-      "label": "通常の区画統計 → 候補の選択",
-      "status": "claim"
-    },
     "extra": {
       "type": "link",
       "label": "式向けメタデータ → 候補の選択",
@@ -96,22 +101,43 @@
       "label": "検索用の索引 → 候補の選択",
       "status": "claim"
     },
+    "normal": {
+      "type": "link",
+      "label": "区画データ → 候補の選択",
+      "status": "claim"
+    },
     "select": {
       "type": "link",
       "label": "候補の選択 → 実行計画と演算",
       "status": "claim"
     },
-    "scan": {
+    "key-classic": {
       "type": "link",
-      "label": "区画データ → 実行計画と演算",
+      "label": "クラスタリングキー → Classic の再配置",
+      "status": "claim"
+    },
+    "key-optima": {
+      "type": "link",
+      "label": "クラスタリングキー → Optima Clustering",
+      "status": "claim"
+    },
+    "recluster-classic": {
+      "type": "link",
+      "label": "Classic の再配置 → 区画データ",
+      "status": "claim"
+    },
+    "recluster-optima": {
+      "type": "link",
+      "label": "Optima Clustering → 区画データ",
       "status": "claim"
     },
     "flow": {
       "type": "scenario",
-      "label": "データと処理の流れ"
+      "label": "読み取りの絞り込みと区画の再配置"
     },
     "internal-deployment": {
-      "type": "unknown"
+      "type": "unknown",
+      "label": "Optima Clustering の区画選択、データ構造、競合検証と、各機能の選択しきい値・内部配置は公開資料で未確認。"
     },
     "ex-query": {
       "type": "implementation",
@@ -153,14 +179,6 @@
         "planning"
       ]
     },
-    "ex-stats": {
-      "type": "implementation",
-      "impl": "snowflake",
-      "label": "micro-partition の統計",
-      "realizes": [
-        "stats"
-      ]
-    },
     "ex-prune": {
       "type": "implementation",
       "impl": "snowflake",
@@ -184,6 +202,30 @@
       "realizes": [
         "table"
       ]
+    },
+    "ex-key": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "ORDERS のクラスタリングキー",
+      "realizes": [
+        "key"
+      ]
+    },
+    "ex-classic": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Classic Automatic Clustering",
+      "realizes": [
+        "classic"
+      ]
+    },
+    "ex-optc": {
+      "type": "implementation",
+      "impl": "snowflake",
+      "label": "Optima Clustering",
+      "realizes": [
+        "optc"
+      ]
     }
   },
   "byRef": {
@@ -197,31 +239,38 @@
       "metadata",
       "index",
       "planning",
-      "stats",
       "prune",
       "plan",
       "table",
+      "key",
+      "classic",
+      "optc",
       "submit",
       "observe",
       "learn-m",
       "learn-i",
       "learn-p",
       "apply-p",
-      "normal",
       "extra",
       "lookup",
+      "normal",
       "select",
-      "scan",
+      "key-classic",
+      "key-optima",
+      "recluster-classic",
+      "recluster-optima",
       "flow",
       "ex-query",
       "ex-history",
       "ex-metadata",
       "ex-index",
       "ex-planning",
-      "ex-stats",
       "ex-prune",
       "ex-plan",
-      "ex-table"
+      "ex-table",
+      "ex-key",
+      "ex-classic",
+      "ex-optc"
     ],
     "docs/reference-snowflake-optima-internals.md#§4": [
       "model"
@@ -232,23 +281,28 @@
       "metadata",
       "index",
       "planning",
-      "stats",
       "prune",
       "plan",
       "table",
+      "key",
       "submit",
       "observe",
       "learn-m",
       "learn-i",
       "learn-p",
       "apply-p",
-      "normal",
       "extra",
       "lookup",
-      "select",
-      "scan"
+      "normal",
+      "select"
     ],
     "docs/reference-snowflake-optima-internals.md#§3": [
+      "classic",
+      "optc",
+      "key-classic",
+      "key-optima",
+      "recluster-classic",
+      "recluster-optima",
       "flow"
     ],
     "docs/reference-snowflake-optima-internals.md#§5": [
@@ -257,10 +311,12 @@
       "ex-metadata",
       "ex-index",
       "ex-planning",
-      "ex-stats",
       "ex-prune",
       "ex-plan",
-      "ex-table"
+      "ex-table",
+      "ex-key",
+      "ex-classic",
+      "ex-optc"
     ]
   },
   "reference": {
@@ -268,11 +324,14 @@
     "order": 95,
     "domain": "分析基盤・DWH",
     "kind": "仕組みの深掘り",
-    "detailOf": "snowflake-optimization-internals",
+    "detailOf": "snowflake",
+    "product": "Snowflake",
+    "role": "internals",
+    "step": 4,
     "objectives": [
-      "問い合わせ履歴を用いる索引・式のメタデータ・実行計画の改善を区別して追う。",
-      "SQL を実行し、ワークロードと実行シグナルを観測する。",
-      "式のメタデータ、検索用の索引、計画改善をそれぞれ判断する。"
+      "式向けメタデータ、検索用の索引、計画改善を区別する。",
+      "通常の区画統計と Optima の追加情報が、読む区画の絞り込みにどう使われるかを追う。",
+      "Automatic Clustering の Classic と Optima Clustering の違いを区別する。"
     ],
     "sources": [
       {
@@ -290,6 +349,22 @@
       {
         "title": "Optima Indexing の事例",
         "url": "https://www.snowflake.com/en/blog/engineering/snowflake-optima-query-spike-optimization/"
+      },
+      {
+        "title": "Automatic Clustering at Snowflake（2024 年の内部構造）",
+        "url": "https://www.snowflake.com/en/blog/engineering/automatic-clustering-at-snowflake/"
+      },
+      {
+        "title": "Automatic Clustering の仕様と費用",
+        "url": "https://docs.snowflake.com/en/user-guide/tables-auto-reclustering"
+      },
+      {
+        "title": "Optima Clustering の発表",
+        "url": "https://www.snowflake.com/en/blog/engineering/introducing-snowflake-optima-clustering/"
+      },
+      {
+        "title": "SYSTEM$CLUSTERING_INFORMATION",
+        "url": "https://docs.snowflake.com/en/sql-reference/functions/system_clustering_information"
       }
     ]
   }

@@ -1,121 +1,48 @@
-name: "Microsoft Fabric の基本アーキテクチャ"
-description: "受注データを OneLake に置き、Lakehouse の Delta テーブルを SQL と Power BI で利用します。"
+name: Microsoft Fabric の基本アーキテクチャ
+description: 一つの OneLake に Lakehouse と Warehouse の Delta テーブルを置き、SQL 分析エンドポイントと Power BI から読む流れを、容量とワークスペースの単位で追う。
 reference:
-  objectives: ["OneLake、Lakehouse、Spark、SQL 分析エンドポイントの役割を区別する。", "一つの Delta テーブルを更新と分析で共有する流れを追う。"]
-  sources:
-    - {"title": "Microsoft Learn · Microsoft Fabric", "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview"}
-    - {"title": "Microsoft Learn · OneLake", "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"}
-    - {"title": "Microsoft Learn · SQL analytics endpoint", "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"}
-    - {title: Microsoft Learn · Fabric Lakehouse, url: "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"}
-    - {title: Microsoft Learn · OneLake catalog, url: "https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview"}
-sources: [docs/reference-microsoft-fabric.md]
-evidence: [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§1"}]
+  objectives: [OneLake、Lakehouse、Warehouse、SQL 分析エンドポイント、セマンティックモデルの役割を区別する。, 取り込みから Power BI レポートまでの経路と、Spark と T-SQL の書き込み経路の違いを追う。, 容量（CU）とワークスペースが計算の単位になることを説明する。]
+  sources: [{title: Microsoft Learn · Microsoft Fabric, url: https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview}, {title: Microsoft Learn · OneLake, url: https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview}, {title: Microsoft Learn · Fabric Lakehouse, url: https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview}, {title: Microsoft Learn · SQL analytics endpoint, url: https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint}, {title: Microsoft Learn · Fabric Data Warehouse, url: https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing}, {title: Microsoft Learn · Direct Lake overview, url: https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview}, {title: Microsoft Learn · Fabric licenses and capacity, url: https://learn.microsoft.com/en-us/fabric/enterprise/licenses}, {title: Microsoft Learn · OneLake catalog, url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview}]
+sources:
+  - docs/reference-microsoft-fabric.md
+evidence:
+  - {type: doc, ref: docs/reference-microsoft-fabric.md#§1}
+  - {type: doc, ref: docs/reference-microsoft-fabric.md#§2}
 tiers:
-  - {id: flow, label: データと処理, z: 0, size: [16, 5]}
+  - {id: flow, label: データと処理, z: 0, size: [22, 12]}
 nodes:
-  source: {"label": "受注データ", "kind": "external", "tier": "flow", "x": 0, "y": 3, "description": "取り込み元。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  pipeline: {"label": "取込パイプライン", "kind": "service", "tier": "flow", "x": 4, "y": 3, "description": "受注ファイルをコピーする。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  files: {"label": "取込ファイルの保管領域", "kind": "db", "tier": "flow", "x": 8, "y": 3, "description": "受注ファイルを置く。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  spark: {"label": "データ変換ノートブック", "kind": "worker", "tier": "flow", "x": 12, "y": 3, "description": "型や欠損値を確認する。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  delta: {"label": "分析用の Delta テーブル", "kind": "db", "tier": "flow", "x": 16, "y": 3, "description": "分析用明細を保持する。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§1"}]}
-  sql: {"label": "SQL 読み取り口", "kind": "service", "tier": "flow", "x": 12, "y": 0, "description": "Delta テーブルの読み取り口。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
-  bi: {"label": "BI レポート", "kind": "client", "tier": "flow", "x": 8, "y": 0, "description": "集計結果を可視化する。", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
-  catalog: {label: "データ資産カタログ", kind: service, tier: flow, x: 16, y: 0, drill: fabric-onelake-catalog, description: "分析資産を検索して管理状況を調べる。", evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]}
+  source: {label: 受注データ（業務システム・ファイル）, kind: external, tier: flow, x: 0, 'y': 4, description: 取り込み元。Azure のストレージや業務 DB などの外部データ。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§2}]}
+  pipeline: {label: 取込パイプライン, kind: service, tier: flow, x: 4, 'y': 4, description: Data Factory のパイプラインで外部データをコピーする。Lakehouse と Warehouse のどちらにも取り込める。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§2}]}
+  lakehouse: {label: Lakehouse（Files・Tables）, kind: table, tier: flow, x: 8, 'y': 4, description: Files に原本、Tables に Delta テーブルを置く項目。作成すると SQL 分析エンドポイントが自動で付く。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§3}]}
+  spark: {label: Spark ノートブック, kind: worker, tier: flow, x: 4, 'y': 7.5, description: Files のデータを整え、Tables に Delta テーブルとして書く。Lakehouse の更新は Spark が担う。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§3}]}
+  warehouse: {label: Warehouse（T-SQL で読み書き）, kind: service, tier: flow, x: 12, 'y': 7.5, drill: fabric-warehouse-sql-endpoint, description: T-SQL の DDL・DML とマルチテーブルのトランザクションを使えるウェアハウス項目。データは OneLake に Delta で保存される。詳細は「Warehouse と SQL 分析エンドポイント」。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]}
+  onelake: {label: OneLake（Delta Parquet）, kind: db, tier: flow, x: 12, 'y': 4, drill: fabric-onelake-shortcuts, description: テナントに一つの論理データレイク。Fabric の各項目のデータを Delta Parquet で保持し、ショートカットで外部ストレージも同じ名前空間に見せる。詳細は「OneLake とショートカット」。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§2}]}
+  sqlep: {label: SQL 分析エンドポイント（読み取り専用）, kind: service, tier: flow, x: 12, 'y': 0.5, description: Lakehouse の Delta テーブルを T-SQL で読む入口。更新はできない。Warehouse などにも同種のエンドポイントが付く。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]}
+  semantic: {label: Power BI セマンティックモデル, kind: table, tier: flow, x: 16, 'y': 4, drill: fabric-direct-lake, description: 指標とリレーションを定義する。Direct Lake では OneLake の Delta テーブルを VertiPaq に読み込んで応答する。詳細は「Direct Lake と Power BI」。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§5}]}
+  bi: {label: Power BI レポート, kind: client, tier: flow, x: 20, 'y': 4, description: セマンティックモデルの指標を表示する。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§5}]}
+  catalog: {label: OneLake catalog, kind: catalog, tier: flow, x: 4, 'y': 0.5, drill: fabric-onelake-catalog, description: Fabric の資産を検索し、認定やリネージを調べる入口。詳細は「OneLake catalog の発見とガバナンス」。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§6}]}
+  capacity: {label: 容量（Capacity Unit）, kind: scheduler, tier: flow, x: 8, 'y': 10.5, description: ワークスペースを割り当てる計算資源の単位。Spark と SQL の処理が CU を消費する。F SKU は Azure で購入する。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§6}]}
 links:
-  - {"id": "extract", "from": "source", "to": "pipeline", "label": "受注データを取得", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  - {"id": "copy", "from": "pipeline", "to": "files", "label": "着地領域にファイルをコピー", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  - {"id": "load", "from": "files", "to": "spark", "label": "取り込んだデータを読む", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  - {"id": "write", "from": "spark", "to": "delta", "label": "Delta テーブルに書く", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§2"}]}
-  - {"id": "read", "from": "delta", "to": "sql", "label": "明細を SQL で読む", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
-  - {"id": "report", "from": "sql", "to": "bi", "label": "売上を表示", "evidence": [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§3"}]}
-  - {id: discover, from: catalog, to: delta, label: "レイクハウスの資産を検索", evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]}
+  - {id: extract, from: source, to: pipeline, label: 外部データを取得, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§2}]}
+  - {id: copy, from: pipeline, to: lakehouse, label: Files にコピー, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§2}]}
+  - {id: transform, from: lakehouse, to: spark, label: Files を読む, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§3}]}
+  - {id: write, from: spark, to: lakehouse, label: Tables に Delta を書く, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§3}]}
+  - {id: persist-lh, from: lakehouse, to: onelake, label: Delta ファイルを保存, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§3}]}
+  - {id: load-wh, from: pipeline, to: warehouse, label: COPY INTO・パイプラインで取り込み, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]}
+  - {id: persist-wh, from: warehouse, to: onelake, label: Delta として保存, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]}
+  - {id: expose, from: lakehouse, to: sqlep, label: Delta テーブルを自動検出, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]}
+  - {id: direct-lake, from: onelake, to: semantic, label: Direct Lake で列を読む, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§5}]}
+  - {id: resolve, from: sqlep, to: semantic, label: テーブルを解決（Direct Lake on SQL）, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§5}]}
+  - {id: report, from: semantic, to: bi, label: 指標を表示, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§5}]}
+  - {id: discover, from: catalog, to: lakehouse, label: 資産を検索, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§6}]}
+  - {id: run-spark, from: capacity, to: spark, label: CU を割り当て, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§6}]}
+  - {id: run-sql, from: capacity, to: warehouse, label: CU を割り当て, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§6}]}
 scenarios:
-  - id: report-sales
-    label: "受注データから売上レポートへ"
-    evidence: [{"type": "doc", "ref": "docs/reference-microsoft-fabric.md#§1"}]
-    steps:
-      - {"links": ["extract", "copy"], "note": "Fabric のパイプラインで受注ファイルを OneLake に取り込む。"}
-      - {"links": ["load", "write"], "note": "Spark で受注を整え、分析用 Delta テーブルに書き込む。"}
-      - {"links": ["read"], "note": "SQL 分析エンドポイントが Delta テーブルから売上を集計する。"}
-      - {"links": ["report"], "note": "Power BI が SQL 接続経由で集計結果を表示する。"}
-  - id: discover-asset
-    label: カタログから Lakehouse を探して利用する
-    evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§4}]
-    steps:
-      - {links: [discover], note: OneLake catalog で目的の Lakehouse を探し、発見可能性と権限を確認する。}
-      - {links: [read, report], note: 読み取り権限のあるデータから売上を集計する。}
-
+  - {id: lakehouse-report, label: 受注データから売上レポートへ（Lakehouse 経路）, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§1}], steps: [{links: [extract, copy], note: パイプラインが受注ファイルを Lakehouse の Files にコピーする。}, {links: [transform, write, persist-lh, run-spark], note: Spark が型や欠損を整え、Tables の Delta テーブルに書く。実体は OneLake に保存され、容量の CU を消費する。}, {links: [expose, resolve], note: SQL 分析エンドポイントが Delta テーブルを検出し、セマンティックモデルがテーブルを解決する。}, {links: [direct-lake, report], note: Direct Lake が OneLake から必要な列を読み、Power BI レポートが指標を表示する。}]}
+  - {id: warehouse-load, label: T-SQL で Warehouse に取り込む, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§1}], steps: [{links: [extract, load-wh, run-sql], note: パイプラインが外部データを Warehouse にロードする。}, {links: [persist-wh, direct-lake, report], note: Warehouse のテーブルは OneLake の Delta として保存され、Direct Lake のモデルから同じように読める。}]}
+  - {id: discover-asset, label: カタログから Lakehouse を探す, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§1}], steps: [{links: [discover], note: OneLake catalog で目的の Lakehouse を探し、権限を確認して利用する。}]}
+unknowns:
+  - {id: synapse-dates, text: Azure Synapse Analytics の提供終了日は取得した資料で未確認。Fabric Data Warehouse の Migration Assistant が Synapse などからの移行を支援する。, refs: [load-wh]}
+  - {id: perf, text: 取り込みや照会の性能・料金の実測値は未確認。容量の消費量は実環境で確認する。, refs: [run-spark, run-sql]}
 implementations:
-  - id: fabric-lakehouse
-    label: "Microsoft Fabric の注文レイクハウス"
-    description: "Azure Blob Storage の受注 CSV を Fabric ワークスペースの Lakehouse に取り込み、Spark と Power BI で利用する例。"
-    sources:
-      - {title: "Microsoft Learn · Microsoft Fabric", url: "https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview"}
-      - {title: "Microsoft Learn · OneLake", url: "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"}
-      - {title: "Microsoft Learn · SQL analytics endpoint", url: "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"}
-      - {title: "Microsoft Learn · Fabric Lakehouse", url: "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"}
-      - {title: "Microsoft Learn · OneLake catalog", url: "https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview"}
-      - {title: "Fabric の Copy activity", url: "https://learn.microsoft.com/en-us/fabric/data-factory/copy-data-activity"}
-      - {title: "Power BI セマンティックモデルの作成", url: "https://learn.microsoft.com/en-us/fabric/data-warehouse/create-semantic-model"}
-      - {title: "Fabric の Azure Blob Storage コネクター", url: https://learn.microsoft.com/en-us/fabric/data-factory/connector-azure-blob-storage-copy-activity}
-      - {title: "Fabric の Notebook activity と容量", url: https://learn.microsoft.com/en-us/fabric/data-factory/notebook-activity}
-      - {title: "Direct Lake on SQL と OneLake", url: https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-create-lakehouse}
-    tiers:
-      - {id: "source", label: "Azure のデータ源", z: 0, size: [5,4]}
-      - {id: "flow", label: "Fabric の取込・変換・参照", z: 0, size: [25,6]}
-      - {id: "implementation-setup", label: "実装時の設定・観測", z: 1, size: [25,3]}
-    nodes:
-      example-source: {svc: "azure:storage", label: "Azure Blob Storage（受注 CSV）", kind: "file", tier: "source", x: 2, y: 1.5, realizes: ["source"], description: "取込接続からファイルを読み出す。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-pipeline: {svc: "fabric:pipeline", label: "Fabric Data Factory の Copy activity", kind: "workflow", tier: "flow", x: 3, y: 3, realizes: ["pipeline"], description: "原本ファイルを OneLake の Lakehouse にコピーする。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-files: {svc: "fabric:lakehouse", label: "OneLake（Lakehouse Files）", kind: "file", tier: "flow", x: 9, y: 3, realizes: ["files"], description: "コピーした受注 CSV を保持する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-spark: {svc: "fabric:notebook", label: "Fabric Spark ノートブック", kind: "worker", tier: "flow", x: 15, y: 3, realizes: ["spark"], description: "Microsoft 管理の Spark で実行する。利用者はノートブックと容量を設定し、内部ホストは直接操作しない。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-sql: {svc: "fabric:platform", label: "Lakehouse SQL 分析エンドポイント", kind: "service", tier: "flow", x: 21, y: 0, realizes: ["sql"], description: "Microsoft 管理の SQL エンドポイント。利用者は SQL と権限を設定し、Lakehouse テーブルを読み取る。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-bi: {svc: "fabric:report", label: "Power BI 受注レポート", kind: "client", tier: "flow", x: 9, y: 0, realizes: ["bi"], description: "公開されたセマンティックモデルの指標を表示する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-catalog: {svc: "fabric:platform", label: "OneLake カタログ", kind: "catalog", tier: "flow", x: 22, y: 5, realizes: ["catalog"], description: "Lakehouse などの資産を確認する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-semantic: {svc: "fabric:semantic", label: "Power BI セマンティックモデル", kind: "table", tier: "implementation-setup", x: 15, y: 1.5, description: "Direct Lake on SQL でテーブルを解決し、売上の定義とリレーションを共有する。", evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      example-delta: {svc: "fabric:lakehouse", label: "OneLake（Lakehouse Tables・Delta）", kind: "table", tier: "flow", x: 21, y: 3, realizes: ["delta"], description: "Fabric Spark が書き出した分析用 Delta テーブルを保持する。", evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§5}]}
-    links:
-      - {id: example-run-notebook, from: example-pipeline, to: example-spark, label: コピー成功後に Notebook activity を実行}
-      - {id: example-direct-lake, from: example-delta, to: example-semantic, label: Direct Lake で Delta データを読む}
-      - {id: "example-semantic-source", from: "example-sql", to: "example-semantic", label: "テーブルを解決して権限を確認", realizes: [report], replace: true, evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-      - {id: "example-semantic-connection", from: "example-semantic", to: "example-bi", label: "定義済み指標を提供", realizes: [report], replace: true, evidence: [{"type":"doc","ref":"docs/reference-microsoft-fabric.md#§5"}]}
-    groups:
-      - {kind: cloud, provider: azure, label: Azure サブスクリプション, tier: [source], nodes: [example-source]}
-      - {kind: cloud, provider: fabric, label: 容量に割り当てた Fabric ワークスペース, tier: [flow, implementation-setup], nodes: [example-pipeline, example-files, example-spark, example-delta, example-sql, example-bi, example-catalog, example-semantic]}
-
-    layout2d:
-      tiers:
-        - {id: diagram, label: Azure と Fabric の実装構成, z: 0, size: [33, 13]}
-      nodes:
-        example-source: {tier: diagram, x: 2, y: 3}
-        example-pipeline: {tier: diagram, x: 8, y: 3}
-        example-spark: {tier: diagram, x: 13, y: 3}
-        example-files: {tier: diagram, x: 18, y: 3}
-        example-delta: {tier: diagram, x: 23, y: 3}
-        example-sql: {tier: diagram, x: 18, y: 7}
-        example-semantic: {tier: diagram, x: 29, y: 7}
-        example-bi: {tier: diagram, x: 29, y: 11}
-        example-catalog: {tier: diagram, x: 13, y: 10}
-      groups:
-        - {kind: cloud, label: Azure サブスクリプション, provider: azure, tier: [diagram], x0: -1, y0: 1, x1: 5, y1: 5, nodes: [example-source]}
-        - {kind: cloud, label: Fabric テナント・ワークスペース, provider: fabric, tier: [diagram], x0: 5, y0: 0, x1: 32, y1: 13, nodes: [example-pipeline, example-spark, example-files, example-delta, example-sql, example-semantic, example-bi, example-catalog]}
-        - {kind: cluster, label: Lakehouse と SQL エンドポイント, provider: fabric, tier: [diagram], x0: 15.5, y0: 1, x1: 26, y1: 9, nodes: [example-files, example-delta, example-sql]}
-    layout3d:
-      tiers:
-        - {id: azure, label: Azure Blob Storage, z: 0, size: [4, 5]}
-        - {id: fabric, label: Fabric ワークスペース, z: 0, origin: [8, 0], size: [17, 8]}
-        - {id: onelake, label: OneLake Lakehouse, z: 0, origin: [29, 0], size: [9, 8]}
-      nodes:
-        example-source: {tier: azure, x: 2, y: 2}
-        example-pipeline: {tier: fabric, x: 2, y: 2}
-        example-spark: {tier: fabric, x: 7, y: 2}
-        example-sql: {tier: fabric, x: 12, y: 2}
-        example-semantic: {tier: fabric, x: 12, y: 6}
-        example-bi: {tier: fabric, x: 16, y: 6}
-        example-catalog: {tier: fabric, x: 2, y: 6}
-        example-files: {tier: onelake, x: 2, y: 3}
-        example-delta: {tier: onelake, x: 7, y: 3}
-      groups:
-        - {kind: cloud, label: Azure サブスクリプション, provider: azure, tier: [azure], nodes: [example-source]}
-        - {kind: cloud, label: Fabric テナント・ワークスペース, provider: fabric, tier: [fabric, onelake], nodes: [example-pipeline, example-spark, example-files, example-delta, example-sql, example-semantic, example-bi, example-catalog]}
-        - {kind: cluster, label: Lakehouse データ, provider: fabric, tier: [onelake], nodes: [example-files, example-delta]}
+  - {id: fabric-lakehouse, label: Microsoft Fabric の注文レイクハウス, description: Azure Blob Storage の受注 CSV を F SKU の容量に割り当てたワークスペースに取り込み、Lakehouse と Warehouse を Power BI から使う例。, sources: [{title: Microsoft Learn · Microsoft Fabric, url: https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview}, {title: Microsoft Learn · OneLake, url: https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview}, {title: Microsoft Learn · Fabric Lakehouse, url: https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview}, {title: Microsoft Learn · SQL analytics endpoint, url: https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint}, {title: Microsoft Learn · Fabric Data Warehouse, url: https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing}, {title: Microsoft Learn · Direct Lake overview, url: https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview}, {title: Microsoft Learn · Fabric licenses and capacity, url: https://learn.microsoft.com/en-us/fabric/enterprise/licenses}, {title: Microsoft Learn · OneLake catalog, url: https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview}, {title: Microsoft Learn · Copy activity, url: https://learn.microsoft.com/en-us/fabric/data-factory/copy-data-activity}], tiers: [{id: flow, label: データと処理, z: 0, size: [22, 12]}], nodes: {i-source: {svc: azure:storage, label: Azure Blob Storage（受注 CSV）, kind: external, tier: flow, x: 0, 'y': 4, realizes: [source], description: Fabric の接続で読み出す。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-pipeline: {svc: fabric:pipeline, label: Data Factory の Copy activity, kind: service, tier: flow, x: 4, 'y': 4, realizes: [pipeline], description: Blob のファイルを Lakehouse Files にコピーし、Warehouse へはロードする。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-lakehouse: {svc: fabric:lakehouse, label: Lakehouse（Files・Tables）, kind: table, tier: flow, x: 8, 'y': 4, realizes: [lakehouse], description: Files に原本、Tables に Delta を置く。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-spark: {svc: fabric:notebook, label: Fabric Spark ノートブック, kind: worker, tier: flow, x: 4, 'y': 7.5, realizes: [spark], description: Microsoft 管理の Spark で実行する。利用者はノートブックと容量を設定し、内部ホストは操作しない。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-warehouse: {svc: fabric:platform, label: Fabric Warehouse, kind: service, tier: flow, x: 12, 'y': 7.5, realizes: [warehouse], description: T-SQL の書き込みを受ける。内部の計算ノードは操作しない。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-onelake: {svc: fabric:lakehouse, label: OneLake, kind: db, tier: flow, x: 12, 'y': 4, realizes: [onelake], description: 各項目の Delta Parquet を保持する。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-sqlep: {svc: fabric:platform, label: Lakehouse SQL 分析エンドポイント, kind: service, tier: flow, x: 12, 'y': 0.5, realizes: [sqlep], description: Microsoft 管理。利用者は SQL と権限を設定する。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-semantic: {svc: fabric:semantic, label: Power BI セマンティックモデル, kind: table, tier: flow, x: 16, 'y': 4, realizes: [semantic], description: Direct Lake で売上の定義とリレーションを共有する。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-bi: {svc: fabric:report, label: Power BI 受注レポート, kind: client, tier: flow, x: 20, 'y': 4, realizes: [bi], description: 公開したセマンティックモデルの指標を表示する。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-catalog: {svc: fabric:platform, label: OneLake catalog, kind: catalog, tier: flow, x: 4, 'y': 0.5, realizes: [catalog], description: Lakehouse などの資産を検索する。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}, i-capacity: {svc: fabric:platform, label: Fabric 容量（F SKU）, kind: scheduler, tier: flow, x: 8, 'y': 10.5, realizes: [capacity], description: Azure で購入し、ワークスペースを割り当てる。F64 未満では閲覧者にも Pro などのライセンスが要る。, evidence: [{type: doc, ref: docs/reference-microsoft-fabric.md#§7}]}}, links: [], groups: [{kind: cloud, provider: azure, label: Azure サブスクリプション, tier: [flow], nodes: [i-source]}, {kind: cloud, provider: fabric, label: Fabric テナント・ワークスペース, tier: [flow], nodes: [i-pipeline, i-lakehouse, i-spark, i-warehouse, i-onelake, i-sqlep, i-semantic, i-bi, i-catalog, i-capacity]}], layout2d: {tiers: [{id: diagram, label: Azure と Fabric の実装構成, z: 0, size: [26, 16]}], nodes: {i-source: {tier: diagram, x: 2, 'y': 6}, i-pipeline: {tier: diagram, x: 6, 'y': 6}, i-lakehouse: {tier: diagram, x: 10, 'y': 6}, i-spark: {tier: diagram, x: 6, 'y': 9.5}, i-warehouse: {tier: diagram, x: 14, 'y': 9.5}, i-onelake: {tier: diagram, x: 14, 'y': 6}, i-sqlep: {tier: diagram, x: 14, 'y': 2.5}, i-semantic: {tier: diagram, x: 18, 'y': 6}, i-bi: {tier: diagram, x: 22, 'y': 6}, i-catalog: {tier: diagram, x: 6, 'y': 2.5}, i-capacity: {tier: diagram, x: 10, 'y': 12.5}}, groups: [{kind: cloud, label: Azure サブスクリプション, provider: azure, tier: [diagram], x0: 0.3999999999999999, y0: 4.6, x1: 3.6, y1: 7.4, nodes: [i-source]}, {kind: cloud, label: Fabric テナント・ワークスペース, provider: fabric, tier: [diagram], x0: 4.4, y0: 1.1, x1: 23.6, y1: 13.9, nodes: [i-pipeline, i-lakehouse, i-spark, i-warehouse, i-onelake, i-sqlep, i-semantic, i-bi, i-catalog, i-capacity]}]}, layout3d: {tiers: [{id: azure, label: Azure サブスクリプション, z: 0, origin: [0, 0], size: [5, 13]}, {id: fabric, label: Fabric テナント・ワークスペース, z: 0, origin: [8, 0], size: [21, 13]}], nodes: {i-source: {tier: azure, x: 2, 'y': 4.5}, i-pipeline: {tier: fabric, x: 2, 'y': 4.5}, i-lakehouse: {tier: fabric, x: 6, 'y': 4.5}, i-spark: {tier: fabric, x: 2, 'y': 8}, i-warehouse: {tier: fabric, x: 10, 'y': 8}, i-onelake: {tier: fabric, x: 10, 'y': 4.5}, i-sqlep: {tier: fabric, x: 10, 'y': 1}, i-semantic: {tier: fabric, x: 14, 'y': 4.5}, i-bi: {tier: fabric, x: 18, 'y': 4.5}, i-catalog: {tier: fabric, x: 2, 'y': 1}, i-capacity: {tier: fabric, x: 6, 'y': 11}}, groups: [{kind: cloud, label: Azure サブスクリプション, provider: azure, tier: [azure], nodes: [i-source]}, {kind: cloud, label: Fabric テナント・ワークスペース, provider: fabric, tier: [fabric], nodes: [i-pipeline, i-lakehouse, i-spark, i-warehouse, i-onelake, i-sqlep, i-semantic, i-bi, i-catalog, i-capacity]}]}}

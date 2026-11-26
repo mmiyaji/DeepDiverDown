@@ -1,246 +1,398 @@
 {
   "model": "databricks-sql-performance",
-  "name": "Databricks SQL の実行プロファイルとファイル配置",
+  "name": "Databricks SQL：実行プロファイル・Photon・キャッシュ",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
-    "bi": {
+    "client": {
       "type": "node",
-      "label": "注文集計 SQL",
+      "label": "SQL の発行（SQL Warehouse）",
       "status": "claim"
     },
-    "warehouse": {
+    "catalog": {
       "type": "node",
-      "label": "SQL 実行の計算資源",
+      "label": "テーブルの解決・権限",
       "status": "claim"
     },
-    "engine": {
+    "planner": {
       "type": "node",
-      "label": "最適化された演算エンジン",
+      "label": "計画と実行時の調整",
+      "status": "claim"
+    },
+    "result": {
+      "type": "node",
+      "label": "保存済みの結果",
       "status": "claim"
     },
     "scan": {
       "type": "node",
-      "label": "列指向テーブルのデータファイル",
+      "label": "候補ファイルの読み取り",
       "status": "claim"
     },
-    "shuffle": {
+    "operators": {
       "type": "node",
-      "label": "結合・再分配",
+      "label": "結合・集計・再分配",
+      "status": "claim"
+    },
+    "diskcache": {
+      "type": "node",
+      "label": "実行資源内のデータキャッシュ",
       "status": "claim"
     },
     "profile": {
       "type": "node",
-      "label": "クエリの演算子プロファイル",
+      "label": "実行の観測",
       "status": "claim"
     },
-    "optimizer": {
+    "maintenance": {
       "type": "node",
-      "label": "テーブル保守",
+      "label": "データ配置の保守",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "表の状態とファイル統計",
+      "status": "claim"
+    },
+    "files": {
+      "type": "node",
+      "label": "列指向の保存ファイル",
+      "status": "claim"
+    },
+    "layout": {
+      "type": "node",
+      "label": "配置方針",
       "status": "claim"
     },
     "submit": {
       "type": "link",
-      "label": "注文集計 SQL → SQL 実行の計算資源",
+      "label": "SQL の発行（SQL Warehouse） → 計画と実行時の調整",
       "status": "claim"
     },
-    "execute": {
+    "resolve": {
       "type": "link",
-      "label": "SQL 実行の計算資源 → 最適化された演算エンジン",
+      "label": "テーブルの解決・権限 → 計画と実行時の調整",
+      "status": "claim"
+    },
+    "stats": {
+      "type": "link",
+      "label": "表の状態とファイル統計 → 計画と実行時の調整",
+      "status": "claim"
+    },
+    "start": {
+      "type": "link",
+      "label": "計画と実行時の調整 → 候補ファイルの読み取り",
       "status": "claim"
     },
     "read": {
       "type": "link",
-      "label": "最適化された演算エンジン → 列指向テーブルのデータファイル",
+      "label": "列指向の保存ファイル → 候補ファイルの読み取り",
       "status": "claim"
     },
-    "join": {
-      "type": "scenario",
-      "label": "結合の待ちと再分配を調べる",
+    "disk": {
+      "type": "link",
+      "label": "実行資源内のデータキャッシュ → 候補ファイルの読み取り",
+      "status": "claim"
+    },
+    "process": {
+      "type": "link",
+      "label": "候補ファイルの読み取り → 結合・集計・再分配",
+      "status": "claim"
+    },
+    "return": {
+      "type": "link",
+      "label": "結合・集計・再分配 → SQL の発行（SQL Warehouse）",
+      "status": "claim"
+    },
+    "check": {
+      "type": "link",
+      "label": "計画と実行時の調整 → 保存済みの結果",
+      "status": "claim"
+    },
+    "cached": {
+      "type": "link",
+      "label": "保存済みの結果 → SQL の発行（SQL Warehouse）",
       "status": "claim"
     },
     "observe": {
       "type": "link",
-      "label": "結合・再分配 → クエリの演算子プロファイル",
+      "label": "結合・集計・再分配 → 実行の観測",
       "status": "claim"
     },
-    "scan-profile": {
+    "config": {
       "type": "link",
-      "label": "列指向テーブルのデータファイル → クエリの演算子プロファイル",
+      "label": "配置方針 → データ配置の保守",
       "status": "claim"
     },
-    "maintain": {
+    "rewrite": {
       "type": "link",
-      "label": "テーブル保守 → 列指向テーブルのデータファイル",
+      "label": "データ配置の保守 → 列指向の保存ファイル",
       "status": "claim"
     },
-    "plan": {
+    "commit": {
+      "type": "link",
+      "label": "データ配置の保守 → 表の状態とファイル統計",
+      "status": "claim"
+    },
+    "skipping": {
       "type": "scenario",
-      "label": "日付を絞った集計でスキャンを確認"
+      "label": "統計でファイルを絞る"
     },
-    "example-user": {
-      "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "SQL analyst",
-      "realizes": []
+    "adaptive": {
+      "type": "scenario",
+      "label": "実行時の結合と再分配"
     },
-    "example-serverless": {
-      "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "Databricks serverless compute plane",
-      "realizes": []
+    "cache": {
+      "type": "scenario",
+      "label": "結果とディスクキャッシュ"
     },
-    "example-s3": {
-      "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "Customer S3 managed storage",
-      "realizes": []
+    "cluster": {
+      "type": "scenario",
+      "label": "ファイル再配置と再計測"
     },
-    "example-iam": {
-      "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "IAM storage role",
-      "realizes": []
+    "unverified": {
+      "type": "unknown",
+      "label": "実環境の性能、キャッシュの命中率、キュー待ちの時間は未検証。Photon の内部実装は 2022 年の論文時点の説明で、現在の挙動は未確認。"
     },
-    "example-bi": {
+    "ex-client": {
       "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "Databricks SQL Editor",
+      "impl": "aws-serverless",
+      "label": "BI クライアント",
       "realizes": [
-        "bi"
+        "client"
       ]
     },
-    "example-warehouse": {
+    "ex-catalog": {
       "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "Serverless SQL Warehouse と Photon",
+      "impl": "aws-serverless",
+      "label": "Unity Catalog",
       "realizes": [
-        "warehouse",
-        "engine",
-        "shuffle"
+        "catalog"
       ]
     },
-    "example-scan": {
+    "ex-planner": {
       "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "Unity Catalog 管理 Delta テーブル",
+      "impl": "aws-serverless",
+      "label": "SQL の計画と AQE",
+      "realizes": [
+        "planner"
+      ]
+    },
+    "ex-result": {
+      "type": "implementation",
+      "impl": "aws-serverless",
+      "label": "SQL Warehouse の結果キャッシュ",
+      "realizes": [
+        "result"
+      ]
+    },
+    "ex-scan": {
+      "type": "implementation",
+      "impl": "aws-serverless",
+      "label": "Photon のファイルスキャン",
       "realizes": [
         "scan"
       ]
     },
-    "example-profile": {
+    "ex-operators": {
       "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "Databricks Query Profile",
+      "impl": "aws-serverless",
+      "label": "Photon と対応しない演算",
+      "realizes": [
+        "operators"
+      ]
+    },
+    "ex-diskcache": {
+      "type": "implementation",
+      "impl": "aws-serverless",
+      "label": "Warehouse のディスクキャッシュ",
+      "realizes": [
+        "diskcache"
+      ]
+    },
+    "ex-profile": {
+      "type": "implementation",
+      "impl": "aws-serverless",
+      "label": "SQL Query Profile",
       "realizes": [
         "profile"
       ]
     },
-    "example-optimizer": {
+    "ex-maintenance": {
       "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "Liquid Clustering のテーブル設定",
+      "impl": "aws-serverless",
+      "label": "Predictive Optimization と OPTIMIZE",
       "realizes": [
-        "optimizer"
+        "maintenance"
       ]
     },
-    "example-history": {
+    "ex-log": {
       "type": "implementation",
-      "impl": "databricks-sql-serverless",
-      "label": "system.query.history",
-      "realizes": []
+      "impl": "aws-serverless",
+      "label": "S3 上の Delta ログと統計",
+      "realizes": [
+        "log"
+      ]
+    },
+    "ex-files": {
+      "type": "implementation",
+      "impl": "aws-serverless",
+      "label": "S3 上の Delta Parquet ファイル",
+      "realizes": [
+        "files"
+      ]
+    },
+    "ex-layout": {
+      "type": "implementation",
+      "impl": "aws-serverless",
+      "label": "Delta の Liquid Clustering 設定",
+      "realizes": [
+        "layout"
+      ]
     }
   },
   "byRef": {
     "docs/reference-databricks-sql-performance.md#§1": [
-      "model",
-      "bi",
-      "submit"
+      "model"
     ],
     "docs/reference-databricks-sql-performance.md": [
       "model",
-      "bi",
-      "warehouse",
-      "engine",
+      "client",
+      "catalog",
+      "planner",
+      "result",
       "scan",
-      "shuffle",
+      "operators",
+      "diskcache",
       "profile",
-      "optimizer",
+      "maintenance",
+      "log",
+      "files",
+      "layout",
       "submit",
-      "execute",
+      "resolve",
+      "stats",
+      "start",
       "read",
-      "join",
+      "disk",
+      "process",
+      "return",
+      "check",
+      "cached",
       "observe",
-      "scan-profile",
-      "maintain",
-      "plan",
-      "example-user",
-      "example-serverless",
-      "example-s3",
-      "example-iam",
-      "example-bi",
-      "example-warehouse",
-      "example-scan",
-      "example-profile",
-      "example-optimizer",
-      "example-history"
-    ],
-    "docs/reference-databricks-sql-performance.md#§2": [
-      "warehouse",
-      "engine",
-      "execute"
-    ],
-    "docs/reference-databricks-sql-performance.md#§4": [
-      "scan",
-      "optimizer",
-      "read",
-      "maintain"
+      "config",
+      "rewrite",
+      "commit",
+      "skipping",
+      "adaptive",
+      "cache",
+      "cluster",
+      "ex-client",
+      "ex-catalog",
+      "ex-planner",
+      "ex-result",
+      "ex-scan",
+      "ex-operators",
+      "ex-diskcache",
+      "ex-profile",
+      "ex-maintenance",
+      "ex-log",
+      "ex-files",
+      "ex-layout"
     ],
     "docs/reference-databricks-sql-performance.md#§3": [
-      "shuffle",
-      "profile",
-      "join",
-      "observe",
-      "scan-profile",
-      "plan"
+      "model",
+      "adaptive"
+    ],
+    "docs/reference-databricks-sql-performance.md#§4": [
+      "model",
+      "cache"
     ],
     "docs/reference-databricks-sql-performance.md#§5": [
-      "example-user",
-      "example-serverless",
-      "example-s3",
-      "example-iam",
-      "example-bi",
-      "example-warehouse",
-      "example-scan",
-      "example-profile",
-      "example-optimizer",
-      "example-history"
+      "model",
+      "cluster"
+    ],
+    "docs/reference-databricks-sql-performance.md#§6": [
+      "model",
+      "ex-client",
+      "ex-catalog",
+      "ex-planner",
+      "ex-result",
+      "ex-scan",
+      "ex-operators",
+      "ex-diskcache",
+      "ex-profile",
+      "ex-maintenance",
+      "ex-log",
+      "ex-files",
+      "ex-layout"
+    ],
+    "docs/reference-databricks-sql-performance.md#§2": [
+      "client",
+      "catalog",
+      "planner",
+      "result",
+      "scan",
+      "operators",
+      "diskcache",
+      "profile",
+      "maintenance",
+      "log",
+      "files",
+      "layout",
+      "submit",
+      "resolve",
+      "stats",
+      "start",
+      "read",
+      "disk",
+      "process",
+      "return",
+      "check",
+      "cached",
+      "observe",
+      "config",
+      "rewrite",
+      "commit",
+      "skipping"
     ]
   },
   "reference": {
     "category": "クラウド分析基盤",
     "order": 20,
     "domain": "分析基盤・DWH",
-    "kind": "製品・技術のアーキテクチャ",
+    "kind": "仕組みの深掘り",
     "detailOf": "databricks",
+    "product": "Databricks",
+    "role": "internals",
+    "step": 3,
     "objectives": [
-      "ストレージの配置と、実行コンピュートの選び方を区別する。",
-      "SQL の実行プロファイルでスキャンとシャッフルを比較する。"
+      "Delta のログとファイル単位の統計による読み飛ばしを理解する。",
+      "Photon と AQE、ファイル配置の役割を区別する。",
+      "結果キャッシュとディスクキャッシュを区別し、観測と費用を考える。"
     ],
     "sources": [
       {
-        "title": "SQL Warehouse の種類",
-        "url": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types"
+        "title": "Data skipping",
+        "url": "https://docs.databricks.com/aws/en/tables/data-skipping"
+      },
+      {
+        "title": "Delta Lake protocol",
+        "url": "https://github.com/delta-io/delta/blob/master/PROTOCOL.md"
       },
       {
         "title": "Photon",
         "url": "https://docs.databricks.com/aws/en/compute/photon"
       },
       {
-        "title": "クエリプロファイル",
-        "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
+        "title": "Photon SIGMOD 2022",
+        "url": "https://www.databricks.com/de/wp-content/uploads/2022/07/Photon-A-Fast-Query-Engine-for-Lakehouse-Systems.pdf"
+      },
+      {
+        "title": "Adaptive query execution",
+        "url": "https://docs.databricks.com/aws/en/optimizations/aqe"
       },
       {
         "title": "Liquid clustering",
@@ -249,6 +401,38 @@
       {
         "title": "Predictive optimization",
         "url": "https://docs.databricks.com/aws/en/optimizations/predictive-optimization"
+      },
+      {
+        "title": "Query caching",
+        "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-caching"
+      },
+      {
+        "title": "Query Profile",
+        "url": "https://docs.databricks.com/aws/en/sql/user/queries/query-profile"
+      },
+      {
+        "title": "SQL Warehouse の種類",
+        "url": "https://docs.databricks.com/aws/en/compute/sql-warehouse/warehouse-types"
+      },
+      {
+        "title": "Performance best practices",
+        "url": "https://docs.databricks.com/aws/en/lakehouse-architecture/performance-efficiency/best-practices"
+      },
+      {
+        "title": "Data + AI Summit: Liquid Clustering",
+        "url": "https://answers.databricks.com/delta-lake-liquid-clustering-lightning-fast-queries-massive-datasets-2w50YGvW8TM"
+      },
+      {
+        "title": "Optimizing MERGE Performance using Liquid Clustering",
+        "url": "https://www.youtube.com/watch?v=yZmrpXJg-G8"
+      },
+      {
+        "title": "Managed storage",
+        "url": "https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage"
+      },
+      {
+        "title": "Serverless architecture",
+        "url": "https://docs.databricks.com/aws/en/security/network/serverless-network-security/serverless-compute"
       }
     ]
   }

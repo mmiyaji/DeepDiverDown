@@ -23,13 +23,16 @@ Unity Catalog はデータを統治し、Databricks SQLなどからクエリで�
 |---|---|---|
 | Lakeflow・取り込み | [Lakeflow の CDC と品質管理](reference-databricks-lakeflow.md) | Connect、Auto Loader、Spark Declarative Pipelines、Jobs |
 | Unity Catalog | [権限・ストレージ・リネージ](reference-databricks-unity-catalog.md) | メタストア、ワークスペース、管理／外部テーブル、列リネージ |
-| Databricks SQL | [実行プロファイルとファイル配置](reference-databricks-sql-performance.md) | SQL Warehouse、Photon、Liquid clustering、保守 |
+| Databricks SQL | [実行プロファイル・Photon・キャッシュ](reference-databricks-sql-performance.md) | SQL Warehouse、Photon、結果・ディスクキャッシュ、Query Profile |
+| Delta テーブル | [Liquid Clustering・Deletion Vector・ファイル読み飛ばし](reference-databricks-liquid-clustering-internals.md) | クラスタリング、行の論理削除、統計と実行時キーによる絞り込み |
+| 状態付きストリーミング | [RocksDB 状態とチェックポイント](reference-databricks-streaming-state-internals.md) | RocksDB、changelog、障害後の再開 |
 | OpenSharing | [共有の接続と失効](reference-databricks-open-sharing.md) | Databricks と外部クライアントへの共有経路 |
 | MLflow と Model Serving | [モデルの版管理](reference-databricks-mlflow-serving.md) | 学習の追跡、UC への登録、推論時の配備 |
 | AI Search | [索引更新と検索](reference-databricks-ai-search.md) | Delta Sync、埋め込み、検索とアクセス権 |
 
 ## 6. 参考資料
 - [Databricks reference architectures](https://docs.databricks.com/aws/en/lakehouse-architecture/reference)
+- [Lakebase](https://docs.databricks.com/aws/en/oltp/)
 
 ## 7. データの共有
 
@@ -73,3 +76,7 @@ S3 への権限は AWS IAM ロールとして定義し、Databricks 側のスト
 [Unity Catalog 外部ロケーション](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/s3)、[Model Serving](https://docs.databricks.com/aws/en/machine-learning/model-serving/)。
 
 この例ではパイプラインと SQL Warehouse にサーバーレス計算を選び、学習ジョブは顧客 AWS アカウントの EC2 上の classic compute を使う。Databricks は制御プレーンとサーバーレス計算プレーンを管理し、利用者はワークスペース、パイプライン、SQL Warehouse、クラスタ、モデルと権限を設定する。サーバーレスの内部ホストを直接操作するものではない。Unity Catalog 管理テーブルは論理オブジェクトで、実データは顧客側に設定した S3 管理ストレージに置く。公式資料を組み合わせた例であり、この一連の構成・バージョンの実動作は未検証。[Databricks ネットワーク構成](https://docs.databricks.com/aws/en/security/network/deployment-architecture/)、[管理ストレージ](https://docs.databricks.com/aws/en/connect/unity-catalog/cloud-storage/managed-storage)
+
+## 補足：2026 年 11 月時点
+
+Lakebase は Databricks に組み込まれたマネージドの Postgres で、取引処理（OLTP）向けのアプリがレイクハウスのデータと並んで動く用途を想定している。公式ページには名称変更の記載がなく、全体の提供状況（GA・Preview）も確認できなかったため未確認とする。この図はデータ基盤の分析・共有・機械学習の経路に絞り、Lakebase の図は作らない。

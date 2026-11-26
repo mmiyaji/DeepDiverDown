@@ -16,6 +16,8 @@ reference:
       url: https://cloud.google.com/bigquery/docs/query-plan-explanation
     - title: Overview of BigQuery analytics
       url: https://cloud.google.com/bigquery/docs/query-overview
+    - title: Apache Iceberg managed tables in BigQuery
+      url: https://docs.cloud.google.com/bigquery/docs/iceberg-tables
 sources:
   - docs/reference-bigquery.md
 evidence:
@@ -25,6 +27,8 @@ evidence:
     ref: docs/reference-bigquery.md#§7
   - type: doc
     ref: docs/reference-bigquery.md#§8
+  - type: doc
+    ref: docs/reference-bigquery.md#§10
 tiers:
   - id: interface
     label: 利用と管理
@@ -98,6 +102,16 @@ nodes:
     evidence:
       - type: doc
         ref: docs/reference-bigquery.md#§3
+  iceberg:
+    label: Iceberg テーブルとカタログ（Lakehouse for Apache Iceberg、旧 BigLake）
+    kind: catalog
+    tier: data
+    x: 3.5
+    'y': 2.6
+    description: 利用者の Cloud Storage に置く Iceberg テーブルと REST カタログ。BigQuery と外部エンジンが共有する。名称は旧 BigLake。
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§10
   engine:
     slots: 8
     label: 並列クエリ実行枠
@@ -173,6 +187,13 @@ links:
     evidence:
       - type: doc
         ref: docs/reference-bigquery.md#§6
+  - id: lake-read
+    from: engine
+    to: iceberg
+    label: Iceberg テーブルを読む
+    evidence:
+      - type: doc
+        ref: docs/reference-bigquery.md#§10
   - id: aggregate
     from: workers
     to: engine
@@ -334,7 +355,7 @@ implementations:
           - data
           - compute
           - implementation-setup
-        nodes: [example-api, example-dataset, example-engine, example-gcs, example-loader, example-reservation]
+        nodes: [example-api, example-dataset, example-engine, example-gcs, example-loader, example-reservation, example-iceberg]
     nodes:
       example-client:
         label: bq CLI を使う投入端末
@@ -413,6 +434,7 @@ implementations:
           - type: doc
             ref: docs/reference-bigquery.md#§9
       example-loader: {label: BigQuery（CSV ロードジョブ）, svc: gcp:bigquery, kind: worker, tier: implementation-setup, x: 6, y: 1.5, description: Google 管理のロード処理が Cloud Storage から CSV を読み管理表へ保存する。利用者は API からジョブと権限を指定する。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§9}]}
+      example-iceberg: {label: BigQuery の Iceberg 管理テーブルとカタログ, svc: gcp:bigquery, kind: catalog, tier: implementation-setup, x: 6, y: 0.2, realizes: [iceberg], description: 利用者の Cloud Storage に置く Iceberg テーブル。詳細は Iceberg レイクハウスの図で扱う。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§10}]}
       example-reservation: {label: BigQuery（QUERY 予約割当）, svc: gcp:bigquery, kind: policy, tier: implementation-setup, x: 12, y: 1.5, description: 利用者が同一ロケーションの QUERY 予約を分析プロジェクトに割り当てる。ロードは既定の共有プールを利用する。, evidence: [{type: doc, ref: docs/reference-bigquery.md#§9}]}
     links:
       - id: example-gcs-connection
@@ -437,9 +459,10 @@ implementations:
         example-dataset: {tier: diagram, x: 18, y: 2}
         example-api: {tier: diagram, x: 7, y: 8}
         example-engine: {tier: diagram, x: 12, y: 8}
+        example-iceberg: {tier: diagram, x: 18, y: 5}
         example-reservation: {tier: diagram, x: 18, y: 8}
       groups:
-        - {kind: cloud, label: Google Cloud 分析プロジェクト（サービスの論理的所属）, provider: gcp, tier: [diagram], x0: 4.3, y0: -0.5, x1: 21.5, y1: 11.5, nodes: [example-gcs, example-loader, example-dataset, example-api, example-engine, example-reservation]}
+        - {kind: cloud, label: Google Cloud 分析プロジェクト（サービスの論理的所属）, provider: gcp, tier: [diagram], x0: 4.3, y0: -0.5, x1: 21.5, y1: 11.5, nodes: [example-gcs, example-loader, example-dataset, example-api, example-engine, example-reservation, example-iceberg]}
     layout3d:
       tiers:
         - {id: clients, label: 利用者, kind: origin, z: 0, origin: [-5, 0], size: [3, 7]}
@@ -453,6 +476,7 @@ implementations:
         example-dataset: {tier: bigquery, x: 7, y: 1}
         example-api: {tier: bigquery, x: 2, y: 5}
         example-engine: {tier: bigquery, x: 7, y: 5}
+        example-iceberg: {tier: bigquery, x: 13, y: 1}
         example-reservation: {tier: bigquery, x: 13, y: 5}
       groups:
-        - {kind: cloud, label: Google Cloud 分析プロジェクト（サービスの論理的所属）, provider: gcp, tier: [input, bigquery], nodes: [example-gcs, example-loader, example-dataset, example-api, example-engine, example-reservation]}
+        - {kind: cloud, label: Google Cloud 分析プロジェクト（サービスの論理的所属）, provider: gcp, tier: [input, bigquery], nodes: [example-gcs, example-loader, example-dataset, example-api, example-engine, example-reservation, example-iceberg]}

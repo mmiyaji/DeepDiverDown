@@ -1,0 +1,82 @@
+name: "BigQuery：Capacitor とストレージの最適化"
+description: 書き込みから列指向ファイルへの保存、パーティションとクラスタリングによる読み取りの絞り込み、保持と課金の設定を追う。
+parent: {model: bigquery, node: storage}
+reference:
+  objectives:
+    - 列指向ストレージ、パーティション、クラスタリングの役割を区別する。
+    - 読み取る量を減らす設定と、保持・課金の設定を分けて説明する。
+    - 取得資料で確認できた範囲と未確認の範囲を区別する。
+  sources:
+    - {title: Overview of BigQuery storage, url: https://docs.cloud.google.com/bigquery/docs/storage_overview}
+    - {title: Query plan and timeline, url: https://docs.cloud.google.com/bigquery/docs/query-plan-explanation}
+sources: [docs/reference-bigquery-storage-optimization.md]
+evidence: [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§1"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§2"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§3"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§4"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§5"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§6"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§7"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§9"}, {type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§10"}]
+tiers:
+  - {id: write, label: 書き込みと読み取り, z: 2, size: [12, 3]}
+  - {id: layout, label: テーブルのデータ配置, z: 1, size: [12, 3]}
+  - {id: policy, label: 保持と課金, z: 0, size: [12, 3]}
+nodes:
+  writer: {label: 取り込み（ロード・Storage Write API）, kind: client, tier: write, x: 0, y: 1.5, description: テーブルへデータを書き込む。, evidence: &s [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§2"}]}
+  query: {label: クエリ実行（スロット）, kind: worker, tier: write, x: 8, y: 1.5, description: 必要な列と区画だけを読む。実行の流れは「クエリ実行とスロット」の図で扱う。, evidence: &q [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§5"}]}
+  table: {label: テーブル（パーティション・クラスタリング設定）, kind: table, tier: layout, x: 1, y: 1.5, description: パーティション列とクラスタリング列を設定する。, evidence: &p [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§4"}]}
+  capacitor: {label: Capacitor の列指向ファイル, kind: file, tier: layout, x: 6, y: 1.5, description: 列ごとにまとめて保存する管理ストレージの形式。ファイル配置の詳細は未確認。, evidence: &c [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§3"}]}
+  prune: {label: 読み取り範囲の絞り込み, kind: policy, tier: layout, x: 10.5, y: 1.5, description: パーティションとクラスタリング列の条件で、読むデータ量を減らす。, evidence: *p}
+  optimizer: {label: 自動の再配置（再クラスタリング）, kind: worker, tier: layout, x: 6, y: 0.2, description: 書き込みで崩れたクラスタリングの順序を Google が整える。取得資料に記述がなく未確認。, evidence: &o [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§6"}]}
+  retention: {label: タイムトラベルとフェイルセーフ, kind: policy, tier: policy, x: 2, y: 1.5, description: データセットの設定で保持期間が決まる。フェイルセーフの期間は変更できない。, evidence: &r [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§7"}]}
+  billing: {label: 課金方式（論理・物理）, kind: policy, tier: policy, x: 8, y: 1.5, description: データセットごとに論理（非圧縮）か物理（圧縮）を選ぶ。変更は反映に 24 時間、再変更まで 14 日。, evidence: *r}
+links:
+  - {id: write, from: writer, to: table, label: 行を書き込む, evidence: *s}
+  - {id: store, from: table, to: capacitor, label: 列指向形式で保存, evidence: *c}
+  - {id: reorg, from: optimizer, to: capacitor, label: 配置を整える, evidence: *o}
+  - {id: filter, from: query, to: prune, label: 条件を渡す, evidence: *p}
+  - {id: select, from: prune, to: capacitor, label: 必要な範囲だけ読む, evidence: *p}
+  - {id: scan, from: capacitor, to: query, label: 列データを返す, evidence: *q}
+  - {id: keep, from: retention, to: table, label: 過去の状態を保持, evidence: *r}
+  - {id: meter, from: billing, to: capacitor, label: 保存量を計量, evidence: *r}
+scenarios:
+  - id: write-and-read
+    label: 書き込み、絞り込み、読み取り
+    evidence: [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§5"}]
+    steps:
+      - {links: [write, store], note: 書き込んだ行をテーブルの設定に従い列指向形式で保存する。}
+      - {links: [filter, select, scan], note: クエリの条件でパーティションとクラスタリング列を使い、読む範囲を絞る。}
+      - {links: [keep, meter], note: 保持設定と課金方式が、過去の状態と保存量の計量に影響する。}
+unknowns:
+  - {id: layout-detail, text: Capacitor のファイル構造、Colossus との関係、自動再クラスタリングの条件は取得資料に記述がなく未確認。, refs: [capacitor, optimizer]}
+  - {id: retention-days, text: タイムトラベルとフェイルセーフの日数は取得資料に記載がなく未確認。, refs: [retention]}
+  - {id: write-opt, text: ストレージ書き込み最適化の挙動は未確認。, refs: [writer]}
+implementations:
+  - id: gcp-clustered-table
+    label: パーティション・クラスタリング済みの管理表
+    description: 受注テーブルを日付でパーティションし、顧客 ID でクラスタリングして、物理課金のデータセットに置く例。
+    sources:
+      - {title: Overview of BigQuery storage, url: https://docs.cloud.google.com/bigquery/docs/storage_overview}
+      - {title: Query plan and timeline, url: https://docs.cloud.google.com/bigquery/docs/query-plan-explanation}
+    tiers: &t2 [{id: diagram, label: BigQuery のストレージ配置, z: 0, size: [24, 12]}]
+    nodes:
+      bq-writer: {label: Storage Write API を使うアプリ, kind: client, tier: diagram, x: 1, y: 3, realizes: [writer], description: 受注行を書き込む。, evidence: &i [{type: doc, ref: "docs/reference-bigquery-storage-optimization.md#§8"}]}
+      bq-query: {label: BigQuery のクエリ実行, svc: gcp:bigquery, kind: worker, tier: diagram, x: 1, y: 8, realizes: [query], description: 日付と顧客 ID の条件でクエリする。, evidence: *i}
+      bq-table: {label: orders テーブル（日付パーティション・顧客 ID クラスタリング）, svc: gcp:bigquery, kind: table, tier: diagram, x: 8, y: 3, realizes: [table], description: 利用者がテーブル作成時にパーティションとクラスタリングを設定する。, evidence: *i}
+      bq-capacitor: {label: BigQuery の管理ストレージ（Capacitor）, svc: gcp:bigquery, kind: db, tier: diagram, x: 14, y: 5.5, realizes: [capacitor], description: Google が運用する。利用者はファイルに直接アクセスできない。, evidence: *i}
+      bq-prune: {label: BigQuery の読み取り範囲の絞り込み, svc: gcp:bigquery, kind: policy, tier: diagram, x: 8, y: 8, realizes: [prune], description: クエリ条件でパーティションとクラスタリング列を使う。, evidence: *i}
+      bq-optimizer: {label: BigQuery の自動再配置, svc: gcp:bigquery, kind: worker, tier: diagram, x: 19, y: 1.5, realizes: [optimizer], description: Google が運用する。条件と挙動は未確認。, evidence: *i}
+      bq-retention: {label: データセットの保持設定, svc: gcp:bigquery, kind: policy, tier: diagram, x: 19, y: 8, realizes: [retention], description: タイムトラベルの期間をデータセットで設定する。, evidence: *i}
+      bq-billing: {label: 物理課金のデータセット設定, svc: gcp:bigquery, kind: policy, tier: diagram, x: 14, y: 10, realizes: [billing], description: 物理（圧縮）課金を選ぶ。タイムトラベルとフェイルセーフの保存は別に課金される。, evidence: *i}
+    links: []
+    groups: &g2 [{kind: cloud, label: Google Cloud 分析プロジェクト, provider: gcp, tier: diagram, x0: 4.5, y0: -0.5, x1: 23.5, y1: 11.8, nodes: &env [bq-query, bq-table, bq-capacitor, bq-prune, bq-optimizer, bq-retention, bq-billing]}]
+    layout2d: {tiers: *t2, nodes: {}, groups: *g2}
+    layout3d:
+      tiers:
+        - {id: app, label: 利用者のアプリ, kind: origin, z: 0, origin: [-5, 0], size: [3, 7]}
+        - {id: bq, label: BigQuery, z: 0, size: [17, 8]}
+      nodes:
+        bq-writer: {tier: app, x: 1, y: 2}
+        bq-query: {tier: bq, x: 2, y: 5.5}
+        bq-table: {tier: bq, x: 2, y: 1.5}
+        bq-capacitor: {tier: bq, x: 8, y: 3.5}
+        bq-prune: {tier: bq, x: 8, y: 6.5}
+        bq-optimizer: {tier: bq, x: 13, y: 1}
+        bq-retention: {tier: bq, x: 13, y: 4}
+        bq-billing: {tier: bq, x: 13, y: 6.5}
+      groups:
+        - {kind: cloud, label: Google Cloud 分析プロジェクト, provider: gcp, tier: [bq], nodes: *env}

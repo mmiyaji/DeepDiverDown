@@ -1,9 +1,9 @@
 {
   "model": "snowflake-horizon-catalog",
-  "name": "Snowflake Horizon Catalog の分類・保護・監査",
+  "name": "Snowflake Horizon Catalog：分類・保護・監査と Iceberg REST",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 6,
+    "total": 6
   },
   "byId": {
     "owner": {
@@ -46,6 +46,21 @@
       "label": "列アクセスの監査履歴",
       "status": "claim"
     },
+    "engine": {
+      "type": "node",
+      "label": "外部エンジン",
+      "status": "claim"
+    },
+    "rest": {
+      "type": "node",
+      "label": "Iceberg REST カタログ API",
+      "status": "claim"
+    },
+    "iceberg": {
+      "type": "node",
+      "label": "Snowflake 管理 Iceberg テーブル",
+      "status": "claim"
+    },
     "inspect": {
       "type": "link",
       "label": "機微データ分類 → 注文のメールアドレス列",
@@ -86,13 +101,33 @@
       "label": "データ管理者 → 列アクセスの監査履歴",
       "status": "claim"
     },
-    "protect": {
-      "type": "scenario",
-      "label": "メールアドレスの分類とマスキング"
+    "request": {
+      "type": "link",
+      "label": "外部エンジン → Iceberg REST カタログ API",
+      "status": "claim"
     },
-    "investigate": {
+    "resolve": {
+      "type": "link",
+      "label": "Iceberg REST カタログ API → Snowflake 管理 Iceberg テーブル",
+      "status": "claim"
+    },
+    "vend": {
+      "type": "link",
+      "label": "Iceberg REST カタログ API → 外部エンジン",
+      "status": "claim"
+    },
+    "read-iceberg": {
+      "type": "link",
+      "label": "外部エンジン → Snowflake 管理 Iceberg テーブル",
+      "status": "claim"
+    },
+    "flow": {
       "type": "scenario",
-      "label": "機微列の変更影響を調べる"
+      "label": "分類・保護・監査と外部エンジンからの読み取り"
+    },
+    "external-policy": {
+      "type": "unknown",
+      "label": "外部エンジンへのマスキング等のポリシー伝播、S3 互換の非 AWS ストレージでの動作、内部配置は公開資料で未確認。"
     },
     "example-admin-user": {
       "type": "implementation",
@@ -174,6 +209,30 @@
       "impl": "snowflake-policy",
       "label": "監査用 Virtual Warehouse",
       "realizes": []
+    },
+    "example-engine": {
+      "type": "implementation",
+      "impl": "snowflake-policy",
+      "label": "Spark などの外部エンジン",
+      "realizes": [
+        "engine"
+      ]
+    },
+    "example-rest": {
+      "type": "implementation",
+      "impl": "snowflake-policy",
+      "label": "Horizon Iceberg REST カタログ API",
+      "realizes": [
+        "rest"
+      ]
+    },
+    "example-iceberg": {
+      "type": "implementation",
+      "impl": "snowflake-policy",
+      "label": "ORDERS_ICE（Snowflake 管理 Iceberg）",
+      "realizes": [
+        "iceberg"
+      ]
     }
   },
   "byRef": {
@@ -191,6 +250,9 @@
       "orders",
       "mart",
       "history",
+      "engine",
+      "rest",
+      "iceberg",
       "inspect",
       "assign",
       "bind",
@@ -199,8 +261,11 @@
       "derive",
       "track",
       "audit",
-      "protect",
-      "investigate",
+      "request",
+      "resolve",
+      "vend",
+      "read-iceberg",
+      "flow",
       "example-admin-user",
       "example-owner",
       "example-classify",
@@ -211,32 +276,43 @@
       "example-history",
       "example-privacy",
       "example-analysis-wh",
-      "example-audit-wh"
+      "example-audit-wh",
+      "example-engine",
+      "example-rest",
+      "example-iceberg"
     ],
     "docs/reference-snowflake-horizon-catalog.md#§2": [
       "owner",
       "classify",
       "tag",
       "inspect",
-      "assign"
+      "assign",
+      "flow"
     ],
     "docs/reference-snowflake-horizon-catalog.md#§3": [
       "policy",
       "analyst",
       "bind",
       "select",
-      "mask",
-      "protect"
+      "mask"
     ],
     "docs/reference-snowflake-horizon-catalog.md#§4": [
       "mart",
       "history",
       "derive",
       "track",
-      "audit",
-      "investigate"
+      "audit"
     ],
     "docs/reference-snowflake-horizon-catalog.md#§5": [
+      "engine",
+      "rest",
+      "iceberg",
+      "request",
+      "resolve",
+      "vend",
+      "read-iceberg"
+    ],
+    "docs/reference-snowflake-horizon-catalog.md#§6": [
       "example-admin-user",
       "example-owner",
       "example-classify",
@@ -247,7 +323,10 @@
       "example-history",
       "example-privacy",
       "example-analysis-wh",
-      "example-audit-wh"
+      "example-audit-wh",
+      "example-engine",
+      "example-rest",
+      "example-iceberg"
     ]
   },
   "reference": {
@@ -257,7 +336,8 @@
     "kind": "製品・技術のアーキテクチャ",
     "objectives": [
       "ロールによる利用権限と、タグを使った実行時の保護を区別する。",
-      "分類、利用の記録、リネージで確認できる情報を区別する。"
+      "分類、利用の記録、リネージで確認できる情報を区別する。",
+      "外部エンジンが Iceberg REST カタログと一時認証情報で表を読む経路を区別する。"
     ],
     "sources": [
       {
@@ -275,6 +355,14 @@
       {
         "title": "アクセス履歴",
         "url": "https://docs.snowflake.com/en/user-guide/access-history"
+      },
+      {
+        "title": "Horizon Catalog の Iceberg REST と外部エンジン",
+        "url": "https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon"
+      },
+      {
+        "title": "S3 互換ストレージと Horizon Catalog（2026 年 10 月、private preview）",
+        "url": "https://www.snowflake.com/en/blog/engineering/s3-compatible-storage-iceberg-horizon-catalog/"
       }
     ]
   }

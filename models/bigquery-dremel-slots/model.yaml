@@ -1,0 +1,84 @@
+name: "BigQuery：クエリ実行とスロット"
+description: クエリのステージをスロットが並列に処理し、予約とスケジューラーが配分する流れを追う。
+parent: {model: bigquery, node: engine}
+reference:
+  objectives:
+    - ステージ、スロット、シャッフルの役割を区別する。
+    - オンデマンドと容量課金（予約）でスロットの配分元がどう違うかを説明する。
+    - 競合時の優先順位と公平なスケジューリングの順序を追う。
+  sources:
+    - {title: Understand slots, url: https://docs.cloud.google.com/bigquery/docs/slots}
+    - {title: Query plan and timeline, url: https://docs.cloud.google.com/bigquery/docs/query-plan-explanation}
+sources: [docs/reference-bigquery-dremel-slots.md]
+evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§1"}, {type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§7"}, {type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§9"}, {type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§10"}]
+tiers:
+  - {id: submit, label: ジョブと計画, z: 2, size: [12, 3]}
+  - {id: capacity, label: スロットの配分, z: 1, size: [12, 3]}
+  - {id: run, label: 実行とデータ, z: 0, size: [12, 3]}
+nodes:
+  client: {label: ジョブを送る利用者, kind: external, tier: submit, x: 0, y: 1.5, description: コンソール、CLI、API からクエリジョブを送る。, evidence: &q [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§2"}]}
+  planner: {label: クエリ計画（ステージ）, kind: worker, tier: submit, x: 6, y: 1.5, description: SQL をステージの実行グラフにする。実行中に計画を修正することがある（REPARTITION・COALESCE ステージ）。, evidence: *q}
+  reservation: {label: 予約と割り当て, kind: policy, tier: capacity, x: 1, y: 1.5, description: ベースラインとオートスケールのスロット容量を持ち、プロジェクトに割り当てる。オンデマンドでは既定の共有プールを使う。, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§4"}]}
+  scheduler: {label: スロットの配分（公平なスケジューリング）, kind: scheduler, tier: capacity, x: 7, y: 1.5, description: プロジェクト間、続いてプロジェクト内のジョブ間でスロットを均等に分ける。, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§5"}]}
+  slots: {label: スロット（並列実行）, kind: worker, tier: run, x: 2, y: 1.5, slots: 8, description: ステージの作業単位を並列に処理する仮想的な計算単位。利用者が 1 クエリのスロット数を直接指定することはできない。, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§3"}]}
+  storage: {label: 管理ストレージ, kind: db, tier: run, x: 6, y: 0.5, description: 列指向のテーブルデータ。, evidence: *q}
+  shuffle: {label: シャッフル（分散メモリ）, kind: queue, tier: run, x: 6, y: 2.5, description: ステージ間の中間データを渡す。メモリからあふれた量は shuffleOutputBytesSpilled に出る。, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§6"}]}
+  result: {label: 結果の受け手, kind: actor, tier: run, x: 10, y: 1.5, description: BI 利用者やアプリケーション。, evidence: *q}
+links:
+  - {id: submit, from: client, to: planner, label: クエリジョブを送信, evidence: *q}
+  - {id: assign, from: planner, to: reservation, label: プロジェクトの割り当てを参照, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§4"}]}
+  - {id: provide, from: reservation, to: scheduler, label: スロット容量を提供, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§4"}]}
+  - {id: work, from: planner, to: scheduler, label: ステージの作業単位を渡す, evidence: *q}
+  - {id: allocate, from: scheduler, to: slots, label: スロットを配分, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§5"}]}
+  - {id: read, from: slots, to: storage, label: 必要な列を読む, evidence: *q}
+  - {id: spill, from: slots, to: shuffle, label: 中間データを書く, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§6"}]}
+  - {id: next, from: shuffle, to: slots, label: 次のステージが読む, evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§6"}]}
+  - {id: reply, from: slots, to: result, label: 結果を返す, evidence: *q}
+scenarios:
+  - id: run-query
+    label: 予約のスロットでクエリを実行する
+    evidence: [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§7"}]
+    steps:
+      - {links: [submit, assign, provide], note: ジョブを受け付け、割り当てに応じてスロット容量の配分元を決める。}
+      - {links: [work, allocate], note: ステージの作業単位に、公平なスケジューリングでスロットを割り当てる。}
+      - {links: [read, spill, next], note: スロットが列を読み、ステージ間の中間データをシャッフルで渡す。}
+      - {links: [reply], note: 最終ステージの結果を返す。}
+unknowns:
+  - {id: unverified, text: スロット数ごとの実行時間、オートスケールの反応時間、シャッフルの容量上限は未確認。, refs: [slots, shuffle]}
+  - {id: dremel, text: 実行エンジンの内部名（Dremel）と分散ツリー構造の詳細は、今回取得した資料に記述がなく未確認。, refs: [planner]}
+implementations:
+  - id: gcp-reservation
+    label: BigQuery Enterprise 予約とオートスケール
+    description: 分析プロジェクトに Enterprise edition の予約を割り当て、ベースラインとオートスケールのスロットでクエリを実行する例。
+    sources:
+      - {title: Understand slots, url: https://docs.cloud.google.com/bigquery/docs/slots}
+      - {title: Query plan and timeline, url: https://docs.cloud.google.com/bigquery/docs/query-plan-explanation}
+      - {title: BigQuery のワークロード管理, url: https://docs.cloud.google.com/bigquery/docs/reservations-intro}
+    tiers: &t2 [{id: diagram, label: BigQuery のクエリ実行, z: 0, size: [24, 12]}]
+    nodes:
+      bq-client: {label: bq CLI の投入端末, kind: external, tier: diagram, x: 1, y: 5, realizes: [client], description: クエリジョブを送る。, evidence: &i [{type: doc, ref: "docs/reference-bigquery-dremel-slots.md#§8"}]}
+      bq-plan: {label: BigQuery ジョブとクエリ計画, svc: gcp:bigquery, kind: worker, tier: diagram, x: 7, y: 5, realizes: [planner], description: ステージを作る。計画の詳細は INFORMATION_SCHEMA とクエリ計画で確認する。, evidence: *i}
+      bq-reservation: {label: Enterprise edition の予約（ベースライン＋オートスケール）, svc: gcp:bigquery, kind: policy, tier: diagram, x: 7, y: 1, realizes: [reservation], description: 利用者が作成し、プロジェクトに割り当てる。オートスケールは 50 スロット単位。, evidence: *i}
+      bq-scheduler: {label: BigQuery のスロット配分, svc: gcp:bigquery, kind: scheduler, tier: diagram, x: 13, y: 1, realizes: [scheduler], description: Google が運用する。利用者は予約と割り当てで影響する。, evidence: *i}
+      bq-slots: {label: BigQuery のスロット, svc: gcp:bigquery, kind: worker, tier: diagram, x: 13, y: 5, realizes: [slots], description: Google が運用する実行基盤。ワーカーへ直接アクセスできない。, evidence: *i}
+      bq-shuffle: {label: BigQuery のシャッフル層, svc: gcp:bigquery, kind: queue, tier: diagram, x: 18, y: 8.5, realizes: [shuffle], description: ステージ間の中間データを保持する。, evidence: *i}
+      bq-storage: {label: BigQuery の管理ストレージ, svc: gcp:bigquery, kind: db, tier: diagram, x: 18, y: 2, realizes: [storage], description: テーブルデータを保持する。, evidence: *i}
+      bq-analyst: {label: BigQuery Studio の分析者, kind: actor, tier: diagram, x: 1, y: 9.5, realizes: [result], description: 結果を受け取る。, evidence: *i}
+    links: []
+    groups: &g2 [{kind: cloud, label: Google Cloud 分析プロジェクト, provider: gcp, tier: diagram, x0: 4.5, y0: -0.5, x1: 22.5, y1: 11.5, nodes: &env [bq-plan, bq-reservation, bq-scheduler, bq-slots, bq-shuffle, bq-storage]}]
+    layout2d: {tiers: *t2, nodes: {}, groups: *g2}
+    layout3d:
+      tiers:
+        - {id: users, label: 利用者, kind: origin, z: 0, origin: [-5, 0], size: [3, 7]}
+        - {id: bq, label: BigQuery, z: 0, size: [17, 7]}
+      nodes:
+        bq-client: {tier: users, x: 1, y: 1.5}
+        bq-analyst: {tier: users, x: 1, y: 5}
+        bq-plan: {tier: bq, x: 2, y: 3.5}
+        bq-reservation: {tier: bq, x: 2, y: 1}
+        bq-scheduler: {tier: bq, x: 7, y: 1}
+        bq-slots: {tier: bq, x: 7, y: 3.5}
+        bq-shuffle: {tier: bq, x: 13, y: 5}
+        bq-storage: {tier: bq, x: 13, y: 1.5}
+      groups:
+        - {kind: cloud, label: Google Cloud 分析プロジェクト, provider: gcp, tier: [bq], nodes: *env}

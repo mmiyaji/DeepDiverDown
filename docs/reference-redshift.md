@@ -3,6 +3,8 @@
 ## 1. 範囲
 Amazon Redshift のプロビジョンドクラスターを、クライアント、リーダーノード、コンピュートノード、データベース、Redshift Managed Storage（RMS）の関係として示す。Redshift サービスはクラスターの設定、監視、バックアップ、パッチ適用を管理する。
 
+Redshift Serverless は RPU で容量を指定する別の提供形態で、仕組みは「Amazon Redshift Serverless：RPU とスケーリング」に分ける。2026 年 11 月時点で、RA3 のほか RG インスタンスタイプが資料に現れるが、この図では未確認。
+
 出典 [Amazon Redshift provisioned clusters overview](https://docs.aws.amazon.com/redshift/latest/mgmt/overview.html)
 
 ## 2. クラスター

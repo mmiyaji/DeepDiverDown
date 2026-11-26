@@ -1,215 +1,306 @@
-name: Snowflake のクエリ性能とウェアハウス
-description: 同時実行時の待ち行列、マイクロパーティションの除外、条件を満たす結果の再利用を分けて調べる。
+name: Snowflake：クエリ性能とウェアハウス
+description: 同時実行の待ち行列、区画の絞り込み、検索用構造、結果とデータのキャッシュ、追加並列化を分けて調べる。
 parent:
   model: snowflake
   node: biwh
 reference:
   objectives:
-    - 並行実行と一つのクエリ内部のスキャン量を別々に計測する。
-    - 結果再利用時と実行時の経路を比較する。
+  - 並行実行と一つのクエリ内部のスキャン量を別々に計測する。
+  - 結果再利用、ウェアハウスのデータキャッシュ、実行時の経路を比較する。
+  - 任意の最適化（検索用構造、Optima、QAS）の適用条件と維持費を確認する。
   sources:
-    - title: マイクロパーティション
-      url: https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
-    - title: マルチクラスターウェアハウス
-      url: https://docs.snowflake.com/en/user-guide/warehouses-multicluster
-    - title: 永続化されたクエリ結果
-      url: https://docs.snowflake.com/en/user-guide/querying-persisted-results
-    - title: クエリ性能の最適化
-      url: https://docs.snowflake.com/en/user-guide/performance-query-options
-    - title: Query Profile とクエリの調査
-      url: https://docs.snowflake.com/en/user-guide/ui-snowsight-activity
-    - title: Top-K pruning
-      url: https://docs.snowflake.com/en/user-guide/querying-top-k-pruning-optimization
-    - title: Snowflake Optima Metadata
-      url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/
+  - title: マイクロパーティション
+    url: https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
+  - title: マルチクラスターウェアハウス
+    url: https://docs.snowflake.com/en/user-guide/warehouses-multicluster
+  - title: 永続化されたクエリ結果
+    url: https://docs.snowflake.com/en/user-guide/querying-persisted-results
+  - title: クエリ性能の最適化
+    url: https://docs.snowflake.com/en/user-guide/performance-query-options
+  - title: Query Profile とクエリの調査
+    url: https://docs.snowflake.com/en/user-guide/ui-snowsight-activity
+  - title: Top-K pruning
+    url: https://docs.snowflake.com/en/user-guide/querying-top-k-pruning-optimization
+  - title: Snowflake Optima Metadata
+    url: https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/
+  - title: Search optimization
+    url: https://docs.snowflake.com/en/user-guide/search-optimization-service
+  - title: Optima
+    url: https://docs.snowflake.com/en/user-guide/snowflake-optima
+  - title: Query Acceleration Service
+    url: https://docs.snowflake.com/en/user-guide/query-acceleration-service
+  - title: Warehouse cache
+    url: https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache
 sources:
-  - docs/reference-snowflake-query-performance.md
+- docs/reference-snowflake-query-performance.md
 evidence:
-  - type: doc
-    ref: docs/reference-snowflake-query-performance.md#§1
+- type: doc
+  ref: docs/reference-snowflake-query-performance.md#§1
 tiers:
-  - id: flow
-    label: 構成と処理の流れ
-    z: 0
-    size:
-      - 13.5
-      - 5.5
+- id: flow
+  label: 構成と処理の流れ
+  z: 0
+  size:
+  - 15
+  - 6
 nodes:
   bi:
     label: BI クエリ
     kind: client
     tier: flow
     x: 0
-    'y': 2
+    y: 2
     description: 注文日別売上を集計する。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§1
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§1
   control:
     label: クエリ受付と計画
     kind: service
     tier: flow
     x: 3
-    'y': 2
-    description: クエリを評価する入口。
+    y: 2
+    description: 条件と区画メタデータで計画し、結果再利用を判断する。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§1
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§1
   queue:
     label: 実行待ち行列
     kind: queue
     tier: flow
     x: 6
-    'y': 0
+    y: 0
     description: 同時実行の空きを待つ。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§2
   clusters:
-    label: 並列クエリ実行資源
+    label: ウェアハウスの実行資源
     kind: worker
     tier: flow
     x: 9
-    'y': 0
-    description: 実行枠を提供する。
-    parallel: 'N'
+    y: 0
+    description: 区画の読み取り、結合、集計、並べ替えを実行する。動的 pruning と Top-K pruning は実行時に働く。
+    parallel: N
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§2
+    drill: snowflake-aggregation-placement
   metadata:
     label: 区画メタデータ
     kind: db
     tier: flow
-    x: 9
-    'y': 3
-    description: 列の最小値・最大値など。
+    x: 9.5
+    y: 3
+    description: 列の最小値・最大値など。範囲が合わない区画を除外する。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§3
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§3
+    drill: snowflake-optima-internals
   micro:
     label: 列指向のストレージ区画
     kind: db
     tier: flow
-    x: 13
-    'y': 3
+    x: 14.5
+    y: 2.5
     description: 候補となる列データを読む。
     partitions: 4
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§3
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§3
   result:
     label: 永続化済み結果
     kind: cache
     tier: flow
     x: 6
-    'y': 5
+    y: 5
     description: 対象の実行結果を再利用できる。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§4
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§4
+  search:
+    label: 検索用の補助構造
+    kind: db
+    tier: flow
+    x: 12
+    y: 0
+    description: Search Optimization の永続化された access path。値が含まれ得る区画の候補を絞る。任意で追加費用がある。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§3
+  optima:
+    label: 式ごとの追加統計
+    kind: db
+    tier: flow
+    x: 9
+    y: 5
+    description: Optima Metadata が頻出する式の統計を生成する。Gen2 standard warehouse と Adaptive Warehouse が対象。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§3
+  whcache:
+    label: ウェアハウスのデータキャッシュ
+    kind: cache
+    tier: flow
+    x: 6
+    y: 3
+    description: 稼働中のウェアハウスの後続クエリで使える表データ。停止時に破棄される。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§4
+  qas:
+    label: Query Acceleration Service
+    kind: service
+    tier: flow
+    x: 13
+    y: 5
+    description: 有効化と対象条件を満たす場合、処理の一部を共有計算資源にオフロードする。Enterprise Edition 以上。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§3
+  profile:
+    label: Query Profile
+    kind: service
+    tier: flow
+    x: 3
+    y: 5
+    description: 待ち、読み取った区画数、演算子ごとの行数や spill を調べる。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§1
 links:
-  - id: submit
-    from: bi
-    to: control
-    label: 集計 SQL
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§1
-  - id: wait
-    from: control
-    to: queue
-    label: 実行枠を待つ
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§2
-  - id: allocate
-    from: queue
-    to: clusters
-    label: 空いたクラスターで実行
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§2
-  - id: bounds
-    from: control
-    to: metadata
-    label: 候補の範囲を調べる
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§3
-  - id: scan
-    from: clusters
-    to: micro
-    label: 残った区画の列を読む
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§3
-  - id: reuse
-    from: control
-    to: result
-    label: 条件を満たす結果を参照
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§4
-  - id: return
-    from: clusters
-    to: bi
-    label: 集計を返す
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§2
-  - id: cached
-    from: result
-    to: bi
-    label: 保存済み結果を返す
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§4
+- id: submit
+  from: bi
+  to: control
+  label: 集計 SQL
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§1
+- id: wait
+  from: control
+  to: queue
+  label: 実行枠を待つ
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§2
+- id: allocate
+  from: queue
+  to: clusters
+  label: 空いたクラスターで実行
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§2
+- id: bounds
+  from: control
+  to: metadata
+  label: 候補の範囲を調べる
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§3
+- id: scan
+  from: clusters
+  to: micro
+  label: 残った区画の列を読む
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§3
+- id: reuse
+  from: control
+  to: result
+  label: 条件を満たす結果を参照
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§4
+- id: return
+  from: clusters
+  to: bi
+  label: 集計を返す
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§2
+- id: cached
+  from: result
+  to: bi
+  label: 保存済み結果を返す
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§4
+- id: index
+  from: search
+  to: control
+  label: 検索パスを参照
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§3
+- id: expr
+  from: optima
+  to: control
+  label: 式の統計を参照
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§3
+- id: warm
+  from: whcache
+  to: clusters
+  label: キャッシュ済みデータを読む
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§4
+- id: accel
+  from: clusters
+  to: qas
+  label: 対象処理をオフロード
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§3
+- id: observe
+  from: clusters
+  to: profile
+  label: 実行の実績を確認
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§1
 scenarios:
-  - id: pruning
-    label: 日付フィルターで読む区画を減らす
-    visual: grid
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§3
-    steps:
-      - links:
-          - submit
-          - bounds
-        note: 1月25日以降の注文を指定し、日付の範囲が重ならない区画を除外する。
-        prune:
-          - row:p1
-          - row:p2
-      - links:
-          - wait
-          - allocate
-        note: クエリを実行できるクラスターに割り当てる。
-      - links:
-          - scan
-          - return
-        note: 残った区画から必要列を読み、集計結果を返す。
-        read:
-          - row:p3
-          - row:p4
-  - id: reuse
-    label: 結果再利用と実行時の待ちを比較
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-query-performance.md#§4
-    steps:
-      - links:
-          - submit
-          - reuse
-          - cached
-        note: 再利用条件を満たした同じ要求では、既存の結果を返す。
-      - links:
-          - submit
-          - wait
-          - allocate
-        note: 再利用できない要求が集中した場合は、実行枠の空きを待つ。
-      - links:
-          - scan
-          - return
-        note: マルチクラスター構成では同時要求を別のクラスターに割り当てられる。
+- id: pruning
+  label: 条件で絞り、実行し、結果を再利用する
+  visual: grid
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-query-performance.md#§3
+  steps:
+  - links:
+    - submit
+    - bounds
+    note: 1月25日以降の注文を指定し、日付の範囲が重ならない区画を除外する。
+    prune:
+    - row:p1
+    - row:p2
+  - links:
+    - index
+    - expr
+    note: 対象の検索条件や式では、検索用の補助構造と追加統計でさらに候補を絞れる場合がある。
+  - links:
+    - wait
+    - allocate
+    note: クエリを実行できるクラスターに割り当てる。同時要求が多いと実行枠の空きを待つ。
+  - links:
+    - scan
+    - warm
+    note: 残った区画から必要列を読む。稼働中のウェアハウスのキャッシュにあれば使う。
+    read:
+    - row:p3
+    - row:p4
+  - links:
+    - accel
+    note: QAS が有効で対象のクエリなら、処理の一部を共有計算資源へオフロードする。
+  - links:
+    - return
+    - observe
+    note: 集計を返し、Query Profile で読んだ区画数と spill を確認する。
+  - links:
+    - reuse
+    - cached
+    note: 再利用条件を満たす同じ要求は実行せず、保存済みの結果を返す。
 grid:
   title: 日付条件による区画の除外
   rowLabel: 区画の日付範囲
@@ -217,162 +308,389 @@ grid:
   unit: ' 単位'
   node: micro
   rows:
-    - id: p1
-      label: 1/01〜1/07
-    - id: p2
-      label: 1/08〜1/14
-    - id: p3
-      label: 1/24〜1/27
-    - id: p4
-      label: 1/28〜1/31
+  - id: p1
+    label: 1/01〜1/07
+  - id: p2
+    label: 1/08〜1/14
+  - id: p3
+    label: 1/24〜1/27
+  - id: p4
+    label: 1/28〜1/31
   cols:
-    - id: date
-      label: 注文日
-    - id: amount
-      label: 金額
+  - id: date
+    label: 注文日
+  - id: amount
+    label: 金額
   values:
-    - - 3
-      - 8
-    - - 3
-      - 8
-    - - 3
-      - 8
-    - - 3
-      - 8
+  - - 3
+    - 8
+  - - 3
+    - 8
+  - - 3
+    - 8
+  - - 3
+    - 8
   note: 数値は例示。日付範囲が一部でも重なる 1/24〜1/27 は候補に残る。
 implementations:
-  - id: snowflake-bi
-    label: Snowflake Enterprise の BI 負荷調査
-    description: BI 専用のマルチクラスターウェアハウスで、待ち時間、区画の読み取り、結果再利用を調べる例。
-    sources:
-      - title: マイクロパーティション
-        url: https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
-      - title: マルチクラスターウェアハウス
-        url: https://docs.snowflake.com/en/user-guide/warehouses-multicluster
-      - title: 永続化されたクエリ結果
-        url: https://docs.snowflake.com/en/user-guide/querying-persisted-results
-      - title: QUERY_HISTORY ビュー
-        url: https://docs.snowflake.com/en/sql-reference/account-usage/query_history
-      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
+- id: snowflake-bi
+  label: Snowflake Enterprise の BI 負荷調査
+  description: BI 専用のマルチクラスターウェアハウスで、待ち時間、区画の読み取り、結果再利用を調べる例。
+  sources:
+  - title: マイクロパーティション
+    url: https://docs.snowflake.com/en/user-guide/tables-clustering-micropartitions
+  - title: マルチクラスターウェアハウス
+    url: https://docs.snowflake.com/en/user-guide/warehouses-multicluster
+  - title: 永続化されたクエリ結果
+    url: https://docs.snowflake.com/en/user-guide/querying-persisted-results
+  - title: QUERY_HISTORY ビュー
+    url: https://docs.snowflake.com/en/sql-reference/account-usage/query_history
+  - title: Snowflake architecture
+    url: https://docs.snowflake.com/en/user-guide/intro-key-concepts
+  - title: Search optimization
+    url: https://docs.snowflake.com/en/user-guide/search-optimization-service
+  - title: Optima
+    url: https://docs.snowflake.com/en/user-guide/snowflake-optima
+  - title: Query Acceleration Service
+    url: https://docs.snowflake.com/en/user-guide/query-acceleration-service
+  - title: Warehouse cache
+    url: https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache
+  tiers:
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+    - 15
+    - 6
+  - id: implementation-setup
+    label: 実装時の設定・観測
+    z: 1
+    size:
+    - 8
+    - 3
+  nodes:
+    example-bi:
+      label: 注文集計 SQL クライアント
+      kind: client
+      tier: flow
+      x: 0
+      y: 2
+      realizes:
+      - bi
+      description: 注文日を条件に、同一の SQL を実行する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+    example-control:
+      label: Snowflake Cloud Services
+      kind: service
+      tier: flow
+      svc: snowflake:platform
+      x: 3
+      y: 2
+      realizes:
+      - control
+      description: クエリを受付け、計画や結果再利用の判断を調整する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+    example-queue:
+      svc: snowflake:warehouse
+      label: BI_WH マルチクラスターウェアハウス
+      kind: queue
+      tier: flow
+      x: 6
+      y: 0
+      realizes:
+      - queue
+      description: 最小・最大クラスター数とスケーリングポリシーを設定する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+    example-metadata:
+      label: Snowflake ORDERS のマイクロパーティション
+      kind: db
+      tier: flow
+      x: 9
+      y: 3
+      realizes:
+      - metadata
+      - micro
+      description: サービスが管理する区画メタデータで不要な区画を除外する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+    example-result:
+      label: Snowflake の永続化クエリ結果
+      kind: cache
+      tier: flow
+      x: 6
+      y: 5
+      realizes:
+      - result
+      description: 同一クエリなど、再利用の条件を満たすときに使う。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+    example-history:
+      label: ACCOUNT_USAGE.QUERY_HISTORY
+      kind: service
+      tier: implementation-setup
+      x: 1
+      y: 1.5
+      description: 待ち時間と読み取ったパーティション数を照合する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+    example-compute:
+      label: BI_WH のクラスター
+      kind: worker
+      tier: flow
+      x: 7.5
+      y: 1
+      realizes:
+      - clusters
+      description: 区画の読み取りと集計を実行する。利用者はサイズと最小・最大クラスター数を設定する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+      svc: snowflake:warehouse
+    example-whcache:
+      label: ウェアハウスのデータキャッシュ
+      kind: cache
+      tier: flow
+      x: 7.5
+      y: 4
+      realizes:
+      - whcache
+      description: 稼働中の BI_WH の後続クエリで使える。停止時に破棄される。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+      provider: snowflake
+    example-search:
+      label: Search Optimization の access path（任意）
+      kind: db
+      tier: flow
+      x: 11
+      y: 0
+      realizes:
+      - search
+      description: 対象テーブルで有効化した場合だけ使う。構築・維持に追加費用がある。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+      provider: snowflake
+    example-optima:
+      label: Optima Metadata（対象環境）
+      kind: db
+      tier: flow
+      x: 11
+      y: 5
+      realizes:
+      - optima
+      description: Gen2 standard warehouse などの対象環境で、頻出する式の統計を自動生成する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+      provider: snowflake
+    example-qas:
+      label: Query Acceleration Service（任意）
+      kind: service
+      tier: flow
+      x: 13
+      y: 5
+      realizes:
+      - qas
+      description: ウェアハウスで有効化した場合、対象クエリの一部を共有計算資源へオフロードする。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+      provider: snowflake
+    example-profile:
+      label: Snowsight Query Profile
+      kind: service
+      tier: implementation-setup
+      x: 3.5
+      y: 1.5
+      realizes:
+      - profile
+      description: 読み取った区画数、演算子ごとの行数、spill を確認する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-query-performance.md#§5
+      provider: snowflake
+  links:
+  - id: example-history-connection
+    from: example-queue
+    to: example-history
+    label: 実行履歴で調査
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-query-performance.md#§5
+  groups:
+  - kind: cloud
+    provider: snowflake
+    label: Snowflake account
+    tier:
+    - flow
+    - implementation-setup
+    nodes: &id001
+    - example-control
+    - example-queue
+    - example-compute
+    - example-whcache
+    - example-search
+    - example-optima
+    - example-qas
+    - example-profile
+    - example-metadata
+    - example-result
+    - example-history
+  layout2d:
     tiers:
-      - id: flow
-        label: 構成と処理の流れ
-        z: 0
-        size:
-          - 13.5
-          - 5.5
-      - id: implementation-setup
-        label: 実装時の設定・観測
-        z: 1
-        size:
-          - 8
-          - 3
+    - id: diagram
+      label: Snowflake query analysis
+      z: 0
+      size:
+      - 31
+      - 11
     nodes:
       example-bi:
-        label: 注文集計 SQL クライアント
-        kind: client
-        tier: flow
+        tier: diagram
         x: 0
-        'y': 2
-        realizes:
-          - bi
-        description: 注文日を条件に、同一の SQL を実行する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-query-performance.md#§5
+        y: 4
       example-control:
-        label: Snowflake Cloud Services
-        kind: service
-        tier: flow
-        svc: snowflake:platform
-        x: 3
-        'y': 2
-        realizes:
-          - control
-        description: クエリを受付け、計画や結果再利用の判断を調整する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-query-performance.md#§5
+        tier: diagram
+        x: 5
+        y: 4
       example-queue:
-        svc: snowflake:warehouse
-        label: BI_WH マルチクラスターウェアハウス
-        kind: queue
-        tier: flow
-        x: 6
-        'y': 0
-        realizes:
-          - queue
-          - clusters
-        description: 最小・最大クラスター数とスケーリングポリシーを設定する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-query-performance.md#§5
+        tier: diagram
+        x: 10
+        y: 1
       example-metadata:
-        label: Snowflake ORDERS のマイクロパーティション
-        kind: db
-        tier: flow
-        x: 9
-        'y': 3
-        realizes:
-          - metadata
-          - micro
-        description: サービスが管理する区画メタデータで不要な区画を除外する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-query-performance.md#§5
+        tier: diagram
+        x: 20
+        y: 4
       example-result:
-        label: Snowflake の永続化クエリ結果
-        kind: cache
-        tier: flow
-        x: 6
-        'y': 5
-        realizes:
-          - result
-        description: 同一クエリなど、再利用の条件を満たすときに使う。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-query-performance.md#§5
+        tier: diagram
+        x: 10
+        y: 8
       example-history:
-        label: ACCOUNT_USAGE.QUERY_HISTORY
-        kind: service
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
-        description: 待ち時間と読み取ったパーティション数を照合する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-query-performance.md#§5
-    links:
-      - id: example-history-connection
-        from: example-queue
-        to: example-history
-        label: 実行履歴で調査
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-query-performance.md#§5
+        tier: diagram
+        x: 20
+        y: 8
+      example-compute:
+        tier: diagram
+        x: 15
+        y: 1
+      example-whcache:
+        tier: diagram
+        x: 15
+        y: 4
+      example-qas:
+        tier: diagram
+        x: 20
+        y: 1
+      example-search:
+        tier: diagram
+        x: 25
+        y: 1
+      example-optima:
+        tier: diagram
+        x: 25
+        y: 4
+      example-profile:
+        tier: diagram
+        x: 15
+        y: 8
     groups:
-      - {kind: cloud, provider: snowflake, label: Snowflake account, tier: [flow, implementation-setup], nodes: [example-control, example-queue, example-metadata, example-result, example-history]}
-    layout2d:
-      tiers: [{id: diagram, label: Snowflake query analysis, z: 0, size: [23, 10]}]
-      nodes:
-        example-bi: {tier: diagram, x: 0, y: 4}
-        example-control: {tier: diagram, x: 5, y: 2}
-        example-queue: {tier: diagram, x: 10, y: 2}
-        example-metadata: {tier: diagram, x: 15, y: 2}
-        example-result: {tier: diagram, x: 10, y: 6}
-        example-history: {tier: diagram, x: 15, y: 6}
-      groups:
-        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: diagram, nodes: [example-control, example-queue, example-metadata, example-result, example-history]}
-    layout3d:
-      tiers:
-        - {id: services, label: Snowflake managed services and data, z: 0, size: [20, 6]}
-        - {id: client, label: BI client, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
-      nodes:
-        example-bi: {tier: client, x: 0, y: 1.5}
-        example-control: {tier: services, x: 2, y: 1}
-        example-queue: {tier: services, x: 6, y: 1}
-        example-metadata: {tier: services, x: 10, y: 1}
-        example-result: {tier: services, x: 6, y: 4}
-        example-history: {tier: services, x: 10, y: 4}
-      groups:
-        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: services, nodes: [example-control, example-queue, example-metadata, example-result, example-history]}
+    - kind: cloud
+      provider: snowflake
+      label: Snowflake account
+      tier: diagram
+      nodes: *id001
+      x0: 3.2
+      y0: -0.3
+      x1: 29
+      y1: 10
+  layout3d:
+    tiers:
+    - id: services
+      label: Snowflake managed services and data
+      z: 0
+      size:
+      - 30
+      - 6
+    - id: client
+      label: BI client
+      kind: origin
+      z: 0
+      origin:
+      - -4
+      - 0
+      size:
+      - 2
+      - 3
+    nodes:
+      example-bi:
+        tier: client
+        x: 0
+        y: 1.5
+      example-control:
+        tier: services
+        x: 2
+        y: 1
+      example-queue:
+        tier: services
+        x: 6
+        y: 1
+      example-metadata:
+        tier: services
+        x: 10
+        y: 4
+      example-result:
+        tier: services
+        x: 6
+        y: 4
+      example-history:
+        tier: services
+        x: 18
+        y: 4
+      example-compute:
+        tier: services
+        x: 10
+        y: 1
+      example-qas:
+        tier: services
+        x: 14
+        y: 1
+      example-search:
+        tier: services
+        x: 18
+        y: 1
+      example-optima:
+        tier: services
+        x: 22
+        y: 1
+      example-whcache:
+        tier: services
+        x: 14
+        y: 4
+      example-profile:
+        tier: services
+        x: 2
+        y: 4
+    groups:
+    - kind: cloud
+      provider: snowflake
+      label: Snowflake account
+      tier: services
+      nodes: *id001
+unknowns:
+- id: internal-deployment
+  text: 内部ノード数、キャッシュの配置、QAS の共有計算資源の規模、Optima の選択しきい値は公開資料で未確認。
+  refs:
+  - clusters
+  - whcache
+  - qas
+  - optima

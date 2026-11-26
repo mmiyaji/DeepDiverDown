@@ -6,7 +6,7 @@ import { loadAnalyze } from '../tools/load.mjs';
 import { implementation3D } from '../js/implementation-3d.js';
 import { buildDiagramLayout } from '../js/diagram-layout.js';
 
-const ids = ['snowflake-snowpipe-streaming-internals', 'snowflake-kafka-iceberg-streaming', 'snowflake-optima-internals', 'snowflake-iceberg-vended-credentials', 'snowflake-iceberg-s3-compatible', 'snowflake-aggregation-placement', 'databricks-streaming-state-internals', 'databricks-deletion-vectors-internals', 'databricks-unity-vended-credentials', 'databricks-dynamic-file-pruning'];
+const ids = ['snowflake-snowpipe-streaming-internals', 'snowflake-optima-internals', 'snowflake-iceberg-vended-credentials', 'snowflake-horizon-catalog', 'snowflake-aggregation-placement', 'databricks-streaming-state-internals', 'databricks-unity-vended-credentials', 'databricks-liquid-clustering-internals'];
 const load = id => yaml.load(readFileSync(new URL(`../models/${id}/model.yaml`, import.meta.url), 'utf8'));
 const link = (model, id) => model.links.find(l => l.id === id);
 
@@ -21,7 +21,10 @@ test('追加した調査モデルは参照先・接続・シナリオ・実装�
     for (const step of model.scenarios.flatMap(s => s.steps)) for (const edge of step.links) assert.ok(link(model, edge), `${id}: ${edge}`);
     const parent = load(model.parent.model);
     assert.ok(parent.nodes[model.parent.node], `${id}: parent`);
-    assert.equal(parent.nodes[model.parent.node].drill, id, `${id}: detail navigation`);
+    // 1 つの親部品に複数の詳細図が付く場合は、drill の先は同じ部品に付いた詳細図のどれかであればよい
+    const target = parent.nodes[model.parent.node].drill;
+    const sibling = target === id || (load(target).parent?.model === model.parent.model && load(target).parent?.node === model.parent.node);
+    assert.ok(sibling, `${id}: detail navigation`);
   }
 });
 
@@ -35,12 +38,13 @@ test('事前クラスタリングの有無と差分・状態の復旧は別の�
 });
 
 test('論理削除とファイルの書き換え・削除は独立する', () => {
-  const model = load('databricks-deletion-vectors-internals');
-  assert.deepEqual([link(model, 'mark').from, link(model, 'mark').to], ['locate', 'dv']);
-  assert.deepEqual([link(model, 'apply').from, link(model, 'apply').to], ['dv', 'read']);
-  assert.deepEqual([link(model, 'cleanup').from, link(model, 'cleanup').to], ['purge', 'vacuum']);
-  assert.ok(model.scenarios[0].steps[0].links.includes('mark'));
-  assert.ok(!model.scenarios[0].steps[0].links.includes('cleanup'));
+  const model = load('databricks-liquid-clustering-internals');
+  assert.deepEqual([link(model, 'mutate').from, link(model, 'mutate').to], ['operator', 'dv']);
+  assert.deepEqual([link(model, 'mask').from, link(model, 'mask').to], ['dv', 'query']);
+  assert.deepEqual([link(model, 'purge').from, link(model, 'purge').to], ['dv', 'optimize']);
+  const steps = model.scenarios.find(s => s.id === 'delete-vector').steps;
+  assert.ok(steps[0].links.includes('mutate'));
+  assert.ok(!steps[0].links.includes('purge'));
 });
 
 test('すべての実装例は 2D と 3D に同じ部品と接続を投影できる', () => {

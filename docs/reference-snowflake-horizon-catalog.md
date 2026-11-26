@@ -16,10 +16,17 @@ Horizon Catalog は資産の発見、分類、ガバナンス、追跡を組み�
 
 ACCESS_HISTORY で直接・間接に参照されたオブジェクトや列などを確認する。利用権限、エディション、処理経路によって参照可能な情報と捕捉範囲が異なる。影響調査では変換先と利用記録を照合する。
 
+## 5. 外部エンジンからの読み取り（Iceberg REST）
+
+外部エンジンは Horizon Iceberg REST カタログ API（`https://<account_identifier>.snowflakecomputing.com/polaris/api/catalog`）で、Snowflake 管理 Iceberg テーブルを読み書きする。Horizon Catalog は Apache Polaris を組み込んで互換性を持つ。ヘッダー `X-Iceberg-Access-Delegation: vended-credentials` を指定すると、Snowflake が表ごとの一時的なストレージ認証情報を返す。認証方式は External OAuth、キーペア（JWT）、Programmatic Access Token、Workload Identity Federation が公式資料に挙がる。読み取りには表の `SELECT` とデータベース・スキーマの `USAGE`、書き込みには DML 権限が必要で、表の所有ロールは外部ボリュームの `USAGE` を保つ。
+
+2026 年 11 月時点の公式資料では、Snowflake 管理 Iceberg v2 と v3 の読み取りと書き込みが GA と記載されている。制約は次のとおり。外部エンジンからの CTAS、equality delete、Iceberg の tag・branch、スナップショットのロールバック、v2 から v3 へのアップグレード、dynamic table や共有表への書き込みは使えない。変換した表では vended credentials が使えない。S3 互換の非 AWS ストレージは未対応と記載されている。API 呼び出しは 100 万件あたり 0.5 クレジットの Cloud Services 課金が 2026 年後半に始まる予定で、変更されうる。外部エンジンへのマスキングなどのポリシー伝播は未確認である。
+
+2026 年 10 月の Snowflake 技術記事は、S3 互換ストレージ上の管理 Iceberg テーブルを外部エンジンへ公開する構想を private preview として紹介している。ストレージの内部識別を `s3://` 形式のパスへ解決し、古いメタデータでは一度だけメタデータ更新が必要になる場合があるとする。現行ドキュメントの「未対応」と状況が食い違うため、提供範囲は利用前に確認する（未確認）。S3 互換ストレージを AWS S3 サービスと混同しない。
+
 ## 図で確認するシナリオ
 
-- **メールアドレスの分類とマスキング** — 対象列の分類結果を確認する。 → 保護対象のタグとポリシーを関連付ける。 → SELECT 権限のある分析担当にも、設定によりマスク済みの値を返す。
-- **機微列の変更影響を調べる** — 機微列を使用する下流ビューを確認する。 → アクセス履歴で実際の利用者と参照された列を照合する。
+- **分類・保護・監査と外部エンジンからの読み取り** — 対象列の分類結果を確認する。 → 保護対象のタグとポリシーを関連付ける。 → SELECT 権限のある分析担当にも、設定によりマスク済みの値を返す。 → 下流ビューを確認し、アクセス履歴で実際の利用者と照合する。 → 外部エンジンは REST カタログで権限を確認し、一時認証情報でメタデータとデータを読む。
 
 ## 公式資料
 
@@ -27,8 +34,10 @@ ACCESS_HISTORY で直接・間接に参照されたオブジェクトや列な�
 - [データガバナンス](https://docs.snowflake.com/en/guides-overview-govern)
 - [タグベースのマスキング](https://docs.snowflake.com/en/user-guide/tag-based-masking-policies)
 - [アクセス履歴](https://docs.snowflake.com/en/user-guide/access-history)
+- [Horizon Catalog の Iceberg REST と外部エンジン](https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon)
+- [S3 互換ストレージと Horizon Catalog](https://www.snowflake.com/en/blog/engineering/s3-compatible-storage-iceberg-horizon-catalog/)
 
-## 5. 実装例 Snowflake での列分類とタグマスク
+## 6. 実装例 Snowflake での列分類とタグマスクと外部エンジンの読み取り
 
 受注メール列に分類タグとマスキングポリシーを適用し、分析権限と監査権限を分離する例。
 
@@ -40,6 +49,7 @@ ACCESS_HISTORY で直接・間接に参照されたオブジェクトや列な�
 | 分析担当ロール | SALES_READER ロール | 分析用 Warehouse の使用と、公開ビューの参照を許可する。 |
 | 注文のメールアドレス列 | ORDERS.CUSTOMER_EMAIL | メール列に分類タグを設定する。 |
 | 注文分析ビュー | SALES.ORDERS_ANALYSIS | 注文分析に必要な列を公開する。 |
+| 外部エンジン・Iceberg REST カタログ API・管理 Iceberg テーブル | Spark などの外部エンジン、Horizon Iceberg REST カタログ API、ORDERS_ICE | 外部エンジンがカタログで権限を確認し、一時認証情報で表を読む。 |
 | 列アクセスの監査履歴 | ACCOUNT_USAGE.ACCESS_HISTORY | `SNOWFLAKE.GOVERNANCE_VIEWER` を付与した監査用アカウントロールで参照する。 |
 
 この例は Snowflake Enterprise Edition 以上を前提とする。タグに関連付けるポリシーと列の型をそろえる。分析用と監査用にクエリを実行する Warehouse を用意し、利用者のロールには担当するデータへの権限と対応する Warehouse の使用権限を付与する。

@@ -2,13 +2,13 @@
   "model": "microsoft-fabric",
   "name": "Microsoft Fabric の基本アーキテクチャ",
   "coverage": {
-    "covered": 5,
-    "total": 5
+    "covered": 7,
+    "total": 7
   },
   "byId": {
     "source": {
       "type": "node",
-      "label": "受注データ",
+      "label": "受注データ（業務システム・ファイル）",
       "status": "claim"
     },
     "pipeline": {
@@ -16,80 +16,142 @@
       "label": "取込パイプライン",
       "status": "claim"
     },
-    "files": {
+    "lakehouse": {
       "type": "node",
-      "label": "取込ファイルの保管領域",
+      "label": "Lakehouse（Files・Tables）",
       "status": "claim"
     },
     "spark": {
       "type": "node",
-      "label": "データ変換ノートブック",
+      "label": "Spark ノートブック",
       "status": "claim"
     },
-    "delta": {
+    "warehouse": {
       "type": "node",
-      "label": "分析用の Delta テーブル",
+      "label": "Warehouse（T-SQL で読み書き）",
       "status": "claim"
     },
-    "sql": {
+    "onelake": {
       "type": "node",
-      "label": "SQL 読み取り口",
+      "label": "OneLake（Delta Parquet）",
+      "status": "claim"
+    },
+    "sqlep": {
+      "type": "node",
+      "label": "SQL 分析エンドポイント（読み取り専用）",
+      "status": "claim"
+    },
+    "semantic": {
+      "type": "node",
+      "label": "Power BI セマンティックモデル",
       "status": "claim"
     },
     "bi": {
       "type": "node",
-      "label": "BI レポート",
+      "label": "Power BI レポート",
       "status": "claim"
     },
     "catalog": {
       "type": "node",
-      "label": "データ資産カタログ",
+      "label": "OneLake catalog",
+      "status": "claim"
+    },
+    "capacity": {
+      "type": "node",
+      "label": "容量（Capacity Unit）",
       "status": "claim"
     },
     "extract": {
       "type": "link",
-      "label": "受注データ → 取込パイプライン",
+      "label": "受注データ（業務システム・ファイル） → 取込パイプライン",
       "status": "claim"
     },
     "copy": {
       "type": "link",
-      "label": "取込パイプライン → 取込ファイルの保管領域",
+      "label": "取込パイプライン → Lakehouse（Files・Tables）",
       "status": "claim"
     },
-    "load": {
+    "transform": {
       "type": "link",
-      "label": "取込ファイルの保管領域 → データ変換ノートブック",
+      "label": "Lakehouse（Files・Tables） → Spark ノートブック",
       "status": "claim"
     },
     "write": {
       "type": "link",
-      "label": "データ変換ノートブック → 分析用の Delta テーブル",
+      "label": "Spark ノートブック → Lakehouse（Files・Tables）",
       "status": "claim"
     },
-    "read": {
+    "persist-lh": {
       "type": "link",
-      "label": "分析用の Delta テーブル → SQL 読み取り口",
+      "label": "Lakehouse（Files・Tables） → OneLake（Delta Parquet）",
+      "status": "claim"
+    },
+    "load-wh": {
+      "type": "link",
+      "label": "取込パイプライン → Warehouse（T-SQL で読み書き）",
+      "status": "claim"
+    },
+    "persist-wh": {
+      "type": "link",
+      "label": "Warehouse（T-SQL で読み書き） → OneLake（Delta Parquet）",
+      "status": "claim"
+    },
+    "expose": {
+      "type": "link",
+      "label": "Lakehouse（Files・Tables） → SQL 分析エンドポイント（読み取り専用）",
+      "status": "claim"
+    },
+    "direct-lake": {
+      "type": "link",
+      "label": "OneLake（Delta Parquet） → Power BI セマンティックモデル",
+      "status": "claim"
+    },
+    "resolve": {
+      "type": "link",
+      "label": "SQL 分析エンドポイント（読み取り専用） → Power BI セマンティックモデル",
       "status": "claim"
     },
     "report": {
       "type": "link",
-      "label": "SQL 読み取り口 → BI レポート",
+      "label": "Power BI セマンティックモデル → Power BI レポート",
       "status": "claim"
     },
     "discover": {
       "type": "link",
-      "label": "データ資産カタログ → 分析用の Delta テーブル",
+      "label": "OneLake catalog → Lakehouse（Files・Tables）",
       "status": "claim"
     },
-    "report-sales": {
+    "run-spark": {
+      "type": "link",
+      "label": "容量（Capacity Unit） → Spark ノートブック",
+      "status": "claim"
+    },
+    "run-sql": {
+      "type": "link",
+      "label": "容量（Capacity Unit） → Warehouse（T-SQL で読み書き）",
+      "status": "claim"
+    },
+    "lakehouse-report": {
       "type": "scenario",
-      "label": "受注データから売上レポートへ"
+      "label": "受注データから売上レポートへ（Lakehouse 経路）"
+    },
+    "warehouse-load": {
+      "type": "scenario",
+      "label": "T-SQL で Warehouse に取り込む"
     },
     "discover-asset": {
       "type": "scenario",
-      "label": "カタログから Lakehouse を探して利用する"
+      "label": "カタログから Lakehouse を探す"
     },
-    "example-source": {
+    "synapse-dates": {
+      "type": "unknown",
+      "label": "Azure Synapse Analytics の提供終了日は取得した資料で未確認。Fabric Data Warehouse の Migration Assistant が Synapse などからの移行を支援する。"
+    },
+    "perf": {
+      "type": "unknown",
+      "label": "取り込みや照会の性能・料金の実測値は未確認。容量の消費量は実環境で確認する。"
+    },
+    "i-source": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
       "label": "Azure Blob Storage（受注 CSV）",
@@ -97,23 +159,23 @@
         "source"
       ]
     },
-    "example-pipeline": {
+    "i-pipeline": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
-      "label": "Fabric Data Factory の Copy activity",
+      "label": "Data Factory の Copy activity",
       "realizes": [
         "pipeline"
       ]
     },
-    "example-files": {
+    "i-lakehouse": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
-      "label": "OneLake（Lakehouse Files）",
+      "label": "Lakehouse（Files・Tables）",
       "realizes": [
-        "files"
+        "lakehouse"
       ]
     },
-    "example-spark": {
+    "i-spark": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
       "label": "Fabric Spark ノートブック",
@@ -121,15 +183,39 @@
         "spark"
       ]
     },
-    "example-sql": {
+    "i-warehouse": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "Fabric Warehouse",
+      "realizes": [
+        "warehouse"
+      ]
+    },
+    "i-onelake": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "OneLake",
+      "realizes": [
+        "onelake"
+      ]
+    },
+    "i-sqlep": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
       "label": "Lakehouse SQL 分析エンドポイント",
       "realizes": [
-        "sql"
+        "sqlep"
       ]
     },
-    "example-bi": {
+    "i-semantic": {
+      "type": "implementation",
+      "impl": "fabric-lakehouse",
+      "label": "Power BI セマンティックモデル",
+      "realizes": [
+        "semantic"
+      ]
+    },
+    "i-bi": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
       "label": "Power BI 受注レポート",
@@ -137,95 +223,120 @@
         "bi"
       ]
     },
-    "example-catalog": {
+    "i-catalog": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
-      "label": "OneLake カタログ",
+      "label": "OneLake catalog",
       "realizes": [
         "catalog"
       ]
     },
-    "example-semantic": {
+    "i-capacity": {
       "type": "implementation",
       "impl": "fabric-lakehouse",
-      "label": "Power BI セマンティックモデル",
-      "realizes": []
-    },
-    "example-delta": {
-      "type": "implementation",
-      "impl": "fabric-lakehouse",
-      "label": "OneLake（Lakehouse Tables・Delta）",
+      "label": "Fabric 容量（F SKU）",
       "realizes": [
-        "delta"
+        "capacity"
       ]
     }
   },
   "byRef": {
     "docs/reference-microsoft-fabric.md#§1": [
       "model",
-      "delta",
-      "report-sales"
+      "lakehouse-report",
+      "warehouse-load",
+      "discover-asset"
     ],
     "docs/reference-microsoft-fabric.md": [
       "model",
       "source",
       "pipeline",
-      "files",
+      "lakehouse",
       "spark",
-      "delta",
-      "sql",
+      "warehouse",
+      "onelake",
+      "sqlep",
+      "semantic",
       "bi",
       "catalog",
+      "capacity",
       "extract",
       "copy",
-      "load",
+      "transform",
       "write",
-      "read",
+      "persist-lh",
+      "load-wh",
+      "persist-wh",
+      "expose",
+      "direct-lake",
+      "resolve",
       "report",
       "discover",
-      "report-sales",
+      "run-spark",
+      "run-sql",
+      "lakehouse-report",
+      "warehouse-load",
       "discover-asset",
-      "example-source",
-      "example-pipeline",
-      "example-files",
-      "example-spark",
-      "example-sql",
-      "example-bi",
-      "example-catalog",
-      "example-semantic",
-      "example-delta"
+      "i-source",
+      "i-pipeline",
+      "i-lakehouse",
+      "i-spark",
+      "i-warehouse",
+      "i-onelake",
+      "i-sqlep",
+      "i-semantic",
+      "i-bi",
+      "i-catalog",
+      "i-capacity"
     ],
     "docs/reference-microsoft-fabric.md#§2": [
+      "model",
       "source",
       "pipeline",
-      "files",
-      "spark",
+      "onelake",
       "extract",
-      "copy",
-      "load",
-      "write"
+      "copy"
     ],
     "docs/reference-microsoft-fabric.md#§3": [
-      "sql",
-      "bi",
-      "read",
-      "report"
+      "lakehouse",
+      "spark",
+      "transform",
+      "write",
+      "persist-lh"
     ],
     "docs/reference-microsoft-fabric.md#§4": [
-      "catalog",
-      "discover",
-      "discover-asset"
+      "warehouse",
+      "sqlep",
+      "load-wh",
+      "persist-wh",
+      "expose"
     ],
     "docs/reference-microsoft-fabric.md#§5": [
-      "example-source",
-      "example-pipeline",
-      "example-files",
-      "example-spark",
-      "example-sql",
-      "example-bi",
-      "example-catalog",
-      "example-semantic",
-      "example-delta"
+      "semantic",
+      "bi",
+      "direct-lake",
+      "resolve",
+      "report"
+    ],
+    "docs/reference-microsoft-fabric.md#§6": [
+      "catalog",
+      "capacity",
+      "discover",
+      "run-spark",
+      "run-sql"
+    ],
+    "docs/reference-microsoft-fabric.md#§7": [
+      "i-source",
+      "i-pipeline",
+      "i-lakehouse",
+      "i-spark",
+      "i-warehouse",
+      "i-onelake",
+      "i-sqlep",
+      "i-semantic",
+      "i-bi",
+      "i-catalog",
+      "i-capacity"
     ]
   },
   "reference": {
@@ -233,9 +344,12 @@
     "order": 50,
     "domain": "分析基盤・DWH",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "Microsoft Fabric",
+    "role": "overview",
     "objectives": [
-      "OneLake、Lakehouse、Spark、SQL 分析エンドポイントの役割を区別する。",
-      "一つの Delta テーブルを更新と分析で共有する流れを追う。"
+      "OneLake、Lakehouse、Warehouse、SQL 分析エンドポイント、セマンティックモデルの役割を区別する。",
+      "取り込みから Power BI レポートまでの経路と、Spark と T-SQL の書き込み経路の違いを追う。",
+      "容量（CU）とワークスペースが計算の単位になることを説明する。"
     ],
     "sources": [
       {
@@ -247,12 +361,24 @@
         "url": "https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview"
       },
       {
+        "title": "Microsoft Learn · Fabric Lakehouse",
+        "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"
+      },
+      {
         "title": "Microsoft Learn · SQL analytics endpoint",
         "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint"
       },
       {
-        "title": "Microsoft Learn · Fabric Lakehouse",
-        "url": "https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview"
+        "title": "Microsoft Learn · Fabric Data Warehouse",
+        "url": "https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing"
+      },
+      {
+        "title": "Microsoft Learn · Direct Lake overview",
+        "url": "https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview"
+      },
+      {
+        "title": "Microsoft Learn · Fabric licenses and capacity",
+        "url": "https://learn.microsoft.com/en-us/fabric/enterprise/licenses"
       },
       {
         "title": "Microsoft Learn · OneLake catalog",

@@ -1,0 +1,103 @@
+name: Amazon Redshift：Spectrum と Iceberg レイクハウス
+description: 外部スキーマで Glue Data Catalog の表を参照し、S3 の Parquet や Iceberg を読む経路と、zero-ETL で運用 DB を取り込む経路。
+parent: {model: redshift, node: rms}
+reference:
+  objectives:
+    - 外部スキーマ、Glue Data Catalog、S3 のデータの関係を追う。
+    - Iceberg 表を Redshift と別のエンジンから同時に扱う方法を説明する。
+    - zero-ETL による取り込みと、データレイクの外部表参照を区別する。
+  sources:
+    - {title: Amazon Redshift Spectrum, url: https://docs.aws.amazon.com/redshift/latest/dg/c-using-spectrum.html}
+    - {title: Using Apache Iceberg tables with Amazon Redshift, url: https://docs.aws.amazon.com/redshift/latest/dg/querying-iceberg.html}
+    - {title: Zero-ETL integrations, url: https://docs.aws.amazon.com/redshift/latest/mgmt/zero-etl-using.html}
+sources: [docs/reference-redshift-spectrum-lakehouse.md]
+evidence: [{type: doc, ref: "docs/reference-redshift-spectrum-lakehouse.md#§1"}, {type: doc, ref: "docs/reference-redshift-spectrum-lakehouse.md#§2"}]
+tiers: [{id: flow, label: データレイク参照と zero-ETL, z: 0, size: [28, 13]}]
+nodes:
+  client: {label: SQL クライアント, kind: external, tier: flow, x: 0, y: 6, evidence: &lake [{type: doc, ref: "docs/reference-redshift-spectrum-lakehouse.md#§2"}]}
+  compute: {label: Redshift のコンピュート, kind: worker, tier: flow, x: 6, y: 6, description: クラスターまたは Serverless ワークグループ。ローカル表と外部表を結合できる。, evidence: *lake}
+  extschema: {label: 外部スキーマ, kind: policy, tier: flow, x: 6, y: 2, description: Data Catalog のデータベースと IAM ロールを指定して作る。, evidence: *lake}
+  glue: {label: Glue Data Catalog, kind: db, tier: flow, x: 13, y: 2, description: 外部表と Iceberg 表のメタデータを持つ。, evidence: *lake}
+  lf: {label: Lake Formation の権限, kind: policy, tier: flow, x: 20, y: 2, description: Iceberg 表にもきめ細かいアクセス制御が使える。, evidence: *lake}
+  spectrum: {label: データレイクのスキャン処理, kind: worker, tier: flow, x: 13, y: 6, description: RA3 は Redshift Spectrum を使い、RG と Serverless は自身のコンピュートで処理する。, evidence: *lake}
+  iceberg: {label: Iceberg 表のメタデータ, kind: file, tier: flow, x: 20, y: 6, description: 表の統計を Redshift が計画に使う。, evidence: &ice [{type: doc, ref: "docs/reference-redshift-spectrum-lakehouse.md#§3"}]}
+  files: {label: S3 のデータファイル, kind: file, tier: flow, x: 25, y: 6, description: Parquet などのファイル。, evidence: *lake}
+  athena: {label: 別のエンジン（Athena・EMR）, kind: worker, tier: flow, x: 25, y: 10, description: ACID に Iceberg 表を更新する。Redshift が同時に読める。, evidence: *ice}
+  source: {label: 運用データベース, kind: db, tier: flow, x: 0, y: 11, description: Aurora、RDS、DynamoDB など。, evidence: &zero [{type: doc, ref: "docs/reference-redshift-spectrum-lakehouse.md#§4"}]}
+  zeroetl: {label: zero-ETL 統合, kind: worker, tier: flow, x: 6, y: 11, description: 初回ロードの後に変更を継続的に複製する。, evidence: *zero}
+  local: {label: Redshift のローカル表, kind: db, tier: flow, x: 13, y: 11, description: 統合で作る宛先データベース。, evidence: *zero}
+links:
+  - {id: query, from: client, to: compute, label: SQL を送る, evidence: *lake}
+  - {id: resolve, from: compute, to: extschema, label: 外部表を名前解決, evidence: *lake}
+  - {id: catalog, from: extschema, to: glue, label: メタデータを取得, evidence: *lake}
+  - {id: authz, from: lf, to: glue, label: 権限を適用, evidence: *lake}
+  - {id: push, from: compute, to: spectrum, label: 外部表のスキャンを依頼, evidence: *lake}
+  - {id: meta, from: spectrum, to: iceberg, label: 統計でファイルを絞る, evidence: *ice}
+  - {id: point, from: iceberg, to: files, label: データファイルを指す, evidence: *ice}
+  - {id: scanfiles, from: spectrum, to: files, label: ファイルを読む, evidence: *lake}
+  - {id: write, from: athena, to: iceberg, label: ACID に更新, evidence: *ice}
+  - {id: replicate, from: source, to: zeroetl, label: 変更を複製, evidence: *zero}
+  - {id: apply, from: zeroetl, to: local, label: 宛先データベースへ反映, evidence: *zero}
+  - {id: join, from: compute, to: local, label: ローカル表と結合, evidence: *zero}
+scenarios:
+  - id: lake-join
+    label: データレイクの Iceberg 表とローカル表を結合する
+    evidence: [{type: doc, ref: "docs/reference-redshift-spectrum-lakehouse.md#§3"}]
+    steps:
+      - {links: [replicate, apply], note: zero-ETL が運用 DB の変更を Redshift の宛先データベースへ反映する。}
+      - {links: [write], note: 別のエンジンが Iceberg 表を更新する。}
+      - {links: [query, resolve, catalog, authz], note: クエリが外部スキーマ経由で Data Catalog を参照し、権限が適用される。}
+      - {links: [push, meta, point, scanfiles, join], note: Iceberg の統計でファイルを絞って読み、ローカル表と結合する。}
+unknowns:
+  - {id: sagemaker, text: SageMaker Lakehouse 経由の接続（Iceberg REST を含む）と提供段階は今回取得した資料で未確認。, refs: [glue]}
+  - {id: iceberg-write, text: Redshift から外部 Iceberg 表へ書く機能の提供段階（Preview・GA）は未確認。上の図は読み取りと、他エンジンによる更新だけを描く。, refs: [iceberg]}
+  - {id: zero-stage, text: zero-ETL の対象は資料に「現在サポート」と列挙されるが、ソースごとの Preview・GA は未確認。, refs: [zeroetl]}
+  - {id: perf, text: スキャン性能と料金は実環境で未検証。, refs: [spectrum]}
+implementations:
+  - id: ra3-lake-zeroetl
+    label: RA3 クラスターから S3 の Iceberg 表を参照し、Aurora を zero-ETL で取り込む
+    description: 利用者の AWS アカウントの RA3 クラスターが、Glue Data Catalog の Iceberg 表（Athena が更新）を Spectrum で読む。Aurora からは zero-ETL で複製する。
+    sources:
+      - {title: Amazon Redshift Spectrum, url: https://docs.aws.amazon.com/redshift/latest/dg/c-using-spectrum.html}
+      - {title: Using Apache Iceberg tables with Amazon Redshift, url: https://docs.aws.amazon.com/redshift/latest/dg/querying-iceberg.html}
+      - {title: Zero-ETL integrations, url: https://docs.aws.amazon.com/redshift/latest/mgmt/zero-etl-using.html}
+    tiers: &lk-tiers [{id: diagram, label: Redshift とデータレイク, z: 0, size: [28, 13]}]
+    nodes:
+      lk-client: {label: SQL クライアント, kind: external, tier: diagram, x: 1, y: 6, realizes: [client], evidence: &lk-impl [{type: doc, ref: "docs/reference-redshift-spectrum-lakehouse.md#§5"}]}
+      lk-compute: {label: RA3 クラスター, kind: worker, tier: diagram, x: 7, y: 6, realizes: [compute], evidence: *lk-impl, svc: redshift, management: {type: aws, scope: "AWS がノードを運用し、利用者はノードタイプと SQL を設定する。"}}
+      lk-extschema: {label: 外部スキーマ, kind: policy, tier: diagram, x: 7, y: 2, realizes: [extschema], evidence: *lk-impl, svc: redshift, management: {type: customer, scope: "利用者が CREATE EXTERNAL SCHEMA で作る。"}}
+      lk-glue: {label: Glue Data Catalog, kind: db, tier: diagram, x: 13, y: 2, realizes: [glue], evidence: *lk-impl, svc: glue, management: {type: shared, scope: "AWS がカタログ基盤を運用し、利用者が表の定義を管理する。"}}
+      lk-lf: {label: Lake Formation, kind: policy, tier: diagram, x: 20, y: 2, realizes: [lf], evidence: *lk-impl, svc: lakeformation, management: {type: customer, scope: "利用者が権限を設定する。"}}
+      lk-spectrum: {label: Redshift Spectrum, kind: worker, tier: diagram, x: 13, y: 6, realizes: [spectrum], description: RA3 のデータレイク問い合わせは Spectrum を使う。, evidence: *lk-impl, svc: redshift, management: {type: aws, scope: "AWS が Spectrum の処理基盤を運用する。利用者は直接操作しない。"}}
+      lk-iceberg: {label: Iceberg メタデータ（S3）, kind: file, tier: diagram, x: 20, y: 6, realizes: [iceberg], evidence: *lk-impl, svc: s3, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がバケットと権限を管理する。"}}
+      lk-files: {label: S3 のデータファイル, kind: file, tier: diagram, x: 25, y: 6, realizes: [files], evidence: *lk-impl, svc: s3, management: {type: shared, scope: "AWS が S3 基盤を運用し、利用者がデータを管理する。"}}
+      lk-athena: {label: Athena（Iceberg 更新）, kind: worker, tier: diagram, x: 25, y: 10, realizes: [athena], evidence: *lk-impl, svc: athena, management: {type: shared, scope: "AWS が実行基盤を運用し、利用者が SQL を実行する。"}}
+      lk-aurora: {label: Aurora, kind: db, tier: diagram, x: 1, y: 11, realizes: [source], evidence: *lk-impl, svc: aurora, management: {type: shared, scope: "AWS がデータベース基盤を運用し、利用者がデータと設定を管理する。"}}
+      lk-zeroetl: {label: zero-ETL 統合, kind: worker, tier: diagram, x: 7, y: 11, realizes: [zeroetl], evidence: *lk-impl, svc: redshift, management: {type: aws, scope: "AWS が複製を運用し、利用者が統合を作成・監視する。"}}
+      lk-local: {label: 宛先データベース（RMS）, kind: db, tier: diagram, x: 13, y: 11, realizes: [local], evidence: *lk-impl, svc: redshift, management: {type: shared, scope: "AWS が管理ストレージを運用し、利用者がデータと権限を管理する。"}}
+    links: []
+    groups: &lk-groups
+      - {kind: cloud, provider: aws, label: AWS 分析アカウント, tier: diagram, x0: 5, y0: -0.3, x1: 27.8, y1: 12.3, nodes: &lk-env [lk-compute, lk-extschema, lk-glue, lk-lf, lk-spectrum, lk-iceberg, lk-files, lk-athena, lk-aurora, lk-zeroetl, lk-local]}
+      - {kind: cluster, label: RA3 クラスター, tier: diagram, x0: 5.8, y0: 4.7, x1: 15, y1: 7.8, nodes: [lk-compute, lk-spectrum]}
+    layout2d: {tiers: *lk-tiers, nodes: {}, groups: *lk-groups}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, kind: origin, z: 0, size: [3, 8]}
+        - {id: redshift, label: Redshift, z: 0, origin: [4, 0], size: [10, 8]}
+        - {id: lake, label: データレイクとカタログ, z: 0, origin: [15, 0], size: [12, 8]}
+        - {id: source, label: 運用データ, z: 0, origin: [28, 0], size: [6, 8]}
+      nodes:
+        lk-client: {tier: clients, x: 1, y: 4}
+        lk-compute: {tier: redshift, x: 2, y: 3}
+        lk-spectrum: {tier: redshift, x: 6, y: 3}
+        lk-local: {tier: redshift, x: 4, y: 6.5}
+        lk-extschema: {tier: redshift, x: 4, y: 0.8}
+        lk-glue: {tier: lake, x: 2, y: 1}
+        lk-lf: {tier: lake, x: 6, y: 1}
+        lk-iceberg: {tier: lake, x: 4, y: 3.5}
+        lk-files: {tier: lake, x: 8, y: 3.5}
+        lk-athena: {tier: lake, x: 8, y: 6.5}
+        lk-aurora: {tier: source, x: 2, y: 2}
+        lk-zeroetl: {tier: source, x: 2, y: 6}
+      groups:
+        - {kind: cloud, provider: aws, label: AWS 分析アカウント, tier: [redshift, lake, source], nodes: *lk-env}

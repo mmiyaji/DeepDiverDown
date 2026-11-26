@@ -52,4 +52,5 @@ export const CATEGORY_DOCS = {
   '変換とオーケストレーション': 'transform',
   'テーブル形式とカタログ': 'table-catalog',
   'ファイル形式': 'file-formats',
+  'クラウド分析基盤': 'cloud-analytics',
 };

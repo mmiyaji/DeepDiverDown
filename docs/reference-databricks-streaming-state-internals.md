@@ -4,6 +4,8 @@
 
 状態付き Structured Streaming の RocksDB、差分チェックポイント、障害復旧を追う。 公式資料を組み合わせた説明用のモデルで、実機の配置や導入事例ではない。
 
+Spark の Structured Streaming の図（マイクロバッチ・状態・復旧）は汎用の流れを扱う。この図は Databricks 固有の RocksDB state store、changelog checkpointing、非同期 state checkpointing に絞る。2026 年 11 月時点の公式資料に基づき、DBR ごとの既定値の最新版は未確認とする。
+
 ## 2. 構成と役割
 
 - **再読できる入力**：入力イベントと処理位置を取得する。

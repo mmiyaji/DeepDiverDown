@@ -1,6 +1,6 @@
 {
   "model": "snowflake-query-performance",
-  "name": "Snowflake のクエリ性能とウェアハウス",
+  "name": "Snowflake：クエリ性能とウェアハウス",
   "coverage": {
     "covered": 5,
     "total": 5
@@ -23,7 +23,7 @@
     },
     "clusters": {
       "type": "node",
-      "label": "並列クエリ実行資源",
+      "label": "ウェアハウスの実行資源",
       "status": "claim"
     },
     "metadata": {
@@ -41,6 +41,31 @@
       "label": "永続化済み結果",
       "status": "claim"
     },
+    "search": {
+      "type": "node",
+      "label": "検索用の補助構造",
+      "status": "claim"
+    },
+    "optima": {
+      "type": "node",
+      "label": "式ごとの追加統計",
+      "status": "claim"
+    },
+    "whcache": {
+      "type": "node",
+      "label": "ウェアハウスのデータキャッシュ",
+      "status": "claim"
+    },
+    "qas": {
+      "type": "node",
+      "label": "Query Acceleration Service",
+      "status": "claim"
+    },
+    "profile": {
+      "type": "node",
+      "label": "Query Profile",
+      "status": "claim"
+    },
     "submit": {
       "type": "link",
       "label": "BI クエリ → クエリ受付と計画",
@@ -53,7 +78,7 @@
     },
     "allocate": {
       "type": "link",
-      "label": "実行待ち行列 → 並列クエリ実行資源",
+      "label": "実行待ち行列 → ウェアハウスの実行資源",
       "status": "claim"
     },
     "bounds": {
@@ -63,17 +88,17 @@
     },
     "scan": {
       "type": "link",
-      "label": "並列クエリ実行資源 → 列指向のストレージ区画",
+      "label": "ウェアハウスの実行資源 → 列指向のストレージ区画",
       "status": "claim"
     },
     "reuse": {
-      "type": "scenario",
-      "label": "結果再利用と実行時の待ちを比較",
+      "type": "link",
+      "label": "クエリ受付と計画 → 永続化済み結果",
       "status": "claim"
     },
     "return": {
       "type": "link",
-      "label": "並列クエリ実行資源 → BI クエリ",
+      "label": "ウェアハウスの実行資源 → BI クエリ",
       "status": "claim"
     },
     "cached": {
@@ -81,9 +106,38 @@
       "label": "永続化済み結果 → BI クエリ",
       "status": "claim"
     },
+    "index": {
+      "type": "link",
+      "label": "検索用の補助構造 → クエリ受付と計画",
+      "status": "claim"
+    },
+    "expr": {
+      "type": "link",
+      "label": "式ごとの追加統計 → クエリ受付と計画",
+      "status": "claim"
+    },
+    "warm": {
+      "type": "link",
+      "label": "ウェアハウスのデータキャッシュ → ウェアハウスの実行資源",
+      "status": "claim"
+    },
+    "accel": {
+      "type": "link",
+      "label": "ウェアハウスの実行資源 → Query Acceleration Service",
+      "status": "claim"
+    },
+    "observe": {
+      "type": "link",
+      "label": "ウェアハウスの実行資源 → Query Profile",
+      "status": "claim"
+    },
     "pruning": {
       "type": "scenario",
-      "label": "日付フィルターで読む区画を減らす"
+      "label": "条件で絞り、実行し、結果を再利用する"
+    },
+    "internal-deployment": {
+      "type": "unknown",
+      "label": "内部ノード数、キャッシュの配置、QAS の共有計算資源の規模、Optima の選択しきい値は公開資料で未確認。"
     },
     "example-bi": {
       "type": "implementation",
@@ -106,8 +160,7 @@
       "impl": "snowflake-bi",
       "label": "BI_WH マルチクラスターウェアハウス",
       "realizes": [
-        "queue",
-        "clusters"
+        "queue"
       ]
     },
     "example-metadata": {
@@ -132,6 +185,54 @@
       "impl": "snowflake-bi",
       "label": "ACCOUNT_USAGE.QUERY_HISTORY",
       "realizes": []
+    },
+    "example-compute": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "BI_WH のクラスター",
+      "realizes": [
+        "clusters"
+      ]
+    },
+    "example-whcache": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "ウェアハウスのデータキャッシュ",
+      "realizes": [
+        "whcache"
+      ]
+    },
+    "example-search": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "Search Optimization の access path（任意）",
+      "realizes": [
+        "search"
+      ]
+    },
+    "example-optima": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "Optima Metadata（対象環境）",
+      "realizes": [
+        "optima"
+      ]
+    },
+    "example-qas": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "Query Acceleration Service（任意）",
+      "realizes": [
+        "qas"
+      ]
+    },
+    "example-profile": {
+      "type": "implementation",
+      "impl": "snowflake-bi",
+      "label": "Snowsight Query Profile",
+      "realizes": [
+        "profile"
+      ]
     }
   },
   "byRef": {
@@ -139,7 +240,9 @@
       "model",
       "bi",
       "control",
-      "submit"
+      "profile",
+      "submit",
+      "observe"
     ],
     "docs/reference-snowflake-query-performance.md": [
       "model",
@@ -150,6 +253,11 @@
       "metadata",
       "micro",
       "result",
+      "search",
+      "optima",
+      "whcache",
+      "qas",
+      "profile",
       "submit",
       "wait",
       "allocate",
@@ -158,13 +266,24 @@
       "reuse",
       "return",
       "cached",
+      "index",
+      "expr",
+      "warm",
+      "accel",
+      "observe",
       "pruning",
       "example-bi",
       "example-control",
       "example-queue",
       "example-metadata",
       "example-result",
-      "example-history"
+      "example-history",
+      "example-compute",
+      "example-whcache",
+      "example-search",
+      "example-optima",
+      "example-qas",
+      "example-profile"
     ],
     "docs/reference-snowflake-query-performance.md#§2": [
       "queue",
@@ -176,14 +295,22 @@
     "docs/reference-snowflake-query-performance.md#§3": [
       "metadata",
       "micro",
+      "search",
+      "optima",
+      "qas",
       "bounds",
       "scan",
+      "index",
+      "expr",
+      "accel",
       "pruning"
     ],
     "docs/reference-snowflake-query-performance.md#§4": [
       "result",
+      "whcache",
       "reuse",
-      "cached"
+      "cached",
+      "warm"
     ],
     "docs/reference-snowflake-query-performance.md#§5": [
       "example-bi",
@@ -191,18 +318,28 @@
       "example-queue",
       "example-metadata",
       "example-result",
-      "example-history"
+      "example-history",
+      "example-compute",
+      "example-whcache",
+      "example-search",
+      "example-optima",
+      "example-qas",
+      "example-profile"
     ]
   },
   "reference": {
     "category": "クラウド分析基盤",
     "order": 20,
     "domain": "分析基盤・DWH",
-    "kind": "製品・技術のアーキテクチャ",
+    "kind": "仕組みの深掘り",
     "detailOf": "snowflake",
+    "product": "Snowflake",
+    "role": "internals",
+    "step": 3,
     "objectives": [
       "並行実行と一つのクエリ内部のスキャン量を別々に計測する。",
-      "結果再利用時と実行時の経路を比較する。"
+      "結果再利用、ウェアハウスのデータキャッシュ、実行時の経路を比較する。",
+      "任意の最適化（検索用構造、Optima、QAS）の適用条件と維持費を確認する。"
     ],
     "sources": [
       {
@@ -232,6 +369,22 @@
       {
         "title": "Snowflake Optima Metadata",
         "url": "https://www.snowflake.com/en/blog/engineering/snowflake-optima-metadata-query-pruning/"
+      },
+      {
+        "title": "Search optimization",
+        "url": "https://docs.snowflake.com/en/user-guide/search-optimization-service"
+      },
+      {
+        "title": "Optima",
+        "url": "https://docs.snowflake.com/en/user-guide/snowflake-optima"
+      },
+      {
+        "title": "Query Acceleration Service",
+        "url": "https://docs.snowflake.com/en/user-guide/query-acceleration-service"
+      },
+      {
+        "title": "Warehouse cache",
+        "url": "https://docs.snowflake.com/en/user-guide/performance-query-warehouse-cache"
       }
     ]
   }

@@ -1,53 +1,57 @@
 # Microsoft Fabric の基本アーキテクチャ
 
-## 1. OneLake とワークスペース
+2026 年 11 月時点の公式資料に基づく。
 
-OneLake は Fabric テナントの論理データレイクで、ワークスペースや項目を通じてデータが整理される。この例では Lakehouse を作り、受注データを処理する。
+## 1. 位置づけ
 
-## 2. 取り込みと整備
+Fabric は、取り込み、Spark、SQL ウェアハウス、リアルタイム分析、Power BI を一つの SaaS にまとめたデータ分析基盤である。データはテナントごとに一つの OneLake に置き、計算は容量（Capacity Unit）単位で共有する。この図は、Lakehouse 経路と Warehouse 経路が OneLake と Power BI で合流する流れを示す。Azure Synapse Analytics からの移行は Fabric Data Warehouse の Migration Assistant が対象に含める。Synapse の提供終了日は取得した資料で未確認。
 
-Fabric のパイプラインが受注データを Lakehouse の Files 領域へ取り込み、Spark ノートブックが型や欠損値を確認して管理対象の Delta テーブルに書き出す。Files と Tables のデータはどちらも OneLake に置かれる。
+[Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview)、[Fabric Data Warehouse](https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing)
 
-## 3. SQL と Power BI
+## 2. OneLake と取り込み
 
-Lakehouse 作成時に用意される SQL 分析エンドポイントで Delta テーブルを T-SQL から参照する。テーブルの更新は Spark 側で行う。Power BI のセマンティックモデルはこの SQL 接続を利用できる。Fabric Warehouse はこの例の Lakehouse とは別の項目である。
+OneLake はテナントに一つの論理データレイクで、Fabric の各項目のデータを Delta Parquet で保持する。Lakehouse と Warehouse のデータはどちらも OneLake にある。取込パイプラインは外部データを Lakehouse の Files か Warehouse にコピーする。外部ストレージのデータをコピーせずに見せる仕組みは「OneLake とショートカット」の図で追う。
 
-## 4. 資産の発見とガバナンス
+[OneLake](https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview)
 
-OneLake catalog から Fabric の資産を探す。発見できることと、SQL エンドポイントやストレージへの読み取り権限はそれぞれ確認する。探索、アクセスの申請、運用管理は [OneLake catalog の詳細図](reference-fabric-onelake-catalog.md) を参照する。
+## 3. Lakehouse と Spark
 
-## 公式資料
+Lakehouse は Files（原本）と Tables（Delta テーブル）を持つ。Spark ノートブックが Files を整えて Tables に書く。Lakehouse のテーブルを更新するのは Spark で、T-SQL では更新できない。
 
-- [Microsoft Learn · Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview)
-- [Microsoft Learn · OneLake](https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview)
-- [Microsoft Learn · SQL analytics endpoint](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)
-- [Microsoft Learn · Fabric Lakehouse](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview)
-- [Microsoft Learn · OneLake catalog](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)
+[Fabric Lakehouse](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview)
 
-## 5. 実装例 Microsoft Fabric の注文レイクハウス
+## 4. Warehouse と SQL 分析エンドポイント
 
-Fabric の同一ワークスペースに取込パイプライン、Lakehouse、ノートブック、Power BI レポートを置く例。
+Warehouse は T-SQL の書き込みとマルチテーブルのトランザクションを持つ。Lakehouse には読み取り専用の SQL 分析エンドポイントが自動で付く。どちらも同じ SQL エンジンで動く。違いと同期の仕組みは「Warehouse と SQL 分析エンドポイント」の図で追う。
+
+[Fabric Data Warehouse](https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing)、[SQL analytics endpoint](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)
+
+## 5. セマンティックモデルと Power BI
+
+Power BI のセマンティックモデルは、指標とリレーションを定義する。Direct Lake では OneLake の Delta テーブルから必要な列を読み込んで応答する。詳細は「Direct Lake と Power BI」の図で追う。
+
+[Direct Lake overview](https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview)
+
+## 6. 発見・容量・ワークスペース
+
+OneLake catalog で資産を探す。詳細は [OneLake catalog の図](reference-fabric-onelake-catalog.md) を参照する。ワークスペースは項目の入れ物で、容量に割り当てる。F SKU は Azure で購入し、Azure が秒単位で課金する。F64 以上では、閲覧者ロールの利用者は Fabric の無料ライセンスで Power BI の内容を見られる。F64 未満では Pro などのライセンスが要る。
+
+[OneLake catalog](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)、[Fabric licenses and capacity](https://learn.microsoft.com/en-us/fabric/enterprise/licenses)
+
+## 7. 実装例 Microsoft Fabric の注文レイクハウス
 
 | 機能 | 具体的な担い手 | 設定・成果物 |
 |---|---|---|
-| 受注データ | Azure サブスクリプションの Azure Blob Storage | Fabric の接続で受注 CSV を読み出す。 |
-| 取込パイプライン | Fabric Data Factory の Copy activity | 原本ファイルを OneLake の Lakehouse にコピーする。 |
-| 取込ファイルの保管領域・分析用の Delta テーブル | OneLake の Lakehouse Files と Tables | 原本ファイルは Files、整備済み Delta は Tables に分ける。 |
-| データ変換ノートブック | Fabric Spark ノートブック | 型変換や品質チェックを行い、分析用 Delta を書き込む。 |
-| SQL 読み取り口 | Lakehouse SQL 分析エンドポイント | Lakehouse のテーブルを読み取り専用 SQL で提供する。 |
-| BI レポート | Power BI 受注レポート | 公開されたセマンティックモデルの指標を表示する。 |
-| データ資産カタログ | OneLake カタログ | Lakehouse などの資産を確認する。 |
+| 受注データ | Azure Blob Storage | 受注 CSV |
+| 取込パイプライン | Data Factory の Copy activity | Files へのコピー、Warehouse へのロード |
+| Lakehouse・Spark | Lakehouse と Fabric Spark ノートブック | Files の原本、Tables の Delta |
+| Warehouse | Fabric Warehouse | T-SQL で更新する表 |
+| OneLake | OneLake | Delta Parquet |
+| SQL 読み取り口 | SQL 分析エンドポイント | 読み取り専用の T-SQL |
+| セマンティックモデル・レポート | Power BI | Direct Lake のモデルとレポート |
+| 資産の検索 | OneLake catalog | 検索と認定 |
+| 計算の単位 | Fabric 容量（F SKU） | ワークスペースの割り当て |
 
-Lakehouse の更新にはノートブックを使う。SQL 分析エンドポイントは Lakehouse のテーブルの参照経路である。レポートに合わせてセマンティックモデルを明示的に作成する。
+公式資料を組み合わせた代表構成であり、動作検証済みの導入事例ではない。Microsoft が Fabric と OneLake の基盤を運用し、利用者は容量、ワークスペース、接続、データ、モデル、権限を管理する。Spark や SQL の内部ホストは直接操作しない。Blob への接続方式、容量の大きさ、Direct Lake の制約は実環境で確認する。Azure と Fabric に AWS 用の管理区分は使わない。
 
-Azure サブスクリプションの Azure Blob Storage に受注 CSV を置き、Fabric ワークスペースの Copy Activity が接続を使って Lakehouse の Files にコピーする。Fabric 容量に割り当てたワークスペースで、コピー成功後に Notebook Activity が Fabric 管理の Spark を起動し、Tables に Delta を保存する。
-
-セマンティックモデルは Direct Lake on SQL で作成する。SQL 分析エンドポイントからテーブルを解決して権限を確認し、対象の Delta データを OneLake から読み取る。Power BI レポートはこのモデルの指標を表示する。実行状況は Fabric パイプラインの実行履歴で確認する。
-
-- [Fabric の Azure Blob Storage コネクター](https://learn.microsoft.com/en-us/fabric/data-factory/connector-azure-blob-storage-copy-activity)
-- [Fabric の Notebook activity と容量](https://learn.microsoft.com/en-us/fabric/data-factory/notebook-activity)
-- [Direct Lake on SQL と OneLake](https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-create-lakehouse)
-
-出典 [Microsoft Learn · Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview)、[Microsoft Learn · OneLake](https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview)、[Microsoft Learn · SQL analytics endpoint](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)、[Microsoft Learn · Fabric Lakehouse](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview)、[Microsoft Learn · OneLake catalog](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)、[Fabric の Copy activity](https://learn.microsoft.com/en-us/fabric/data-factory/copy-data-activity)、[Power BI セマンティックモデルの作成](https://learn.microsoft.com/en-us/fabric/data-warehouse/create-semantic-model)
-
-これは公式資料を組み合わせた代表構成であり、動作検証済みの導入事例ではない。Microsoft が Fabric・OneLake・Spark・SQL エンドポイントと Azure Storage のサービス基盤を運用し、利用者はワークスペースと容量、接続認証、パイプラインとノートブック、データ、セマンティックモデル、権限を管理する。管理 Spark や SQL の内部ホストを直接操作する想定はない。Blob への接続方式と権限、容量、Direct Lake の制約や SQL へのフォールバックは実環境で確認する。Azure/Fabric には AWS 用管理区分を流用しない。
+出典 [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/fundamentals/microsoft-fabric-overview)、[OneLake](https://learn.microsoft.com/en-us/fabric/onelake/onelake-overview)、[Fabric Lakehouse](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-overview)、[SQL analytics endpoint](https://learn.microsoft.com/en-us/fabric/data-engineering/lakehouse-sql-analytics-endpoint)、[Fabric Data Warehouse](https://learn.microsoft.com/en-us/fabric/data-warehouse/data-warehousing)、[Direct Lake overview](https://learn.microsoft.com/en-us/fabric/fundamentals/direct-lake-overview)、[Fabric licenses and capacity](https://learn.microsoft.com/en-us/fabric/enterprise/licenses)、[OneLake catalog](https://learn.microsoft.com/en-us/fabric/governance/onelake-catalog-overview)、[Copy activity](https://learn.microsoft.com/en-us/fabric/data-factory/copy-data-activity)

@@ -2,8 +2,8 @@
   "model": "bigquery",
   "name": "BigQuery のストレージ・コンピュート分離アーキテクチャ",
   "coverage": {
-    "covered": 9,
-    "total": 9
+    "covered": 10,
+    "total": 10
   },
   "byId": {
     "client": {
@@ -29,6 +29,11 @@
     "storage": {
       "type": "node",
       "label": "管理された列指向ストレージ",
+      "status": "claim"
+    },
+    "iceberg": {
+      "type": "node",
+      "label": "Iceberg テーブルとカタログ（Lakehouse for Apache Iceberg、旧 BigLake）",
       "status": "claim"
     },
     "engine": {
@@ -74,6 +79,11 @@
     "distribute": {
       "type": "link",
       "label": "並列クエリ実行枠 → 分散シャッフル",
+      "status": "claim"
+    },
+    "lake-read": {
+      "type": "link",
+      "label": "並列クエリ実行枠 → Iceberg テーブルとカタログ（Lakehouse for Apache Iceberg、旧 BigLake）",
       "status": "claim"
     },
     "aggregate": {
@@ -164,6 +174,14 @@
       "label": "BigQuery（CSV ロードジョブ）",
       "realizes": []
     },
+    "example-iceberg": {
+      "type": "implementation",
+      "impl": "bq-reservation",
+      "label": "BigQuery の Iceberg 管理テーブルとカタログ",
+      "realizes": [
+        "iceberg"
+      ]
+    },
     "example-reservation": {
       "type": "implementation",
       "impl": "bq-reservation",
@@ -185,6 +203,7 @@
       "bi",
       "dataset",
       "storage",
+      "iceberg",
       "engine",
       "workers",
       "submit",
@@ -194,6 +213,7 @@
       "plan",
       "scan",
       "distribute",
+      "lake-read",
       "aggregate",
       "serve",
       "load-query",
@@ -207,6 +227,7 @@
       "example-engine",
       "example-gcs",
       "example-loader",
+      "example-iceberg",
       "example-reservation"
     ],
     "docs/reference-bigquery.md#§7": [
@@ -216,6 +237,12 @@
     ],
     "docs/reference-bigquery.md#§8": [
       "model"
+    ],
+    "docs/reference-bigquery.md#§10": [
+      "model",
+      "iceberg",
+      "lake-read",
+      "example-iceberg"
     ],
     "docs/reference-bigquery.md#§6": [
       "api",
@@ -267,6 +294,8 @@
     "order": 30,
     "domain": "分析基盤・DWH",
     "kind": "製品・技術のアーキテクチャ",
+    "product": "BigQuery",
+    "role": "overview",
     "objectives": [
       "BigQuery のリソース階層とデータセットの役割を区別する。",
       "管理ストレージとクエリコンピュートが独立して伸縮する理由を理解する。",
@@ -292,6 +321,10 @@
       {
         "title": "Overview of BigQuery analytics",
         "url": "https://cloud.google.com/bigquery/docs/query-overview"
+      },
+      {
+        "title": "Apache Iceberg managed tables in BigQuery",
+        "url": "https://docs.cloud.google.com/bigquery/docs/iceberg-tables"
       }
     ]
   }

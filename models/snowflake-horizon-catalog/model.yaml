@@ -1,388 +1,711 @@
-name: Snowflake Horizon Catalog の分類・保護・監査
-description: 分類した機微列へマスキングを適用し、誰がその列を参照したかと下流への影響を確認する。
+name: Snowflake Horizon Catalog：分類・保護・監査と Iceberg REST
+description: 分類した機微列へマスキングを適用し、参照履歴と下流への影響を確認する。外部エンジンは Iceberg REST カタログ経由で表を読む。
 parent:
   model: snowflake
   node: metadata
 reference:
   objectives:
-    - ロールによる利用権限と、タグを使った実行時の保護を区別する。
-    - 分類、利用の記録、リネージで確認できる情報を区別する。
+  - ロールによる利用権限と、タグを使った実行時の保護を区別する。
+  - 分類、利用の記録、リネージで確認できる情報を区別する。
+  - 外部エンジンが Iceberg REST カタログと一時認証情報で表を読む経路を区別する。
   sources:
-    - title: Snowflake Horizon Catalog
-      url: https://docs.snowflake.com/en/user-guide/snowflake-horizon
-    - title: データガバナンス
-      url: https://docs.snowflake.com/en/guides-overview-govern
-    - title: タグベースのマスキング
-      url: https://docs.snowflake.com/en/user-guide/tag-based-masking-policies
-    - title: アクセス履歴
-      url: https://docs.snowflake.com/en/user-guide/access-history
+  - title: Snowflake Horizon Catalog
+    url: https://docs.snowflake.com/en/user-guide/snowflake-horizon
+  - title: データガバナンス
+    url: https://docs.snowflake.com/en/guides-overview-govern
+  - title: タグベースのマスキング
+    url: https://docs.snowflake.com/en/user-guide/tag-based-masking-policies
+  - title: アクセス履歴
+    url: https://docs.snowflake.com/en/user-guide/access-history
+  - title: Horizon Catalog の Iceberg REST と外部エンジン
+    url: https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon
+  - title: S3 互換ストレージと Horizon Catalog（2026 年 10 月、private preview）
+    url: https://www.snowflake.com/en/blog/engineering/s3-compatible-storage-iceberg-horizon-catalog/
 sources:
-  - docs/reference-snowflake-horizon-catalog.md
+- docs/reference-snowflake-horizon-catalog.md
 evidence:
-  - type: doc
-    ref: docs/reference-snowflake-horizon-catalog.md#§1
+- type: doc
+  ref: docs/reference-snowflake-horizon-catalog.md#§1
 tiers:
-  - id: flow
-    label: 構成と処理の流れ
-    z: 0
-    size:
-      - 13.5
-      - 4.5
+- id: flow
+  label: 構成と処理の流れ
+  z: 0
+  size:
+  - 13.5
+  - 7.5
 nodes:
   owner:
     label: データ管理者
     kind: actor
     tier: flow
     x: 0
-    'y': 0
+    y: 0
     description: 分類結果とタグの付け方を確認。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§2
   classify:
     label: 機微データ分類
     kind: service
     tier: flow
     x: 3
-    'y': 0
+    y: 0
     description: 機微情報の候補を分類。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§2
   tag:
     label: 列の分類ラベル
     kind: service
     tier: flow
     x: 6
-    'y': 0
+    y: 0
     description: 列に付与する分類メタデータ。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§2
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§2
   policy:
     label: 列の値を保護するポリシー
     kind: service
     tier: flow
     x: 9
-    'y': 0
+    y: 0
     description: 実行時にロールに従って変換。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§3
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§3
   analyst:
     label: 分析担当ロール
     kind: actor
     tier: flow
     x: 0
-    'y': 4
+    y: 4
     description: 利用権限のある列をクエリ。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§3
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§3
   orders:
-    drill: snowflake-iceberg-s3-compatible
     label: 注文のメールアドレス列
     kind: db
     tier: flow
     x: 6
-    'y': 4
+    y: 4
     description: 保護対象の列。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§1
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§1
   mart:
     label: 注文分析ビュー
     kind: db
     tier: flow
     x: 9
-    'y': 4
+    y: 4
     description: 下流の影響調査先。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§4
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§4
   history:
     label: 列アクセスの監査履歴
     kind: db
     tier: flow
     x: 13
-    'y': 4
+    y: 4
     description: アクセスしたオブジェクト・列を追う。
     evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§4
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§4
+  engine:
+    label: 外部エンジン
+    kind: client
+    tier: flow
+    x: 0
+    y: 6
+    description: Spark、Trino、PyIceberg など Iceberg REST 対応のエンジン。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§5
+  rest:
+    label: Iceberg REST カタログ API
+    kind: service
+    tier: flow
+    x: 4
+    y: 6
+    description: 表の登録情報と SELECT などの権限を確認し、メタデータの位置と一時認証情報を返す。エンドポイントはアカウントの /polaris/api/catalog。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§5
+  iceberg:
+    label: Snowflake 管理 Iceberg テーブル
+    kind: db
+    tier: flow
+    x: 8
+    y: 6
+    description: メタデータとデータファイルを外部ボリューム上に持つ。外部エンジンが直接読む。
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§5
 links:
-  - id: classify
-    from: owner
-    to: classify
-    label: 分類を設定・確認
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§2
-  - id: inspect
-    from: classify
-    to: orders
-    label: 列の機微情報を分類
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§2
-  - id: assign
-    from: tag
-    to: orders
-    label: 列にタグを付与
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§2
-  - id: bind
-    from: tag
-    to: policy
-    label: 型が合うマスキングを関連付け
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§3
-  - id: select
-    from: analyst
-    to: orders
-    label: 許可されたロールで参照
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§3
-  - id: mask
-    from: policy
-    to: orders
-    label: 許可条件に応じた表示値
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§3
-  - id: derive
-    from: orders
-    to: mart
-    label: 注文分析で利用
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§4
-  - id: track
-    from: mart
-    to: history
-    label: 使用列の情報を照合
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§4
-  - id: audit
-    from: owner
-    to: history
-    label: 利用履歴を確認
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§4
+- id: classify
+  from: owner
+  to: classify
+  label: 分類を設定・確認
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§2
+- id: inspect
+  from: classify
+  to: orders
+  label: 列の機微情報を分類
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§2
+- id: assign
+  from: tag
+  to: orders
+  label: 列にタグを付与
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§2
+- id: bind
+  from: tag
+  to: policy
+  label: 型が合うマスキングを関連付け
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§3
+- id: select
+  from: analyst
+  to: orders
+  label: 許可されたロールで参照
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§3
+- id: mask
+  from: policy
+  to: orders
+  label: 許可条件に応じた表示値
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§3
+- id: derive
+  from: orders
+  to: mart
+  label: 注文分析で利用
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§4
+- id: track
+  from: mart
+  to: history
+  label: 使用列の情報を照合
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§4
+- id: audit
+  from: owner
+  to: history
+  label: 利用履歴を確認
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§4
+- id: request
+  from: engine
+  to: rest
+  label: 表を要求
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§5
+- id: resolve
+  from: rest
+  to: iceberg
+  label: 権限と保存場所を解決
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§5
+- id: vend
+  from: rest
+  to: engine
+  label: 一時認証情報を返す
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§5
+- id: read-iceberg
+  from: engine
+  to: iceberg
+  label: メタデータとデータを読む
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§5
 scenarios:
-  - id: protect
-    label: メールアドレスの分類とマスキング
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§3
-    steps:
-      - links:
-          - classify
-          - inspect
-        note: 対象列の分類結果を確認する。
-      - links:
-          - assign
-          - bind
-        note: 保護対象のタグとポリシーを関連付ける。
-      - links:
-          - select
-          - mask
-        note: SELECT 権限のある分析担当にも、設定によりマスク済みの値を返す。
-  - id: investigate
-    label: 機微列の変更影響を調べる
-    evidence:
-      - type: doc
-        ref: docs/reference-snowflake-horizon-catalog.md#§4
-    steps:
-      - links:
-          - derive
-        note: 機微列を使用する下流ビューを確認する。
-      - links:
-          - track
-          - audit
-        note: アクセス履歴で実際の利用者と参照された列を照合する。
+- id: flow
+  label: 分類・保護・監査と外部エンジンからの読み取り
+  evidence:
+  - type: doc
+    ref: docs/reference-snowflake-horizon-catalog.md#§2
+  steps:
+  - links:
+    - classify
+    - inspect
+    note: 対象列の分類結果を確認する。
+  - links:
+    - assign
+    - bind
+    note: 保護対象のタグとポリシーを関連付ける。
+  - links:
+    - select
+    - mask
+    note: SELECT 権限のある分析担当にも、設定によりマスク済みの値を返す。
+  - links:
+    - derive
+    - track
+    - audit
+    note: 下流ビューを確認し、アクセス履歴で実際の利用者と参照された列を照合する。
+  - links:
+    - request
+    - resolve
+    - vend
+    - read-iceberg
+    note: 外部エンジンは REST カタログで権限を確認し、一時認証情報でメタデータとデータを読む。
 implementations:
-  - id: snowflake-policy
-    label: Snowflake での列分類とタグマスク
-    description: 受注メール列に分類タグとマスキングポリシーを適用し、分析権限と監査権限を分離する例。
-    sources:
-      - title: Snowflake Horizon Catalog
-        url: https://docs.snowflake.com/en/user-guide/snowflake-horizon
-      - title: データガバナンス
-        url: https://docs.snowflake.com/en/guides-overview-govern
-      - title: タグベースのマスキング
-        url: https://docs.snowflake.com/en/user-guide/tag-based-masking-policies
-      - title: アクセス履歴
-        url: https://docs.snowflake.com/en/user-guide/access-history
-      - title: Snowflake アクセス制御
-        url: https://docs.snowflake.com/en/user-guide/security-access-control-overview
-      - title: Account Usage のデータベースロール
-        url: https://docs.snowflake.com/en/sql-reference/account-usage
-      - {title: Snowflake architecture, url: https://docs.snowflake.com/en/user-guide/intro-key-concepts}
+- id: snowflake-policy
+  label: Snowflake での列分類とタグマスク
+  description: 受注メール列に分類タグとマスキングポリシーを適用し、分析権限と監査権限を分離する例。
+  sources:
+  - title: Snowflake Horizon Catalog
+    url: https://docs.snowflake.com/en/user-guide/snowflake-horizon
+  - title: データガバナンス
+    url: https://docs.snowflake.com/en/guides-overview-govern
+  - title: タグベースのマスキング
+    url: https://docs.snowflake.com/en/user-guide/tag-based-masking-policies
+  - title: アクセス履歴
+    url: https://docs.snowflake.com/en/user-guide/access-history
+  - title: Snowflake アクセス制御
+    url: https://docs.snowflake.com/en/user-guide/security-access-control-overview
+  - title: Account Usage のデータベースロール
+    url: https://docs.snowflake.com/en/sql-reference/account-usage
+  - title: Snowflake architecture
+    url: https://docs.snowflake.com/en/user-guide/intro-key-concepts
+  - title: Horizon Catalog の Iceberg REST と外部エンジン
+    url: https://docs.snowflake.com/en/user-guide/tables-iceberg-access-using-external-query-engine-snowflake-horizon
+  tiers:
+  - id: flow
+    label: 構成と処理の流れ
+    z: 0
+    size:
+    - 13.5
+    - 4.5
+  - id: implementation-setup
+    label: 実装時の設定・観測
+    z: 1
+    size:
+    - 14
+    - 3
+  nodes:
+    example-admin-user:
+      label: Authorized user
+      kind: client
+      tier: flow
+      x: -3
+      y: 1
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-owner:
+      label: 分類設定用ロール
+      kind: policy
+      tier: flow
+      x: 0
+      y: 0
+      realizes:
+      - owner
+      description: 分類プロファイルと結果を管理する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-classify:
+      svc: snowflake:horizon
+      label: Sensitive Data Classification
+      kind: service
+      tier: flow
+      x: 3
+      y: 0
+      realizes:
+      - classify
+      description: 機微情報候補の分類結果を確認する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-tag:
+      label: 分類タグとマスキングポリシー
+      kind: service
+      tier: flow
+      x: 6
+      y: 0
+      realizes:
+      - tag
+      - policy
+      description: 文字列用ポリシーをタグに関連付ける。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-analyst:
+      label: SALES_READER ロール
+      kind: policy
+      tier: flow
+      x: 0
+      y: 4
+      realizes:
+      - analyst
+      description: 許可された分析ビューだけを参照する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-orders:
+      label: ORDERS.CUSTOMER_EMAIL
+      kind: db
+      tier: flow
+      x: 6
+      y: 4
+      realizes:
+      - orders
+      description: メール列に分類タグを設定する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-mart:
+      label: SALES.ORDERS_ANALYSIS
+      kind: db
+      tier: flow
+      x: 9
+      y: 4
+      realizes:
+      - mart
+      description: 注文分析に必要な列を公開する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-history:
+      label: ACCOUNT_USAGE.ACCESS_HISTORY
+      kind: db
+      tier: flow
+      x: 13
+      y: 4
+      realizes:
+      - history
+      description: アクセスした資産と列を、対応するクエリで確認する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-privacy:
+      label: アクセス監査用ロール
+      kind: policy
+      tier: implementation-setup
+      x: 1
+      y: 1.5
+      description: SNOWFLAKE.GOVERNANCE_VIEWER を付与した監査用アカウントロール。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-analysis-wh:
+      label: 分析用 Virtual Warehouse
+      svc: snowflake:warehouse
+      kind: worker
+      tier: flow
+      x: 3
+      y: 4
+      description: SALES_READER の SQL を実行し、授権された分析ビューを読む。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-audit-wh:
+      label: 監査用 Virtual Warehouse
+      svc: snowflake:warehouse
+      kind: worker
+      tier: implementation-setup
+      x: 6
+      y: 1.5
+      description: 監査担当の SQL で Account Usage を調べる。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-engine:
+      label: Spark などの外部エンジン
+      kind: client
+      tier: flow
+      x: -3
+      y: 6
+      realizes:
+      - engine
+      description: 利用者が運用する Iceberg REST 対応エンジン。キーペア、OAuth、PAT などで Snowflake に認証する。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+    example-rest:
+      label: Horizon Iceberg REST カタログ API
+      kind: service
+      tier: flow
+      x: 3
+      y: 6
+      realizes:
+      - rest
+      description: 'X-Iceberg-Access-Delegation: vended-credentials を指定すると一時認証情報を返す。読み取りには表の SELECT とデータベース・スキーマの USAGE が必要。'
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+      provider: snowflake
+      svc: snowflake:horizon
+    example-iceberg:
+      label: ORDERS_ICE（Snowflake 管理 Iceberg）
+      kind: db
+      tier: flow
+      x: 9
+      y: 6
+      realizes:
+      - iceberg
+      description: 外部ボリューム上のメタデータとデータファイル。書き込みには DML 権限と外部ボリュームの USAGE が必要。
+      evidence:
+      - type: doc
+        ref: docs/reference-snowflake-horizon-catalog.md#§6
+      provider: snowflake
+  links:
+  - id: example-user-role
+    from: example-admin-user
+    to: example-owner
+    label: Use authorized role
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§6
+  - id: example-analyst-query
+    from: example-analyst
+    to: example-analysis-wh
+    label: SALES_READER で SELECT を実行
+    realizes:
+    - select
+    replace: true
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§6
+  - id: example-read-view
+    from: example-analysis-wh
+    to: example-mart
+    label: マスクを適用した分析ビューを読む
+    realizes:
+    - select
+    replace: true
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§6
+  - id: example-audit-query
+    from: example-privacy
+    to: example-audit-wh
+    label: 監査用ロールで履歴の SQL を実行
+    realizes:
+    - audit
+    replace: true
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§6
+  - id: example-read-history
+    from: example-audit-wh
+    to: example-history
+    label: ACCESS_HISTORY を読む
+    realizes:
+    - audit
+    replace: true
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§6
+  - id: example-privacy-connection
+    from: example-privacy
+    to: example-history
+    label: 監査履歴の閲覧を許可
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§6
+  - id: example-engine-auth
+    from: example-engine
+    to: example-rest
+    label: 認証して表を要求
+    realizes:
+    - request
+    evidence:
+    - type: doc
+      ref: docs/reference-snowflake-horizon-catalog.md#§6
+  groups:
+  - kind: cloud
+    provider: snowflake
+    label: Snowflake account
+    tier:
+    - flow
+    - implementation-setup
+    nodes: &id001
+    - example-owner
+    - example-classify
+    - example-tag
+    - example-analyst
+    - example-orders
+    - example-mart
+    - example-history
+    - example-privacy
+    - example-analysis-wh
+    - example-audit-wh
+    - example-rest
+    - example-iceberg
+  layout2d:
     tiers:
-      - id: flow
-        label: 構成と処理の流れ
-        z: 0
-        size:
-          - 13.5
-          - 4.5
-      - id: implementation-setup
-        label: 実装時の設定・観測
-        z: 1
-        size:
-          - 14
-          - 3
+    - id: diagram
+      label: Snowflake account and user
+      z: 0
+      size:
+      - 27
+      - 14
     nodes:
-      example-admin-user: {label: Authorized user, kind: client, tier: flow, x: -3, y: 1, evidence: [{type: doc, ref: "docs/reference-snowflake-horizon-catalog.md#§5"}]}
+      example-admin-user:
+        tier: diagram
+        x: 0
+        y: 4
       example-owner:
-        label: 分類設定用ロール
-        kind: policy
-        tier: flow
-        x: 0
-        'y': 0
-        realizes:
-          - owner
-        description: 分類プロファイルと結果を管理する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
+        tier: diagram
+        x: 5
+        y: 1
       example-classify:
-        svc: snowflake:horizon
-        label: Sensitive Data Classification
-        kind: service
-        tier: flow
-        x: 3
-        'y': 0
-        realizes:
-          - classify
-        description: 機微情報候補の分類結果を確認する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
-      example-tag:
-        label: 分類タグとマスキングポリシー
-        kind: service
-        tier: flow
-        x: 6
-        'y': 0
-        realizes:
-          - tag
-          - policy
-        description: 文字列用ポリシーをタグに関連付ける。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
-      example-analyst:
-        label: SALES_READER ロール
-        kind: policy
-        tier: flow
-        x: 0
-        'y': 4
-        realizes:
-          - analyst
-        description: 許可された分析ビューだけを参照する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
-      example-orders:
-        label: ORDERS.CUSTOMER_EMAIL
-        kind: db
-        tier: flow
-        x: 6
-        'y': 4
-        realizes:
-          - orders
-        description: メール列に分類タグを設定する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
-      example-mart:
-        label: SALES.ORDERS_ANALYSIS
-        kind: db
-        tier: flow
+        tier: diagram
         x: 9
-        'y': 4
-        realizes:
-          - mart
-        description: 注文分析に必要な列を公開する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
-      example-history:
-        label: ACCOUNT_USAGE.ACCESS_HISTORY
-        kind: db
-        tier: flow
+        y: 1
+      example-tag:
+        tier: diagram
         x: 13
-        'y': 4
-        realizes:
-          - history
-        description: アクセスした資産と列を、対応するクエリで確認する。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
+        y: 1
+      example-analyst:
+        tier: diagram
+        x: 17
+        y: 1
+      example-orders:
+        tier: diagram
+        x: 21
+        y: 1
+      example-mart:
+        tier: diagram
+        x: 5
+        y: 5
+      example-history:
+        tier: diagram
+        x: 9
+        y: 5
       example-privacy:
-        label: アクセス監査用ロール
-        kind: policy
-        tier: implementation-setup
-        x: 1
-        'y': 1.5
-        description: SNOWFLAKE.GOVERNANCE_VIEWER を付与した監査用アカウントロール。
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
-      example-analysis-wh: {label: 分析用 Virtual Warehouse, svc: 'snowflake:warehouse', kind: worker, tier: flow, x: 3, y: 4, description: SALES_READER の SQL を実行し、授権された分析ビューを読む。, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
-      example-audit-wh: {label: 監査用 Virtual Warehouse, svc: 'snowflake:warehouse', kind: worker, tier: implementation-setup, x: 6, y: 1.5, description: 監査担当の SQL で Account Usage を調べる。, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
-    links:
-      - {id: example-user-role, from: example-admin-user, to: example-owner, label: "Use authorized role", evidence: [{type: doc, ref: "docs/reference-snowflake-horizon-catalog.md#§5"}]}
-      - {id: example-analyst-query, from: example-analyst, to: example-analysis-wh, label: SALES_READER で SELECT を実行, realizes: [select], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
-      - {id: example-read-view, from: example-analysis-wh, to: example-mart, label: マスクを適用した分析ビューを読む, realizes: [select], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
-      - {id: example-audit-query, from: example-privacy, to: example-audit-wh, label: 監査用ロールで履歴の SQL を実行, realizes: [audit], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
-      - {id: example-read-history, from: example-audit-wh, to: example-history, label: ACCESS_HISTORY を読む, realizes: [audit], replace: true, evidence: [{type: doc, ref: docs/reference-snowflake-horizon-catalog.md#§5}]}
-      - id: example-privacy-connection
-        from: example-privacy
-        to: example-history
-        label: 監査履歴の閲覧を許可
-        evidence:
-          - type: doc
-            ref: docs/reference-snowflake-horizon-catalog.md#§5
+        tier: diagram
+        x: 13
+        y: 5
+      example-analysis-wh:
+        tier: diagram
+        x: 17
+        y: 5
+      example-audit-wh:
+        tier: diagram
+        x: 21
+        y: 5
+      example-engine:
+        tier: diagram
+        x: 0
+        y: 10
+      example-rest:
+        tier: diagram
+        x: 6
+        y: 10
+      example-iceberg:
+        tier: diagram
+        x: 13
+        y: 10
     groups:
-      - {kind: cloud, provider: snowflake, label: Snowflake account, tier: [flow, implementation-setup], nodes: [example-owner, example-classify, example-tag, example-analyst, example-orders, example-mart, example-history, example-privacy, example-analysis-wh, example-audit-wh]}
-    layout2d:
-      tiers: [{id: diagram, label: Snowflake account and user, z: 0, size: [27, 12]}]
-      nodes:
-        example-admin-user: {tier: diagram, x: 0, y: 4}
-        example-owner: {tier: diagram, x: 5, y: 1}
-        example-classify: {tier: diagram, x: 9, y: 1}
-        example-tag: {tier: diagram, x: 13, y: 1}
-        example-analyst: {tier: diagram, x: 17, y: 1}
-        example-orders: {tier: diagram, x: 21, y: 1}
-        example-mart: {tier: diagram, x: 5, y: 5}
-        example-history: {tier: diagram, x: 9, y: 5}
-        example-privacy: {tier: diagram, x: 13, y: 5}
-        example-analysis-wh: {tier: diagram, x: 17, y: 5}
-        example-audit-wh: {tier: diagram, x: 21, y: 5}
-      groups:
-        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: diagram, nodes: [example-owner, example-classify, example-tag, example-analyst, example-orders, example-mart, example-history, example-privacy, example-analysis-wh, example-audit-wh]}
-    layout3d:
-      tiers:
-        - {id: account, label: Snowflake account, z: 0, size: [22, 6]}
-        - {id: user, label: User, kind: origin, z: 0, origin: [-4, 0], size: [2, 3]}
-      nodes:
-        example-admin-user: {tier: user, x: 0, y: 1.5}
-        example-owner: {tier: account, x: 2, y: 1}
-        example-classify: {tier: account, x: 6, y: 1}
-        example-tag: {tier: account, x: 10, y: 1}
-        example-analyst: {tier: account, x: 14, y: 1}
-        example-orders: {tier: account, x: 18, y: 1}
-        example-mart: {tier: account, x: 2, y: 4}
-        example-history: {tier: account, x: 6, y: 4}
-        example-privacy: {tier: account, x: 10, y: 4}
-        example-analysis-wh: {tier: account, x: 14, y: 4}
-        example-audit-wh: {tier: account, x: 18, y: 4}
-      groups:
-        - {kind: cloud, provider: snowflake, label: Snowflake account, tier: account, nodes: [example-owner, example-classify, example-tag, example-analyst, example-orders, example-mart, example-history, example-privacy, example-analysis-wh, example-audit-wh]}
+    - kind: cloud
+      provider: snowflake
+      label: Snowflake account
+      tier: diagram
+      nodes: *id001
+  layout3d:
+    tiers:
+    - id: account
+      label: Snowflake account
+      z: 0
+      size:
+      - 22
+      - 9
+    - id: user
+      label: User
+      kind: origin
+      z: 0
+      origin:
+      - -4
+      - 0
+      size:
+      - 2
+      - 9
+    nodes:
+      example-admin-user:
+        tier: user
+        x: 0
+        y: 1.5
+      example-owner:
+        tier: account
+        x: 2
+        y: 1
+      example-classify:
+        tier: account
+        x: 6
+        y: 1
+      example-tag:
+        tier: account
+        x: 10
+        y: 1
+      example-analyst:
+        tier: account
+        x: 14
+        y: 1
+      example-orders:
+        tier: account
+        x: 18
+        y: 1
+      example-mart:
+        tier: account
+        x: 2
+        y: 4
+      example-history:
+        tier: account
+        x: 6
+        y: 4
+      example-privacy:
+        tier: account
+        x: 10
+        y: 4
+      example-analysis-wh:
+        tier: account
+        x: 14
+        y: 4
+      example-audit-wh:
+        tier: account
+        x: 18
+        y: 4
+      example-engine:
+        tier: user
+        x: 0
+        y: 7.5
+      example-rest:
+        tier: account
+        x: 6
+        y: 7.5
+      example-iceberg:
+        tier: account
+        x: 12
+        y: 7.5
+    groups:
+    - kind: cloud
+      provider: snowflake
+      label: Snowflake account
+      tier: account
+      nodes: *id001
+unknowns:
+- id: external-policy
+  text: 外部エンジンへのマスキング等のポリシー伝播、S3 互換の非 AWS ストレージでの動作、内部配置は公開資料で未確認。
+  refs:
+  - rest
+  - iceberg

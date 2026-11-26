@@ -1,0 +1,78 @@
+name: "BigQuery：Iceberg レイクハウス（旧 BigLake）"
+description: 利用者の Cloud Storage に置いた Iceberg テーブルを、BigQuery と外部エンジンが REST カタログ経由で共有する経路を追う。
+parent: {model: bigquery, node: iceberg}
+reference:
+  objectives:
+    - BigQuery の Iceberg 管理テーブルと、REST カタログ経由のテーブルを区別する。
+    - 外部エンジンが認証情報の払い出しでデータファイルを読む経路を追う。
+    - 一般提供（GA）と Preview の範囲を区別する。
+  sources:
+    - {title: Apache Iceberg managed tables in BigQuery, url: https://docs.cloud.google.com/bigquery/docs/iceberg-tables}
+    - {title: Apache Iceberg REST catalog endpoint, url: https://docs.cloud.google.com/bigquery/docs/blms-rest-catalog}
+sources: [docs/reference-bigquery-lakehouse-iceberg.md]
+evidence: [{type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§1"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§2"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§3"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§4"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§5"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§6"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§7"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§8"}, {type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§9"}]
+tiers:
+  - {id: engines, label: 読み書きするエンジン, z: 2, size: [12, 3]}
+  - {id: catalog, label: カタログと認証, z: 1, size: [12, 3]}
+  - {id: data, label: 利用者のストレージ, z: 0, size: [12, 3]}
+nodes:
+  bqengine: {label: BigQuery（SQL・Storage Write API）, kind: worker, tier: engines, x: 1, y: 1.5, description: Iceberg 管理テーブルを SQL で読み書きする。, evidence: &m [{type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§3"}]}
+  external: {label: 外部エンジン（Spark・Trino）, kind: external, tier: engines, x: 9, y: 1.5, description: Iceberg REST のクライアントとしてカタログに接続する。, evidence: &e [{type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§5"}]}
+  managed: {label: Iceberg 管理テーブル, kind: table, tier: catalog, x: 1, y: 1.5, description: BigQuery が管理する Iceberg テーブル。DML、自動の最適化、タイムトラベルが使える。, evidence: *m}
+  restcat: {label: Lakehouse ランタイムカタログ（Iceberg REST）, kind: catalog, tier: catalog, x: 6, y: 1.5, description: Iceberg REST カタログのエンドポイント。BigLake metastore の後継名称と見られるが、名称の対応は公式資料で未確認。, evidence: &r [{type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§4"}]}
+  vending: {label: 認証情報の払い出し, kind: policy, tier: catalog, x: 10.5, y: 1.5, description: ヘッダー X-Iceberg-Access-Delegation に vended-credentials を指定すると、カタログが Cloud Storage への一時的な権限を渡す。, evidence: *e}
+  meta: {label: Iceberg メタデータ（metadata.json・スナップショット）, kind: file, tier: data, x: 1, y: 0.7, description: テーブルの状態を示す。metadata.json は 1 MB まで。, evidence: *r}
+  files: {label: Parquet データファイル, kind: file, tier: data, x: 1, y: 2.4, description: 利用者の Cloud Storage バケットに置く。Parquet のみ。, evidence: *r}
+  bucket: {label: Cloud Storage バケット, kind: db, tier: data, x: 8, y: 1.5, description: 利用者が所有する。, evidence: *m}
+links:
+  - {id: sql, from: bqengine, to: managed, label: SQL で読み書き, evidence: *m}
+  - {id: register, from: managed, to: restcat, label: テーブルを登録, evidence: *r}
+  - {id: connect, from: external, to: restcat, label: テーブルの場所を問い合わせ, evidence: *e}
+  - {id: vend, from: restcat, to: vending, label: 認証情報を発行, evidence: *e}
+  - {id: grant, from: vending, to: external, label: 一時的な権限を返す, evidence: *e}
+  - {id: read-files, from: external, to: bucket, label: データファイルを読む, evidence: *e}
+  - {id: place-files, from: bucket, to: files, label: ファイルを置く, evidence: *m}
+  - {id: place-meta, from: bucket, to: meta, label: メタデータを置く, evidence: *r}
+  - {id: write-through, from: managed, to: bucket, label: データを書く, evidence: *m}
+scenarios:
+  - id: share-iceberg
+    label: BigQuery が書いたテーブルを Spark が読む
+    evidence: [{type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§6"}]
+    steps:
+      - {links: [sql, write-through, register], note: BigQuery が Iceberg 管理テーブルへ書き、カタログに登録する。}
+      - {links: [connect, vend, grant], note: 外部エンジンがカタログに問い合わせ、認証情報の払い出しを受ける。}
+      - {links: [read-files, place-files, place-meta], note: 外部エンジンがバケットのメタデータとデータファイルを直接読む。}
+unknowns:
+  - {id: rename, text: 「Lakehouse for Apache Iceberg」「BigLake metastore」と取得資料の「Lakehouse ランタイムカタログ」の名称対応は、公式の改称告知で未確認。, refs: [restcat]}
+  - {id: stage, text: 管理テーブルの機能の GA・Preview 区分は取得資料に記載がなく未確認。, refs: [managed]}
+  - {id: perf, text: 外部エンジンの読み取り性能と BigQuery との整合のとれる遅延は未確認。, refs: [external]}
+implementations:
+  - id: gcp-iceberg-spark
+    label: BigQuery と Managed Service for Apache Spark の Iceberg 共有
+    description: Cloud Storage の Iceberg テーブルを BigQuery が書き、Spark が REST カタログと認証情報の払い出しで読む例。
+    sources:
+      - {title: Apache Iceberg managed tables in BigQuery, url: https://docs.cloud.google.com/bigquery/docs/iceberg-tables}
+      - {title: Apache Iceberg REST catalog endpoint, url: https://docs.cloud.google.com/bigquery/docs/blms-rest-catalog}
+    tiers: &t2 [{id: diagram, label: Iceberg レイクハウス, z: 0, size: [24, 12]}]
+    nodes:
+      bq-sql: {label: BigQuery のクエリとロード, svc: gcp:bigquery, kind: worker, tier: diagram, x: 7, y: 2, realizes: [bqengine], description: Iceberg 管理テーブルへ書き込む。, evidence: &i [{type: doc, ref: "docs/reference-bigquery-lakehouse-iceberg.md#§7"}]}
+      bq-iceberg: {label: BigQuery の Iceberg 管理テーブル, svc: gcp:bigquery, kind: table, tier: diagram, x: 12, y: 2, realizes: [managed], description: Google が運用するテーブル管理。, evidence: *i}
+      bq-catalog: {label: Lakehouse ランタイムカタログ, svc: gcp:bigquery, kind: catalog, tier: diagram, x: 12, y: 7, realizes: [restcat], description: Iceberg REST のエンドポイント。V2 は GA、V3 と BigQuery の DDL・DML 経由の操作は Preview（2026 年 11 月時点）。, evidence: *i}
+      bq-vending: {label: カタログの認証情報払い出し, svc: gcp:bigquery, kind: policy, tier: diagram, x: 17, y: 7, realizes: [vending], description: カタログのサービスアカウントにバケットの storage.objectUser が必要。, evidence: *i}
+      spark: {label: Spark（Managed Service for Apache Spark）, kind: worker, tier: diagram, x: 1, y: 7, realizes: [external], description: Iceberg 1.10 以降は GoogleAuthManager を内蔵する。, evidence: *i}
+      gcs-bucket: {label: Cloud Storage の Iceberg バケット, svc: gcp:gcs, kind: file, tier: diagram, x: 19, y: 2, realizes: [bucket, files, meta], description: 利用者が所有し、データとメタデータを置く。, evidence: *i}
+    links: []
+    groups: &g2 [{kind: cloud, label: Google Cloud プロジェクト, provider: gcp, tier: diagram, x0: -0.5, y0: -0.5, x1: 23.5, y1: 11.5, nodes: &env [bq-sql, bq-iceberg, bq-catalog, bq-vending, spark, gcs-bucket]}]
+    layout2d: {tiers: *t2, nodes: {}, groups: *g2}
+    layout3d:
+      tiers:
+        - {id: gcp, label: Google Cloud, z: 0, size: [22, 8]}
+      nodes:
+        bq-sql: {tier: gcp, x: 2, y: 1.5}
+        bq-iceberg: {tier: gcp, x: 8, y: 1.5}
+        bq-catalog: {tier: gcp, x: 8, y: 5.5}
+        bq-vending: {tier: gcp, x: 14, y: 5.5}
+        spark: {tier: gcp, x: 2, y: 5.5}
+        gcs-bucket: {tier: gcp, x: 15, y: 1.5}
+      groups:
+        - {kind: cloud, label: Google Cloud プロジェクト, provider: gcp, tier: [gcp], nodes: *env}
