@@ -61,7 +61,12 @@ function documentLink(text, path) {
 function sourceLink({ title, url }) {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return link(title, parsed.href);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      const anchor = link(title, parsed.href);
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      return anchor;
+    }
   } catch {
     return null;
   }
