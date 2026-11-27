@@ -969,12 +969,17 @@ async function loadCategoryCompare(category) {
     box.hidden = false;
   } catch {}
 }
+/* ヘッダーには図の名前ではなく、分類の階層を出す（名前は詳細パネルとタブに出ている） */
+function modelCrumb() {
+  const ref = REGISTRY.find(r => r.id === KEY)?.reference;
+  return ref?.domain ? [ref.domain, ref.category].filter(Boolean).join(' › ') : '';
+}
 function hideCategoryPage() {
   if (!document.body.classList.contains('cat-mode')) return;
   document.body.classList.remove('cat-mode'); $('cat-page').hidden = true;
   delete LIB_SEL.cat; saveLibSel(); renderLibrary();
   document.title = `${M.name} — DeepDiverDown`;
-  $('mtitle').textContent = M.name; $('mparent').hidden = !$('mparent').getAttribute('href');
+  $('mtitle').textContent = modelCrumb(); $('mparent').hidden = !$('mparent').getAttribute('href');
 }
 function selectLibDomain(d) { LIB_SEL.domain = d; saveLibSel(); $('lib-scroll').scrollTop = 0; renderLibrary(); }
 function selectLibKind(k) { LIB_SEL.kind = k; saveLibSel(); renderLibrary(); }
@@ -1048,7 +1053,7 @@ function toggleTag(t, only = false) {
   if (only) { LIB_TAGS.clear(); LIB_TAGS.add(t); } else LIB_TAGS.has(t) ? LIB_TAGS.delete(t) : LIB_TAGS.add(t);
   renderTagFilter(); updateLibraryFilter();
 }
-/* モデルを選ぶ（Ctrl+K・ヘッダーのモデル名）：サイドバーのモデル一覧を開いて絞り込み欄へ */
+/* モデルを選ぶ（Ctrl+K）：サイドバーのモデル一覧を開いて絞り込み欄へ */
 function pickModel() {
   if (matchMedia('(max-width:1279px)').matches) document.body.classList.add('nav-open');
   else document.body.classList.remove('nav-closed');
@@ -2028,7 +2033,7 @@ addEventListener('keydown', e => {
 
 /* ================= 起動 ================= */
 document.title = `${M.name} — DeepDiverDown`;
-$('mtitle').textContent = M.name;
+$('mtitle').textContent = modelCrumb();
 $('viewer-title').textContent = M.name;
 /* ドリルダウン：上位の図（parent）があればパンくずで戻れるようにする */
 {
