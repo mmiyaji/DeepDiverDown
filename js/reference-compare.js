@@ -239,7 +239,7 @@ export function renderReferenceComparison(container, current, candidates, loadMo
         base.forEach((entry, index) => {
           if (index) sources.append(' / ');
           const link = document.createElement('a');
-          link.href = 'docs/reference-' + encodeURIComponent(entry.id) + '.md';
+          link.href = 'research.html?doc=' + encodeURIComponent('docs/reference-' + entry.id + '.md');
           link.target = '_blank'; link.rel = 'noopener';
           link.textContent = entry.name;
           sources.append(link);
@@ -273,7 +273,7 @@ export function renderReferenceComparison(container, current, candidates, loadMo
           const source = item.model.sources?.find(path => /^docs\/[a-z0-9-]+\.md$/.test(path));
           if (!source) { sources.append(base[index].name + '（資料未指定）'); return; }
           const link = document.createElement('a');
-          link.href = source; link.target = '_blank'; link.rel = 'noopener'; link.textContent = base[index].name;
+          link.href = 'research.html?doc=' + encodeURIComponent(source); link.target = '_blank'; link.rel = 'noopener'; link.textContent = base[index].name;
           sources.append(link);
         });
         assistance.append(sources);

@@ -1,4 +1,4 @@
-import { comparisonCandidates } from './reference-compare.js?v=performance-compare1';
+import { comparisonCandidates } from './reference-compare.js?v=performance-compare2';
 
 // These edges encode curated comparison topics and registry classifications, not integrations.
 export function makeKnowledgeGraph(entries, registry) {

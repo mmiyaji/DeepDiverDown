@@ -4,7 +4,7 @@ import { Scene3D } from './scene3d.js?v=view14';
 import { buildDiagramLayout, overviewScale } from './diagram-layout.js?v=perf9';
 import { implementation3D, platformFootprint, platformNeedsMemberBounds } from './implementation-3d.js?v=platform-boundary1';
 import { legendState, showGroup, showLink } from './legend-visibility.js';
-import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=performance-compare1';
+import { comparisonCandidates, renderReferenceComparison } from './reference-compare.js?v=performance-compare2';
 import { NODE_KINDS, nodeShape } from './node-kinds.js';
 import { loadServiceIcons } from './service-icons.js';
 import { loadSettings, saveSettings, applyAppearance, once, DEFAULTS, AI_PROVIDERS } from './settings.js?v=render-mode1';
@@ -1366,8 +1366,15 @@ function referenceDetails() {
       `<li><a href="${esc(source.url)}" target="_blank" rel="noopener">${esc(source.title)}</a></li>`).join('')}</ul>` : ''}`;
 }
 
+/* docs/*.md は生のテキストではなく、調査一覧の読み取り画面（research.html?doc=）で整形して開く */
+function docReaderHref(path) {
+  return /^docs\/[a-z0-9-]+\.md$/.test(path) || path === 'README.md' ? `research.html?doc=${encodeURIComponent(path)}` : null;
+}
+
 function sourceLink(source) {
   const label = esc(source);
+  const reader = docReaderHref(source);
+  if (reader) return `<a href="${esc(reader)}" target="_blank" rel="noopener">${label}</a>`;
   if (!URL.canParse(source, location.href) || !['http:', 'https:'].includes(new URL(source, location.href).protocol)) return label;
   return `<a href="${label}" target="_blank" rel="noopener">${label}</a>`;
 }
@@ -1736,7 +1743,7 @@ function openEvidenceRef(ref) {
   });
   modal('根拠の参照先', `<p class="mono evidence-address">${esc(ref)}</p>
     ${sectionInfo ? `<p>${esc(sectionInfo.id)} ${esc(sectionInfo.title)}</p>` : ''}
-    ${source ? `<a href="${esc(source)}" target="_blank" rel="noopener">参照資料を開く</a>` : ''}
+    ${source ? `<a href="${esc(docReaderHref(source) || source)}" target="_blank" rel="noopener">参照資料を開く</a>` : ''}
     ${owners.length ? '<h4>この参照先に紐付く要素</h4>' + owners.join('') : ''}`);
 }
 
