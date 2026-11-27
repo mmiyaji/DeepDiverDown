@@ -73,8 +73,7 @@ test('comparisons start at the open architecture and combine shared topics witho
   const candidates = comparisonCandidates(registry, 'kafka-connect');
   assert.ok(candidates.some(c => c.entry.id === 'airbyte'));
   assert.ok(!candidates.some(c => c.entry.id === 'amazon-eks'));
-  assert.equal(candidates.filter(c => c.entry.id === 'postgresql-logical-decoding').length, 1);
-  assert.equal(candidates.find(c => c.entry.id === 'postgresql-logical-decoding').topics.length, 2);
+  assert.ok(!candidates.some(c => c.entry.id === 'postgresql-logical-decoding'));
   assert.deepEqual(comparisonCandidates([...registry, { id: 'local-example' }], 'local-example'), []);
 });
 
@@ -85,5 +84,7 @@ test('pairs can be opened from either end, including overview and detail diagram
     assert.equal(new Set(ids).size, ids.length);
     for (const other of ids) assert.ok(peers.get(other).includes(id), id + ' / ' + other);
   }
-  assert.ok(peers.get('databricks-mlflow-serving').includes('databricks'));
+  assert.ok(peers.get('redis').includes('valkey'));
+  assert.ok(!peers.get('redis').includes('redis-memory-internals'));
+  assert.deepEqual(peers.get('kafka'), []);
 });

@@ -84,76 +84,46 @@ const PRODUCTS = {
   ],
 };
 
-const GROUPS = [
-  ['自動運転とシミュレーション', ['autoware-autonomous-driving', 'carla-simulation', 'ros2-dds-communication']],
-  ['車載 OS とプラットフォーム', ['autosar-classic', 'autosar-adaptive', 'automotive-grade-linux', 'android-automotive', 'kuksa-vss']],
-  ['エッジの実行と管理', ['edge-k3s', 'k3s', 'kubeedge', 'aws-iot-greengrass', 'eclipse-hawkbit']],
-  ['イベントの配信と接続管理', ['slack-real-time-messaging', 'kafka', 'kafka-connect', 'trend-agentic-streaming']],
-  ['Iceberg v3 の内部構造', ['iceberg-v3-variant', 'iceberg-v3-metadata', 'apache-iceberg', 'iceberg-catalog-read', 'parquet-internals']],
-  ['エージェントの記憶と知識グラフ', ['graphiti', 'hindsight', 'hydradb', 'trend-graphrag', 'semantic-ontology']],
-  ['検索とデータアクセス', ['qdrant', 'databricks-ai-search', 'mcp-toolbox', 'mcp-data-agent']],
-  ['リアルタイム分析', ['risingwave', 'flink', 'kafka-streams', 'trend-agentic-streaming']],
-  ['AI とシステムの監視', ['langfuse', 'monitoring-datadog', 'monitoring-newrelic', 'opentelemetry']],
-  ['オブジェクトストレージ', ['rustfs', 'hydradb', 'data-lakehouse']],
-  ['ファイル形式と圧縮', ['file-compression', 'file-formats', 'parquet-internals', 'orc-internals', 'avro-internals']],
-  ['スポット容量と Kubernetes', ['cloud-spot-capacity', 'spot-ocean', 'amazon-eks', 'azure-aks', 'google-gke', 'kubernetes']],
-  ['監視とオブザーバビリティ', ['monitoring-datadog', 'monitoring-newrelic', 'monitoring-prometheus', 'opentelemetry']],
-  ['知識グラフと生成 AI', ['trend-graphrag', 'semantic-ontology', 'databricks-ai-search', 'analytics-agent']],
-  ['データプロダクトと管理', ['trend-data-product', 'google-cloud-knowledge-catalog', 'data-catalog-architecture', 'datahub']],
-  ['イベントとエージェント', ['trend-agentic-streaming', 'agent-approval', 'kafka', 'kafka-streams']],
-  ['セマンティックと知識グラフ', ['semantic-ontology', 'semantic-virtual-graph', 'semantic-shacl', 'dbt-metricflow', 'data-catalog-architecture']],
-  ['データの提供とプライバシー', ['dwh-synthetic-data', 'dwh-differential-privacy', 'data-clean-room']],
-  ['コンテナの配置と復旧', Object.keys(PRODUCTS)],
-  ['外部データの取り込みと再開', ['kafka-connect', 'debezium', 'airbyte', 'fivetran', 'postgresql-logical-decoding']],
-  ['イベントログと購読位置', ['kafka', 'kafka-connect', 'kafka-streams', 'postgresql-logical-decoding']],
-  ['分析エージェントの構成とツール', ['analytics-agent', 'mcp-data-agent', 'cortex-data-agent', 'databricks-ai-search', 'agent-approval']],
-  ['分析指標の定義', ['dbt-metricflow', 'dbt', 'dwh-aggregate-tables', 'analytics-agent']],
-  ['機械学習の特徴量と推論', ['feast-feature-store', 'databricks-mlflow-serving']],
-  ['ストリームの処理と状態管理', ['flink', 'kafka-streams', 'spark-structured-streaming', 'spark-streaming', 'google-cloud-dataflow']],
-  ['分析クエリの実行', ['spark', 'trino', 'clickhouse', 'duckdb']],
-  ['テーブルの更新と履歴管理', ['apache-iceberg', 'delta-lake', 'apache-hudi', 'apache-paimon']],
-  ['分析基盤のストレージと計算', ['snowflake', 'databricks', 'bigquery', 'redshift', 'microsoft-fabric']],
-  ['データパイプラインの構築と実行', ['aws-glue', 'azure-data-factory', 'google-cloud-dataflow', 'databricks-lakeflow', 'apache-airflow']],
-  ['取り込み後の変換と更新', ['etl-elt', 'dbt', 'snowflake-ingestion-cdc', 'databricks-lakeflow']],
+/* 比較対象は「同じ位置づけで、中身が違うもの」に限る。
+   1. 分類（category）が同じ製品の概要図どうし。reference.compare があれば、その値が同じものだけ（同じ分類でも位置づけが違うものを外す）。
+   2. 分類にまだ製品の整理（role）がない図は、下の組み合わせだけ。同じ役割の別製品・別方式に限る。
+   同じ製品の概要と詳細、関連が薄いだけの図は対象にしない。 */
+const PAIRS = [
+  ['車載ソフトウェアの標準', ['autosar-classic', 'autosar-adaptive']],
+  ['車載アプリの基盤', ['automotive-grade-linux', 'android-automotive']],
+  ['エッジの実行基盤', ['edge-k3s', 'kubeedge', 'aws-iot-greengrass']],
+  ['SaaS の監視', ['monitoring-datadog', 'monitoring-newrelic']],
+  ['マネージド Kubernetes', ['amazon-eks', 'azure-aks', 'google-gke']],
+  ['Kubernetes のディストリビューション', ['kubernetes', 'openshift', 'k3s', 'rke2']],
+  ['コンテナのオーケストレーター', ['amazon-ecs', 'nomad', 'docker-swarm']],
+  ['インフラのコード化', ['terraform', 'opentofu', 'pulumi']],
+  ['外部データの取り込みと再開', ['kafka-connect', 'airbyte']],
+  ['ストリーム処理の状態管理', ['kafka-streams', 'flink']],
   ['クエリ性能の診断', ['snowflake-query-performance', 'databricks-sql-performance']],
-  ['クラスタリングと条件に応じた読み飛ばし', ['snowflake-optima-internals', 'databricks-liquid-clustering-internals']],
+  ['クラスタリングと読み飛ばし', ['snowflake-optima-internals', 'databricks-liquid-clustering-internals']],
   ['カタログが発行する一時認証情報', ['snowflake-iceberg-vended-credentials', 'databricks-unity-vended-credentials']],
-  ['組織間のデータ共有', ['snowflake-secure-sharing', 'databricks-open-sharing', 'data-clean-room']],
-  ['データ資産の発見と管理', ['data-catalog-architecture', 'datahub', 'openmetadata', 'amazon-datazone', 'microsoft-purview', 'fabric-onelake-catalog', 'google-cloud-knowledge-catalog', 'snowflake-horizon-catalog', 'databricks-unity-catalog']],
-  ['データリネージの収集と利用', ['openlineage', 'datahub', 'openmetadata']],
-  ['テーブルカタログとメタデータの解決', ['iceberg-rest-catalog', 'apache-polaris', 'project-nessie', 'iceberg-catalog-read']],
-  ['ファイルの符号化と読み取り', ['file-formats', 'parquet-internals', 'orc-internals', 'avro-internals']],
-  ['Avro の書き込みスキーマを特定する方法', ['avro-internals', 'apicurio-registry']],
-  ['DWH のモデリングと集計', ['dwh-design-patterns', 'dwh-star-schema', 'dwh-snowflake-schema', 'dwh-fact-table-types', 'dwh-kimball-bus', 'dwh-inmon-cif', 'dwh-data-vault', 'dwh-wide-table', 'dwh-aggregate-tables', 'dwh-slowly-changing-dimensions']],
-  ['レイク上のデータ構成', ['medallion', 'data-lakehouse']],
-  ['配置とスキャン範囲', ['partitioning-sharding', 'sorting-pruning', 'iceberg-distributed-scan']],
-  ['シャッフルを伴う分散実行', ['spark', 'shuffle-skew']],
-  ['ファイルの統合と読み取りコスト', ['compaction', 'lsm-compaction', 'apache-hudi', 'apache-paimon']],
-  ['変更履歴からの復元', ['snowflake-time-travel', 'delta-lake', 'apache-iceberg']],
-  ['ジョブの実行と再試行', ['apache-airflow', 'temporal']],
-  ['配備と変更の反映', ['cicd', 'argo-cd']],
-  ['注文 API の通信をどこで観測するか', ['opentelemetry', 'cilium-hubble']],
-  ['ポリシーを検証・適用する場所', ['opa-conftest', 'cilium-hubble']],
-  ['Raft のリーダーと定足数', ['etcd-raft', 'docker-swarm']],
-  ['注文アプリケーションの構成', ['ec-shop', 'online-boutique', 'aws-web']],
-  ['サービスのネットワーク境界', ['aws-web', 'hybrid']],
+  ['組織間のデータ共有', ['snowflake-secure-sharing', 'databricks-open-sharing']],
 ];
 
 export function comparisonCandidates(registry, currentId) {
   const result = new Map();
   const byId = new Map(registry.map(entry => [entry.id, entry]));
-  if (!byId.has(currentId)) return [];
+  const current = byId.get(currentId);
+  if (!current) return [];
   function add(id, topic) {
     if (id === currentId || !byId.has(id)) return;
     if (!result.has(id)) result.set(id, { entry: byId.get(id), topics: [] });
     result.get(id).topics.push(topic);
   }
-  for (const [topic, ids] of GROUPS) {
-    if (ids.includes(currentId)) ids.forEach(id => add(id, topic));
-  }
-  add(byId.get(currentId).reference?.detailOf, '全体構成との対応');
-  for (const entry of registry) {
-    if (entry.reference?.detailOf === currentId) add(entry.id, '詳細構成との対応');
+  for (const [topic, ids] of PAIRS) if (ids.includes(currentId)) ids.forEach(id => add(id, topic));
+  const ref = current.reference || {};
+  if (ref.category && ref.role === 'overview' && ref.product) {
+    const key = r => r.compare || r.category;
+    for (const entry of registry) {
+      const r = entry.reference || {};
+      if (entry.id !== currentId && r.domain === ref.domain && r.category === ref.category && r.role === 'overview'
+        && r.product && r.product !== ref.product && key(r) === key(ref)) add(entry.id, ref.category);
+    }
   }
   return [...result.values()];
 }

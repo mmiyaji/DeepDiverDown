@@ -13,7 +13,7 @@ test('knowledge graph includes every indexed reference in its declared category'
 test('knowledge graph exposes curated comparison reasons and never links missing references', () => {
   const graph = makeKnowledgeGraph(index.entries, registry);
   const flink = graph.related('kafka-streams').find(r => r.entry.id === 'flink');
-  assert.ok(flink?.topics.includes('ストリームの処理と状態管理'));
+  assert.ok(flink?.topics.includes('ストリーム処理の状態管理'));
   assert.deepEqual(graph.related('does-not-exist'), []);
   for (const e of index.entries) for (const peer of graph.related(e.id)) assert.ok(graph.byId.has(peer.entry.id) && peer.topics.length);
 });
