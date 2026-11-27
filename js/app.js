@@ -91,13 +91,14 @@ const homePan = () => {
 /* 2D の利用者による拡大（ホイール＋Ctrl、トラックパッドのピンチ、2 本指のピンチ）。描画とカードを一緒に拡大するので、カードだけが小さく残ることがない */
 const USER_ZOOM_MAX = 8, SCALE_MAX = 6; // 利用者の拡大率の上限と、表示倍率全体の上限
 let userZoom = 1;
+let previewZoom = 1; // 比較表示（PREVIEW）の拡大率。Ctrl＋ホイール（ピンチ）で変える
 function updateDiagramScale() {
   const view = $('view'), button = document.querySelector('[data-act="readable-diagram"]');
   const applicable = !PREVIEW && st.dimension === '2' && compareViewport.classList.contains('compare-viewport');
   button.hidden = !applicable;
   button.setAttribute('aria-pressed', String(applicable && readableDiagram));
   button.textContent = readableDiagram ? '全体を表示' : '文字を拡大';
-  let scale = 1;
+  let scale = PREVIEW ? previewZoom : 1;
   if (applicable && !readableDiagram) {
     const vw = compareViewport.clientWidth, vh = compareViewport.clientHeight;
     const width = parseFloat(view.style.minWidth) || vw;
@@ -113,7 +114,7 @@ function updateDiagramScale() {
   }
   const value = scale === 1 ? '' : String(scale);
   if (view.style.zoom !== value) view.style.zoom = value;
-  scene.setCssZoom?.(applicable ? scale : 1);
+  scene.setCssZoom?.(applicable || PREVIEW ? scale : 1);
   homePan();
 }
 /* 見えている点（cx, cy：ビューポート内の位置）を動かさずに、拡大率を userZoom に変える */
@@ -2070,15 +2071,28 @@ compareViewport.addEventListener('wheel', e => {
     return;
   }
   const horizontal = compareViewport.scrollWidth > compareViewport.clientWidth;
-  const vertical = compareViewport.scrollHeight > compareViewport.clientHeight;
-  if (!PREVIEW && e.shiftKey && horizontal) {
-    e.preventDefault(); e.stopPropagation();
-    if (PREVIEW) compareViewport.scrollLeft += e.deltaY || e.deltaX; else setPan(panX - (e.deltaY || e.deltaX), panY);
-  } else if (PREVIEW && (horizontal || vertical)) {
-    e.stopPropagation();
-    if (horizontal && !vertical && !e.deltaX) {
-      e.preventDefault(); compareViewport.scrollLeft += e.deltaY;
+  if (PREVIEW) {
+    // 比較表示：Ctrl＋ホイール（トラックパッドのピンチも）はカーソルの位置を保って拡大・縮小する。ブラウザ全体の拡大に任せると、図ではなくページごと動く。
+    // 縦のホイールを横移動に変えない（縦にスクロールしたのに左右へ動くため）。横に動かすのは Shift＋ホイールか横スクロールだけ
+    if (e.ctrlKey) {
+      e.preventDefault(); e.stopPropagation();
+      const r = compareViewport.getBoundingClientRect();
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 100 : e.deltaY;
+      const before = previewZoom;
+      previewZoom = Math.min(4, Math.max(0.4, before * Math.exp(-dy * 0.0022)));
+      if (previewZoom !== before) {
+        const cx = e.clientX - r.left, cy = e.clientY - r.top, k = previewZoom / before;
+        const left = (compareViewport.scrollLeft + cx) * k - cx, top = (compareViewport.scrollTop + cy) * k - cy;
+        updateDiagramScale();
+        compareViewport.scrollLeft = left; compareViewport.scrollTop = top;
+      }
+    } else if (e.shiftKey && horizontal) {
+      e.preventDefault(); e.stopPropagation(); compareViewport.scrollLeft += e.deltaY || e.deltaX;
     }
+    return;
+  }
+  if (e.shiftKey && horizontal) {
+    e.preventDefault(); e.stopPropagation(); setPan(panX - (e.deltaY || e.deltaX), panY);
   }
 }, { capture: true, passive: false });
 /* 2 本指のピンチ（タッチ）：2 点の間隔の比で拡大率を変え、中心を保つ */
