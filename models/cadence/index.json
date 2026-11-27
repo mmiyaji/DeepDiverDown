@@ -1,0 +1,307 @@
+{
+  "model": "cadence",
+  "name": "Cadence の基本アーキテクチャ",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント",
+      "status": "claim"
+    },
+    "frontend": {
+      "type": "node",
+      "label": "Frontend サービス",
+      "status": "claim"
+    },
+    "history": {
+      "type": "node",
+      "label": "History サービス",
+      "status": "claim"
+    },
+    "store": {
+      "type": "node",
+      "label": "イベント履歴の永続化ストア",
+      "status": "claim"
+    },
+    "visibility": {
+      "type": "node",
+      "label": "可視性ストア",
+      "status": "claim"
+    },
+    "matching": {
+      "type": "node",
+      "label": "Matching サービス",
+      "status": "claim"
+    },
+    "tasklist": {
+      "type": "node",
+      "label": "タスクリスト",
+      "status": "claim"
+    },
+    "wfworker": {
+      "type": "node",
+      "label": "ワークフローワーカー",
+      "status": "claim"
+    },
+    "actworker": {
+      "type": "node",
+      "label": "アクティビティワーカー",
+      "status": "claim"
+    },
+    "c-fe": {
+      "type": "link",
+      "label": "クライアント → Frontend サービス",
+      "status": "claim"
+    },
+    "fe-hist": {
+      "type": "link",
+      "label": "Frontend サービス → History サービス",
+      "status": "claim"
+    },
+    "hist-store": {
+      "type": "link",
+      "label": "History サービス → イベント履歴の永続化ストア",
+      "status": "claim"
+    },
+    "hist-vis": {
+      "type": "link",
+      "label": "History サービス → 可視性ストア",
+      "status": "claim"
+    },
+    "hist-match": {
+      "type": "link",
+      "label": "History サービス → Matching サービス",
+      "status": "claim"
+    },
+    "match-tl": {
+      "type": "link",
+      "label": "Matching サービス → タスクリスト",
+      "status": "claim"
+    },
+    "tl-wf": {
+      "type": "link",
+      "label": "タスクリスト → ワークフローワーカー",
+      "status": "claim"
+    },
+    "tl-act": {
+      "type": "link",
+      "label": "タスクリスト → アクティビティワーカー",
+      "status": "claim"
+    },
+    "wf-fe": {
+      "type": "link",
+      "label": "ワークフローワーカー → Frontend サービス",
+      "status": "claim"
+    },
+    "act-fe": {
+      "type": "link",
+      "label": "アクティビティワーカー → Frontend サービス",
+      "status": "claim"
+    },
+    "start-and-run": {
+      "type": "scenario",
+      "label": "ワークフローを開始してアクティビティを実行する"
+    },
+    "CD-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "ワークフローのコードは決定的にする",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "シャード数と、History サービス内のシャードの割り当て方は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "スティッキー実行（決定タスクを同じワーカーへ戻す仕組み）は取得した資料に記載がなく未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Internal Worker（アーカイブなど内部用ワークフローの実行）との接続の向きと、アーカイブ先は未確認のため図に描いていない。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "クロスデータセンターレプリケーションとスケジュールの詳細は未取得で未確認。"
+    },
+    "cd-client": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "cd-frontend": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "Cadence Frontend",
+      "realizes": [
+        "frontend"
+      ]
+    },
+    "cd-history": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "Cadence History",
+      "realizes": [
+        "history"
+      ]
+    },
+    "cd-matching": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "Cadence Matching",
+      "realizes": [
+        "matching",
+        "tasklist"
+      ]
+    },
+    "cd-cassandra": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "Cassandra クラスタ",
+      "realizes": [
+        "store"
+      ]
+    },
+    "cd-es": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "Kafka と Elasticsearch",
+      "realizes": [
+        "visibility"
+      ]
+    },
+    "cd-wfhost": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "ワークフローワーカーのホスト",
+      "realizes": [
+        "wfworker"
+      ]
+    },
+    "cd-acthost": {
+      "type": "implementation",
+      "impl": "onprem-cassandra",
+      "label": "アクティビティワーカーのホスト",
+      "realizes": [
+        "actworker"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-cadence.md#§1": [
+      "model",
+      "client",
+      "CD-01"
+    ],
+    "docs/reference-cadence.md": [
+      "model",
+      "client",
+      "frontend",
+      "history",
+      "store",
+      "visibility",
+      "matching",
+      "tasklist",
+      "wfworker",
+      "actworker",
+      "c-fe",
+      "fe-hist",
+      "hist-store",
+      "hist-vis",
+      "hist-match",
+      "match-tl",
+      "tl-wf",
+      "tl-act",
+      "wf-fe",
+      "act-fe",
+      "start-and-run",
+      "CD-01",
+      "cd-client",
+      "cd-frontend",
+      "cd-history",
+      "cd-matching",
+      "cd-cassandra",
+      "cd-es",
+      "cd-wfhost",
+      "cd-acthost"
+    ],
+    "docs/reference-cadence.md#§2": [
+      "frontend",
+      "history",
+      "matching",
+      "c-fe",
+      "fe-hist",
+      "hist-match",
+      "wf-fe",
+      "act-fe"
+    ],
+    "docs/reference-cadence.md#§3": [
+      "store",
+      "hist-store"
+    ],
+    "docs/reference-cadence.md#§5": [
+      "visibility",
+      "hist-vis"
+    ],
+    "docs/reference-cadence.md#§4": [
+      "tasklist",
+      "wfworker",
+      "actworker",
+      "match-tl",
+      "tl-wf",
+      "tl-act",
+      "start-and-run"
+    ],
+    "docs/reference-cadence.md#§6": [
+      "cd-client",
+      "cd-frontend",
+      "cd-history",
+      "cd-matching",
+      "cd-cassandra",
+      "cd-es",
+      "cd-wfhost",
+      "cd-acthost"
+    ]
+  },
+  "reference": {
+    "domain": "運用基盤",
+    "category": "ワークフロー実行",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Cadence",
+    "role": "overview",
+    "order": 30,
+    "objectives": [
+      "ワークフローの状態がイベント履歴として保存される流れを確認する",
+      "決定タスクとアクティビティタスクがタスクリスト経由でワーカーへ渡る流れを確認する",
+      "サーバーが前提とする永続化ストアと可視性ストアを確認する"
+    ],
+    "sources": [
+      {
+        "title": "Cadence Introduction",
+        "url": "https://cadenceworkflow.io/docs/concepts/"
+      },
+      {
+        "title": "Cadence Workflows",
+        "url": "https://cadenceworkflow.io/docs/concepts/workflows/"
+      },
+      {
+        "title": "Cadence Deployment topology",
+        "url": "https://cadenceworkflow.io/docs/concepts/topology/"
+      },
+      {
+        "title": "Cadence Task lists",
+        "url": "https://cadenceworkflow.io/docs/concepts/task-lists/"
+      },
+      {
+        "title": "cadence-workflow/cadence (GitHub)",
+        "url": "https://github.com/cadence-workflow/cadence"
+      }
+    ]
+  }
+}

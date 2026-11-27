@@ -1,0 +1,98 @@
+name: CockroachDB の分散 SQL とレンジ複製
+description: CockroachDB の SQL 層、トランザクション層、レンジ、Raft 複製とリースホルダー、Pebble ストアを追う。
+reference:
+  objectives: [SQL が KV 操作とレンジの Raft 書き込みになる経路を確認する, リースホルダーとクローズドタイムスタンプによる読み取りの仕組みを確認する, 自前運用の構成とライセンスの前提を確認する]
+  sources:
+    - {title: Architecture overview, url: https://docs.cockroachlabs.com/docs/stable/architecture/overview}
+    - {title: Transaction layer, url: https://docs.cockroachlabs.com/docs/stable/architecture/transaction-layer}
+    - {title: Replication layer, url: https://docs.cockroachlabs.com/docs/stable/architecture/replication-layer}
+    - {title: Storage layer, url: https://docs.cockroachlabs.com/docs/stable/architecture/storage-layer}
+    - {title: Licensing FAQs, url: https://docs.cockroachlabs.com/docs/stable/licensing-faqs}
+    - {title: Deploy CockroachDB on-premises, url: https://docs.cockroachlabs.com/docs/stable/deploy-cockroachdb-on-premises}
+sources: [docs/reference-cockroachdb.md]
+evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§1}, {type: doc, ref: docs/reference-cockroachdb.md#§5}]
+tiers:
+  - {id: flow, label: クライアント・SQL・レンジ・ストレージ, z: 0, size: [32, 13]}
+nodes:
+  client: {label: SQL クライアント, kind: client, tier: flow, x: 1, y: 5, description: SQL を発行する。接続方式の詳細は未確認。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§1}]}
+  sql: {label: SQL 層（ゲートウェイ）, kind: service, tier: flow, x: 6, y: 5, description: 受け付けたノードが SQL を KV 操作に変換する。自分で処理できない要求は担当ノードへ転送する。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§1}]}
+  txn: {label: トランザクション層, kind: service, tier: flow, x: 11, y: 5, description: 既定は SERIALIZABLE。書き込みインテントとトランザクションレコードで原子性を保ち、並列コミットで合意の往復を 1 回に減らす。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§2}]}
+  hlc: {label: ハイブリッド論理クロック, kind: service, tier: flow, x: 11, y: 9, description: ゲートウェイノードがトランザクションのタイムスタンプを選ぶ。ずれが上限を超えるとノードが停止する。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§2}]}
+  ranges: {label: レンジ, kind: db, tier: flow, x: 16, y: 5, description: ソート済みキー空間の連続区間。既定で 3 レプリカを持つ。分割サイズは未確認。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  lease: {label: リースホルダー（Raft リーダー）, kind: service, tier: flow, x: 21, y: 2, description: レンジの読み取りと書き込みの提案を担当する。リーダーリースでは Raft リーダーと同じレプリカ。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  followers: {label: Raft フォロワー, kind: service, tier: flow, x: 21, y: 5.5, description: Raft ログを受けて複製を持つ。書き込みは過半数の合意でコミットされる。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  closed: {label: クローズドタイムスタンプ, kind: service, tier: flow, x: 21, y: 9, description: これ以前の書き込みを受け付けないとリースホルダーが約束する時刻。フォロワーはこれ以前の読み取りを返せる。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  pebble: {label: Pebble ストア, kind: db, tier: flow, x: 27, y: 5, description: LSM ツリーの組み込み KV。メムテーブルごとの WAL と MVCC のバージョンを持つ。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§4}]}
+links:
+  - {id: c-sql, from: client, to: sql, label: SQL を送信, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§1}]}
+  - {id: sql-txn, from: sql, to: txn, label: KV 操作に変換, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§1}]}
+  - {id: txn-hlc, from: txn, to: hlc, label: タイムスタンプを取得, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§2}]}
+  - {id: txn-range, from: txn, to: ranges, label: キーのレンジへ要求, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  - {id: range-lease, from: ranges, to: lease, label: 担当レプリカへ送る, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  - {id: lease-raft, from: lease, to: followers, label: Raft ログを複製, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  - {id: lease-closed, from: lease, to: closed, label: 書き込み停止の時刻を進める, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  - {id: closed-fol, from: closed, to: followers, label: フォロワーリードを許可, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+  - {id: lease-store, from: lease, to: pebble, label: 合意した書き込みを保存, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§4}]}
+  - {id: raft-store, from: followers, to: pebble, label: ログを適用して保存, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§4}]}
+scenarios:
+  - id: write-commit
+    label: 書き込みを合意してコミットする
+    evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§2}]
+    steps:
+      - {links: [c-sql, sql-txn, txn-hlc], note: ゲートウェイノードが SQL を KV 操作に変え、トランザクションのタイムスタンプを選ぶ。}
+      - {links: [txn-range, range-lease], note: 書き込みインテントをキーのレンジのリースホルダーへ送る。}
+      - {links: [lease-raft, lease-store, raft-store], note: 過半数の Raft 合意の後に各レプリカの Pebble へ保存する。並列コミットでは合意前にトランザクションレコードを STAGING にする。}
+requirements:
+  - {id: CR-01, kind: usecase, title: 複数ノードに分けた SQL データを SERIALIZABLE で扱う, text: レンジを Raft で複製し、1 台の障害（3 ノード・複製係数 3）に耐える。, links: [txn, ranges, lease-raft], evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§3}]}
+unknowns:
+  - {id: UNK-01, text: PostgreSQL 互換の接続方式と DistSQL による分散実行は取得した資料に記載がなく未確認。, refs: [client, sql]}
+  - {id: UNK-02, text: レンジの分割サイズの既定値とメタレンジによるキーの検索は未確認。, refs: [ranges]}
+  - {id: UNK-03, text: 24.3.0 の正確な日付、オープンソースの扱い、機能ごとのライセンス要否、生存目標の設定は未確認。stable 版の版番号も資料に明記がない。, refs: [lease, pebble]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-cluster
+    label: 自前の Linux 上のクラスタ（HAProxy 経由）
+    description: 利用者が cockroach を各マシンに 1 ノードずつ起動して init し、HAProxy を前段に置き、各ノードのローカルディスクの Pebble に保存する例。図は 2 ノードに省略している。代表例であり、導入事例ではない。
+    sources:
+      - {title: Deploy CockroachDB on-premises, url: https://docs.cockroachlabs.com/docs/stable/deploy-cockroachdb-on-premises}
+      - {title: Replication layer, url: https://docs.cockroachlabs.com/docs/stable/architecture/replication-layer}
+      - {title: Storage layer, url: https://docs.cockroachlabs.com/docs/stable/architecture/storage-layer}
+    tiers:
+      - {id: diagram, label: クライアント・ノード・ディスク, z: 0, size: [30, 12]}
+    nodes:
+      cr-client: {label: SQL クライアント, kind: client, tier: diagram, x: 1, y: 5, realizes: [client], description: cockroach sql などの SQL クライアント。ロードバランサーのアドレスへ接続する。, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      cr-lb: {label: HAProxy, kind: service, tier: diagram, x: 8, y: 5, description: cockroach gen haproxy が生成する設定で、TCP モード・ポート 26257 で振り分ける。/health?ready=1 で正常性を確認する。, management: {type: customer, scope: "Customer operates the HAProxy host and configuration."}, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      cr-node-a: {label: cockroach ノード A, kind: service, tier: diagram, x: 15, y: 3, realizes: [sql, txn, hlc, ranges, lease, closed], description: SQL の解析、トランザクション、HLC、レンジのリース、クローズドタイムスタンプを担当する cockroach プロセス。, management: {type: customer, scope: "Customer operates the host, cockroach process, certificates, NTP and upgrades."}, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      cr-node-b: {label: cockroach ノード B（レプリカ）, kind: service, tier: diagram, x: 15, y: 8, realizes: [followers], description: 別のマシンでレンジの Raft フォロワーを持つ cockroach プロセス。同じレンジの 2 レプリカは同じノードに置かれない。, management: {type: customer, scope: "Customer operates the host, cockroach process, certificates, NTP and upgrades."}, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      cr-disk: {label: ローカルディスク（Pebble ストア）, kind: db, tier: diagram, x: 23, y: 5.5, realizes: [pebble], description: 各ノードのストア。LSM の SST と WAL を置く。, management: {type: customer, scope: "Customer operates the disks and backups."}, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+    links:
+      - {id: cr-req, from: cr-client, to: cr-lb, label: SQL を送信, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      - {id: cr-route, from: cr-lb, to: cr-node-a, label: ノードへ振り分け, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      - {id: cr-raft, from: cr-node-a, to: cr-node-b, label: Raft ログを複製, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      - {id: cr-save-a, from: cr-node-a, to: cr-disk, label: Pebble に保存, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+      - {id: cr-save-b, from: cr-node-b, to: cr-disk, label: Pebble に保存, evidence: [{type: doc, ref: docs/reference-cockroachdb.md#§6}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [cr-lb, cr-node-a, cr-node-b, cr-disk]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアント・ノード・ディスク, z: 0, size: [30, 12]}
+      nodes:
+        cr-client: {tier: diagram, x: 1, y: 5}
+        cr-lb: {tier: diagram, x: 8, y: 5}
+        cr-node-a: {tier: diagram, x: 15, y: 3}
+        cr-node-b: {tier: diagram, x: 15, y: 8}
+        cr-disk: {tier: diagram, x: 23, y: 5.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [cr-lb, cr-node-a, cr-node-b, cr-disk]}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, z: 0, size: [6, 11]}
+        - {id: servers, label: HAProxy・ノード・ディスク, z: 0, origin: [8, 0], size: [24, 11]}
+      nodes:
+        cr-client: {tier: clients, x: 3, y: 5}
+        cr-lb: {tier: servers, x: 3, y: 5}
+        cr-node-a: {tier: servers, x: 10, y: 3}
+        cr-node-b: {tier: servers, x: 10, y: 8}
+        cr-disk: {tier: servers, x: 18, y: 5.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [cr-lb, cr-node-a, cr-node-b, cr-disk]}

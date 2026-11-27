@@ -1,0 +1,356 @@
+{
+  "model": "milvus",
+  "name": "Milvus のベクトル検索とセグメント",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント",
+      "status": "claim"
+    },
+    "proxy": {
+      "type": "node",
+      "label": "Proxy",
+      "status": "claim"
+    },
+    "coordinator": {
+      "type": "node",
+      "label": "コーディネーター",
+      "status": "claim"
+    },
+    "meta": {
+      "type": "node",
+      "label": "メタストレージ",
+      "status": "claim"
+    },
+    "streaming": {
+      "type": "node",
+      "label": "ストリーミングノード",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "クエリノード",
+      "status": "claim"
+    },
+    "growing": {
+      "type": "node",
+      "label": "growing セグメント",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "WAL（メッセージストレージ）",
+      "status": "claim"
+    },
+    "data": {
+      "type": "node",
+      "label": "データノード",
+      "status": "claim"
+    },
+    "objstore": {
+      "type": "node",
+      "label": "オブジェクトストレージ",
+      "status": "claim"
+    },
+    "c-proxy": {
+      "type": "link",
+      "label": "クライアント → Proxy",
+      "status": "claim"
+    },
+    "proxy-coord": {
+      "type": "link",
+      "label": "Proxy → コーディネーター",
+      "status": "claim"
+    },
+    "proxy-stream": {
+      "type": "link",
+      "label": "Proxy → ストリーミングノード",
+      "status": "claim"
+    },
+    "proxy-query": {
+      "type": "link",
+      "label": "Proxy → クエリノード",
+      "status": "claim"
+    },
+    "coord-meta": {
+      "type": "link",
+      "label": "コーディネーター → メタストレージ",
+      "status": "claim"
+    },
+    "coord-stream": {
+      "type": "link",
+      "label": "コーディネーター → ストリーミングノード",
+      "status": "claim"
+    },
+    "coord-query": {
+      "type": "link",
+      "label": "コーディネーター → クエリノード",
+      "status": "claim"
+    },
+    "coord-data": {
+      "type": "link",
+      "label": "コーディネーター → データノード",
+      "status": "claim"
+    },
+    "stream-wal": {
+      "type": "link",
+      "label": "ストリーミングノード → WAL（メッセージストレージ）",
+      "status": "claim"
+    },
+    "stream-grow": {
+      "type": "link",
+      "label": "ストリーミングノード → growing セグメント",
+      "status": "claim"
+    },
+    "stream-obj": {
+      "type": "link",
+      "label": "ストリーミングノード → オブジェクトストレージ",
+      "status": "claim"
+    },
+    "data-obj": {
+      "type": "link",
+      "label": "データノード → オブジェクトストレージ",
+      "status": "claim"
+    },
+    "obj-query": {
+      "type": "link",
+      "label": "オブジェクトストレージ → クエリノード",
+      "status": "claim"
+    },
+    "query-proxy": {
+      "type": "link",
+      "label": "クエリノード → Proxy",
+      "status": "claim"
+    },
+    "insert-and-search": {
+      "type": "scenario",
+      "label": "書き込みを growing と sealed に流して検索する"
+    },
+    "MV-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "書き込み直後のデータも検索する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Proxy からストリーミングノードへの書き込み経路と、growing から sealed への変換後の保存の担い手は、概要ページの記述だけでは細部を確認できず未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "データノードがインデックスをいつどう構築し、クエリノードがどう読み込むかの詳細は未確認。DiskANN など on-disk インデックスの扱いも未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "TSO の仕組みと WAL による耐久性の詳細は整合性レベルのページに記載がなく未確認。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "版による差（2.6 系のストリーミングノードや Woodpecker の導入時期、旧構成のコーディネーター分割）は未確認。"
+    },
+    "mv-client": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "mv-proxy": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "Milvus Proxy（Pod）",
+      "realizes": [
+        "proxy"
+      ]
+    },
+    "mv-coord": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "Mix Coordinator（Pod）",
+      "realizes": [
+        "coordinator"
+      ]
+    },
+    "mv-etcd": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "etcd",
+      "realizes": [
+        "meta"
+      ]
+    },
+    "mv-stream": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "Streaming Node（Pod）",
+      "realizes": [
+        "streaming",
+        "growing"
+      ]
+    },
+    "mv-query": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "Query Node（Pod）",
+      "realizes": [
+        "query"
+      ]
+    },
+    "mv-woodpecker": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "Woodpecker",
+      "realizes": [
+        "wal"
+      ]
+    },
+    "mv-data": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "Data Node（Pod）",
+      "realizes": [
+        "data"
+      ]
+    },
+    "mv-minio": {
+      "type": "implementation",
+      "impl": "k8s-operator",
+      "label": "MinIO",
+      "realizes": [
+        "objstore"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-milvus.md#§1": [
+      "model"
+    ],
+    "docs/reference-milvus.md": [
+      "model",
+      "client",
+      "proxy",
+      "coordinator",
+      "meta",
+      "streaming",
+      "query",
+      "growing",
+      "wal",
+      "data",
+      "objstore",
+      "c-proxy",
+      "proxy-coord",
+      "proxy-stream",
+      "proxy-query",
+      "coord-meta",
+      "coord-stream",
+      "coord-query",
+      "coord-data",
+      "stream-wal",
+      "stream-grow",
+      "stream-obj",
+      "data-obj",
+      "obj-query",
+      "query-proxy",
+      "insert-and-search",
+      "MV-01",
+      "mv-client",
+      "mv-proxy",
+      "mv-coord",
+      "mv-etcd",
+      "mv-stream",
+      "mv-query",
+      "mv-woodpecker",
+      "mv-data",
+      "mv-minio"
+    ],
+    "docs/reference-milvus.md#§4": [
+      "model"
+    ],
+    "docs/reference-milvus.md#§6": [
+      "model"
+    ],
+    "docs/reference-milvus.md#§2": [
+      "client",
+      "proxy",
+      "coordinator",
+      "meta",
+      "streaming",
+      "wal",
+      "data",
+      "objstore",
+      "c-proxy",
+      "proxy-coord",
+      "coord-meta",
+      "coord-stream",
+      "coord-query",
+      "coord-data",
+      "stream-wal"
+    ],
+    "docs/reference-milvus.md#§3": [
+      "query",
+      "growing",
+      "proxy-stream",
+      "proxy-query",
+      "stream-grow",
+      "stream-obj",
+      "data-obj",
+      "obj-query",
+      "query-proxy",
+      "insert-and-search"
+    ],
+    "docs/reference-milvus.md#§5": [
+      "MV-01"
+    ],
+    "docs/reference-milvus.md#§7": [
+      "mv-client",
+      "mv-proxy",
+      "mv-coord",
+      "mv-etcd",
+      "mv-stream",
+      "mv-query",
+      "mv-woodpecker",
+      "mv-data",
+      "mv-minio"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "ベクトルデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Milvus",
+    "role": "overview",
+    "order": 20,
+    "objectives": [
+      "四つの層と、各ノードの役割を確認する",
+      "growing セグメントと sealed セグメントの流れを確認する",
+      "メタ・WAL・オブジェクトの三つのストレージの役割を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Milvus architecture overview",
+        "url": "https://milvus.io/docs/architecture_overview.md"
+      },
+      {
+        "title": "Milvus in-memory index",
+        "url": "https://milvus.io/docs/index.md"
+      },
+      {
+        "title": "Milvus consistency level",
+        "url": "https://milvus.io/docs/consistency.md"
+      },
+      {
+        "title": "Install Milvus cluster with Milvus Operator",
+        "url": "https://milvus.io/docs/install_cluster-milvusoperator.md"
+      },
+      {
+        "title": "Milvus repository",
+        "url": "https://github.com/milvus-io/milvus"
+      }
+    ]
+  }
+}

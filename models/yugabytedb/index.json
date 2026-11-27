@@ -1,0 +1,324 @@
+{
+  "model": "yugabytedb",
+  "name": "YugabyteDB の基本アーキテクチャ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント",
+      "status": "claim"
+    },
+    "ysql": {
+      "type": "node",
+      "label": "YSQL（PostgreSQL 互換 API）",
+      "status": "claim"
+    },
+    "ycql": {
+      "type": "node",
+      "label": "YCQL（Cassandra 系 API）",
+      "status": "claim"
+    },
+    "txn": {
+      "type": "node",
+      "label": "トランザクション（ハイブリッド時刻・MVCC）",
+      "status": "claim"
+    },
+    "master": {
+      "type": "node",
+      "label": "YB-Master",
+      "status": "claim"
+    },
+    "tserver": {
+      "type": "node",
+      "label": "YB-TServer",
+      "status": "claim"
+    },
+    "tablet": {
+      "type": "node",
+      "label": "タブレット",
+      "status": "claim"
+    },
+    "raft": {
+      "type": "node",
+      "label": "Raft グループ（リーダー・フォロワー）",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "Raft ログ（WAL）",
+      "status": "claim"
+    },
+    "docdb": {
+      "type": "node",
+      "label": "DocDB（RocksDB ベース）",
+      "status": "claim"
+    },
+    "xcluster": {
+      "type": "node",
+      "label": "xCluster（ユニバース間の非同期複製）",
+      "status": "claim"
+    },
+    "c-ysql": {
+      "type": "link",
+      "label": "クライアント → YSQL（PostgreSQL 互換 API）",
+      "status": "claim"
+    },
+    "c-ycql": {
+      "type": "link",
+      "label": "クライアント → YCQL（Cassandra 系 API）",
+      "status": "claim"
+    },
+    "ysql-txn": {
+      "type": "link",
+      "label": "YSQL（PostgreSQL 互換 API） → トランザクション（ハイブリッド時刻・MVCC）",
+      "status": "claim"
+    },
+    "ycql-txn": {
+      "type": "link",
+      "label": "YCQL（Cassandra 系 API） → トランザクション（ハイブリッド時刻・MVCC）",
+      "status": "claim"
+    },
+    "txn-ts": {
+      "type": "link",
+      "label": "トランザクション（ハイブリッド時刻・MVCC） → YB-TServer",
+      "status": "claim"
+    },
+    "master-ts": {
+      "type": "link",
+      "label": "YB-Master → YB-TServer",
+      "status": "claim"
+    },
+    "ts-tablet": {
+      "type": "link",
+      "label": "YB-TServer → タブレット",
+      "status": "claim"
+    },
+    "tablet-raft": {
+      "type": "link",
+      "label": "タブレット → Raft グループ（リーダー・フォロワー）",
+      "status": "claim"
+    },
+    "raft-wal": {
+      "type": "link",
+      "label": "Raft グループ（リーダー・フォロワー） → Raft ログ（WAL）",
+      "status": "claim"
+    },
+    "raft-docdb": {
+      "type": "link",
+      "label": "Raft グループ（リーダー・フォロワー） → DocDB（RocksDB ベース）",
+      "status": "claim"
+    },
+    "wal-xc": {
+      "type": "link",
+      "label": "Raft ログ（WAL） → xCluster（ユニバース間の非同期複製）",
+      "status": "claim"
+    },
+    "docdb-read": {
+      "type": "link",
+      "label": "DocDB（RocksDB ベース） → タブレット",
+      "status": "claim"
+    },
+    "write": {
+      "type": "scenario",
+      "label": "書き込みを実行して複製する"
+    },
+    "read": {
+      "type": "scenario",
+      "label": "強い一貫性で読む"
+    },
+    "YB-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "PostgreSQL 互換の分散 SQL で水平に拡張する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "YB-Master のメタデータの保存方式（システムカタログの複製など）は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "トランザクションステータステーブルと分離レベルの扱いは取得した資料に記載がなく未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "リーダーリース、タブレット分割、コロケーション、リードレプリカの詳細は未確認。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "実運用の台数、ゾーン配置、TLS・認証の設定は未確認。"
+    },
+    "yb-client": {
+      "type": "implementation",
+      "impl": "onprem-universe",
+      "label": "クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "yb-master": {
+      "type": "implementation",
+      "impl": "onprem-universe",
+      "label": "YB-Master（3 台）",
+      "realizes": [
+        "master"
+      ]
+    },
+    "yb-tserver": {
+      "type": "implementation",
+      "impl": "onprem-universe",
+      "label": "YB-TServer（YSQL・YCQL・タブレット）",
+      "realizes": [
+        "ysql",
+        "ycql",
+        "txn",
+        "tserver",
+        "tablet",
+        "raft"
+      ]
+    },
+    "yb-disk": {
+      "type": "implementation",
+      "impl": "onprem-universe",
+      "label": "ローカルディスク（WAL・DocDB）",
+      "realizes": [
+        "wal",
+        "docdb"
+      ]
+    },
+    "yb-target": {
+      "type": "implementation",
+      "impl": "onprem-universe",
+      "label": "複製先ユニバース",
+      "realizes": [
+        "xcluster"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-yugabytedb.md#§1": [
+      "model"
+    ],
+    "docs/reference-yugabytedb.md": [
+      "model",
+      "client",
+      "ysql",
+      "ycql",
+      "txn",
+      "master",
+      "tserver",
+      "tablet",
+      "raft",
+      "wal",
+      "docdb",
+      "xcluster",
+      "c-ysql",
+      "c-ycql",
+      "ysql-txn",
+      "ycql-txn",
+      "txn-ts",
+      "master-ts",
+      "ts-tablet",
+      "tablet-raft",
+      "raft-wal",
+      "raft-docdb",
+      "wal-xc",
+      "docdb-read",
+      "write",
+      "read",
+      "YB-01",
+      "yb-client",
+      "yb-master",
+      "yb-tserver",
+      "yb-disk",
+      "yb-target"
+    ],
+    "docs/reference-yugabytedb.md#§2": [
+      "client",
+      "ysql",
+      "ycql",
+      "docdb",
+      "c-ysql",
+      "c-ycql",
+      "YB-01"
+    ],
+    "docs/reference-yugabytedb.md#§5": [
+      "txn",
+      "ysql-txn",
+      "ycql-txn",
+      "txn-ts"
+    ],
+    "docs/reference-yugabytedb.md#§3": [
+      "master",
+      "tserver",
+      "master-ts"
+    ],
+    "docs/reference-yugabytedb.md#§4": [
+      "tablet",
+      "ts-tablet"
+    ],
+    "docs/reference-yugabytedb.md#§6": [
+      "raft",
+      "wal",
+      "tablet-raft",
+      "raft-wal",
+      "raft-docdb",
+      "docdb-read",
+      "write",
+      "read"
+    ],
+    "docs/reference-yugabytedb.md#§7": [
+      "xcluster",
+      "wal-xc"
+    ],
+    "docs/reference-yugabytedb.md#§8": [
+      "yb-client",
+      "yb-master",
+      "yb-tserver",
+      "yb-disk",
+      "yb-target"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "分散データベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "YugabyteDB",
+    "role": "overview",
+    "order": 40,
+    "objectives": [
+      "クエリ層とストレージ層（DocDB）の分担を確認する",
+      "行がタブレットに割り当てられ Raft で複製される経路を確認する",
+      "YB-Master と YB-TServer の役割を区別する"
+    ],
+    "sources": [
+      {
+        "title": "YugabyteDB architecture",
+        "url": "https://docs.yugabyte.com/preview/architecture/"
+      },
+      {
+        "title": "Sharding data across nodes",
+        "url": "https://docs.yugabyte.com/preview/architecture/docdb-sharding/sharding/"
+      },
+      {
+        "title": "Replication in DocDB",
+        "url": "https://docs.yugabyte.com/preview/architecture/docdb-replication/replication/"
+      },
+      {
+        "title": "Distributed transactions overview",
+        "url": "https://docs.yugabyte.com/preview/architecture/transactions/transactions-overview/"
+      },
+      {
+        "title": "xCluster replication",
+        "url": "https://docs.yugabyte.com/preview/architecture/docdb-replication/async-replication/"
+      },
+      {
+        "title": "yugabyte-db (GitHub)",
+        "url": "https://github.com/yugabyte/yugabyte-db"
+      }
+    ]
+  }
+}

@@ -1,0 +1,280 @@
+{
+  "model": "cockroachdb",
+  "name": "CockroachDB の分散 SQL とレンジ複製",
+  "coverage": {
+    "covered": 6,
+    "total": 6
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "sql": {
+      "type": "node",
+      "label": "SQL 層（ゲートウェイ）",
+      "status": "claim"
+    },
+    "txn": {
+      "type": "node",
+      "label": "トランザクション層",
+      "status": "claim"
+    },
+    "hlc": {
+      "type": "node",
+      "label": "ハイブリッド論理クロック",
+      "status": "claim"
+    },
+    "ranges": {
+      "type": "node",
+      "label": "レンジ",
+      "status": "claim"
+    },
+    "lease": {
+      "type": "node",
+      "label": "リースホルダー（Raft リーダー）",
+      "status": "claim"
+    },
+    "followers": {
+      "type": "node",
+      "label": "Raft フォロワー",
+      "status": "claim"
+    },
+    "closed": {
+      "type": "node",
+      "label": "クローズドタイムスタンプ",
+      "status": "claim"
+    },
+    "pebble": {
+      "type": "node",
+      "label": "Pebble ストア",
+      "status": "claim"
+    },
+    "c-sql": {
+      "type": "link",
+      "label": "SQL クライアント → SQL 層（ゲートウェイ）",
+      "status": "claim"
+    },
+    "sql-txn": {
+      "type": "link",
+      "label": "SQL 層（ゲートウェイ） → トランザクション層",
+      "status": "claim"
+    },
+    "txn-hlc": {
+      "type": "link",
+      "label": "トランザクション層 → ハイブリッド論理クロック",
+      "status": "claim"
+    },
+    "txn-range": {
+      "type": "link",
+      "label": "トランザクション層 → レンジ",
+      "status": "claim"
+    },
+    "range-lease": {
+      "type": "link",
+      "label": "レンジ → リースホルダー（Raft リーダー）",
+      "status": "claim"
+    },
+    "lease-raft": {
+      "type": "link",
+      "label": "リースホルダー（Raft リーダー） → Raft フォロワー",
+      "status": "claim"
+    },
+    "lease-closed": {
+      "type": "link",
+      "label": "リースホルダー（Raft リーダー） → クローズドタイムスタンプ",
+      "status": "claim"
+    },
+    "closed-fol": {
+      "type": "link",
+      "label": "クローズドタイムスタンプ → Raft フォロワー",
+      "status": "claim"
+    },
+    "lease-store": {
+      "type": "link",
+      "label": "リースホルダー（Raft リーダー） → Pebble ストア",
+      "status": "claim"
+    },
+    "raft-store": {
+      "type": "link",
+      "label": "Raft フォロワー → Pebble ストア",
+      "status": "claim"
+    },
+    "write-commit": {
+      "type": "scenario",
+      "label": "書き込みを合意してコミットする"
+    },
+    "CR-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "複数ノードに分けた SQL データを SERIALIZABLE で扱う",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "PostgreSQL 互換の接続方式と DistSQL による分散実行は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "レンジの分割サイズの既定値とメタレンジによるキーの検索は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "24.3.0 の正確な日付、オープンソースの扱い、機能ごとのライセンス要否、生存目標の設定は未確認。stable 版の版番号も資料に明記がない。"
+    },
+    "cr-client": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "SQL クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "cr-lb": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "HAProxy",
+      "realizes": []
+    },
+    "cr-node-a": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "cockroach ノード A",
+      "realizes": [
+        "sql",
+        "txn",
+        "hlc",
+        "ranges",
+        "lease",
+        "closed"
+      ]
+    },
+    "cr-node-b": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "cockroach ノード B（レプリカ）",
+      "realizes": [
+        "followers"
+      ]
+    },
+    "cr-disk": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "ローカルディスク（Pebble ストア）",
+      "realizes": [
+        "pebble"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-cockroachdb.md#§1": [
+      "model",
+      "client",
+      "sql",
+      "c-sql",
+      "sql-txn"
+    ],
+    "docs/reference-cockroachdb.md": [
+      "model",
+      "client",
+      "sql",
+      "txn",
+      "hlc",
+      "ranges",
+      "lease",
+      "followers",
+      "closed",
+      "pebble",
+      "c-sql",
+      "sql-txn",
+      "txn-hlc",
+      "txn-range",
+      "range-lease",
+      "lease-raft",
+      "lease-closed",
+      "closed-fol",
+      "lease-store",
+      "raft-store",
+      "write-commit",
+      "CR-01",
+      "cr-client",
+      "cr-lb",
+      "cr-node-a",
+      "cr-node-b",
+      "cr-disk"
+    ],
+    "docs/reference-cockroachdb.md#§5": [
+      "model"
+    ],
+    "docs/reference-cockroachdb.md#§2": [
+      "txn",
+      "hlc",
+      "txn-hlc",
+      "write-commit"
+    ],
+    "docs/reference-cockroachdb.md#§3": [
+      "ranges",
+      "lease",
+      "followers",
+      "closed",
+      "txn-range",
+      "range-lease",
+      "lease-raft",
+      "lease-closed",
+      "closed-fol",
+      "CR-01"
+    ],
+    "docs/reference-cockroachdb.md#§4": [
+      "pebble",
+      "lease-store",
+      "raft-store"
+    ],
+    "docs/reference-cockroachdb.md#§6": [
+      "cr-client",
+      "cr-lb",
+      "cr-node-a",
+      "cr-node-b",
+      "cr-disk"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "分散データベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "CockroachDB",
+    "role": "overview",
+    "order": 30,
+    "objectives": [
+      "SQL が KV 操作とレンジの Raft 書き込みになる経路を確認する",
+      "リースホルダーとクローズドタイムスタンプによる読み取りの仕組みを確認する",
+      "自前運用の構成とライセンスの前提を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Architecture overview",
+        "url": "https://docs.cockroachlabs.com/docs/stable/architecture/overview"
+      },
+      {
+        "title": "Transaction layer",
+        "url": "https://docs.cockroachlabs.com/docs/stable/architecture/transaction-layer"
+      },
+      {
+        "title": "Replication layer",
+        "url": "https://docs.cockroachlabs.com/docs/stable/architecture/replication-layer"
+      },
+      {
+        "title": "Storage layer",
+        "url": "https://docs.cockroachlabs.com/docs/stable/architecture/storage-layer"
+      },
+      {
+        "title": "Licensing FAQs",
+        "url": "https://docs.cockroachlabs.com/docs/stable/licensing-faqs"
+      },
+      {
+        "title": "Deploy CockroachDB on-premises",
+        "url": "https://docs.cockroachlabs.com/docs/stable/deploy-cockroachdb-on-premises"
+      }
+    ]
+  }
+}

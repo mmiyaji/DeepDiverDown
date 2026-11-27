@@ -1,0 +1,124 @@
+name: Milvus のベクトル検索とセグメント
+description: アクセス層・コーディネーター・ワーカー・ストレージに分かれる Milvus で、書き込みが growing から sealed のセグメントになり、検索に使われるまでを示す。
+reference:
+  objectives: [四つの層と、各ノードの役割を確認する, growing セグメントと sealed セグメントの流れを確認する, メタ・WAL・オブジェクトの三つのストレージの役割を確認する]
+  sources:
+    - {title: Milvus architecture overview, url: https://milvus.io/docs/architecture_overview.md}
+    - {title: Milvus in-memory index, url: https://milvus.io/docs/index.md}
+    - {title: Milvus consistency level, url: https://milvus.io/docs/consistency.md}
+    - {title: Install Milvus cluster with Milvus Operator, url: https://milvus.io/docs/install_cluster-milvusoperator.md}
+    - {title: Milvus repository, url: https://github.com/milvus-io/milvus}
+sources: [docs/reference-milvus.md]
+evidence: [{type: doc, ref: docs/reference-milvus.md#§1}, {type: doc, ref: docs/reference-milvus.md#§4}, {type: doc, ref: docs/reference-milvus.md#§6}]
+tiers:
+  - {id: flow, label: アクセス・制御・ワーカー・ストレージ, z: 0, size: [34, 14]}
+nodes:
+  client: {label: クライアント, kind: client, tier: flow, x: 1, y: 6, description: SDK や REST で接続し、挿入・検索・DDL を送る。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  proxy: {label: Proxy, kind: service, tier: flow, x: 7, y: 6, description: クライアントの接続先となるステートレスなノード。要求を検証し、各ノードの部分結果を集約して返す。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  coordinator: {label: コーディネーター, kind: service, tier: flow, x: 7, y: 1.5, description: クラスタで有効なものは 1 つだけの制御役。DDL・DCL・TSO、ストリーミングの割り当て、クエリのトポロジーとセグメント管理を担う。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  meta: {label: メタストレージ, kind: db, tier: flow, x: 14, y: 0.5, description: メタデータのスナップショットとチェックポイントを保存し、サービス登録とヘルスチェックを担う。資料に載る実装は etcd。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  streaming: {label: ストリーミングノード, kind: service, tier: flow, x: 14, y: 3.5, description: シャード単位で WAL への書き込みと復旧を受け持つ。growing データへの検索に答え、growing を sealed に変換する。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  query: {label: クエリノード, kind: service, tier: flow, x: 14, y: 9, description: オブジェクトストレージから sealed の履歴データとインデックスを読み込み、履歴データへの検索に答える。, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  growing: {label: growing セグメント, kind: db, tier: flow, x: 21, y: 2, description: 書き込み直後で検索できるデータ。容量に達すると sealed になる。, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  wal: {label: WAL（メッセージストレージ）, kind: db, tier: flow, x: 21, y: 5.5, description: 書き込みを順序付けて保持するログ。Woodpecker・Pulsar・Kafka が挙げられている。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  data: {label: データノード, kind: service, tier: flow, x: 21, y: 12, description: compaction とインデックス構築などのオフライン処理を行う。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  objstore: {label: オブジェクトストレージ, kind: db, tier: flow, x: 28, y: 8, description: sealed セグメントとインデックスのファイルを保存する。MinIO・AWS S3・Azure Blob Storage が挙げられている。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+links:
+  - {id: c-proxy, from: client, to: proxy, label: 挿入・検索を送信, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  - {id: proxy-coord, from: proxy, to: coordinator, label: DDL を依頼, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  - {id: proxy-stream, from: proxy, to: streaming, label: 書き込みを渡す, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  - {id: proxy-query, from: proxy, to: query, label: 履歴データの検索を送信, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  - {id: coord-meta, from: coordinator, to: meta, label: メタデータを保存, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  - {id: coord-stream, from: coordinator, to: streaming, label: シャードの担当を割り当て, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  - {id: coord-query, from: coordinator, to: query, label: セグメントの読み込みを指示, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  - {id: coord-data, from: coordinator, to: data, label: compaction・索引構築を指示, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  - {id: stream-wal, from: streaming, to: wal, label: 書き込みをログに追記, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  - {id: stream-grow, from: streaming, to: growing, label: 書き込みを growing に保持, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  - {id: stream-obj, from: streaming, to: objstore, label: sealed セグメントを保存, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  - {id: data-obj, from: data, to: objstore, label: compaction・索引の結果を保存, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  - {id: obj-query, from: objstore, to: query, label: sealed とインデックスを読み戻し, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+  - {id: query-proxy, from: query, to: proxy, label: 部分結果を返す, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
+scenarios:
+  - id: insert-and-search
+    label: 書き込みを growing と sealed に流して検索する
+    evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]
+    steps:
+      - {links: [c-proxy, proxy-stream], note: Proxy が書き込みを受け、ストリーミングノードへ渡す。}
+      - {links: [stream-wal, stream-grow], note: ログに追記し、growing セグメントに保持する。この間も growing データは検索できる。}
+      - {links: [stream-obj, data-obj], note: 容量に達した growing は sealed に変換されて保存され、データノードが compaction と索引構築を行う。}
+      - {links: [proxy-query, obj-query, query-proxy], note: クエリノードが sealed とインデックスを読み込んで検索し、Proxy が部分結果を集約する。}
+requirements:
+  - {id: MV-01, kind: usecase, title: 書き込み直後のデータも検索する, text: growing セグメントはストリーミングノードが検索に答えるため、sealed になる前でも検索対象になる。可視になる時点は整合性レベルで決まる。, links: [proxy-stream, stream-grow], evidence: [{type: doc, ref: docs/reference-milvus.md#§5}]}
+unknowns:
+  - {id: UNK-01, text: Proxy からストリーミングノードへの書き込み経路と、growing から sealed への変換後の保存の担い手は、概要ページの記述だけでは細部を確認できず未確認。, refs: [proxy, streaming]}
+  - {id: UNK-02, text: データノードがインデックスをいつどう構築し、クエリノードがどう読み込むかの詳細は未確認。DiskANN など on-disk インデックスの扱いも未確認。, refs: [data, query]}
+  - {id: UNK-03, text: TSO の仕組みと WAL による耐久性の詳細は整合性レベルのページに記載がなく未確認。, refs: [coordinator, wal]}
+  - {id: UNK-04, text: 版による差（2.6 系のストリーミングノードや Woodpecker の導入時期、旧構成のコーディネーター分割）は未確認。, refs: [coordinator, streaming]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: k8s-operator
+    label: 自前の Kubernetes 上のクラスタ（Milvus Operator）
+    description: 自前の Kubernetes クラスタに Milvus Operator でコンポーネントと etcd・MinIO を配置し、メッセージキューに Woodpecker を使う例。Operator のサンプル構成に基づく代表例で、導入事例ではない。
+    sources:
+      - {title: Install Milvus cluster with Milvus Operator, url: https://milvus.io/docs/install_cluster-milvusoperator.md}
+      - {title: Milvus architecture overview, url: https://milvus.io/docs/architecture_overview.md}
+    tiers:
+      - {id: diagram, label: クライアント・Milvus・ストレージ, z: 0, size: [34, 14]}
+    nodes:
+      mv-client: {label: クライアント, kind: client, tier: diagram, x: 1, y: 6, realizes: [client], description: pymilvus などの SDK。, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-proxy: {label: Milvus Proxy（Pod）, kind: service, tier: diagram, x: 8, y: 6, realizes: [proxy], description: Kubernetes 上の Pod として動き、クライアントの接続先になる。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-coord: {label: Mix Coordinator（Pod）, kind: service, tier: diagram, x: 8, y: 2, realizes: [coordinator], description: Operator のサンプルでコーディネーターを 1 つの Pod にまとめた構成。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-etcd: {label: etcd, kind: db, tier: diagram, x: 15, y: 0.5, realizes: [meta], description: Operator が同じクラスタに配置するメタストレージ。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-stream: {label: Streaming Node（Pod）, kind: service, tier: diagram, x: 15, y: 3.5, realizes: [streaming, growing], description: シャードの書き込みと growing セグメントを受け持つ。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-query: {label: Query Node（Pod）, kind: service, tier: diagram, x: 15, y: 9, realizes: [query], description: sealed セグメントとインデックスを読み込んで検索する。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-woodpecker: {label: Woodpecker, kind: service, tier: diagram, x: 22, y: 5.5, realizes: [wal], description: Operator のサンプルが既定にするメッセージキュー。オブジェクトストレージへ直接書く。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-data: {label: Data Node（Pod）, kind: service, tier: diagram, x: 22, y: 12, realizes: [data], description: compaction とインデックス構築を行う。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      mv-minio: {label: MinIO, kind: db, tier: diagram, x: 29, y: 8, realizes: [objstore], description: Operator が配置するオブジェクトストレージ。S3 などに置き換えられる。, management: {type: customer, scope: "Customer operates the Kubernetes cluster, Milvus Pods, dependencies and configuration."}, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+    links:
+      - {id: mv-req, from: mv-client, to: mv-proxy, label: 挿入・検索を送信, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-ddl, from: mv-proxy, to: mv-coord, label: DDL を依頼, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-write, from: mv-proxy, to: mv-stream, label: 書き込みを渡す, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-search, from: mv-proxy, to: mv-query, label: 履歴データの検索を送信, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-meta, from: mv-coord, to: mv-etcd, label: メタデータを保存, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-assign, from: mv-coord, to: mv-stream, label: シャードの担当を割り当て, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-load, from: mv-coord, to: mv-query, label: セグメントの読み込みを指示, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-compact, from: mv-coord, to: mv-data, label: compaction・索引構築を指示, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-log, from: mv-stream, to: mv-woodpecker, label: 書き込みをログに追記, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-wal-store, from: mv-woodpecker, to: mv-minio, label: ログをオブジェクトに保存, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-seal, from: mv-stream, to: mv-minio, label: sealed セグメントを保存, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-index, from: mv-data, to: mv-minio, label: compaction・索引の結果を保存, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-read, from: mv-minio, to: mv-query, label: sealed とインデックスを読み戻し, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+      - {id: mv-result, from: mv-query, to: mv-proxy, label: 部分結果を返す, evidence: [{type: doc, ref: docs/reference-milvus.md#§7}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群（Kubernetes クラスタ）, provider: onprem, tier: diagram, nodes: [mv-proxy, mv-coord, mv-etcd, mv-stream, mv-query, mv-woodpecker, mv-data, mv-minio]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアント・Milvus・ストレージ, z: 0, size: [34, 14]}
+      nodes:
+        mv-client: {tier: diagram, x: 1, y: 6}
+        mv-proxy: {tier: diagram, x: 8, y: 6}
+        mv-coord: {tier: diagram, x: 8, y: 2}
+        mv-etcd: {tier: diagram, x: 15, y: 0.5}
+        mv-stream: {tier: diagram, x: 15, y: 3.5}
+        mv-query: {tier: diagram, x: 15, y: 9}
+        mv-woodpecker: {tier: diagram, x: 22, y: 5.5}
+        mv-data: {tier: diagram, x: 22, y: 12}
+        mv-minio: {tier: diagram, x: 29, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群（Kubernetes クラスタ）, provider: onprem, tier: diagram, nodes: [mv-proxy, mv-coord, mv-etcd, mv-stream, mv-query, mv-woodpecker, mv-data, mv-minio]}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, z: 0, size: [6, 14]}
+        - {id: servers, label: Milvus とストレージ, z: 0, origin: [8, 0], size: [32, 14]}
+      nodes:
+        mv-client: {tier: clients, x: 3, y: 6}
+        mv-proxy: {tier: servers, x: 3, y: 6}
+        mv-coord: {tier: servers, x: 3, y: 2}
+        mv-etcd: {tier: servers, x: 10, y: 0.5}
+        mv-stream: {tier: servers, x: 10, y: 3.5}
+        mv-query: {tier: servers, x: 10, y: 9}
+        mv-woodpecker: {tier: servers, x: 17, y: 5.5}
+        mv-data: {tier: servers, x: 17, y: 12}
+        mv-minio: {tier: servers, x: 24, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群（Kubernetes クラスタ）, provider: onprem, tier: [servers], nodes: [mv-proxy, mv-coord, mv-etcd, mv-stream, mv-query, mv-woodpecker, mv-data, mv-minio]}
