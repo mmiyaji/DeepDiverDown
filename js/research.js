@@ -42,6 +42,7 @@ function element(tag, text, className) {
 function link(text, href) {
   const anchor = element('a', text);
   anchor.href = href;
+  anchor.className = 'no-ext-icon';
   return anchor;
 }
 
@@ -63,6 +64,7 @@ function sourceLink({ title, url }) {
     const parsed = new URL(url);
     if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
       const anchor = link(title, parsed.href);
+      anchor.className = '';
       anchor.target = '_blank';
       anchor.rel = 'noopener noreferrer';
       return anchor;
