@@ -59,4 +59,7 @@ export const CATEGORY_DOCS = {
   '時系列データ': 'time-series',
   'インメモリデータベース': 'in-memory',
   'グラフデータベース': 'graph-db',
+  '分散データベース': 'distributed-db',
+  'ワークフロー実行': 'workflow',
+  'ベクトルデータベース': 'vector-db',
 };
