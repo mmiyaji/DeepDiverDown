@@ -2,10 +2,11 @@
 
 ## 1. 概要と分岐の経緯
 
-Valkey はメモリ上でキーと値を扱うデータストアである。Linux Foundation が 2024 年 3 月 28 日に設立の意向を発表し、Redis 7.2.4 を土台に BSD 3-clause ライセンスで開発を続けるとした。背景は Redis が 7.4 以降を RSALv2 と SSPLv1 のデュアルライセンスに変えたこと。AWS、Google Cloud、Oracle、Ericsson、Snap が支援を表明した。ガバナンスは Linux Foundation 配下のオープンな運営で、技術委員会には Redis の元コントリビューターが含まれる。Redis との共通点（データ型、TTL、eviction など）は [reference-redis.md](reference-redis.md) に譲り、この資料は Valkey 固有の点を扱う。
+Valkey はメモリ上でキーと値を扱うデータストアである。Linux Foundation が 2024 年 3 月 28 日に設立の意向を発表し、Redis 7.2.4 を土台に BSD 3-clause ライセンスで開発を続けるとした。背景は Redis が 2024 年に（7.4 以降を） RSALv2 と SSPLv1 のデュアルライセンスに変えたこと。AWS、Google Cloud、Oracle、Ericsson、Snap が支援を表明した。ガバナンスは Linux Foundation 配下のオープンな運営で、技術委員会には Redis の元コントリビューターが含まれる。Redis との共通点（データ型、TTL、eviction など）は [reference-redis.md](reference-redis.md) に譲り、この資料は Valkey 固有の点を扱う。
 
 - [Linux Foundation Launches Open Source Valkey Community](https://linuxfoundation.org/press/linux-foundation-launches-open-source-valkey-community)
-- [Valkey FAQ](https://valkey.io/topics/faq/)（商標が LF Projects, LLC に属すると記載。分岐の理由は別ページへの参照のみで、本文では確認していない）
+- [Valkey FAQ](https://valkey.io/topics/faq/)（商標が LF Projects, LLC に属すると記載。分岐の理由は別ページへの参照のみ）
+- [Valkey history](https://valkey.io/topics/history/)（分岐の経緯。Redis Ltd. が 2024 年に BSD から RSALv2・SSPLv1 のデュアルライセンスへ変えたこと、BSD で続けたい貢献者が多かったこと、商標が Redis Ltd. にあるため別名で続ける必要があったこと、Alibaba・Amazon・Ericsson・Google・Huawei・Tencent の貢献者を中心に Linux Foundation で始めたこと）
 
 ## 2. I/O スレッド
 
@@ -42,15 +43,15 @@ Redis OSS 7.2 とそれ以前の OSS 版との互換性を保つ。RESP2 と RES
 
 - [Migration from Redis to Valkey](https://valkey.io/topics/migration/)
 
-## 7. 実装例：Linux 上のプライマリとレプリカ
+## 7. 実装例：Linux 上のクラスタ（プライマリとレプリカ）
 
 | 機能 | 具体的な担い手 |
 | --- | --- |
 | クライアント | RESP 対応のクライアント（`valkey-cli` など） |
 | I/O 処理・コマンド実行 | valkey-server の I/O スレッドとメインスレッド |
-| データセット | プライマリのメモリ |
+| データセット | プライマリのメモリ（スロットを分担） |
 | 複製 | 別ホストの Valkey レプリカ |
 | 永続化 | プライマリのローカルディスクの RDB と AOF |
-| クラスタ | ハッシュスロットとクラスタバス（この例はクラスタでないため担い手を置かない。図では未配置の部品として示す） |
+| クラスタ | ハッシュスロットの分担は各プライマリ、ノード間のゴシップはクラスタバス（プライマリ B を含む） |
 
-利用者が自前のサーバーで Valkey、OS、ディスクを運用する構成。公式資料に基づく代表例であり、導入事例や動作検証済みの構成ではない。ホスト台数、認証、TLS は未確認。
+利用者が自前のサーバーで Valkey、OS、ディスクを運用する構成。公式資料に基づく代表例であり、導入事例や動作検証済みの構成ではない。図はプライマリ 2 台に省略しており、実運用の台数・スロットの割り当て・認証、TLS は未確認。

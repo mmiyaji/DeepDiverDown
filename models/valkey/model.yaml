@@ -46,12 +46,11 @@ unknowns:
   - {id: UNK-01, text: I/O スレッドの設定ディレクティブ名と既定値は取得した資料に記載がなく未確認。, refs: [iothreads]}
   - {id: UNK-02, text: クラスタ仕様書の末尾約 2 万文字は未読。複数データベースの制限一覧も未確認。, refs: [slots, bus]}
   - {id: UNK-03, text: Redis との複製・クラスタ・マルチパート AOF の差分比較、Redis 8 以降との機能差は公式資料で未確認。, refs: [replica, aof]}
-  - {id: UNK-04, text: 分岐の理由を述べた Valkey 公式の history ページは未取得。経緯は Linux Foundation の発表に基づく。, refs: []}
 gates: {maxDrift: 0, maxHigh: 0}
 implementations:
-  - id: onprem-primary-replica
-    label: 自前の Linux 上のプライマリとレプリカ
-    description: プライマリが RDB と AOF をローカルディスクに保存し、別ホストのレプリカへ非同期に複製する例。代表例であり、導入事例ではない。
+  - id: onprem-cluster
+    label: 自前の Linux 上のクラスタ（プライマリとレプリカ）
+    description: プライマリがスロットを分担してクラスタバスでつながり、RDB と AOF をローカルディスクに保存し、別ホストのレプリカへ非同期に複製する例。図はプライマリ 2 台に省略している。代表例であり、導入事例ではない。
     sources:
       - {title: Valkey replication, url: https://valkey.io/topics/replication/}
       - {title: Valkey persistence, url: https://valkey.io/topics/persistence/}
@@ -60,27 +59,28 @@ implementations:
       - {id: diagram, label: クライアント・Valkey・ディスク, z: 0, size: [28, 11]}
     nodes:
       vk-client: {label: クライアント, kind: client, tier: diagram, x: 1, y: 5, realizes: [client], description: valkey-cli などの RESP クライアント。, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
-      vk-primary: {label: Valkey プライマリ, kind: service, tier: diagram, x: 9, y: 5, realizes: [iothreads, main, dataset], description: I/O スレッドとメインスレッドでコマンドを処理し、データセットをメモリに持つ。, management: {type: customer, scope: "Customer operates the host, Valkey process and configuration."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
-      vk-cluster-off: {label: ハッシュスロット・クラスタバス（クラスタ無効、未配置）, kind: service, tier: diagram, x: 9, y: 8.5, realizes: [slots, bus], description: クラスタ構成でだけ使う機能。この例はレプリカ構成でクラスタではないため動かさない。, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      vk-primary: {label: Valkey プライマリ, kind: service, tier: diagram, x: 9, y: 5, realizes: [iothreads, main, dataset, slots], description: I/O スレッドとメインスレッドでコマンドを処理し、スロットの一部に分けたデータセットをメモリに持つ。, management: {type: customer, scope: "Customer operates the host, Valkey process and configuration."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      vk-primary-b: {label: Valkey プライマリ B（クラスタバス）, kind: service, tier: diagram, x: 9, y: 8.5, realizes: [bus], description: スロットの別の範囲を担当するプライマリ。クラスタバスでノード間のゴシップと障害検知を行う。, management: {type: customer, scope: "Customer operates the host, Valkey process and configuration."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
       vk-replica: {label: Valkey レプリカ, kind: service, tier: diagram, x: 17, y: 2, realizes: [replica], description: 別ホストでプライマリから非同期に複製を受ける。, management: {type: customer, scope: "Customer operates the host, Valkey process and configuration."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
       vk-disk: {label: ローカルディスク（RDB・AOF）, kind: db, tier: diagram, x: 17, y: 8, realizes: [rdb, aof], description: RDB ファイルと AOF のマニフェスト・増分ファイルを置く。, management: {type: customer, scope: "Customer operates the disk, backups and access."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
     links:
+      - {id: vk-gossip, from: vk-primary, to: vk-primary-b, label: クラスタバスでスロットの担当を共有, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
       - {id: vk-req, from: vk-client, to: vk-primary, label: コマンドを送信, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
       - {id: vk-repl, from: vk-primary, to: vk-replica, label: 非同期で複製, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
       - {id: vk-save, from: vk-primary, to: vk-disk, label: RDB・AOF を保存, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
     groups:
-      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vk-primary, vk-replica, vk-disk, vk-cluster-off]}
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vk-primary, vk-replica, vk-disk, vk-primary-b]}
     layout2d:
       tiers:
         - {id: diagram, label: クライアント・Valkey・ディスク, z: 0, size: [28, 11]}
       nodes:
         vk-client: {tier: diagram, x: 1, y: 5}
         vk-primary: {tier: diagram, x: 9, y: 5}
-        vk-cluster-off: {tier: diagram, x: 9, y: 8.5}
+        vk-primary-b: {tier: diagram, x: 9, y: 8.5}
         vk-replica: {tier: diagram, x: 17, y: 2}
         vk-disk: {tier: diagram, x: 17, y: 8}
       groups:
-        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vk-primary, vk-replica, vk-disk, vk-cluster-off]}
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vk-primary, vk-replica, vk-disk, vk-primary-b]}
     layout3d:
       tiers:
         - {id: clients, label: クライアント, z: 0, size: [6, 11]}
@@ -88,8 +88,8 @@ implementations:
       nodes:
         vk-client: {tier: clients, x: 3, y: 5}
         vk-primary: {tier: servers, x: 3, y: 5}
-        vk-cluster-off: {tier: servers, x: 3, y: 8.5}
+        vk-primary-b: {tier: servers, x: 3, y: 8.5}
         vk-replica: {tier: servers, x: 10, y: 2}
         vk-disk: {tier: servers, x: 10, y: 8}
       groups:
-        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [vk-primary, vk-replica, vk-disk, vk-cluster-off]}
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [vk-primary, vk-replica, vk-disk, vk-primary-b]}

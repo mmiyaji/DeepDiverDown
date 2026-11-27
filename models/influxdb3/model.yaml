@@ -46,43 +46,49 @@ unknowns:
   - {id: UNK-02, text: Core と Enterprise の機能差の詳細と、コンパクターとオブジェクトストアの接続の詳細は未確認。, refs: [compactor]}
 gates: {maxDrift: 0, maxHigh: 0}
 implementations:
-  - id: core-s3
-    label: Core の単一プロセスと S3 互換ストレージ
-    description: Core を 1 台で動かし、Telegraf が書き、Grafana が検索する代表例。導入事例ではない。
+  - id: enterprise-multi-node
+    label: Enterprise の役割別ノードとオブジェクトストア
+    description: Enterprise を --mode で取り込み・クエリ・コンパクション・プロセシングの専用ノードに分け、共通のオブジェクトストアを使う代表例。導入事例ではない。
     sources:
       - {title: InfluxDB 3 Core and Enterprise architecture, url: https://www.influxdata.com/blog/influxdb3-core-enterprise-architecture}
-      - {title: InfluxDB 3 Core durability, url: https://docs.influxdata.com/influxdb3/core/reference/internals/durability/}
+      - {title: Enterprise clustering, url: https://docs.influxdata.com/influxdb3/enterprise/admin/clustering/}
     tiers:
-      - {id: diagram, label: 書き込み・Core・保存, z: 0, size: [28, 8]}
+      - {id: diagram, label: 書き込み・ノード・保存, z: 0, size: [30, 12]}
     nodes:
-      ix-telegraf: {label: Telegraf, kind: client, tier: diagram, x: 1, y: 2, realizes: [writers], description: 収集した指標を書き込む。, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
-      ix-core: {label: InfluxDB 3 Core プロセス, kind: service, tier: diagram, x: 10, y: 3.5, realizes: [ingest, model, buffer, query, pe], description: 書き込み、バッファ、検索、プロセシングエンジンを 1 プロセスで動かす。, management: {type: customer, scope: "Customer operates the process, host and configuration."}, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
-      ix-compactor: {label: コンパクター（Enterprise 限定、この例では未配置）, kind: service, tier: diagram, x: 10, y: 6.5, realizes: [compactor], description: Enterprise の compact モードのノードが担う機能で、Core には含まれない。この例では動かさない。, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
-      ix-store: {label: S3 互換オブジェクトストア, kind: db, tier: diagram, x: 20, y: 2, realizes: [store], description: Parquet の永続化先。, management: {type: customer, scope: "Customer operates the storage."}, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
-      ix-grafana: {label: Grafana, kind: client, tier: diagram, x: 20, y: 5.5, realizes: [clients], description: SQL または InfluxQL で検索する。, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
+      ix-telegraf: {label: Telegraf, kind: client, tier: diagram, x: 1, y: 3, realizes: [writers], description: 収集した指標を書き込む。, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
+      ix-ingest: {label: 取り込みノード（--mode ingest）, kind: service, tier: diagram, x: 8, y: 3, realizes: [ingest, model, buffer], description: 書き込みの受け付け、WAL、スキーマの適用、クエリ可能バッファを担う。クエリノードが直近のデータをどう読むかは未確認。, management: {type: customer, scope: "Customer operates the node, host and configuration."}, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
+      ix-process: {label: プロセシングノード（--mode process）, kind: service, tier: diagram, x: 8, y: 7, realizes: [pe], description: Python プラグインを動かす。--plugin-dir が必要。, management: {type: customer, scope: "Customer operates the node, host and configuration."}, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
+      ix-query: {label: クエリノード（--mode query）, kind: service, tier: diagram, x: 16, y: 7, realizes: [query], description: SQL と InfluxQL を実行する。同じオブジェクトストアを読むため水平に増やせる。, management: {type: customer, scope: "Customer operates the node, host and configuration."}, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
+      ix-compactor: {label: コンパクターノード（--mode compact）, kind: service, tier: diagram, x: 16, y: 10.5, realizes: [compactor], description: Parquet を整理して長期間のクエリを速くする。推奨の複数ノード構成は専用のコンパクターを置く。, management: {type: customer, scope: "Customer operates the node, host and configuration."}, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
+      ix-store: {label: S3 互換オブジェクトストア, kind: db, tier: diagram, x: 24, y: 3, realizes: [store], description: Parquet の永続化先。各ノードがこの上の専用領域を使う。, management: {type: customer, scope: "Customer operates the storage."}, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
+      ix-grafana: {label: Grafana, kind: client, tier: diagram, x: 24, y: 7, realizes: [clients], description: SQL または InfluxQL で検索する。, evidence: [{type: doc, ref: docs/reference-influxdb3.md#§8}]}
     groups:
-      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [ix-telegraf, ix-core, ix-store, ix-grafana, ix-compactor]}
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [ix-telegraf, ix-ingest, ix-process, ix-query, ix-compactor, ix-store, ix-grafana]}
     layout2d:
       tiers:
-        - {id: diagram, label: 書き込み・Core・保存, z: 0, size: [28, 8]}
+        - {id: diagram, label: 書き込み・ノード・保存, z: 0, size: [30, 12]}
       nodes:
-        ix-telegraf: {tier: diagram, x: 1, y: 2}
-        ix-core: {tier: diagram, x: 10, y: 3.5}
-        ix-compactor: {tier: diagram, x: 10, y: 6.5}
-        ix-store: {tier: diagram, x: 20, y: 2}
-        ix-grafana: {tier: diagram, x: 20, y: 5.5}
+        ix-telegraf: {tier: diagram, x: 1, y: 3}
+        ix-ingest: {tier: diagram, x: 8, y: 3}
+        ix-process: {tier: diagram, x: 8, y: 7}
+        ix-query: {tier: diagram, x: 16, y: 7}
+        ix-compactor: {tier: diagram, x: 16, y: 10.5}
+        ix-store: {tier: diagram, x: 24, y: 3}
+        ix-grafana: {tier: diagram, x: 24, y: 7}
       groups:
-        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [ix-telegraf, ix-core, ix-store, ix-grafana, ix-compactor]}
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [ix-telegraf, ix-ingest, ix-process, ix-query, ix-compactor, ix-store, ix-grafana]}
     layout3d:
       tiers:
-        - {id: src, label: 書き込み元, z: 0, size: [6, 8]}
-        - {id: core, label: Core, z: 0, origin: [8, 0], size: [8, 8]}
-        - {id: out, label: 保存と検索, z: 0, origin: [18, 0], size: [8, 8]}
+        - {id: src, label: 書き込み元, z: 0, size: [6, 12]}
+        - {id: nodes, label: 役割別ノード, z: 0, origin: [8, 0], size: [10, 12]}
+        - {id: out, label: 保存と検索, z: 0, origin: [20, 0], size: [8, 12]}
       nodes:
-        ix-telegraf: {tier: src, x: 3, y: 2}
-        ix-core: {tier: core, x: 4, y: 3.5}
-        ix-compactor: {tier: core, x: 4, y: 6.5}
-        ix-store: {tier: out, x: 4, y: 2}
-        ix-grafana: {tier: out, x: 4, y: 5.5}
+        ix-telegraf: {tier: src, x: 3, y: 3}
+        ix-ingest: {tier: nodes, x: 2, y: 3}
+        ix-process: {tier: nodes, x: 2, y: 7}
+        ix-query: {tier: nodes, x: 8, y: 7}
+        ix-compactor: {tier: nodes, x: 8, y: 10.5}
+        ix-store: {tier: out, x: 4, y: 3}
+        ix-grafana: {tier: out, x: 4, y: 7}
       groups:
-        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [src, core, out], nodes: [ix-telegraf, ix-core, ix-store, ix-grafana, ix-compactor]}
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [src, nodes, out], nodes: [ix-telegraf, ix-ingest, ix-process, ix-query, ix-compactor, ix-store, ix-grafana]}

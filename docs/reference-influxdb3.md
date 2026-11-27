@@ -42,15 +42,16 @@ Enterprise は `--mode` でノードの役割を分ける。`ingest`（取り込
 
 [Enterprise clustering](https://docs.influxdata.com/influxdb3/enterprise/admin/clustering/)
 
-## 8. 実装例
+## 8. 実装例：Enterprise の役割別ノード
 
 | 機能 | 具体的な担い手 |
 | --- | --- |
 | 書き込み元 | Telegraf |
-| サーバー | InfluxDB 3 Core の単一プロセス |
-| 検索 | DataFusion（SQL・InfluxQL） |
+| 取り込み・WAL・スキーマ・バッファ | `--mode ingest` のノード |
+| プロセシングエンジン | `--mode process` のノード（`--plugin-dir` が必要） |
+| 検索 | `--mode query` のノード（DataFusion、SQL・InfluxQL） |
+| コンパクター | `--mode compact` のノード |
 | 検索クライアント | Grafana |
 | 永続化 | S3 互換のオブジェクトストア |
-| コンパクター | Enterprise 限定の機能で、Core の例では担い手を置かない（図では未配置の部品として示す） |
 
-代表的な構成であり、導入事例や動作検証済みの構成ではない。ホストの種類、Telegraf と Grafana の稼働場所、認証の設定は未確認。
+代表的な構成であり、導入事例や動作検証済みの構成ではない。Core の単一プロセスで動かす場合はコンパクターを置かない。各ノードの台数、クエリノードが取り込みノードの直近データを読む経路、ホストの種類、認証の設定は未確認。

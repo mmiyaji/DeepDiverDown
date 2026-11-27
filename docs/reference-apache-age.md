@@ -8,7 +8,7 @@ Apache AGE は PostgreSQL の拡張で、同じデータベースでリレーシ
 
 ## 2. 対応する PostgreSQL バージョン
 
-GitHub の README は PostgreSQL 11、12、13、14、15、16、17、18 に対応すると記す。一方、マニュアルのセットアップ頁は 11〜15 までの記載で、資料間で食い違う。最新リリースは v1.8.0（README のバッジ）。バージョンごとのブランチ対応は未確認。
+GitHub の README は PostgreSQL 11、12、13、14、15、16、17、18 に対応すると記す。一方、マニュアルのセットアップ頁は 11〜15 までの記載で、資料間で食い違う。最新リリースは v1.8.0（README のバッジ）。リリースページには PG ごとのタグ（例：PG18/v1.8.0、PG17/v1.7.0、PG15 と PG14 の v1.6.0、PG13 と PG14 の v1.5.0）が並び、PG11・12 のタグは見当たらない。PG15 の v1.8.0 などはリリース候補（rc0）の扱いで、正式版かどうかはタグからは判断できない。マニュアルの 11〜15 は README やリリースと比べて古い記載とみられるが、更新日は未確認。
 
 [apache/age (GitHub)](https://github.com/apache/age) / [AGE Manual: Setup](https://age.apache.org/age-manual/master/intro/setup.html)
 
