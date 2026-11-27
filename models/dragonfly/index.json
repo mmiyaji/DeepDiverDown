@@ -1,0 +1,256 @@
+{
+  "model": "dragonfly",
+  "name": "Dragonfly の基本アーキテクチャ",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "Redis・Memcached クライアント",
+      "status": "claim"
+    },
+    "io": {
+      "type": "node",
+      "label": "I/O スレッド（io_uring）",
+      "status": "claim"
+    },
+    "coord": {
+      "type": "node",
+      "label": "コーディネーター（ファイバー）",
+      "status": "claim"
+    },
+    "shard": {
+      "type": "node",
+      "label": "シャードのスレッド",
+      "status": "claim"
+    },
+    "dash": {
+      "type": "node",
+      "label": "DashTable",
+      "status": "claim"
+    },
+    "snap": {
+      "type": "node",
+      "label": "フォークなしのスナップショット",
+      "status": "claim"
+    },
+    "rdb": {
+      "type": "node",
+      "label": "スナップショットファイル（RDB 形式）",
+      "status": "claim"
+    },
+    "replica": {
+      "type": "node",
+      "label": "レプリカ",
+      "status": "claim"
+    },
+    "connect": {
+      "type": "link",
+      "label": "Redis・Memcached クライアント → I/O スレッド（io_uring）",
+      "status": "claim"
+    },
+    "dispatch": {
+      "type": "link",
+      "label": "I/O スレッド（io_uring） → コーディネーター（ファイバー）",
+      "status": "claim"
+    },
+    "message": {
+      "type": "link",
+      "label": "コーディネーター（ファイバー） → シャードのスレッド",
+      "status": "claim"
+    },
+    "access": {
+      "type": "link",
+      "label": "シャードのスレッド → DashTable",
+      "status": "claim"
+    },
+    "serialize": {
+      "type": "link",
+      "label": "シャードのスレッド → フォークなしのスナップショット",
+      "status": "claim"
+    },
+    "save": {
+      "type": "link",
+      "label": "フォークなしのスナップショット → スナップショットファイル（RDB 形式）",
+      "status": "claim"
+    },
+    "replicate": {
+      "type": "link",
+      "label": "シャードのスレッド → レプリカ",
+      "status": "claim"
+    },
+    "write-multi-key": {
+      "type": "scenario",
+      "label": "マルチキーの書き込み"
+    },
+    "snapshot-save": {
+      "type": "scenario",
+      "label": "スナップショットの保存"
+    },
+    "DF-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "既存の Redis クライアントのまま複数コアを使う",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "io_uring を使うスレッドごとの I/O ループの詳細は公式のアーキテクチャ資料を取得できず未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Sentinel とクラスターモードの詳細、DSAL の条文の解釈は未確認。"
+    },
+    "df-client": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "アプリケーション（Redis クライアント）",
+      "realizes": [
+        "client"
+      ]
+    },
+    "df-primary": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "dragonfly プロセス（プライマリ）",
+      "realizes": [
+        "io",
+        "coord",
+        "shard",
+        "dash",
+        "snap"
+      ]
+    },
+    "df-disk": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "ローカルディスク",
+      "realizes": [
+        "rdb"
+      ]
+    },
+    "df-replica": {
+      "type": "implementation",
+      "impl": "standalone-onprem",
+      "label": "dragonfly プロセス（レプリカ）",
+      "realizes": [
+        "replica"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-dragonfly.md#§1": [
+      "model",
+      "client"
+    ],
+    "docs/reference-dragonfly.md": [
+      "model",
+      "client",
+      "io",
+      "coord",
+      "shard",
+      "dash",
+      "snap",
+      "rdb",
+      "replica",
+      "connect",
+      "dispatch",
+      "message",
+      "access",
+      "serialize",
+      "save",
+      "replicate",
+      "write-multi-key",
+      "snapshot-save",
+      "DF-01",
+      "df-client",
+      "df-primary",
+      "df-disk",
+      "df-replica"
+    ],
+    "docs/reference-dragonfly.md#§8": [
+      "model"
+    ],
+    "docs/reference-dragonfly.md#§2": [
+      "io",
+      "shard",
+      "connect",
+      "DF-01"
+    ],
+    "docs/reference-dragonfly.md#§6": [
+      "io"
+    ],
+    "docs/reference-dragonfly.md#§3": [
+      "coord",
+      "dispatch",
+      "message",
+      "write-multi-key"
+    ],
+    "docs/reference-dragonfly.md#§4": [
+      "dash",
+      "access"
+    ],
+    "docs/reference-dragonfly.md#§5": [
+      "snap",
+      "rdb",
+      "serialize",
+      "save",
+      "snapshot-save"
+    ],
+    "docs/reference-dragonfly.md#§7": [
+      "replica",
+      "replicate"
+    ],
+    "docs/reference-dragonfly.md#§9": [
+      "df-client",
+      "df-primary",
+      "df-disk",
+      "df-replica"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "インメモリデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Dragonfly",
+    "role": "overview",
+    "order": 50,
+    "objectives": [
+      "shared-nothing のシャードとコーディネーターの役割を区別する",
+      "DashTable とフォークなしのスナップショットの位置づけを確認する",
+      "レプリカへの複製とライセンスの範囲を確認する"
+    ],
+    "sources": [
+      {
+        "title": "GitHub dragonflydb/dragonfly",
+        "url": "https://github.com/dragonflydb/dragonfly"
+      },
+      {
+        "title": "Shared-nothing 設計",
+        "url": "https://github.com/dragonflydb/dragonfly/blob/main/docs/df-share-nothing.md"
+      },
+      {
+        "title": "DashTable",
+        "url": "https://github.com/dragonflydb/dragonfly/blob/main/docs/dashtable.md"
+      },
+      {
+        "title": "Snapshotting",
+        "url": "https://www.dragonflydb.io/docs/managing-dragonfly/snapshotting"
+      },
+      {
+        "title": "Replication",
+        "url": "https://www.dragonflydb.io/docs/managing-dragonfly/replication"
+      },
+      {
+        "title": "Server Configuration Flags",
+        "url": "https://www.dragonflydb.io/docs/managing-dragonfly/flags"
+      },
+      {
+        "title": "License",
+        "url": "https://www.dragonflydb.io/docs/about/license"
+      }
+    ]
+  }
+}

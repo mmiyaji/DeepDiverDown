@@ -1,0 +1,86 @@
+name: JanusGraph の基本アーキテクチャ
+description: Gremlin を受け付ける JanusGraph Server が、保存バックエンドと索引バックエンドを分けて使う構成と、スキーマ・索引の関係を示す。
+reference:
+  objectives: [保存バックエンドと索引バックエンドの役割の違いを区別する, 複合索引・混合索引・頂点中心インデックスの保存先を確認する, スキーマ定義と索引の関係を確認する]
+  sources:
+    - {title: JanusGraph Documentation, url: https://docs.janusgraph.org/}
+    - {title: JanusGraph Server, url: https://docs.janusgraph.org/operations/server/}
+    - {title: Schema and Data Modeling, url: https://docs.janusgraph.org/schema/}
+    - {title: Index Management, url: https://docs.janusgraph.org/schema/index-management/index-performance/}
+    - {title: Elasticsearch index backend, url: https://docs.janusgraph.org/index-backend/elasticsearch/}
+sources: [docs/reference-janusgraph.md]
+evidence: [{type: doc, ref: docs/reference-janusgraph.md#§1}]
+tiers:
+  - {id: flow, label: クライアント・JanusGraph・バックエンド, z: 0, size: [28, 11]}
+nodes:
+  client: {label: Gremlin クライアント, kind: client, tier: flow, x: 1, y: 5.5, description: Gremlin トラバーサルをリモートから実行する。, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§2}]}
+  server: {label: JanusGraph Server, kind: service, tier: flow, x: 8, y: 5.5, description: Gremlin Server を土台にし、既定のポートは 8182。YAML の graphs セクションでグラフを開く。, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§2}]}
+  schema: {label: スキーマ（ラベル・プロパティキー）, kind: db, tier: flow, x: 15, y: 1.5, description: 頂点ラベル、エッジラベルの多重度、プロパティキーのカーディナリティを定義する。, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§5}]}
+  store: {label: 保存バックエンド, kind: db, tier: flow, x: 15, y: 5.5, description: 頂点・エッジ・プロパティと複合索引を保存する。Cassandra、HBase、BerkeleyDB などから選ぶ。, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§3}, {type: doc, ref: docs/reference-janusgraph.md#§6}]}
+  vci: {label: 頂点中心インデックス, kind: db, tier: flow, x: 22, y: 3.5, description: 頂点ごとにエッジを並べ、条件に合うエッジだけを読む。保存バックエンドの edgeStore に置く。, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§6}]}
+  indexbe: {label: 索引バックエンド, kind: db, tier: flow, x: 22, y: 8.5, description: 混合索引を保持し、全文・範囲・地理検索を処理する。Elasticsearch、Solr、Lucene から選ぶ。構成は任意。, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§4}]}
+links:
+  - {id: query, from: client, to: server, label: Gremlin を実行, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§2}]}
+  - {id: read-schema, from: server, to: schema, label: スキーマを参照, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§5}]}
+  - {id: store-io, from: server, to: store, label: グラフデータを読み書き, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§3}]}
+  - {id: edge-idx, from: store, to: vci, label: エッジ索引を保持, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§6}]}
+  - {id: index-io, from: server, to: indexbe, label: 混合索引を検索・更新, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§4}]}
+scenarios:
+  - id: traverse
+    label: 頂点から隣接エッジをたどる
+    evidence: [{type: doc, ref: docs/reference-janusgraph.md#§6}]
+    steps:
+      - {links: [query, read-schema], note: Gremlin を受け、スキーマのラベルとキーを確認する。}
+      - {links: [store-io, edge-idx], note: 頂点中心インデックスで条件に合うエッジだけを読む。}
+  - id: fulltext
+    label: 全文検索で頂点を探す
+    evidence: [{type: doc, ref: docs/reference-janusgraph.md#§4}]
+    steps:
+      - {links: [query, index-io], note: textContains などの条件を混合索引で検索する。}
+      - {links: [store-io], note: 見つかった頂点を保存バックエンドから読む。}
+requirements:
+  - {id: JG-01, kind: usecase, title: 保存と検索の基盤を分けて選ぶ, text: 保存バックエンドと索引バックエンドを独立に選び、全文・範囲検索だけを索引バックエンドに任せる。, links: [store-io, index-io], evidence: [{type: doc, ref: docs/reference-janusgraph.md#§4}]}
+unknowns:
+  - {id: UNK-01, text: Gremlin Console の接続手順と、Solr・Lucene の設定項目は今回の取得範囲になく未確認。, refs: [client, indexbe]}
+  - {id: UNK-02, text: Bigtable、ScyllaDB、InMemory の個別の特性は未確認。, refs: [store]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-cassandra-es
+    label: 自前の Cassandra と Elasticsearch
+    description: JanusGraph Server が Cassandra に保存し、Elasticsearch に混合索引を置く自前構成の例。代表例であり、導入事例ではない。
+    sources:
+      - {title: JanusGraph Server, url: https://docs.janusgraph.org/operations/server/}
+      - {title: Storage Backends, url: https://docs.janusgraph.org/storage-backend/}
+      - {title: Elasticsearch index backend, url: https://docs.janusgraph.org/index-backend/elasticsearch/}
+    tiers:
+      - {id: diagram, label: クライアント・JanusGraph・バックエンド, z: 0, size: [28, 11]}
+    nodes:
+      jg-client: {label: Gremlin クライアント, kind: client, tier: diagram, x: 1, y: 5.5, realizes: [client], description: JanusGraph Server の 8182 番ポートへ接続する。, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§7}]}
+      jg-server: {label: JanusGraph Server, kind: service, tier: diagram, x: 8, y: 5.5, realizes: [server, schema], description: gremlin-server.yaml の graphs で、保存・索引バックエンドを指定したプロパティファイルを開く。, management: {type: customer, scope: "Customer operates the server and configuration."}, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§7}]}
+      jg-cassandra: {label: Apache Cassandra, kind: db, tier: diagram, x: 17, y: 3, realizes: [store, vci], description: 保存バックエンド。グラフデータ、複合索引、頂点中心インデックスを保存する。, management: {type: customer, scope: "Customer operates the Cassandra cluster."}, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§7}]}
+      jg-es: {label: Elasticsearch, kind: db, tier: diagram, x: 17, y: 8, realizes: [indexbe], description: 索引バックエンド。index.search.hostname で接続先を指定する。, management: {type: customer, scope: "Customer operates the Elasticsearch cluster."}, evidence: [{type: doc, ref: docs/reference-janusgraph.md#§7}]}
+    links: []
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [jg-server, jg-cassandra, jg-es]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアント・JanusGraph・バックエンド, z: 0, size: [28, 11]}
+      nodes:
+        jg-client: {tier: diagram, x: 1, y: 5.5}
+        jg-server: {tier: diagram, x: 8, y: 5.5}
+        jg-cassandra: {tier: diagram, x: 17, y: 3}
+        jg-es: {tier: diagram, x: 17, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [jg-server, jg-cassandra, jg-es]}
+    layout3d:
+      tiers:
+        - {id: front, label: クライアント, z: 0, size: [6, 11]}
+        - {id: core, label: JanusGraph, z: 0, origin: [8, 0], size: [8, 11]}
+        - {id: backends, label: バックエンド, z: 0, origin: [18, 0], size: [8, 11]}
+      nodes:
+        jg-client: {tier: front, x: 3, y: 5.5}
+        jg-server: {tier: core, x: 4, y: 5.5}
+        jg-cassandra: {tier: backends, x: 4, y: 3}
+        jg-es: {tier: backends, x: 4, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [core, backends], nodes: [jg-server, jg-cassandra, jg-es]}

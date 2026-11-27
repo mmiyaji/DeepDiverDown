@@ -1,0 +1,249 @@
+{
+  "model": "questdb",
+  "name": "QuestDB の基本アーキテクチャ",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント・コレクター",
+      "status": "claim"
+    },
+    "ingest": {
+      "type": "node",
+      "label": "取り込みエンドポイント",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "WAL セグメント",
+      "status": "claim"
+    },
+    "apply": {
+      "type": "node",
+      "label": "シーケンサーとアプライジョブ",
+      "status": "claim"
+    },
+    "columns": {
+      "type": "node",
+      "label": "列ファイルとパーティション",
+      "status": "claim"
+    },
+    "parquet": {
+      "type": "node",
+      "label": "Parquet パーティション",
+      "status": "claim"
+    },
+    "sql": {
+      "type": "node",
+      "label": "SQL エンジン",
+      "status": "claim"
+    },
+    "user": {
+      "type": "node",
+      "label": "クエリ利用者・BI",
+      "status": "claim"
+    },
+    "send": {
+      "type": "link",
+      "label": "クライアント・コレクター → 取り込みエンドポイント",
+      "status": "claim"
+    },
+    "append-wal": {
+      "type": "link",
+      "label": "取り込みエンドポイント → WAL セグメント",
+      "status": "claim"
+    },
+    "sequence": {
+      "type": "link",
+      "label": "WAL セグメント → シーケンサーとアプライジョブ",
+      "status": "claim"
+    },
+    "merge": {
+      "type": "link",
+      "label": "シーケンサーとアプライジョブ → 列ファイルとパーティション",
+      "status": "claim"
+    },
+    "convert": {
+      "type": "link",
+      "label": "列ファイルとパーティション → Parquet パーティション",
+      "status": "claim"
+    },
+    "scan-native": {
+      "type": "link",
+      "label": "SQL エンジン → 列ファイルとパーティション",
+      "status": "claim"
+    },
+    "scan-parquet": {
+      "type": "link",
+      "label": "SQL エンジン → Parquet パーティション",
+      "status": "claim"
+    },
+    "query": {
+      "type": "link",
+      "label": "クエリ利用者・BI → SQL エンジン",
+      "status": "claim"
+    },
+    "write-path": {
+      "type": "scenario",
+      "label": "書き込みからテーブルへの反映"
+    },
+    "tiering": {
+      "type": "scenario",
+      "label": "過去パーティションの Parquet 化"
+    },
+    "QD-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "時系列データを高頻度で取り込み時間で集計する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "パーティションのディレクトリ構成、SYMBOL 型の内部、メモリマップの詳細は取得した資料になく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Parquet への階層化とコールドストレージのうち OSS 版で使える範囲は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "PGWire の既定ポートは未確認。"
+    },
+    "qd-client": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "クライアント・コレクター",
+      "realizes": [
+        "client"
+      ]
+    },
+    "qd-server": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "QuestDB プロセス",
+      "realizes": [
+        "ingest",
+        "apply",
+        "sql"
+      ]
+    },
+    "qd-disk": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "ローカルディスク（WAL・列ファイル）",
+      "realizes": [
+        "wal",
+        "columns",
+        "parquet"
+      ]
+    },
+    "qd-user": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "クエリ利用者・BI",
+      "realizes": [
+        "user"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-questdb.md#§1": [
+      "model"
+    ],
+    "docs/reference-questdb.md": [
+      "model",
+      "client",
+      "ingest",
+      "wal",
+      "apply",
+      "columns",
+      "parquet",
+      "sql",
+      "user",
+      "send",
+      "append-wal",
+      "sequence",
+      "merge",
+      "convert",
+      "scan-native",
+      "scan-parquet",
+      "query",
+      "write-path",
+      "tiering",
+      "QD-01",
+      "qd-client",
+      "qd-server",
+      "qd-disk",
+      "qd-user"
+    ],
+    "docs/reference-questdb.md#§2": [
+      "client",
+      "ingest",
+      "user",
+      "send"
+    ],
+    "docs/reference-questdb.md#§3": [
+      "wal",
+      "apply",
+      "append-wal",
+      "sequence",
+      "merge",
+      "write-path",
+      "QD-01"
+    ],
+    "docs/reference-questdb.md#§4": [
+      "columns",
+      "scan-native"
+    ],
+    "docs/reference-questdb.md#§6": [
+      "parquet",
+      "convert",
+      "scan-parquet",
+      "tiering"
+    ],
+    "docs/reference-questdb.md#§5": [
+      "sql",
+      "query"
+    ],
+    "docs/reference-questdb.md#§7": [
+      "qd-client",
+      "qd-server",
+      "qd-disk",
+      "qd-user"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "時系列データ",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "QuestDB",
+    "role": "overview",
+    "order": 50,
+    "objectives": [
+      "取り込み経路と WAL からテーブルへの反映の流れを確認する",
+      "列ファイルとパーティションの持ち方を確認する",
+      "Parquet 階層と時系列 SQL の位置づけを確認する"
+    ],
+    "sources": [
+      {
+        "title": "QuestDB Write-Ahead Log",
+        "url": "https://questdb.com/docs/concept/write-ahead-log/"
+      },
+      {
+        "title": "QuestDB Ingestion overview",
+        "url": "https://questdb.com/docs/ingestion-overview/"
+      },
+      {
+        "title": "QuestDB Storage engine",
+        "url": "https://questdb.com/docs/architecture/storage-engine/"
+      },
+      {
+        "title": "QuestDB SQL extensions",
+        "url": "https://questdb.com/docs/concept/sql-extensions/"
+      }
+    ]
+  }
+}

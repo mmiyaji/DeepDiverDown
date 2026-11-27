@@ -1,0 +1,238 @@
+{
+  "model": "nebulagraph",
+  "name": "NebulaGraph の基本アーキテクチャ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント（nGQL）",
+      "status": "claim"
+    },
+    "graphd": {
+      "type": "node",
+      "label": "Graph Service（graphd）",
+      "status": "claim"
+    },
+    "metad": {
+      "type": "node",
+      "label": "Meta Service（metad）",
+      "status": "claim"
+    },
+    "storaged": {
+      "type": "node",
+      "label": "Storage Service（storaged）",
+      "status": "claim"
+    },
+    "space": {
+      "type": "node",
+      "label": "スペース（グラフ空間）",
+      "status": "claim"
+    },
+    "partition": {
+      "type": "node",
+      "label": "パーティション",
+      "status": "claim"
+    },
+    "raft": {
+      "type": "node",
+      "label": "パーティションごとの Raft グループ",
+      "status": "claim"
+    },
+    "rocksdb": {
+      "type": "node",
+      "label": "RocksDB",
+      "status": "claim"
+    },
+    "send-query": {
+      "type": "link",
+      "label": "クライアント（nGQL） → Graph Service（graphd）",
+      "status": "claim"
+    },
+    "get-meta": {
+      "type": "link",
+      "label": "Graph Service（graphd） → Meta Service（metad）",
+      "status": "claim"
+    },
+    "rw-data": {
+      "type": "link",
+      "label": "Graph Service（graphd） → Storage Service（storaged）",
+      "status": "claim"
+    },
+    "hold-space": {
+      "type": "link",
+      "label": "Meta Service（metad） → スペース（グラフ空間）",
+      "status": "claim"
+    },
+    "split": {
+      "type": "link",
+      "label": "スペース（グラフ空間） → パーティション",
+      "status": "claim"
+    },
+    "replicate": {
+      "type": "link",
+      "label": "パーティション → パーティションごとの Raft グループ",
+      "status": "claim"
+    },
+    "store-kv": {
+      "type": "link",
+      "label": "パーティションごとの Raft グループ → RocksDB",
+      "status": "claim"
+    },
+    "write-vertex": {
+      "type": "scenario",
+      "label": "頂点を書き込む"
+    },
+    "NG-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "問い合わせとストレージを分けて拡張する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "graphd が状態を持たないかどうか、graphd の既定ポートは今回取得した資料で未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Learner レプリカの扱いは今回取得した資料になく未確認。"
+    },
+    "ng-client": {
+      "type": "implementation",
+      "impl": "self-managed-onprem",
+      "label": "アプリ（nGQL クライアント）",
+      "realizes": [
+        "client"
+      ]
+    },
+    "ng-graphd": {
+      "type": "implementation",
+      "impl": "self-managed-onprem",
+      "label": "nebula-graphd",
+      "realizes": [
+        "graphd"
+      ]
+    },
+    "ng-metad": {
+      "type": "implementation",
+      "impl": "self-managed-onprem",
+      "label": "nebula-metad（3 台推奨）",
+      "realizes": [
+        "metad",
+        "space"
+      ]
+    },
+    "ng-storaged": {
+      "type": "implementation",
+      "impl": "self-managed-onprem",
+      "label": "nebula-storaged と RocksDB",
+      "realizes": [
+        "storaged",
+        "partition",
+        "raft",
+        "rocksdb"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-nebulagraph.md#§1": [
+      "model",
+      "NG-01"
+    ],
+    "docs/reference-nebulagraph.md": [
+      "model",
+      "client",
+      "graphd",
+      "metad",
+      "storaged",
+      "space",
+      "partition",
+      "raft",
+      "rocksdb",
+      "send-query",
+      "get-meta",
+      "rw-data",
+      "hold-space",
+      "split",
+      "replicate",
+      "store-kv",
+      "write-vertex",
+      "NG-01",
+      "ng-client",
+      "ng-graphd",
+      "ng-metad",
+      "ng-storaged"
+    ],
+    "docs/reference-nebulagraph.md#§7": [
+      "client",
+      "send-query"
+    ],
+    "docs/reference-nebulagraph.md#§2": [
+      "graphd",
+      "rw-data"
+    ],
+    "docs/reference-nebulagraph.md#§3": [
+      "metad",
+      "get-meta",
+      "hold-space"
+    ],
+    "docs/reference-nebulagraph.md#§6": [
+      "storaged",
+      "rocksdb",
+      "store-kv"
+    ],
+    "docs/reference-nebulagraph.md#§4": [
+      "space",
+      "partition",
+      "split"
+    ],
+    "docs/reference-nebulagraph.md#§5": [
+      "raft",
+      "replicate",
+      "write-vertex"
+    ],
+    "docs/reference-nebulagraph.md#§8": [
+      "ng-client",
+      "ng-graphd",
+      "ng-metad",
+      "ng-storaged"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "グラフデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "NebulaGraph",
+    "role": "overview",
+    "order": 50,
+    "objectives": [
+      "graphd・metad・storaged の役割を区別する",
+      "スペース・パーティション・Raft グループ・RocksDB の関係を確認する",
+      "nGQL と openCypher の互換範囲を確認する"
+    ],
+    "sources": [
+      {
+        "title": "NebulaGraph Architecture overview",
+        "url": "https://docs.nebula-graph.io/3.8.0/1.introduction/3.nebula-graph-architecture/1.architecture-overview/"
+      },
+      {
+        "title": "NebulaGraph Storage Service",
+        "url": "https://docs.nebula-graph.io/3.8.0/1.introduction/3.nebula-graph-architecture/4.storage-service/"
+      },
+      {
+        "title": "NebulaGraph Meta Service",
+        "url": "https://docs.nebula-graph.io/3.8.0/1.introduction/3.nebula-graph-architecture/2.meta-service/"
+      },
+      {
+        "title": "NebulaGraph CREATE SPACE",
+        "url": "https://docs.nebula-graph.io/3.8.0/3.ngql-guide/9.space-statements/1.create-space/"
+      },
+      {
+        "title": "nGQL overview",
+        "url": "https://docs.nebula-graph.io/3.8.0/3.ngql-guide/1.nGQL-overview/1.overview/"
+      }
+    ]
+  }
+}

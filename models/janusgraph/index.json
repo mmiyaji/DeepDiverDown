@@ -1,0 +1,213 @@
+{
+  "model": "janusgraph",
+  "name": "JanusGraph の基本アーキテクチャ",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "Gremlin クライアント",
+      "status": "claim"
+    },
+    "server": {
+      "type": "node",
+      "label": "JanusGraph Server",
+      "status": "claim"
+    },
+    "schema": {
+      "type": "node",
+      "label": "スキーマ（ラベル・プロパティキー）",
+      "status": "claim"
+    },
+    "store": {
+      "type": "node",
+      "label": "保存バックエンド",
+      "status": "claim"
+    },
+    "vci": {
+      "type": "node",
+      "label": "頂点中心インデックス",
+      "status": "claim"
+    },
+    "indexbe": {
+      "type": "node",
+      "label": "索引バックエンド",
+      "status": "claim"
+    },
+    "query": {
+      "type": "link",
+      "label": "Gremlin クライアント → JanusGraph Server",
+      "status": "claim"
+    },
+    "read-schema": {
+      "type": "link",
+      "label": "JanusGraph Server → スキーマ（ラベル・プロパティキー）",
+      "status": "claim"
+    },
+    "store-io": {
+      "type": "link",
+      "label": "JanusGraph Server → 保存バックエンド",
+      "status": "claim"
+    },
+    "edge-idx": {
+      "type": "link",
+      "label": "保存バックエンド → 頂点中心インデックス",
+      "status": "claim"
+    },
+    "index-io": {
+      "type": "link",
+      "label": "JanusGraph Server → 索引バックエンド",
+      "status": "claim"
+    },
+    "traverse": {
+      "type": "scenario",
+      "label": "頂点から隣接エッジをたどる"
+    },
+    "fulltext": {
+      "type": "scenario",
+      "label": "全文検索で頂点を探す"
+    },
+    "JG-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "保存と検索の基盤を分けて選ぶ",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Gremlin Console の接続手順と、Solr・Lucene の設定項目は今回の取得範囲になく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Bigtable、ScyllaDB、InMemory の個別の特性は未確認。"
+    },
+    "jg-client": {
+      "type": "implementation",
+      "impl": "onprem-cassandra-es",
+      "label": "Gremlin クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "jg-server": {
+      "type": "implementation",
+      "impl": "onprem-cassandra-es",
+      "label": "JanusGraph Server",
+      "realizes": [
+        "server",
+        "schema"
+      ]
+    },
+    "jg-cassandra": {
+      "type": "implementation",
+      "impl": "onprem-cassandra-es",
+      "label": "Apache Cassandra",
+      "realizes": [
+        "store",
+        "vci"
+      ]
+    },
+    "jg-es": {
+      "type": "implementation",
+      "impl": "onprem-cassandra-es",
+      "label": "Elasticsearch",
+      "realizes": [
+        "indexbe"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-janusgraph.md#§1": [
+      "model"
+    ],
+    "docs/reference-janusgraph.md": [
+      "model",
+      "client",
+      "server",
+      "schema",
+      "store",
+      "vci",
+      "indexbe",
+      "query",
+      "read-schema",
+      "store-io",
+      "edge-idx",
+      "index-io",
+      "traverse",
+      "fulltext",
+      "JG-01",
+      "jg-client",
+      "jg-server",
+      "jg-cassandra",
+      "jg-es"
+    ],
+    "docs/reference-janusgraph.md#§2": [
+      "client",
+      "server",
+      "query"
+    ],
+    "docs/reference-janusgraph.md#§5": [
+      "schema",
+      "read-schema"
+    ],
+    "docs/reference-janusgraph.md#§3": [
+      "store",
+      "store-io"
+    ],
+    "docs/reference-janusgraph.md#§6": [
+      "store",
+      "vci",
+      "edge-idx",
+      "traverse"
+    ],
+    "docs/reference-janusgraph.md#§4": [
+      "indexbe",
+      "index-io",
+      "fulltext",
+      "JG-01"
+    ],
+    "docs/reference-janusgraph.md#§7": [
+      "jg-client",
+      "jg-server",
+      "jg-cassandra",
+      "jg-es"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "グラフデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "JanusGraph",
+    "role": "overview",
+    "order": 60,
+    "objectives": [
+      "保存バックエンドと索引バックエンドの役割の違いを区別する",
+      "複合索引・混合索引・頂点中心インデックスの保存先を確認する",
+      "スキーマ定義と索引の関係を確認する"
+    ],
+    "sources": [
+      {
+        "title": "JanusGraph Documentation",
+        "url": "https://docs.janusgraph.org/"
+      },
+      {
+        "title": "JanusGraph Server",
+        "url": "https://docs.janusgraph.org/operations/server/"
+      },
+      {
+        "title": "Schema and Data Modeling",
+        "url": "https://docs.janusgraph.org/schema/"
+      },
+      {
+        "title": "Index Management",
+        "url": "https://docs.janusgraph.org/schema/index-management/index-performance/"
+      },
+      {
+        "title": "Elasticsearch index backend",
+        "url": "https://docs.janusgraph.org/index-backend/elasticsearch/"
+      }
+    ]
+  }
+}

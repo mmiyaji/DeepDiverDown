@@ -1,0 +1,115 @@
+name: Memcached の分散キャッシュ
+description: クライアントがキーのハッシュでサーバーを選び、各サーバーがスラブアロケータと LRU でメモリ上の値を管理する。値は再起動で消え、extstore でフラッシュへ逃がせる。
+reference:
+  objectives: [クライアント側のハッシュ分散とサーバーの独立を確認する, スラブクラスと LRU によるメモリ管理を確認する, 永続化なしの前提と extstore の範囲を区別する]
+  sources:
+    - {title: Performance and Efficiency, url: https://docs.memcached.org/serverguide/performance/}
+    - {title: Extstore, url: https://docs.memcached.org/features/flashstorage/}
+    - {title: Warm Restart, url: https://docs.memcached.org/features/restart/}
+    - {title: new_lru.txt, url: https://github.com/memcached/memcached/blob/master/doc/new_lru.txt}
+    - {title: Caching Story, url: https://docs.memcached.org/tutorialcachingstory/}
+sources: [docs/reference-memcached.md]
+evidence: [{type: doc, ref: docs/reference-memcached.md#§1}]
+tiers:
+  - {id: flow, label: アプリ・Memcached ノード・フラッシュ, z: 0, size: [28, 11]}
+nodes:
+  app: {label: アプリケーション, kind: client, tier: flow, x: 1, y: 5.5, description: 先に Memcached を調べ、ミスならデータベースへ問い合わせる。, evidence: [{type: doc, ref: docs/reference-memcached.md#§1}]}
+  db: {label: データベース, kind: db, tier: flow, x: 1, y: 9.5, description: 正本のデータ。Memcached はこの写しを短時間置く。, evidence: [{type: doc, ref: docs/reference-memcached.md#§1}]}
+  hashlib: {label: クライアントのハッシュ表, kind: service, tier: flow, x: 7, y: 5.5, description: 起動時にサーバー一覧から作り、キーごとに 1 台を選ぶ。方式の名称は未確認。, evidence: [{type: doc, ref: docs/reference-memcached.md#§2}]}
+  node1: {label: Memcached サーバー A, kind: service, tier: flow, x: 14, y: 2, description: ほかのサーバーと通信せず、メモリ上限も個別に持つ。, evidence: [{type: doc, ref: docs/reference-memcached.md#§2}]}
+  node2: {label: Memcached サーバー B, kind: service, tier: flow, x: 14, y: 9, description: サーバー A が停止しても動き続ける。ミスになるのは A に置いたキーだけ。, evidence: [{type: doc, ref: docs/reference-memcached.md#§2}]}
+  workers: {label: ワーカースレッド（libevent）, kind: service, tier: flow, x: 14, y: 5.5, description: 受け付けスレッドが 1 つ、ワーカーがそれぞれイベントループを持つ。集中ロックでキャッシュを共有する。, evidence: [{type: doc, ref: docs/reference-memcached.md#§3}]}
+  hashtable: {label: ハッシュ表, kind: db, tier: flow, x: 20, y: 2, description: キーからアイテムを引く。メモリは -m の上限の外で使う。, evidence: [{type: doc, ref: docs/reference-memcached.md#§3}]}
+  slabs: {label: スラブクラスとチャンク, kind: db, tier: flow, x: 20, y: 5.5, description: 1 MB のページを固定サイズのチャンクに切る。ページは別のクラスへ移らない。, evidence: [{type: doc, ref: docs/reference-memcached.md#§4}, {type: doc, ref: docs/reference-memcached.md#§6}]}
+  lru: {label: LRU（HOT・WARM・COLD）, kind: service, tier: flow, x: 20, y: 9, description: スラブクラスごとにあり、空きがなければ末尾から期限切れ、なければ期限内のアイテムを追い出す。, evidence: [{type: doc, ref: docs/reference-memcached.md#§5}]}
+  extstore: {label: extstore（フラッシュ）, kind: db, tier: flow, x: 26, y: 9, description: LRU 末尾の値をページ単位で書き出す。キーと位置のヘッダーは RAM に残る。再起動で使えなくなる。, evidence: [{type: doc, ref: docs/reference-memcached.md#§7}]}
+links:
+  - {id: app-lookup, from: app, to: hashlib, label: キーでサーバーを選ぶ, evidence: [{type: doc, ref: docs/reference-memcached.md#§2}]}
+  - {id: app-db, from: app, to: db, label: ミス時に問い合わせ, evidence: [{type: doc, ref: docs/reference-memcached.md#§1}]}
+  - {id: pick-a, from: hashlib, to: node1, label: 該当キーを送る, evidence: [{type: doc, ref: docs/reference-memcached.md#§2}]}
+  - {id: pick-b, from: hashlib, to: node2, label: 該当キーを送る, evidence: [{type: doc, ref: docs/reference-memcached.md#§2}]}
+  - {id: serve, from: node1, to: workers, label: 接続を処理, evidence: [{type: doc, ref: docs/reference-memcached.md#§3}]}
+  - {id: find, from: workers, to: hashtable, label: キーを検索, evidence: [{type: doc, ref: docs/reference-memcached.md#§3}]}
+  - {id: place, from: workers, to: slabs, label: 値を格納, evidence: [{type: doc, ref: docs/reference-memcached.md#§4}]}
+  - {id: evict, from: slabs, to: lru, label: 空きがなければ追い出し, evidence: [{type: doc, ref: docs/reference-memcached.md#§5}]}
+  - {id: flush, from: lru, to: extstore, label: 末尾の値を書き出し, evidence: [{type: doc, ref: docs/reference-memcached.md#§7}]}
+scenarios:
+  - id: cache-miss
+    label: キャッシュミスからデータベースへ
+    evidence: [{type: doc, ref: docs/reference-memcached.md#§1}]
+    steps:
+      - {links: [app-lookup, pick-a], note: クライアントがキーのハッシュでサーバーを 1 台選ぶ。}
+      - {links: [serve, find], note: サーバーがハッシュ表を引き、なければミスを返す。}
+      - {links: [app-db], note: アプリがデータベースから読み、必要なら Memcached に置く。}
+  - id: memory-full
+    label: メモリが満杯のときの追い出し
+    evidence: [{type: doc, ref: docs/reference-memcached.md#§5}]
+    steps:
+      - {links: [serve, place], note: 同じスラブクラスに空きチャンクがない。}
+      - {links: [evict], note: LRU の末尾から期限切れのアイテム、なければ期限内のアイテムを追い出す。}
+      - {links: [flush], note: extstore を有効にしていれば、末尾の値をフラッシュへ書き出す。}
+requirements:
+  - {id: MC-01, kind: usecase, title: データベースの読み取りを減らす, text: 先に Memcached を調べ、ミスのときだけデータベースへ問い合わせる。, links: [app-lookup, app-db], evidence: [{type: doc, ref: docs/reference-memcached.md#§1}]}
+unknowns:
+  - {id: UNK-01, text: クライアントのハッシュ方式の名称と既定のポート 11211 は、取得した公式資料で明記を確認できていない。, refs: [hashlib]}
+  - {id: UNK-02, text: スラブのリバランス機能と、セグメント化 LRU が現行版で既定で有効かどうかは未確認。, refs: [slabs, lru]}
+gates: {maxDrift: 0, maxHigh: 0}
+layout3d:
+  tiers:
+    - {id: client, label: クライアント側, z: 0, size: [8, 11]}
+    - {id: server, label: Memcached サーバー, z: 0, origin: [10, 0], size: [10, 11]}
+    - {id: store, label: メモリ管理と外部ストレージ, z: 0, origin: [22, 0], size: [8, 11]}
+  nodes:
+    app: {tier: client, x: 2, y: 5.5}
+    db: {tier: client, x: 2, y: 9.5}
+    hashlib: {tier: client, x: 6, y: 5.5}
+    node1: {tier: server, x: 2, y: 2}
+    node2: {tier: server, x: 2, y: 9}
+    workers: {tier: server, x: 2, y: 5.5}
+    hashtable: {tier: server, x: 8, y: 2}
+    slabs: {tier: store, x: 2, y: 5.5}
+    lru: {tier: store, x: 2, y: 9}
+    extstore: {tier: store, x: 6, y: 9}
+implementations:
+  - id: onprem-single
+    label: 自前の 2 台構成
+    description: アプリケーションと自前ホスト 2 台の Memcached で組む例。クライアント側のハッシュ表がキーごとに 1 台を選ぶ。代表例であり、導入事例ではない。
+    sources:
+      - {title: Performance and Efficiency, url: https://docs.memcached.org/serverguide/performance/}
+      - {title: Caching Story, url: https://docs.memcached.org/tutorialcachingstory/}
+    tiers:
+      - {id: diagram, label: アプリ・Memcached・データベース, z: 0, size: [28, 11]}
+    nodes:
+      mc-app: {label: アプリケーション（クライアントライブラリ）, kind: client, tier: diagram, x: 1, y: 5.5, realizes: [app, hashlib], description: 先に Memcached を調べ、ミスならデータベースへ問い合わせる。, evidence: [{type: doc, ref: docs/reference-memcached.md#§8}]}
+      mc-db: {label: データベース, kind: db, tier: diagram, x: 1, y: 9.5, realizes: [db], description: 正本のデータ。種類は資料になく未確認。, evidence: [{type: doc, ref: docs/reference-memcached.md#§8}]}
+      mc-server: {label: Memcached プロセス, kind: service, tier: diagram, x: 12, y: 5.5, realizes: [node1, workers, hashtable, slabs, lru], description: サーバー A。1 台のホストで動き、ワーカースレッドとハッシュ表、スラブクラス、LRU を持つ。, management: {type: customer, scope: "Customer operates the host, Memcached process and options."}, evidence: [{type: doc, ref: docs/reference-memcached.md#§8}]}
+      mc-server-b: {label: Memcached プロセス（サーバー B）, kind: service, tier: diagram, x: 12, y: 9.5, realizes: [node2], description: 別のホストで動く 2 台目。サーバー A とは通信しない。, management: {type: customer, scope: "Customer operates the host, Memcached process and options."}, evidence: [{type: doc, ref: docs/reference-memcached.md#§8}]}
+      mc-flash: {label: フラッシュ（extstore、任意）, kind: db, tier: diagram, x: 20, y: 5.5, realizes: [extstore], description: extstore を有効にした場合だけ使う。有効にするかどうかは資料になく未確認。, management: {type: customer, scope: "Customer operates the flash device and extstore options."}, evidence: [{type: doc, ref: docs/reference-memcached.md#§8}]}
+    links:
+      - {id: mc-lookup, from: mc-app, to: mc-server, label: キーで検索, evidence: [{type: doc, ref: docs/reference-memcached.md#§8}]}
+      - {id: mc-spill, from: mc-server, to: mc-flash, label: 末尾の値を書き出し, evidence: [{type: doc, ref: docs/reference-memcached.md#§8}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [mc-server, mc-flash, mc-db, mc-server-b]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: アプリ・Memcached・データベース, z: 0, size: [28, 11]}
+      nodes:
+        mc-app: {tier: diagram, x: 1, y: 5.5}
+        mc-db: {tier: diagram, x: 1, y: 9.5}
+        mc-server: {tier: diagram, x: 12, y: 5.5}
+        mc-server-b: {tier: diagram, x: 12, y: 9.5}
+        mc-flash: {tier: diagram, x: 20, y: 5.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [mc-server, mc-flash, mc-db, mc-server-b]}
+    layout3d:
+      tiers:
+        - {id: clients, label: アプリ側, z: 0, size: [8, 11]}
+        - {id: servers, label: Memcached, z: 0, origin: [10, 0], size: [10, 11]}
+      nodes:
+        mc-app: {tier: clients, x: 3, y: 5.5}
+        mc-db: {tier: clients, x: 3, y: 9.5}
+        mc-server: {tier: servers, x: 2, y: 5.5}
+        mc-server-b: {tier: servers, x: 2, y: 9.5}
+        mc-flash: {tier: servers, x: 7, y: 5.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [mc-server, mc-flash, mc-db, mc-server-b]}

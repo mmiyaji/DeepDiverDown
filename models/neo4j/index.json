@@ -1,0 +1,237 @@
+{
+  "model": "neo4j",
+  "name": "Neo4j のプロパティグラフとネイティブのグラフ保存",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント（ドライバー・Browser）",
+      "status": "claim"
+    },
+    "cypher": {
+      "type": "node",
+      "label": "Cypher クエリ",
+      "status": "claim"
+    },
+    "propgraph": {
+      "type": "node",
+      "label": "プロパティグラフ",
+      "status": "claim"
+    },
+    "store": {
+      "type": "node",
+      "label": "ノード・リレーションシップのレコード",
+      "status": "claim"
+    },
+    "txlog": {
+      "type": "node",
+      "label": "トランザクションログ",
+      "status": "claim"
+    },
+    "primary": {
+      "type": "node",
+      "label": "primary（ライター）",
+      "status": "claim"
+    },
+    "secondary": {
+      "type": "node",
+      "label": "secondary",
+      "status": "claim"
+    },
+    "edition": {
+      "type": "node",
+      "label": "Community と Enterprise",
+      "status": "claim"
+    },
+    "run": {
+      "type": "link",
+      "label": "クライアント（ドライバー・Browser） → Cypher クエリ",
+      "status": "claim"
+    },
+    "match": {
+      "type": "link",
+      "label": "Cypher クエリ → プロパティグラフ",
+      "status": "claim"
+    },
+    "read-store": {
+      "type": "link",
+      "label": "プロパティグラフ → ノード・リレーションシップのレコード",
+      "status": "claim"
+    },
+    "log-write": {
+      "type": "link",
+      "label": "Cypher クエリ → トランザクションログ",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "link",
+      "label": "トランザクションログ → ノード・リレーションシップのレコード",
+      "status": "claim"
+    },
+    "replicate": {
+      "type": "link",
+      "label": "primary（ライター） → secondary",
+      "status": "claim"
+    },
+    "ee-cluster": {
+      "type": "link",
+      "label": "Community と Enterprise → primary（ライター）",
+      "status": "claim"
+    },
+    "write-tx": {
+      "type": "scenario",
+      "label": "書き込みをコミットしてクラスタへ配る"
+    },
+    "NJ-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "読み取りを secondary へ分ける",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "ノード・リレーションシップ・プロパティの各レコードの構造とポインタ（リレーションシップチェーン）は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Raft の選挙とログ複製の手順、Community での複数データベースの可否は未確認。"
+    },
+    "nj-driver": {
+      "type": "implementation",
+      "impl": "enterprise-cluster-onprem",
+      "label": "アプリケーション（Neo4j ドライバー）",
+      "realizes": [
+        "client"
+      ]
+    },
+    "nj-writer": {
+      "type": "implementation",
+      "impl": "enterprise-cluster-onprem",
+      "label": "Neo4j サーバー A（primary・ライター）",
+      "realizes": [
+        "cypher",
+        "propgraph",
+        "store",
+        "txlog",
+        "primary",
+        "edition"
+      ]
+    },
+    "nj-follower": {
+      "type": "implementation",
+      "impl": "enterprise-cluster-onprem",
+      "label": "Neo4j サーバー B・C（primary）",
+      "realizes": [
+        "primary",
+        "store",
+        "txlog"
+      ]
+    },
+    "nj-secondary": {
+      "type": "implementation",
+      "impl": "enterprise-cluster-onprem",
+      "label": "Neo4j サーバー D（secondary）",
+      "realizes": [
+        "secondary",
+        "store",
+        "txlog"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-neo4j.md#§1": [
+      "model"
+    ],
+    "docs/reference-neo4j.md": [
+      "model",
+      "client",
+      "cypher",
+      "propgraph",
+      "store",
+      "txlog",
+      "primary",
+      "secondary",
+      "edition",
+      "run",
+      "match",
+      "read-store",
+      "log-write",
+      "checkpoint",
+      "replicate",
+      "ee-cluster",
+      "write-tx",
+      "NJ-01",
+      "nj-driver",
+      "nj-writer",
+      "nj-follower",
+      "nj-secondary"
+    ],
+    "docs/reference-neo4j.md#§2": [
+      "client",
+      "cypher",
+      "propgraph",
+      "run",
+      "match"
+    ],
+    "docs/reference-neo4j.md#§3": [
+      "store",
+      "read-store"
+    ],
+    "docs/reference-neo4j.md#§4": [
+      "txlog",
+      "log-write",
+      "checkpoint"
+    ],
+    "docs/reference-neo4j.md#§5": [
+      "primary",
+      "secondary",
+      "replicate",
+      "write-tx",
+      "NJ-01"
+    ],
+    "docs/reference-neo4j.md#§6": [
+      "edition",
+      "ee-cluster"
+    ],
+    "docs/reference-neo4j.md#§7": [
+      "nj-driver",
+      "nj-writer",
+      "nj-follower",
+      "nj-secondary"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "グラフデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Neo4j",
+    "role": "overview",
+    "order": 20,
+    "objectives": [
+      "プロパティグラフと Cypher の関係を確認する",
+      "ノード・リレーションシップのレコードとトランザクションログの役割を区別する",
+      "primary と secondary、Community と Enterprise の違いを確認する"
+    ],
+    "sources": [
+      {
+        "title": "Neo4j Operations Manual",
+        "url": "https://neo4j.com/docs/operations-manual/current/introduction/"
+      },
+      {
+        "title": "Store formats",
+        "url": "https://neo4j.com/docs/operations-manual/current/database-internals/store-formats/"
+      },
+      {
+        "title": "Transaction logs",
+        "url": "https://neo4j.com/docs/operations-manual/current/database-internals/transaction-logs/"
+      },
+      {
+        "title": "Clustering introduction",
+        "url": "https://neo4j.com/docs/operations-manual/current/clustering/introduction/"
+      }
+    ]
+  }
+}

@@ -1,0 +1,106 @@
+name: Amazon Neptune の基本アーキテクチャ
+description: ライターとリーダーが 3 つの AZ にまたがるクラスターボリュームを共有する構成と、Neptune Analytics との位置づけを示す。
+reference:
+  objectives: [ライターとリーダーの役割とエンドポイントの使い分けを区別する, クラスターボリュームの 6 コピーと 3 AZ を確認する, プロパティグラフと RDF のクエリ言語の対応と Neptune Analytics との違いを確認する]
+  sources:
+    - {title: What Is Amazon Neptune?, url: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html}
+    - {title: Neptune DB clusters and instances, url: https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-db-clusters.html}
+    - {title: Neptune endpoints, url: https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-endpoints.html}
+    - {title: Neptune storage, reliability and availability, url: https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-storage.html}
+    - {title: Neptune graph data model, url: https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-data-model.html}
+    - {title: Neptune Analytics vs Neptune Database, url: https://docs.aws.amazon.com/neptune-analytics/latest/userguide/neptune-analytics-vs-neptune-database.html}
+    - {title: Neptune endpoints and quotas, url: https://docs.aws.amazon.com/general/latest/gr/neptune.html}
+sources: [docs/reference-amazon-neptune.md]
+evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§1}, {type: doc, ref: docs/reference-amazon-neptune.md#§7}]
+tiers:
+  - {id: flow, label: アプリ・クラスター・ボリューム, z: 0, size: [34, 13]}
+nodes:
+  app: {label: クライアントアプリ, kind: client, tier: flow, x: 1, y: 5.5, description: openCypher・Gremlin・SPARQL のいずれかで接続する。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§2}]}
+  cluster-ep: {label: クラスターエンドポイント, kind: service, tier: flow, x: 8, y: 3, description: 現在のライターへ接続する。書き込みに使う。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§4}]}
+  reader-ep: {label: リーダーエンドポイント, kind: service, tier: flow, x: 8, y: 8, description: リーダーへラウンドロビンで接続する。接続後は同じホストに固定される。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§4}]}
+  writer: {label: ライター（プライマリ）, kind: db, tier: flow, x: 15, y: 3, description: 書き込みを調整する。1 クラスターに 1 台で、読み取りも受ける。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§3}]}
+  readers: {label: リーダー（最大 15 台）, kind: db, tier: flow, x: 15, y: 8, description: 読み取り専用。ライター障害時のフェイルオーバー先になる。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§3}]}
+  volume: {label: クラスターボリューム, kind: db, tier: flow, x: 22, y: 5.5, description: 3 つの AZ に 6 コピーを持つ共有ボリューム。最大 128 TiB。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§5}]}
+  pg: {label: プロパティグラフ, kind: db, tier: flow, x: 29, y: 3, description: openCypher と Gremlin で同じグラフにアクセスする。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§2}]}
+  rdf: {label: RDF グラフ, kind: db, tier: flow, x: 29, y: 8, description: SPARQL でアクセスする。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§2}]}
+  analytics: {label: Neptune Analytics, kind: service, tier: flow, x: 22, y: 11.5, description: グラフをメモリに載せて分析する別サービス。S3 または Neptune Database から読み込む。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§6}]}
+links:
+  - {id: write, from: app, to: cluster-ep, label: 書き込み・読み取り, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§4}]}
+  - {id: read, from: app, to: reader-ep, label: 読み取り, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§4}]}
+  - {id: to-writer, from: cluster-ep, to: writer, label: 現在のライターへ, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§4}]}
+  - {id: to-readers, from: reader-ep, to: readers, label: ラウンドロビン, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§4}]}
+  - {id: writer-vol, from: writer, to: volume, label: 書き込み（6 コピー中 4 で確定）, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§5}]}
+  - {id: readers-vol, from: readers, to: volume, label: 読み取り, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§3}]}
+  - {id: hold-pg, from: volume, to: pg, label: 格納, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§2}]}
+  - {id: hold-rdf, from: volume, to: rdf, label: 格納, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§2}]}
+  - {id: load-analytics, from: volume, to: analytics, label: グラフを読み込み, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§6}]}
+scenarios:
+  - id: write-and-read
+    label: ライターで書き、リーダーで読む
+    evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§3}]
+    steps:
+      - {links: [write, to-writer, writer-vol], note: ライターが 6 コピーのうち 4 つの応答でボリュームへ書き込む。}
+      - {links: [read, to-readers, readers-vol], note: リーダーが同じボリュームを読む。遅延は通常 100 ミリ秒よりかなり短い。}
+requirements:
+  - {id: NP-01, kind: usecase, title: 読み取りをリーダーに分ける, text: 書き込みはクラスターエンドポイント、読み取りはリーダーエンドポイントへ向ける。, links: [write, read, to-writer, to-readers], evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§4}]}
+unknowns:
+  - {id: UNK-01, text: プロパティグラフと RDF を同じグラフで混在させられるかは公式資料で未確認。, refs: [pg, rdf]}
+  - {id: UNK-02, text: Neptune Analytics の提供リージョン、対応言語（openCypher 以外）、課金単位は今回の資料で未確認。, refs: [analytics]}
+  - {id: UNK-03, text: Serverless と Global Database は今回の取得範囲になく未確認。, refs: [writer, readers]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: aws-cluster
+    label: AWS 上の Neptune Database クラスターと Neptune Analytics
+    description: ライター 1 台とリーダー、クラスターボリューム、S3 のバックアップを使う AWS の代表構成。代表例であり、導入事例ではない。
+    sources:
+      - {title: Neptune DB clusters and instances, url: https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-db-clusters.html}
+      - {title: Neptune storage, reliability and availability, url: https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-storage.html}
+      - {title: Neptune Analytics vs Neptune Database, url: https://docs.aws.amazon.com/neptune-analytics/latest/userguide/neptune-analytics-vs-neptune-database.html}
+    tiers:
+      - {id: diagram, label: アプリ・クラスター・ボリューム, z: 0, size: [34, 13]}
+    nodes:
+      np-app: {label: クライアントアプリ, kind: client, tier: diagram, x: 1, y: 5.5, realizes: [app], description: Gremlin・openCypher・SPARQL のクライアントで接続する。, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+      np-cep: {label: クラスターエンドポイント, kind: service, tier: diagram, x: 8, y: 3, realizes: [cluster-ep], description: 現在のライターへ接続する。, management: {type: shared, scope: "AWS runs the endpoint and failover routing; customer chooses which clients use it."}, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+      np-rep: {label: リーダーエンドポイント, kind: service, tier: diagram, x: 8, y: 8, realizes: [reader-ep], description: リーダーへラウンドロビンで接続する。, management: {type: shared, scope: "AWS runs the endpoint; customer chooses which clients use it."}, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+      np-writer: {label: ライター（プライマリ DB インスタンス）, kind: db, tier: diagram, x: 15, y: 3, realizes: [writer, pg, rdf], description: 書き込みを受けるインスタンス。インスタンスクラスは利用者が選ぶ。, management: {type: shared, scope: "AWS runs the engine, patching and failover; customer chooses instance class, parameters and queries."}, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+      np-reader: {label: リーダー（リードレプリカ）, kind: db, tier: diagram, x: 15, y: 8, realizes: [readers], description: 別 AZ に置いてフェイルオーバー先にする。, management: {type: shared, scope: "AWS runs the engine and failover; customer chooses replica count, classes and AZs."}, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+      np-volume: {label: クラスターボリューム（3 AZ・6 コピー）, kind: db, tier: diagram, x: 23, y: 5.5, realizes: [volume], description: AWS が運用し、利用者は直接操作できない。内部構成は未確認。, management: {type: aws, scope: "AWS operates the storage nodes and self-healing; customers cannot access them directly."}, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+      np-s3: {label: S3 のバックアップ, svc: s3, kind: db, tier: diagram, x: 30, y: 3, description: 連続バックアップの保存先。, management: {type: shared, scope: "AWS stores continuous backups in S3; customer sets retention and restores."}, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+      np-analytics: {label: Neptune Analytics のグラフ, kind: service, tier: diagram, x: 23, y: 11.5, realizes: [analytics], description: メモリ上でグラフアルゴリズムを実行する。データは S3 または Neptune Database から読み込む。, management: {type: shared, scope: "AWS provisions compute from graph size; customer loads data and runs queries."}, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§8}]}
+    links:
+      - {id: np-backup, from: np-volume, to: np-s3, label: 連続バックアップ, evidence: [{type: doc, ref: docs/reference-amazon-neptune.md#§5}]}
+    groups:
+      - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと VPC, tier: diagram, nodes: [np-cep, np-rep, np-writer, np-reader, np-analytics]}
+      - {kind: cloud, provider: aws, label: AWS 運用のボリュームとバックアップ, tier: diagram, nodes: [np-volume, np-s3]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: アプリ・クラスター・ボリューム, z: 0, size: [34, 13]}
+      nodes:
+        np-app: {tier: diagram, x: 1, y: 5.5}
+        np-cep: {tier: diagram, x: 8, y: 3}
+        np-rep: {tier: diagram, x: 8, y: 8}
+        np-writer: {tier: diagram, x: 15, y: 3}
+        np-reader: {tier: diagram, x: 15, y: 8}
+        np-analytics: {tier: diagram, x: 23, y: 11.5}
+        np-volume: {tier: diagram, x: 23, y: 5.5}
+        np-s3: {tier: diagram, x: 30, y: 3}
+      groups:
+        - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと VPC, tier: diagram, nodes: [np-cep, np-rep, np-writer, np-reader, np-analytics]}
+        - {kind: cloud, provider: aws, label: AWS 運用のボリュームとバックアップ, tier: diagram, nodes: [np-volume, np-s3]}
+    layout3d:
+      tiers:
+        - {id: apps, label: アプリ, z: 0, size: [6, 13]}
+        - {id: cluster, label: エンドポイントとインスタンス, z: 0, origin: [7, 0], size: [12, 13]}
+        - {id: durable, label: ボリュームとバックアップ, z: 0, origin: [20, 0], size: [14, 13]}
+      nodes:
+        np-app: {tier: apps, x: 3, y: 5.5}
+        np-cep: {tier: cluster, x: 2, y: 3}
+        np-rep: {tier: cluster, x: 2, y: 8}
+        np-writer: {tier: cluster, x: 8, y: 3}
+        np-reader: {tier: cluster, x: 8, y: 8}
+        np-analytics: {tier: cluster, x: 8, y: 11.5}
+        np-volume: {tier: durable, x: 3, y: 5.5}
+        np-s3: {tier: durable, x: 10, y: 3}
+      groups:
+        - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと VPC, tier: cluster, nodes: [np-cep, np-rep, np-writer, np-reader, np-analytics]}
+        - {kind: cloud, provider: aws, label: AWS 運用のボリュームとバックアップ, tier: durable, nodes: [np-volume, np-s3]}

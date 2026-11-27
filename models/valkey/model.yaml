@@ -1,0 +1,95 @@
+name: Valkey の基本アーキテクチャ
+description: Redis 7.2.4 から分岐した Valkey の I/O スレッド、メモリ上のデータセット、レプリカ、クラスタのスロット、RDB・AOF を示す。
+reference:
+  objectives: [メインスレッドと I/O スレッドの分担を確認する, レプリカ・クラスタ・永続化がデータセットにどうつながるかを確認する, Redis との互換性の範囲を確認する]
+  sources:
+    - {title: Linux Foundation Launches Open Source Valkey Community, url: https://linuxfoundation.org/press/linux-foundation-launches-open-source-valkey-community}
+    - {title: Unlock one million RPS, url: https://valkey.io/blog/unlock-one-million-rps/}
+    - {title: Valkey replication, url: https://valkey.io/topics/replication/}
+    - {title: Valkey Cluster specification, url: https://valkey.io/topics/cluster-spec/}
+    - {title: Valkey persistence, url: https://valkey.io/topics/persistence/}
+    - {title: Migration from Redis to Valkey, url: https://valkey.io/topics/migration/}
+sources: [docs/reference-valkey.md]
+evidence: [{type: doc, ref: docs/reference-valkey.md#§1}]
+tiers:
+  - {id: flow, label: クライアント・サーバー・永続化, z: 0, size: [28, 13]}
+nodes:
+  client: {label: クライアント, kind: client, tier: flow, x: 1, y: 5, description: RESP2・RESP3 で接続する。Redis OSS 7.2 向けのクライアントがそのまま使える。, evidence: [{type: doc, ref: docs/reference-valkey.md#§6}]}
+  iothreads: {label: I/O スレッド, kind: service, tier: flow, x: 8, y: 2, description: 読み取りとパース、応答の書き込み、epoll_wait、メモリ解放を担う。稼働数はメインスレッドが負荷に応じて調整する。, evidence: [{type: doc, ref: docs/reference-valkey.md#§2}]}
+  main: {label: メインスレッド, kind: service, tier: flow, x: 8, y: 7, description: コマンドの実行はここだけで行う。I/O スレッドへ仕事を渡す。, evidence: [{type: doc, ref: docs/reference-valkey.md#§2}]}
+  dataset: {label: メモリ上のデータセット, kind: db, tier: flow, x: 15, y: 5, description: キーと値を保持する。クラスタでは 16,384 のハッシュスロットに分かれる。, evidence: [{type: doc, ref: docs/reference-valkey.md#§4}]}
+  slots: {label: ハッシュスロット, kind: db, tier: flow, x: 15, y: 9.5, description: CRC16(キー) mod 16384 でスロットが決まる。9.0 のアトミックなスロット移行で再配置する。, evidence: [{type: doc, ref: docs/reference-valkey.md#§4}]}
+  replica: {label: レプリカ, kind: service, tier: flow, x: 22, y: 1.5, description: PSYNC で差分を受ける。全量同期は既定でディスクを経由せず、8.0 以降はデュアルチャネルも選べる。, evidence: [{type: doc, ref: docs/reference-valkey.md#§3}]}
+  rdb: {label: RDB スナップショット, kind: db, tier: flow, x: 22, y: 4.5, description: save 規則で時点スナップショットを 1 ファイルに書く。, evidence: [{type: doc, ref: docs/reference-valkey.md#§5}]}
+  aof: {label: AOF（マルチパート）, kind: db, tier: flow, x: 22, y: 7.5, description: 基本ファイルと増分ファイルをマニフェストで管理する。appendfsync の既定は everysec。, evidence: [{type: doc, ref: docs/reference-valkey.md#§5}]}
+  bus: {label: クラスタバス, kind: service, tier: flow, x: 22, y: 11, description: クライアントのポート+10000 でノード間のゴシップと障害検知を行う。, evidence: [{type: doc, ref: docs/reference-valkey.md#§4}]}
+links:
+  - {id: c-io, from: client, to: iothreads, label: コマンドを送信, evidence: [{type: doc, ref: docs/reference-valkey.md#§2}]}
+  - {id: io-main, from: iothreads, to: main, label: パース済みコマンドを渡す, evidence: [{type: doc, ref: docs/reference-valkey.md#§2}]}
+  - {id: main-data, from: main, to: dataset, label: コマンドを実行, evidence: [{type: doc, ref: docs/reference-valkey.md#§2}]}
+  - {id: data-slots, from: dataset, to: slots, label: スロットに分割, evidence: [{type: doc, ref: docs/reference-valkey.md#§4}]}
+  - {id: repl, from: dataset, to: replica, label: 非同期で複製, evidence: [{type: doc, ref: docs/reference-valkey.md#§3}]}
+  - {id: snap, from: dataset, to: rdb, label: スナップショットを保存, evidence: [{type: doc, ref: docs/reference-valkey.md#§5}]}
+  - {id: log, from: dataset, to: aof, label: 書き込みを追記, evidence: [{type: doc, ref: docs/reference-valkey.md#§5}]}
+  - {id: gossip, from: slots, to: bus, label: スロットの担当を共有, evidence: [{type: doc, ref: docs/reference-valkey.md#§4}]}
+scenarios:
+  - id: write-and-replicate
+    label: 書き込みを実行して複製・永続化する
+    evidence: [{type: doc, ref: docs/reference-valkey.md#§3}]
+    steps:
+      - {links: [c-io, io-main], note: I/O スレッドが読み取りとパースを行い、メインスレッドへ渡す。}
+      - {links: [main-data], note: メインスレッドがデータセットに書き込む。}
+      - {links: [repl, log], note: 非同期でレプリカへ送り、AOF に追記する。確認済みの書き込みもフェイルオーバーで失われうる。}
+requirements:
+  - {id: VK-01, kind: usecase, title: Redis OSS 7.2 のクライアントと RDB を引き継ぐ, text: RESP と RDB・AOF の互換性により、クライアントとデータファイルを移行できる。Redis CE 7.4 以降は対象外。, links: [c-io, snap, log], evidence: [{type: doc, ref: docs/reference-valkey.md#§6}]}
+unknowns:
+  - {id: UNK-01, text: I/O スレッドの設定ディレクティブ名と既定値は取得した資料に記載がなく未確認。, refs: [iothreads]}
+  - {id: UNK-02, text: クラスタ仕様書の末尾約 2 万文字は未読。複数データベースの制限一覧も未確認。, refs: [slots, bus]}
+  - {id: UNK-03, text: Redis との複製・クラスタ・マルチパート AOF の差分比較、Redis 8 以降との機能差は公式資料で未確認。, refs: [replica, aof]}
+  - {id: UNK-04, text: 分岐の理由を述べた Valkey 公式の history ページは未取得。経緯は Linux Foundation の発表に基づく。, refs: []}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-primary-replica
+    label: 自前の Linux 上のプライマリとレプリカ
+    description: プライマリが RDB と AOF をローカルディスクに保存し、別ホストのレプリカへ非同期に複製する例。代表例であり、導入事例ではない。
+    sources:
+      - {title: Valkey replication, url: https://valkey.io/topics/replication/}
+      - {title: Valkey persistence, url: https://valkey.io/topics/persistence/}
+      - {title: Unlock one million RPS, url: https://valkey.io/blog/unlock-one-million-rps/}
+    tiers:
+      - {id: diagram, label: クライアント・Valkey・ディスク, z: 0, size: [28, 11]}
+    nodes:
+      vk-client: {label: クライアント, kind: client, tier: diagram, x: 1, y: 5, realizes: [client], description: valkey-cli などの RESP クライアント。, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      vk-primary: {label: Valkey プライマリ, kind: service, tier: diagram, x: 9, y: 5, realizes: [iothreads, main, dataset], description: I/O スレッドとメインスレッドでコマンドを処理し、データセットをメモリに持つ。, management: {type: customer, scope: "Customer operates the host, Valkey process and configuration."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      vk-cluster-off: {label: ハッシュスロット・クラスタバス（クラスタ無効、未配置）, kind: service, tier: diagram, x: 9, y: 8.5, realizes: [slots, bus], description: クラスタ構成でだけ使う機能。この例はレプリカ構成でクラスタではないため動かさない。, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      vk-replica: {label: Valkey レプリカ, kind: service, tier: diagram, x: 17, y: 2, realizes: [replica], description: 別ホストでプライマリから非同期に複製を受ける。, management: {type: customer, scope: "Customer operates the host, Valkey process and configuration."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      vk-disk: {label: ローカルディスク（RDB・AOF）, kind: db, tier: diagram, x: 17, y: 8, realizes: [rdb, aof], description: RDB ファイルと AOF のマニフェスト・増分ファイルを置く。, management: {type: customer, scope: "Customer operates the disk, backups and access."}, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+    links:
+      - {id: vk-req, from: vk-client, to: vk-primary, label: コマンドを送信, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      - {id: vk-repl, from: vk-primary, to: vk-replica, label: 非同期で複製, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+      - {id: vk-save, from: vk-primary, to: vk-disk, label: RDB・AOF を保存, evidence: [{type: doc, ref: docs/reference-valkey.md#§7}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vk-primary, vk-replica, vk-disk, vk-cluster-off]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアント・Valkey・ディスク, z: 0, size: [28, 11]}
+      nodes:
+        vk-client: {tier: diagram, x: 1, y: 5}
+        vk-primary: {tier: diagram, x: 9, y: 5}
+        vk-cluster-off: {tier: diagram, x: 9, y: 8.5}
+        vk-replica: {tier: diagram, x: 17, y: 2}
+        vk-disk: {tier: diagram, x: 17, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vk-primary, vk-replica, vk-disk, vk-cluster-off]}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, z: 0, size: [6, 11]}
+        - {id: servers, label: Valkey とディスク, z: 0, origin: [8, 0], size: [18, 11]}
+      nodes:
+        vk-client: {tier: clients, x: 3, y: 5}
+        vk-primary: {tier: servers, x: 3, y: 5}
+        vk-cluster-off: {tier: servers, x: 3, y: 8.5}
+        vk-replica: {tier: servers, x: 10, y: 2}
+        vk-disk: {tier: servers, x: 10, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [vk-primary, vk-replica, vk-disk, vk-cluster-off]}

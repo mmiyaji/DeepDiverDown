@@ -1,0 +1,335 @@
+{
+  "model": "amazon-timestream",
+  "name": "Amazon Timestream（LiveAnalytics）の基本アーキテクチャ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "producers": {
+      "type": "node",
+      "label": "書き込み元",
+      "status": "claim"
+    },
+    "write": {
+      "type": "node",
+      "label": "WriteRecords API",
+      "status": "claim"
+    },
+    "rejected": {
+      "type": "node",
+      "label": "拒否データの保存先（S3）",
+      "status": "claim"
+    },
+    "mem": {
+      "type": "node",
+      "label": "メモリストア",
+      "status": "claim"
+    },
+    "mag": {
+      "type": "node",
+      "label": "マグネティックストア",
+      "status": "claim"
+    },
+    "retention": {
+      "type": "node",
+      "label": "保持ポリシー",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "クエリエンジン（SQL）",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "読み出し側（Grafana・Quick・JDBC）",
+      "status": "claim"
+    },
+    "kms": {
+      "type": "node",
+      "label": "KMS カスタマー管理キー",
+      "status": "claim"
+    },
+    "ingest": {
+      "type": "link",
+      "label": "書き込み元 → WriteRecords API",
+      "status": "claim"
+    },
+    "write-mem": {
+      "type": "link",
+      "label": "WriteRecords API → メモリストア",
+      "status": "claim"
+    },
+    "write-mag": {
+      "type": "link",
+      "label": "WriteRecords API → マグネティックストア",
+      "status": "claim"
+    },
+    "write-rej": {
+      "type": "link",
+      "label": "WriteRecords API → 拒否データの保存先（S3）",
+      "status": "claim"
+    },
+    "tier-move": {
+      "type": "link",
+      "label": "メモリストア → マグネティックストア",
+      "status": "claim"
+    },
+    "policy-mem": {
+      "type": "link",
+      "label": "保持ポリシー → メモリストア",
+      "status": "claim"
+    },
+    "policy-mag": {
+      "type": "link",
+      "label": "保持ポリシー → マグネティックストア",
+      "status": "claim"
+    },
+    "encrypt": {
+      "type": "link",
+      "label": "KMS カスタマー管理キー → マグネティックストア",
+      "status": "claim"
+    },
+    "query-mem": {
+      "type": "link",
+      "label": "クエリエンジン（SQL） → メモリストア",
+      "status": "claim"
+    },
+    "query-mag": {
+      "type": "link",
+      "label": "クエリエンジン（SQL） → マグネティックストア",
+      "status": "claim"
+    },
+    "sql": {
+      "type": "link",
+      "label": "読み出し側（Grafana・Quick・JDBC） → クエリエンジン（SQL）",
+      "status": "claim"
+    },
+    "write-and-age": {
+      "type": "scenario",
+      "label": "書き込んだデータが保持期間で移る"
+    },
+    "late-data": {
+      "type": "scenario",
+      "label": "遅れて届いたデータを書く"
+    },
+    "TS-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "直近と履歴を同じ SQL で読む",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "LiveAnalytics のサポート終了日は取得した公式ページに記載がなく未確認。新規顧客の受け付けは 2025-06-20 に終了済み。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "InfluxDB 3 系の提供有無と、InfluxDB から LiveAnalytics への公式な連携は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "スケジュールクエリと UNLOAD の動作は今回確認しておらず、図に含めていない。"
+    },
+    "ts-producers": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "書き込み元（アプリ・Telegraf など）",
+      "realizes": [
+        "producers"
+      ]
+    },
+    "ts-write": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "Timestream Write（WriteRecords）",
+      "realizes": [
+        "write"
+      ]
+    },
+    "ts-s3": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "Amazon S3（拒否データ用バケット）",
+      "realizes": [
+        "rejected"
+      ]
+    },
+    "ts-mem": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "メモリストア",
+      "realizes": [
+        "mem"
+      ]
+    },
+    "ts-mag": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "マグネティックストア",
+      "realizes": [
+        "mag"
+      ]
+    },
+    "ts-retention": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "テーブルの保持ポリシー",
+      "realizes": [
+        "retention"
+      ]
+    },
+    "ts-kms": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "AWS KMS（カスタマー管理キー）",
+      "realizes": [
+        "kms"
+      ]
+    },
+    "ts-query": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "Timestream Query（SQL）",
+      "realizes": [
+        "query"
+      ]
+    },
+    "ts-reader": {
+      "type": "implementation",
+      "impl": "liveanalytics-on-aws",
+      "label": "Grafana・Quick・JDBC クライアント",
+      "realizes": [
+        "reader"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-amazon-timestream.md#§1": [
+      "model"
+    ],
+    "docs/reference-amazon-timestream.md": [
+      "model",
+      "producers",
+      "write",
+      "rejected",
+      "mem",
+      "mag",
+      "retention",
+      "query",
+      "reader",
+      "kms",
+      "ingest",
+      "write-mem",
+      "write-mag",
+      "write-rej",
+      "tier-move",
+      "policy-mem",
+      "policy-mag",
+      "encrypt",
+      "query-mem",
+      "query-mag",
+      "sql",
+      "write-and-age",
+      "late-data",
+      "TS-01",
+      "ts-producers",
+      "ts-write",
+      "ts-s3",
+      "ts-mem",
+      "ts-mag",
+      "ts-retention",
+      "ts-kms",
+      "ts-query",
+      "ts-reader"
+    ],
+    "docs/reference-amazon-timestream.md#§2": [
+      "model"
+    ],
+    "docs/reference-amazon-timestream.md#§5": [
+      "producers",
+      "write",
+      "rejected",
+      "ingest",
+      "write-mem",
+      "write-mag",
+      "write-rej",
+      "late-data",
+      "ts-write",
+      "ts-s3"
+    ],
+    "docs/reference-amazon-timestream.md#§3": [
+      "mem",
+      "mag",
+      "kms",
+      "encrypt",
+      "ts-kms"
+    ],
+    "docs/reference-amazon-timestream.md#§4": [
+      "retention",
+      "tier-move",
+      "policy-mem",
+      "policy-mag",
+      "write-and-age",
+      "ts-retention"
+    ],
+    "docs/reference-amazon-timestream.md#§6": [
+      "query",
+      "reader",
+      "query-mem",
+      "query-mag",
+      "sql",
+      "TS-01",
+      "ts-query",
+      "ts-reader"
+    ],
+    "docs/reference-amazon-timestream.md#§8": [
+      "ts-producers"
+    ],
+    "docs/reference-amazon-timestream.md#§7": [
+      "ts-mem",
+      "ts-mag"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "時系列データ",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Amazon Timestream",
+    "role": "overview",
+    "order": 70,
+    "objectives": [
+      "メモリストアとマグネティックストアの役割分担を区別する",
+      "保持期間によるデータの移動と削除を確認する",
+      "遅延データの書き込み条件を確認する",
+      "LiveAnalytics の提供状況と InfluxDB との関係を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Amazon Timestream for LiveAnalytics availability change",
+        "url": "https://docs.aws.amazon.com/timestream/latest/developerguide/AmazonTimestreamForLiveAnalytics-availability-change.html"
+      },
+      {
+        "title": "Storage",
+        "url": "https://docs.aws.amazon.com/timestream/latest/developerguide/storage.html"
+      },
+      {
+        "title": "Writes",
+        "url": "https://docs.aws.amazon.com/timestream/latest/developerguide/writes.html"
+      },
+      {
+        "title": "Quotas",
+        "url": "https://docs.aws.amazon.com/timestream/latest/developerguide/ts-limits.html"
+      },
+      {
+        "title": "What is Amazon Timestream for LiveAnalytics?",
+        "url": "https://docs.aws.amazon.com/timestream/latest/developerguide/what-is-timestream.html"
+      },
+      {
+        "title": "Timestream for InfluxDB",
+        "url": "https://docs.aws.amazon.com/timestream/latest/developerguide/timestream-for-influxdb.html"
+      }
+    ]
+  }
+}

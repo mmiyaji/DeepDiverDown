@@ -1,0 +1,270 @@
+{
+  "model": "victoriametrics",
+  "name": "VictoriaMetrics の基本アーキテクチャ",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "sources": {
+      "type": "node",
+      "label": "Prometheus・vmagent・各種エージェント",
+      "status": "claim"
+    },
+    "lb": {
+      "type": "node",
+      "label": "ロードバランサー（vmauth・nginx）",
+      "status": "claim"
+    },
+    "vminsert": {
+      "type": "node",
+      "label": "vminsert",
+      "status": "claim"
+    },
+    "vmstorage": {
+      "type": "node",
+      "label": "vmstorage（複数台）",
+      "status": "claim"
+    },
+    "vmselect": {
+      "type": "node",
+      "label": "vmselect",
+      "status": "claim"
+    },
+    "tenant": {
+      "type": "node",
+      "label": "テナント（accountID・projectID）",
+      "status": "claim"
+    },
+    "single": {
+      "type": "node",
+      "label": "単一ノード版",
+      "status": "claim"
+    },
+    "user": {
+      "type": "node",
+      "label": "Grafana・利用者",
+      "status": "claim"
+    },
+    "write-lb": {
+      "type": "link",
+      "label": "Prometheus・vmagent・各種エージェント → ロードバランサー（vmauth・nginx）",
+      "status": "claim"
+    },
+    "lb-insert": {
+      "type": "link",
+      "label": "ロードバランサー（vmauth・nginx） → vminsert",
+      "status": "claim"
+    },
+    "shard": {
+      "type": "link",
+      "label": "vminsert → vmstorage（複数台）",
+      "status": "claim"
+    },
+    "tenant-in": {
+      "type": "link",
+      "label": "vminsert → テナント（accountID・projectID）",
+      "status": "claim"
+    },
+    "fetch": {
+      "type": "link",
+      "label": "vmselect → vmstorage（複数台）",
+      "status": "claim"
+    },
+    "query": {
+      "type": "link",
+      "label": "Grafana・利用者 → vmselect",
+      "status": "claim"
+    },
+    "write-single": {
+      "type": "link",
+      "label": "Prometheus・vmagent・各種エージェント → 単一ノード版",
+      "status": "claim"
+    },
+    "query-single": {
+      "type": "link",
+      "label": "Grafana・利用者 → 単一ノード版",
+      "status": "claim"
+    },
+    "cluster-write-read": {
+      "type": "scenario",
+      "label": "クラスタ版への書き込みと問い合わせ"
+    },
+    "single-node": {
+      "type": "scenario",
+      "label": "単一ノード版で完結させる"
+    },
+    "VM-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "Prometheus の送信先を VictoriaMetrics に置き換える",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "クラスタ版の Graphite と OpenTSDB telnet の取り込み経路は取得範囲で未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "単一ノード版からクラスタ版へ移る具体的な基準（取り込み量以外）は未確認。"
+    },
+    "vm-prom": {
+      "type": "implementation",
+      "impl": "cluster-onprem",
+      "label": "Prometheus・vmagent",
+      "realizes": [
+        "sources"
+      ]
+    },
+    "vm-auth": {
+      "type": "implementation",
+      "impl": "cluster-onprem",
+      "label": "vmauth",
+      "realizes": [
+        "lb"
+      ]
+    },
+    "vm-insert": {
+      "type": "implementation",
+      "impl": "cluster-onprem",
+      "label": "vminsert",
+      "realizes": [
+        "vminsert",
+        "tenant"
+      ]
+    },
+    "vm-storage": {
+      "type": "implementation",
+      "impl": "cluster-onprem",
+      "label": "vmstorage（複数台）",
+      "realizes": [
+        "vmstorage"
+      ]
+    },
+    "vm-select": {
+      "type": "implementation",
+      "impl": "cluster-onprem",
+      "label": "vmselect",
+      "realizes": [
+        "vmselect"
+      ]
+    },
+    "vm-single": {
+      "type": "implementation",
+      "impl": "cluster-onprem",
+      "label": "単一ノード版（この例では未配置）",
+      "realizes": [
+        "single"
+      ]
+    },
+    "vm-grafana": {
+      "type": "implementation",
+      "impl": "cluster-onprem",
+      "label": "Grafana",
+      "realizes": [
+        "user"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-victoriametrics.md#§1": [
+      "model"
+    ],
+    "docs/reference-victoriametrics.md": [
+      "model",
+      "sources",
+      "lb",
+      "vminsert",
+      "vmstorage",
+      "vmselect",
+      "tenant",
+      "single",
+      "user",
+      "write-lb",
+      "lb-insert",
+      "shard",
+      "tenant-in",
+      "fetch",
+      "query",
+      "write-single",
+      "query-single",
+      "cluster-write-read",
+      "single-node",
+      "VM-01",
+      "vm-prom",
+      "vm-auth",
+      "vm-insert",
+      "vm-storage",
+      "vm-select",
+      "vm-single",
+      "vm-grafana"
+    ],
+    "docs/reference-victoriametrics.md#§5": [
+      "sources",
+      "write-lb",
+      "write-single",
+      "VM-01"
+    ],
+    "docs/reference-victoriametrics.md#§3": [
+      "lb",
+      "vminsert",
+      "vmstorage",
+      "vmselect",
+      "lb-insert",
+      "shard",
+      "fetch",
+      "query",
+      "cluster-write-read"
+    ],
+    "docs/reference-victoriametrics.md#§4": [
+      "vmstorage",
+      "tenant",
+      "tenant-in"
+    ],
+    "docs/reference-victoriametrics.md#§2": [
+      "single",
+      "user",
+      "query-single",
+      "single-node"
+    ],
+    "docs/reference-victoriametrics.md#§6": [
+      "single"
+    ],
+    "docs/reference-victoriametrics.md#§7": [
+      "vm-prom",
+      "vm-auth",
+      "vm-insert",
+      "vm-storage",
+      "vm-select",
+      "vm-single",
+      "vm-grafana"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "時系列データ",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "VictoriaMetrics",
+    "role": "overview",
+    "order": 60,
+    "objectives": [
+      "vminsert・vmstorage・vmselect の役割とポートを区別する",
+      "Prometheus remote write などの取り込み経路を確認する",
+      "単一ノード版とクラスタ版の違いを確認する"
+    ],
+    "sources": [
+      {
+        "title": "Single-node VictoriaMetrics",
+        "url": "https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/"
+      },
+      {
+        "title": "Cluster version",
+        "url": "https://docs.victoriametrics.com/victoriametrics/cluster-victoriametrics/"
+      },
+      {
+        "title": "Prometheus integration",
+        "url": "https://docs.victoriametrics.com/victoriametrics/integrations/prometheus/"
+      }
+    ]
+  }
+}

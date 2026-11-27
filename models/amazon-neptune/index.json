@@ -1,0 +1,309 @@
+{
+  "model": "amazon-neptune",
+  "name": "Amazon Neptune の基本アーキテクチャ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "app": {
+      "type": "node",
+      "label": "クライアントアプリ",
+      "status": "claim"
+    },
+    "cluster-ep": {
+      "type": "node",
+      "label": "クラスターエンドポイント",
+      "status": "claim"
+    },
+    "reader-ep": {
+      "type": "node",
+      "label": "リーダーエンドポイント",
+      "status": "claim"
+    },
+    "writer": {
+      "type": "node",
+      "label": "ライター（プライマリ）",
+      "status": "claim"
+    },
+    "readers": {
+      "type": "node",
+      "label": "リーダー（最大 15 台）",
+      "status": "claim"
+    },
+    "volume": {
+      "type": "node",
+      "label": "クラスターボリューム",
+      "status": "claim"
+    },
+    "pg": {
+      "type": "node",
+      "label": "プロパティグラフ",
+      "status": "claim"
+    },
+    "rdf": {
+      "type": "node",
+      "label": "RDF グラフ",
+      "status": "claim"
+    },
+    "analytics": {
+      "type": "node",
+      "label": "Neptune Analytics",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "クライアントアプリ → クラスターエンドポイント",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "クライアントアプリ → リーダーエンドポイント",
+      "status": "claim"
+    },
+    "to-writer": {
+      "type": "link",
+      "label": "クラスターエンドポイント → ライター（プライマリ）",
+      "status": "claim"
+    },
+    "to-readers": {
+      "type": "link",
+      "label": "リーダーエンドポイント → リーダー（最大 15 台）",
+      "status": "claim"
+    },
+    "writer-vol": {
+      "type": "link",
+      "label": "ライター（プライマリ） → クラスターボリューム",
+      "status": "claim"
+    },
+    "readers-vol": {
+      "type": "link",
+      "label": "リーダー（最大 15 台） → クラスターボリューム",
+      "status": "claim"
+    },
+    "hold-pg": {
+      "type": "link",
+      "label": "クラスターボリューム → プロパティグラフ",
+      "status": "claim"
+    },
+    "hold-rdf": {
+      "type": "link",
+      "label": "クラスターボリューム → RDF グラフ",
+      "status": "claim"
+    },
+    "load-analytics": {
+      "type": "link",
+      "label": "クラスターボリューム → Neptune Analytics",
+      "status": "claim"
+    },
+    "write-and-read": {
+      "type": "scenario",
+      "label": "ライターで書き、リーダーで読む"
+    },
+    "NP-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "読み取りをリーダーに分ける",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "プロパティグラフと RDF を同じグラフで混在させられるかは公式資料で未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Neptune Analytics の提供リージョン、対応言語（openCypher 以外）、課金単位は今回の資料で未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Serverless と Global Database は今回の取得範囲になく未確認。"
+    },
+    "np-app": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "クライアントアプリ",
+      "realizes": [
+        "app"
+      ]
+    },
+    "np-cep": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "クラスターエンドポイント",
+      "realizes": [
+        "cluster-ep"
+      ]
+    },
+    "np-rep": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "リーダーエンドポイント",
+      "realizes": [
+        "reader-ep"
+      ]
+    },
+    "np-writer": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "ライター（プライマリ DB インスタンス）",
+      "realizes": [
+        "writer",
+        "pg",
+        "rdf"
+      ]
+    },
+    "np-reader": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "リーダー（リードレプリカ）",
+      "realizes": [
+        "readers"
+      ]
+    },
+    "np-volume": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "クラスターボリューム（3 AZ・6 コピー）",
+      "realizes": [
+        "volume"
+      ]
+    },
+    "np-s3": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "S3 のバックアップ",
+      "realizes": []
+    },
+    "np-analytics": {
+      "type": "implementation",
+      "impl": "aws-cluster",
+      "label": "Neptune Analytics のグラフ",
+      "realizes": [
+        "analytics"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-amazon-neptune.md#§1": [
+      "model"
+    ],
+    "docs/reference-amazon-neptune.md": [
+      "model",
+      "app",
+      "cluster-ep",
+      "reader-ep",
+      "writer",
+      "readers",
+      "volume",
+      "pg",
+      "rdf",
+      "analytics",
+      "write",
+      "read",
+      "to-writer",
+      "to-readers",
+      "writer-vol",
+      "readers-vol",
+      "hold-pg",
+      "hold-rdf",
+      "load-analytics",
+      "write-and-read",
+      "NP-01",
+      "np-app",
+      "np-cep",
+      "np-rep",
+      "np-writer",
+      "np-reader",
+      "np-volume",
+      "np-s3",
+      "np-analytics"
+    ],
+    "docs/reference-amazon-neptune.md#§7": [
+      "model"
+    ],
+    "docs/reference-amazon-neptune.md#§2": [
+      "app",
+      "pg",
+      "rdf",
+      "hold-pg",
+      "hold-rdf"
+    ],
+    "docs/reference-amazon-neptune.md#§4": [
+      "cluster-ep",
+      "reader-ep",
+      "write",
+      "read",
+      "to-writer",
+      "to-readers",
+      "NP-01"
+    ],
+    "docs/reference-amazon-neptune.md#§3": [
+      "writer",
+      "readers",
+      "readers-vol",
+      "write-and-read"
+    ],
+    "docs/reference-amazon-neptune.md#§5": [
+      "volume",
+      "writer-vol"
+    ],
+    "docs/reference-amazon-neptune.md#§6": [
+      "analytics",
+      "load-analytics"
+    ],
+    "docs/reference-amazon-neptune.md#§8": [
+      "np-app",
+      "np-cep",
+      "np-rep",
+      "np-writer",
+      "np-reader",
+      "np-volume",
+      "np-s3",
+      "np-analytics"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "グラフデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Amazon Neptune",
+    "role": "overview",
+    "order": 70,
+    "objectives": [
+      "ライターとリーダーの役割とエンドポイントの使い分けを区別する",
+      "クラスターボリュームの 6 コピーと 3 AZ を確認する",
+      "プロパティグラフと RDF のクエリ言語の対応と Neptune Analytics との違いを確認する"
+    ],
+    "sources": [
+      {
+        "title": "What Is Amazon Neptune?",
+        "url": "https://docs.aws.amazon.com/neptune/latest/userguide/intro.html"
+      },
+      {
+        "title": "Neptune DB clusters and instances",
+        "url": "https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-db-clusters.html"
+      },
+      {
+        "title": "Neptune endpoints",
+        "url": "https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-endpoints.html"
+      },
+      {
+        "title": "Neptune storage",
+        "reliability and availability": null,
+        "url": "https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-storage.html"
+      },
+      {
+        "title": "Neptune graph data model",
+        "url": "https://docs.aws.amazon.com/neptune/latest/userguide/feature-overview-data-model.html"
+      },
+      {
+        "title": "Neptune Analytics vs Neptune Database",
+        "url": "https://docs.aws.amazon.com/neptune-analytics/latest/userguide/neptune-analytics-vs-neptune-database.html"
+      },
+      {
+        "title": "Neptune endpoints and quotas",
+        "url": "https://docs.aws.amazon.com/general/latest/gr/neptune.html"
+      }
+    ]
+  }
+}

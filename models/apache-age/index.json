@@ -1,0 +1,254 @@
+{
+  "model": "apache-age",
+  "name": "Apache AGE の基本アーキテクチャ",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "sql": {
+      "type": "node",
+      "label": "SQL の実行（PostgreSQL）",
+      "status": "claim"
+    },
+    "cypher": {
+      "type": "node",
+      "label": "AGE 拡張の cypher()",
+      "status": "claim"
+    },
+    "catalog": {
+      "type": "node",
+      "label": "ag_catalog（ag_graph・ag_label）",
+      "status": "claim"
+    },
+    "graphns": {
+      "type": "node",
+      "label": "グラフの名前空間",
+      "status": "claim"
+    },
+    "vlabel": {
+      "type": "node",
+      "label": "頂点ラベルのテーブル",
+      "status": "claim"
+    },
+    "elabel": {
+      "type": "node",
+      "label": "辺ラベルのテーブル",
+      "status": "claim"
+    },
+    "rel": {
+      "type": "node",
+      "label": "通常のテーブル",
+      "status": "claim"
+    },
+    "connect": {
+      "type": "link",
+      "label": "SQL クライアント → SQL の実行（PostgreSQL）",
+      "status": "claim"
+    },
+    "call": {
+      "type": "link",
+      "label": "SQL の実行（PostgreSQL） → AGE 拡張の cypher()",
+      "status": "claim"
+    },
+    "lookup": {
+      "type": "link",
+      "label": "AGE 拡張の cypher() → ag_catalog（ag_graph・ag_label）",
+      "status": "claim"
+    },
+    "use-ns": {
+      "type": "link",
+      "label": "AGE 拡張の cypher() → グラフの名前空間",
+      "status": "claim"
+    },
+    "store-v": {
+      "type": "link",
+      "label": "グラフの名前空間 → 頂点ラベルのテーブル",
+      "status": "claim"
+    },
+    "store-e": {
+      "type": "link",
+      "label": "グラフの名前空間 → 辺ラベルのテーブル",
+      "status": "claim"
+    },
+    "join-rel": {
+      "type": "link",
+      "label": "SQL の実行（PostgreSQL） → 通常のテーブル",
+      "status": "claim"
+    },
+    "create-graph-data": {
+      "type": "scenario",
+      "label": "Cypher の CREATE で頂点と辺を保存する"
+    },
+    "query-with-sql": {
+      "type": "scenario",
+      "label": "グラフの結果を通常のテーブルと組み合わせる"
+    },
+    "AGE-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "同じデータベースでグラフと表を扱う",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "ラベルテーブルの列名は取得した公式資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "対応する PostgreSQL バージョンは README が 11〜18、セットアップ頁が 11〜15 で食い違う。ブランチごとの対応は未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "インデックスと openCypher の対応範囲の公式な制限一覧は未確認。"
+    },
+    "age-client": {
+      "type": "implementation",
+      "impl": "self-hosted-postgres",
+      "label": "psql・アプリケーション",
+      "realizes": [
+        "client"
+      ]
+    },
+    "age-pg": {
+      "type": "implementation",
+      "impl": "self-hosted-postgres",
+      "label": "PostgreSQL サーバー",
+      "realizes": [
+        "sql",
+        "rel"
+      ]
+    },
+    "age-ext": {
+      "type": "implementation",
+      "impl": "self-hosted-postgres",
+      "label": "AGE 拡張",
+      "realizes": [
+        "cypher"
+      ]
+    },
+    "age-store": {
+      "type": "implementation",
+      "impl": "self-hosted-postgres",
+      "label": "ag_catalog とグラフのラベルテーブル",
+      "realizes": [
+        "catalog",
+        "graphns",
+        "vlabel",
+        "elabel"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-apache-age.md#§1": [
+      "model",
+      "rel",
+      "join-rel",
+      "AGE-01"
+    ],
+    "docs/reference-apache-age.md": [
+      "model",
+      "client",
+      "sql",
+      "cypher",
+      "catalog",
+      "graphns",
+      "vlabel",
+      "elabel",
+      "rel",
+      "connect",
+      "call",
+      "lookup",
+      "use-ns",
+      "store-v",
+      "store-e",
+      "join-rel",
+      "create-graph-data",
+      "query-with-sql",
+      "AGE-01",
+      "age-client",
+      "age-pg",
+      "age-ext",
+      "age-store"
+    ],
+    "docs/reference-apache-age.md#§3": [
+      "client",
+      "age-client",
+      "age-ext"
+    ],
+    "docs/reference-apache-age.md#§7": [
+      "sql",
+      "cypher",
+      "connect",
+      "call",
+      "query-with-sql"
+    ],
+    "docs/reference-apache-age.md#§8": [
+      "sql"
+    ],
+    "docs/reference-apache-age.md#§2": [
+      "sql"
+    ],
+    "docs/reference-apache-age.md#§4": [
+      "catalog",
+      "lookup",
+      "use-ns"
+    ],
+    "docs/reference-apache-age.md#§5": [
+      "graphns",
+      "vlabel",
+      "elabel",
+      "store-v",
+      "store-e",
+      "create-graph-data",
+      "age-store"
+    ],
+    "docs/reference-apache-age.md#§6": [
+      "vlabel",
+      "elabel"
+    ],
+    "docs/reference-apache-age.md#§9": [
+      "age-pg"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "グラフデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Apache AGE",
+    "role": "overview",
+    "order": 30,
+    "objectives": [
+      "SQL 内で openCypher を呼ぶ入口を確認する",
+      "ag_catalog の登録情報とラベルテーブルの関係を確認する",
+      "通常のテーブルと同じデータベースで扱う前提と制限を確認する"
+    ],
+    "sources": [
+      {
+        "title": "AGE Manual Overview",
+        "url": "https://age.apache.org/age-manual/master/intro/overview.html"
+      },
+      {
+        "title": "AGE Manual Graphs",
+        "url": "https://age.apache.org/age-manual/master/intro/graphs.html"
+      },
+      {
+        "title": "AGE Manual Data Types",
+        "url": "https://age.apache.org/age-manual/master/intro/types.html"
+      },
+      {
+        "title": "AGE Manual Cypher Query Format",
+        "url": "https://age.apache.org/age-manual/master/intro/cypher.html"
+      },
+      {
+        "title": "apache/age (GitHub)",
+        "url": "https://github.com/apache/age"
+      }
+    ]
+  }
+}

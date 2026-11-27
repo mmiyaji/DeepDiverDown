@@ -1,0 +1,271 @@
+{
+  "model": "apache-ignite",
+  "name": "Apache Ignite の基本アーキテクチャ（2.18 系）",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "アプリケーション",
+      "status": "claim"
+    },
+    "affinity": {
+      "type": "node",
+      "label": "アフィニティ関数",
+      "status": "claim"
+    },
+    "sql": {
+      "type": "node",
+      "label": "SQL エンジン",
+      "status": "claim"
+    },
+    "compute": {
+      "type": "node",
+      "label": "コロケーション計算",
+      "status": "claim"
+    },
+    "partitioned": {
+      "type": "node",
+      "label": "PARTITIONED キャッシュ",
+      "status": "claim"
+    },
+    "replicated": {
+      "type": "node",
+      "label": "REPLICATED キャッシュ",
+      "status": "claim"
+    },
+    "wal": {
+      "type": "node",
+      "label": "WAL",
+      "status": "claim"
+    },
+    "partfiles": {
+      "type": "node",
+      "label": "パーティションファイル",
+      "status": "claim"
+    },
+    "request": {
+      "type": "link",
+      "label": "アプリケーション → アフィニティ関数",
+      "status": "claim"
+    },
+    "query": {
+      "type": "link",
+      "label": "アプリケーション → SQL エンジン",
+      "status": "claim"
+    },
+    "submit": {
+      "type": "link",
+      "label": "アプリケーション → コロケーション計算",
+      "status": "claim"
+    },
+    "route-part": {
+      "type": "link",
+      "label": "アフィニティ関数 → PARTITIONED キャッシュ",
+      "status": "claim"
+    },
+    "map-part": {
+      "type": "link",
+      "label": "SQL エンジン → PARTITIONED キャッシュ",
+      "status": "claim"
+    },
+    "map-repl": {
+      "type": "link",
+      "label": "SQL エンジン → REPLICATED キャッシュ",
+      "status": "claim"
+    },
+    "run-colo": {
+      "type": "link",
+      "label": "コロケーション計算 → PARTITIONED キャッシュ",
+      "status": "claim"
+    },
+    "log-wal": {
+      "type": "link",
+      "label": "PARTITIONED キャッシュ → WAL",
+      "status": "claim"
+    },
+    "log-wal-r": {
+      "type": "link",
+      "label": "REPLICATED キャッシュ → WAL",
+      "status": "claim"
+    },
+    "checkpoint": {
+      "type": "link",
+      "label": "WAL → パーティションファイル",
+      "status": "claim"
+    },
+    "colocated-sql": {
+      "type": "scenario",
+      "label": "コロケーションしたテーブルを SQL で検索する"
+    },
+    "persist-write": {
+      "type": "scenario",
+      "label": "永続化を有効にして書き込む"
+    },
+    "IG-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "データと計算を同じノードに置く",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "Ignite 3 の Raft、スキーマ駆動テーブル、compute の仕様と Ignite 2 からの移行は今回取得した資料になく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "分散 JOIN の挙動とリバランスの詳細は取得範囲になく未確認。"
+    },
+    "ig-app": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "アプリケーション",
+      "realizes": [
+        "client"
+      ]
+    },
+    "ig-node": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "Ignite サーバーノード",
+      "realizes": [
+        "affinity",
+        "sql",
+        "compute",
+        "partitioned",
+        "replicated"
+      ]
+    },
+    "ig-wal": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "ローカルディスクの WAL",
+      "realizes": [
+        "wal"
+      ]
+    },
+    "ig-files": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "ローカルディスクのパーティションファイル",
+      "realizes": [
+        "partfiles"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-apache-ignite.md#§1": [
+      "model"
+    ],
+    "docs/reference-apache-ignite.md": [
+      "model",
+      "client",
+      "affinity",
+      "sql",
+      "compute",
+      "partitioned",
+      "replicated",
+      "wal",
+      "partfiles",
+      "request",
+      "query",
+      "submit",
+      "route-part",
+      "map-part",
+      "map-repl",
+      "run-colo",
+      "log-wal",
+      "log-wal-r",
+      "checkpoint",
+      "colocated-sql",
+      "persist-write",
+      "IG-01",
+      "ig-app",
+      "ig-node",
+      "ig-wal",
+      "ig-files"
+    ],
+    "docs/reference-apache-ignite.md#§7": [
+      "model"
+    ],
+    "docs/reference-apache-ignite.md#§5": [
+      "client",
+      "sql",
+      "query",
+      "map-part",
+      "map-repl"
+    ],
+    "docs/reference-apache-ignite.md#§2": [
+      "affinity",
+      "partitioned",
+      "replicated",
+      "request",
+      "route-part"
+    ],
+    "docs/reference-apache-ignite.md#§6": [
+      "compute",
+      "submit",
+      "run-colo",
+      "colocated-sql",
+      "IG-01"
+    ],
+    "docs/reference-apache-ignite.md#§3": [
+      "partitioned"
+    ],
+    "docs/reference-apache-ignite.md#§4": [
+      "wal",
+      "partfiles",
+      "log-wal",
+      "log-wal-r",
+      "checkpoint",
+      "persist-write"
+    ],
+    "docs/reference-apache-ignite.md#§8": [
+      "ig-app",
+      "ig-node",
+      "ig-wal",
+      "ig-files"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "インメモリデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Apache Ignite",
+    "role": "overview",
+    "order": 60,
+    "objectives": [
+      "PARTITIONED と REPLICATED の違いを確認する",
+      "ネイティブ永続化の WAL とチェックポイントの流れを確認する",
+      "コロケーションで SQL と計算がデータの近くで動く仕組みを確認する"
+    ],
+    "sources": [
+      {
+        "title": "Data Partitioning (2.18)",
+        "url": "https://ignite.apache.org/docs/ignite2/latest/data-modeling/data-partitioning"
+      },
+      {
+        "title": "Native Persistence (2.18)",
+        "url": "https://ignite.apache.org/docs/ignite2/latest/persistence/native-persistence"
+      },
+      {
+        "title": "Affinity Colocation (2.18)",
+        "url": "https://ignite.apache.org/docs/ignite2/latest/data-modeling/affinity-collocation"
+      },
+      {
+        "title": "Colocating Computations With Data (2.18)",
+        "url": "https://ignite.apache.org/docs/ignite2/latest/distributed-computing/collocated-computations"
+      },
+      {
+        "title": "Ignite 2 SQL (2.18)",
+        "url": "https://ignite.apache.org/docs/ignite2/latest/SQL/sql-introduction"
+      },
+      {
+        "title": "Apache Ignite 3 docs",
+        "url": "https://ignite.apache.org/docs/ignite3/latest/"
+      }
+    ]
+  }
+}

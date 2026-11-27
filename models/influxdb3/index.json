@@ -1,0 +1,264 @@
+{
+  "model": "influxdb3",
+  "name": "InfluxDB 3 の基本アーキテクチャ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "writers": {
+      "type": "node",
+      "label": "書き込み元",
+      "status": "claim"
+    },
+    "ingest": {
+      "type": "node",
+      "label": "書き込みバッファと WAL",
+      "status": "claim"
+    },
+    "model": {
+      "type": "node",
+      "label": "データベース・テーブル・列",
+      "status": "claim"
+    },
+    "buffer": {
+      "type": "node",
+      "label": "クエリ可能バッファ",
+      "status": "claim"
+    },
+    "store": {
+      "type": "node",
+      "label": "オブジェクトストアの Parquet",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "クエリエンジン（DataFusion）",
+      "status": "claim"
+    },
+    "clients": {
+      "type": "node",
+      "label": "検索クライアント",
+      "status": "claim"
+    },
+    "pe": {
+      "type": "node",
+      "label": "プロセシングエンジン",
+      "status": "claim"
+    },
+    "compactor": {
+      "type": "node",
+      "label": "コンパクター（Enterprise）",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "書き込み元 → 書き込みバッファと WAL",
+      "status": "claim"
+    },
+    "apply-model": {
+      "type": "link",
+      "label": "書き込みバッファと WAL → データベース・テーブル・列",
+      "status": "claim"
+    },
+    "to-buffer": {
+      "type": "link",
+      "label": "書き込みバッファと WAL → クエリ可能バッファ",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "クエリ可能バッファ → オブジェクトストアの Parquet",
+      "status": "claim"
+    },
+    "read-buffer": {
+      "type": "link",
+      "label": "クエリエンジン（DataFusion） → クエリ可能バッファ",
+      "status": "claim"
+    },
+    "read-store": {
+      "type": "link",
+      "label": "クエリエンジン（DataFusion） → オブジェクトストアの Parquet",
+      "status": "claim"
+    },
+    "serve": {
+      "type": "link",
+      "label": "クエリエンジン（DataFusion） → 検索クライアント",
+      "status": "claim"
+    },
+    "plugin-write": {
+      "type": "link",
+      "label": "プロセシングエンジン → 書き込みバッファと WAL",
+      "status": "claim"
+    },
+    "compact": {
+      "type": "link",
+      "label": "コンパクター（Enterprise） → オブジェクトストアの Parquet",
+      "status": "claim"
+    },
+    "write-and-query": {
+      "type": "scenario",
+      "label": "書き込んで検索する"
+    },
+    "IX-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "直近のデータを書いてすぐ検索する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "書き込み API のエンドポイントと形式は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "Core と Enterprise の機能差の詳細と、コンパクターとオブジェクトストアの接続の詳細は未確認。"
+    },
+    "ix-telegraf": {
+      "type": "implementation",
+      "impl": "core-s3",
+      "label": "Telegraf",
+      "realizes": [
+        "writers"
+      ]
+    },
+    "ix-core": {
+      "type": "implementation",
+      "impl": "core-s3",
+      "label": "InfluxDB 3 Core プロセス",
+      "realizes": [
+        "ingest",
+        "model",
+        "buffer",
+        "query",
+        "pe"
+      ]
+    },
+    "ix-compactor": {
+      "type": "implementation",
+      "impl": "core-s3",
+      "label": "コンパクター（Enterprise 限定、この例では未配置）",
+      "realizes": [
+        "compactor"
+      ]
+    },
+    "ix-store": {
+      "type": "implementation",
+      "impl": "core-s3",
+      "label": "S3 互換オブジェクトストア",
+      "realizes": [
+        "store"
+      ]
+    },
+    "ix-grafana": {
+      "type": "implementation",
+      "impl": "core-s3",
+      "label": "Grafana",
+      "realizes": [
+        "clients"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-influxdb3.md#§1": [
+      "model"
+    ],
+    "docs/reference-influxdb3.md": [
+      "model",
+      "writers",
+      "ingest",
+      "buffer",
+      "store",
+      "query",
+      "clients",
+      "pe",
+      "compactor",
+      "write",
+      "apply-model",
+      "to-buffer",
+      "persist",
+      "read-buffer",
+      "read-store",
+      "serve",
+      "plugin-write",
+      "compact",
+      "write-and-query",
+      "IX-01",
+      "ix-telegraf",
+      "ix-core",
+      "ix-compactor",
+      "ix-store",
+      "ix-grafana"
+    ],
+    "docs/reference-influxdb3.md#§3": [
+      "writers",
+      "ingest",
+      "write"
+    ],
+    "docs/reference-influxdb3.md#§2": [
+      "model",
+      "apply-model"
+    ],
+    "docs/reference-influxdb3.md#§4": [
+      "buffer",
+      "store",
+      "to-buffer",
+      "persist",
+      "read-store",
+      "write-and-query",
+      "IX-01"
+    ],
+    "docs/reference-influxdb3.md#§5": [
+      "query",
+      "clients",
+      "read-buffer",
+      "serve"
+    ],
+    "docs/reference-influxdb3.md#§6": [
+      "pe",
+      "plugin-write"
+    ],
+    "docs/reference-influxdb3.md#§7": [
+      "compactor",
+      "compact"
+    ],
+    "docs/reference-influxdb3.md#§8": [
+      "ix-telegraf",
+      "ix-core",
+      "ix-compactor",
+      "ix-store",
+      "ix-grafana"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "時系列データ",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "InfluxDB 3",
+    "role": "overview",
+    "order": 40,
+    "objectives": [
+      "書き込み・検索・永続化の経路を区別する",
+      "データモデルとプロセシングエンジンの位置を確認する",
+      "Core と Enterprise のノード構成の違いを確認する"
+    ],
+    "sources": [
+      {
+        "title": "InfluxDB 3 Core and Enterprise architecture",
+        "url": "https://www.influxdata.com/blog/influxdb3-core-enterprise-architecture"
+      },
+      {
+        "title": "Get started with InfluxDB 3 Core",
+        "url": "https://docs.influxdata.com/influxdb3/core/get-started/"
+      },
+      {
+        "title": "InfluxDB 3 Core durability",
+        "url": "https://docs.influxdata.com/influxdb3/core/reference/internals/durability/"
+      },
+      {
+        "title": "Enterprise clustering",
+        "url": "https://docs.influxdata.com/influxdb3/enterprise/admin/clustering/"
+      }
+    ]
+  }
+}

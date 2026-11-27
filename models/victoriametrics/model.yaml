@@ -1,0 +1,96 @@
+name: VictoriaMetrics の基本アーキテクチャ
+description: 取り込み、保存、問い合わせを分けたクラスタ版の構成と、1 つの実行ファイルで動く単一ノード版との違いを示す。
+reference:
+  objectives: [vminsert・vmstorage・vmselect の役割とポートを区別する, Prometheus remote write などの取り込み経路を確認する, 単一ノード版とクラスタ版の違いを確認する]
+  sources:
+    - {title: Single-node VictoriaMetrics, url: https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/}
+    - {title: Cluster version, url: https://docs.victoriametrics.com/victoriametrics/cluster-victoriametrics/}
+    - {title: Prometheus integration, url: https://docs.victoriametrics.com/victoriametrics/integrations/prometheus/}
+sources: [docs/reference-victoriametrics.md]
+evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§1}]
+tiers:
+  - {id: flow, label: 取り込み・保存・問い合わせ, z: 0, size: [30, 11]}
+nodes:
+  sources: {label: Prometheus・vmagent・各種エージェント, kind: client, tier: flow, x: 1, y: 2, description: remote write、InfluxDB、OpenTelemetry などで書き込む。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§5}]}
+  lb: {label: ロードバランサー（vmauth・nginx）, kind: service, tier: flow, x: 7, y: 5, description: vminsert と vmselect が複数台のとき、/insert を 8480、/select を 8481 に振り分ける。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]}
+  vminsert: {label: vminsert, kind: service, tier: flow, x: 13, y: 2, description: 取り込みを受け、メトリック名とラベルの一貫性ハッシュで vmstorage に振り分ける。HTTP 8480。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]}
+  vmstorage: {label: vmstorage（複数台）, kind: db, tier: flow, x: 19, y: 5, description: 生データを保存する。vmstorage 同士は通信しない。-replicationFactor で複数台に複製できる。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}, {type: doc, ref: docs/reference-victoriametrics.md#§4}]}
+  vmselect: {label: vmselect, kind: service, tier: flow, x: 19, y: 8.5, description: 全 vmstorage からデータを集めて問い合わせに答える。HTTP 8481。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]}
+  tenant: {label: テナント（accountID・projectID）, kind: db, tier: flow, x: 13, y: 8.5, description: URL の accountID で書き込み先と読み出し先を分ける。projectID の既定は 0。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§4}]}
+  single: {label: 単一ノード版, kind: service, tier: flow, x: 25, y: 1.5, description: 1 つの実行ファイルで取り込みと問い合わせを行う。ポート 8428。取り込みが 1 秒あたり 100 万データポイント未満なら公式資料が勧める。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§2}, {type: doc, ref: docs/reference-victoriametrics.md#§6}]}
+  user: {label: Grafana・利用者, kind: actor, tier: flow, x: 25, y: 8.5, description: MetricsQL または PromQL で問い合わせる。Grafana の接続設定は未確認。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§2}]}
+links:
+  - {id: write-lb, from: sources, to: lb, label: remote write で書き込み, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§5}]}
+  - {id: lb-insert, from: lb, to: vminsert, label: /insert を振り分け, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]}
+  - {id: shard, from: vminsert, to: vmstorage, label: ハッシュで振り分けて保存（8400）, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]}
+  - {id: tenant-in, from: vminsert, to: tenant, label: accountID を判別, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§4}]}
+  - {id: fetch, from: vmselect, to: vmstorage, label: データを取得（8401）, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]}
+  - {id: query, from: user, to: vmselect, label: 問い合わせ（/select）, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]}
+  - {id: write-single, from: sources, to: single, label: /api/v1/write に書き込み, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§5}]}
+  - {id: query-single, from: user, to: single, label: 問い合わせ（8428）, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§2}]}
+scenarios:
+  - id: cluster-write-read
+    label: クラスタ版への書き込みと問い合わせ
+    evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§3}]
+    steps:
+      - {links: [write-lb, lb-insert], note: Prometheus が vminsert の /insert/<tenant>/prometheus に remote write する。}
+      - {links: [shard], note: vminsert が一貫性ハッシュで vmstorage を選んで保存する。}
+      - {links: [query, fetch], note: vmselect が全 vmstorage からデータを集めて返す。}
+  - id: single-node
+    label: 単一ノード版で完結させる
+    evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§2}]
+    steps:
+      - {links: [write-single, query-single], note: 同じ 8428 ポートで書き込みと問い合わせを行う。}
+requirements:
+  - {id: VM-01, kind: usecase, title: Prometheus の送信先を VictoriaMetrics に置き換える, text: remote write の URL を変えて書き込む。, links: [write-lb, write-single], evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§5}]}
+unknowns:
+  - {id: UNK-01, text: クラスタ版の Graphite と OpenTSDB telnet の取り込み経路は取得範囲で未確認。, refs: [vminsert]}
+  - {id: UNK-02, text: 単一ノード版からクラスタ版へ移る具体的な基準（取り込み量以外）は未確認。, refs: [single]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: cluster-onprem
+    label: 自前のクラスタ版（vmauth・vminsert・vmstorage・vmselect）
+    description: Prometheus からの remote write を vmauth 経由で vminsert に受け、複数の vmstorage に保存する自前構成の例。代表例であり、導入事例ではない。
+    sources:
+      - {title: Cluster version, url: https://docs.victoriametrics.com/victoriametrics/cluster-victoriametrics/}
+      - {title: Prometheus integration, url: https://docs.victoriametrics.com/victoriametrics/integrations/prometheus/}
+    tiers:
+      - {id: diagram, label: 取り込み・保存・問い合わせ, z: 0, size: [28, 11]}
+    nodes:
+      vm-prom: {label: Prometheus・vmagent, kind: client, tier: diagram, x: 1, y: 2, realizes: [sources], description: remote write で vmauth 経由の vminsert に送る。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§7}]}
+      vm-auth: {label: vmauth, kind: service, tier: diagram, x: 7, y: 5, realizes: [lb], description: /insert と /select を振り分ける。設定は未確認。, management: {type: customer, scope: "Customer operates the load balancer and its configuration."}, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§7}]}
+      vm-insert: {label: vminsert, kind: service, tier: diagram, x: 13, y: 2, realizes: [vminsert, tenant], description: 取り込みを受けて vmstorage に振り分ける。, management: {type: customer, scope: "Customer operates the vminsert nodes."}, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§7}]}
+      vm-storage: {label: vmstorage（複数台）, kind: db, tier: diagram, x: 19, y: 5, realizes: [vmstorage], description: 生データを保存する。台数は未確認。, management: {type: customer, scope: "Customer operates the storage nodes, disks and backups."}, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§7}]}
+      vm-select: {label: vmselect, kind: service, tier: diagram, x: 19, y: 8.5, realizes: [vmselect], description: 問い合わせを受けて vmstorage からデータを集める。, management: {type: customer, scope: "Customer operates the vmselect nodes."}, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§7}]}
+      vm-single: {label: 単一ノード版（この例では未配置）, kind: service, tier: diagram, x: 13, y: 8.5, realizes: [single], description: クラスタ版の代わりに使う単一ノード版。この例はクラスタ版なので動かさない。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§7}]}
+      vm-grafana: {label: Grafana, kind: client, tier: diagram, x: 25, y: 8.5, realizes: [user], description: vmselect に問い合わせる。接続設定は未確認。, evidence: [{type: doc, ref: docs/reference-victoriametrics.md#§7}]}
+    links: []
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vm-prom, vm-auth, vm-insert, vm-storage, vm-select, vm-single]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 取り込み・保存・問い合わせ, z: 0, size: [28, 11]}
+      nodes:
+        vm-prom: {tier: diagram, x: 1, y: 2}
+        vm-auth: {tier: diagram, x: 7, y: 5}
+        vm-insert: {tier: diagram, x: 13, y: 2}
+        vm-storage: {tier: diagram, x: 19, y: 5}
+        vm-select: {tier: diagram, x: 19, y: 8.5}
+        vm-single: {tier: diagram, x: 13, y: 8.5}
+        vm-grafana: {tier: diagram, x: 25, y: 8.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [vm-prom, vm-auth, vm-insert, vm-storage, vm-select, vm-single]}
+    layout3d:
+      tiers:
+        - {id: ingest, label: 取り込み, z: 0, size: [12, 11]}
+        - {id: store, label: 保存・問い合わせ, z: 0, origin: [14, 0], size: [12, 11]}
+      nodes:
+        vm-prom: {tier: ingest, x: 2, y: 2}
+        vm-auth: {tier: ingest, x: 6, y: 5}
+        vm-insert: {tier: ingest, x: 10, y: 2}
+        vm-storage: {tier: store, x: 3, y: 5}
+        vm-select: {tier: store, x: 3, y: 8.5}
+        vm-single: {tier: ingest, x: 10, y: 8.5}
+        vm-grafana: {tier: store, x: 9, y: 8.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [ingest, store], nodes: [vm-prom, vm-auth, vm-insert, vm-storage, vm-select, vm-single]}

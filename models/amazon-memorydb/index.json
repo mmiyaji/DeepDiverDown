@@ -1,0 +1,300 @@
+{
+  "model": "amazon-memorydb",
+  "name": "Amazon MemoryDB の基本アーキテクチャ",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "app": {
+      "type": "node",
+      "label": "クライアントアプリ",
+      "status": "claim"
+    },
+    "acl": {
+      "type": "node",
+      "label": "ACL とユーザー",
+      "status": "claim"
+    },
+    "primary": {
+      "type": "node",
+      "label": "シャード 1 のプライマリ",
+      "status": "claim"
+    },
+    "replica": {
+      "type": "node",
+      "label": "シャード 1 のレプリカ（最大 5 台）",
+      "status": "claim"
+    },
+    "primary2": {
+      "type": "node",
+      "label": "シャード 2 のプライマリ",
+      "status": "claim"
+    },
+    "txlog": {
+      "type": "node",
+      "label": "マルチ AZ のトランザクションログ",
+      "status": "claim"
+    },
+    "snapshot": {
+      "type": "node",
+      "label": "S3 の自動スナップショット",
+      "status": "claim"
+    },
+    "auth": {
+      "type": "link",
+      "label": "クライアントアプリ → ACL とユーザー",
+      "status": "claim"
+    },
+    "perm": {
+      "type": "link",
+      "label": "ACL とユーザー → シャード 1 のプライマリ",
+      "status": "claim"
+    },
+    "write": {
+      "type": "link",
+      "label": "クライアントアプリ → シャード 1 のプライマリ",
+      "status": "claim"
+    },
+    "read": {
+      "type": "link",
+      "label": "クライアントアプリ → シャード 1 のレプリカ（最大 5 台）",
+      "status": "claim"
+    },
+    "write2": {
+      "type": "link",
+      "label": "クライアントアプリ → シャード 2 のプライマリ",
+      "status": "claim"
+    },
+    "log1": {
+      "type": "link",
+      "label": "シャード 1 のプライマリ → マルチ AZ のトランザクションログ",
+      "status": "claim"
+    },
+    "log2": {
+      "type": "link",
+      "label": "シャード 2 のプライマリ → マルチ AZ のトランザクションログ",
+      "status": "claim"
+    },
+    "apply": {
+      "type": "link",
+      "label": "マルチ AZ のトランザクションログ → シャード 1 のレプリカ（最大 5 台）",
+      "status": "claim"
+    },
+    "restore": {
+      "type": "link",
+      "label": "マルチ AZ のトランザクションログ → シャード 1 のプライマリ",
+      "status": "claim"
+    },
+    "snap": {
+      "type": "link",
+      "label": "マルチ AZ のトランザクションログ → S3 の自動スナップショット",
+      "status": "claim"
+    },
+    "write-path": {
+      "type": "scenario",
+      "label": "書き込みが永続化されるまで"
+    },
+    "recovery": {
+      "type": "scenario",
+      "label": "ノード再起動後の復旧"
+    },
+    "MD-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "耐久性のある主データベースとして使う",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "トランザクションログの内部構成（ノード数、ストレージ種別）は公式資料で未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "7.3 より新しいエンジン版と GovCloud などの提供有無は未確認。"
+    },
+    "mdb-app": {
+      "type": "implementation",
+      "impl": "aws-vpc",
+      "label": "VPC 内のアプリ",
+      "realizes": [
+        "app"
+      ]
+    },
+    "mdb-acl": {
+      "type": "implementation",
+      "impl": "aws-vpc",
+      "label": "ACL とユーザー",
+      "realizes": [
+        "acl"
+      ]
+    },
+    "mdb-p1": {
+      "type": "implementation",
+      "impl": "aws-vpc",
+      "label": "シャード 1 のプライマリ（ノード）",
+      "realizes": [
+        "primary"
+      ]
+    },
+    "mdb-r1": {
+      "type": "implementation",
+      "impl": "aws-vpc",
+      "label": "シャード 1 のレプリカ（ノード）",
+      "realizes": [
+        "replica"
+      ]
+    },
+    "mdb-p2": {
+      "type": "implementation",
+      "impl": "aws-vpc",
+      "label": "シャード 2 のプライマリ（ノード）",
+      "realizes": [
+        "primary2"
+      ]
+    },
+    "mdb-log": {
+      "type": "implementation",
+      "impl": "aws-vpc",
+      "label": "マルチ AZ のトランザクションログ",
+      "realizes": [
+        "txlog"
+      ]
+    },
+    "mdb-s3": {
+      "type": "implementation",
+      "impl": "aws-vpc",
+      "label": "S3 のスナップショット",
+      "realizes": [
+        "snapshot"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-amazon-memorydb.md#§1": [
+      "model",
+      "MD-01"
+    ],
+    "docs/reference-amazon-memorydb.md": [
+      "model",
+      "app",
+      "acl",
+      "primary",
+      "replica",
+      "primary2",
+      "txlog",
+      "snapshot",
+      "auth",
+      "perm",
+      "write",
+      "read",
+      "write2",
+      "log1",
+      "log2",
+      "apply",
+      "restore",
+      "snap",
+      "write-path",
+      "recovery",
+      "MD-01",
+      "mdb-app",
+      "mdb-acl",
+      "mdb-p1",
+      "mdb-r1",
+      "mdb-p2",
+      "mdb-log",
+      "mdb-s3"
+    ],
+    "docs/reference-amazon-memorydb.md#§2": [
+      "app",
+      "acl",
+      "primary",
+      "replica",
+      "primary2",
+      "write",
+      "write2"
+    ],
+    "docs/reference-amazon-memorydb.md#§4": [
+      "app",
+      "primary",
+      "replica",
+      "read",
+      "apply",
+      "write-path",
+      "recovery"
+    ],
+    "docs/reference-amazon-memorydb.md#§6": [
+      "acl",
+      "snapshot",
+      "auth",
+      "perm",
+      "snap"
+    ],
+    "docs/reference-amazon-memorydb.md#§3": [
+      "primary",
+      "txlog",
+      "write",
+      "log1",
+      "log2",
+      "restore",
+      "write-path",
+      "recovery",
+      "MD-01"
+    ],
+    "docs/reference-amazon-memorydb.md#§5": [
+      "txlog"
+    ],
+    "docs/reference-amazon-memorydb.md#§7": [
+      "mdb-app",
+      "mdb-acl",
+      "mdb-p1",
+      "mdb-r1",
+      "mdb-p2",
+      "mdb-log",
+      "mdb-s3"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "インメモリデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Amazon MemoryDB",
+    "role": "overview",
+    "order": 70,
+    "objectives": [
+      "シャード・プライマリ・レプリカの役割を区別する",
+      "書き込みがトランザクションログに残ってから成功を返す流れを確認する",
+      "ElastiCache との位置づけの違いを確認する"
+    ],
+    "sources": [
+      {
+        "title": "What is MemoryDB",
+        "url": "https://docs.aws.amazon.com/memorydb/latest/devguide/what-is-memorydb.html"
+      },
+      {
+        "title": "MemoryDB core components",
+        "url": "https://docs.aws.amazon.com/memorydb/latest/devguide/components.html"
+      },
+      {
+        "title": "MemoryDB features",
+        "url": "https://docs.aws.amazon.com/memorydb/latest/devguide/servicename-feature-overview.html"
+      },
+      {
+        "title": "Consistency",
+        "url": "https://docs.aws.amazon.com/memorydb/latest/devguide/consistency.html"
+      },
+      {
+        "title": "Related services (MemoryDB and ElastiCache)",
+        "url": "https://docs.aws.amazon.com/memorydb/latest/devguide/related-services-choose-between-memorydb-and-redis.html"
+      },
+      {
+        "title": "Engine versions",
+        "url": "https://docs.aws.amazon.com/memorydb/latest/devguide/engine-versions.html"
+      },
+      {
+        "title": "Regions and Availability Zones",
+        "url": "https://docs.aws.amazon.com/memorydb/latest/devguide/regionsandazs.html"
+      }
+    ]
+  }
+}

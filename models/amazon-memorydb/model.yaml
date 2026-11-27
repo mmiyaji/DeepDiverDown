@@ -1,0 +1,96 @@
+name: Amazon MemoryDB の基本アーキテクチャ
+description: シャードのプライマリとレプリカ、書き込みを永続化するマルチ AZ のトランザクションログ、S3 のスナップショットの関係を示す。
+reference:
+  objectives: [シャード・プライマリ・レプリカの役割を区別する, 書き込みがトランザクションログに残ってから成功を返す流れを確認する, ElastiCache との位置づけの違いを確認する]
+  sources:
+    - {title: What is MemoryDB, url: https://docs.aws.amazon.com/memorydb/latest/devguide/what-is-memorydb.html}
+    - {title: MemoryDB core components, url: https://docs.aws.amazon.com/memorydb/latest/devguide/components.html}
+    - {title: MemoryDB features, url: https://docs.aws.amazon.com/memorydb/latest/devguide/servicename-feature-overview.html}
+    - {title: Consistency, url: https://docs.aws.amazon.com/memorydb/latest/devguide/consistency.html}
+    - {title: Related services (MemoryDB and ElastiCache), url: https://docs.aws.amazon.com/memorydb/latest/devguide/related-services-choose-between-memorydb-and-redis.html}
+    - {title: Engine versions, url: https://docs.aws.amazon.com/memorydb/latest/devguide/engine-versions.html}
+    - {title: Regions and Availability Zones, url: https://docs.aws.amazon.com/memorydb/latest/devguide/regionsandazs.html}
+sources: [docs/reference-amazon-memorydb.md]
+evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§1}]
+tiers:
+  - {id: flow, label: クライアント・シャード・ログ, z: 0, size: [28, 11]}
+nodes:
+  app: {label: クライアントアプリ, kind: client, tier: flow, x: 1, y: 5.5, description: Valkey / Redis OSS のクライアントで接続する。書き込みはプライマリ、READONLY の読み取りはレプリカに向ける。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§2}, {type: doc, ref: docs/reference-amazon-memorydb.md#§4}]}
+  acl: {label: ACL とユーザー, kind: service, tier: flow, x: 7, y: 1.5, description: ユーザー名とパスワードで認証し、ACL のルールでコマンドとキーの権限を決める。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§2}, {type: doc, ref: docs/reference-amazon-memorydb.md#§6}]}
+  primary: {label: シャード 1 のプライマリ, kind: db, tier: flow, x: 13, y: 3, description: 読み書きを受ける。書き込みはトランザクションログに保存してから成功を返す。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§2}, {type: doc, ref: docs/reference-amazon-memorydb.md#§3}, {type: doc, ref: docs/reference-amazon-memorydb.md#§4}]}
+  replica: {label: シャード 1 のレプリカ（最大 5 台）, kind: db, tier: flow, x: 13, y: 8, description: 読み取りだけを受ける。結果整合で、プライマリの昇格候補になる。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§2}, {type: doc, ref: docs/reference-amazon-memorydb.md#§4}]}
+  primary2: {label: シャード 2 のプライマリ, kind: db, tier: flow, x: 13, y: 10.5, description: データセットをキーで分割した別のシャード。クラスターは最大 500 シャード。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§2}]}
+  txlog: {label: マルチ AZ のトランザクションログ, kind: db, tier: flow, x: 20, y: 5.5, description: 書き込みの永続化先。再起動、フェイルオーバー、復旧に使う。内部構成は未確認。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§3}, {type: doc, ref: docs/reference-amazon-memorydb.md#§5}]}
+  snapshot: {label: S3 の自動スナップショット, kind: db, tier: flow, x: 26, y: 5.5, description: スナップショットを S3 に保存する。保持は最長 35 日。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§6}]}
+links:
+  - {id: auth, from: app, to: acl, label: ユーザー認証, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§6}]}
+  - {id: perm, from: acl, to: primary, label: 権限を適用, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§6}]}
+  - {id: write, from: app, to: primary, label: 書き込み, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§2}, {type: doc, ref: docs/reference-amazon-memorydb.md#§3}]}
+  - {id: read, from: app, to: replica, label: 読み取り（READONLY）, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§4}]}
+  - {id: write2, from: app, to: primary2, label: 別シャードへ書き込み, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§2}]}
+  - {id: log1, from: primary, to: txlog, label: 書き込みを保存, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§3}]}
+  - {id: log2, from: primary2, to: txlog, label: 書き込みを保存, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§3}]}
+  - {id: apply, from: txlog, to: replica, label: 順序どおりに適用, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§4}]}
+  - {id: restore, from: txlog, to: primary, label: 再起動・復旧時に再生, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§3}]}
+  - {id: snap, from: txlog, to: snapshot, label: スナップショット作成, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§6}]}
+scenarios:
+  - id: write-path
+    label: 書き込みが永続化されるまで
+    evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§3}, {type: doc, ref: docs/reference-amazon-memorydb.md#§4}]
+    steps:
+      - {links: [auth, perm], note: クライアントが ACL のユーザーで認証し、コマンドの権限を確認される。}
+      - {links: [write, log1], note: プライマリが書き込みをトランザクションログに保存する。}
+      - {links: [apply], note: 保存後に成功を返し、レプリカへ同じ順序で反映する。}
+  - id: recovery
+    label: ノード再起動後の復旧
+    evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§3}, {type: doc, ref: docs/reference-amazon-memorydb.md#§4}]
+    steps:
+      - {links: [restore], note: ノードが再起動してもログを再生し、データを戻す。}
+      - {links: [read], note: レプリカからの読み取りは遅れて反映されることがある。}
+requirements:
+  - {id: MD-01, kind: usecase, title: 耐久性のある主データベースとして使う, text: キャッシュと永続 DB を分けず、書き込みをログに残してから成功を返す。, links: [write, log1, restore], evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§1}, {type: doc, ref: docs/reference-amazon-memorydb.md#§3}]}
+unknowns:
+  - {id: UNK-01, text: トランザクションログの内部構成（ノード数、ストレージ種別）は公式資料で未確認。, refs: [txlog]}
+  - {id: UNK-02, text: 7.3 より新しいエンジン版と GovCloud などの提供有無は未確認。, refs: [primary]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: aws-vpc
+    label: AWS 上の MemoryDB クラスター（2 シャード）
+    description: VPC 内のアプリが 2 シャードのクラスターに接続し、書き込みを AWS 運用のトランザクションログに保存する例。代表例であり、導入事例ではない。
+    sources:
+      - {title: MemoryDB core components, url: https://docs.aws.amazon.com/memorydb/latest/devguide/components.html}
+      - {title: Consistency, url: https://docs.aws.amazon.com/memorydb/latest/devguide/consistency.html}
+      - {title: MemoryDB features, url: https://docs.aws.amazon.com/memorydb/latest/devguide/servicename-feature-overview.html}
+    tiers:
+      - {id: diagram, label: アプリ・クラスター・ログ, z: 0, size: [28, 12]}
+    nodes:
+      mdb-app: {label: VPC 内のアプリ, kind: client, tier: diagram, x: 1, y: 5.5, realizes: [app], description: Valkey / Redis OSS クライアントで接続する。, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+      mdb-acl: {label: ACL とユーザー, kind: service, tier: diagram, x: 7, y: 1.5, realizes: [acl], description: クラスターに紐づく ACL がコマンドとキーの権限を決める。, management: {type: shared, scope: "AWS runs the access check; customer defines users and ACL rules."}, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+      mdb-p1: {label: シャード 1 のプライマリ（ノード）, kind: db, tier: diagram, x: 13, y: 3, realizes: [primary], description: EC2 上のエンジンが読み書きを受ける。, management: {type: shared, scope: "AWS runs the node, patches and failure recovery; customer chooses node type, shard and replica counts."}, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+      mdb-r1: {label: シャード 1 のレプリカ（ノード）, kind: db, tier: diagram, x: 13, y: 8, realizes: [replica], description: 別 AZ に置き、読み取りを受ける。, management: {type: shared, scope: "AWS runs the node and failover; customer chooses replica count."}, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+      mdb-p2: {label: シャード 2 のプライマリ（ノード）, kind: db, tier: diagram, x: 13, y: 10.5, realizes: [primary2], description: データセットを分けた別シャードのプライマリ。, management: {type: shared, scope: "AWS runs the node and patches; customer chooses shard count."}, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+      mdb-log: {label: マルチ AZ のトランザクションログ, kind: db, tier: diagram, x: 20, y: 5.5, realizes: [txlog], description: AWS が運用し、利用者は直接操作できない。内部構成は未確認。, management: {type: aws, scope: "AWS operates the log; customers cannot access it directly."}, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+      mdb-s3: {label: S3 のスナップショット, svc: s3, kind: db, tier: diagram, x: 26, y: 5.5, realizes: [snapshot], description: 自動スナップショットの保存先。保持は最長 35 日。, management: {type: shared, scope: "AWS stores snapshots in S3; customer sets retention (up to 35 days)."}, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+    links:
+      - {id: mdb-auth, from: mdb-app, to: mdb-acl, label: ユーザー認証, evidence: [{type: doc, ref: docs/reference-amazon-memorydb.md#§7}]}
+    groups:
+      - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと VPC, tier: diagram, nodes: [mdb-acl, mdb-p1, mdb-r1, mdb-p2]}
+      - {kind: cloud, provider: aws, label: AWS 運用のログとストレージ, tier: diagram, nodes: [mdb-log, mdb-s3]}
+      - {kind: cloud, provider: aws, label: 利用者の AWS アカウント（アプリ）, tier: diagram, nodes: [mdb-app]}
+    layout3d:
+      tiers:
+        - {id: apps, label: アプリ, z: 0, size: [6, 12]}
+        - {id: cluster, label: クラスター（VPC）, z: 0, origin: [8, 0], size: [10, 12]}
+        - {id: durable, label: ログとストレージ, z: 0, origin: [20, 0], size: [8, 12]}
+      nodes:
+        mdb-app: {tier: apps, x: 3, y: 5.5}
+        mdb-acl: {tier: cluster, x: 2, y: 1.5}
+        mdb-p1: {tier: cluster, x: 7, y: 3}
+        mdb-r1: {tier: cluster, x: 7, y: 8}
+        mdb-p2: {tier: cluster, x: 7, y: 10.5}
+        mdb-log: {tier: durable, x: 2, y: 5.5}
+        mdb-s3: {tier: durable, x: 6, y: 5.5}
+      groups:
+        - {kind: cloud, provider: aws, label: 利用者の AWS アカウントと VPC, tier: cluster, nodes: [mdb-acl, mdb-p1, mdb-r1, mdb-p2]}
+        - {kind: cloud, provider: aws, label: AWS 運用のログとストレージ, tier: durable, nodes: [mdb-log, mdb-s3]}
+        - {kind: cloud, provider: aws, label: 利用者の AWS アカウント（アプリ）, tier: apps, nodes: [mdb-app]}

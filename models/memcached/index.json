@@ -1,0 +1,284 @@
+{
+  "model": "memcached",
+  "name": "Memcached の分散キャッシュ",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "app": {
+      "type": "node",
+      "label": "アプリケーション",
+      "status": "claim"
+    },
+    "db": {
+      "type": "node",
+      "label": "データベース",
+      "status": "claim"
+    },
+    "hashlib": {
+      "type": "node",
+      "label": "クライアントのハッシュ表",
+      "status": "claim"
+    },
+    "node1": {
+      "type": "node",
+      "label": "Memcached サーバー A",
+      "status": "claim"
+    },
+    "node2": {
+      "type": "node",
+      "label": "Memcached サーバー B",
+      "status": "claim"
+    },
+    "workers": {
+      "type": "node",
+      "label": "ワーカースレッド（libevent）",
+      "status": "claim"
+    },
+    "hashtable": {
+      "type": "node",
+      "label": "ハッシュ表",
+      "status": "claim"
+    },
+    "slabs": {
+      "type": "node",
+      "label": "スラブクラスとチャンク",
+      "status": "claim"
+    },
+    "lru": {
+      "type": "node",
+      "label": "LRU（HOT・WARM・COLD）",
+      "status": "claim"
+    },
+    "extstore": {
+      "type": "node",
+      "label": "extstore（フラッシュ）",
+      "status": "claim"
+    },
+    "app-lookup": {
+      "type": "link",
+      "label": "アプリケーション → クライアントのハッシュ表",
+      "status": "claim"
+    },
+    "app-db": {
+      "type": "link",
+      "label": "アプリケーション → データベース",
+      "status": "claim"
+    },
+    "pick-a": {
+      "type": "link",
+      "label": "クライアントのハッシュ表 → Memcached サーバー A",
+      "status": "claim"
+    },
+    "pick-b": {
+      "type": "link",
+      "label": "クライアントのハッシュ表 → Memcached サーバー B",
+      "status": "claim"
+    },
+    "serve": {
+      "type": "link",
+      "label": "Memcached サーバー A → ワーカースレッド（libevent）",
+      "status": "claim"
+    },
+    "find": {
+      "type": "link",
+      "label": "ワーカースレッド（libevent） → ハッシュ表",
+      "status": "claim"
+    },
+    "place": {
+      "type": "link",
+      "label": "ワーカースレッド（libevent） → スラブクラスとチャンク",
+      "status": "claim"
+    },
+    "evict": {
+      "type": "link",
+      "label": "スラブクラスとチャンク → LRU（HOT・WARM・COLD）",
+      "status": "claim"
+    },
+    "flush": {
+      "type": "link",
+      "label": "LRU（HOT・WARM・COLD） → extstore（フラッシュ）",
+      "status": "claim"
+    },
+    "cache-miss": {
+      "type": "scenario",
+      "label": "キャッシュミスからデータベースへ"
+    },
+    "memory-full": {
+      "type": "scenario",
+      "label": "メモリが満杯のときの追い出し"
+    },
+    "MC-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "データベースの読み取りを減らす",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "クライアントのハッシュ方式の名称と既定のポート 11211 は、取得した公式資料で明記を確認できていない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "スラブのリバランス機能と、セグメント化 LRU が現行版で既定で有効かどうかは未確認。"
+    },
+    "mc-app": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "アプリケーション（クライアントライブラリ）",
+      "realizes": [
+        "app",
+        "hashlib"
+      ]
+    },
+    "mc-db": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "データベース",
+      "realizes": [
+        "db"
+      ]
+    },
+    "mc-server": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "Memcached プロセス",
+      "realizes": [
+        "node1",
+        "workers",
+        "hashtable",
+        "slabs",
+        "lru"
+      ]
+    },
+    "mc-server-b": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "Memcached プロセス（サーバー B）",
+      "realizes": [
+        "node2"
+      ]
+    },
+    "mc-flash": {
+      "type": "implementation",
+      "impl": "onprem-single",
+      "label": "フラッシュ（extstore、任意）",
+      "realizes": [
+        "extstore"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-memcached.md#§1": [
+      "model",
+      "app",
+      "db",
+      "app-db",
+      "cache-miss",
+      "MC-01"
+    ],
+    "docs/reference-memcached.md": [
+      "model",
+      "app",
+      "db",
+      "hashlib",
+      "node1",
+      "node2",
+      "workers",
+      "hashtable",
+      "slabs",
+      "lru",
+      "extstore",
+      "app-lookup",
+      "app-db",
+      "pick-a",
+      "pick-b",
+      "serve",
+      "find",
+      "place",
+      "evict",
+      "flush",
+      "cache-miss",
+      "memory-full",
+      "MC-01",
+      "mc-app",
+      "mc-db",
+      "mc-server",
+      "mc-server-b",
+      "mc-flash"
+    ],
+    "docs/reference-memcached.md#§2": [
+      "hashlib",
+      "node1",
+      "node2",
+      "app-lookup",
+      "pick-a",
+      "pick-b"
+    ],
+    "docs/reference-memcached.md#§3": [
+      "workers",
+      "hashtable",
+      "serve",
+      "find"
+    ],
+    "docs/reference-memcached.md#§4": [
+      "slabs",
+      "place"
+    ],
+    "docs/reference-memcached.md#§6": [
+      "slabs"
+    ],
+    "docs/reference-memcached.md#§5": [
+      "lru",
+      "evict",
+      "memory-full"
+    ],
+    "docs/reference-memcached.md#§7": [
+      "extstore",
+      "flush"
+    ],
+    "docs/reference-memcached.md#§8": [
+      "mc-app",
+      "mc-db",
+      "mc-server",
+      "mc-server-b",
+      "mc-flash"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "インメモリデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Memcached",
+    "role": "overview",
+    "order": 40,
+    "objectives": [
+      "クライアント側のハッシュ分散とサーバーの独立を確認する",
+      "スラブクラスと LRU によるメモリ管理を確認する",
+      "永続化なしの前提と extstore の範囲を区別する"
+    ],
+    "sources": [
+      {
+        "title": "Performance and Efficiency",
+        "url": "https://docs.memcached.org/serverguide/performance/"
+      },
+      {
+        "title": "Extstore",
+        "url": "https://docs.memcached.org/features/flashstorage/"
+      },
+      {
+        "title": "Warm Restart",
+        "url": "https://docs.memcached.org/features/restart/"
+      },
+      {
+        "title": "new_lru.txt",
+        "url": "https://github.com/memcached/memcached/blob/master/doc/new_lru.txt"
+      },
+      {
+        "title": "Caching Story",
+        "url": "https://docs.memcached.org/tutorialcachingstory/"
+      }
+    ]
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "model": "memgraph",
+  "name": "Memgraph のインメモリグラフ DB 構成",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "アプリケーション・クライアント",
+      "status": "claim"
+    },
+    "kafka": {
+      "type": "node",
+      "label": "Kafka・Redpanda・Pulsar",
+      "status": "claim"
+    },
+    "query": {
+      "type": "node",
+      "label": "Bolt・Cypher のクエリ処理",
+      "status": "claim"
+    },
+    "stream": {
+      "type": "node",
+      "label": "ストリーム取り込み",
+      "status": "claim"
+    },
+    "graph": {
+      "type": "node",
+      "label": "インメモリのグラフストレージ",
+      "status": "claim"
+    },
+    "durable": {
+      "type": "node",
+      "label": "WAL とスナップショット",
+      "status": "claim"
+    },
+    "disk": {
+      "type": "node",
+      "label": "オンディスクモード（RocksDB）",
+      "status": "claim"
+    },
+    "replica": {
+      "type": "node",
+      "label": "REPLICA",
+      "status": "claim"
+    },
+    "coord": {
+      "type": "node",
+      "label": "コーディネーター（HA）",
+      "status": "claim"
+    },
+    "bolt-query": {
+      "type": "link",
+      "label": "アプリケーション・クライアント → Bolt・Cypher のクエリ処理",
+      "status": "claim"
+    },
+    "run-graph": {
+      "type": "link",
+      "label": "Bolt・Cypher のクエリ処理 → インメモリのグラフストレージ",
+      "status": "claim"
+    },
+    "consume": {
+      "type": "link",
+      "label": "Kafka・Redpanda・Pulsar → ストリーム取り込み",
+      "status": "claim"
+    },
+    "stream-write": {
+      "type": "link",
+      "label": "ストリーム取り込み → インメモリのグラフストレージ",
+      "status": "claim"
+    },
+    "persist": {
+      "type": "link",
+      "label": "インメモリのグラフストレージ → WAL とスナップショット",
+      "status": "claim"
+    },
+    "spill": {
+      "type": "link",
+      "label": "インメモリのグラフストレージ → オンディスクモード（RocksDB）",
+      "status": "claim"
+    },
+    "replicate": {
+      "type": "link",
+      "label": "インメモリのグラフストレージ → REPLICA",
+      "status": "claim"
+    },
+    "failover": {
+      "type": "link",
+      "label": "コーディネーター（HA） → REPLICA",
+      "status": "claim"
+    },
+    "query-and-persist": {
+      "type": "scenario",
+      "label": "クエリの実行と永続化"
+    },
+    "stream-ingest": {
+      "type": "scenario",
+      "label": "Kafka からの取り込みと複製"
+    },
+    "MG-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "メモリ上のグラフに Cypher で問い合わせる",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "openCypher への準拠度と Neo4j 公式ドライバーでの接続可否は公式資料で未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "WAL の設定項目、SYNC・ASYNC・STRICT_SYNC の動作、コーディネーターの内部動作とポートは取得した資料に記載がなく未確認。"
+    },
+    "mg-app": {
+      "type": "implementation",
+      "impl": "self-managed-main-replica",
+      "label": "アプリケーション",
+      "realizes": [
+        "client"
+      ]
+    },
+    "mg-kafka": {
+      "type": "implementation",
+      "impl": "self-managed-main-replica",
+      "label": "Kafka",
+      "realizes": [
+        "kafka"
+      ]
+    },
+    "mg-main": {
+      "type": "implementation",
+      "impl": "self-managed-main-replica",
+      "label": "Memgraph MAIN",
+      "realizes": [
+        "query",
+        "stream",
+        "graph",
+        "disk"
+      ]
+    },
+    "mg-data": {
+      "type": "implementation",
+      "impl": "self-managed-main-replica",
+      "label": "データディレクトリ（snapshots・wal）",
+      "realizes": [
+        "durable"
+      ]
+    },
+    "mg-replica": {
+      "type": "implementation",
+      "impl": "self-managed-main-replica",
+      "label": "Memgraph REPLICA",
+      "realizes": [
+        "replica"
+      ]
+    },
+    "mg-coord": {
+      "type": "implementation",
+      "impl": "self-managed-main-replica",
+      "label": "コーディネーター（Enterprise）",
+      "realizes": [
+        "coord"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-memgraph.md#§1": [
+      "model"
+    ],
+    "docs/reference-memgraph.md": [
+      "model",
+      "client",
+      "kafka",
+      "query",
+      "stream",
+      "graph",
+      "durable",
+      "disk",
+      "replica",
+      "coord",
+      "bolt-query",
+      "run-graph",
+      "consume",
+      "stream-write",
+      "persist",
+      "spill",
+      "replicate",
+      "failover",
+      "query-and-persist",
+      "stream-ingest",
+      "MG-01",
+      "mg-app",
+      "mg-kafka",
+      "mg-main",
+      "mg-data",
+      "mg-replica",
+      "mg-coord"
+    ],
+    "docs/reference-memgraph.md#§2": [
+      "client",
+      "query",
+      "bolt-query"
+    ],
+    "docs/reference-memgraph.md#§5": [
+      "kafka",
+      "stream",
+      "consume",
+      "stream-write",
+      "stream-ingest"
+    ],
+    "docs/reference-memgraph.md#§3": [
+      "graph",
+      "disk",
+      "run-graph",
+      "spill"
+    ],
+    "docs/reference-memgraph.md#§4": [
+      "durable",
+      "persist",
+      "query-and-persist",
+      "MG-01"
+    ],
+    "docs/reference-memgraph.md#§6": [
+      "replica",
+      "coord",
+      "replicate",
+      "failover"
+    ],
+    "docs/reference-memgraph.md#§7": [
+      "mg-app",
+      "mg-kafka",
+      "mg-main",
+      "mg-data",
+      "mg-replica",
+      "mg-coord"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "グラフデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Memgraph",
+    "role": "overview",
+    "order": 40,
+    "objectives": [
+      "クエリの受付・インメモリのグラフ・永続化の関係を確認する",
+      "ストレージモードの違いと制約を確認する",
+      "ストリーム取り込みとレプリケーション・HA の位置づけを確認する"
+    ],
+    "sources": [
+      {
+        "title": "Memgraph overview",
+        "url": "https://memgraph.com/docs/memgraph/overview"
+      },
+      {
+        "title": "Storage memory usage",
+        "url": "https://memgraph.com/docs/fundamentals/storage-memory-usage"
+      },
+      {
+        "title": "Backup and restore",
+        "url": "https://memgraph.com/docs/database-management/backup-and-restore"
+      },
+      {
+        "title": "Replication",
+        "url": "https://memgraph.com/docs/clustering/replication"
+      },
+      {
+        "title": "High availability",
+        "url": "https://memgraph.com/docs/clustering/high-availability"
+      },
+      {
+        "title": "Data streams",
+        "url": "https://memgraph.com/docs/data-streams"
+      },
+      {
+        "title": "Client libraries",
+        "url": "https://memgraph.com/docs/client-libraries"
+      }
+    ]
+  }
+}

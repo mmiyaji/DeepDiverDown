@@ -1,0 +1,93 @@
+name: Dragonfly の基本アーキテクチャ
+description: Redis・Memcached 互換のクライアントが、スレッドごとのシャードに分かれた DashTable を使う流れと、フォークなしのスナップショット、レプリカへの複製を示す。
+reference:
+  objectives: [shared-nothing のシャードとコーディネーターの役割を区別する, DashTable とフォークなしのスナップショットの位置づけを確認する, レプリカへの複製とライセンスの範囲を確認する]
+  sources:
+    - {title: GitHub dragonflydb/dragonfly, url: https://github.com/dragonflydb/dragonfly}
+    - {title: Shared-nothing 設計, url: https://github.com/dragonflydb/dragonfly/blob/main/docs/df-share-nothing.md}
+    - {title: DashTable, url: https://github.com/dragonflydb/dragonfly/blob/main/docs/dashtable.md}
+    - {title: Snapshotting, url: https://www.dragonflydb.io/docs/managing-dragonfly/snapshotting}
+    - {title: Replication, url: https://www.dragonflydb.io/docs/managing-dragonfly/replication}
+    - {title: Server Configuration Flags, url: https://www.dragonflydb.io/docs/managing-dragonfly/flags}
+    - {title: License, url: https://www.dragonflydb.io/docs/about/license}
+sources: [docs/reference-dragonfly.md]
+evidence: [{type: doc, ref: docs/reference-dragonfly.md#§1}, {type: doc, ref: docs/reference-dragonfly.md#§8}]
+tiers:
+  - {id: flow, label: クライアント・I/O スレッド・シャード・永続化, z: 0, size: [28, 11]}
+nodes:
+  client: {label: Redis・Memcached クライアント, kind: client, tier: flow, x: 1, y: 5.5, description: RESP と Memcached のプロトコルで接続する。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§1}]}
+  io: {label: I/O スレッド（io_uring）, kind: service, tier: flow, x: 6, y: 5.5, description: 接続は生存中 1 つのスレッドに結び付く。既定は io_uring で、--force_epoll で epoll に切り替える。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§2}, {type: doc, ref: docs/reference-dragonfly.md#§6}]}
+  coord: {label: コーディネーター（ファイバー）, kind: service, tier: flow, x: 12, y: 5.5, description: マルチキーコマンド、Lua、トランザクションを関係するシャードへ振り分ける。データには直接触らない。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§3}]}
+  shard: {label: シャードのスレッド, kind: service, tier: flow, x: 18, y: 5.5, description: キーのハッシュで決まるシャードを 1 スレッドだけが読み書きする。ミューテックスは使わない。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§2}]}
+  dash: {label: DashTable, kind: db, tier: flow, x: 24, y: 1.5, description: ディレクトリ、セグメント（56 通常バケット + 4 スタッシュ）で構成し、セグメント単位で分割する。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§4}]}
+  snap: {label: フォークなしのスナップショット, kind: service, tier: flow, x: 24, y: 5.5, description: バージョンカウンターとエポックで時点の一貫性を保ち、更新時の書き込みフックで値を送る。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§5}]}
+  rdb: {label: スナップショットファイル（RDB 形式）, kind: db, tier: flow, x: 24, y: 9.5, description: --dir と --dbfilename で保存先を決め、--snapshot_cron で定期実行する。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§5}]}
+  replica: {label: レプリカ, kind: service, tier: flow, x: 18, y: 9.5, description: REPLICAOF で接続し、再接続時はバックログから部分同期、足りなければ全量同期する。昇格は手動。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§7}]}
+links:
+  - {id: connect, from: client, to: io, label: コマンドを送信, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§2}]}
+  - {id: dispatch, from: io, to: coord, label: コマンドを実行, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§3}]}
+  - {id: message, from: coord, to: shard, label: メッセージで依頼, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§3}]}
+  - {id: access, from: shard, to: dash, label: 読み書き, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§4}]}
+  - {id: serialize, from: shard, to: snap, label: 書き込みフックで送る, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§5}]}
+  - {id: save, from: snap, to: rdb, label: 保存, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§5}]}
+  - {id: replicate, from: shard, to: replica, label: 全量・差分を複製, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§7}]}
+scenarios:
+  - id: write-multi-key
+    label: マルチキーの書き込み
+    evidence: [{type: doc, ref: docs/reference-dragonfly.md#§3}]
+    steps:
+      - {links: [connect, dispatch], note: クライアントのコマンドが I/O スレッドのファイバーに渡る。}
+      - {links: [message, access], note: コーディネーターが関係するシャードへ依頼し、各シャードが DashTable を更新する。}
+  - id: snapshot-save
+    label: スナップショットの保存
+    evidence: [{type: doc, ref: docs/reference-dragonfly.md#§5}]
+    steps:
+      - {links: [serialize, save], note: 各シャードが自分のデータを直列化し、更新中の値も書き込みフックで送ってファイルへ保存する。}
+requirements:
+  - {id: DF-01, kind: usecase, title: 既存の Redis クライアントのまま複数コアを使う, text: コマンドを Redis 互換で受け、キー空間をシャードに分けてスレッドごとに処理する。, links: [connect, dispatch, message, access], evidence: [{type: doc, ref: docs/reference-dragonfly.md#§2}]}
+unknowns:
+  - {id: UNK-01, text: io_uring を使うスレッドごとの I/O ループの詳細は公式のアーキテクチャ資料を取得できず未確認。, refs: [io]}
+  - {id: UNK-02, text: Sentinel とクラスターモードの詳細、DSAL の条文の解釈は未確認。, refs: [replica]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: standalone-onprem
+    label: 自前の Linux サーバー（プライマリとレプリカ）
+    description: Dragonfly を Linux サーバー 2 台で動かし、ローカルディスクにスナップショットを保存する自前構成の例。代表例であり、導入事例ではない。
+    sources:
+      - {title: Replication, url: https://www.dragonflydb.io/docs/managing-dragonfly/replication}
+      - {title: Snapshotting, url: https://www.dragonflydb.io/docs/managing-dragonfly/snapshotting}
+      - {title: Server Configuration Flags, url: https://www.dragonflydb.io/docs/managing-dragonfly/flags}
+    tiers:
+      - {id: diagram, label: クライアントとサーバー, z: 0, size: [28, 11]}
+    nodes:
+      df-client: {label: アプリケーション（Redis クライアント）, kind: client, tier: diagram, x: 1, y: 5.5, realizes: [client], description: 6379 番ポートへ接続する。--memcached_port で Memcached も受ける。, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§9}]}
+      df-primary: {label: dragonfly プロセス（プライマリ）, kind: service, tier: diagram, x: 9, y: 5.5, realizes: [io, coord, shard, dash, snap], description: 1 プロセスで I/O、コーディネーター、シャード、スナップショットを動かす。, management: {type: customer, scope: "Customer operates the server, configuration and upgrades."}, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§9}]}
+      df-disk: {label: ローカルディスク, kind: db, tier: diagram, x: 17, y: 9.5, realizes: [rdb], description: スナップショットファイルを置く。, management: {type: customer, scope: "Customer operates the disk and backups."}, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§9}]}
+      df-replica: {label: dragonfly プロセス（レプリカ）, kind: service, tier: diagram, x: 17, y: 1.5, realizes: [replica], description: REPLICAOF でプライマリに接続する。, management: {type: customer, scope: "Customer operates the replica and promotion."}, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§9}]}
+    links:
+      - {id: df-app, from: df-client, to: df-primary, label: コマンドを送信, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§9}]}
+      - {id: df-save, from: df-primary, to: df-disk, label: スナップショットを保存, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§9}]}
+      - {id: df-repl, from: df-primary, to: df-replica, label: 複製, evidence: [{type: doc, ref: docs/reference-dragonfly.md#§9}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [df-client, df-primary, df-disk, df-replica]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアントとサーバー, z: 0, size: [28, 11]}
+      nodes:
+        df-client: {tier: diagram, x: 1, y: 5.5}
+        df-primary: {tier: diagram, x: 9, y: 5.5}
+        df-disk: {tier: diagram, x: 17, y: 9.5}
+        df-replica: {tier: diagram, x: 17, y: 1.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [df-client, df-primary, df-disk, df-replica]}
+    layout3d:
+      tiers:
+        - {id: app, label: アプリケーション, z: 0, size: [6, 11]}
+        - {id: server, label: Dragonfly サーバー, z: 0, origin: [8, 0], size: [16, 11]}
+      nodes:
+        df-client: {tier: app, x: 3, y: 5.5}
+        df-primary: {tier: server, x: 3, y: 5.5}
+        df-disk: {tier: server, x: 11, y: 9.5}
+        df-replica: {tier: server, x: 11, y: 1.5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [app, server], nodes: [df-client, df-primary, df-disk, df-replica]}

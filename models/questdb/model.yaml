@@ -1,0 +1,105 @@
+name: QuestDB の基本アーキテクチャ
+description: 取り込み経路、WAL とアプライジョブ、列ファイルとパーティション、Parquet への階層化と、時系列向け SQL の位置づけを示す。
+reference:
+  objectives: [取り込み経路と WAL からテーブルへの反映の流れを確認する, 列ファイルとパーティションの持ち方を確認する, Parquet 階層と時系列 SQL の位置づけを確認する]
+  sources:
+    - {title: QuestDB Write-Ahead Log, url: https://questdb.com/docs/concept/write-ahead-log/}
+    - {title: QuestDB Ingestion overview, url: https://questdb.com/docs/ingestion-overview/}
+    - {title: QuestDB Storage engine, url: https://questdb.com/docs/architecture/storage-engine/}
+    - {title: QuestDB SQL extensions, url: https://questdb.com/docs/concept/sql-extensions/}
+sources: [docs/reference-questdb.md]
+evidence: [{type: doc, ref: docs/reference-questdb.md#§1}]
+tiers:
+  - {id: flow, label: 取り込み・WAL・ストレージ, z: 0, size: [28, 11]}
+nodes:
+  client: {label: クライアント・コレクター, kind: client, tier: flow, x: 1, y: 3, description: クライアントライブラリ（QWP）、ILP、PGWire、REST から書き込む。, evidence: [{type: doc, ref: docs/reference-questdb.md#§2}]}
+  ingest: {label: 取り込みエンドポイント, kind: service, tier: flow, x: 7, y: 3, description: ILP は HTTP 9000 と TCP 9009。ILP は存在しないテーブルを自動作成する。, evidence: [{type: doc, ref: docs/reference-questdb.md#§2}]}
+  wal: {label: WAL セグメント, kind: db, tier: flow, x: 13, y: 3, description: 順次書き込みで確定する。既定の nosync ではクラッシュで確定済みの書き込みを失うことがある。, evidence: [{type: doc, ref: docs/reference-questdb.md#§3}]}
+  apply: {label: シーケンサーとアプライジョブ, kind: service, tier: flow, x: 13, y: 7, description: トランザクション番号を割り当て、複数のトランザクションをソートしてまとめて反映する。遅れた行もここでマージする。, evidence: [{type: doc, ref: docs/reference-questdb.md#§3}]}
+  columns: {label: 列ファイルとパーティション, kind: db, tier: flow, x: 20, y: 7, description: 列ごとのファイルで、最新パーティションはネイティブのバイナリ形式。詳細なディレクトリ構成は未確認。, evidence: [{type: doc, ref: docs/reference-questdb.md#§4}]}
+  parquet: {label: Parquet パーティション, kind: db, tier: flow, x: 26, y: 7, description: 過去のパーティションを変換でき、SQL で検索できる。リモートへの移動は Enterprise。, evidence: [{type: doc, ref: docs/reference-questdb.md#§6}]}
+  sql: {label: SQL エンジン, kind: service, tier: flow, x: 20, y: 3, description: SAMPLE BY、LATEST ON、ASOF JOIN などの時系列向け拡張を持つ。, evidence: [{type: doc, ref: docs/reference-questdb.md#§5}]}
+  user: {label: クエリ利用者・BI, kind: actor, tier: flow, x: 26, y: 3, description: PGWire や REST で問い合わせる。PGWire のポートは未確認。, evidence: [{type: doc, ref: docs/reference-questdb.md#§2}]}
+links:
+  - {id: send, from: client, to: ingest, label: 書き込み, evidence: [{type: doc, ref: docs/reference-questdb.md#§2}]}
+  - {id: append-wal, from: ingest, to: wal, label: WAL に追記, evidence: [{type: doc, ref: docs/reference-questdb.md#§3}]}
+  - {id: sequence, from: wal, to: apply, label: 非同期に取り出し, evidence: [{type: doc, ref: docs/reference-questdb.md#§3}]}
+  - {id: merge, from: apply, to: columns, label: ソートして反映, evidence: [{type: doc, ref: docs/reference-questdb.md#§3}]}
+  - {id: convert, from: columns, to: parquet, label: Parquet に変換, evidence: [{type: doc, ref: docs/reference-questdb.md#§6}]}
+  - {id: scan-native, from: sql, to: columns, label: 列を読む, evidence: [{type: doc, ref: docs/reference-questdb.md#§4}]}
+  - {id: scan-parquet, from: sql, to: parquet, label: Parquet を検索, evidence: [{type: doc, ref: docs/reference-questdb.md#§6}]}
+  - {id: query, from: user, to: sql, label: 問い合わせ, evidence: [{type: doc, ref: docs/reference-questdb.md#§5}]}
+scenarios:
+  - id: write-path
+    label: 書き込みからテーブルへの反映
+    evidence: [{type: doc, ref: docs/reference-questdb.md#§3}]
+    steps:
+      - {links: [send, append-wal], note: クライアントの書き込みを WAL に追記して確定する。}
+      - {links: [sequence, merge], note: アプライジョブが非同期にテーブルへ反映する。}
+  - id: tiering
+    label: 過去パーティションの Parquet 化
+    evidence: [{type: doc, ref: docs/reference-questdb.md#§6}]
+    steps:
+      - {links: [convert, scan-parquet], note: パーティションを Parquet に変換しても SQL で検索できる。}
+requirements:
+  - {id: QD-01, kind: usecase, title: 時系列データを高頻度で取り込み時間で集計する, text: WAL で書き込みを受け、SAMPLE BY などで集計する。, links: [send, append-wal, merge, query], evidence: [{type: doc, ref: docs/reference-questdb.md#§3}]}
+unknowns:
+  - {id: UNK-01, text: パーティションのディレクトリ構成、SYMBOL 型の内部、メモリマップの詳細は取得した資料になく未確認。, refs: [columns]}
+  - {id: UNK-02, text: Parquet への階層化とコールドストレージのうち OSS 版で使える範囲は未確認。, refs: [parquet]}
+  - {id: UNK-03, text: PGWire の既定ポートは未確認。, refs: [user]}
+gates: {maxDrift: 0, maxHigh: 0}
+layout3d:
+  tiers:
+    - {id: ingest, label: 取り込み, z: 0, size: [12, 11]}
+    - {id: engine, label: WAL・SQL・ストレージ, z: 0, origin: [14, 0], size: [16, 11]}
+  nodes:
+    client: {tier: ingest, x: 2, y: 3}
+    ingest: {tier: ingest, x: 8, y: 3}
+    wal: {tier: engine, x: 2, y: 3}
+    apply: {tier: engine, x: 2, y: 7}
+    columns: {tier: engine, x: 8, y: 7}
+    parquet: {tier: engine, x: 13, y: 7}
+    sql: {tier: engine, x: 8, y: 3}
+    user: {tier: engine, x: 13, y: 3}
+implementations:
+  - id: onprem-single
+    label: 自前の単一サーバー
+    description: 自前ホスト 1 台の QuestDB プロセスとローカルディスクで組む最小の例。代表例であり、導入事例ではない。
+    sources:
+      - {title: QuestDB Write-Ahead Log, url: https://questdb.com/docs/concept/write-ahead-log/}
+      - {title: QuestDB Storage engine, url: https://questdb.com/docs/architecture/storage-engine/}
+      - {title: QuestDB Ingestion overview, url: https://questdb.com/docs/ingestion-overview/}
+    tiers:
+      - {id: diagram, label: クライアント・QuestDB・ディスク, z: 0, size: [28, 11]}
+    nodes:
+      qd-client: {label: クライアント・コレクター, kind: client, tier: diagram, x: 1, y: 3, realizes: [client], description: クライアントライブラリや ILP などで書き込む。, evidence: [{type: doc, ref: docs/reference-questdb.md#§7}]}
+      qd-server: {label: QuestDB プロセス, kind: service, tier: diagram, x: 10, y: 5, realizes: [ingest, apply, sql], description: 取り込み、アプライジョブ、SQL エンジンを 1 プロセスで担う。内部のスレッド構成は未確認。, management: {type: customer, scope: "Customer operates the host, QuestDB process and configuration."}, evidence: [{type: doc, ref: docs/reference-questdb.md#§7}]}
+      qd-disk: {label: ローカルディスク（WAL・列ファイル）, kind: db, tier: diagram, x: 19, y: 5, realizes: [wal, columns, parquet], description: WAL セグメントと列ファイルのパーティションを置く。過去パーティションを Parquet に変換した場合の置き場もここ（OSS 版で使える範囲は未確認）。, management: {type: customer, scope: "Customer operates the disk, backups and access."}, evidence: [{type: doc, ref: docs/reference-questdb.md#§7}]}
+      qd-user: {label: クエリ利用者・BI, kind: actor, tier: diagram, x: 1, y: 8, realizes: [user], description: PGWire や REST で問い合わせる。, evidence: [{type: doc, ref: docs/reference-questdb.md#§7}]}
+    links:
+      - {id: qd-write, from: qd-client, to: qd-server, label: 書き込み, evidence: [{type: doc, ref: docs/reference-questdb.md#§7}]}
+      - {id: qd-store, from: qd-server, to: qd-disk, label: WAL と列ファイルを読み書き, evidence: [{type: doc, ref: docs/reference-questdb.md#§7}]}
+      - {id: qd-ask, from: qd-user, to: qd-server, label: 問い合わせ, evidence: [{type: doc, ref: docs/reference-questdb.md#§7}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー, provider: onprem, tier: diagram, nodes: [qd-server, qd-disk]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアント・QuestDB・ディスク, z: 0, size: [28, 11]}
+      nodes:
+        qd-client: {tier: diagram, x: 1, y: 3}
+        qd-user: {tier: diagram, x: 1, y: 8}
+        qd-server: {tier: diagram, x: 10, y: 5}
+        qd-disk: {tier: diagram, x: 19, y: 5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー, provider: onprem, tier: diagram, nodes: [qd-server, qd-disk]}
+    layout3d:
+      tiers:
+        - {id: clients, label: 利用側, z: 0, size: [6, 11]}
+        - {id: servers, label: QuestDB とディスク, z: 0, origin: [8, 0], size: [18, 11]}
+      nodes:
+        qd-client: {tier: clients, x: 3, y: 3}
+        qd-user: {tier: clients, x: 3, y: 8}
+        qd-server: {tier: servers, x: 4, y: 5}
+        qd-disk: {tier: servers, x: 12, y: 5}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー, provider: onprem, tier: [servers], nodes: [qd-server, qd-disk]}

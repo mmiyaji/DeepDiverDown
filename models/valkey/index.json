@@ -1,0 +1,272 @@
+{
+  "model": "valkey",
+  "name": "Valkey の基本アーキテクチャ",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "クライアント",
+      "status": "claim"
+    },
+    "iothreads": {
+      "type": "node",
+      "label": "I/O スレッド",
+      "status": "claim"
+    },
+    "main": {
+      "type": "node",
+      "label": "メインスレッド",
+      "status": "claim"
+    },
+    "dataset": {
+      "type": "node",
+      "label": "メモリ上のデータセット",
+      "status": "claim"
+    },
+    "slots": {
+      "type": "node",
+      "label": "ハッシュスロット",
+      "status": "claim"
+    },
+    "replica": {
+      "type": "node",
+      "label": "レプリカ",
+      "status": "claim"
+    },
+    "rdb": {
+      "type": "node",
+      "label": "RDB スナップショット",
+      "status": "claim"
+    },
+    "aof": {
+      "type": "node",
+      "label": "AOF（マルチパート）",
+      "status": "claim"
+    },
+    "bus": {
+      "type": "node",
+      "label": "クラスタバス",
+      "status": "claim"
+    },
+    "c-io": {
+      "type": "link",
+      "label": "クライアント → I/O スレッド",
+      "status": "claim"
+    },
+    "io-main": {
+      "type": "link",
+      "label": "I/O スレッド → メインスレッド",
+      "status": "claim"
+    },
+    "main-data": {
+      "type": "link",
+      "label": "メインスレッド → メモリ上のデータセット",
+      "status": "claim"
+    },
+    "data-slots": {
+      "type": "link",
+      "label": "メモリ上のデータセット → ハッシュスロット",
+      "status": "claim"
+    },
+    "repl": {
+      "type": "link",
+      "label": "メモリ上のデータセット → レプリカ",
+      "status": "claim"
+    },
+    "snap": {
+      "type": "link",
+      "label": "メモリ上のデータセット → RDB スナップショット",
+      "status": "claim"
+    },
+    "log": {
+      "type": "link",
+      "label": "メモリ上のデータセット → AOF（マルチパート）",
+      "status": "claim"
+    },
+    "gossip": {
+      "type": "link",
+      "label": "ハッシュスロット → クラスタバス",
+      "status": "claim"
+    },
+    "write-and-replicate": {
+      "type": "scenario",
+      "label": "書き込みを実行して複製・永続化する"
+    },
+    "VK-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "Redis OSS 7.2 のクライアントと RDB を引き継ぐ",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "I/O スレッドの設定ディレクティブ名と既定値は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "クラスタ仕様書の末尾約 2 万文字は未読。複数データベースの制限一覧も未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Redis との複製・クラスタ・マルチパート AOF の差分比較、Redis 8 以降との機能差は公式資料で未確認。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "分岐の理由を述べた Valkey 公式の history ページは未取得。経緯は Linux Foundation の発表に基づく。"
+    },
+    "vk-client": {
+      "type": "implementation",
+      "impl": "onprem-primary-replica",
+      "label": "クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "vk-primary": {
+      "type": "implementation",
+      "impl": "onprem-primary-replica",
+      "label": "Valkey プライマリ",
+      "realizes": [
+        "iothreads",
+        "main",
+        "dataset"
+      ]
+    },
+    "vk-cluster-off": {
+      "type": "implementation",
+      "impl": "onprem-primary-replica",
+      "label": "ハッシュスロット・クラスタバス（クラスタ無効、未配置）",
+      "realizes": [
+        "slots",
+        "bus"
+      ]
+    },
+    "vk-replica": {
+      "type": "implementation",
+      "impl": "onprem-primary-replica",
+      "label": "Valkey レプリカ",
+      "realizes": [
+        "replica"
+      ]
+    },
+    "vk-disk": {
+      "type": "implementation",
+      "impl": "onprem-primary-replica",
+      "label": "ローカルディスク（RDB・AOF）",
+      "realizes": [
+        "rdb",
+        "aof"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-valkey.md#§1": [
+      "model"
+    ],
+    "docs/reference-valkey.md": [
+      "model",
+      "client",
+      "iothreads",
+      "main",
+      "dataset",
+      "slots",
+      "replica",
+      "rdb",
+      "aof",
+      "bus",
+      "c-io",
+      "io-main",
+      "main-data",
+      "data-slots",
+      "repl",
+      "snap",
+      "log",
+      "gossip",
+      "write-and-replicate",
+      "VK-01",
+      "vk-client",
+      "vk-primary",
+      "vk-cluster-off",
+      "vk-replica",
+      "vk-disk"
+    ],
+    "docs/reference-valkey.md#§6": [
+      "client",
+      "VK-01"
+    ],
+    "docs/reference-valkey.md#§2": [
+      "iothreads",
+      "main",
+      "c-io",
+      "io-main",
+      "main-data"
+    ],
+    "docs/reference-valkey.md#§4": [
+      "dataset",
+      "slots",
+      "bus",
+      "data-slots",
+      "gossip"
+    ],
+    "docs/reference-valkey.md#§3": [
+      "replica",
+      "repl",
+      "write-and-replicate"
+    ],
+    "docs/reference-valkey.md#§5": [
+      "rdb",
+      "aof",
+      "snap",
+      "log"
+    ],
+    "docs/reference-valkey.md#§7": [
+      "vk-client",
+      "vk-primary",
+      "vk-cluster-off",
+      "vk-replica",
+      "vk-disk"
+    ]
+  },
+  "reference": {
+    "domain": "データ保存",
+    "category": "インメモリデータベース",
+    "kind": "製品・技術のアーキテクチャ",
+    "product": "Valkey",
+    "role": "overview",
+    "order": 30,
+    "objectives": [
+      "メインスレッドと I/O スレッドの分担を確認する",
+      "レプリカ・クラスタ・永続化がデータセットにどうつながるかを確認する",
+      "Redis との互換性の範囲を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Linux Foundation Launches Open Source Valkey Community",
+        "url": "https://linuxfoundation.org/press/linux-foundation-launches-open-source-valkey-community"
+      },
+      {
+        "title": "Unlock one million RPS",
+        "url": "https://valkey.io/blog/unlock-one-million-rps/"
+      },
+      {
+        "title": "Valkey replication",
+        "url": "https://valkey.io/topics/replication/"
+      },
+      {
+        "title": "Valkey Cluster specification",
+        "url": "https://valkey.io/topics/cluster-spec/"
+      },
+      {
+        "title": "Valkey persistence",
+        "url": "https://valkey.io/topics/persistence/"
+      },
+      {
+        "title": "Migration from Redis to Valkey",
+        "url": "https://valkey.io/topics/migration/"
+      }
+    ]
+  }
+}
