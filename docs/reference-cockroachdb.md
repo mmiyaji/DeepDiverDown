@@ -1,12 +1,13 @@
 # CockroachDB の概要（分散 SQL・トランザクション・レンジ複製・Pebble）
 
-2026 年 11 月時点の公式資料に基づく。資料は docs.cockroachlabs.com の stable 版で、版番号は資料中に明記がなく未確認。
+2026 年 11 月時点の公式資料に基づく。資料は docs.cockroachlabs.com の stable 版で、本文に版の記載はない。stable 版のページ内リンクは v26.4 を指し、リリース一覧の先頭も v26.4（一般提供日 2026-10-26）である。パッチ版は未確認。
 
 ## 1. 概要と層構成
 
 CockroachDB は SQL を受け付け、キーと値（KV）の操作に変換して複数ノードに分散保存するデータベースである。公式資料は 5 層で説明する。SQL 層（SQL を KV 操作に変換）、トランザクション層（複数の KV を原子的に変更）、分散層（複製したレンジを 1 つの KV 空間として見せる）、複製層（レンジを同期的に複製）、ストレージ層（ディスクの読み書き）である。どのノードも SQL を受け付け、自分で処理できない要求は担当ノードへ転送する。PostgreSQL 互換の接続方式、DistSQL による分散実行は、取得した資料に記載がなく未確認。
 
-- [Architecture overview](https://docs.cockroachlabs.com/docs/stable/architecture/overview)
+- [Architecture overview](https://docs.cockroachlabs.com/docs/stable/architecture/overview)（2026年11月28日取得。版は本文になく、ページ内リンクの v26.4 から読み取った）
+- [Releases](https://docs.cockroachlabs.com/docs/releases)（2026年11月28日取得。サポート対象リリース表の先頭が v26.4、一般提供日 2026-10-26。「stable」との明示はない）
 
 ## 2. トランザクション
 

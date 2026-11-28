@@ -8,6 +8,8 @@ reference:
     - {title: Milvus consistency level, url: https://milvus.io/docs/consistency.md}
     - {title: Install Milvus cluster with Milvus Operator, url: https://milvus.io/docs/install_cluster-milvusoperator.md}
     - {title: Milvus repository, url: https://github.com/milvus-io/milvus}
+    - {title: Milvus release notes, url: https://milvus.io/docs/release_notes.md}
+    - {title: Milvus Main Components (v2.5.x), url: https://milvus.io/docs/v2.5.x/main_components.md}
 sources: [docs/reference-milvus.md]
 evidence: [{type: doc, ref: docs/reference-milvus.md#§1}, {type: doc, ref: docs/reference-milvus.md#§4}, {type: doc, ref: docs/reference-milvus.md#§6}]
 tiers:
@@ -15,7 +17,7 @@ tiers:
 nodes:
   client: {label: クライアント, kind: client, tier: flow, x: 1, y: 6, description: SDK や REST で接続し、挿入・検索・DDL を送る。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
   proxy: {label: Proxy, kind: service, tier: flow, x: 7, y: 6, description: クライアントの接続先となるステートレスなノード。要求を検証し、各ノードの部分結果を集約して返す。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
-  coordinator: {label: コーディネーター, kind: service, tier: flow, x: 7, y: 1.5, description: クラスタで有効なものは 1 つだけの制御役。DDL・DCL・TSO、ストリーミングの割り当て、クエリのトポロジーとセグメント管理を担う。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
+  coordinator: {label: コーディネーター, kind: service, tier: flow, x: 7, y: 1.5, description: クラスタで有効なものは 1 つだけの制御役。v2.5.x の資料では root・query・data の 3 つに分かれて書かれている。DDL・DCL・TSO、ストリーミングの割り当て、クエリのトポロジーとセグメント管理を担う。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
   meta: {label: メタストレージ, kind: db, tier: flow, x: 14, y: 0.5, description: メタデータのスナップショットとチェックポイントを保存し、サービス登録とヘルスチェックを担う。資料に載る実装は etcd。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
   streaming: {label: ストリーミングノード, kind: service, tier: flow, x: 14, y: 3.5, description: シャード単位で WAL への書き込みと復旧を受け持つ。growing データへの検索に答え、growing を sealed に変換する。, evidence: [{type: doc, ref: docs/reference-milvus.md#§2}]}
   query: {label: クエリノード, kind: service, tier: flow, x: 14, y: 9, description: オブジェクトストレージから sealed の履歴データとインデックスを読み込み、履歴データへの検索に答える。, evidence: [{type: doc, ref: docs/reference-milvus.md#§3}]}
@@ -53,7 +55,7 @@ unknowns:
   - {id: UNK-01, text: Proxy からストリーミングノードへの書き込み経路と、growing から sealed への変換後の保存の担い手は、概要ページの記述だけでは細部を確認できず未確認。, refs: [proxy, streaming]}
   - {id: UNK-02, text: データノードがインデックスをいつどう構築し、クエリノードがどう読み込むかの詳細は未確認。DiskANN など on-disk インデックスの扱いも未確認。, refs: [data, query]}
   - {id: UNK-03, text: TSO の仕組みと WAL による耐久性の詳細は整合性レベルのページに記載がなく未確認。, refs: [coordinator, wal]}
-  - {id: UNK-04, text: 版による差（2.6 系のストリーミングノードや Woodpecker の導入時期、旧構成のコーディネーター分割）は未確認。, refs: [coordinator, streaming]}
+  - {id: UNK-04, text: v2.5.x の資料では Root coord・Query coord・Data coord と Index node が挙がり、現行資料と構成が違うことは確認した。ストリーミングノード・Woodpecker・単一コーディネーターの導入版と、旧 3 コーディネーターの役割の移り先は未確認。, refs: [coordinator, streaming]}
 gates: {maxDrift: 0, maxHigh: 0}
 implementations:
   - id: k8s-operator

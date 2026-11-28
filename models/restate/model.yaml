@@ -6,6 +6,8 @@ reference:
     - {title: Restate Durable Execution, url: https://docs.restate.dev/concepts/durable_execution}
     - {title: Restate Services, url: https://docs.restate.dev/foundations/services}
     - {title: Restate Clusters, url: https://docs.restate.dev/operate/clusters}
+    - {title: Restate Architecture, url: https://docs.restate.dev/references/architecture}
+    - {title: Restate Versioning, url: https://docs.restate.dev/operate/registration}
     - {title: Restate GitHub LICENSE, url: https://github.com/restatedev/restate/blob/main/LICENSE}
 sources: [docs/reference-restate.md]
 evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}, {type: doc, ref: "docs/reference-restate.md#§4"}]
@@ -14,12 +16,12 @@ tiers:
 nodes:
   client: {label: クライアント, kind: client, tier: flow, x: 1, y: 6, description: HTTP などで呼び出しを送る。Kafka やプログラムからの起動もある。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
   ingress: {label: HTTP インジェスト, kind: service, tier: flow, x: 6, y: 6, description: 呼び出しを受け付ける。冪等キーで重複した要求は元の結果を返す。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
-  proc: {label: パーティション処理, kind: service, tier: flow, x: 12, y: 6, description: 呼び出しの進行を追い、ジャーナルを記録し、失敗時に再試行する。内部の部品名は未確認。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
-  admin: {label: 管理とサービス登録, kind: service, tier: flow, x: 12, y: 1.5, description: サービスのデプロイを検出して登録する。手順は未確認。, evidence: [{type: doc, ref: "docs/reference-restate.md#§5"}]}
+  proc: {label: パーティション処理, kind: service, tier: flow, x: 12, y: 6, description: パーティションごとのリーダーが呼び出しの進行を追い、サービスへ双方向ストリームで実行を依頼し、ジャーナルを記録して失敗時に再試行する。内部の部品名は未確認。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
+  admin: {label: 管理とサービス登録, kind: service, tier: flow, x: 12, y: 1.5, description: サービスのデプロイを UI・CLI・Admin API で登録し、既存の定義を壊さないか検査する。エンドポイントへの問い合わせの中身は未確認。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
   meta: {label: メタデータサーバー, kind: db, tier: flow, x: 12, y: 11, description: クラスタの構成情報を持つ。n 台の障害に耐えるには 2n+1 ノード必要。, evidence: [{type: doc, ref: "docs/reference-restate.md#§3"}]}
   service: {label: SDK サービス, kind: worker, tier: flow, x: 19, y: 1.5, description: SDK を組み込んだ Service・Virtual Object・Workflow のハンドラー。状態を持たなくてよい。, evidence: [{type: doc, ref: "docs/reference-restate.md#§2"}]}
   log: {label: 複製ログ, kind: queue, tier: flow, x: 19, y: 5, description: パーティションごとのログ。書き込みは定足数で複製する。, evidence: [{type: doc, ref: "docs/reference-restate.md#§3"}]}
-  state: {label: 実行履歴と状態, kind: db, tier: flow, x: 19, y: 9, description: ジャーナルと Virtual Object・Workflow のキー値状態を保持する。保存形式は未確認。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
+  state: {label: 実行履歴と状態, kind: db, tier: flow, x: 19, y: 9, description: ジャーナル、冪等性のメタデータ、Virtual Object・Workflow のキー別状態、タイマーの索引を、組み込みの RocksDB に持つ。ログから再構築できる派生物。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
   ext: {label: 外部 API・DB, kind: external, tier: flow, x: 26, y: 1.5, description: ハンドラーが副作用として呼ぶ先。結果はジャーナルに記録される。, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
   snap: {label: スナップショット, kind: db, tier: flow, x: 26, y: 9, description: S3 互換の保存先に置く。ログの切り詰めとノード追加に使う。, evidence: [{type: doc, ref: "docs/reference-restate.md#§3"}]}
 links:
@@ -31,7 +33,7 @@ links:
   - {id: proc-invoke, from: proc, to: service, label: ジャーナルと状態を添えて実行を依頼, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
   - {id: svc-journal, from: service, to: proc, label: ステップの結果を記録, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
   - {id: svc-ext, from: service, to: ext, label: 副作用を実行, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}]}
-  - {id: admin-svc, from: admin, to: service, label: デプロイを検出, evidence: [{type: doc, ref: "docs/reference-restate.md#§5"}]}
+  - {id: admin-svc, from: admin, to: service, label: デプロイを検出, evidence: [{type: doc, ref: "docs/reference-restate.md#§1"}, {type: doc, ref: "docs/reference-restate.md#§5"}]}
   - {id: meta-proc, from: meta, to: proc, label: 構成情報を提供, evidence: [{type: doc, ref: "docs/reference-restate.md#§3"}]}
 scenarios:
   - id: crash-and-resume
@@ -42,8 +44,8 @@ scenarios:
       - {links: [svc-ext, svc-journal, proc-log], note: 副作用を実行し、結果をジャーナルに記録する。ここでサービスが止まる。}
       - {links: [proc-invoke, svc-journal], note: 別のインスタンスへ記録済みのジャーナルを添えて再依頼する。完了済みのステップは再実行せず、続きから進む。}
 unknowns:
-  - {id: UNK-01, text: パーティション処理の内部部品（Invoker など）と状態の保存形式は取得した資料に記載がなく未確認。, refs: [proc, state]}
-  - {id: UNK-02, text: サービス登録（discovery）の手順と SDK とのプロトコルの詳細は未確認。, refs: [admin, service]}
+  - {id: UNK-01, text: パーティション処理の内部部品の名称（Invoker など）は取得したアーキテクチャの資料に記載がなく未確認。ジャーナルの保存形式の詳細も未確認（RocksDB に持つことは確認済み）。, refs: [proc, state]}
+  - {id: UNK-02, text: 登録時にサーバーがエンドポイントへ何を問い合わせるか（discovery の中身）と、SDK との通信プロトコルの詳細は未確認。登録方法（UI・CLI・Admin API）と双方向ストリームは確認済み。, refs: [admin, service]}
   - {id: UNK-03, text: 版ごとの機能差と Restate Cloud の仕様は未確認。, refs: [proc]}
 gates: {maxDrift: 0, maxHigh: 0}
 implementations:

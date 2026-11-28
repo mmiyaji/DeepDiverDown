@@ -8,6 +8,11 @@ reference:
     - {title: Weaviate vector index, url: https://docs.weaviate.io/weaviate/concepts/vector-index}
     - {title: Weaviate (GitHub), url: https://github.com/weaviate/weaviate}
     - {title: Weaviate deployment, url: https://docs.weaviate.io/deploy}
+    - {title: Weaviate vector quantization, url: https://docs.weaviate.io/weaviate/concepts/vector-quantization}
+    - {title: Weaviate PQ compression, url: https://docs.weaviate.io/weaviate/configuration/compression/pq-compression}
+    - {title: Weaviate BQ compression, url: https://docs.weaviate.io/weaviate/configuration/compression/bq-compression}
+    - {title: Weaviate SQ compression, url: https://docs.weaviate.io/weaviate/configuration/compression/sq-compression}
+    - {title: Weaviate RQ compression, url: https://docs.weaviate.io/weaviate/configuration/compression/rq-compression}
 sources: [docs/reference-weaviate.md]
 evidence: [{type: doc, ref: docs/reference-weaviate.md#§1}, {type: doc, ref: docs/reference-weaviate.md#§6}]
 tiers:
@@ -20,7 +25,7 @@ nodes:
   raft: {label: メタデータの合意（Raft）, kind: service, tier: flow, x: 13, y: 1.5, description: v1.25 以降、コレクション定義とテナントの状態をリーダー経由の Raft で確定し、全ノードへ複製する。, evidence: [{type: doc, ref: docs/reference-weaviate.md#§4}]}
   shard: {label: シャード, kind: db, tier: flow, x: 19, y: 5, description: コレクションのデータの分割単位。マルチテナントではテナントごとに 1 シャードで、専用の索引を持つ。, evidence: [{type: doc, ref: docs/reference-weaviate.md#§3}]}
   replication: {label: データ複製（リーダーレス）, kind: service, tier: flow, x: 19, y: 9.5, description: 複製係数ぶんのレプリカへ書く。一貫性レベル ONE・QUORUM・ALL を書き込みと読み取りで選ぶ。, evidence: [{type: doc, ref: docs/reference-weaviate.md#§4}]}
-  vindex: {label: ベクトル索引, kind: db, tier: flow, x: 25, y: 2, description: HNSW、flat、dynamic から選ぶ。HNSW はメモリ上のグラフで、量子化でメモリを減らせる。, evidence: [{type: doc, ref: docs/reference-weaviate.md#§5}]}
+  vindex: {label: ベクトル索引, kind: db, tier: flow, x: 25, y: 2, description: HNSW、flat、dynamic から選ぶ。HNSW はメモリ上のグラフで、PQ・SQ・BQ・RQ の量子化でメモリを減らせる（flat は BQ と RQ のみ）。, evidence: [{type: doc, ref: docs/reference-weaviate.md#§5}]}
   inverted: {label: 転置索引, kind: db, tier: flow, x: 25, y: 5.5, description: BM25 のキーワード検索とフィルター用の索引。, evidence: [{type: doc, ref: docs/reference-weaviate.md#§3}]}
   objstore: {label: オブジェクトストア, kind: db, tier: flow, x: 25, y: 9, description: オブジェクトのプロパティ、メタデータ、ベクトルを保持する。, evidence: [{type: doc, ref: docs/reference-weaviate.md#§3}]}
 links:
@@ -48,6 +53,7 @@ unknowns:
   - {id: UNK-02, text: ハイブリッド検索の結果の統合方法とフィルター付き検索の実装は取得した資料に記載がなく未確認。, refs: [api, vindex]}
   - {id: UNK-03, text: 非同期複製の伝播の仕組みと read repair の動作は取得した資料に記載がなく未確認。, refs: [replication]}
   - {id: UNK-04, text: 永続ボリュームの設定、バックアップ、認証・RBAC の詳細は取得した資料に記載がなく未確認。, refs: [objstore]}
+  - {id: UNK-05, text: PQ・BQ・SQ が導入された版番号は取得した資料に記載がなく未確認。, refs: [vindex]}
 gates: {maxDrift: 0, maxHigh: 0}
 implementations:
   - id: onprem-cluster

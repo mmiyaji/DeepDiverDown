@@ -6,6 +6,8 @@ reference:
     - {title: Cadence Introduction, url: https://cadenceworkflow.io/docs/concepts/}
     - {title: Cadence Workflows, url: https://cadenceworkflow.io/docs/concepts/workflows/}
     - {title: Cadence Deployment topology, url: https://cadenceworkflow.io/docs/concepts/topology/}
+    - {title: Cadence Service Dependencies, url: https://cadenceworkflow.io/docs/tech-review/day-0-planning/design/service-dependencies}
+    - {title: Cadence Cluster Configuration, url: https://cadenceworkflow.io/docs/operation-guide/setup/}
     - {title: Cadence Task lists, url: https://cadenceworkflow.io/docs/concepts/task-lists/}
     - {title: cadence-workflow/cadence (GitHub), url: https://github.com/cadence-workflow/cadence}
 sources: [docs/reference-cadence.md]
@@ -44,9 +46,9 @@ scenarios:
 requirements:
   - {id: CD-01, kind: rule, title: ワークフローのコードは決定的にする, text: 回復はイベントソーシングによるため、ワークフローのコードは同じ結果を再現する必要がある。外部との通信はアクティビティで行い、時刻の取得やスリープは Cadence の API を使う。, links: [tl-wf, wf-fe], evidence: [{type: doc, ref: docs/reference-cadence.md#§1}]}
 unknowns:
-  - {id: UNK-01, text: シャード数と、History サービス内のシャードの割り当て方は取得した資料に記載がなく未確認。, refs: [history]}
+  - {id: UNK-01, text: 本構成で採るシャード数の具体値は未確認。シャードがワークフローごとに 1 つ対応し、一貫性ハッシュのリングで History ノードが持つこと、数は作成後に変えられないことは確認済み。, refs: [history]}
   - {id: UNK-02, text: スティッキー実行（決定タスクを同じワーカーへ戻す仕組み）は取得した資料に記載がなく未確認。, refs: [tasklist, wfworker]}
-  - {id: UNK-03, text: Internal Worker（アーカイブなど内部用ワークフローの実行）との接続の向きと、アーカイブ先は未確認のため図に描いていない。, refs: [history]}
+  - {id: UNK-03, text: Internal Worker（Worker サービス）は RPC の API を持たずメンバーシップ経由で到達されることまでは確認済みだが、他サービスとの接続の向きは未確認のため図に描いていない。アーカイブ先は S3・GCS・ファイルシステムの種類があるが、本構成での選択は未確認。, refs: [history]}
   - {id: UNK-04, text: クロスデータセンターレプリケーションとスケジュールの詳細は未取得で未確認。, refs: [history]}
 gates: {maxDrift: 0, maxHigh: 0}
 implementations:

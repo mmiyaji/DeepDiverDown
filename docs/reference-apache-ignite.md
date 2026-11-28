@@ -6,6 +6,13 @@ Apache Ignite 2.x は、サーバーノードのクラスタにキャッシュ�
 
 [Ignite 2 の SQL](https://ignite.apache.org/docs/ignite2/latest/SQL/sql-introduction)
 
+§8 の確認に使った資料（いずれも取得日 2026年11月28日。内容は Ignite 2 系の記述）：
+
+- [Native Persistence](https://ignite.apache.org/docs/latest/persistence/native-persistence)
+- [Persistence Tuning](https://ignite.apache.org/docs/latest/perf-and-troubleshooting/persistence-tuning)
+- [General Performance Tips](https://ignite.apache.org/docs/latest/perf-and-troubleshooting/general-perf-tips)
+- [Network Configuration](https://ignite.apache.org/docs/latest/clustering/network-configuration)
+
 ## 2. パーティションとキャッシュモード
 
 データはパーティション（既定で 0〜1023）に分かれてサーバーノードへ配置される。アフィニティ関数がキーをパーティションへ、パーティションをノードへ対応付ける。既定は rendezvous hashing で、トポロジ変更時に動くパーティションは参加・離脱したノードに関わるものだけである。
@@ -50,8 +57,8 @@ Ignite 3 の最新リリースは 3.1.0 で、ドキュメントは別系統（`
 | 機能 | 具体的な担い手 |
 | --- | --- |
 | クライアント | アプリケーション（JDBC・ネイティブ API） |
-| サーバーノード | Ignite サーバーノード（ノード数は未確認） |
+| サーバーノード | Ignite サーバーノード（複数台のクラスタを推奨。具体的な台数は資料になく未確認） |
 | インメモリのキャッシュ | PARTITIONED / REPLICATED キャッシュ |
 | 永続化 | 各ノードのローカルディスクの WAL とパーティションファイル |
 
-代表的な構成であり、導入事例や動作検証済みの構成ではない。ノード台数、ネットワーク構成、ディスク種別は未確認。
+代表的な構成であり、導入事例や動作検証済みの構成ではない。公式資料で確認できた範囲は次のとおり。台数は、1 ノードだけでなく複数ノードのクラスタで試験することを勧め、物理マシン 1 台につき 1 ノードを推奨する。仮想環境では 1 つのホストに複数のサーバー VM を置くと、そのホストの故障でデータを失うおそれがある。ネットワークは、ノード同士が探索用ポート（既定 47500）と通信用ポート（既定 47100）で届く必要があり、使えない場合は後続の 100 ポートを試す。ノードが複数のアドレスを持つ場合は、ノード間通信に使うインターフェースを `localAddress` などで指定する。IPv4 と IPv6 の混在はクラスタ分断の原因になりうるため、IPv6 が不要なら `-Djava.net.preferIPv4Stack=true` を使う。ディスクは、データ用と WAL 用で別のドライブにすることを勧め、例はデータが SSD、WAL と WAL アーカイブが HDD。本番では高性能な SSD を勧める。具体的なノード台数の目安、帯域やファイアウォールの要件、容量計画の指針は資料になく未確認。

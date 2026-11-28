@@ -5,6 +5,8 @@
 YugabyteDB は PostgreSQL 互換をうたう分散 SQL データベースである。公式の GitHub リポジトリは、データベース本体を Apache License 2.0、管理基盤 YugabyteDB Anywhere（`managed/`）を Polyform Free Trial License 1.0.0 としている。既定のビルドは Apache 2.0 のデータベースのバイナリだけを作る。商用サービスもある（提供形態の詳細は未確認）。得意とするのはクラウドネイティブな OLTP とされる。
 
 - [yugabyte-db（GitHub）](https://github.com/yugabyte/yugabyte-db)
+- [Tablet splitting](https://docs.yugabyte.com/preview/architecture/docdb-sharding/tablet-splitting/)（2026年11月28日取得。§4 のタブレット分割の根拠）
+- [Colocated tables](https://docs.yugabyte.com/stable/additional-features/colocation/)（2026年11月28日取得。§4 のコロケーションの根拠。preview 版の同名ページは stable 版へ転送された）
 
 ## 2. 2 層構造と API
 
@@ -23,7 +25,7 @@ DocDB はテーブルをタブレットという複数のシャードとして�
 - ハッシュシャーディング：シャード列のハッシュで行を散らす。ハッシュ空間は 2 バイトで、最大 64K タブレット。16 タブレットなら各 4,096 値を担当する。範囲検索は不得手。YSQL は `PRIMARY KEY (customer_id HASH)` のように指定し、YCQL は既定でハッシュ。
 - レンジシャーディング：主キーの並びで連続した範囲に分ける。最初は 1 タブレットで、データの増加に応じて動的に分割される。範囲検索に向くがホットスポットが起きうる。YSQL は `ASC` などで指定し、YCQL は非対応。
 
-タブレット分割とコロケーションの詳細は未確認。
+タブレット分割には 3 通りある。事前分割はテーブル作成時にタブレット数を決める方法で、ハッシュシャーディングの YSQL は `SPLIT INTO n TABLETS`、YCQL は `WITH tablets` で指定し、レンジシャーディングの YSQL は `SPLIT AT VALUES` で分割点を並べる。手動分割は稼働中のテーブルに `yb-admin split_tablet <tablet_uuid>` を実行する。タブレットの併合は未対応で、手動分割を使いすぎるとタブレットの大きさとアクセスが偏る。自動分割は 2.18.0 から既定で有効で、ノードあたりのタブレット数に応じた 3 段階の閾値（128 MiB、10 GiB、100 GiB）で分割する。新しいハッシュシャーディングのテーブルは、既定でノードごとに 1 タブレットになる。コロケーションは、関連する複数のテーブルを 1 つの親タブレット（コロケーションタブレット）に置き、テーブルごとにタブレットを作らない方式で、データはクラスタの RF に従って複製される。クラスタ全体の既定は `ysql_colocate_database_by_default = true`、データベース単位は `CREATE DATABASE <name> with COLOCATION = true` で指定する。コロケーションされたデータベース内のテーブルは既定でコロケーションされ、`WITH (COLOCATION = false)` で外せる。コロケーションされたテーブルは分割できない。負荷が偏るテーブルはコロケーションしないよう資料は勧めている。コロケーションタブレット内の内部配置と、コロケーション済みテーブルの性能は未確認。
 
 - [Sharding data across nodes](https://docs.yugabyte.com/preview/architecture/docdb-sharding/sharding/)
 

@@ -5,6 +5,9 @@
 Milvus はベクトルを保存して類似検索を行うオープンソースのデータベースである。リポジトリの README は Apache 2.0 ライセンスで配布され、LF AI & Data Foundation 配下のプロジェクトで、Zilliz が主な貢献者と記す。デプロイの形は 3 つあり、Milvus Lite（pip で入れてファイルから動かす）、Standalone（1 台）、Distributed（Kubernetes 前提の分散構成）である。Zilliz Cloud（Serverless・Dedicated・BYOC）は別のマネージドサービスで、この資料の対象外とする。2026 年 11 月時点の公式資料に基づく。
 
 - [Milvus repository](https://github.com/milvus-io/milvus)
+- [Milvus release notes](https://milvus.io/docs/release_notes.md)（取得日 2026年11月28日。コーディネーターと Streaming Service の記述の確認）
+- [Milvus architecture overview（v2.5.x）](https://milvus.io/docs/v2.5.x/architecture_overview.md)（取得日 2026年11月28日。層の名前のみで個別の部品名なし）
+- [Milvus Main Components（v2.5.x）](https://milvus.io/docs/v2.5.x/main_components.md)（取得日 2026年11月28日。旧構成のコーディネーターとワーカーの名前の確認）
 
 ## 2. 四つの層
 
@@ -15,7 +18,7 @@ Milvus はベクトルを保存して類似検索を行うオープンソース�
 - ワーカーノード：ステートレスで、コーディネーターの指示に従う。ストリーミングノードはシャード単位で WAL 上の一貫性と復旧を受け持ち、growing データへの検索に答え、growing を sealed に変換する。クエリノードはオブジェクトストレージから履歴データを読み込んで検索に答える。データノードは compaction とインデックス構築を行う。
 - ストレージ層：メタストレージ（資料に載る実装は etcd）、メッセージ（WAL）ストレージ（Woodpecker、Pulsar、Kafka）、オブジェクトストレージ（MinIO、AWS S3、Azure Blob Storage）。Woodpecker はローカルディスクを使わず、オブジェクトストレージへ直接書く設計と説明されている。
 
-資料はコーディネーターを 1 つの役割として書いており、root・data・query に分かれた旧来の呼び名は取得した資料に出てこない。版による構成差は未確認。
+現行の概要ページはコーディネーターを 1 つの役割として書く。v2.5.x 版の Main Components ページは Root coord・Query coord・Data coord の 3 つのコーディネーターと、Query node・Index node・Data node を挙げ、Mix coord とストリーミングノードの記載はない。リリースノートの 3.0.x の修正項目には MixCoord と Streaming Service の名が出る。旧来の 3 つの呼び名と現行の 1 つの役割は、版によって構成が違うことまでを確認した。切り替わった版の番号と、旧 3 コーディネーターの役割が現行のどこへ移ったかは未確認。
 
 - [Milvus architecture overview](https://milvus.io/docs/architecture_overview.md)
 

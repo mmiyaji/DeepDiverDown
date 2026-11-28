@@ -9,6 +9,9 @@ reference:
     - {title: Colocating Computations With Data (2.18), url: https://ignite.apache.org/docs/ignite2/latest/distributed-computing/collocated-computations}
     - {title: Ignite 2 SQL (2.18), url: https://ignite.apache.org/docs/ignite2/latest/SQL/sql-introduction}
     - {title: Apache Ignite 3 docs, url: https://ignite.apache.org/docs/ignite3/latest/}
+    - {title: Persistence Tuning, url: https://ignite.apache.org/docs/latest/perf-and-troubleshooting/persistence-tuning}
+    - {title: General Performance Tips, url: https://ignite.apache.org/docs/latest/perf-and-troubleshooting/general-perf-tips}
+    - {title: Network Configuration, url: https://ignite.apache.org/docs/latest/clustering/network-configuration}
 sources: [docs/reference-apache-ignite.md]
 evidence: [{type: doc, ref: docs/reference-apache-ignite.md#§1}, {type: doc, ref: docs/reference-apache-ignite.md#§7}]
 tiers:
@@ -51,11 +54,12 @@ requirements:
 unknowns:
   - {id: UNK-01, text: Ignite 3 の Raft、スキーマ駆動テーブル、compute の仕様と Ignite 2 からの移行は今回取得した資料になく未確認。, refs: [partitioned]}
   - {id: UNK-02, text: 分散 JOIN の挙動とリバランスの詳細は取得範囲になく未確認。, refs: [sql]}
+  - {id: UNK-03, text: 具体的なノード台数の目安、帯域とファイアウォールの要件、容量計画の指針は公式資料で確認できず未確認。, refs: [partitioned]}
 gates: {maxDrift: 0, maxHigh: 0}
 implementations:
   - id: onprem-cluster
     label: 自前のサーバー群で動かす Ignite 2.18 クラスタ
-    description: アプリケーションが複数の Ignite サーバーノードに接続し、各ノードのローカルディスクに永続化する構成の例。代表例であり、導入事例ではない。
+    description: アプリケーションが複数の Ignite サーバーノードに接続し、各ノードのローカルディスクに永続化する構成の例。公式資料は物理マシン 1 台につき 1 ノードの複数台クラスタ、ノード間の探索用ポート（既定 47500）と通信用ポート（既定 47100）の疎通、データと WAL を別ドライブに置くこと（例はデータが SSD、WAL が HDD）を述べる。具体的な台数、帯域、ディスク容量は未確認。代表例であり、導入事例ではない。
     sources:
       - {title: Data Partitioning (2.18), url: https://ignite.apache.org/docs/ignite2/latest/data-modeling/data-partitioning}
       - {title: Native Persistence (2.18), url: https://ignite.apache.org/docs/ignite2/latest/persistence/native-persistence}
@@ -64,8 +68,8 @@ implementations:
     nodes:
       ig-app: {label: アプリケーション, kind: client, tier: diagram, x: 1, y: 5.5, realizes: [client], description: JDBC・ネイティブ API で接続する。, evidence: [{type: doc, ref: docs/reference-apache-ignite.md#§8}]}
       ig-node: {label: Ignite サーバーノード, kind: service, tier: diagram, x: 9, y: 5.5, realizes: [affinity, sql, compute, partitioned, replicated], description: アフィニティ、SQL、コロケーション計算、キャッシュを 1 つの JVM プロセスで担う。ノード台数は未確認。, management: {type: customer, scope: "Customer operates the nodes, configuration and upgrades."}, evidence: [{type: doc, ref: docs/reference-apache-ignite.md#§8}]}
-      ig-wal: {label: ローカルディスクの WAL, kind: db, tier: diagram, x: 18, y: 3, realizes: [wal], description: 既定の保存先は IGNITE_WORK_DIR 配下。, management: {type: customer, scope: "Customer operates the disks."}, evidence: [{type: doc, ref: docs/reference-apache-ignite.md#§8}]}
-      ig-files: {label: ローカルディスクのパーティションファイル, kind: db, tier: diagram, x: 18, y: 8, realizes: [partfiles], description: パーティションごとのファイル。, management: {type: customer, scope: "Customer operates the disks."}, evidence: [{type: doc, ref: docs/reference-apache-ignite.md#§8}]}
+      ig-wal: {label: ローカルディスクの WAL, kind: db, tier: diagram, x: 18, y: 3, realizes: [wal], description: 既定の保存先は IGNITE_WORK_DIR 配下。データとは別のドライブに置くことが勧められ、例では HDD。, management: {type: customer, scope: "Customer operates the disks."}, evidence: [{type: doc, ref: docs/reference-apache-ignite.md#§8}]}
+      ig-files: {label: ローカルディスクのパーティションファイル, kind: db, tier: diagram, x: 18, y: 8, realizes: [partfiles], description: パーティションごとのファイル。WAL とは別のドライブに置くことが勧められ、例では SSD。, management: {type: customer, scope: "Customer operates the disks."}, evidence: [{type: doc, ref: docs/reference-apache-ignite.md#§8}]}
     links: []
     groups:
       - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [ig-node, ig-wal, ig-files]}

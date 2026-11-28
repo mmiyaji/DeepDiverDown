@@ -6,6 +6,11 @@ Weaviate はオブジェクトとそのベクトルを保存し、ベクトル�
 
 - [Weaviate (GitHub)](https://github.com/weaviate/weaviate)
 - [Weaviate deployment](https://docs.weaviate.io/deploy)
+- [Weaviate vector quantization](https://docs.weaviate.io/weaviate/concepts/vector-quantization)（取得日 2026年11月28日）
+- [Weaviate PQ compression](https://docs.weaviate.io/weaviate/configuration/compression/pq-compression)（取得日 2026年11月28日）
+- [Weaviate BQ compression](https://docs.weaviate.io/weaviate/configuration/compression/bq-compression)（取得日 2026年11月28日）
+- [Weaviate SQ compression](https://docs.weaviate.io/weaviate/configuration/compression/sq-compression)（取得日 2026年11月28日）
+- [Weaviate RQ compression](https://docs.weaviate.io/weaviate/configuration/compression/rq-compression)（取得日 2026年11月28日）
 
 ## 2. 登録と検索の流れ
 
@@ -42,7 +47,7 @@ Weaviate はオブジェクトとそのベクトルを保存し、ベクトル�
 - dynamic（実験的、v1.25 以降）：flat で始め、オブジェクト数が閾値（既定 10,000）を超えると HNSW へ切り替える。`ASYNC_INDEXING=true` が必要で、切り替えは一方向。
 - HFresh（v1.36 以降）：HNSW の重心索引とディスク上の投稿リストを持つクラスタ型。距離は `cosine` と `l2-squared` のみ。
 
-量子化の方式（PQ・BQ・SQ・RQ）の詳細は、取得した資料に回転量子化（RQ）以外の記載がなく未確認。
+量子化は 4 方式ある。PQ（直積量子化）はベクトルを区間に分け、区間ごとにコードブックの重心へ置き換える。既定の重心数は 256、訓練数は 1 シャードあたり 100,000 件（`trainingLimit`）で、HNSW のみ対応し、flat は非対応。SQ（スカラー量子化）は 32 ビットの浮動小数を 8 ビットの区間に写し、約 4 倍に圧縮する。訓練が必要で、既定の訓練数は 1 シャードあたり 100,000 件、HNSW のみ対応。BQ（二値量子化）は各次元を 1 ビットにし、32 倍に圧縮する。HNSW と flat に対応する。RQ（回転量子化）は擬似乱数の回転をかけてから量子化し、8 ビット（約 4 倍、再現率 98〜99%）、4 ビット（約 8 倍）、1 ビット（32 倍に近づく）を選べ、訓練は不要。8 ビットは HNSW が v1.32、flat が v1.35、1 ビットは HNSW が v1.33、flat が v1.35、4 ビットは HNSW のみで v1.40 から。SQ・BQ・RQ は圧縮後のベクトルで多めに候補を取り、非圧縮のベクトルで再採点する。BQ と SQ は v1.31 から既存コレクションでも有効にできる。いったん設定した量子化は無効にできない。PQ の訓練は、手動か、`ASYNC_INDEXING=true` での自動（AutoPQ）。PQ・BQ・SQ が導入された版番号は取得した資料に記載がなく未確認。
 
 - [Weaviate vector index](https://docs.weaviate.io/weaviate/concepts/vector-index)
 
