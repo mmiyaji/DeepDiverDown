@@ -17,6 +17,7 @@ export const DEFAULTS = {
   disabledRules: [],    // 無効にした指摘ルール
   gates: {},            // 点検しきい値の上書き { maxDrift, maxHigh }
   sidebar: true,        // サイドバーを開く
+  productIntro: true,   // 製品の概要図を開いたとき、製品の特徴を自動で表示する
 };
 
 export function loadSettings() {

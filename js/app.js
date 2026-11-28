@@ -13,7 +13,7 @@ import { openDesign } from './design.js?v=objects1';
 import { FileMap } from './filemap.js?v=review1';
 import { initResize } from './resize.js?v=rz3';
 import { productOf, productName, isConcept, shortName, PRODUCT_ALSO } from './products.js?v=4';
-import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=table1';
+import { CATEGORY_INFO, CATEGORY_DOCS } from './categories.js?v=table2';
 import { drawThumbnail } from './home-thumbnail.js';
 import { lab } from './lab.js';
 import { labLayout } from './lab-layout.js';
@@ -908,11 +908,15 @@ function productGroupOf(entry) {
 }
 function productFromCompare(md, name) {
   const lines = md.replace(/\r/g, '').split('\n'), norm = t => t.replace(/\*\*/g, '').replace(/\s+/g, '').toLowerCase();
-  const rows = lines.filter(l => /^\|/.test(l) && !/^[|\s:-]+$/.test(l)).map(l => l.replace(/^\||\|$/g, '').split('|').map(c => c.trim()));
-  if (rows.length < 2) return { features: [], choose: '' };
-  const head = rows[0], key = norm(name);
-  const col = head.findIndex((h, k) => k && (norm(h) === key || norm(h).includes(key) || key.includes(norm(h))));
-  if (col < 0) return { features: [], choose: '' };
+  // 表は見出しで分けて複数あってよい。製品名が列見出しにある最初の表を使う
+  const tables = []; let cur = null;
+  for (const l of lines) {
+    if (/^\|/.test(l)) { if (!cur) tables.push(cur = []); if (!/^[|\s:-]+$/.test(l)) cur.push(l.replace(/^\||\|$/g, '').split('|').map(c => c.trim())); } else cur = null;
+  }
+  const key = norm(name), match = h => h.findIndex((x, k) => k && (norm(x) === key || norm(x).includes(key) || key.includes(norm(x))));
+  const rows = tables.find(t => t.length > 1 && match(t[0]) >= 0);
+  if (!rows) return { features: [], choose: '' };
+  const head = rows[0], col = match(head);
   const features = rows.slice(1).map(r => [r[0], r[col] || '']).filter(([, v]) => v);
   const at = lines.findIndex(l => /^##\s*選び方/.test(l));
   const choose = at < 0 ? '' : lines.slice(at + 1).find(l => /^- /.test(l) && l.includes(`**${head[col]}**`) && l.includes('→'))?.slice(2).split('→')[0].trim() || '';
@@ -921,7 +925,7 @@ function productFromCompare(md, name) {
 async function openProductSummary() {
   const hit = productGroupOf(ENTRY); if (!hit) return;
   const { category, group } = hit, idx = await researchIndex();
-  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
   const description = idx.get(group.overview.id)?.description || '', oss = ossFacts(await ossStats(), group.name);
   let features = [], choose = '';
   const slug = CATEGORY_DOCS[category];
@@ -1803,7 +1807,8 @@ function openSettings() {
       + row('3D の部品デザイン', '', select('nodeStyle3D', '3D の部品デザイン', [['components', '形と色で部品を区別'], ['flow', 'フロアと接続を強調']], S.nodeStyle3D === 'flow' ? 'flow' : 'components')),
     controls: row('初期の表示', '', select('dimension', '初期の表示', [['3', '3D'], ['2', '2D']], S.dimension))
       + row('初期の視点', '', select('defaultView', '初期の視点', [['iso', '斜め'], ['top', '真上'], ['side', '横'], ['back', '裏側']], S.defaultView))
-      + row('左ドラッグの既定', '', select('dragMode', '左ドラッグの既定', [['rotate', '回転'], ['pan', '移動']], S.dragMode)),
+      + row('左ドラッグの既定', '', select('dragMode', '左ドラッグの既定', [['rotate', '回転'], ['pan', '移動']], S.dragMode))
+      + row('製品の特徴を自動で表示', '製品の概要図を開いたとき、その製品の特徴を表示します。同じ製品は、このタブで一度だけです。', `<label class="switch"><input type="checkbox" name="productIntro" aria-label="製品の特徴を自動で表示" ${S.productIntro !== false ? 'checked' : ''}><span></span></label>`),
     ai: row('実行先', 'AI 用ビューアでの対話・取り込み・指摘対応に使います。', select('aiProvider', '実行先', Object.entries(AI_PROVIDERS), S.aiProvider === 'codex' ? 'codex' : 'claude')),
     review: group('点検のしきい値')
       + `<p class="set-h set-note">空欄の場合はモデルの設定を使います。</p>`
@@ -1840,6 +1845,7 @@ function openSettings() {
     S.nodeStyle2D = fd.get('nodeStyle2D') === 'silhouette' ? 'silhouette' : 'card';
     S.aiProvider = fd.get('aiProvider') === 'codex' ? 'codex' : 'claude';
     if (hasIcons) S.officialIcons = fd.has('officialIcons');
+    S.productIntro = fd.has('productIntro');
     const g = {}; for (const k of ['maxDrift', 'maxHigh']) if (fd.get(k) !== '') g[k] = Math.max(0, +fd.get(k)); S.gates = g;
     S.disabledRules = rules.map(r => r.id).filter(id => !fd.getAll('rule').includes(id));
     f.querySelectorAll('output')[0].textContent = Math.round(S.labelScale * 100) + '%';
@@ -2194,3 +2200,10 @@ if (adminView) {
 }
 // 製品に属する図だけ、「製品の特徴」ボタンを出す
 $('product-summary').hidden = !productGroupOf(ENTRY);
+// 製品の概要図を開いたら、製品の特徴を自動で見せる（設定でオフにできる。同じ製品は、このタブで一度だけ）
+{
+  const hit = !PREVIEW && !adminView && S.productIntro !== false && ENTRY.reference?.role === 'overview' ? productGroupOf(ENTRY) : null;
+  let first = false;
+  if (hit) { try { const k = 'ddd.intro.' + hit.group.name; first = !sessionStorage.getItem(k); sessionStorage.setItem(k, '1'); } catch { first = false; } }
+  if (first && $('modal').hidden) void openProductSummary();
+}
