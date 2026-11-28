@@ -26,12 +26,38 @@
     github: { label: 'GitHub', color: '#57606A' },
     postgresql: { label: 'PostgreSQL', color: '#336791' },
     airbyte: { label: 'Airbyte', color: '#6d6a63' },
+    oss: { label: 'OSS 製品', color: '#6d6a63' },
   };
   const S = (abbr, name, cat, more = {}) => ({ abbr, name, cat, ...more });
   const I = true; // infra
   const SERVICES = {
     fivetran: { platform: S('Fivetran', 'Fivetran SaaS', 'int') },
     github: { platform: S('GitHub', 'GitHub.com', 'devtools') },
+    // OSS 製品のロゴは Simple Icons（icons/oss/、tools/fetch-provider-icons.mjs で取得）。製品名の商標は各プロジェクトに帰属する
+    oss: {
+      spark: S('Spark', 'Apache Spark', 'compute', { icon: ['apachespark'] }),
+      kafka: S('Kafka', 'Apache Kafka', 'int', { shape: 'queue', icon: ['apachekafka'] }),
+      flink: S('Flink', 'Apache Flink', 'compute', { icon: ['apacheflink'] }),
+      airflow: S('Airflow', 'Apache Airflow', 'mgmt', { icon: ['apacheairflow'] }),
+      trino: S('Trino', 'Trino', 'compute', { icon: ['trino'] }),
+      clickhouse: S('CH', 'ClickHouse', 'db', { shape: 'cyl', icon: ['clickhouse'] }),
+      duckdb: S('Duck', 'DuckDB', 'db', { shape: 'cyl', icon: ['duckdb'] }),
+      qdrant: S('Qdrant', 'Qdrant', 'db', { shape: 'cyl', icon: ['qdrant'] }),
+      milvus: S('Milvus', 'Milvus', 'db', { shape: 'cyl', icon: ['milvus'] }),
+      prometheus: S('Prom', 'Prometheus', 'mgmt', { icon: ['prometheus'] }),
+      influxdb: S('Influx', 'InfluxDB', 'db', { shape: 'cyl', icon: ['influxdb'] }),
+      timescaledb: S('TSDB', 'TimescaleDB', 'db', { shape: 'cyl', icon: ['timescale'] }),
+      victoriametrics: S('VM', 'VictoriaMetrics', 'db', { shape: 'cyl', icon: ['victoriametrics'] }),
+      redis: S('Redis', 'Redis', 'db', { shape: 'cyl', icon: ['redis'] }),
+      neo4j: S('Neo4j', 'Neo4j', 'db', { shape: 'cyl', icon: ['neo4j'] }),
+      tidb: S('TiDB', 'TiDB', 'db', { shape: 'cyl', icon: ['tidb'] }),
+      cockroachdb: S('CRDB', 'CockroachDB', 'db', { shape: 'cyl', icon: ['cockroachlabs'] }),
+      temporal: S('Temporal', 'Temporal', 'compute', { icon: ['temporal'] }),
+      airbyte: S('Airbyte', 'Airbyte', 'int', { icon: ['airbyte'] }),
+      parquet: S('Parquet', 'Apache Parquet', 'storage', { shape: 'cyl', icon: ['apacheparquet'] }),
+      arrow: S('Arrow', 'Apache Arrow', 'compute', { icon: ['apachearrow'] }),
+      avro: S('Avro', 'Apache Avro', 'storage', { shape: 'cyl', icon: ['apacheavro'] }),
+    },
     postgresql: { server: S('PG', 'PostgreSQL', 'db', { shape: 'cyl' }) },
     airbyte: {
       server: S('AB', 'Airbyte Server', 'mgmt'),

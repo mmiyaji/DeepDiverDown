@@ -214,6 +214,7 @@ implementations:
         realizes:
           - collection
       ex-search:
+        svc: oss:qdrant
         label: Qdrant 検索 API
         kind: service
         tier: flow
@@ -307,7 +308,7 @@ implementations:
       aws-qdrant-ec2: {label: "Amazon EC2 / ノードグループ", svc: ec2, kind: host, tier: compute, x: 17, y: 1.5, description: "Qdrant と検索アプリの Pod を実行する Kubernetes ノード。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
       aws-qdrant-app: {label: "Python 検索アプリ", kind: service, tier: compute, x: 3, y: 1.5, realizes: [app], description: "Qdrant Client と同じ Python プロセス内で埋め込みモデルを実行する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
       aws-qdrant-embed: {label: "FastEmbed / BGE small", kind: worker, tier: compute, x: 7, y: 1.5, realizes: [embed], description: "文書とクエリを同じモデルで 384 次元のベクトルに変換する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
-      aws-qdrant-qdrant: {label: "Qdrant StatefulSet", kind: db, tier: compute, x: 12, y: 1.5, realizes: [collection, search, segment], description: "クラスタ内の Service 経由でクエリを受け、コレクションとセグメントを管理する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
+      aws-qdrant-qdrant: {svc: 'oss:qdrant', label: "Qdrant StatefulSet", kind: db, tier: compute, x: 12, y: 1.5, realizes: [collection, search, segment], description: "クラスタ内の Service 経由でクエリを受け、コレクションとセグメントを管理する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
       aws-qdrant-csi: {label: EBS CSI ドライバー, kind: worker, svc: k8s:deployment, tier: compute, x: 14, y: 3, description: EBS ボリュームの作成・接続を Kubernetes に提供する。, management: {type: shared, scope: AWS がドライバーを提供し、利用者が導入と権限・更新を管理する。}, evidence: [{type: doc, ref: docs/reference-qdrant.md#§5}]}
       aws-qdrant-volume: {label: "Amazon EBS / 永続ボリューム", svc: ebs, kind: db, tier: storage, x: 12, y: 1.5, description: "EBS CSI で割り当てたブロックストレージのファイルシステムに、Qdrant のデータと索引を保存する。", evidence: [{type: doc, ref: "docs/reference-qdrant.md#§5"}]}
     links:

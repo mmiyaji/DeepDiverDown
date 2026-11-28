@@ -147,6 +147,8 @@ node tools/fetch-provider-icons.mjs
 npm run icons
 ```
 
+OSS 製品（Kafka・Redis・Prometheus など）のロゴは、Simple Icons（CC0。商標は各プロジェクトに帰属）から OSS 製品のロゴ 22 件を icons/oss/ に配置しました。 で取得します（バージョン固定）。
+
 Oracle Cloud のアイコンは同じコマンドで公式の SVG 配布物から取得します。一部のサービス固有アイコンは配布物で確認できず、略称表示になります。Cloudflare の製品アイコンも公式リポジトリから取得します。 Fivetran・GitHub・PostgreSQL は公式ブランド素材の配布元を確認していますが、このサイトでの取得・利用条件は未確認のため、略称で表示します。
 
 Airbyte のロゴの利用条件は未確認です。Airbyte Server、Connector Builder、各コネクターは略称と汎用記号で表示します。図の実行環境は Kubernetes や AWS などの枠で示します。[Airbyte Media Kit](https://airbyte.com/company/press)

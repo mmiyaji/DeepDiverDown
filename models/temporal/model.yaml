@@ -148,6 +148,7 @@ implementations:
           - type: doc
             ref: docs/reference-temporal.md#§6
       temporal-service:
+        svc: oss:temporal
         label: Temporal Server の Frontend・History・Matching
         kind: workflow
         tier: service
@@ -297,8 +298,8 @@ implementations:
       aws-eks-temporal-payment: {label: "外部決済 API（例示）", kind: external, tier: entry, x: 1, y: 3.1, realizes: [payment], description: "同一の操作キーに既存の決済結果を返すと仮定する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
       aws-eks-temporal-eks: {label: "EKS Kubernetes API", kind: service, tier: runtime, x: 1, y: 0.4, svc: eks, description: "AWS 管理 VPC 内の Kubernetes API。利用者は API と公開設定を操作するがサーバーに直接アクセスしない。", management: {type: aws, scope: AWS が制御プレーン基盤を運用し、利用者が API と公開設定を操作する。}, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
       aws-eks-temporal-nodes: {label: "EKS の EC2 ノード", kind: host, tier: runtime, x: 1, y: 3.9, svc: ec2, description: "Temporal Server と Worker の Pod を実行する。", management: {type: shared, scope: EKS がノード作成・更新を支援し、利用者が設定と更新開始を担う。}, evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
-      aws-eks-temporal-server: {label: "Temporal Frontend・History", kind: workflow, tier: runtime, x: 6.2, y: 0.7, realizes: [service], description: "SDK の gRPC 要求を受け、履歴を管理する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
-      aws-eks-temporal-matching: {label: "Temporal Matching", kind: queue, tier: runtime, x: 12.4, y: 0.7, realizes: [queue], description: "Task Queue の Workflow Task と Activity Task をポーリングする Worker へ配る。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-server: {svc: 'oss:temporal', label: "Temporal Frontend・History", kind: workflow, tier: runtime, x: 6.2, y: 0.7, realizes: [service], description: "SDK の gRPC 要求を受け、履歴を管理する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
+      aws-eks-temporal-matching: {svc: 'oss:temporal', label: "Temporal Matching", kind: queue, tier: runtime, x: 12.4, y: 0.7, realizes: [queue], description: "Task Queue の Workflow Task と Activity Task をポーリングする Worker へ配る。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
       aws-eks-temporal-worker-a: {label: "注文 Worker Pod A", kind: worker, tier: runtime, x: 5, y: 4.9, realizes: [workflow-a], description: "注文 Workflow を最初に処理する実行担当の例。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
       aws-eks-temporal-worker-b: {label: "注文 Worker Pod B", kind: worker, tier: runtime, x: 9, y: 4.9, realizes: [workflow-b], description: "別の注文 Worker が Task と履歴を受け、決定的に再生する。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
       aws-eks-temporal-activity: {label: "決済 Activity Worker Pod", kind: worker, tier: runtime, x: 14, y: 4.9, realizes: [activity], description: "専用 Task Queue を読み、注文の操作キーで外部決済を呼ぶ。", evidence: [{type: doc, ref: docs/reference-temporal.md#§7}]}
