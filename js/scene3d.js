@@ -1474,14 +1474,24 @@ export class Scene3D {
       const a = points[i - 1], b = points[i], len = a.distanceTo(b);
       if (len < 0.001) continue;
       const along = b.clone().sub(a).normalize();
-      const across = new THREE.Vector3(-along.z, 0, along.x);
-      if (!across.lengthSq()) across.set(1, 0, -1);
-      across.normalize().multiplyScalar(halfWidth ?? (thick ? 0.05 : 0.03));
-      for (let start = 0; start < len; start += dashed ? dash + gap : len) {
-        const p = a.clone().addScaledVector(along, start);
-        const q = a.clone().addScaledVector(along, dashed ? Math.min(len, start + dash) : len);
-        const corners = [p.clone().sub(across), p.add(across), q.clone().sub(across), q.add(across)];
-        for (const index of [0, 1, 2, 2, 1, 3]) vertices.push(...corners[index].toArray());
+      const width = halfWidth ?? (thick ? 0.05 : 0.03);
+      // 帯は 1 枚だと真横から見たとき厚みがなく消えるため、3D（unit なし）では直交する 2 枚で十字にする。
+      // 縦の区間（フロア間の接続）は、水平に伸びる向きが決まらないので x 軸と z 軸の 2 枚にする
+      const across = [];
+      if (Math.abs(along.y) > 0.98) across.push(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1));
+      else {
+        const flat = new THREE.Vector3(-along.z, 0, along.x).normalize();
+        across.push(flat);
+        if (!unit) across.push(new THREE.Vector3().crossVectors(along, flat).normalize());
+      }
+      for (const direction of across) {
+        const w = direction.clone().multiplyScalar(width);
+        for (let start = 0; start < len; start += dashed ? dash + gap : len) {
+          const p = a.clone().addScaledVector(along, start);
+          const q = a.clone().addScaledVector(along, dashed ? Math.min(len, start + dash) : len);
+          const corners = [p.clone().sub(w), p.clone().add(w), q.clone().sub(w), q.clone().add(w)];
+          for (const index of [0, 1, 2, 2, 1, 3]) vertices.push(...corners[index].toArray());
+        }
       }
     }
     const geo = new THREE.BufferGeometry();
