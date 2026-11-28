@@ -1,0 +1,369 @@
+name: Karapace のスキーマレジストリ
+description: Schema Registry API・REST Proxy・互換性検査・サブジェクトとバージョン・Kafka の _schemas トピック・primary の選出の役割と、スキーマの登録と取得の流れ。
+reference:
+  objectives:
+    - Schema Registry API と REST Proxy の入口を区別する。
+    - スキーマを専用 DB ではなく Kafka の _schemas トピックに保存し、各インスタンスが読み戻す仕組みを説明する。
+    - primary だけが書き込みを担当し、Kafka のグループで選ばれることを説明する。
+  sources:
+    - title: Karapace（GitHub README）
+      url: https://github.com/Aiven-Open/karapace
+    - title: Karapace 公式サイト
+      url: https://karapace.io/
+sources:
+  - docs/reference-karapace.md
+evidence:
+  - { type: doc, ref: "docs/reference-karapace.md#§1" }
+  - { type: doc, ref: "docs/reference-karapace.md#§2" }
+  - { type: doc, ref: "docs/reference-karapace.md#§3" }
+  - { type: doc, ref: "docs/reference-karapace.md#§4" }
+  - { type: doc, ref: "docs/reference-karapace.md#§5" }
+  - { type: doc, ref: "docs/reference-karapace.md#§6" }
+  - { type: doc, ref: "docs/reference-karapace.md#§7" }
+  - { type: doc, ref: "docs/reference-karapace.md#§8" }
+  - { type: doc, ref: "docs/reference-karapace.md#§9" }
+tiers:
+  - id: flow
+    label: スキーマの登録と取得
+    z: 0
+    size: [24, 8]
+nodes:
+  admin:
+    label: 登録担当
+    kind: actor
+    tier: flow
+    x: 0
+    'y': 0.8
+    description: REST でスキーマを登録し、互換性モードを設定する。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§2" }
+  clients:
+    label: Kafka クライアント（Confluent 互換 SerDes）
+    kind: client
+    tier: flow
+    x: 0
+    'y': 4.5
+    replicas: 2
+    description: Producer と Consumer の中でシリアライザーが Registry を呼び、ID に対応するスキーマを取得する。schema.registry.url を Karapace に向ける。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§2" }
+  proxy:
+    label: REST Proxy（8082）
+    kind: service
+    tier: flow
+    x: 5
+    'y': 0
+    description: HTTP で Kafka にレコードを送受信する。スキーマが要る操作では Registry を呼ぶ。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§2" }
+  api:
+    label: Schema Registry API（8081）
+    kind: service
+    tier: flow
+    x: 5
+    'y': 3.2
+    replicas: 2
+    description: Confluent Schema Registry 6.1.1 互換を目標にした REST API。書き込みは primary が担当する。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§2" }
+      - { type: doc, ref: "docs/reference-karapace.md#§6" }
+  compat:
+    label: 互換性モード（BACKWARD・FULL など）
+    kind: policy
+    tier: flow
+    x: 11
+    'y': 0.8
+    description: 新しいバージョンを、最新または過去の全バージョンと比べて検査する。IMPORT モードでは検査しない。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§4" }
+  subjects:
+    label: サブジェクト・バージョン・スキーマ ID
+    kind: catalog
+    tier: flow
+    x: 11
+    'y': 3.8
+    replicas: 2
+    description: サブジェクトごとのバージョン履歴と ID を、トピックから読み込んで作った内部の状態として持つ。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§3" }
+      - { type: doc, ref: "docs/reference-karapace.md#§5" }
+  election:
+    label: primary の選出（Kafka グループ）
+    kind: scheduler
+    tier: flow
+    x: 11
+    'y': 6.6
+    description: group_id のグループで、資格のあるインスタンスから primary を 1 つ選ぶ。既定の戦略は client_id が辞書順で先頭のもの。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§6" }
+  reader:
+    label: schema reader
+    kind: worker
+    tier: flow
+    x: 16.5
+    'y': 3.8
+    replicas: 2
+    description: _schemas トピックを読み、内部の状態を作り続ける。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§5" }
+  topic:
+    label: _schemas トピック（Kafka）
+    kind: queue
+    tier: flow
+    x: 21
+    'y': 3.8
+    replicas: 2
+    description: スキーマと設定の変更を保存する。専用のデータベースは使わない。
+    evidence:
+      - { type: doc, ref: "docs/reference-karapace.md#§5" }
+links:
+  - id: register
+    from: admin
+    to: api
+    label: スキーマを登録する
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§2" }]
+  - id: fetch
+    from: clients
+    to: api
+    label: ID でスキーマを取得する
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§2" }]
+  - id: proxy-registry
+    from: proxy
+    to: api
+    label: スキーマ操作を呼ぶ
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§2" }]
+  - id: check
+    from: api
+    to: compat
+    label: 新しいバージョンを検査する
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§4" }]
+  - id: read-state
+    from: api
+    to: subjects
+    label: バージョンを読む
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§3" }]
+  - id: write-topic
+    from: api
+    to: topic
+    label: primary が変更を書く
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§6" }]
+  - id: elect
+    from: election
+    to: api
+    label: primary を決める
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§6" }]
+  - id: consume
+    from: topic
+    to: reader
+    label: レコードを読む
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§5" }]
+  - id: rebuild
+    from: reader
+    to: subjects
+    label: 内部の状態を更新する
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§5" }]
+scenarios:
+  - id: register-version
+    label: 新しいバージョンを登録する
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§6" }]
+    steps:
+      - links: [register]
+        note: 登録担当が REST でスキーマを送る。
+      - links: [check]
+        note: サブジェクトの互換性モードで、既存のバージョンと比べる。違反は拒否される。
+      - links: [write-topic]
+        note: primary が検査を通ったスキーマを _schemas トピックに書く。
+      - links: [consume, rebuild]
+        note: 各インスタンスの schema reader がレコードを読み、内部の状態に反映する。
+  - id: resolve-schema
+    label: Consumer が ID でスキーマを取得する
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§2" }]
+    steps:
+      - links: [fetch]
+        note: レコードに付いたスキーマ ID で、シリアライザーが API に問い合わせる。
+      - links: [read-state]
+        note: インスタンスが自分の内部の状態から ID に対応するスキーマを返す。
+requirements:
+  - id: BR-01
+    kind: rule
+    title: 書き込みは primary が担当する
+    text: 登録と設定変更は primary が _schemas トピックに書く。primary は Kafka のグループで選ばれ、master_eligibility が false のインスタンスは選ばれない。
+    links: [write-topic, elect]
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§6" }]
+  - id: BR-02
+    kind: rule
+    title: 状態はトピックから再構築できる
+    text: 各インスタンスの内部の状態は _schemas トピックを読んで作る。専用のデータベースは持たない。
+    links: [consume, rebuild]
+    evidence: [{ type: doc, ref: "docs/reference-karapace.md#§5" }]
+unknowns:
+  - id: UNK-01
+    text: replica が書き込みを受けたときの扱い（primary への転送、失敗時の応答、タイムアウト）は、確認した README では説明されていない。
+    refs: [api, election]
+  - id: UNK-02
+    text: 本番での _schemas トピックのレプリカ数の推奨値は README に書かれていない。
+    refs: [topic]
+  - id: UNK-03
+    text: 実装例の台数、VM の大きさ、REST Proxy を同じ VM に置くかは資料で指定されていない。マネージド版の構成も確認していない。
+    refs: [api, proxy]
+gates: { maxDrift: 0, maxHigh: 0 }
+implementations:
+  - id: karapace-onprem-kafka
+    label: オンプレミスの VM・Kafka クラスター
+    description: 利用者のデータセンターで、複数の VM に Karapace を置き、Kafka クラスターの _schemas トピックに保存する構成例。
+    sources:
+      - title: Karapace（GitHub README）
+        url: https://github.com/Aiven-Open/karapace
+    tiers:
+      - { id: entry, label: 利用者, kind: origin, z: 2, size: [20, 4] }
+      - { id: app, label: Karapace, z: 1, size: [20, 8] }
+      - { id: data, label: Kafka, z: 0, size: [20, 4] }
+    nodes:
+      karapace-admin:
+        label: 登録担当
+        kind: actor
+        tier: entry
+        x: 2
+        'y': 1.5
+        realizes: [admin]
+        description: REST でスキーマを登録する。
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+      karapace-clients:
+        label: Kafka クライアント（アプリ）
+        kind: client
+        tier: entry
+        x: 8
+        'y': 1.5
+        realizes: [clients]
+        description: シリアライザーが schema.registry.url にロードバランサーを指定する。
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+      karapace-lb:
+        label: ロードバランサー（8081）
+        kind: gateway
+        tier: app
+        x: 2
+        'y': 4
+        svc: onprem:lb
+        description: Karapace の VM に HTTP を振り分ける。
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+        management: { type: customer, scope: 利用者がロードバランサーと TLS を運用する。 }
+      karapace-primary:
+        label: Karapace VM（primary）
+        kind: service
+        tier: app
+        x: 8
+        'y': 1
+        svc: onprem:vm
+        realizes: [api, compat, subjects, reader, election]
+        description: 選ばれた primary。書き込みを担当し、schema reader で内部の状態を保つ。
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+        management: { type: customer, scope: 利用者が VM、設定、認証を管理する。 }
+      karapace-replica:
+        label: Karapace VM（replica）
+        kind: service
+        tier: app
+        x: 8
+        'y': 4
+        svc: onprem:vm
+        replicas: 2
+        realizes: [api, compat, subjects, reader]
+        description: 読み取りに応える。書き込みの扱いは未確認。
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+        management: { type: customer, scope: 利用者が台数と設定を管理する。 }
+      karapace-proxy:
+        label: REST Proxy（8082）
+        kind: service
+        tier: app
+        x: 14
+        'y': 1
+        svc: onprem:vm
+        realizes: [proxy]
+        description: karapace_rest を有効にしたプロセス。同じ VM か別の VM かは未確認。
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+        management: { type: customer, scope: 利用者が運用する。 }
+      karapace-kafka:
+        label: Kafka クラスター（_schemas）
+        kind: queue
+        tier: data
+        x: 8
+        'y': 1.5
+        svc: oss:kafka
+        replicas: 3
+        realizes: [topic]
+        description: _schemas トピックを保存し、primary 選出のグループも提供する。
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+        management: { type: customer, scope: 利用者が Kafka の運用とレプリケーションを管理する。 }
+    links:
+      - id: karapace-admin-lb
+        from: karapace-admin
+        to: karapace-lb
+        label: 登録を送る
+        realizes: [register]
+        replace: true
+      - id: karapace-clients-lb
+        from: karapace-clients
+        to: karapace-lb
+        label: ID でスキーマを要求
+        realizes: [fetch]
+        replace: true
+      - id: karapace-lb-replica
+        from: karapace-lb
+        to: karapace-replica
+        label: HTTP を振り分ける
+        realizes: [register, fetch]
+        replace: true
+      - id: karapace-lb-primary
+        from: karapace-lb
+        to: karapace-primary
+        label: HTTP を振り分ける
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§9" }]
+      - id: karapace-primary-kafka
+        from: karapace-primary
+        to: karapace-kafka
+        label: 変更を書く
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§5" }]
+      - id: karapace-kafka-replica
+        from: karapace-kafka
+        to: karapace-replica
+        label: レコードを読む
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§5" }]
+      - id: karapace-proxy-lb
+        from: karapace-proxy
+        to: karapace-lb
+        label: スキーマ操作を呼ぶ
+        evidence: [{ type: doc, ref: "docs/reference-karapace.md#§2" }]
+    groups:
+      - kind: datacenter
+        label: 利用者のデータセンター
+        provider: onprem
+        tier: [app, data]
+        nodes: [karapace-lb, karapace-primary, karapace-replica, karapace-proxy, karapace-kafka]
+    layout2d:
+      tiers:
+        - { id: diagram, label: オンプレミスの Karapace, z: 0, size: [28, 13] }
+      nodes:
+        karapace-admin: { tier: diagram, x: 1, y: 3 }
+        karapace-clients: { tier: diagram, x: 1, y: 8 }
+        karapace-lb: { tier: diagram, x: 8, y: 5.5 }
+        karapace-primary: { tier: diagram, x: 13.5, y: 2 }
+        karapace-replica: { tier: diagram, x: 13.5, y: 8.5 }
+        karapace-proxy: { tier: diagram, x: 13.5, y: 5.5 }
+        karapace-kafka: { tier: diagram, x: 21, y: 5.5 }
+      groups:
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [diagram], x0: 5.5, y0: -0.6, x1: 26.5, y1: 11, nodes: [karapace-lb, karapace-primary, karapace-replica, karapace-proxy, karapace-kafka] }
+    layout3d:
+      tiers:
+        - { id: zone0, label: 利用者, kind: origin, z: 0, origin: [-6, 0], size: [4, 7] }
+        - { id: zone1, label: 入口, z: 0, size: [5, 8] }
+        - { id: zone2, label: Karapace の VM, z: 0, origin: [7, 0], size: [5, 10] }
+        - { id: zone3, label: Kafka, z: 0, origin: [14, 0], size: [5, 6] }
+      nodes:
+        karapace-admin: { tier: zone0, x: 2, y: 1.5 }
+        karapace-clients: { tier: zone0, x: 2, y: 5 }
+        karapace-lb: { tier: zone1, x: 2, y: 4 }
+        karapace-primary: { tier: zone2, x: 2, y: 1 }
+        karapace-proxy: { tier: zone2, x: 2, y: 4 }
+        karapace-replica: { tier: zone2, x: 2, y: 7.5 }
+        karapace-kafka: { tier: zone3, x: 2, y: 3 }
+      groups:
+        - { kind: datacenter, label: 利用者のデータセンター, provider: onprem, tier: [zone1, zone2, zone3], nodes: [karapace-lb, karapace-primary, karapace-replica, karapace-proxy, karapace-kafka] }

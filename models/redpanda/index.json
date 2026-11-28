@@ -1,0 +1,293 @@
+{
+  "model": "redpanda",
+  "name": "Redpanda の Kafka 互換ログ基盤",
+  "coverage": {
+    "covered": 8,
+    "total": 8
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "Kafka クライアント",
+      "status": "claim"
+    },
+    "console": {
+      "type": "node",
+      "label": "Redpanda Console",
+      "status": "claim"
+    },
+    "cores": {
+      "type": "node",
+      "label": "ブローカー（コアごとのスレッド）",
+      "status": "claim"
+    },
+    "controller": {
+      "type": "node",
+      "label": "コントローラー（Raft）",
+      "status": "claim"
+    },
+    "leader": {
+      "type": "node",
+      "label": "パーティションのリーダー",
+      "status": "claim"
+    },
+    "follower": {
+      "type": "node",
+      "label": "フォロワー（レプリカ）",
+      "status": "claim"
+    },
+    "log": {
+      "type": "node",
+      "label": "ローカルログ（セグメント）",
+      "status": "claim"
+    },
+    "tiered": {
+      "type": "node",
+      "label": "階層型ストレージ（オブジェクトストレージ）",
+      "status": "claim"
+    },
+    "c-api": {
+      "type": "link",
+      "label": "Kafka クライアント → ブローカー（コアごとのスレッド）",
+      "status": "claim"
+    },
+    "console-api": {
+      "type": "link",
+      "label": "Redpanda Console → ブローカー（コアごとのスレッド）",
+      "status": "claim"
+    },
+    "route": {
+      "type": "link",
+      "label": "ブローカー（コアごとのスレッド） → パーティションのリーダー",
+      "status": "claim"
+    },
+    "meta": {
+      "type": "link",
+      "label": "ブローカー（コアごとのスレッド） → コントローラー（Raft）",
+      "status": "claim"
+    },
+    "assign": {
+      "type": "link",
+      "label": "コントローラー（Raft） → パーティションのリーダー",
+      "status": "claim"
+    },
+    "repl": {
+      "type": "link",
+      "label": "パーティションのリーダー → フォロワー（レプリカ）",
+      "status": "claim"
+    },
+    "repl-ack": {
+      "type": "link",
+      "label": "フォロワー（レプリカ） → パーティションのリーダー",
+      "status": "claim"
+    },
+    "append": {
+      "type": "link",
+      "label": "パーティションのリーダー → ローカルログ（セグメント）",
+      "status": "claim"
+    },
+    "upload": {
+      "type": "link",
+      "label": "パーティションのリーダー → 階層型ストレージ（オブジェクトストレージ）",
+      "status": "claim"
+    },
+    "remote-read": {
+      "type": "link",
+      "label": "階層型ストレージ（オブジェクトストレージ） → ブローカー（コアごとのスレッド）",
+      "status": "claim"
+    },
+    "write-replicate-tier": {
+      "type": "scenario",
+      "label": "書き込み・複製・退避"
+    },
+    "read-old-offset": {
+      "type": "scenario",
+      "label": "古いオフセットの読み出し"
+    },
+    "RP-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "Kafka API のクライアントから使う",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "取得した資料に Schema Registry と HTTP Proxy の記載が無く、構成と配置は未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "fsync の方針と書き込み確認の既定値は、取得した資料に記載が無く未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Community Edition License と Business Source License 1.1 の関係、および版ごとの適用は未確認。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "マネージド版（Redpanda Cloud）の構成は取得した資料で扱っておらず未確認。"
+    },
+    "rp-client": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "Kafka クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "rp-console": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "Redpanda Console",
+      "realizes": [
+        "console"
+      ]
+    },
+    "rp-b1": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "Redpanda ブローカー 1",
+      "realizes": [
+        "cores",
+        "controller",
+        "leader"
+      ]
+    },
+    "rp-b2": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "Redpanda ブローカー 2",
+      "realizes": [
+        "follower"
+      ]
+    },
+    "rp-disk": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "ローカルディスク（ログ）",
+      "realizes": [
+        "log"
+      ]
+    },
+    "rp-store": {
+      "type": "implementation",
+      "impl": "onprem-cluster",
+      "label": "オブジェクトストレージ",
+      "realizes": [
+        "tiered"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-redpanda.md#§1": [
+      "model"
+    ],
+    "docs/reference-redpanda.md": [
+      "model",
+      "client",
+      "console",
+      "cores",
+      "controller",
+      "leader",
+      "follower",
+      "log",
+      "tiered",
+      "c-api",
+      "console-api",
+      "route",
+      "meta",
+      "assign",
+      "repl",
+      "repl-ack",
+      "append",
+      "upload",
+      "remote-read",
+      "write-replicate-tier",
+      "read-old-offset",
+      "RP-01",
+      "rp-client",
+      "rp-console",
+      "rp-b1",
+      "rp-b2",
+      "rp-disk",
+      "rp-store"
+    ],
+    "docs/reference-redpanda.md#§2": [
+      "client",
+      "cores",
+      "c-api",
+      "RP-01"
+    ],
+    "docs/reference-redpanda.md#§7": [
+      "console",
+      "console-api"
+    ],
+    "docs/reference-redpanda.md#§4": [
+      "controller",
+      "meta",
+      "assign"
+    ],
+    "docs/reference-redpanda.md#§3": [
+      "leader",
+      "follower",
+      "route",
+      "repl",
+      "repl-ack",
+      "write-replicate-tier"
+    ],
+    "docs/reference-redpanda.md#§5": [
+      "log",
+      "append"
+    ],
+    "docs/reference-redpanda.md#§6": [
+      "tiered",
+      "upload",
+      "remote-read",
+      "read-old-offset"
+    ],
+    "docs/reference-redpanda.md#§8": [
+      "rp-client",
+      "rp-console",
+      "rp-b1",
+      "rp-b2",
+      "rp-disk",
+      "rp-store"
+    ]
+  },
+  "reference": {
+    "kind": "製品・技術のアーキテクチャ",
+    "role": "overview",
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "product": "Redpanda",
+    "order": 12,
+    "compare": "ログ型のイベント基盤",
+    "objectives": [
+      "Kafka API 互換のブローカーとクライアントの関係を確認する",
+      "パーティションごとの Raft グループとコントローラーの役割を区別する",
+      "ローカルログと階層型ストレージの分担を確認する",
+      "ライセンスの区分と制約を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Redpanda architecture",
+        "url": "https://docs.redpanda.com/current/get-started/architecture/"
+      },
+      {
+        "title": "Tiered Storage",
+        "url": "https://docs.redpanda.com/current/manage/tiered-storage/"
+      },
+      {
+        "title": "Redpanda Licenses and Enterprise Features",
+        "url": "https://docs.redpanda.com/current/get-started/licensing/overview/"
+      },
+      {
+        "title": "Licensing",
+        "url": "https://docs.redpanda.com/current/get-started/licensing/"
+      },
+      {
+        "title": "Business Source License（リポジトリの licenses/bsl.md）",
+        "url": "https://github.com/redpanda-data/redpanda/blob/dev/licenses/bsl.md"
+      }
+    ]
+  }
+}

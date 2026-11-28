@@ -1,0 +1,309 @@
+{
+  "model": "karapace",
+  "name": "Karapace のスキーマレジストリ",
+  "coverage": {
+    "covered": 9,
+    "total": 9
+  },
+  "byId": {
+    "admin": {
+      "type": "node",
+      "label": "登録担当",
+      "status": "claim"
+    },
+    "clients": {
+      "type": "node",
+      "label": "Kafka クライアント（Confluent 互換 SerDes）",
+      "status": "claim"
+    },
+    "proxy": {
+      "type": "node",
+      "label": "REST Proxy（8082）",
+      "status": "claim"
+    },
+    "api": {
+      "type": "node",
+      "label": "Schema Registry API（8081）",
+      "status": "claim"
+    },
+    "compat": {
+      "type": "node",
+      "label": "互換性モード（BACKWARD・FULL など）",
+      "status": "claim"
+    },
+    "subjects": {
+      "type": "node",
+      "label": "サブジェクト・バージョン・スキーマ ID",
+      "status": "claim"
+    },
+    "election": {
+      "type": "node",
+      "label": "primary の選出（Kafka グループ）",
+      "status": "claim"
+    },
+    "reader": {
+      "type": "node",
+      "label": "schema reader",
+      "status": "claim"
+    },
+    "topic": {
+      "type": "node",
+      "label": "_schemas トピック（Kafka）",
+      "status": "claim"
+    },
+    "register": {
+      "type": "link",
+      "label": "登録担当 → Schema Registry API（8081）",
+      "status": "claim"
+    },
+    "fetch": {
+      "type": "link",
+      "label": "Kafka クライアント（Confluent 互換 SerDes） → Schema Registry API（8081）",
+      "status": "claim"
+    },
+    "proxy-registry": {
+      "type": "link",
+      "label": "REST Proxy（8082） → Schema Registry API（8081）",
+      "status": "claim"
+    },
+    "check": {
+      "type": "link",
+      "label": "Schema Registry API（8081） → 互換性モード（BACKWARD・FULL など）",
+      "status": "claim"
+    },
+    "read-state": {
+      "type": "link",
+      "label": "Schema Registry API（8081） → サブジェクト・バージョン・スキーマ ID",
+      "status": "claim"
+    },
+    "write-topic": {
+      "type": "link",
+      "label": "Schema Registry API（8081） → _schemas トピック（Kafka）",
+      "status": "claim"
+    },
+    "elect": {
+      "type": "link",
+      "label": "primary の選出（Kafka グループ） → Schema Registry API（8081）",
+      "status": "claim"
+    },
+    "consume": {
+      "type": "link",
+      "label": "_schemas トピック（Kafka） → schema reader",
+      "status": "claim"
+    },
+    "rebuild": {
+      "type": "link",
+      "label": "schema reader → サブジェクト・バージョン・スキーマ ID",
+      "status": "claim"
+    },
+    "register-version": {
+      "type": "scenario",
+      "label": "新しいバージョンを登録する"
+    },
+    "resolve-schema": {
+      "type": "scenario",
+      "label": "Consumer が ID でスキーマを取得する"
+    },
+    "BR-01": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "書き込みは primary が担当する",
+      "status": "claim"
+    },
+    "BR-02": {
+      "type": "requirement",
+      "kind": "rule",
+      "label": "状態はトピックから再構築できる",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "replica が書き込みを受けたときの扱い（primary への転送、失敗時の応答、タイムアウト）は、確認した README では説明されていない。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "本番での _schemas トピックのレプリカ数の推奨値は README に書かれていない。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "実装例の台数、VM の大きさ、REST Proxy を同じ VM に置くかは資料で指定されていない。マネージド版の構成も確認していない。"
+    },
+    "karapace-admin": {
+      "type": "implementation",
+      "impl": "karapace-onprem-kafka",
+      "label": "登録担当",
+      "realizes": [
+        "admin"
+      ]
+    },
+    "karapace-clients": {
+      "type": "implementation",
+      "impl": "karapace-onprem-kafka",
+      "label": "Kafka クライアント（アプリ）",
+      "realizes": [
+        "clients"
+      ]
+    },
+    "karapace-lb": {
+      "type": "implementation",
+      "impl": "karapace-onprem-kafka",
+      "label": "ロードバランサー（8081）",
+      "realizes": []
+    },
+    "karapace-primary": {
+      "type": "implementation",
+      "impl": "karapace-onprem-kafka",
+      "label": "Karapace VM（primary）",
+      "realizes": [
+        "api",
+        "compat",
+        "subjects",
+        "reader",
+        "election"
+      ]
+    },
+    "karapace-replica": {
+      "type": "implementation",
+      "impl": "karapace-onprem-kafka",
+      "label": "Karapace VM（replica）",
+      "realizes": [
+        "api",
+        "compat",
+        "subjects",
+        "reader"
+      ]
+    },
+    "karapace-proxy": {
+      "type": "implementation",
+      "impl": "karapace-onprem-kafka",
+      "label": "REST Proxy（8082）",
+      "realizes": [
+        "proxy"
+      ]
+    },
+    "karapace-kafka": {
+      "type": "implementation",
+      "impl": "karapace-onprem-kafka",
+      "label": "Kafka クラスター（_schemas）",
+      "realizes": [
+        "topic"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-karapace.md#§1": [
+      "model"
+    ],
+    "docs/reference-karapace.md": [
+      "model",
+      "admin",
+      "clients",
+      "proxy",
+      "api",
+      "compat",
+      "subjects",
+      "election",
+      "reader",
+      "topic",
+      "register",
+      "fetch",
+      "proxy-registry",
+      "check",
+      "read-state",
+      "write-topic",
+      "elect",
+      "consume",
+      "rebuild",
+      "register-version",
+      "resolve-schema",
+      "BR-01",
+      "BR-02",
+      "karapace-admin",
+      "karapace-clients",
+      "karapace-lb",
+      "karapace-primary",
+      "karapace-replica",
+      "karapace-proxy",
+      "karapace-kafka"
+    ],
+    "docs/reference-karapace.md#§2": [
+      "model",
+      "admin",
+      "clients",
+      "proxy",
+      "api",
+      "register",
+      "fetch",
+      "proxy-registry",
+      "resolve-schema"
+    ],
+    "docs/reference-karapace.md#§3": [
+      "model",
+      "subjects",
+      "read-state"
+    ],
+    "docs/reference-karapace.md#§4": [
+      "model",
+      "compat",
+      "check"
+    ],
+    "docs/reference-karapace.md#§5": [
+      "model",
+      "subjects",
+      "reader",
+      "topic",
+      "consume",
+      "rebuild",
+      "BR-02"
+    ],
+    "docs/reference-karapace.md#§6": [
+      "model",
+      "api",
+      "election",
+      "write-topic",
+      "elect",
+      "register-version",
+      "BR-01"
+    ],
+    "docs/reference-karapace.md#§7": [
+      "model"
+    ],
+    "docs/reference-karapace.md#§8": [
+      "model"
+    ],
+    "docs/reference-karapace.md#§9": [
+      "model",
+      "karapace-admin",
+      "karapace-clients",
+      "karapace-lb",
+      "karapace-primary",
+      "karapace-replica",
+      "karapace-proxy",
+      "karapace-kafka"
+    ]
+  },
+  "reference": {
+    "kind": "製品・技術のアーキテクチャ",
+    "role": "overview",
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "product": "Karapace",
+    "order": 66,
+    "compare": "スキーマレジストリ",
+    "objectives": [
+      "Schema Registry API と REST Proxy の入口を区別する。",
+      "スキーマを専用 DB ではなく Kafka の _schemas トピックに保存し、各インスタンスが読み戻す仕組みを説明する。",
+      "primary だけが書き込みを担当し、Kafka のグループで選ばれることを説明する。"
+    ],
+    "sources": [
+      {
+        "title": "Karapace（GitHub README）",
+        "url": "https://github.com/Aiven-Open/karapace"
+      },
+      {
+        "title": "Karapace 公式サイト",
+        "url": "https://karapace.io/"
+      }
+    ]
+  }
+}

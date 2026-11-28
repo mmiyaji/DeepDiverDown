@@ -1,0 +1,307 @@
+{
+  "model": "materialize",
+  "name": "Materialize のストリーミング SQL と増分ビュー",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "SQL クライアント",
+      "status": "claim"
+    },
+    "balancerd": {
+      "type": "node",
+      "label": "balancerd",
+      "status": "claim"
+    },
+    "environmentd": {
+      "type": "node",
+      "label": "environmentd",
+      "status": "claim"
+    },
+    "operator": {
+      "type": "node",
+      "label": "Materialize Operator",
+      "status": "claim"
+    },
+    "upstream": {
+      "type": "node",
+      "label": "外部のデータ源",
+      "status": "claim"
+    },
+    "clusterd": {
+      "type": "node",
+      "label": "クラスタ（clusterd）",
+      "status": "claim"
+    },
+    "index": {
+      "type": "node",
+      "label": "インデックス（Arrangement）",
+      "status": "claim"
+    },
+    "mv": {
+      "type": "node",
+      "label": "マテリアライズドビュー",
+      "status": "claim"
+    },
+    "storage": {
+      "type": "node",
+      "label": "ストレージ層",
+      "status": "claim"
+    },
+    "sink": {
+      "type": "node",
+      "label": "シンクの宛先",
+      "status": "claim"
+    },
+    "c-bal": {
+      "type": "link",
+      "label": "SQL クライアント → balancerd",
+      "status": "claim"
+    },
+    "bal-env": {
+      "type": "link",
+      "label": "balancerd → environmentd",
+      "status": "claim"
+    },
+    "op-env": {
+      "type": "link",
+      "label": "Materialize Operator → environmentd",
+      "status": "claim"
+    },
+    "env-cl": {
+      "type": "link",
+      "label": "environmentd → クラスタ（clusterd）",
+      "status": "claim"
+    },
+    "src-cl": {
+      "type": "link",
+      "label": "外部のデータ源 → クラスタ（clusterd）",
+      "status": "claim"
+    },
+    "cl-idx": {
+      "type": "link",
+      "label": "クラスタ（clusterd） → インデックス（Arrangement）",
+      "status": "claim"
+    },
+    "cl-mv": {
+      "type": "link",
+      "label": "クラスタ（clusterd） → マテリアライズドビュー",
+      "status": "claim"
+    },
+    "st-cl": {
+      "type": "link",
+      "label": "ストレージ層 → クラスタ（clusterd）",
+      "status": "claim"
+    },
+    "cl-sink": {
+      "type": "link",
+      "label": "クラスタ（clusterd） → シンクの宛先",
+      "status": "claim"
+    },
+    "ingest-and-serve": {
+      "type": "scenario",
+      "label": "変更を取り込んでビューを保ち、読む"
+    },
+    "MZ-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "変化するデータを SQL のビューで常に最新に保つ",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "メタデータの保存先と、永続化に使うストレージ（PostgreSQL・S3 互換など）は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "タイムスタンプの付け方、一貫性の保証、内部の計算モデルは取得した資料に記載がなく未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "上限（メモリ 24 GiB・ディスク 48 GiB 未満）を超える自前運用の条件と、ライセンスキーの要否は未確認。クラウド版の内部構成は取得していない。"
+    },
+    "mz-client": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "SQL クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "mz-upstream": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "外部のデータ源",
+      "realizes": [
+        "upstream"
+      ]
+    },
+    "mz-balancerd": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "balancerd（Deployment）",
+      "realizes": [
+        "balancerd"
+      ]
+    },
+    "mz-env": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "environmentd（StatefulSet）",
+      "realizes": [
+        "environmentd"
+      ]
+    },
+    "mz-operator": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "Materialize Operator",
+      "realizes": [
+        "operator"
+      ]
+    },
+    "mz-cluster": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "clusterd（StatefulSet）",
+      "realizes": [
+        "clusterd",
+        "index",
+        "mv"
+      ]
+    },
+    "mz-storage": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "ストレージ層（実体は未確認）",
+      "realizes": [
+        "storage"
+      ]
+    },
+    "mz-sink": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "シンクの宛先",
+      "realizes": [
+        "sink"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-materialize.md#§1": [
+      "model"
+    ],
+    "docs/reference-materialize.md": [
+      "model",
+      "client",
+      "balancerd",
+      "environmentd",
+      "operator",
+      "upstream",
+      "clusterd",
+      "index",
+      "mv",
+      "storage",
+      "sink",
+      "c-bal",
+      "bal-env",
+      "op-env",
+      "env-cl",
+      "src-cl",
+      "cl-idx",
+      "cl-mv",
+      "st-cl",
+      "cl-sink",
+      "ingest-and-serve",
+      "MZ-01",
+      "mz-client",
+      "mz-upstream",
+      "mz-balancerd",
+      "mz-env",
+      "mz-operator",
+      "mz-cluster",
+      "mz-storage",
+      "mz-sink"
+    ],
+    "docs/reference-materialize.md#§2": [
+      "client",
+      "balancerd",
+      "environmentd",
+      "operator",
+      "c-bal",
+      "bal-env",
+      "op-env",
+      "env-cl"
+    ],
+    "docs/reference-materialize.md#§4": [
+      "upstream",
+      "src-cl"
+    ],
+    "docs/reference-materialize.md#§3": [
+      "clusterd"
+    ],
+    "docs/reference-materialize.md#§5": [
+      "index",
+      "mv",
+      "storage",
+      "cl-idx",
+      "cl-mv",
+      "st-cl",
+      "MZ-01"
+    ],
+    "docs/reference-materialize.md#§6": [
+      "sink",
+      "cl-sink",
+      "ingest-and-serve"
+    ],
+    "docs/reference-materialize.md#§7": [
+      "mz-client",
+      "mz-upstream",
+      "mz-balancerd",
+      "mz-env",
+      "mz-operator",
+      "mz-cluster",
+      "mz-storage",
+      "mz-sink"
+    ]
+  },
+  "reference": {
+    "kind": "製品・技術のアーキテクチャ",
+    "role": "overview",
+    "domain": "データ処理",
+    "category": "ストリーム処理",
+    "product": "Materialize",
+    "order": 11,
+    "compare": "ストリーミングデータベース",
+    "objectives": [
+      "balancerd・environmentd・clusterd の役割を区別する",
+      "ソースからビュー・インデックス・シンクまでの流れを確認する",
+      "クラスタとレプリカの意味とライセンスの条件を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Materialize concepts",
+        "url": "https://materialize.com/docs/concepts/"
+      },
+      {
+        "title": "Clusters",
+        "url": "https://materialize.com/docs/concepts/clusters/"
+      },
+      {
+        "title": "Sources",
+        "url": "https://materialize.com/docs/concepts/sources/"
+      },
+      {
+        "title": "Self-managed deployments",
+        "url": "https://materialize.com/docs/self-managed-deployments/"
+      },
+      {
+        "title": "Materialize LICENSE",
+        "url": "https://github.com/MaterializeInc/materialize/blob/main/LICENSE"
+      }
+    ]
+  }
+}

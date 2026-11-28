@@ -86,5 +86,6 @@ test('pairs can be opened from either end, including overview and detail diagram
   }
   assert.ok(peers.get('redis').includes('valkey'));
   assert.ok(!peers.get('redis').includes('redis-memory-internals'));
-  assert.deepEqual(peers.get('kafka'), []);
+  assert.ok(peers.get('kafka').includes('redpanda'));
+  assert.ok(!peers.get('kafka').includes('flink'));
 });

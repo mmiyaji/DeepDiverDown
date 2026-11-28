@@ -1,0 +1,108 @@
+name: SQLMesh の SQL 変換と仮想データ環境
+description: モデルの変更をプランで差分検出し、バージョン別の物理テーブルを作り、環境を参照の付け替えで昇格する流れを示す。
+reference:
+  objectives: [プランが変更の影響範囲を計算前に示すことを確認する, バージョン別の物理テーブルと環境の参照の関係を確認する, 状態の保存先とウェアハウスを分ける理由を確認する]
+  sources:
+    - {title: SQLMesh の概念の概要, url: https://sqlmesh.readthedocs.io/en/stable/concepts/overview/}
+    - {title: プランの概念, url: https://sqlmesh.readthedocs.io/en/stable/concepts/plans/}
+    - {title: 設定ガイド, url: https://sqlmesh.readthedocs.io/en/stable/guides/configuration/}
+    - {title: SQLMesh の GitHub リポジトリ, url: https://github.com/TobikoData/sqlmesh}
+sources: [docs/reference-sqlmesh.md]
+evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§1}]
+tiers:
+  - {id: flow, label: 開発者・SQLMesh・ウェアハウス, z: 0, size: [28, 13]}
+nodes:
+  author: {label: 開発者, kind: client, tier: flow, x: 1, y: 5, description: モデルと設定を書き、プランを実行する。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§3}]}
+  project: {label: モデルと設定, kind: file, tier: flow, x: 6, y: 5, description: SQL または Python のモデルと config.yaml。1 モデルが 1 つのテーブルまたはビューを作る。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§2}]}
+  plan: {label: プラン, kind: service, tier: flow, x: 11, y: 5, description: 手元と対象環境の差分を、計算の前に breaking・non-breaking・間接変更へ分類して示す。環境名を省くと prod が対象。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§3}]}
+  state: {label: 状態の保存先, kind: db, tier: flow, x: 11, y: 10, description: スナップショットと処理済みの区間を持つ。既定はウェアハウス内の sqlmesh スキーマ。本番では別の接続が推奨される。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§5}]}
+  scheduler: {label: スケジューラー, kind: worker, tier: flow, x: 17, y: 5, description: プランを適用して、バックフィルの対象区間を計算する。既定は builtin。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§5}]}
+  checks: {label: テストと監査, kind: service, tier: flow, x: 17, y: 1.5, description: テストは入力と期待出力で検証し、監査は 0 行を返すべき SQL で実データを検証する。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§6}]}
+  engine: {label: SQL の実行エンジン, kind: service, tier: flow, x: 23, y: 3, description: 生成された SQL を実行するウェアハウス。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§5}]}
+  physical: {label: バージョン別の物理テーブル, kind: db, tier: flow, x: 23, y: 7.5, description: モデルの変更ごとにフィンガープリント付きのバージョンが専用のテーブルに作られ、環境間で共有される。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+  envviews: {label: 環境の参照（仮想データ環境）, kind: db, tier: flow, x: 17, y: 10, description: dev や prod が、物理テーブルのバージョンを指す参照の集まり。付け替えだけで昇格する。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+  consumer: {label: 下流の利用者, kind: client, tier: flow, x: 23, y: 11.5, description: 環境の参照を通して、モデルの出力を読む。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+links:
+  - {id: l-write, from: author, to: project, label: モデルを書く, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§2}]}
+  - {id: l-diff, from: project, to: plan, label: 変更を差分検出, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§3}]}
+  - {id: l-state, from: plan, to: state, label: 既存のバージョンと区間を照会, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§5}]}
+  - {id: l-apply, from: plan, to: scheduler, label: 適用して再計算を依頼, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§3}]}
+  - {id: l-run, from: scheduler, to: engine, label: バックフィルの SQL を実行, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§5}]}
+  - {id: l-store, from: engine, to: physical, label: バージョン別のテーブルへ書く, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+  - {id: l-verify, from: scheduler, to: checks, label: テストと監査を起動, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§6}]}
+  - {id: l-audit, from: checks, to: engine, label: 監査クエリを実行, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§6}]}
+  - {id: l-promote, from: plan, to: envviews, label: 参照を更新（仮想更新）, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+  - {id: l-point, from: envviews, to: physical, label: バージョンを指す, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+  - {id: l-read, from: consumer, to: envviews, label: 環境経由で読む, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+scenarios:
+  - id: change-and-promote
+    label: モデルを変更して dev で確認し、prod へ昇格する
+    evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§3}]
+    steps:
+      - {links: [l-write, l-diff, l-state], note: 変更を差分検出し、保存済みのバージョンと照合して影響範囲を決める。}
+      - {links: [l-apply, l-run, l-store, l-verify, l-audit], note: dev 向けに新しいバージョンを計算し、テストと監査を通す。}
+      - {links: [l-promote, l-point, l-read], note: 再計算なしで prod の参照を計算済みのテーブルへ向け直す。}
+requirements:
+  - {id: SM-01, kind: usecase, title: 変更の影響を計算前に把握する, text: プランが直接・間接の影響を示し、必要な再計算だけを実行する。, links: [l-diff, l-state, l-apply], evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§3}]}
+  - {id: SM-02, kind: usecase, title: データを複製せず環境を昇格する, text: 計算済みのバージョンへ参照を付け替えて昇格する。, links: [l-promote, l-point], evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§4}]}
+unknowns:
+  - {id: UNK-01, text: スナップショットの命名規則と、環境の参照ビューの具体的な作り方は取得した資料に記載がなく未確認。, refs: [physical, envviews]}
+  - {id: UNK-02, text: 最新版の番号は取得した GitHub のページに記載がなく未確認。, refs: [project]}
+  - {id: UNK-03, text: マネージド版の有無と提供範囲は未確認。, refs: [scheduler]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-postgres
+    label: 自前の CI ホスト、PostgreSQL のウェアハウスと状態
+    description: CI ホスト上の SQLMesh が、ウェアハウス用と状態用の 2 つの PostgreSQL サーバーへ接続する例。代表例であり、導入事例ではない。
+    sources:
+      - {title: 設定ガイド, url: https://sqlmesh.readthedocs.io/en/stable/guides/configuration/}
+      - {title: プランの概念, url: https://sqlmesh.readthedocs.io/en/stable/concepts/plans/}
+    tiers:
+      - {id: diagram, label: 開発者・SQLMesh・PostgreSQL, z: 0, size: [28, 12]}
+    nodes:
+      sm-dev: {label: 開発者, kind: client, tier: diagram, x: 1, y: 3, realizes: [author], description: sqlmesh plan を実行する CLI の利用者。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      sm-user: {label: 下流の利用者, kind: client, tier: diagram, x: 1, y: 9, realizes: [consumer], description: BI ツールなどでウェアハウスの環境の参照を読む。, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      sm-host: {label: CI ホスト, kind: host, tier: diagram, x: 9, y: 1, description: SQLMesh を実行する自前のマシン。, management: {type: customer, scope: "Customer operates the host and OS."}, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      sm-runner: {label: SQLMesh（Python）, kind: worker, tier: diagram, x: 9, y: 4, realizes: [plan, scheduler, checks], description: プランの作成、builtin スケジューラーによる適用、テストと監査を実行する。, management: {type: customer, scope: "Customer operates the SQLMesh process and configuration."}, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      sm-config: {label: モデルと config.yaml, kind: file, tier: diagram, x: 9, y: 7.5, realizes: [project], description: ゲートウェイに connection と state_connection を指定する。, management: {type: customer, scope: "Customer manages the project files."}, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      sm-wh: {label: ウェアハウス用 PostgreSQL, kind: db, tier: diagram, x: 19, y: 3, realizes: [engine, physical, envviews], description: SQL を実行し、バージョン別の物理テーブルと環境の参照を持つ。, management: {type: customer, scope: "Customer operates the server, data and access."}, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      sm-state: {label: 状態用 PostgreSQL, kind: db, tier: diagram, x: 19, y: 9, realizes: [state], description: state_connection の接続先。スナップショットと処理済みの区間を保存する。, management: {type: customer, scope: "Customer operates the server, data and access."}, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+    links:
+      - {id: sm-cli, from: sm-dev, to: sm-runner, label: plan を実行, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      - {id: sm-run-host, from: sm-host, to: sm-runner, label: プロセスを実行, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      - {id: sm-load, from: sm-config, to: sm-runner, label: モデルと接続設定を読む, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      - {id: sm-sql, from: sm-runner, to: sm-wh, label: SQL を発行, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      - {id: sm-st, from: sm-runner, to: sm-state, label: 状態を読み書き, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+      - {id: sm-read, from: sm-user, to: sm-wh, label: 環境の参照を読む, evidence: [{type: doc, ref: docs/reference-sqlmesh.md#§7}]}
+    groups:
+      - {kind: datacenter, label: CI ホスト, provider: onprem, tier: diagram, nodes: [sm-host, sm-runner, sm-config]}
+      - {kind: datacenter, label: PostgreSQL サーバー群, provider: onprem, tier: diagram, nodes: [sm-wh, sm-state]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 開発者・SQLMesh・PostgreSQL, z: 0, size: [28, 12]}
+      nodes:
+        sm-dev: {tier: diagram, x: 1, y: 3}
+        sm-user: {tier: diagram, x: 1, y: 9}
+        sm-host: {tier: diagram, x: 9, y: 1}
+        sm-runner: {tier: diagram, x: 9, y: 4}
+        sm-config: {tier: diagram, x: 9, y: 7.5}
+        sm-wh: {tier: diagram, x: 19, y: 3}
+        sm-state: {tier: diagram, x: 19, y: 9}
+      groups:
+        - {kind: datacenter, label: CI ホスト, provider: onprem, tier: diagram, nodes: [sm-host, sm-runner, sm-config]}
+        - {kind: datacenter, label: PostgreSQL サーバー群, provider: onprem, tier: diagram, nodes: [sm-wh, sm-state]}
+    layout3d:
+      tiers:
+        - {id: clients, label: 利用者, z: 0, size: [6, 12]}
+        - {id: servers, label: SQLMesh と PostgreSQL, z: 0, origin: [8, 0], size: [20, 12]}
+      nodes:
+        sm-dev: {tier: clients, x: 3, y: 3}
+        sm-user: {tier: clients, x: 3, y: 9}
+        sm-host: {tier: servers, x: 3, y: 1}
+        sm-runner: {tier: servers, x: 3, y: 4}
+        sm-config: {tier: servers, x: 3, y: 7.5}
+        sm-wh: {tier: servers, x: 13, y: 3}
+        sm-state: {tier: servers, x: 13, y: 9}
+      groups:
+        - {kind: datacenter, label: CI ホスト, provider: onprem, tier: [servers], nodes: [sm-host, sm-runner, sm-config]}
+        - {kind: datacenter, label: PostgreSQL サーバー群, provider: onprem, tier: [servers], nodes: [sm-wh, sm-state]}

@@ -1,0 +1,207 @@
+name: Hopsworks の特徴量ストア
+description: Hopsworks のフィーチャーグループ、オンラインとオフラインの二つのストア、Kafka 経由の書き込み、フィーチャービュー、モデルの配備を示す。
+reference:
+  objectives: [オンラインとオフラインの二つのストアの役割を区別する, 書き込み経路（ストリーム API とバッチ API）の違いを確認する, フィーチャービューが学習と推論をつなぐ流れを確認する]
+  sources:
+    - {title: Hopsworks の概要, url: https://docs.hopsworks.ai/latest/concepts/hopsworks/}
+    - {title: フィーチャーグループの概要, url: https://docs.hopsworks.ai/latest/concepts/fs/feature_group/fg_overview/}
+    - {title: 書き込み API, url: https://docs.hopsworks.ai/latest/concepts/fs/feature_group/write_apis/}
+    - {title: フィーチャービューの概要, url: https://docs.hopsworks.ai/latest/concepts/fs/feature_view/fv_overview/}
+    - {title: 外部フィーチャーグループ, url: https://docs.hopsworks.ai/latest/concepts/fs/feature_group/external_fg/}
+    - {title: logicalclocks/hopsworks（GitHub）, url: https://github.com/logicalclocks/hopsworks}
+sources: [docs/reference-hopsworks.md]
+evidence: [{type: doc, ref: docs/reference-hopsworks.md#§1}]
+tiers:
+  - {id: flow, label: 取り込み・保存・提供, z: 0, size: [46, 11]}
+nodes:
+  source: {label: データソース, kind: external, tier: flow, x: 1, y: 5, description: バッチ・ストリームの元データ。Snowflake、BigQuery、Redshift、S3 などは外部テーブルとして接続もできる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§2}]}
+  pipeline: {label: 特徴量パイプライン, kind: worker, tier: flow, x: 7, y: 5, description: Python または Spark で特徴量を計算して書く。Python クライアントの書き込みはストリーム API だけ。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  kafka: {label: Kafka トピック, kind: service, tier: flow, x: 13, y: 3, description: ストリーム API の書き込みを受ける。配信は at-least-once で、後段の処理で実質 1 回にそろえる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  onlinefs: {label: OnlineFS, kind: service, tier: flow, x: 19, y: 1.5, description: Kafka の内容をオンラインストアへ冪等に upsert する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  dstream: {label: Hudi DeltaStreamer ジョブ, kind: worker, tier: flow, x: 19, y: 8.5, description: Kafka の内容をオフラインの Hudi テーブルへ書く。コミット時に重複を除く。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  online: {label: オンラインストア（RonDB）, kind: db, tier: flow, x: 25, y: 2, description: エンティティごとの最新値だけを持つ。event_time と TTL を付けると複数行も持てる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§2}]}
+  offline: {label: オフラインストア, kind: db, tier: flow, x: 25, y: 8, description: 履歴を持ち、学習データとバッチ推論の取得元になる。Hudi テーブルとして書く（概要図の表記は Delta で、版による違いは未確認）。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§2}]}
+  fview: {label: フィーチャービュー, kind: service, tier: flow, x: 31, y: 5, description: 複数のフィーチャーグループの特徴量を結合した論理的な入口。変換関数を持ち、学習と推論で同じ変換を使う。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+  train: {label: 学習・バッチ推論, kind: worker, tier: flow, x: 37, y: 2, description: フィーチャービューから学習・検証・テストのデータを作り、モデルを学習する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+  serving: {label: モデルの登録と配備（KServe）, kind: service, tier: flow, x: 37, y: 8, description: モデルレジストリに登録し、KServe で配備する。推論リクエストは Kafka に記録できる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§5}]}
+  app: {label: 推論クライアント, kind: client, tier: flow, x: 43, y: 8, description: サービングキーを渡して推論を要求する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+links:
+  - {id: l-ingest, from: source, to: pipeline, label: 元データを読み込む, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  - {id: l-stream, from: pipeline, to: kafka, label: ストリーム API で書く, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  - {id: l-batch, from: pipeline, to: offline, label: バッチ API で直接書く（Spark のみ）, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  - {id: l-k-on, from: kafka, to: onlinefs, label: 変更を渡す, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  - {id: l-k-off, from: kafka, to: dstream, label: 変更を渡す, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  - {id: l-upsert, from: onlinefs, to: online, label: 最新値を upsert, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  - {id: l-commit, from: dstream, to: offline, label: 履歴を追記, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]}
+  - {id: l-hist, from: offline, to: fview, label: 履歴を取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+  - {id: l-latest, from: online, to: fview, label: 最新値を取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+  - {id: l-data, from: fview, to: train, label: 学習データを作成, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+  - {id: l-model, from: train, to: serving, label: 学習済みモデルを登録, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§5}]}
+  - {id: l-req, from: app, to: serving, label: 推論を要求, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+  - {id: l-vec, from: serving, to: fview, label: 特徴量ベクトルを取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+scenarios:
+  - id: stream-write
+    label: ストリーム API で書いて二つのストアに反映する
+    evidence: [{type: doc, ref: docs/reference-hopsworks.md#§3}]
+    steps:
+      - {links: [l-ingest, l-stream], note: パイプラインが特徴量を計算し、Kafka トピックへ書く。}
+      - {links: [l-k-on, l-k-off], note: OnlineFS と DeltaStreamer ジョブがそれぞれ Kafka を読む。}
+      - {links: [l-upsert, l-commit], note: オンラインは最新値に置き換え、オフラインは履歴に追記する。}
+  - id: train-and-serve
+    label: 学習して配備し、推論時に特徴量を引く
+    evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]
+    steps:
+      - {links: [l-hist, l-data, l-model], note: フィーチャービューから学習データを作り、モデルを登録する。}
+      - {links: [l-req, l-vec, l-latest], note: 推論時にサービングキーでオンラインの最新値を取得する。}
+requirements:
+  - {id: HW-01, kind: usecase, title: 学習と推論で同じ特徴量定義と変換を使う, text: フィーチャービューが学習データとオンラインの特徴量ベクトルの両方を供給し、変換関数を共有する。, links: [l-data, l-vec], evidence: [{type: doc, ref: docs/reference-hopsworks.md#§4}]}
+unknowns:
+  - {id: UNK-01, text: オフラインストアの形式は、書き込み API の資料が Hudi、概要図が Delta と表記しており、版ごとの違いは未確認。, refs: [offline, dstream]}
+  - {id: UNK-02, text: 履歴を時点で正しく結合する仕組み（point-in-time join）の詳細は取得した資料に記載がなく未確認。, refs: [fview]}
+  - {id: UNK-03, text: Flink の対応、Arrow Flight によるオフラインクエリ、HopsFS の役割は取得した資料に記載がなく未確認。, refs: [pipeline, offline]}
+  - {id: UNK-04, text: 稼働台数、ノード構成、Kafka・RonDB の具体的な配置は未確認。, refs: [kafka, online]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-hopsworks
+    label: 自前の Linux 上の Hopsworks（OSS 版）
+    description: 利用者が自前のサーバーに Hopsworks を導入し、Spark・Python のジョブ、Kafka、RonDB、Hudi テーブル、KServe を運用する例。README は Linux VM とエアギャップのデータセンターへの導入に対応するとしている。代表例であり、導入事例ではない。
+    sources:
+      - {title: logicalclocks/hopsworks（GitHub）, url: https://github.com/logicalclocks/hopsworks}
+      - {title: 書き込み API, url: https://docs.hopsworks.ai/latest/concepts/fs/feature_group/write_apis/}
+      - {title: Hopsworks の概要, url: https://docs.hopsworks.ai/latest/concepts/hopsworks/}
+    tiers:
+      - {id: diagram, label: 取り込み・保存・提供, z: 0, size: [46, 11]}
+    nodes:
+      hw-source: {label: 元データ, kind: external, tier: diagram, x: 1, y: 5, realizes: [source], description: バッチ・ストリームの元データ。Snowflake、BigQuery、Redshift、S3 などは外部テーブルとして接続もできる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      hw-pipeline: {label: Spark・Python の特徴量ジョブ, kind: worker, tier: diagram, x: 7, y: 5, realizes: [pipeline], description: Python または Spark で特徴量を計算して書く。Python クライアントの書き込みはストリーム API だけ。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-kafka: {label: Kafka, kind: service, tier: diagram, x: 13, y: 3, realizes: [kafka], description: ストリーム API の書き込みを受ける。配信は at-least-once で、後段の処理で実質 1 回にそろえる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-onlinefs: {label: OnlineFS, kind: service, tier: diagram, x: 19, y: 1.5, realizes: [onlinefs], description: Kafka の内容をオンラインストアへ冪等に upsert する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-dstream: {label: Hudi DeltaStreamer, kind: worker, tier: diagram, x: 19, y: 8.5, realizes: [dstream], description: Kafka の内容をオフラインの Hudi テーブルへ書く。コミット時に重複を除く。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-online: {label: RonDB（オンライン）, kind: db, tier: diagram, x: 25, y: 2, realizes: [online], description: エンティティごとの最新値だけを持つ。event_time と TTL を付けると複数行も持てる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-offline: {label: Hudi テーブル（オフライン）, kind: db, tier: diagram, x: 25, y: 8, realizes: [offline], description: 履歴を持ち、学習データとバッチ推論の取得元になる。Hudi テーブルとして書く（概要図の表記は Delta で、版による違いは未確認）。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-fview: {label: フィーチャービュー API, kind: service, tier: diagram, x: 31, y: 5, realizes: [fview], description: 複数のフィーチャーグループの特徴量を結合した論理的な入口。変換関数を持ち、学習と推論で同じ変換を使う。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-train: {label: 学習ジョブ, kind: worker, tier: diagram, x: 37, y: 2, realizes: [train], description: フィーチャービューから学習・検証・テストのデータを作り、モデルを学習する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-serving: {label: KServe とモデルレジストリ, kind: service, tier: diagram, x: 37, y: 8, realizes: [serving], description: モデルレジストリに登録し、KServe で配備する。推論リクエストは Kafka に記録できる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}], management: {type: customer, scope: "Customer operates the hosts, Hopsworks installation and configuration."}}
+      hw-app: {label: 推論クライアント, kind: client, tier: diagram, x: 43, y: 8, realizes: [app], description: サービングキーを渡して推論を要求する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+    links:
+      - {id: hw-l-ingest, from: hw-source, to: hw-pipeline, label: 元データを読み込む, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-stream, from: hw-pipeline, to: hw-kafka, label: ストリーム API で書く, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-batch, from: hw-pipeline, to: hw-offline, label: バッチ API で直接書く（Spark のみ）, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-k-on, from: hw-kafka, to: hw-onlinefs, label: 変更を渡す, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-k-off, from: hw-kafka, to: hw-dstream, label: 変更を渡す, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-upsert, from: hw-onlinefs, to: hw-online, label: 最新値を upsert, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-commit, from: hw-dstream, to: hw-offline, label: 履歴を追記, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-hist, from: hw-offline, to: hw-fview, label: 履歴を取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-latest, from: hw-online, to: hw-fview, label: 最新値を取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-data, from: hw-fview, to: hw-train, label: 学習データを作成, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-model, from: hw-train, to: hw-serving, label: 学習済みモデルを登録, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-req, from: hw-app, to: hw-serving, label: 推論を要求, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+      - {id: hw-l-vec, from: hw-serving, to: hw-fview, label: 特徴量ベクトルを取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§6}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [hw-pipeline, hw-kafka, hw-onlinefs, hw-dstream, hw-online, hw-offline, hw-fview, hw-train, hw-serving]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 取り込み・保存・提供, z: 0, size: [46, 11]}
+      nodes:
+        hw-source: {tier: diagram, x: 1, y: 5}
+        hw-pipeline: {tier: diagram, x: 7, y: 5}
+        hw-kafka: {tier: diagram, x: 13, y: 3}
+        hw-onlinefs: {tier: diagram, x: 19, y: 1.5}
+        hw-dstream: {tier: diagram, x: 19, y: 8.5}
+        hw-online: {tier: diagram, x: 25, y: 2}
+        hw-offline: {tier: diagram, x: 25, y: 8}
+        hw-fview: {tier: diagram, x: 31, y: 5}
+        hw-train: {tier: diagram, x: 37, y: 2}
+        hw-serving: {tier: diagram, x: 37, y: 8}
+        hw-app: {tier: diagram, x: 43, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [hw-pipeline, hw-kafka, hw-onlinefs, hw-dstream, hw-online, hw-offline, hw-fview, hw-train, hw-serving]}
+    layout3d:
+      tiers:
+        - {id: edge, label: 入口と利用者, z: 0, size: [14, 11]}
+        - {id: platform, label: Hopsworks, z: 0, origin: [16, 0], size: [32, 11]}
+      nodes:
+        hw-source: {tier: edge, x: 3, y: 5}
+        hw-pipeline: {tier: platform, x: 1, y: 5}
+        hw-kafka: {tier: platform, x: 7, y: 3}
+        hw-onlinefs: {tier: platform, x: 13, y: 1.5}
+        hw-dstream: {tier: platform, x: 13, y: 8.5}
+        hw-online: {tier: platform, x: 19, y: 2}
+        hw-offline: {tier: platform, x: 19, y: 8}
+        hw-fview: {tier: platform, x: 25, y: 5}
+        hw-train: {tier: platform, x: 31, y: 2}
+        hw-serving: {tier: platform, x: 31, y: 8}
+        hw-app: {tier: user, x: 3, y: 8}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [platform], nodes: [hw-pipeline, hw-kafka, hw-onlinefs, hw-dstream, hw-online, hw-offline, hw-fview, hw-train, hw-serving]}
+  - id: managed-hopsworks
+    label: 利用者のクラウドアカウント上の Managed Hopsworks
+    description: README は、Managed Hopsworks が利用者の AWS、Azure、GCP の環境で動くとしている。この例は AWS を選んだ代表例で、基盤の構成と運用の分担は未確認。導入事例ではない。
+    sources:
+      - {title: logicalclocks/hopsworks（GitHub）, url: https://github.com/logicalclocks/hopsworks}
+      - {title: 書き込み API, url: https://docs.hopsworks.ai/latest/concepts/fs/feature_group/write_apis/}
+    tiers:
+      - {id: diagram, label: 取り込み・保存・提供, z: 0, size: [46, 11]}
+    nodes:
+      hc-source: {label: 元データ, kind: external, tier: diagram, x: 1, y: 5, realizes: [source], description: バッチ・ストリームの元データ。Snowflake、BigQuery、Redshift、S3 などは外部テーブルとして接続もできる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-pipeline: {label: Spark・Python の特徴量ジョブ, kind: worker, tier: diagram, x: 7, y: 5, realizes: [pipeline], description: Python または Spark で特徴量を計算して書く。Python クライアントの書き込みはストリーム API だけ。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-kafka: {label: Kafka, kind: service, tier: diagram, x: 13, y: 3, realizes: [kafka], description: ストリーム API の書き込みを受ける。配信は at-least-once で、後段の処理で実質 1 回にそろえる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-onlinefs: {label: OnlineFS, kind: service, tier: diagram, x: 19, y: 1.5, realizes: [onlinefs], description: Kafka の内容をオンラインストアへ冪等に upsert する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-dstream: {label: Hudi DeltaStreamer, kind: worker, tier: diagram, x: 19, y: 8.5, realizes: [dstream], description: Kafka の内容をオフラインの Hudi テーブルへ書く。コミット時に重複を除く。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-online: {label: RonDB（オンライン）, kind: db, tier: diagram, x: 25, y: 2, realizes: [online], description: エンティティごとの最新値だけを持つ。event_time と TTL を付けると複数行も持てる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-offline: {label: Hudi テーブル（オフライン）, kind: db, tier: diagram, x: 25, y: 8, realizes: [offline], description: 履歴を持ち、学習データとバッチ推論の取得元になる。Hudi テーブルとして書く（概要図の表記は Delta で、版による違いは未確認）。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-fview: {label: フィーチャービュー API, kind: service, tier: diagram, x: 31, y: 5, realizes: [fview], description: 複数のフィーチャーグループの特徴量を結合した論理的な入口。変換関数を持ち、学習と推論で同じ変換を使う。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-train: {label: 学習ジョブ, kind: worker, tier: diagram, x: 37, y: 2, realizes: [train], description: フィーチャービューから学習・検証・テストのデータを作り、モデルを学習する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-serving: {label: KServe とモデルレジストリ, kind: service, tier: diagram, x: 37, y: 8, realizes: [serving], description: モデルレジストリに登録し、KServe で配備する。推論リクエストは Kafka に記録できる。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      hc-app: {label: 推論クライアント, kind: client, tier: diagram, x: 43, y: 8, realizes: [app], description: サービングキーを渡して推論を要求する。, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+    links:
+      - {id: hc-l-ingest, from: hc-source, to: hc-pipeline, label: 元データを読み込む, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-stream, from: hc-pipeline, to: hc-kafka, label: ストリーム API で書く, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-batch, from: hc-pipeline, to: hc-offline, label: バッチ API で直接書く（Spark のみ）, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-k-on, from: hc-kafka, to: hc-onlinefs, label: 変更を渡す, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-k-off, from: hc-kafka, to: hc-dstream, label: 変更を渡す, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-upsert, from: hc-onlinefs, to: hc-online, label: 最新値を upsert, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-commit, from: hc-dstream, to: hc-offline, label: 履歴を追記, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-hist, from: hc-offline, to: hc-fview, label: 履歴を取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-latest, from: hc-online, to: hc-fview, label: 最新値を取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-data, from: hc-fview, to: hc-train, label: 学習データを作成, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-model, from: hc-train, to: hc-serving, label: 学習済みモデルを登録, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-req, from: hc-app, to: hc-serving, label: 推論を要求, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+      - {id: hc-l-vec, from: hc-serving, to: hc-fview, label: 特徴量ベクトルを取得, evidence: [{type: doc, ref: docs/reference-hopsworks.md#§7}]}
+    groups:
+      - {kind: cloud, label: 利用者の AWS アカウント, provider: aws, tier: diagram, nodes: [hc-pipeline, hc-kafka, hc-onlinefs, hc-dstream, hc-online, hc-offline, hc-fview, hc-train, hc-serving]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 取り込み・保存・提供, z: 0, size: [46, 11]}
+      nodes:
+        hc-source: {tier: diagram, x: 1, y: 5}
+        hc-pipeline: {tier: diagram, x: 7, y: 5}
+        hc-kafka: {tier: diagram, x: 13, y: 3}
+        hc-onlinefs: {tier: diagram, x: 19, y: 1.5}
+        hc-dstream: {tier: diagram, x: 19, y: 8.5}
+        hc-online: {tier: diagram, x: 25, y: 2}
+        hc-offline: {tier: diagram, x: 25, y: 8}
+        hc-fview: {tier: diagram, x: 31, y: 5}
+        hc-train: {tier: diagram, x: 37, y: 2}
+        hc-serving: {tier: diagram, x: 37, y: 8}
+        hc-app: {tier: diagram, x: 43, y: 8}
+      groups:
+        - {kind: cloud, label: 利用者の AWS アカウント, provider: aws, tier: diagram, nodes: [hc-pipeline, hc-kafka, hc-onlinefs, hc-dstream, hc-online, hc-offline, hc-fview, hc-train, hc-serving]}
+    layout3d:
+      tiers:
+        - {id: edge, label: 入口と利用者, z: 0, size: [14, 11]}
+        - {id: platform, label: Hopsworks, z: 0, origin: [16, 0], size: [32, 11]}
+      nodes:
+        hc-source: {tier: edge, x: 3, y: 5}
+        hc-pipeline: {tier: platform, x: 1, y: 5}
+        hc-kafka: {tier: platform, x: 7, y: 3}
+        hc-onlinefs: {tier: platform, x: 13, y: 1.5}
+        hc-dstream: {tier: platform, x: 13, y: 8.5}
+        hc-online: {tier: platform, x: 19, y: 2}
+        hc-offline: {tier: platform, x: 19, y: 8}
+        hc-fview: {tier: platform, x: 25, y: 5}
+        hc-train: {tier: platform, x: 31, y: 2}
+        hc-serving: {tier: platform, x: 31, y: 8}
+        hc-app: {tier: user, x: 3, y: 8}
+      groups:
+        - {kind: cloud, label: 利用者の AWS アカウント, provider: aws, tier: [platform], nodes: [hc-pipeline, hc-kafka, hc-onlinefs, hc-dstream, hc-online, hc-offline, hc-fview, hc-train, hc-serving]}

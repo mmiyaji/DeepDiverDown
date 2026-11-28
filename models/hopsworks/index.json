@@ -1,0 +1,494 @@
+{
+  "model": "hopsworks",
+  "name": "Hopsworks の特徴量ストア",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "source": {
+      "type": "node",
+      "label": "データソース",
+      "status": "claim"
+    },
+    "pipeline": {
+      "type": "node",
+      "label": "特徴量パイプライン",
+      "status": "claim"
+    },
+    "kafka": {
+      "type": "node",
+      "label": "Kafka トピック",
+      "status": "claim"
+    },
+    "onlinefs": {
+      "type": "node",
+      "label": "OnlineFS",
+      "status": "claim"
+    },
+    "dstream": {
+      "type": "node",
+      "label": "Hudi DeltaStreamer ジョブ",
+      "status": "claim"
+    },
+    "online": {
+      "type": "node",
+      "label": "オンラインストア（RonDB）",
+      "status": "claim"
+    },
+    "offline": {
+      "type": "node",
+      "label": "オフラインストア",
+      "status": "claim"
+    },
+    "fview": {
+      "type": "node",
+      "label": "フィーチャービュー",
+      "status": "claim"
+    },
+    "train": {
+      "type": "node",
+      "label": "学習・バッチ推論",
+      "status": "claim"
+    },
+    "serving": {
+      "type": "node",
+      "label": "モデルの登録と配備（KServe）",
+      "status": "claim"
+    },
+    "app": {
+      "type": "node",
+      "label": "推論クライアント",
+      "status": "claim"
+    },
+    "l-ingest": {
+      "type": "link",
+      "label": "データソース → 特徴量パイプライン",
+      "status": "claim"
+    },
+    "l-stream": {
+      "type": "link",
+      "label": "特徴量パイプライン → Kafka トピック",
+      "status": "claim"
+    },
+    "l-batch": {
+      "type": "link",
+      "label": "特徴量パイプライン → オフラインストア",
+      "status": "claim"
+    },
+    "l-k-on": {
+      "type": "link",
+      "label": "Kafka トピック → OnlineFS",
+      "status": "claim"
+    },
+    "l-k-off": {
+      "type": "link",
+      "label": "Kafka トピック → Hudi DeltaStreamer ジョブ",
+      "status": "claim"
+    },
+    "l-upsert": {
+      "type": "link",
+      "label": "OnlineFS → オンラインストア（RonDB）",
+      "status": "claim"
+    },
+    "l-commit": {
+      "type": "link",
+      "label": "Hudi DeltaStreamer ジョブ → オフラインストア",
+      "status": "claim"
+    },
+    "l-hist": {
+      "type": "link",
+      "label": "オフラインストア → フィーチャービュー",
+      "status": "claim"
+    },
+    "l-latest": {
+      "type": "link",
+      "label": "オンラインストア（RonDB） → フィーチャービュー",
+      "status": "claim"
+    },
+    "l-data": {
+      "type": "link",
+      "label": "フィーチャービュー → 学習・バッチ推論",
+      "status": "claim"
+    },
+    "l-model": {
+      "type": "link",
+      "label": "学習・バッチ推論 → モデルの登録と配備（KServe）",
+      "status": "claim"
+    },
+    "l-req": {
+      "type": "link",
+      "label": "推論クライアント → モデルの登録と配備（KServe）",
+      "status": "claim"
+    },
+    "l-vec": {
+      "type": "link",
+      "label": "モデルの登録と配備（KServe） → フィーチャービュー",
+      "status": "claim"
+    },
+    "stream-write": {
+      "type": "scenario",
+      "label": "ストリーム API で書いて二つのストアに反映する"
+    },
+    "train-and-serve": {
+      "type": "scenario",
+      "label": "学習して配備し、推論時に特徴量を引く"
+    },
+    "HW-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "学習と推論で同じ特徴量定義と変換を使う",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "オフラインストアの形式は、書き込み API の資料が Hudi、概要図が Delta と表記しており、版ごとの違いは未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "履歴を時点で正しく結合する仕組み（point-in-time join）の詳細は取得した資料に記載がなく未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "Flink の対応、Arrow Flight によるオフラインクエリ、HopsFS の役割は取得した資料に記載がなく未確認。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "稼働台数、ノード構成、Kafka・RonDB の具体的な配置は未確認。"
+    },
+    "hw-source": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "元データ",
+      "realizes": [
+        "source"
+      ]
+    },
+    "hw-pipeline": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "Spark・Python の特徴量ジョブ",
+      "realizes": [
+        "pipeline"
+      ]
+    },
+    "hw-kafka": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "Kafka",
+      "realizes": [
+        "kafka"
+      ]
+    },
+    "hw-onlinefs": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "OnlineFS",
+      "realizes": [
+        "onlinefs"
+      ]
+    },
+    "hw-dstream": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "Hudi DeltaStreamer",
+      "realizes": [
+        "dstream"
+      ]
+    },
+    "hw-online": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "RonDB（オンライン）",
+      "realizes": [
+        "online"
+      ]
+    },
+    "hw-offline": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "Hudi テーブル（オフライン）",
+      "realizes": [
+        "offline"
+      ]
+    },
+    "hw-fview": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "フィーチャービュー API",
+      "realizes": [
+        "fview"
+      ]
+    },
+    "hw-train": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "学習ジョブ",
+      "realizes": [
+        "train"
+      ]
+    },
+    "hw-serving": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "KServe とモデルレジストリ",
+      "realizes": [
+        "serving"
+      ]
+    },
+    "hw-app": {
+      "type": "implementation",
+      "impl": "onprem-hopsworks",
+      "label": "推論クライアント",
+      "realizes": [
+        "app"
+      ]
+    },
+    "hc-source": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "元データ",
+      "realizes": [
+        "source"
+      ]
+    },
+    "hc-pipeline": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "Spark・Python の特徴量ジョブ",
+      "realizes": [
+        "pipeline"
+      ]
+    },
+    "hc-kafka": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "Kafka",
+      "realizes": [
+        "kafka"
+      ]
+    },
+    "hc-onlinefs": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "OnlineFS",
+      "realizes": [
+        "onlinefs"
+      ]
+    },
+    "hc-dstream": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "Hudi DeltaStreamer",
+      "realizes": [
+        "dstream"
+      ]
+    },
+    "hc-online": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "RonDB（オンライン）",
+      "realizes": [
+        "online"
+      ]
+    },
+    "hc-offline": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "Hudi テーブル（オフライン）",
+      "realizes": [
+        "offline"
+      ]
+    },
+    "hc-fview": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "フィーチャービュー API",
+      "realizes": [
+        "fview"
+      ]
+    },
+    "hc-train": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "学習ジョブ",
+      "realizes": [
+        "train"
+      ]
+    },
+    "hc-serving": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "KServe とモデルレジストリ",
+      "realizes": [
+        "serving"
+      ]
+    },
+    "hc-app": {
+      "type": "implementation",
+      "impl": "managed-hopsworks",
+      "label": "推論クライアント",
+      "realizes": [
+        "app"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-hopsworks.md#§1": [
+      "model"
+    ],
+    "docs/reference-hopsworks.md": [
+      "model",
+      "source",
+      "pipeline",
+      "kafka",
+      "onlinefs",
+      "dstream",
+      "online",
+      "offline",
+      "fview",
+      "train",
+      "serving",
+      "app",
+      "l-ingest",
+      "l-stream",
+      "l-batch",
+      "l-k-on",
+      "l-k-off",
+      "l-upsert",
+      "l-commit",
+      "l-hist",
+      "l-latest",
+      "l-data",
+      "l-model",
+      "l-req",
+      "l-vec",
+      "stream-write",
+      "train-and-serve",
+      "HW-01",
+      "hw-source",
+      "hw-pipeline",
+      "hw-kafka",
+      "hw-onlinefs",
+      "hw-dstream",
+      "hw-online",
+      "hw-offline",
+      "hw-fview",
+      "hw-train",
+      "hw-serving",
+      "hw-app",
+      "hc-source",
+      "hc-pipeline",
+      "hc-kafka",
+      "hc-onlinefs",
+      "hc-dstream",
+      "hc-online",
+      "hc-offline",
+      "hc-fview",
+      "hc-train",
+      "hc-serving",
+      "hc-app"
+    ],
+    "docs/reference-hopsworks.md#§2": [
+      "source",
+      "online",
+      "offline"
+    ],
+    "docs/reference-hopsworks.md#§3": [
+      "pipeline",
+      "kafka",
+      "onlinefs",
+      "dstream",
+      "l-ingest",
+      "l-stream",
+      "l-batch",
+      "l-k-on",
+      "l-k-off",
+      "l-upsert",
+      "l-commit",
+      "stream-write"
+    ],
+    "docs/reference-hopsworks.md#§4": [
+      "fview",
+      "train",
+      "app",
+      "l-hist",
+      "l-latest",
+      "l-data",
+      "l-req",
+      "l-vec",
+      "train-and-serve",
+      "HW-01"
+    ],
+    "docs/reference-hopsworks.md#§5": [
+      "serving",
+      "l-model"
+    ],
+    "docs/reference-hopsworks.md#§6": [
+      "hw-source",
+      "hw-pipeline",
+      "hw-kafka",
+      "hw-onlinefs",
+      "hw-dstream",
+      "hw-online",
+      "hw-offline",
+      "hw-fview",
+      "hw-train",
+      "hw-serving",
+      "hw-app"
+    ],
+    "docs/reference-hopsworks.md#§7": [
+      "hc-source",
+      "hc-pipeline",
+      "hc-kafka",
+      "hc-onlinefs",
+      "hc-dstream",
+      "hc-online",
+      "hc-offline",
+      "hc-fview",
+      "hc-train",
+      "hc-serving",
+      "hc-app"
+    ]
+  },
+  "reference": {
+    "kind": "製品・技術のアーキテクチャ",
+    "role": "overview",
+    "domain": "AI・新技術",
+    "category": "AI・機械学習基盤",
+    "product": "Hopsworks",
+    "order": 20,
+    "compare": "フィーチャーストア",
+    "objectives": [
+      "オンラインとオフラインの二つのストアの役割を区別する",
+      "書き込み経路（ストリーム API とバッチ API）の違いを確認する",
+      "フィーチャービューが学習と推論をつなぐ流れを確認する"
+    ],
+    "sources": [
+      {
+        "title": "Hopsworks の概要",
+        "url": "https://docs.hopsworks.ai/latest/concepts/hopsworks/"
+      },
+      {
+        "title": "フィーチャーグループの概要",
+        "url": "https://docs.hopsworks.ai/latest/concepts/fs/feature_group/fg_overview/"
+      },
+      {
+        "title": "書き込み API",
+        "url": "https://docs.hopsworks.ai/latest/concepts/fs/feature_group/write_apis/"
+      },
+      {
+        "title": "フィーチャービューの概要",
+        "url": "https://docs.hopsworks.ai/latest/concepts/fs/feature_view/fv_overview/"
+      },
+      {
+        "title": "外部フィーチャーグループ",
+        "url": "https://docs.hopsworks.ai/latest/concepts/fs/feature_group/external_fg/"
+      },
+      {
+        "title": "logicalclocks/hopsworks（GitHub）",
+        "url": "https://github.com/logicalclocks/hopsworks"
+      }
+    ]
+  }
+}

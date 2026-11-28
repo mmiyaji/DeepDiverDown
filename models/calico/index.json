@@ -1,0 +1,314 @@
+{
+  "model": "calico",
+  "name": "Calico のネットワークポリシーとデータプレーン",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "admin": {
+      "type": "node",
+      "label": "管理者",
+      "status": "claim"
+    },
+    "policy": {
+      "type": "node",
+      "label": "NetworkPolicy・GlobalNetworkPolicy",
+      "status": "claim"
+    },
+    "datastore": {
+      "type": "node",
+      "label": "データストア（Kubernetes API または etcd）",
+      "status": "claim"
+    },
+    "controllers": {
+      "type": "node",
+      "label": "kube-controllers",
+      "status": "claim"
+    },
+    "typha": {
+      "type": "node",
+      "label": "Typha",
+      "status": "claim"
+    },
+    "felix": {
+      "type": "node",
+      "label": "Felix",
+      "status": "claim"
+    },
+    "bird": {
+      "type": "node",
+      "label": "BIRD と confd",
+      "status": "claim"
+    },
+    "dataplane": {
+      "type": "node",
+      "label": "ノードのデータプレーン",
+      "status": "claim"
+    },
+    "cni": {
+      "type": "node",
+      "label": "CNI プラグインと IPAM",
+      "status": "claim"
+    },
+    "pod": {
+      "type": "node",
+      "label": "ワークロード（Pod）",
+      "status": "claim"
+    },
+    "l-apply": {
+      "type": "link",
+      "label": "管理者 → NetworkPolicy・GlobalNetworkPolicy",
+      "status": "claim"
+    },
+    "l-store": {
+      "type": "link",
+      "label": "NetworkPolicy・GlobalNetworkPolicy → データストア（Kubernetes API または etcd）",
+      "status": "claim"
+    },
+    "l-sync": {
+      "type": "link",
+      "label": "kube-controllers → データストア（Kubernetes API または etcd）",
+      "status": "claim"
+    },
+    "l-watch": {
+      "type": "link",
+      "label": "データストア（Kubernetes API または etcd） → Typha",
+      "status": "claim"
+    },
+    "l-fan": {
+      "type": "link",
+      "label": "Typha → Felix",
+      "status": "claim"
+    },
+    "l-prog": {
+      "type": "link",
+      "label": "Felix → ノードのデータプレーン",
+      "status": "claim"
+    },
+    "l-fib": {
+      "type": "link",
+      "label": "Felix → BIRD と confd",
+      "status": "claim"
+    },
+    "l-cfg": {
+      "type": "link",
+      "label": "Typha → BIRD と confd",
+      "status": "claim"
+    },
+    "l-cni": {
+      "type": "link",
+      "label": "CNI プラグインと IPAM → ワークロード（Pod）",
+      "status": "claim"
+    },
+    "l-fwd": {
+      "type": "link",
+      "label": "ノードのデータプレーン → ワークロード（Pod）",
+      "status": "claim"
+    },
+    "l-status": {
+      "type": "link",
+      "label": "Felix → Typha",
+      "status": "claim"
+    },
+    "policy-to-dataplane": {
+      "type": "scenario",
+      "label": "ポリシーを作成してノードへ適用する"
+    },
+    "pod-network": {
+      "type": "scenario",
+      "label": "Pod にネットワークを付ける"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "eBPF・nftables・Windows・VPP の各データプレーンの動作と制約は、取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "ポリシーの Pass の動作と tiers の評価順は取得した資料に記載がなく未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "最新リリースの日付と CNCF での位置づけは GitHub のページから確認できず未確認。"
+    },
+    "cx-admin": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "管理者",
+      "realizes": [
+        "admin"
+      ]
+    },
+    "cx-api": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "Kubernetes API サーバー（データストア）",
+      "realizes": [
+        "datastore",
+        "policy"
+      ]
+    },
+    "cx-kc": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "calico-kube-controllers",
+      "realizes": [
+        "controllers"
+      ]
+    },
+    "cx-typha": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "calico-typha",
+      "realizes": [
+        "typha"
+      ]
+    },
+    "cx-node": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "calico-node（Felix・BIRD・confd）",
+      "realizes": [
+        "felix",
+        "bird"
+      ]
+    },
+    "cx-kernel": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "Linux カーネルのデータプレーン",
+      "realizes": [
+        "dataplane"
+      ]
+    },
+    "cx-cni": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "Calico CNI プラグイン",
+      "realizes": [
+        "cni"
+      ]
+    },
+    "cx-pod": {
+      "type": "implementation",
+      "impl": "onprem-k8s",
+      "label": "アプリの Pod",
+      "realizes": [
+        "pod"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-calico.md#§1": [
+      "model"
+    ],
+    "docs/reference-calico.md": [
+      "model",
+      "admin",
+      "policy",
+      "datastore",
+      "controllers",
+      "typha",
+      "felix",
+      "bird",
+      "dataplane",
+      "cni",
+      "pod",
+      "l-apply",
+      "l-store",
+      "l-sync",
+      "l-watch",
+      "l-fan",
+      "l-prog",
+      "l-fib",
+      "l-cfg",
+      "l-cni",
+      "l-fwd",
+      "l-status",
+      "policy-to-dataplane",
+      "pod-network",
+      "cx-admin",
+      "cx-api",
+      "cx-kc",
+      "cx-typha",
+      "cx-node",
+      "cx-kernel",
+      "cx-cni",
+      "cx-pod"
+    ],
+    "docs/reference-calico.md#§6": [
+      "admin"
+    ],
+    "docs/reference-calico.md#§3": [
+      "policy",
+      "pod",
+      "l-apply",
+      "l-fwd",
+      "policy-to-dataplane"
+    ],
+    "docs/reference-calico.md#§2": [
+      "datastore",
+      "controllers",
+      "typha",
+      "felix",
+      "bird",
+      "l-store",
+      "l-sync",
+      "l-watch",
+      "l-fan",
+      "l-fib",
+      "l-cfg",
+      "l-status"
+    ],
+    "docs/reference-calico.md#§4": [
+      "dataplane",
+      "l-prog"
+    ],
+    "docs/reference-calico.md#§5": [
+      "cni",
+      "l-cni",
+      "pod-network"
+    ],
+    "docs/reference-calico.md#§7": [
+      "cx-admin",
+      "cx-api",
+      "cx-kc",
+      "cx-typha",
+      "cx-node",
+      "cx-kernel",
+      "cx-cni",
+      "cx-pod"
+    ]
+  },
+  "reference": {
+    "kind": "製品・技術のアーキテクチャ",
+    "role": "overview",
+    "domain": "コンテナ基盤",
+    "category": "ネットワークとポリシー",
+    "product": "Calico",
+    "order": 20,
+    "objectives": [
+      "ポリシーがデータストアから各ノードのデータプレーンへ届く経路を確認する",
+      "Felix・BIRD・Typha・CNI プラグインの分担を確認する",
+      "選べるデータプレーンの種類を確認する"
+    ],
+    "sources": [
+      {
+        "title": "Calico component architecture",
+        "url": "https://docs.tigera.io/calico/latest/reference/architecture/overview"
+      },
+      {
+        "title": "About Calico",
+        "url": "https://docs.tigera.io/calico/latest/about/"
+      },
+      {
+        "title": "Get started with Calico network policy",
+        "url": "https://docs.tigera.io/calico/latest/network-policy/get-started/calico-policy/calico-network-policy"
+      },
+      {
+        "title": "projectcalico/calico (GitHub)",
+        "url": "https://github.com/projectcalico/calico"
+      }
+    ]
+  }
+}

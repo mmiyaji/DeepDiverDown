@@ -162,6 +162,9 @@ implementations:
         size:
           - 20
           - 3
+    groups:
+      - {kind: datacenter, label: 利用者の管理ホスト, tier: [flow, support], nodes: [ex-server-host, ex-server, ex-artifact]}
+      - {kind: datacenter, label: 現場端末, tier: [flow, support], nodes: [ex-device-host, ex-client, ex-software]}
     nodes:
       ex-server-host: {label: 利用者の更新管理ホスト, kind: host, tier: flow, x: 3, y: 2, description: hawkBit を実行する利用者管理のサーバー。, evidence: [{type: doc, ref: docs/reference-eclipse-hawkbit.md#§4}]}
       ex-device-host: {label: 現場の更新対象端末, kind: host, tier: flow, x: 9, y: 2, description: updater と端末ソフトウェアを実行する。, evidence: [{type: doc, ref: docs/reference-eclipse-hawkbit.md#§4}]}
@@ -278,13 +281,13 @@ implementations:
       - {id: data, label: "管理ホスト上の永続領域", z: 1, size: [20, 4]}
       - {id: device, label: "組み込み Linux 端末", z: 0, size: [20, 4]}
     groups:
-      - {kind: datacenter, label: "管理側 Linux ホスト", provider: onprem, tier: [management, data], nodes: [hb-swu-host, hb-swu-proxy, hb-swu-ui, hb-swu-server, hb-swu-db, hb-swu-amqp, hb-swu-store]}
+      - {kind: datacenter, label: "管理側 Linux ホスト", provider: onprem, tier: [management, data], nodes: [hb-swu-host, hb-swu-proxy, hb-swu-ui, hb-swu-server, hb-swu-db, hb-swu-amqp, hb-swu-store, hb-swu-artifact]}
       - {kind: datacenter, label: "現場の組み込み Linux 端末", provider: onprem, tier: [device], nodes: [hb-swu-device, hb-swu-swupdate, hb-swu-boot, hb-swu-software]}
     nodes:
       hb-swu-host: {label: 管理 Linux / Docker Engine ホスト, kind: host, tier: management, x: 1, y: 3, description: Docker Compose で hawkBit と依存サービスを稼働させる。, evidence: [{type: doc, ref: docs/reference-eclipse-hawkbit.md#§5}]}
       hb-swu-device: {label: 現場の組み込み Linux ホスト, kind: host, tier: device, x: 1, y: 3, description: SWUpdate とブートローダーを稼働させる更新対象。, evidence: [{type: doc, ref: docs/reference-eclipse-hawkbit.md#§5}]}
       hb-swu-operator: {label: "更新運用者", kind: actor, tier: release, x: 3, y: 1.5, realizes: [operator], description: "ロールアウトと端末の対象を管理 UI で設定する。", evidence: [{type: doc, ref: "docs/reference-eclipse-hawkbit.md#§5"}]}
-      hb-swu-artifact: {label: "署名付き SWU パッケージ", kind: file, tier: release, x: 12, y: 1.5, realizes: [artifact], description: "対象端末用 rootfs と署名済みマニフェストを用意する。", evidence: [{type: doc, ref: "docs/reference-eclipse-hawkbit.md#§5"}]}
+      hb-swu-artifact: {label: "署名付き SWU パッケージ", kind: file, tier: data, x: 11, y: 1.5, realizes: [artifact], description: "対象端末用 rootfs と署名済みマニフェストを用意する。", evidence: [{type: doc, ref: "docs/reference-eclipse-hawkbit.md#§5"}]}
       hb-swu-proxy: {label: "HTTPS 終端 / 逆プロキシ", kind: gateway, tier: management, x: 3, y: 1.5, description: "端末の HTTPS 接続を終端して DDI を Update Server に転送する。", evidence: [{type: doc, ref: "docs/reference-eclipse-hawkbit.md#§5"}]}
       hb-swu-ui: {label: "hawkBit UI", kind: client, tier: management, x: 8, y: 1.5, description: "Management API で更新対象・成果物・ロールアウトを操作する別コンテナ。", evidence: [{type: doc, ref: "docs/reference-eclipse-hawkbit.md#§5"}]}
       hb-swu-server: {label: "hawkBit Update Server", kind: service, tier: management, x: 13, y: 1.5, realizes: [server], description: "管理 API と DDI を提供し、端末認証と更新割当・結果の記録を行う。", evidence: [{type: doc, ref: "docs/reference-eclipse-hawkbit.md#§5"}]}
@@ -327,9 +330,9 @@ implementations:
         hb-swu-boot: {tier: diagram, x: 17, y: 1}
         hb-swu-software: {tier: diagram, x: 11, y: 4}
         hb-swu-operator: {tier: diagram, x: 20, y: 1}
-        hb-swu-artifact: {tier: diagram, x: 23, y: 1}
+        hb-swu-artifact: {tier: diagram, x: 4, y: 7}
       groups:
-        - {kind: datacenter, label: 利用者の管理ホスト, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 11, nodes: [hb-swu-host, hb-swu-proxy, hb-swu-ui, hb-swu-server, hb-swu-amqp, hb-swu-db, hb-swu-store]}
+        - {kind: datacenter, label: 利用者の管理ホスト, tier: [diagram], x0: -1, y0: 0, x1: 9, y1: 11, nodes: [hb-swu-host, hb-swu-proxy, hb-swu-ui, hb-swu-server, hb-swu-amqp, hb-swu-db, hb-swu-store, hb-swu-artifact]}
         - {kind: datacenter, label: 現場端末, tier: [diagram], x0: 9.5, y0: 0, x1: 19, y1: 11, nodes: [hb-swu-device, hb-swu-swupdate, hb-swu-boot, hb-swu-software]}
     layout3d:
       tiers:
@@ -351,7 +354,7 @@ implementations:
         hb-swu-boot: {tier: edgeapps, x: 7, y: 1}
         hb-swu-software: {tier: edgeapps, x: 1, y: 4}
         hb-swu-operator: {tier: external, x: 1, y: 1}
-        hb-swu-artifact: {tier: external, x: 4, y: 1}
+        hb-swu-artifact: {tier: managementapps, x: 4, y: 7}
       groups:
-        - {kind: datacenter, label: 利用者の管理ホスト, tier: [management, managementapps], nodes: [hb-swu-host, hb-swu-proxy, hb-swu-ui, hb-swu-server, hb-swu-amqp, hb-swu-db, hb-swu-store]}
+        - {kind: datacenter, label: 利用者の管理ホスト, tier: [management, managementapps], nodes: [hb-swu-host, hb-swu-proxy, hb-swu-ui, hb-swu-server, hb-swu-amqp, hb-swu-db, hb-swu-store, hb-swu-artifact]}
         - {kind: datacenter, label: 現場端末, tier: [edgehost, edgeapps], nodes: [hb-swu-device, hb-swu-swupdate, hb-swu-boot, hb-swu-software]}

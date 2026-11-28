@@ -1,0 +1,102 @@
+name: MinIO の S3 互換オブジェクトストレージ
+description: S3 互換 API で受けたオブジェクトを、サーバープール内の消失訂正セットに分割して各ドライブへ保存する。ライセンスと提供形態は 2026 年に変わった。
+reference:
+  objectives: [S3 API から消失訂正セットを経てドライブに保存される流れを確認する, パリティと読み書きのクォーラムによる耐久性の仕組みを確認する, コミュニティ版と AIStor の提供形態・ライセンスの現状を確認する]
+  sources:
+    - {title: MinIO GitHub リポジトリ（README）, url: https://github.com/minio/minio}
+    - {title: MinIO AIStor Erasure Coding, url: https://docs.min.io/enterprise/aistor-object-store/operations/core-concepts/erasure-coding/}
+    - {title: MinIO AIStor Linux, url: https://docs.min.io/enterprise/aistor-object-store/installation/linux/}
+    - {title: MinIO Pricing, url: https://www.min.io/pricing}
+sources: [docs/reference-minio.md]
+evidence: [{type: doc, ref: docs/reference-minio.md#§1}]
+tiers:
+  - {id: flow, label: クライアント・サーバー・ドライブ, z: 0, size: [28, 13]}
+nodes:
+  client: {label: S3 クライアント, kind: client, tier: flow, x: 1, y: 5, description: S3 互換 API でオブジェクトを読み書きする。, evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+  admin: {label: 管理者, kind: actor, tier: flow, x: 1, y: 10, description: サーバープールの追加や設定を行う。, evidence: [{type: doc, ref: docs/reference-minio.md#§4}]}
+  lb: {label: ロードバランサー, kind: gateway, tier: flow, x: 7, y: 5, description: 複数ノードのサーバーへ要求を振り分ける。AIStor の Linux 手順に独立の項目がある。, evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+  api: {label: S3 API サーバー, kind: service, tier: flow, x: 13, y: 5, description: 要求を受け、保存先のサーバープールとセットを選ぶ。, evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+  iam: {label: 認証・認可, kind: service, tier: flow, x: 13, y: 1.5, description: 要求元の認証とポリシー評価を行う。詳細は今回取得した資料になく未確認。, evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+  pool: {label: サーバープール, kind: service, tier: flow, x: 13, y: 9.5, description: ノードとドライブの集まり。プールを足して容量を広げる。, evidence: [{type: doc, ref: docs/reference-minio.md#§4}]}
+  erasure: {label: 消失訂正セット, kind: service, tier: flow, x: 19, y: 5, description: プール内のドライブを同数ずつまとめた単位。オブジェクトをデータ K とパリティ M のシャードに分割する。, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+  heal: {label: ヒーリング, kind: worker, tier: flow, x: 19, y: 9.5, description: 欠けたシャードを残りのシャードから再構築する。読み取りクォーラムが残ることが前提。, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+  drives: {label: ドライブ群, kind: db, tier: flow, x: 25, y: 5, description: 各シャードを置くローカルのドライブ。, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+links:
+  - {id: c-lb, from: client, to: lb, label: S3 要求を送信, evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+  - {id: lb-api, from: lb, to: api, label: ノードへ振り分け, evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+  - {id: api-iam, from: api, to: iam, label: 認証・認可を確認, evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+  - {id: api-pool, from: api, to: pool, label: 保存先プールを選択, evidence: [{type: doc, ref: docs/reference-minio.md#§4}]}
+  - {id: pool-erasure, from: pool, to: erasure, label: プール内のセットを使用, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+  - {id: api-erasure, from: api, to: erasure, label: オブジェクトを書き込み・読み取り, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+  - {id: erasure-drives, from: erasure, to: drives, label: シャードを分散保存, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+  - {id: heal-erasure, from: heal, to: erasure, label: 欠損シャードを再構築, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+  - {id: heal-drives, from: heal, to: drives, label: 再構築したシャードを書き戻す, evidence: [{type: doc, ref: docs/reference-minio.md#§3}]}
+  - {id: admin-pool, from: admin, to: pool, label: プールを追加, evidence: [{type: doc, ref: docs/reference-minio.md#§4}]}
+scenarios:
+  - id: put-object
+    label: オブジェクトを書き込む
+    evidence: [{type: doc, ref: docs/reference-minio.md#§3}]
+    steps:
+      - {links: [c-lb, lb-api, api-iam], note: ロードバランサー経由で S3 API サーバーが要求を受け、認証・認可を確認する。}
+      - {links: [api-pool, pool-erasure], note: 保存先のプールとセットを選ぶ。}
+      - {links: [api-erasure, erasure-drives], note: データとパリティのシャードに分割し、全シャードへの書き込みを試みる。K 個の確認で成功とする。}
+  - id: drive-failure
+    label: ドライブが欠けた後に修復する
+    evidence: [{type: doc, ref: docs/reference-minio.md#§3}]
+    steps:
+      - {links: [heal-erasure], note: 読み取りクォーラム（K 個）が残る間は、残りのシャードから欠損分を再構築できる。}
+      - {links: [heal-drives], note: 再構築したシャードを書き戻す。}
+requirements:
+  - {id: MN-01, kind: usecase, title: S3 互換 API でオブジェクトを保存する, text: S3 クライアントから要求を送り、消失訂正セットを介してドライブへ保存する。, links: [c-lb, api-erasure, erasure-drives], evidence: [{type: doc, ref: docs/reference-minio.md#§2}]}
+unknowns:
+  - {id: UNK-01, text: 認証・認可（IAM、外部 ID プロバイダー、KES による暗号化）の仕組みは今回取得した資料に記載がなく未確認。, refs: [iam]}
+  - {id: UNK-02, text: ビットロット対策は取得した消失訂正の資料に記載がなく未確認。, refs: [erasure]}
+  - {id: UNK-03, text: ソース公開のコミュニティ版（AGPL v3、アーカイブ済み）と AIStor の機能差、AIStor 資料の消失訂正の記述がコミュニティ版にそのまま当てはまるかは未確認。, refs: [erasure, pool]}
+  - {id: UNK-04, text: 分散構成の要件（ファイルシステム、ポート、構成ファイル、サーバープール拡張の構文）は個別手順ページを取得しておらず未確認。, refs: [pool, lb]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-distributed
+    label: 自前の Linux 上の分散構成（複数ノード・複数ドライブ）
+    description: ロードバランサーの背後に複数ノードの MinIO を置き、各ノードのローカルドライブに消失訂正でシャードを保存する例。代表例であり、導入事例ではない。この構成を使えるのは AIStor Enterprise か、ソースからビルドしたコミュニティ版で、AIStor Free は単一ノードのみ。
+    sources:
+      - {title: MinIO AIStor Erasure Coding, url: https://docs.min.io/enterprise/aistor-object-store/operations/core-concepts/erasure-coding/}
+      - {title: MinIO AIStor Linux, url: https://docs.min.io/enterprise/aistor-object-store/installation/linux/}
+      - {title: MinIO Pricing, url: https://www.min.io/pricing}
+    tiers:
+      - {id: diagram, label: クライアント・MinIO・ドライブ, z: 0, size: [28, 11]}
+    nodes:
+      mn-client: {label: S3 クライアント, kind: client, tier: diagram, x: 1, y: 3, realizes: [client], description: S3 互換 SDK や CLI を使うアプリケーション。, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+      mn-admin: {label: 運用担当者, kind: actor, tier: diagram, x: 1, y: 8, realizes: [admin], description: ノードの追加とプール拡張を行う。, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+      mn-lb: {label: ロードバランサー, kind: gateway, tier: diagram, x: 7, y: 3, realizes: [lb], description: 各ノードの S3 エンドポイントへ振り分ける。, management: {type: customer, scope: "Customer operates the load balancer."}, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+      mn-server: {label: MinIO サーバー（各ノード）, kind: service, tier: diagram, x: 13, y: 3, realizes: [api, iam, pool, erasure, heal], description: S3 API、認証・認可、消失訂正、ヒーリングを担うプロセス。サーバープールを構成する。, management: {type: customer, scope: "Customer operates the host, MinIO process, license and configuration."}, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+      mn-disk: {label: ノードのローカルドライブ, kind: db, tier: diagram, x: 21, y: 3, realizes: [drives], description: 各ノードに接続したドライブ。シャードを置く。, management: {type: customer, scope: "Customer operates the drives, replacement and backups."}, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+    links:
+      - {id: mn-req, from: mn-client, to: mn-lb, label: S3 要求を送信, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+      - {id: mn-route, from: mn-lb, to: mn-server, label: ノードへ振り分け, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+      - {id: mn-save, from: mn-server, to: mn-disk, label: シャードを分散保存, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+      - {id: mn-expand, from: mn-admin, to: mn-server, label: プールを追加, evidence: [{type: doc, ref: docs/reference-minio.md#§5}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [mn-lb, mn-server, mn-disk]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアント・MinIO・ドライブ, z: 0, size: [28, 11]}
+      nodes:
+        mn-client: {tier: diagram, x: 1, y: 3}
+        mn-admin: {tier: diagram, x: 1, y: 8}
+        mn-lb: {tier: diagram, x: 7, y: 3}
+        mn-server: {tier: diagram, x: 13, y: 3}
+        mn-disk: {tier: diagram, x: 21, y: 3}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [mn-lb, mn-server, mn-disk]}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント, z: 0, size: [6, 11]}
+        - {id: servers, label: MinIO とドライブ, z: 0, origin: [8, 0], size: [20, 11]}
+      nodes:
+        mn-client: {tier: clients, x: 3, y: 3}
+        mn-admin: {tier: clients, x: 3, y: 8}
+        mn-lb: {tier: servers, x: 2, y: 3}
+        mn-server: {tier: servers, x: 8, y: 3}
+        mn-disk: {tier: servers, x: 15, y: 3}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [mn-lb, mn-server, mn-disk]}

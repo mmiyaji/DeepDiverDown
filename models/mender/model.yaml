@@ -1,0 +1,103 @@
+name: Mender の OTA 更新
+description: Mender Server がデバイスを認証して更新を割り当て、デバイス上の mender-update が成果物を取得して非アクティブ側のパーティションへ書き込み、再起動後に確定またはロールバックする流れを示す。
+reference:
+  objectives: [サーバーとデバイス側クライアントの役割を区別する, デバイス認証と更新の取得・適用・結果報告の流れを確認する, A/B パーティションによるロールバックを確認する]
+  sources:
+    - {title: Mender overview (introduction), url: https://docs.mender.io/overview/introduction}
+    - {title: Device authentication, url: https://docs.mender.io/overview/device-authentication}
+    - {title: mendersoftware/mender (client), url: https://github.com/mendersoftware/mender}
+    - {title: mendersoftware/mender-server, url: https://github.com/mendersoftware/mender-server}
+sources: [docs/reference-mender.md]
+evidence: [{type: doc, ref: docs/reference-mender.md#§1}]
+tiers:
+  - {id: flow, label: 運用者・サーバー・デバイス, z: 0, size: [28, 13]}
+nodes:
+  operator: {label: 運用者, kind: actor, tier: flow, x: 1, y: 3, description: 成果物を登録し、デバイスのグループへデプロイを作成する。保留中のデバイスを承認する。, evidence: [{type: doc, ref: docs/reference-mender.md#§2}]}
+  gateway: {label: 管理 UI・API, kind: service, tier: flow, x: 7, y: 3, description: 運用者の操作とデバイスからの API 呼び出しを受ける。サーバーを構成する個別サービスの名称と数は未確認。, evidence: [{type: doc, ref: docs/reference-mender.md#§2}, {type: doc, ref: docs/reference-mender.md#§6}]}
+  deviceauth: {label: デバイス認証, kind: service, tier: flow, x: 13, y: 1, description: 識別属性と公開鍵と tier の組（認証セット）を保留・承認・拒否・事前承認の状態で管理し、承認済みデバイスへ JWT を発行する。, evidence: [{type: doc, ref: docs/reference-mender.md#§3}]}
+  deployments: {label: デプロイ管理, kind: service, tier: flow, x: 13, y: 5, description: 成果物とデプロイを管理し、デバイスの更新確認に応じて割り当て、結果を記録する。, evidence: [{type: doc, ref: docs/reference-mender.md#§2}]}
+  artifacts: {label: 成果物ストレージ, kind: db, tier: flow, x: 13, y: 9, description: 更新を格納した Mender Artifact を保持する。S3 互換ストレージが使われることを示唆する記述があるが、製品名は未確認。, evidence: [{type: doc, ref: docs/reference-mender.md#§2}]}
+  auth: {label: mender-auth, kind: service, tier: flow, x: 20, y: 1, description: デバイスの秘密鍵で署名した認証要求をサーバーへ送り、取得した JWT を保存して DBus で公開する。トークンの既定の期限は 1 週間で自動更新する。, evidence: [{type: doc, ref: docs/reference-mender.md#§3}]}
+  update: {label: mender-update, kind: client, tier: flow, x: 20, y: 5, description: デバイス上のクライアント。JWT を付けてサーバーを定期的に確認し、更新を取得して適用し、結果を報告する。, evidence: [{type: doc, ref: docs/reference-mender.md#§4}]}
+  inactive: {label: 非アクティブ側パーティション, kind: db, tier: flow, x: 25, y: 3, description: OS の全体イメージ更新の書き込み先。, evidence: [{type: doc, ref: docs/reference-mender.md#§5}]}
+  active: {label: アクティブ側パーティション, kind: db, tier: flow, x: 25, y: 8, description: 稼働中の OS。再起動後の起動に失敗すると、こちらへロールバックする。, evidence: [{type: doc, ref: docs/reference-mender.md#§5}]}
+links:
+  - {id: op-gw, from: operator, to: gateway, label: 成果物登録・デプロイ作成・承認, evidence: [{type: doc, ref: docs/reference-mender.md#§2}]}
+  - {id: gw-auth, from: gateway, to: deviceauth, label: 認証要求を中継, evidence: [{type: doc, ref: docs/reference-mender.md#§3}]}
+  - {id: gw-dep, from: gateway, to: deployments, label: デプロイ操作・更新確認を中継, evidence: [{type: doc, ref: docs/reference-mender.md#§2}]}
+  - {id: dep-art, from: deployments, to: artifacts, label: 成果物を保存・取得, evidence: [{type: doc, ref: docs/reference-mender.md#§2}]}
+  - {id: a-req, from: auth, to: gateway, label: 署名した認証要求を送信, evidence: [{type: doc, ref: docs/reference-mender.md#§3}]}
+  - {id: a-tok, from: auth, to: update, label: JWT を DBus で渡す, evidence: [{type: doc, ref: docs/reference-mender.md#§3}]}
+  - {id: u-poll, from: update, to: gateway, label: 更新を確認・成果物を取得・結果を報告, evidence: [{type: doc, ref: docs/reference-mender.md#§4}]}
+  - {id: u-write, from: update, to: inactive, label: イメージを書き込み, evidence: [{type: doc, ref: docs/reference-mender.md#§5}]}
+  - {id: u-fallback, from: inactive, to: active, label: 起動失敗時にロールバック, evidence: [{type: doc, ref: docs/reference-mender.md#§5}]}
+scenarios:
+  - id: os-update
+    label: OS の全体イメージ更新を配布して確定する
+    evidence: [{type: doc, ref: docs/reference-mender.md#§5}]
+    steps:
+      - {links: [op-gw, gw-dep, dep-art], note: 運用者が成果物を登録し、デバイスへのデプロイを作成する。}
+      - {links: [a-req, gw-auth, a-tok], note: デバイスは承認済みの認証セットで JWT を得る。}
+      - {links: [u-poll], note: mender-update が更新を確認し、成果物を取得する。}
+      - {links: [u-write, u-fallback], note: 非アクティブ側へ書き込み、再起動後に起動成功なら確定、失敗ならロールバックする。}
+requirements:
+  - {id: MD-01, kind: usecase, title: 全体イメージ更新を失敗時に元へ戻す, text: A/B パーティションで、起動に成功した場合のみ更新を確定し、失敗した場合は元の側へ戻す。, links: [u-write, u-fallback], evidence: [{type: doc, ref: docs/reference-mender.md#§5}]}
+unknowns:
+  - {id: UNK-01, text: サーバーを構成する個別サービス（deployments・inventory・workflows など）の名称、データベース、メッセージング、ストレージの製品は取得した資料に明記がなく未確認。, refs: [gateway, deployments, artifacts]}
+  - {id: UNK-02, text: サーバーのライセンスは GitHub ページに LICENSE ファイルの記載のみで種別を確認できず、未確認。エディションごとの機能差も未確認。, refs: [gateway]}
+  - {id: UNK-03, text: ポーリング間隔、ステートスクリプト、差分更新、Update Module の詳細、Mender の版番号は未確認。, refs: [update]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: self-hosted
+    label: 自前のサーバーで運用する Mender Server と組み込みデバイス
+    description: 自前のサーバーで Mender Server を動かし、デバイス側は mender-auth と mender-update を A/B パーティションの Linux デバイスで動かす例。代表例であり、導入事例ではない。サーバー内部は個別サービスを描かず、公式資料で確認できた範囲に限る。
+    sources:
+      - {title: Mender overview (introduction), url: https://docs.mender.io/overview/introduction}
+      - {title: Device authentication, url: https://docs.mender.io/overview/device-authentication}
+      - {title: mendersoftware/mender-server, url: https://github.com/mendersoftware/mender-server}
+    tiers:
+      - {id: diagram, label: 運用者・サーバー・デバイス, z: 0, size: [28, 11]}
+    nodes:
+      md-operator: {label: 運用者, kind: actor, tier: diagram, x: 1, y: 5, realizes: [operator], description: 管理 UI または API を使う。, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      md-server: {label: Mender Server, kind: service, tier: diagram, x: 8, y: 3, realizes: [gateway, deviceauth, deployments], description: 管理 UI・API、デバイス認証、デプロイ管理を動かす。, management: {type: customer, scope: "Customer operates the hosts, server deployment, database and upgrades."}, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      md-store: {label: 成果物ストレージ, kind: db, tier: diagram, x: 8, y: 8, realizes: [artifacts], description: Mender Artifact を置く。S3 互換と示唆されるが製品は未確認。, management: {type: customer, scope: "Customer operates the storage and backups."}, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      md-auth: {label: mender-auth, kind: service, tier: diagram, x: 16, y: 2, realizes: [auth], description: デバイス上で認証と JWT の更新を行う。, management: {type: customer, scope: "Customer builds the image and configures the client."}, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      md-update: {label: mender-update, kind: service, tier: diagram, x: 16, y: 5.5, realizes: [update], description: デバイス上で更新を確認・取得・適用する。, management: {type: customer, scope: "Customer builds the image and configures the client."}, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      md-parts: {label: A/B パーティション, kind: db, tier: diagram, x: 23, y: 4, realizes: [inactive, active], description: 稼働中と更新先の 2 つの OS パーティション。, management: {type: customer, scope: "Customer defines the partition layout and bootloader integration."}, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+    links:
+      - {id: md-ui, from: md-operator, to: md-server, label: 成果物登録・デプロイ作成・承認, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      - {id: md-save, from: md-server, to: md-store, label: 成果物を保存・取得, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      - {id: md-authreq, from: md-auth, to: md-server, label: 署名した認証要求を送信, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      - {id: md-token, from: md-auth, to: md-update, label: JWT を DBus で渡す, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      - {id: md-poll, from: md-update, to: md-server, label: 更新を確認・取得・結果を報告, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+      - {id: md-write, from: md-update, to: md-parts, label: 非アクティブ側へ書き込み, evidence: [{type: doc, ref: docs/reference-mender.md#§7}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [md-server, md-store]}
+      - {kind: datacenter, label: 組み込みデバイス, provider: onprem, tier: diagram, nodes: [md-auth, md-update, md-parts]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 運用者・サーバー・デバイス, z: 0, size: [28, 11]}
+      nodes:
+        md-operator: {tier: diagram, x: 1, y: 5}
+        md-server: {tier: diagram, x: 8, y: 3}
+        md-store: {tier: diagram, x: 8, y: 8}
+        md-auth: {tier: diagram, x: 16, y: 2}
+        md-update: {tier: diagram, x: 16, y: 5.5}
+        md-parts: {tier: diagram, x: 23, y: 4}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [md-server, md-store]}
+        - {kind: datacenter, label: 組み込みデバイス, provider: onprem, tier: diagram, nodes: [md-auth, md-update, md-parts]}
+    layout3d:
+      tiers:
+        - {id: clients, label: 運用者, z: 0, size: [6, 11]}
+        - {id: servers, label: サーバーとデバイス, z: 0, origin: [8, 0], size: [20, 11]}
+      nodes:
+        md-operator: {tier: clients, x: 3, y: 5}
+        md-server: {tier: servers, x: 2, y: 3}
+        md-store: {tier: servers, x: 2, y: 8}
+        md-auth: {tier: servers, x: 9, y: 2}
+        md-update: {tier: servers, x: 9, y: 5.5}
+        md-parts: {tier: servers, x: 16, y: 4}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [md-server, md-store]}
+        - {kind: datacenter, label: 組み込みデバイス, provider: onprem, tier: [servers], nodes: [md-auth, md-update, md-parts]}

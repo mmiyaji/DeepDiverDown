@@ -1,0 +1,112 @@
+name: Calico のネットワークポリシーとデータプレーン
+description: Kubernetes 向け CNI の Calico で、ポリシーの保存、Typha と Felix による配信、ノードのデータプレーン、BGP の経路配布、CNI による Pod の接続を示す。
+reference:
+  objectives: [ポリシーがデータストアから各ノードのデータプレーンへ届く経路を確認する, Felix・BIRD・Typha・CNI プラグインの分担を確認する, 選べるデータプレーンの種類を確認する]
+  sources:
+    - {title: Calico component architecture, url: https://docs.tigera.io/calico/latest/reference/architecture/overview}
+    - {title: About Calico, url: https://docs.tigera.io/calico/latest/about/}
+    - {title: Get started with Calico network policy, url: https://docs.tigera.io/calico/latest/network-policy/get-started/calico-policy/calico-network-policy}
+    - {title: projectcalico/calico (GitHub), url: https://github.com/projectcalico/calico}
+sources: [docs/reference-calico.md]
+evidence: [{type: doc, ref: docs/reference-calico.md#§1}]
+tiers:
+  - {id: flow, label: 管理・制御・ノード, z: 0, size: [30, 14]}
+nodes:
+  admin: {label: 管理者, kind: client, tier: flow, x: 1, y: 6, description: kubectl または calicoctl でポリシーと IP プールを操作する。, evidence: [{type: doc, ref: docs/reference-calico.md#§6}]}
+  policy: {label: NetworkPolicy・GlobalNetworkPolicy, kind: policy, tier: flow, x: 7, y: 2, description: selector で対象エンドポイントを選び、ingress・egress ごとに Allow・Deny・Log の規則を書く。order の小さいものから評価する。, evidence: [{type: doc, ref: docs/reference-calico.md#§3}]}
+  datastore: {label: データストア（Kubernetes API または etcd）, kind: db, tier: flow, x: 7, y: 6, description: Calico のリソースと状態を保存する。Kubernetes API を使う構成は追加のデータストアが要らない。etcd は非 Kubernetes 環境や複数クラスタ向け。, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  controllers: {label: kube-controllers, kind: service, tier: flow, x: 7, y: 10, description: Kubernetes API を監視し、policy・namespace・serviceaccount・workloadendpoint・node の各コントローラーが Calico リソースを更新する。, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  typha: {label: Typha, kind: service, tier: flow, x: 13, y: 6, description: データストアへの接続をまとめ、状態をキャッシュして Felix と confd に配る。既定でインストールされるが、既定では設定されない。, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  felix: {label: Felix, kind: service, tier: flow, x: 19, y: 3, description: エンドポイントのあるノードごとに動き、経路・ACL・インターフェース設定をカーネルへ反映する。, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  bird: {label: BIRD と confd, kind: service, tier: flow, x: 19, y: 9, description: confd がデータストアから BGP 設定を作り BIRD に再読込させる。BIRD は Felix がカーネルに入れた経路を BGP で他ノードへ配る。, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  dataplane: {label: ノードのデータプレーン, kind: service, tier: flow, x: 25, y: 3, description: パケットの転送とポリシーの適用をカーネルで行う。iptables の説明が資料にあり、eBPF・nftables・Windows・VPP も機能表に載る。, evidence: [{type: doc, ref: docs/reference-calico.md#§4}]}
+  cni: {label: CNI プラグインと IPAM, kind: service, tier: flow, x: 25, y: 9, description: Pod 作成時に呼ばれ、仮想インターフェースを作り、Calico の IP プールから Pod の IP を割り当てる。, evidence: [{type: doc, ref: docs/reference-calico.md#§5}]}
+  pod: {label: ワークロード（Pod）, kind: service, tier: flow, x: 25, y: 12.5, description: ポリシーの対象になるワークロードエンドポイント。, evidence: [{type: doc, ref: docs/reference-calico.md#§3}]}
+links:
+  - {id: l-apply, from: admin, to: policy, label: ポリシーを作成, evidence: [{type: doc, ref: docs/reference-calico.md#§3}]}
+  - {id: l-store, from: policy, to: datastore, label: リソースを保存, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  - {id: l-sync, from: controllers, to: datastore, label: Kubernetes の状態を Calico リソースへ反映, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  - {id: l-watch, from: datastore, to: typha, label: 変更を監視, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  - {id: l-fan, from: typha, to: felix, label: 変更を配信, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  - {id: l-prog, from: felix, to: dataplane, label: 規則と経路をプログラム, evidence: [{type: doc, ref: docs/reference-calico.md#§4}]}
+  - {id: l-fib, from: felix, to: bird, label: カーネルの経路表経由で経路を渡す, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  - {id: l-cfg, from: typha, to: bird, label: BGP 設定を配信, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+  - {id: l-cni, from: cni, to: pod, label: 仮想インターフェースと IP を設定, evidence: [{type: doc, ref: docs/reference-calico.md#§5}]}
+  - {id: l-fwd, from: dataplane, to: pod, label: 許可した通信を転送, evidence: [{type: doc, ref: docs/reference-calico.md#§3}]}
+  - {id: l-status, from: felix, to: typha, label: 状態を書き戻し, evidence: [{type: doc, ref: docs/reference-calico.md#§2}]}
+scenarios:
+  - id: policy-to-dataplane
+    label: ポリシーを作成してノードへ適用する
+    evidence: [{type: doc, ref: docs/reference-calico.md#§3}]
+    steps:
+      - {links: [l-apply, l-store], note: 管理者が作成したポリシーをデータストアに保存する。}
+      - {links: [l-watch, l-fan], note: Typha が変更を検知し、各ノードの Felix へ配る。}
+      - {links: [l-prog, l-fwd], note: Felix がデータプレーンの規則を更新し、許可された通信だけが Pod に届く。}
+  - id: pod-network
+    label: Pod にネットワークを付ける
+    evidence: [{type: doc, ref: docs/reference-calico.md#§5}]
+    steps:
+      - {links: [l-cni], note: CNI プラグインが IP を割り当て、Pod の仮想インターフェースを設定する。}
+      - {links: [l-fib, l-cfg], note: Felix が経路をカーネルに入れ、BIRD が BGP で他ノードへ配る。}
+unknowns:
+  - {id: UNK-01, text: eBPF・nftables・Windows・VPP の各データプレーンの動作と制約は、取得した資料に記載がなく未確認。, refs: [dataplane]}
+  - {id: UNK-02, text: ポリシーの Pass の動作と tiers の評価順は取得した資料に記載がなく未確認。, refs: [policy]}
+  - {id: UNK-03, text: 最新リリースの日付と CNCF での位置づけは GitHub のページから確認できず未確認。, refs: [felix]}
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-k8s
+    label: 自前の Kubernetes クラスタ上の Calico
+    description: 自前のサーバー群の Kubernetes に Calico を入れ、データストアに Kubernetes API を使い、各ノードの calico-node（Felix・BIRD・confd）と Typha で動かす例。代表例であり、導入事例ではない。
+    sources:
+      - {title: Calico component architecture, url: https://docs.tigera.io/calico/latest/reference/architecture/overview}
+      - {title: Get started with Calico network policy, url: https://docs.tigera.io/calico/latest/network-policy/get-started/calico-policy/calico-network-policy}
+    tiers:
+      - {id: diagram, label: 管理者・クラスタ, z: 0, size: [30, 14]}
+    nodes:
+      cx-admin: {label: 管理者, kind: client, tier: diagram, x: 1, y: 6, realizes: [admin], description: kubectl・calicoctl を使う運用者。, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      cx-api: {label: Kubernetes API サーバー（データストア）, kind: db, tier: diagram, x: 7, y: 4, realizes: [datastore, policy], description: Calico のリソースと NetworkPolicy を保存する。, management: {type: customer, scope: "Customer operates the cluster, nodes and Calico configuration."}, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      cx-kc: {label: calico-kube-controllers, kind: service, tier: diagram, x: 7, y: 10, realizes: [controllers], description: Kubernetes API を監視して Calico リソースを更新する。, management: {type: customer, scope: "Customer operates the cluster, nodes and Calico configuration."}, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      cx-typha: {label: calico-typha, kind: service, tier: diagram, x: 13, y: 4, realizes: [typha], description: API サーバーへの接続をまとめて Felix に配る。, management: {type: customer, scope: "Customer operates the cluster, nodes and Calico configuration."}, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      cx-node: {label: calico-node（Felix・BIRD・confd）, kind: service, tier: diagram, x: 19, y: 4, realizes: [felix, bird], description: 各ノードで Felix が規則をカーネルに入れ、BIRD が BGP で経路を配る。, management: {type: customer, scope: "Customer operates the cluster, nodes and Calico configuration."}, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      cx-kernel: {label: Linux カーネルのデータプレーン, kind: service, tier: diagram, x: 25, y: 2, realizes: [dataplane], description: iptables で通信を判定して転送する。, management: {type: customer, scope: "Customer operates the cluster, nodes and Calico configuration."}, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      cx-cni: {label: Calico CNI プラグイン, kind: service, tier: diagram, x: 25, y: 7, realizes: [cni], description: 各ノードにインストールされ、Pod の IP を割り当てる。, management: {type: customer, scope: "Customer operates the cluster, nodes and Calico configuration."}, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      cx-pod: {label: アプリの Pod, kind: service, tier: diagram, x: 25, y: 11, realizes: [pod], description: ポリシーの対象。, management: {type: customer, scope: "Customer operates the cluster, nodes and Calico configuration."}, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+    links:
+      - {id: cx-l1, from: cx-admin, to: cx-api, label: ポリシーを作成・保存, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      - {id: cx-l2, from: cx-api, to: cx-typha, label: 変更を監視, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      - {id: cx-l3, from: cx-typha, to: cx-node, label: 変更を配信, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      - {id: cx-l4, from: cx-node, to: cx-kernel, label: 規則と経路をプログラム, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      - {id: cx-l5, from: cx-kernel, to: cx-pod, label: 許可した通信を転送, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      - {id: cx-l6, from: cx-kc, to: cx-api, label: Kubernetes の状態を反映, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+      - {id: cx-l7, from: cx-cni, to: cx-pod, label: IP とインターフェースを設定, evidence: [{type: doc, ref: docs/reference-calico.md#§7}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [cx-api, cx-kc, cx-typha, cx-node, cx-kernel, cx-cni, cx-pod]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: 管理者・クラスタ, z: 0, size: [30, 14]}
+      nodes:
+        cx-admin: {tier: diagram, x: 1, y: 6}
+        cx-api: {tier: diagram, x: 7, y: 4}
+        cx-kc: {tier: diagram, x: 7, y: 10}
+        cx-typha: {tier: diagram, x: 13, y: 4}
+        cx-node: {tier: diagram, x: 19, y: 4}
+        cx-kernel: {tier: diagram, x: 25, y: 2}
+        cx-cni: {tier: diagram, x: 25, y: 7}
+        cx-pod: {tier: diagram, x: 25, y: 11}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [cx-api, cx-kc, cx-typha, cx-node, cx-kernel, cx-cni, cx-pod]}
+    layout3d:
+      tiers:
+        - {id: clients, label: 管理者, z: 0, size: [6, 14]}
+        - {id: cluster, label: Kubernetes クラスタ, z: 0, origin: [8, 0], size: [24, 14]}
+      nodes:
+        cx-admin: {tier: clients, x: 3, y: 6}
+        cx-api: {tier: cluster, x: 1, y: 4}
+        cx-kc: {tier: cluster, x: 1, y: 10}
+        cx-typha: {tier: cluster, x: 7, y: 4}
+        cx-node: {tier: cluster, x: 13, y: 4}
+        cx-kernel: {tier: cluster, x: 19, y: 2}
+        cx-cni: {tier: cluster, x: 19, y: 7}
+        cx-pod: {tier: cluster, x: 19, y: 11}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [cluster], nodes: [cx-api, cx-kc, cx-typha, cx-node, cx-kernel, cx-cni, cx-pod]}

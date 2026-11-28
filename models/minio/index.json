@@ -1,0 +1,280 @@
+{
+  "model": "minio",
+  "name": "MinIO の S3 互換オブジェクトストレージ",
+  "coverage": {
+    "covered": 5,
+    "total": 5
+  },
+  "byId": {
+    "client": {
+      "type": "node",
+      "label": "S3 クライアント",
+      "status": "claim"
+    },
+    "admin": {
+      "type": "node",
+      "label": "管理者",
+      "status": "claim"
+    },
+    "lb": {
+      "type": "node",
+      "label": "ロードバランサー",
+      "status": "claim"
+    },
+    "api": {
+      "type": "node",
+      "label": "S3 API サーバー",
+      "status": "claim"
+    },
+    "iam": {
+      "type": "node",
+      "label": "認証・認可",
+      "status": "claim"
+    },
+    "pool": {
+      "type": "node",
+      "label": "サーバープール",
+      "status": "claim"
+    },
+    "erasure": {
+      "type": "node",
+      "label": "消失訂正セット",
+      "status": "claim"
+    },
+    "heal": {
+      "type": "node",
+      "label": "ヒーリング",
+      "status": "claim"
+    },
+    "drives": {
+      "type": "node",
+      "label": "ドライブ群",
+      "status": "claim"
+    },
+    "c-lb": {
+      "type": "link",
+      "label": "S3 クライアント → ロードバランサー",
+      "status": "claim"
+    },
+    "lb-api": {
+      "type": "link",
+      "label": "ロードバランサー → S3 API サーバー",
+      "status": "claim"
+    },
+    "api-iam": {
+      "type": "link",
+      "label": "S3 API サーバー → 認証・認可",
+      "status": "claim"
+    },
+    "api-pool": {
+      "type": "link",
+      "label": "S3 API サーバー → サーバープール",
+      "status": "claim"
+    },
+    "pool-erasure": {
+      "type": "link",
+      "label": "サーバープール → 消失訂正セット",
+      "status": "claim"
+    },
+    "api-erasure": {
+      "type": "link",
+      "label": "S3 API サーバー → 消失訂正セット",
+      "status": "claim"
+    },
+    "erasure-drives": {
+      "type": "link",
+      "label": "消失訂正セット → ドライブ群",
+      "status": "claim"
+    },
+    "heal-erasure": {
+      "type": "link",
+      "label": "ヒーリング → 消失訂正セット",
+      "status": "claim"
+    },
+    "heal-drives": {
+      "type": "link",
+      "label": "ヒーリング → ドライブ群",
+      "status": "claim"
+    },
+    "admin-pool": {
+      "type": "link",
+      "label": "管理者 → サーバープール",
+      "status": "claim"
+    },
+    "put-object": {
+      "type": "scenario",
+      "label": "オブジェクトを書き込む"
+    },
+    "drive-failure": {
+      "type": "scenario",
+      "label": "ドライブが欠けた後に修復する"
+    },
+    "MN-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "S3 互換 API でオブジェクトを保存する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "認証・認可（IAM、外部 ID プロバイダー、KES による暗号化）の仕組みは今回取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "ビットロット対策は取得した消失訂正の資料に記載がなく未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "ソース公開のコミュニティ版（AGPL v3、アーカイブ済み）と AIStor の機能差、AIStor 資料の消失訂正の記述がコミュニティ版にそのまま当てはまるかは未確認。"
+    },
+    "UNK-04": {
+      "type": "unknown",
+      "label": "分散構成の要件（ファイルシステム、ポート、構成ファイル、サーバープール拡張の構文）は個別手順ページを取得しておらず未確認。"
+    },
+    "mn-client": {
+      "type": "implementation",
+      "impl": "onprem-distributed",
+      "label": "S3 クライアント",
+      "realizes": [
+        "client"
+      ]
+    },
+    "mn-admin": {
+      "type": "implementation",
+      "impl": "onprem-distributed",
+      "label": "運用担当者",
+      "realizes": [
+        "admin"
+      ]
+    },
+    "mn-lb": {
+      "type": "implementation",
+      "impl": "onprem-distributed",
+      "label": "ロードバランサー",
+      "realizes": [
+        "lb"
+      ]
+    },
+    "mn-server": {
+      "type": "implementation",
+      "impl": "onprem-distributed",
+      "label": "MinIO サーバー（各ノード）",
+      "realizes": [
+        "api",
+        "iam",
+        "pool",
+        "erasure",
+        "heal"
+      ]
+    },
+    "mn-disk": {
+      "type": "implementation",
+      "impl": "onprem-distributed",
+      "label": "ノードのローカルドライブ",
+      "realizes": [
+        "drives"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-minio.md#§1": [
+      "model"
+    ],
+    "docs/reference-minio.md": [
+      "model",
+      "client",
+      "admin",
+      "lb",
+      "api",
+      "iam",
+      "pool",
+      "erasure",
+      "heal",
+      "drives",
+      "c-lb",
+      "lb-api",
+      "api-iam",
+      "api-pool",
+      "pool-erasure",
+      "api-erasure",
+      "erasure-drives",
+      "heal-erasure",
+      "heal-drives",
+      "admin-pool",
+      "put-object",
+      "drive-failure",
+      "MN-01",
+      "mn-client",
+      "mn-admin",
+      "mn-lb",
+      "mn-server",
+      "mn-disk"
+    ],
+    "docs/reference-minio.md#§2": [
+      "client",
+      "lb",
+      "api",
+      "iam",
+      "c-lb",
+      "lb-api",
+      "api-iam",
+      "MN-01"
+    ],
+    "docs/reference-minio.md#§4": [
+      "admin",
+      "pool",
+      "api-pool",
+      "admin-pool"
+    ],
+    "docs/reference-minio.md#§3": [
+      "erasure",
+      "heal",
+      "drives",
+      "pool-erasure",
+      "api-erasure",
+      "erasure-drives",
+      "heal-erasure",
+      "heal-drives",
+      "put-object",
+      "drive-failure"
+    ],
+    "docs/reference-minio.md#§5": [
+      "mn-client",
+      "mn-admin",
+      "mn-lb",
+      "mn-server",
+      "mn-disk"
+    ]
+  },
+  "reference": {
+    "kind": "製品・技術のアーキテクチャ",
+    "role": "overview",
+    "domain": "データ保存",
+    "category": "オブジェクトストレージ",
+    "product": "MinIO",
+    "order": 20,
+    "objectives": [
+      "S3 API から消失訂正セットを経てドライブに保存される流れを確認する",
+      "パリティと読み書きのクォーラムによる耐久性の仕組みを確認する",
+      "コミュニティ版と AIStor の提供形態・ライセンスの現状を確認する"
+    ],
+    "sources": [
+      {
+        "title": "MinIO GitHub リポジトリ（README）",
+        "url": "https://github.com/minio/minio"
+      },
+      {
+        "title": "MinIO AIStor Erasure Coding",
+        "url": "https://docs.min.io/enterprise/aistor-object-store/operations/core-concepts/erasure-coding/"
+      },
+      {
+        "title": "MinIO AIStor Linux",
+        "url": "https://docs.min.io/enterprise/aistor-object-store/installation/linux/"
+      },
+      {
+        "title": "MinIO Pricing",
+        "url": "https://www.min.io/pricing"
+      }
+    ]
+  }
+}

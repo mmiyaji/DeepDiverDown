@@ -11,6 +11,19 @@
 
 dbt は変換 SQL を作って投げる側で、処理はウェアハウスが担います。Airflow と Azure Data Factory は処理の順序を管理し、AWS Glue と Google Cloud Dataflow は変換処理そのものを実行します。
 
+## SQL の変換
+
+| 観点 | dbt | SQLMesh |
+| --- | --- | --- |
+| 特徴 | ウェアハウス内の raw データへの **SQL select をモデルとして管理** し、依存を DAG で扱う | **プランで差分を検出** し、バージョン別の物理テーブルを **参照の付け替え** で本番へ昇格する |
+| データモデル・実行モデル | モデルは SQL select。`ref` と `source` から依存順を決め、コンパイルした SQL を **対象のプラットフォームが実行** してテーブルやビューを作る | SQL か Python のモデル 1 つが **1 つのテーブルかビュー**。変更のたびにフィンガープリント付きのスナップショットを作る |
+| 一貫性・耐久性の仕組み | テストでデータを検査する。`manifest.json` にモデル・検査・依存関係を残す。実行状態の保存先は未確認 | **フィンガープリント付きの物理テーブル**。状態は別の保存先に置き、本番では Postgres を推奨。単体テストと監査がある |
+| 拡張のしかた | 接続先ごとのアダプター（dbt-postgres、dbt-redshift など） | Python のモデルとマクロ。ゲートウェイ（`connection`・`state_connection` など）で接続先を設定する |
+| 運用の形態 | dbt Core を CI や ECS で **利用者が運用**。dbt Cloud は未確認 | **利用者が運用する Python プロセスと DB**。マネージド版は未確認 |
+| 得意な用途 | ウェアハウス内の **ELT 変換** | 変更の **影響範囲を計算前に把握** したい変換 |
+| 注意点 | **自前でデータを処理しない**。SQL の実行はウェアハウスが担う | forward-only の変更は、開発環境の出力が **prod に再利用されない**。状態に ClickHouse・Spark・Trino は使えない |
+| ライセンス | 未確認 | Apache License 2.0 |
+
 ## 選び方
 
 - ウェアハウス内の変換を SQL とテストで管理する → **dbt**
@@ -18,6 +31,7 @@ dbt は変換 SQL を作って投げる側で、処理はウェアハウスが�
 - S3 のデータを Spark で変換し、Athena から同じ定義で読む → **AWS Glue**
 - Azure 上の多様なデータストアの間でコピーし、ノーコードで変換する → **Azure Data Factory**
 - Pub/Sub のイベントを集計して BigQuery に出す → **Google Cloud Dataflow**
+- 変更の影響範囲をプランで確認し、計算済みの物理テーブルを付け替えて本番へ出す → **SQLMesh**
 
 対応するデータソース、料金、配置方式、バージョンごとの機能は、各社の資料と契約で確認します。
 
@@ -34,3 +48,8 @@ dbt は変換 SQL を作って投げる側で、処理はウェアハウスが�
 - [Azure Data Factory Mapping data flows](https://learn.microsoft.com/en-us/azure/data-factory/concepts-data-flow-overview)
 - [Dataflow Streaming Engine](https://docs.cloud.google.com/dataflow/docs/streaming-engine)
 - [Dataflow pipeline lifecycle](https://docs.cloud.google.com/dataflow/docs/pipeline-lifecycle)
+- [What is dbt?](https://docs.getdbt.com/docs/introduction)
+- [SQLMesh の概念の概要](https://sqlmesh.readthedocs.io/en/stable/concepts/overview/)
+- [SQLMesh プランの概念](https://sqlmesh.readthedocs.io/en/stable/concepts/plans/)
+- [SQLMesh 設定ガイド](https://sqlmesh.readthedocs.io/en/stable/guides/configuration/)
+- [SQLMesh の GitHub リポジトリ](https://github.com/TobikoData/sqlmesh)

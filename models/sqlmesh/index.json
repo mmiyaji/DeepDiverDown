@@ -1,0 +1,315 @@
+{
+  "model": "sqlmesh",
+  "name": "SQLMesh の SQL 変換と仮想データ環境",
+  "coverage": {
+    "covered": 7,
+    "total": 7
+  },
+  "byId": {
+    "author": {
+      "type": "node",
+      "label": "開発者",
+      "status": "claim"
+    },
+    "project": {
+      "type": "node",
+      "label": "モデルと設定",
+      "status": "claim"
+    },
+    "plan": {
+      "type": "node",
+      "label": "プラン",
+      "status": "claim"
+    },
+    "state": {
+      "type": "node",
+      "label": "状態の保存先",
+      "status": "claim"
+    },
+    "scheduler": {
+      "type": "node",
+      "label": "スケジューラー",
+      "status": "claim"
+    },
+    "checks": {
+      "type": "node",
+      "label": "テストと監査",
+      "status": "claim"
+    },
+    "engine": {
+      "type": "node",
+      "label": "SQL の実行エンジン",
+      "status": "claim"
+    },
+    "physical": {
+      "type": "node",
+      "label": "バージョン別の物理テーブル",
+      "status": "claim"
+    },
+    "envviews": {
+      "type": "node",
+      "label": "環境の参照（仮想データ環境）",
+      "status": "claim"
+    },
+    "consumer": {
+      "type": "node",
+      "label": "下流の利用者",
+      "status": "claim"
+    },
+    "l-write": {
+      "type": "link",
+      "label": "開発者 → モデルと設定",
+      "status": "claim"
+    },
+    "l-diff": {
+      "type": "link",
+      "label": "モデルと設定 → プラン",
+      "status": "claim"
+    },
+    "l-state": {
+      "type": "link",
+      "label": "プラン → 状態の保存先",
+      "status": "claim"
+    },
+    "l-apply": {
+      "type": "link",
+      "label": "プラン → スケジューラー",
+      "status": "claim"
+    },
+    "l-run": {
+      "type": "link",
+      "label": "スケジューラー → SQL の実行エンジン",
+      "status": "claim"
+    },
+    "l-store": {
+      "type": "link",
+      "label": "SQL の実行エンジン → バージョン別の物理テーブル",
+      "status": "claim"
+    },
+    "l-verify": {
+      "type": "link",
+      "label": "スケジューラー → テストと監査",
+      "status": "claim"
+    },
+    "l-audit": {
+      "type": "link",
+      "label": "テストと監査 → SQL の実行エンジン",
+      "status": "claim"
+    },
+    "l-promote": {
+      "type": "link",
+      "label": "プラン → 環境の参照（仮想データ環境）",
+      "status": "claim"
+    },
+    "l-point": {
+      "type": "link",
+      "label": "環境の参照（仮想データ環境） → バージョン別の物理テーブル",
+      "status": "claim"
+    },
+    "l-read": {
+      "type": "link",
+      "label": "下流の利用者 → 環境の参照（仮想データ環境）",
+      "status": "claim"
+    },
+    "change-and-promote": {
+      "type": "scenario",
+      "label": "モデルを変更して dev で確認し、prod へ昇格する"
+    },
+    "SM-01": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "変更の影響を計算前に把握する",
+      "status": "claim"
+    },
+    "SM-02": {
+      "type": "requirement",
+      "kind": "usecase",
+      "label": "データを複製せず環境を昇格する",
+      "status": "claim"
+    },
+    "UNK-01": {
+      "type": "unknown",
+      "label": "スナップショットの命名規則と、環境の参照ビューの具体的な作り方は取得した資料に記載がなく未確認。"
+    },
+    "UNK-02": {
+      "type": "unknown",
+      "label": "最新版の番号は取得した GitHub のページに記載がなく未確認。"
+    },
+    "UNK-03": {
+      "type": "unknown",
+      "label": "マネージド版の有無と提供範囲は未確認。"
+    },
+    "sm-dev": {
+      "type": "implementation",
+      "impl": "onprem-postgres",
+      "label": "開発者",
+      "realizes": [
+        "author"
+      ]
+    },
+    "sm-user": {
+      "type": "implementation",
+      "impl": "onprem-postgres",
+      "label": "下流の利用者",
+      "realizes": [
+        "consumer"
+      ]
+    },
+    "sm-host": {
+      "type": "implementation",
+      "impl": "onprem-postgres",
+      "label": "CI ホスト",
+      "realizes": []
+    },
+    "sm-runner": {
+      "type": "implementation",
+      "impl": "onprem-postgres",
+      "label": "SQLMesh（Python）",
+      "realizes": [
+        "plan",
+        "scheduler",
+        "checks"
+      ]
+    },
+    "sm-config": {
+      "type": "implementation",
+      "impl": "onprem-postgres",
+      "label": "モデルと config.yaml",
+      "realizes": [
+        "project"
+      ]
+    },
+    "sm-wh": {
+      "type": "implementation",
+      "impl": "onprem-postgres",
+      "label": "ウェアハウス用 PostgreSQL",
+      "realizes": [
+        "engine",
+        "physical",
+        "envviews"
+      ]
+    },
+    "sm-state": {
+      "type": "implementation",
+      "impl": "onprem-postgres",
+      "label": "状態用 PostgreSQL",
+      "realizes": [
+        "state"
+      ]
+    }
+  },
+  "byRef": {
+    "docs/reference-sqlmesh.md#§1": [
+      "model"
+    ],
+    "docs/reference-sqlmesh.md": [
+      "model",
+      "author",
+      "project",
+      "plan",
+      "state",
+      "scheduler",
+      "checks",
+      "engine",
+      "physical",
+      "envviews",
+      "consumer",
+      "l-write",
+      "l-diff",
+      "l-state",
+      "l-apply",
+      "l-run",
+      "l-store",
+      "l-verify",
+      "l-audit",
+      "l-promote",
+      "l-point",
+      "l-read",
+      "change-and-promote",
+      "SM-01",
+      "SM-02",
+      "sm-dev",
+      "sm-user",
+      "sm-host",
+      "sm-runner",
+      "sm-config",
+      "sm-wh",
+      "sm-state"
+    ],
+    "docs/reference-sqlmesh.md#§3": [
+      "author",
+      "plan",
+      "l-diff",
+      "l-apply",
+      "change-and-promote",
+      "SM-01"
+    ],
+    "docs/reference-sqlmesh.md#§2": [
+      "project",
+      "l-write"
+    ],
+    "docs/reference-sqlmesh.md#§5": [
+      "state",
+      "scheduler",
+      "engine",
+      "l-state",
+      "l-run"
+    ],
+    "docs/reference-sqlmesh.md#§6": [
+      "checks",
+      "l-verify",
+      "l-audit"
+    ],
+    "docs/reference-sqlmesh.md#§4": [
+      "physical",
+      "envviews",
+      "consumer",
+      "l-store",
+      "l-promote",
+      "l-point",
+      "l-read",
+      "SM-02"
+    ],
+    "docs/reference-sqlmesh.md#§7": [
+      "sm-dev",
+      "sm-user",
+      "sm-host",
+      "sm-runner",
+      "sm-config",
+      "sm-wh",
+      "sm-state"
+    ]
+  },
+  "reference": {
+    "kind": "製品・技術のアーキテクチャ",
+    "role": "overview",
+    "domain": "データ処理",
+    "category": "変換とオーケストレーション",
+    "product": "SQLMesh",
+    "order": 11,
+    "compare": "SQL の変換",
+    "objectives": [
+      "プランが変更の影響範囲を計算前に示すことを確認する",
+      "バージョン別の物理テーブルと環境の参照の関係を確認する",
+      "状態の保存先とウェアハウスを分ける理由を確認する"
+    ],
+    "sources": [
+      {
+        "title": "SQLMesh の概念の概要",
+        "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/overview/"
+      },
+      {
+        "title": "プランの概念",
+        "url": "https://sqlmesh.readthedocs.io/en/stable/concepts/plans/"
+      },
+      {
+        "title": "設定ガイド",
+        "url": "https://sqlmesh.readthedocs.io/en/stable/guides/configuration/"
+      },
+      {
+        "title": "SQLMesh の GitHub リポジトリ",
+        "url": "https://github.com/TobikoData/sqlmesh"
+      }
+    ]
+  }
+}

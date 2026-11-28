@@ -1,0 +1,116 @@
+name: Materialize のストリーミング SQL と増分ビュー
+description: 外部データ源の変更を取り込み、クラスタ上のインデックスとマテリアライズドビューを増分で保つストリーミングデータベース。balancerd・environmentd・clusterd の役割と BSL ライセンスを示す。
+reference:
+  objectives: [balancerd・environmentd・clusterd の役割を区別する, ソースからビュー・インデックス・シンクまでの流れを確認する, クラスタとレプリカの意味とライセンスの条件を確認する]
+  sources:
+    - {title: Materialize concepts, url: https://materialize.com/docs/concepts/}
+    - {title: Clusters, url: https://materialize.com/docs/concepts/clusters/}
+    - {title: Sources, url: https://materialize.com/docs/concepts/sources/}
+    - {title: Self-managed deployments, url: https://materialize.com/docs/self-managed-deployments/}
+    - {title: Materialize LICENSE, url: https://github.com/MaterializeInc/materialize/blob/main/LICENSE}
+sources: [docs/reference-materialize.md]
+evidence: [{type: doc, ref: docs/reference-materialize.md#§1}]
+tiers:
+  - {id: flow, label: 接続・計算・保存, z: 0, size: [32, 14]}
+nodes:
+  client: {label: SQL クライアント, kind: client, tier: flow, x: 1, y: 2, description: pgwire（PostgreSQL 互換）や HTTP で接続し、SELECT や SUBSCRIBE を送る。, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  balancerd: {label: balancerd, kind: service, tier: flow, x: 8, y: 2, description: pgwire と HTTP のプロキシ。接続を environmentd へ振り分ける。, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  environmentd: {label: environmentd, kind: scheduler, tier: flow, x: 15, y: 2, description: データベースの制御プレーン。, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  operator: {label: Materialize Operator, kind: scheduler, tier: flow, x: 22, y: 2, description: Helm で配置する orchestratord。カスタムリソースから Materialize のインスタンスを作って管理する。, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  upstream: {label: 外部のデータ源, kind: external, tier: flow, x: 1, y: 7, description: PostgreSQL・MySQL・SQL Server の CDC、Kafka・Redpanda、Webhook など。, evidence: [{type: doc, ref: docs/reference-materialize.md#§4}]}
+  clusterd: {label: クラスタ（clusterd）, kind: worker, tier: flow, x: 15, y: 7, replicas: 2, description: CPU・メモリ・スクラッチディスクの計算資源。ソース、シンク、インデックス、マテリアライズドビュー、SELECT・SUBSCRIBE が動く。レプリカは同じ処理を行う冗長なコピー。, evidence: [{type: doc, ref: docs/reference-materialize.md#§3}]}
+  index: {label: インデックス（Arrangement）, kind: table, tier: flow, x: 22, y: 5, description: ビューの結果をメモリに置き、増分で更新する。, evidence: [{type: doc, ref: docs/reference-materialize.md#§5}]}
+  mv: {label: マテリアライズドビュー, kind: table, tier: flow, x: 22, y: 9, description: クエリ結果を増分で保つ。保存先の詳細は未確認。, evidence: [{type: doc, ref: docs/reference-materialize.md#§5}]}
+  storage: {label: ストレージ層, kind: db, tier: flow, x: 15, y: 12, description: ハイドレーションで、メモリ上の状態の作り直しに使われる。実体は未確認。, evidence: [{type: doc, ref: docs/reference-materialize.md#§5}]}
+  sink: {label: シンクの宛先, kind: external, tier: flow, x: 29, y: 7, description: Materialize が書き出す先の外部システム。, evidence: [{type: doc, ref: docs/reference-materialize.md#§6}]}
+links:
+  - {id: c-bal, from: client, to: balancerd, label: 接続・クエリを送信, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  - {id: bal-env, from: balancerd, to: environmentd, label: 接続を振り分け, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  - {id: op-env, from: operator, to: environmentd, label: インスタンスを作成・管理, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  - {id: env-cl, from: environmentd, to: clusterd, label: クラスタを制御, evidence: [{type: doc, ref: docs/reference-materialize.md#§2}]}
+  - {id: src-cl, from: upstream, to: clusterd, label: 変更を取り込み, evidence: [{type: doc, ref: docs/reference-materialize.md#§4}]}
+  - {id: cl-idx, from: clusterd, to: index, label: 増分で更新, evidence: [{type: doc, ref: docs/reference-materialize.md#§5}]}
+  - {id: cl-mv, from: clusterd, to: mv, label: 増分で更新, evidence: [{type: doc, ref: docs/reference-materialize.md#§5}]}
+  - {id: st-cl, from: storage, to: clusterd, label: ハイドレーションで状態を再構築, evidence: [{type: doc, ref: docs/reference-materialize.md#§5}]}
+  - {id: cl-sink, from: clusterd, to: sink, label: 結果を書き出し, evidence: [{type: doc, ref: docs/reference-materialize.md#§6}]}
+scenarios:
+  - id: ingest-and-serve
+    label: 変更を取り込んでビューを保ち、読む
+    evidence: [{type: doc, ref: docs/reference-materialize.md#§6}]
+    steps:
+      - {links: [c-bal, bal-env], note: クライアントが balancerd に接続し、environmentd へ渡る。}
+      - {links: [src-cl], note: ソースを動かすクラスタが上流の変更を取り込む。作成時はスナップショットを取る。}
+      - {links: [cl-idx, cl-mv], note: クラスタがインデックスとマテリアライズドビューを増分で更新する。}
+      - {links: [cl-sink], note: シンクが結果を外部へ書き出す。}
+requirements:
+  - {id: MZ-01, kind: usecase, title: 変化するデータを SQL のビューで常に最新に保つ, text: 上流の変更を取り込み、ビューの結果を増分で更新して SELECT や SUBSCRIBE で読める。, links: [src-cl, cl-idx, cl-mv], evidence: [{type: doc, ref: docs/reference-materialize.md#§5}]}
+unknowns:
+  - id: UNK-01
+    text: メタデータの保存先と、永続化に使うストレージ（PostgreSQL・S3 互換など）は取得した資料に記載がなく未確認。
+    refs: [storage, environmentd]
+  - id: UNK-02
+    text: タイムスタンプの付け方、一貫性の保証、内部の計算モデルは取得した資料に記載がなく未確認。
+    refs: [clusterd, mv]
+  - id: UNK-03
+    text: 上限（メモリ 24 GiB・ディスク 48 GiB 未満）を超える自前運用の条件と、ライセンスキーの要否は未確認。クラウド版の内部構成は取得していない。
+    refs: [environmentd]
+gates: {maxDrift: 0, maxHigh: 0}
+implementations:
+  - id: onprem-k8s
+    label: 自前の Kubernetes 上の Materialize
+    description: 自前のサーバー群の Kubernetes に Helm チャートで Operator を配置し、balancerd・environmentd・clusterd を動かす例。代表例であり、導入事例ではない。
+    sources:
+      - {title: Self-managed deployments, url: https://materialize.com/docs/self-managed-deployments/}
+      - {title: Clusters, url: https://materialize.com/docs/concepts/clusters/}
+      - {title: Sources, url: https://materialize.com/docs/concepts/sources/}
+    tiers:
+      - {id: diagram, label: クライアント・Materialize・外部, z: 0, size: [32, 13]}
+    nodes:
+      mz-client: {label: SQL クライアント, kind: client, tier: diagram, x: 1, y: 2, realizes: [client], description: pgwire 対応のクライアントや console。, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      mz-upstream: {label: 外部のデータ源, kind: external, tier: diagram, x: 1, y: 7, realizes: [upstream], description: Kafka や PostgreSQL など。実行場所は資料で指定されていない。, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      mz-balancerd: {label: balancerd（Deployment）, kind: service, tier: diagram, x: 8, y: 2, realizes: [balancerd], description: 接続を environmentd へ振り分ける。, management: {type: customer, scope: "Customer operates Kubernetes, the Helm release and configuration."}, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      mz-env: {label: environmentd（StatefulSet）, kind: scheduler, tier: diagram, x: 15, y: 2, realizes: [environmentd], description: 制御プレーン。, management: {type: customer, scope: "Customer operates Kubernetes, the Helm release and configuration."}, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      mz-operator: {label: Materialize Operator, kind: scheduler, tier: diagram, x: 22, y: 2, realizes: [operator], description: orchestratord。カスタムリソースからインスタンスを管理する。, management: {type: customer, scope: "Customer operates Kubernetes, the Helm release and configuration."}, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      mz-cluster: {label: clusterd（StatefulSet）, kind: worker, tier: diagram, x: 15, y: 7, realizes: [clusterd, index, mv], description: ソース・インデックス・マテリアライズドビュー・シンクを動かし、レプリカを複数持てる。, management: {type: customer, scope: "Customer operates Kubernetes, the Helm release and configuration."}, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      mz-storage: {label: ストレージ層（実体は未確認）, kind: db, tier: diagram, x: 15, y: 11, realizes: [storage], description: 永続化の置き場所。資料で確認できていない。, management: {type: customer, scope: "Customer operates the storage backing Materialize."}, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      mz-sink: {label: シンクの宛先, kind: external, tier: diagram, x: 29, y: 7, realizes: [sink], description: 結果の書き出し先。, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+    links:
+      - {id: mz-req, from: mz-client, to: mz-balancerd, label: 接続・クエリを送信, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      - {id: mz-route, from: mz-balancerd, to: mz-env, label: 接続を振り分け, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      - {id: mz-op, from: mz-operator, to: mz-env, label: インスタンスを管理, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      - {id: mz-ctl, from: mz-env, to: mz-cluster, label: クラスタを制御, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      - {id: mz-ing, from: mz-upstream, to: mz-cluster, label: 変更を取り込み, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      - {id: mz-hyd, from: mz-storage, to: mz-cluster, label: 状態を再構築, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+      - {id: mz-out, from: mz-cluster, to: mz-sink, label: 結果を書き出し, evidence: [{type: doc, ref: docs/reference-materialize.md#§7}]}
+    groups:
+      - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [mz-balancerd, mz-env, mz-operator, mz-cluster, mz-storage]}
+    layout2d:
+      tiers:
+        - {id: diagram, label: クライアント・Materialize・外部, z: 0, size: [32, 13]}
+      nodes:
+        mz-client: {tier: diagram, x: 1, y: 2}
+        mz-upstream: {tier: diagram, x: 1, y: 7}
+        mz-balancerd: {tier: diagram, x: 8, y: 2}
+        mz-env: {tier: diagram, x: 15, y: 2}
+        mz-operator: {tier: diagram, x: 22, y: 2}
+        mz-cluster: {tier: diagram, x: 15, y: 7}
+        mz-storage: {tier: diagram, x: 15, y: 11}
+        mz-sink: {tier: diagram, x: 29, y: 7}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: diagram, nodes: [mz-balancerd, mz-env, mz-operator, mz-cluster, mz-storage]}
+    layout3d:
+      tiers:
+        - {id: clients, label: クライアント・データ源, z: 0, size: [6, 11]}
+        - {id: servers, label: Materialize, z: 0, origin: [8, 0], size: [18, 11]}
+        - {id: egress, label: 外部の出力先, kind: origin, z: 0, origin: [28, 0], size: [5, 11]}
+      nodes:
+        mz-client: {tier: clients, x: 3, y: 2}
+        mz-upstream: {tier: clients, x: 3, y: 7}
+        mz-balancerd: {tier: servers, x: 2, y: 2}
+        mz-env: {tier: servers, x: 9, y: 2}
+        mz-operator: {tier: servers, x: 15, y: 2}
+        mz-cluster: {tier: servers, x: 9, y: 6}
+        mz-storage: {tier: servers, x: 9, y: 9.5}
+        mz-sink: {tier: egress, x: 2.5, y: 6}
+      groups:
+        - {kind: datacenter, label: 自前のサーバー群, provider: onprem, tier: [servers], nodes: [mz-balancerd, mz-env, mz-operator, mz-cluster, mz-storage]}
