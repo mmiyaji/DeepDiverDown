@@ -42,5 +42,5 @@ const index = JSON.parse(fs.readFileSync(path.join(root, 'models/research-index.
 const ids = new Set(registry.map(entry => entry.id));
 index.entries = index.entries.filter(entry => ids.has(entry.id)).map(entry => ({ ...entry, documents: (entry.documents || []).filter(doc => /^docs\/reference-[a-z0-9-]+\.md$/.test(doc) && fs.existsSync(path.join(out, doc))) }));
 fs.writeFileSync(path.join(out, 'models/research-index.json'), JSON.stringify(index, null, 2) + '\n');
-fs.writeFileSync(path.join(out, '_headers'), "/*\n  Cache-Control: public, max-age=0, must-revalidate\n  X-Content-Type-Options: nosniff\n/icons/*\n  Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox\n");
+fs.writeFileSync(path.join(out, '_headers'), "/*\n  Cache-Control: public, max-age=0, must-revalidate\n  X-Content-Type-Options: nosniff\n/*.md\n  Content-Type: text/plain; charset=utf-8\n/*.yaml\n  Content-Type: text/plain; charset=utf-8\n/icons/*\n  Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox\n");
 console.log(`Prepared ${registry.length} references in ${out}`);
